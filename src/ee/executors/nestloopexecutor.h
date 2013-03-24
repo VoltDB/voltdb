@@ -68,7 +68,7 @@ class NestLoopExecutor : public AbstractExecutor {
                     TempTableLimits* limits);
         bool p_execute(const NValueArray &params);
 
-        StandaloneTuple m_null_tuple;
+        StandAloneTupleStorage m_null_tuple;
 };
 
 }

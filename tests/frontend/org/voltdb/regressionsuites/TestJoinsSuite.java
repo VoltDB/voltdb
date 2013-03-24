@@ -27,6 +27,7 @@ import java.io.IOException;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
@@ -254,6 +255,232 @@ public void testThreeTableIndexInnerMultiJoin() throws NoConnectionsException, I
           "@AdHoc", "select * FROM P3 JOIN R1 ON P3.A = R1.A JOIN R2 ON P3.F = R2.C WHERE P3.A > 0")
                            .getResults()[0];
   assertEquals(1, result.getRowCount());
+}
+
+  /**
+  * Two table left and right NLJ
+  * @throws NoConnectionsException
+  * @throws IOException
+  * @throws ProcCallException
+  */
+  public void testSeqOuterJoin() throws NoConnectionsException, IOException, ProcCallException {
+    Client client = this.getClient();
+    client.callProcedure("InsertR1", 1, 1, 1);
+    client.callProcedure("InsertR1", 1, 2, 1);
+    client.callProcedure("InsertR1", 2, 2, 2);
+    client.callProcedure("InsertR1", -1, 3, 3);
+    // R1 1st joined with R2 null
+    // R1 2nd joined with R2 null
+    // R1 3rd joined with R2 null
+    // R1 4th joined with R2 null
+    VoltTable result = client.callProcedure(
+            "@AdHoc", "select * FROM R1 LEFT JOIN R2 ON R1.A = R2.C")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(4, result.getRowCount());
+    VoltTableRow row = result.fetchRow(2);
+    assertEquals(2, row.getLong(1));
+
+    client.callProcedure("InsertR2", 1, 1);
+    client.callProcedure("InsertR2", 1, 3);
+    client.callProcedure("InsertR2", 3, null);
+    // R1 1st joined with R2 1st
+    // R1 2nd joined with R2 1st
+    // R1 3rd joined with R2 null
+    // R1 4th joined with R2 null
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM R1 LEFT JOIN R2 ON R1.A = R2.C")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(4, result.getRowCount());
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM R2 RIGHT JOIN R1 ON R1.A = R2.C")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(4, result.getRowCount());
+
+    // R1 1st joined with R2 with R2 1st
+    // R1 2nd joined with R2 null (failed R1.C = 1)
+    // R1 3rd joined with R2 null (failed  R1.A = R2.C)
+    // R1 4th3rd joined with R2 null (failed  R1.A = R2.C)
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM R1 LEFT JOIN R2 ON R1.A = R2.C AND R1.C = 1")
+                             .getResults()[0];
+    assertEquals(4, result.getRowCount());
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM R2 RIGHT JOIN R1 ON R1.A = R2.C AND R1.C = 1")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(4, result.getRowCount());
+
+    // R1 1st joined with R2 null - eliminated by the second join condition
+    // R1 2nd joined with R2 null
+    // R1 3rd joined with R2 null
+    // R1 4th joined with R2 null
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM R1 LEFT JOIN R2 ON R1.A = R2.C AND R2.A = 100")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(4, result.getRowCount());
+
+    // R1 1st - eliminated by the filter condition
+    // R1 2nd - eliminated by the filter condition
+    // R1 3rd - eliminated by the filter condition
+    // R1 4th - eliminated by the filter condition
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM R1 LEFT JOIN R2 ON R1.A = R2.C WHERE R2.A = 100")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(0, result.getRowCount());
+
+    // R1 1st - joined with R2 1st row
+    // R1 2nd - joined with R2 null eliminated by the filter condition
+    // R1 3rd - joined with R2 null eliminated by the filter condition
+    // R1 4th - joined with R2 null eliminated by the filter condition
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM R1 LEFT JOIN R2 ON R1.A = R2.C WHERE R1.C = 1")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(1, result.getRowCount());
+
+    // R1 1st - eliminated by the filter condition
+    // R1 2nd - eliminated by the filter condition
+    // R1 3rd - eliminated by the filter condition
+    // R1 3rd - joined with the R2 null
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM R1 LEFT JOIN R2 ON R1.A = R2.C WHERE R1.A = -1")
+                             .getResults()[0];
+    assertEquals(1, result.getRowCount());
+    System.out.println(result.toString());
+
+    // R1 1st - joined with the R2
+    // R1 1st - joined with the R2
+    // R1 2nd - eliminated by the filter condition
+    // R1 3rd - eliminated by the filter condition
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM R1 LEFT JOIN R2 ON R1.A = R2.C WHERE R1.A = 1")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(2, result.getRowCount());
+
+    // R1 1st - eliminated by the filter condition
+    // R1 2nd - eliminated by the filter condition
+    // R1 3rd - joined with R2 null and eliminated by the filter condition
+    // R1 4th - joined with R2 null and eliminated by the filter condition
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM R1 LEFT JOIN R2 ON R1.A = R2.C WHERE R2.A = 2")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(0, result.getRowCount());
+
+    // R1 1st - eliminated by the filter condition
+    // R1 2nd - eliminated by the filter condition
+    // R1 3rd - joined with R2 null and pass the filter
+    // R1 4th - joined with R2 null and pass the filter
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM R1 LEFT JOIN R2 ON R1.A = R2.C WHERE R2.A is NULL")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(2, result.getRowCount());
+}
+
+  /**
+  * Two table left and right NLIJ
+  * @throws NoConnectionsException
+  * @throws IOException
+  * @throws ProcCallException
+  */
+  public void testIndexOuterJoin() throws NoConnectionsException, IOException, ProcCallException {
+    Client client = this.getClient();
+    client.callProcedure("InsertR2", 1, 1);
+    client.callProcedure("InsertR2", 2, 2);
+    client.callProcedure("InsertR2", 3, 3);
+    client.callProcedure("InsertR2", 4, 4);
+    // R2 1st joined with R3 null
+    // R2 2nd joined with R3 null
+    // R2 3rd joined with R3 null
+    // R2 4th joined with R3 null
+    VoltTable result = client.callProcedure(
+            "@AdHoc", "select * FROM R2 LEFT JOIN R3 ON R3.A = R2.A")
+                             .getResults()[0];
+    VoltTableRow row = result.fetchRow(2);
+    assertEquals(3, row.getLong(1));
+    System.out.println(result.toString());
+    assertEquals(4, result.getRowCount());
+
+    client.callProcedure("InsertR3", 1, 1);
+    client.callProcedure("InsertR3", 2, 2);
+    client.callProcedure("InsertR3", 5, 5);
+
+    // R2 1st joined with R3 1st
+    // R2 2nd joined with R3 2nd
+    // R2 3rd joined with R3 null
+    // R2 4th joined with R3 null
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM R2 LEFT JOIN R3 ON R3.A = R2.A")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(4, result.getRowCount());
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM R3 RIGHT JOIN R2 ON R3.A = R2.A")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(4, result.getRowCount());
+
+    // R2 1st joined with R3 NULL R2.C < 0
+    // R2 2nd joined with R3 null R2.C < 0
+    // R2 3rd joined with R3 null R2.C < 0
+    // R2 4th joined with R3 null R2.C < 0
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM R2 LEFT JOIN R3 ON R3.A = R2.A AND R2.C < 0")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(4, result.getRowCount());
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM R3 RIGHT JOIN R2 ON R3.A = R2.A AND R2.C < 0")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(4, result.getRowCount());
+
+    // R2 1st joined with R3 null (eliminated by  R3.A > 1
+    // R2 2nd joined with R3 2nd
+    // R2 3rd joined with R3 null
+    // R2 4th joined with R3 null
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM R2 LEFT JOIN R3 ON R3.A = R2.A AND R3.A > 1")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(4, result.getRowCount());
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM R3 RIGHT JOIN R2 ON R3.A = R2.A AND R3.A > 1")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(4, result.getRowCount());
+
+    // R2 1st joined with R3 1st  but eliminated by  R3.A > 1
+    // R2 2nd joined with R3 2nd
+    // R2 3rd joined with R3 null but eliminated by  R3.A > 1
+    // R2 4th joined with R3 null but eliminated by  R3.A > 1
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM R2 LEFT JOIN R3 ON R3.A = R2.A WHERE R3.A > 1")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(1, result.getRowCount());
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM R3 RIGHT JOIN R2 ON R3.A = R2.A WHERE R3.A > 1")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(1, result.getRowCount());
+
+    // R2 1st eliminated by R2.C < 0
+    // R2 2nd eliminated by R2.C < 0
+    // R2 3rd eliminated by R2.C < 0
+    // R2 4th eliminated by R2.C < 0
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM R2 LEFT JOIN R3 ON R3.A = R2.A WHERE R2.C < 0")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(0, result.getRowCount());
 }
 
     static public junit.framework.Test suite() {

@@ -19,11 +19,10 @@ package org.voltdb.planner;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -37,46 +36,12 @@ import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.JoinTree.JoinNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 
 public abstract class AbstractParsedStmt {
-
-    public static class TablePair {
-        public Table t1;
-        public Table t2;
-
-        @Override
-        public boolean equals(Object obj) {
-            if ((obj instanceof TablePair) == false)
-                return false;
-            TablePair tp = (TablePair)obj;
-
-            return (((t1 == tp.t1) && (t2 == tp.t2)) ||
-                    ((t1 == tp.t2) && (t2 == tp.t1)));
-        }
-
-        @Override
-        public int hashCode() {
-            assert((t1.hashCode() ^ t2.hashCode()) == (t2.hashCode() ^ t1.hashCode()));
-
-            return t1.hashCode() ^ t2.hashCode();
-        }
-    }
-
-    public class JoinInfo {
-        public JoinType joinType = JoinType.INVALID;
-        public AbstractExpression joinExpr = null;
-        public AbstractExpression whereExpr = null;
-
-        JoinInfo(JoinType joinType, AbstractExpression joinExpr, AbstractExpression  whereExpr) {
-            this.joinType = joinType;
-            this.joinExpr = joinExpr;
-            this.whereExpr = whereExpr;
-        }
-    }
-
 
     public String sql;
 
@@ -86,25 +51,14 @@ public abstract class AbstractParsedStmt {
 
     public ArrayList<Table> tableList = new ArrayList<Table>();
 
-    public AbstractExpression where = null;
-
-    public ArrayList<AbstractExpression> whereSelectionList = new ArrayList<AbstractExpression>();
+    public HashMap<AbstractExpression, Set<AbstractExpression> > valueEquivalence = new HashMap<AbstractExpression, Set<AbstractExpression>>();
 
     public ArrayList<AbstractExpression> noTableSelectionList = new ArrayList<AbstractExpression>();
 
     public ArrayList<AbstractExpression> multiTableSelectionList = new ArrayList<AbstractExpression>();
 
-    public HashMap<Table, ArrayList<AbstractExpression>> tableFilterList = new HashMap<Table, ArrayList<AbstractExpression>>();
-
-    public HashMap<TablePair, ArrayList<AbstractExpression>> joinSelectionList = new HashMap<TablePair, ArrayList<AbstractExpression>>();
-
-    public HashMap<AbstractExpression, Set<AbstractExpression> > valueEquivalence = new HashMap<AbstractExpression, Set<AbstractExpression>>();
-
-    // @TODO temp solution to carry additional join info
-    // So far only two table outer (left/right) join is supported. Capturing just the join type is enough to guarantee the right join order
-    // This would also work when more than two tables are involved but only two of them are joined with outer join
-    // because of the join order associativity (T1 inner T2) left/right T3 = T1 inner (T2 left/right T3)
-    public HashMap<Table, JoinInfo> tableJoinList = new HashMap<Table, JoinInfo>();
+    // Hierarchical join representation
+    public JoinTree joinTree = new JoinTree();
 
     //User specified join order, null if none is specified
     public String joinOrder = null;
@@ -212,11 +166,8 @@ public abstract class AbstractParsedStmt {
      * @param joinOrder
      */
     void postParse(String sql, String joinOrder) {
-        // split up the where expression into categories
-        this.analyzeWhereExpression();
-        // these just shouldn't happen right?
-        assert(this.multiTableSelectionList.size() == 0);
-        assert(this.noTableSelectionList.size() == 0);
+        // collect value equivalence expressions
+        this.analyzeValueEquivalence();
 
         this.sql = sql;
         this.joinOrder = joinOrder;
@@ -501,21 +452,7 @@ public abstract class AbstractParsedStmt {
      * Build a combined WHERE expressions for the entire statement.
      */
     public AbstractExpression  getCombinedFilterExpression() {
-        ArrayList<AbstractExpression> exprList = new ArrayList<AbstractExpression>();
-        for (Map.Entry<Table, JoinInfo> joinEntry : tableJoinList.entrySet()) {
-            JoinInfo joinInfo = joinEntry.getValue();
-            if (joinInfo.joinExpr != null) {
-                exprList.add(joinInfo.joinExpr);
-            }
-            if (joinInfo.whereExpr != null) {
-                exprList.add(joinInfo.whereExpr);
-            }
-        }
-        AbstractExpression where = ExpressionUtil.combine(exprList);
-        if (where != null) {
-            where = ExpressionUtil.eliminateDuplicates(where);
-        }
-        return where;
+        return joinTree.getCombinedExpression();
     }
 
     /**
@@ -560,21 +497,48 @@ public abstract class AbstractParsedStmt {
        String tableName = tableNode.attributes.get("table");
        Table table = getTableFromDB(tableName);
        assert(table != null);
-       JoinInfo joinInfo = parseTableConditions(tableNode);
+
+       JoinType joinType = JoinType.get(tableNode.attributes.get("jointype"));
+       assert(joinType != JoinType.INVALID);
+       if (joinType == JoinType.FULL) {
+           throw new PlanningErrorException("VoltDB does not support full outer joins");
+       }
+
+       List<AbstractExpression> exprs = parseTableConditions(tableNode);
+       assert(exprs.size() == 2);
+
        tableList.add(table);
-       tableJoinList.put(table, joinInfo);
+       // @TODO ENG_3038 This method of building a tree works for inner joins only
+       // or outer join with only two tables involved
+       if (joinTree == null) {
+           joinTree = new JoinTree();
+       }
+       JoinNode joinNode = new JoinNode(table, joinType, exprs.get(0), exprs.get(1));
+       if (joinTree.m_root == null) {
+           // this is the first table
+           joinTree.m_root = joinNode;
+       } else {
+           // Build the tree by attaching the next table always to the right
+           JoinNode node = new JoinNode();
+           node.m_leftNode = joinTree.m_root;
+           node.m_rightNode = joinNode;
+           joinTree.m_root = node;
+       }
+       if (joinType != JoinType.INNER) {
+           joinTree.m_hasOuterJoin  = true;
+       }
    }
 
     /**
      *
      * @param tablesNode
+     *
      */
     private void parseTables(VoltXMLElement tablesNode) {
         Set<Table> visited = new HashSet<Table>(tableList);
 
         // temp restriction on number of outer joins
         int tableCount = 0;
-        boolean hasOuter = false;
         for (VoltXMLElement node : tablesNode.children) {
             if (node.name.equalsIgnoreCase("tablescan")) {
 
@@ -589,22 +553,12 @@ public abstract class AbstractParsedStmt {
                     visited.add(table);
                 }
 
-                String joinTypeStr = node.attributes.get("jointype");
-                assert(joinTypeStr != null);
-                JoinType joinType = JoinType.get(joinTypeStr);
-                assert(joinType != JoinType.INVALID);
-                if (joinType == JoinType.FULL) {
-                    throw new PlanningErrorException("VoltDB does not support full outer joins");
-                }
-                if (joinType != JoinType.INNER) {
-                    hasOuter = true;
-                }
+                parseTable(node);
+
                 ++tableCount;
-                if (hasOuter && tableCount > 2) {
+                if (joinTree.m_hasOuterJoin && tableCount > 2) {
                     throw new PlanningErrorException("VoltDB does not support outer joins with more than two tables involved");
                 }
-
-                parseTable(node);
             }
         }
     }
@@ -625,86 +579,210 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
+     * Collect value equivalence expressions across the entire SQL
      */
-    void analyzeWhereExpression() {
-
-        ArrayDeque<AbstractExpression> in = new ArrayDeque<AbstractExpression>();
-        ArrayDeque<AbstractExpression> out = new ArrayDeque<AbstractExpression>();
-        // Iterate over the tables to collect their join and where expressions
-        for (Map.Entry<Table, AbstractParsedStmt.JoinInfo> tableJoinInfo : this.tableJoinList.entrySet()) {
-            AbstractParsedStmt.JoinInfo joinInfo = tableJoinInfo.getValue();
-            if (joinInfo.joinExpr != null) {
-                in.add(joinInfo.joinExpr);
-            }
-            if (joinInfo.whereExpr != null) {
-                in.add(joinInfo.whereExpr);
-            }
-        }
-
-        // this first chunk of code breaks the code into a list of expression that
-        // all have to be true for the where clause to be true
-        AbstractExpression inExpr = null;
-        while ((inExpr = in.poll()) != null) {
-            if (inExpr.getExpressionType() == ExpressionType.CONJUNCTION_AND) {
-                in.add(inExpr.getLeft());
-                in.add(inExpr.getRight());
-            }
-            else {
-                out.add(inExpr);
-            }
-        }
-        // nothing to do if there's no where expression
-        if (out.isEmpty()) {
+    void analyzeValueEquivalence() {
+        if (joinTree == null || joinTree.m_root == null) {
             return;
         }
-
-        // the where selection list contains all the clauses
-        whereSelectionList.addAll(out);
-        this.analyzeWhereExpression(whereSelectionList);
+        // collect individual where/join expressions
+        Collection<AbstractExpression> exprList = joinTree.getAllExpressions();
+        analyzeValueEquivalence(exprList);
     }
 
     /**
      */
-void analyzeWhereExpression(ArrayList<AbstractExpression> whereList) {
-        // This next bit of code identifies which tables get classified how
+    void analyzeValueEquivalence(Collection<AbstractExpression> exprList) {
+        for (AbstractExpression expr : exprList) {
+            addExprToEquivalenceSets(expr);
+        }
+    }
+
+    /**
+     * Analyze join and filter expressions for a given join tree
+     */
+    void analyzeTreeExpressions(JoinTree joinTree) {
+        if (joinTree.m_hasOuterJoin) {
+            analyzeOuterJoinExpressions(joinTree.m_root);
+        } else {
+            analyzeInnerJoinExpressions(joinTree);
+        }
+        joinTree.m_wasAnalyzed = true;
+        // these just shouldn't happen right?
+        assert(multiTableSelectionList.size() == 0);
+        assert(noTableSelectionList.size() == 0);
+    }
+
+    /**
+     * Analyze inner join expressions
+     */
+    void analyzeInnerJoinExpressions(JoinTree nextJoinTree) {
+        assert (!nextJoinTree.m_hasOuterJoin);
+        // Inner join optimization: The join filters need to be analyzed only once
+        // for all possible join orders
+        if (joinTree.m_wasAnalyzed == false) {
+            // Collect all expressions
+            Collection<AbstractExpression> exprList = joinTree.getAllExpressions();
+            // This next bit of code identifies which tables get classified how
+            HashSet<Table> tableSet = new HashSet<Table>();
+            for (AbstractExpression expr : exprList) {
+                tableSet.clear();
+                getTablesForExpression(expr, tableSet);
+                if (tableSet.size() == 0) {
+                    noTableSelectionList.add(expr);
+                }
+                else if (tableSet.size() == 1) {
+                    Table table = (Table) tableSet.toArray()[0];
+
+                    ArrayList<AbstractExpression> exprs;
+                    if (joinTree.m_tableFilterList.containsKey(table)) {
+                        exprs = joinTree.m_tableFilterList.get(table);
+                    }
+                    else {
+                        exprs = new ArrayList<AbstractExpression>();
+                        joinTree.m_tableFilterList.put(table, exprs);
+                    }
+                    expr.m_isJoiningClause = false;
+                    exprs.add(expr);
+                }
+                else if (tableSet.size() == 2) {
+                    JoinTree.TablePair pair = new JoinTree.TablePair();
+                    pair.t1 = (Table) tableSet.toArray()[0];
+                    pair.t2 = (Table) tableSet.toArray()[1];
+
+                    ArrayList<AbstractExpression> exprs;
+                    if (joinTree.m_joinSelectionList.containsKey(pair)) {
+                        exprs = joinTree.m_joinSelectionList.get(pair);
+                    }
+                    else {
+                        exprs = new ArrayList<AbstractExpression>();
+                        joinTree.m_joinSelectionList.put(pair, exprs);
+                    }
+                    expr.m_isJoiningClause = true;
+                    exprs.add(expr);
+                }
+                else if (tableSet.size() > 2) {
+                    multiTableSelectionList.add(expr);
+                }
+            }
+            // Mark the join tree analyzed
+            joinTree.m_wasAnalyzed = true;
+       }
+        nextJoinTree.m_tableFilterList = joinTree.m_tableFilterList;
+        nextJoinTree.m_joinSelectionList = joinTree.m_joinSelectionList;
+    }
+
+    /**
+     * Analyze outer join expressions
+     */
+    void analyzeOuterJoinExpressions(JoinNode joinNode) {
+        assert (joinNode != null);
+        assert(joinNode.m_leftNode != null && joinNode.m_rightNode != null);
+        if (joinNode.m_leftNode.m_table == null) {
+            // The left node is not the leaf. Descend there
+            analyzeOuterJoinExpressions(joinNode.m_leftNode);
+        }
+        if (joinNode.m_rightNode.m_table == null) {
+            // The right node is not the leaf. Descend there
+            analyzeOuterJoinExpressions(joinNode.m_rightNode);
+        }
+
+        // At this moment all RIGHT joins are already converted to the LEFT ones
+        assert (joinNode.m_rightNode.m_joinType == JoinType.LEFT || joinNode.m_rightNode.m_joinType == JoinType.INNER);
+        assert (joinNode.m_leftNode.m_joinType == JoinType.INNER);
+
+        ArrayList<AbstractExpression> joinList = new ArrayList<AbstractExpression>();
+        ArrayList<AbstractExpression> whereList = new ArrayList<AbstractExpression>();
+
+        joinList.addAll(ExpressionUtil.uncombineAny(joinNode.m_rightNode.m_joinExpr));
+        joinList.addAll(ExpressionUtil.uncombineAny(joinNode.m_leftNode.m_joinExpr));
+
+        whereList.addAll(ExpressionUtil.uncombineAny(joinNode.m_leftNode.m_whereExpr));
+        whereList.addAll(ExpressionUtil.uncombineAny(joinNode.m_rightNode.m_whereExpr));
+
+        Collection<Table> innerTables = joinNode.m_rightNode.generateJoinOrder();
+        Collection<Table> outerTables = joinNode.m_leftNode.generateJoinOrder();
+
+        // Classify join expressions into the following categories:
+        // 1. The OUTER-only join conditions. If any are false for a given outer tuple,
+        // then NO inner tuples should match it (and it can automatically get null-padded by the join
+        // without even considering the inner table). Testing the outer-only conditions
+        // COULD be considered as an optimal first step to processing each outer tuple
+        // 2. The INNER-only join conditions apply to the inner tuples (even prior to considering any outer tuple).
+        // if true for a given inner tuple, the condition has no effect, if false,
+        // it prevents the inner tuple from matching ANY outer tuple,
+        // In case of multi-tables join, they could be pushed down to a child node if this node is a join itself
+        // 3. The two-sided expressions that get evaluated on each combination of outer and inner tuple
+        // and either accept or reject that particular combination.
+        // 4. The TVE expressions where neither inner nor outer tables are involved. This is not possible
+        // for the currently supported two table joins but could change if number of tables > 2
+        classifyOuterJoinExpressions(joinList, outerTables, innerTables,  joinNode.m_joinOuterList,
+                joinNode.m_joinInnerList, joinNode.m_joinInnerOuterList);
+
+        // Classify where expressions into the following categories:
+        // 1. The OUTER-only filter conditions. If any are false for a given outer tuple,
+        // nothing in the join processing of that outer tuple will get it past this filter,
+        // so it makes sense to "push this filter down" to pre-qualify the outer tuples before they enter the join.
+        // 2. The INNER-only join conditions. If these conditions reject NULL inner tuple it make sense to
+        // move them "up" to the join conditions, otherwise they must remain post-join conditions
+        // to preserve outer join semantic
+        // 3. The two-sided expressions. Same as the inner only conditions.
+        // 4. The TVE expressions where neither inner nor outer tables are involved. Same as for the join expressions
+        classifyOuterJoinExpressions(whereList, outerTables, innerTables,  joinNode.m_whereOuterList,
+                joinNode.m_whereInnerList, joinNode.m_whereInnerOuterList);
+    }
+
+    /**
+     * Split the input expression list info the three categories
+     * 1. TVE expressions with outer tables only
+     * 2. TVE expressions with inner tables only
+     * 3. TVE expressions with inner and outer tables
+     * The outer tables are the tables reachable from the outer node of the join
+     * The inner tables are the tables reachable from the inner node of the join
+     * @param exprList expression list to split
+     * @param outerTables outer table
+     * @param innerTable outer table
+     * @param outerList expressions with outer table only
+     * @param innerList expressions with inner table only
+     * @param innerOuterList with inner and outer tables
+     */
+    void classifyOuterJoinExpressions(List<AbstractExpression> exprList,
+            Collection<Table> outerTables, Collection<Table> innerTables,
+            List<AbstractExpression> outerList, List<AbstractExpression> innerList,
+            List<AbstractExpression> innerOuterList) {
         HashSet<Table> tableSet = new HashSet<Table>();
-        for (AbstractExpression expr : whereList) {
+        HashSet<Table> outerSet = new HashSet<Table>(outerTables);
+        HashSet<Table> innerSet = new HashSet<Table>(innerTables);
+        for (AbstractExpression expr : exprList) {
             tableSet.clear();
             getTablesForExpression(expr, tableSet);
+            Table tables[] = tableSet.toArray(new Table[0]);
             if (tableSet.size() == 0) {
                 noTableSelectionList.add(expr);
             }
             else if (tableSet.size() == 1) {
-                Table table = (Table) tableSet.toArray()[0];
-
-                ArrayList<AbstractExpression> exprs;
-                if (tableFilterList.containsKey(table)) {
-                    exprs = tableFilterList.get(table);
+                if (outerSet.contains(tables[0])) {
+                    outerList.add(expr);
+                } else if (innerSet.contains(tables[0])) {
+                    innerList.add(expr);
+                } else {
+                    // can not be, right?
+                    assert(false);
                 }
-                else {
-                    exprs = new ArrayList<AbstractExpression>();
-                    tableFilterList.put(table, exprs);
-                }
-                expr.m_isJoiningClause = false;
-                addExprToEquivalenceSets(expr);
-                exprs.add(expr);
             }
             else if (tableSet.size() == 2) {
-                TablePair pair = new TablePair();
-                pair.t1 = (Table) tableSet.toArray()[0];
-                pair.t2 = (Table) tableSet.toArray()[1];
-
-                ArrayList<AbstractExpression> exprs;
-                if (joinSelectionList.containsKey(pair)) {
-                    exprs = joinSelectionList.get(pair);
+                boolean outer = outerSet.contains(tables[0]) || outerSet.contains(tables[1]);
+                boolean inner = innerSet.contains(tables[0]) || innerSet.contains(tables[1]);
+                if (outer && inner) {
+                    innerOuterList.add(expr);
+                } else if (outer) {
+                    outerList.add(expr);
+                } else if (inner) {
+                    innerList.add(expr);
+                } else {
+                    // can not be, right?
+                    assert(false);
                 }
-                else {
-                    exprs = new ArrayList<AbstractExpression>();
-                    joinSelectionList.put(pair, exprs);
-                }
-                expr.m_isJoiningClause = true;
-                addExprToEquivalenceSets(expr);
-                exprs.add(expr);
             }
             else if (tableSet.size() > 2) {
                 multiTableSelectionList.add(expr);
@@ -712,7 +790,7 @@ void analyzeWhereExpression(ArrayList<AbstractExpression> whereList) {
         }
     }
 
-    /**
+   /**
      *
      * @param expr
      * @param tables
@@ -763,48 +841,47 @@ void analyzeWhereExpression(ArrayList<AbstractExpression> whereList) {
             retval += "\tALL\n";
         }
 
-        if (!tableJoinList.isEmpty()) {
-            int i = 0;
-            int j = 0;
+        if (joinTree.m_root != null ) {
             retval += "\nTABLES:\n";
-            for (Map.Entry<Table, JoinInfo> entry : tableJoinList.entrySet()) {
-                JoinInfo joinInfo = entry.getValue();
-                retval += "\tTABLE: " + entry.getKey().getTypeName() + ", JOIN: " + joinInfo.toString() + "\n";
-                if (joinInfo.joinExpr != null) {
-                    retval += "\t\t JOIN CONDITIONS:\n";
-                    retval += "\t\t\t(" + String.valueOf(i++) + ") " + joinInfo.joinExpr.toString() + "\n";
+            ArrayDeque<JoinTree.JoinNode> joinNodes = new ArrayDeque<JoinTree.JoinNode>();
+            joinNodes.add(joinTree.m_root);
+            while (!joinNodes.isEmpty()) {
+                JoinTree.JoinNode joinNode = joinNodes.poll();
+                if (joinNode == null) {
+                    continue;
                 }
-                if (joinInfo.whereExpr != null) {
-                    retval += "\t\t WHERE CONDITIONS:\n";
-                    retval += "\t\t\t(" + String.valueOf(j++) + ") " + joinInfo.whereExpr.toString() + "\n";
+                if (joinNode.m_leftNode != null) {
+                    joinNodes.add(joinNode.m_leftNode);
                 }
-            }
-
-            retval += "WHERE SELECTION LIST:\n";
-            for (AbstractExpression expr : whereSelectionList)
-                retval += "\t(" + String.valueOf(i++) + ") " + expr.toString() + "\n";
-
-            retval += "NO TABLE SELECTION LIST:\n";
-            i = 0;
-            for (AbstractExpression expr : noTableSelectionList)
-                retval += "\t(" + String.valueOf(i++) + ") " + expr.toString() + "\n";
-
-            retval += "TABLE FILTER LIST:\n";
-            for (Entry<Table, ArrayList<AbstractExpression>> pair : tableFilterList.entrySet()) {
-                i = 0;
-                retval += "\tTABLE: " + pair.getKey().getTypeName() + "\n";
-                for (AbstractExpression expr : pair.getValue())
-                    retval += "\t\t(" + String.valueOf(i++) + ") " + expr.toString() + "\n";
-            }
-
-            retval += "JOIN CLAUSE LIST:\n";
-            for (Entry<TablePair, ArrayList<AbstractExpression>> pair : joinSelectionList.entrySet()) {
-                i = 0;
-                retval += "\tTABLES: " + pair.getKey().t1.getTypeName() + " and " + pair.getKey().t2.getTypeName() + "\n";
-                for (AbstractExpression expr : pair.getValue())
-                    retval += "\t\t(" + String.valueOf(i++) + ") " + expr.toString() + "\n";
+                if (joinNode.m_rightNode != null) {
+                    joinNodes.add(joinNode.m_rightNode);
+                }
+                if (joinNode.m_table != null) {
+                    retval += "\tTABLE: " + joinNode.m_table.getTypeName() + ", JOIN: " + joinNode.m_joinType.toString() + "\n";
+                    int i = 0;
+                    if (joinNode.m_joinExpr != null) {
+                        retval += "\t\t JOIN CONDITIONS:\n";
+                        retval += "\t\t\t(" + String.valueOf(i++) + ") " + joinNode.m_joinExpr.toString() + "\n";
+                    }
+                    int j = 0;
+                    if (joinNode.m_whereExpr != null) {
+                        retval += "\t\t WHERE CONDITIONS:\n";
+                        retval += "\t\t\t(" + String.valueOf(j++) + ") " + joinNode.m_whereExpr.toString() + "\n";
+                    }
+                }
             }
         }
+
+        retval += "NO TABLE SELECTION LIST:\n";
+        int i = 0;
+        for (AbstractExpression expr : noTableSelectionList)
+            retval += "\t(" + String.valueOf(i++) + ") " + expr.toString() + "\n";
+
+        retval += "MULTI TABLE SELECTION LIST:\n";
+        i = 0;
+        for (AbstractExpression expr : multiTableSelectionList)
+            retval += "\t(" + String.valueOf(i++) + ") " + expr.toString() + "\n";
+
         return retval;
     }
 
@@ -873,8 +950,7 @@ void analyzeWhereExpression(ArrayList<AbstractExpression> whereList) {
      *  in the parser's handling of different statements, but even if it's justified, this method could easily
      *  be extended to handle multiple multi-child conditionNodes.
      */
-   protected JoinInfo parseTableConditions(VoltXMLElement tableScan) {
-
+   protected ArrayList<AbstractExpression> parseTableConditions(VoltXMLElement tableScan) {
         AbstractExpression joinExpr = null;
         AbstractExpression whereExpr = null;
         for (VoltXMLElement childNode : tableScan.children) {
@@ -892,9 +968,10 @@ void analyzeWhereExpression(ArrayList<AbstractExpression> whereList) {
         if (whereExpr != null) {
             ExpressionUtil.finalizeValueTypes(whereExpr);
         }
-        JoinType joinType = JoinType.get(tableScan.attributes.get("jointype"));
-        assert(joinType != JoinType.INVALID);
-        return new JoinInfo(joinType, joinExpr, whereExpr);
+        ArrayList<AbstractExpression> joinWherePair = new ArrayList<AbstractExpression> ();
+        joinWherePair.add(joinExpr);
+        joinWherePair.add(whereExpr);
+        return joinWherePair;
     }
 
 }

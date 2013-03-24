@@ -502,14 +502,6 @@ public class StatementQuery extends StatementDMQL {
         // participating in join. In case of OUTER join, it must be the outer column
         resolveUsingColumns(cols, select.rangeVariables);
 
-        // conditions
-        if (select.queryCondition != null) {
-            VoltXMLElement condition = new VoltXMLElement("querycondition");
-            query.children.add(condition);
-            assert(condition != null);
-            condition.children.add(select.queryCondition.voltGetXML(session));
-        }
-
         // having
         if (select.havingCondition != null) {
             throw new HSQLParseException("VoltDB does not yet support the HAVING clause");

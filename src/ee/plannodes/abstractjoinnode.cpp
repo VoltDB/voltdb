@@ -54,18 +54,20 @@ using namespace std;
 using namespace voltdb;
 
 AbstractJoinPlanNode::AbstractJoinPlanNode(CatalogId id)
-    : AbstractPlanNode(id), m_predicate(NULL)
+    : AbstractPlanNode(id), m_preJoinPredicate(NULL), m_joinPredicate(NULL), m_wherePredicate(NULL)
 {
 }
 
 AbstractJoinPlanNode::AbstractJoinPlanNode()
-    : AbstractPlanNode(), m_predicate(NULL)
+    : AbstractPlanNode(), m_preJoinPredicate(NULL), m_joinPredicate(NULL), m_wherePredicate(NULL)
 {
 }
 
 AbstractJoinPlanNode::~AbstractJoinPlanNode()
 {
-    delete m_predicate;
+    delete m_preJoinPredicate;
+    delete m_joinPredicate;
+    delete m_wherePredicate;
 }
 
 JoinType AbstractJoinPlanNode::getJoinType() const
@@ -78,28 +80,58 @@ void AbstractJoinPlanNode::setJoinType(JoinType join_type)
     m_joinType = join_type;
 }
 
-void AbstractJoinPlanNode::setPredicate(AbstractExpression* predicate)
+void AbstractJoinPlanNode::setPreJoinPredicate(AbstractExpression* preJoinPredicate)
 {
-    assert(!m_predicate);
-    if (m_predicate != predicate)
-    {
-        delete m_predicate;
-    }
-    m_predicate = predicate;
+    assert(!m_preJoinPredicate);
+    m_preJoinPredicate = preJoinPredicate;
 }
 
-AbstractExpression* AbstractJoinPlanNode::getPredicate() const
+AbstractExpression* AbstractJoinPlanNode::getPreJoinPredicate() const
 {
-    return m_predicate;
+    return m_preJoinPredicate;
+}
+
+
+void AbstractJoinPlanNode::setJoinPredicate(AbstractExpression* joinPredicate)
+{
+    assert(!m_joinPredicate);
+    m_joinPredicate = joinPredicate;
+}
+
+AbstractExpression* AbstractJoinPlanNode::getJoinPredicate() const
+{
+    return m_joinPredicate;
+}
+
+void AbstractJoinPlanNode::setWherePredicate(AbstractExpression* wherePredicate)
+{
+    assert(!m_wherePredicate);
+    m_wherePredicate = wherePredicate;
+}
+
+AbstractExpression* AbstractJoinPlanNode::getWherePredicate() const
+{
+    return m_wherePredicate;
 }
 
 string AbstractJoinPlanNode::debugInfo(const string& spacer) const
 {
     ostringstream buffer;
     buffer << spacer << "JoinType[" << m_joinType << "]\n";
-    if (m_predicate != NULL)
+    if (m_preJoinPredicate != NULL)
     {
-        buffer << m_predicate->debug(spacer);
+        buffer << spacer << "Pre-Join Predicate\n";
+        buffer << m_preJoinPredicate->debug(spacer);
+    }
+    if (m_joinPredicate != NULL)
+    {
+        buffer << spacer << "Join Predicate\n";
+        buffer << m_joinPredicate->debug(spacer);
+    }
+    if (m_wherePredicate != NULL)
+    {
+        buffer << spacer << "Where Predicate\n";
+        buffer << m_wherePredicate->debug(spacer);
     }
     return (buffer.str());
 }
@@ -116,14 +148,23 @@ AbstractJoinPlanNode::loadFromJSONObject(Object& obj)
     }
     m_joinType = stringToJoin(joinTypeValue.get_str());
 
-    Value predicateValue = find_value(obj, "PREDICATE");
+    loadPredicateFromJSONObject("PRE_JOIN_PREDICATE", obj, m_preJoinPredicate);
+    loadPredicateFromJSONObject("JOIN_PREDICATE", obj, m_joinPredicate);
+    loadPredicateFromJSONObject("WHERE_PREDICATE", obj, m_wherePredicate);
+}
+
+
+void
+AbstractJoinPlanNode::loadPredicateFromJSONObject(const char* predictateType, Object& obj, AbstractExpression*& predicate)
+{
+    Value predicateValue = find_value(obj, predictateType);
     if (predicateValue == Value::null)
     {
-        m_predicate = NULL;
+        predicate = NULL;
     }
     else
     {
         Object predicateObject = predicateValue.get_obj();
-        m_predicate = AbstractExpression::buildExpressionTree(predicateObject);
+        predicate = AbstractExpression::buildExpressionTree(predicateObject);
     }
 }

@@ -17,7 +17,9 @@
 
 package org.voltdb.expressions;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -113,6 +115,33 @@ public abstract class ExpressionUtil {
         List<AbstractExpression> leaf = new ArrayList<AbstractExpression>();
         leaf.add(expr);
         return leaf;
+    }
+
+    /**
+     * Similar to uncombine but for any type of the expressions.
+     * @param expr
+     * @return
+     */
+    public static Collection<AbstractExpression> uncombineAny(AbstractExpression expr)
+    {
+        ArrayDeque<AbstractExpression> out = new ArrayDeque<AbstractExpression>();
+        if (expr != null) {
+            ArrayDeque<AbstractExpression> in = new ArrayDeque<AbstractExpression>();
+            // this chunk of code breaks the code into a list of expression that
+            // all have to be true for the where clause to be true
+            in.add(expr);
+            AbstractExpression inExpr = null;
+            while ((inExpr = in.poll()) != null) {
+                if (inExpr.getExpressionType() == ExpressionType.CONJUNCTION_AND) {
+                    in.add(inExpr.getLeft());
+                    in.add(inExpr.getRight());
+                }
+                else {
+                    out.add(inExpr);
+                }
+            }
+        }
+        return out;
     }
 
     /**
@@ -350,19 +379,16 @@ public abstract class ExpressionUtil {
      * @param expr to simplify
      * @return simplified expression.
      */
-    public static AbstractExpression eliminateDuplicates(AbstractExpression expr) {
-        // First, decompose the original expression into the subexpressions joined by AND
-        List<AbstractExpression> subExprList = ExpressionUtil.uncombine(expr);
-
-        // Second, eliminate duplicates by building the map of expression's ids, values.
+    public static AbstractExpression eliminateDuplicates(Collection<AbstractExpression> exprList) {
+        // Eliminate duplicates by building the map of expression's ids, values.
         Map<String, AbstractExpression> subExprMap = new HashMap<String, AbstractExpression>();
-        for (AbstractExpression subExpr : subExprList) {
+        for (AbstractExpression subExpr : exprList) {
             subExprMap.put(subExpr.m_id, subExpr);
         }
-        subExprList.clear();
         // Now reconstruct the expression
-        subExprList.addAll(subExprMap.values());
-        return ExpressionUtil.combine(subExprList);
+        ArrayList<AbstractExpression> newList = new ArrayList<AbstractExpression>();
+        newList.addAll(subExprMap.values());
+        return ExpressionUtil.combine(newList);
     }
 
 }

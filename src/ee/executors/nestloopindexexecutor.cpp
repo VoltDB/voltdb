@@ -53,7 +53,6 @@
 #include "execution/VoltDBEngine.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/tuplevalueexpression.h"
-#include "expressions/expressionutil.h"
 #include "plannodes/nestloopindexnode.h"
 #include "plannodes/indexscannode.h"
 #include "storage/table.h"
@@ -245,7 +244,7 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     if (node->getJoinType() == JOIN_TYPE_LEFT) {
         Table* inner_out_table = inline_node->getOutputTable();
         assert(inner_out_table);
-        m_nullTuple = StandaloneTuple(inner_out_table->schema());
+        m_nullTuple.init(inner_out_table->schema());
     }
 
     index_values = TableTuple(index->getKeySchema());
@@ -270,11 +269,21 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
                                 node->getInputTables()[0]->name(),
                                 inline_node->getTargetTable()->name());
 
-    retval &=
-        assignTupleValueIndexes(inline_node->getEndExpression(),
+    if (retval) {
+        retval = assignTupleValueIndexes(inline_node->getEndExpression(),
                                 node->getInputTables()[0]->name(),
                                 inline_node->getTargetTable()->name());
-
+    }
+    if (retval) {
+        retval = assignTupleValueIndexes(node->getPreJoinPredicate(),
+                                node->getInputTables()[0]->name(),
+                                inline_node->getTargetTable()->name());
+    }
+    if (retval) {
+        retval = assignTupleValueIndexes(node->getWherePredicate(),
+                                node->getInputTables()[0]->name(),
+                                inline_node->getTargetTable()->name());
+    }
     return retval;
 }
 
@@ -328,6 +337,19 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
         VOLT_TRACE("Post Expression:\n%s", post_expression->debug(true).c_str());
     }
 
+    // pre join expression
+    AbstractExpression* prejoin_expression = node->getPreJoinPredicate();
+    if (prejoin_expression != NULL) {
+        prejoin_expression->substitute(params);
+        VOLT_TRACE("Post Expression:\n%s", prejoin_expression->debug(true).c_str());
+    }
+
+    // where expression
+    AbstractExpression* where_expression = node->getWherePredicate();
+    if (where_expression != NULL) {
+        where_expression->substitute(params);
+        VOLT_TRACE("Post Expression:\n%s", where_expression->debug(true).c_str());
+    }
     //
     // OUTER TABLE ITERATION
     //
@@ -338,6 +360,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     assert (outer_tuple.sizeInValues() == outer_table->columnCount());
     assert (inner_tuple.sizeInValues() == inner_table->columnCount());
     TableTuple &join_tuple = output_table->tempTuple();
+    TableTuple null_tuple = m_nullTuple;
 
     Table* inner_out_table = inline_node->getOutputTable();
     int num_of_inner_cols = inner_out_table->columnCount();
@@ -346,187 +369,204 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     while (outer_iterator.next(outer_tuple)) {
         VOLT_TRACE("outer_tuple:%s",
                    outer_tuple.debug(outer_table->name()).c_str());
-
-        int activeNumOfSearchKeys = num_of_searchkeys;
-        VOLT_TRACE ("<Nested Loop Index exec, WHILE-LOOP...> Number of searchKeys: %d \n", num_of_searchkeys);
-        IndexLookupType localLookupType = m_lookupType;
-        SortDirectionType localSortDirection = m_sortDirection;
-        VOLT_TRACE("Lookup type: %d\n", m_lookupType);
-        VOLT_TRACE("SortDirectionType: %d\n", m_sortDirection);
+        // Set the outer tuple columns. Must be outside the inner loop
+        // in case of the empty inner table
+        join_tuple.setNValues(0, outer_tuple, 0, num_of_outer_cols);
 
         // did this loop body find at least one match for this tuple?
         bool match = false;
-        // did setting the search key fail (usually due to overflow)
-        bool keyException = false;
+        // For outer joins if outer tuple fails pre-join predicate
+        // (join expression based on the outer table only)
+        // it can't match any of inner tuples
+        if (prejoin_expression == NULL || prejoin_expression->eval(&outer_tuple, NULL).isTrue()) {
 
-        //
-        // Now use the outer table tuple to construct the search key
-        // against the inner table
-        //
-        index_values.setAllNulls();
-        for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
-            // in a normal index scan, params would be substituted here,
-            // but this scan fills in params outside the loop
-            NValue candidateValue = inline_node->getSearchKeyExpressions()[ctr]->eval(&outer_tuple, NULL);
-            try {
-                index_values.setNValue(ctr, candidateValue);
-            }
-            catch (SQLException e) {
-                // This next bit of logic handles underflow and overflow while
-                // setting up the search keys.
-                // e.g. TINYINT > 200 or INT <= 6000000000
+            int activeNumOfSearchKeys = num_of_searchkeys;
+            VOLT_TRACE ("<Nested Loop Index exec, WHILE-LOOP...> Number of searchKeys: %d \n", num_of_searchkeys);
+            IndexLookupType localLookupType = m_lookupType;
+            SortDirectionType localSortDirection = m_sortDirection;
+            VOLT_TRACE("Lookup type: %d\n", m_lookupType);
+            VOLT_TRACE("SortDirectionType: %d\n", m_sortDirection);
 
-                // re-throw if not an overflow or underflow
-                // currently, it's expected to always be an overflow or underflow
-                if ((e.getInternalFlags() & (SQLException::TYPE_OVERFLOW | SQLException::TYPE_UNDERFLOW)) == 0) {
-                    throw e;
+            // did setting the search key fail (usually due to overflow)
+            bool keyException = false;
+
+            //
+            // Now use the outer table tuple to construct the search key
+            // against the inner table
+            //
+            index_values.setAllNulls();
+            for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
+                // in a normal index scan, params would be substituted here,
+                // but this scan fills in params outside the loop
+                NValue candidateValue = inline_node->getSearchKeyExpressions()[ctr]->eval(&outer_tuple, NULL);
+                try {
+                    index_values.setNValue(ctr, candidateValue);
                 }
+                catch (SQLException e) {
+                    // This next bit of logic handles underflow and overflow while
+                    // setting up the search keys.
+                    // e.g. TINYINT > 200 or INT <= 6000000000
 
-                // handle the case where this is a comparison, rather than equality match
-                // comparison is the only place where the executor might return matching tuples
-                // e.g. TINYINT < 1000 should return all values
-                if ((localLookupType != INDEX_LOOKUP_TYPE_EQ) &&
-                    (ctr == (activeNumOfSearchKeys - 1))) {
-
-                    // sanity check that there is at least one EQ column
-                    // or else the join wouldn't work, right?
-                    assert(activeNumOfSearchKeys > 1);
-
-                    if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
-                        if ((localLookupType == INDEX_LOOKUP_TYPE_GT) ||
-                            (localLookupType == INDEX_LOOKUP_TYPE_GTE)) {
-
-                            // gt or gte when key overflows breaks out
-                            // and only returns for left-outer
-                            keyException = true;
-                            break; // the outer while loop
-                        }
-                        else {
-                            // VoltDB should only support LT or LTE with
-                            // empty search keys for order-by without lookup
-                            throw e;
-                        }
-                    }
-                    if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
-                        if ((localLookupType == INDEX_LOOKUP_TYPE_LT) ||
-                            (localLookupType == INDEX_LOOKUP_TYPE_LTE)) {
-
-                            // VoltDB should only support LT or LTE with
-                            // empty search keys for order-by without lookup
-                            throw e;
-                        }
-                        else {
-                            // don't allow GTE because it breaks null handling
-                            localLookupType = INDEX_LOOKUP_TYPE_GT;
-                        }
+                    // re-throw if not an overflow or underflow
+                    // currently, it's expected to always be an overflow or underflow
+                    if ((e.getInternalFlags() & (SQLException::TYPE_OVERFLOW | SQLException::TYPE_UNDERFLOW)) == 0) {
+                        throw e;
                     }
 
-                    // if here, means all tuples with the previous searchkey
-                    // columns need to be scaned.
-                    activeNumOfSearchKeys--;
-                    if (localSortDirection == SORT_DIRECTION_TYPE_INVALID) {
-                        localSortDirection = SORT_DIRECTION_TYPE_ASC;
+                    // handle the case where this is a comparison, rather than equality match
+                    // comparison is the only place where the executor might return matching tuples
+                    // e.g. TINYINT < 1000 should return all values
+                    if ((localLookupType != INDEX_LOOKUP_TYPE_EQ) &&
+                        (ctr == (activeNumOfSearchKeys - 1))) {
+
+                        // sanity check that there is at least one EQ column
+                        // or else the join wouldn't work, right?
+                        assert(activeNumOfSearchKeys > 1);
+
+                        if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
+                            if ((localLookupType == INDEX_LOOKUP_TYPE_GT) ||
+                                (localLookupType == INDEX_LOOKUP_TYPE_GTE)) {
+
+                                // gt or gte when key overflows breaks out
+                                // and only returns for left-outer
+                                keyException = true;
+                                break; // the outer while loop
+                            }
+                            else {
+                                // VoltDB should only support LT or LTE with
+                                // empty search keys for order-by without lookup
+                                throw e;
+                            }
+                        }
+                        if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
+                            if ((localLookupType == INDEX_LOOKUP_TYPE_LT) ||
+                                (localLookupType == INDEX_LOOKUP_TYPE_LTE)) {
+
+                                // VoltDB should only support LT or LTE with
+                                // empty search keys for order-by without lookup
+                                throw e;
+                            }
+                            else {
+                                // don't allow GTE because it breaks null handling
+                                localLookupType = INDEX_LOOKUP_TYPE_GT;
+                            }
+                        }
+
+                        // if here, means all tuples with the previous searchkey
+                        // columns need to be scaned.
+                        activeNumOfSearchKeys--;
+                        if (localSortDirection == SORT_DIRECTION_TYPE_INVALID) {
+                            localSortDirection = SORT_DIRECTION_TYPE_ASC;
+                        }
                     }
-                }
-                // if a EQ comparison is out of range, then the tuple from
-                // the outer loop returns no matches (except left-outer)
-                else {
-                    keyException = true;
-                }
-                break;
-            }
-        }
-        VOLT_TRACE("Searching %s", index_values.debug("").c_str());
-
-
-        // if a search value didn't fit into the targeted index key, skip this key
-        if (!keyException) {
-
-            //
-            // Our index scan on the inner table is going to have three parts:
-            //  (1) Lookup tuples using the search key
-            //
-            //  (2) For each tuple that comes back, check whether the
-            //      end_expression is false.  If it is, then we stop
-            //      scanning. Otherwise...
-            //
-            //  (3) Check whether the tuple satisfies the post expression.
-            //      If it does, then add it to the output table
-            //
-            // Use our search key to prime the index iterator
-            // The loop through each tuple given to us by the iterator
-            //
-            // Essentially cut and pasted this if ladder from
-            // index scan executor
-            if (num_of_searchkeys > 0)
-            {
-                if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
-                    index->moveToKey(&index_values);
-                }
-                else if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
-                    index->moveToGreaterThanKey(&index_values);
-                }
-                else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
-                    index->moveToKeyOrGreater(&index_values);
-                }
-                else {
-                    return false;
-                }
-            } else {
-                bool toStartActually = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
-                index->moveToEnd(toStartActually);
-            }
-
-            while ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
-                    !(inner_tuple = index->nextValueAtKey()).isNullTuple()) ||
-                   ((localLookupType != INDEX_LOOKUP_TYPE_EQ || num_of_searchkeys == 0) &&
-                    !(inner_tuple = index->nextValue()).isNullTuple()))
-            {
-                match = true;
-                VOLT_TRACE("inner_tuple:%s",
-                           inner_tuple.debug(inner_table->name()).c_str());
-
-                //
-                // First check whether the end_expression is now false
-                //
-                if (end_expression != NULL &&
-                    end_expression->eval(&outer_tuple, &inner_tuple).isFalse())
-                {
-                    VOLT_TRACE("End Expression evaluated to false, stopping scan");
+                    // if a EQ comparison is out of range, then the tuple from
+                    // the outer loop returns no matches (except left-outer)
+                    else {
+                        keyException = true;
+                    }
                     break;
                 }
-                //
-                // Then apply our post-predicate to do further filtering
-                //
-                if (post_expression == NULL ||
-                    post_expression->eval(&outer_tuple, &inner_tuple).isTrue())
-                {
-                    //
-                    // Try to put the tuple into our output table
-                    //
-                    join_tuple.setNValues(0, outer_tuple, 0, num_of_outer_cols);
-                    //
-                    // Append the inner values to the end of our join tuple
-                    //
-                    ExpressionUtil::evalExpressions(join_tuple, num_of_outer_cols,
-                        m_outputExpressions.begin() + num_of_outer_cols,
-                        m_outputExpressions.end(), inner_tuple);
-                    VOLT_TRACE("join_tuple tuple: %s",
-                               join_tuple.debug(output_table->name()).c_str());
+            }
+            VOLT_TRACE("Searching %s", index_values.debug("").c_str());
 
-                    VOLT_TRACE("MATCH: %s",
-                               join_tuple.debug(output_table->name()).c_str());
-                    output_table->insertTupleNonVirtual(join_tuple);
+
+            // if a search value didn't fit into the targeted index key, skip this key
+            if (!keyException) {
+
+                //
+                // Our index scan on the inner table is going to have three parts:
+                //  (1) Lookup tuples using the search key
+                //
+                //  (2) For each tuple that comes back, check whether the
+                //      end_expression is false.  If it is, then we stop
+                //      scanning. Otherwise...
+                //
+                //  (3) Check whether the tuple satisfies the post expression.
+                //      If it does, then add it to the output table
+                //
+                // Use our search key to prime the index iterator
+                // The loop through each tuple given to us by the iterator
+                //
+                // Essentially cut and pasted this if ladder from
+                // index scan executor
+                if (num_of_searchkeys > 0)
+                {
+                    if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
+                        index->moveToKey(&index_values);
+                    }
+                    else if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
+                        index->moveToGreaterThanKey(&index_values);
+                    }
+                    else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
+                        index->moveToKeyOrGreater(&index_values);
+                    }
+                    else {
+                        return false;
+                    }
+                } else {
+                    bool toStartActually = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
+                    index->moveToEnd(toStartActually);
+                }
+
+                while ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
+                        !(inner_tuple = index->nextValueAtKey()).isNullTuple()) ||
+                       ((localLookupType != INDEX_LOOKUP_TYPE_EQ || num_of_searchkeys == 0) &&
+                        !(inner_tuple = index->nextValue()).isNullTuple()))
+                {
+                    VOLT_TRACE("inner_tuple:%s",
+                               inner_tuple.debug(inner_table->name()).c_str());
+
+                    //
+                    // First check whether the end_expression is now false
+                    //
+                    if (end_expression != NULL &&
+                        end_expression->eval(&outer_tuple, &inner_tuple).isFalse())
+                    {
+                        VOLT_TRACE("End Expression evaluated to false, stopping scan");
+                        break;
+                    }
+                    //
+                    // Then apply our post-predicate to do further filtering
+                    //
+                    if (post_expression == NULL ||
+                        post_expression->eval(&outer_tuple, &inner_tuple).isTrue())
+                    {
+                        match = true;
+                        // Still need to pass where filtering
+                        if (where_expression == NULL || where_expression->eval(&outer_tuple, &inner_tuple).isTrue()) {
+                            //
+                            // Try to put the tuple into our output table
+                            // Append the inner values to the end of our join tuple
+                            //
+                            for (int col_ctr = num_of_outer_cols;
+                                 col_ctr < join_tuple.sizeInValues();
+                                 ++col_ctr)
+                            {
+                                // For the sake of consistency, we don't try to do
+                                // output expressions here with columns from both tables.
+                                join_tuple.
+                                setNValue(col_ctr,
+                                          m_outputExpressions[col_ctr]->
+                                          eval(&inner_tuple, NULL));
+                            }
+                            VOLT_TRACE("join_tuple tuple: %s",
+                                       join_tuple.debug(output_table->name()).c_str());
+                            VOLT_TRACE("MATCH: %s",
+                                   join_tuple.debug(output_table->name()).c_str());
+                            output_table->insertTupleNonVirtual(join_tuple);
+                        }
+                    }
                 }
             }
         }
-
         //
         // Left Outer Join
         //
-        if (!match && join_type == JOIN_TYPE_LEFT) {
-            join_tuple.setNValues(num_of_outer_cols, m_nullTuple, 0, num_of_inner_cols);
-            output_table->insertTupleNonVirtual(join_tuple);
+        if (join_type == JOIN_TYPE_LEFT && !match ) {
+            if (where_expression == NULL || where_expression->eval(&outer_tuple, &null_tuple).isTrue()) {
+                join_tuple.setNValues(num_of_outer_cols, m_nullTuple, 0, num_of_inner_cols);
+                output_table->insertTupleNonVirtual(join_tuple);
+            }
         }
     }
 

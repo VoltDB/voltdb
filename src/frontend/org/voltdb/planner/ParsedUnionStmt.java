@@ -19,11 +19,11 @@ package org.voltdb.planner;
 
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.expressions.AbstractExpression;
 
 public class ParsedUnionStmt extends AbstractParsedStmt {
 
@@ -36,10 +36,12 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         EXCEPT_ALL,
         EXCEPT
     };
-    /** Hash Set to enforce table uniqueness across ALL the children statements */
+    /** Hash Set to enforce table uniqueness across all the sub-selects */
     public HashSet<String> m_uniqueTables = new HashSet<String>();
     public ArrayList<AbstractParsedStmt> m_children = new ArrayList<AbstractParsedStmt>();
     public UnionType m_unionType = UnionType.NOUNION;
+    /** Collection of filter expressions across all the the sub-selects */
+    public ArrayList<AbstractExpression> m_filterSelectionList = new ArrayList<AbstractExpression>();
 
     /**
     * Class constructor
@@ -83,8 +85,6 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
                 // by the fragmentizer. Need to give an error if any table is mentioned
                 // in the UNION TREE more than once.
                 if (childStmt.scanColumns != null) {
-                    Set<String> tableNames = childStmt.scanColumns.keySet();
-
                     for (Table table : childStmt.tableList) {
                         String tableName = table.getTypeName();
                         if (m_uniqueTables.contains(tableName)) {
@@ -127,11 +127,11 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         for (AbstractParsedStmt selectStmt : m_children) {
             selectStmt.postParse(sql, joinOrder);
             // Propagate parsing results to the parent union
-            this.whereSelectionList.addAll(selectStmt.whereSelectionList);
+            this.m_filterSelectionList.addAll(selectStmt.joinTree.getAllExpressions());
         }
         // Analyze children's where expressions together to identify possible identically
         // partitioned tables
-        this.analyzeWhereExpression(this.whereSelectionList);
+        this.analyzeValueEquivalence(this.m_filterSelectionList);
 
         // these just shouldn't happen right?
         assert(this.multiTableSelectionList.size() == 0);

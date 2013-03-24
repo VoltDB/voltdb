@@ -32,7 +32,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.AbstractParsedStmt.TablePair;
+import org.voltdb.planner.JoinTree.TablePair;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -90,31 +90,43 @@ public abstract class SubPlanAssembler {
      * @return A list of access paths to access the data in the table.
      */
     protected ArrayList<AccessPath> getRelevantAccessPathsForTable(Table table, Table nextTables[]) {
-        ArrayList<AccessPath> paths = new ArrayList<AccessPath>();
-        // add the empty seq-scan access path
-        AccessPath naivePath = new AccessPath();
-        paths.add(naivePath);
-
-        List<AbstractExpression> allExprs = new ArrayList<AbstractExpression>();
-
-        List<AbstractExpression> filterExprs = m_parsedStmt.tableFilterList.get(table);
-        if (filterExprs != null) {
-            allExprs.addAll(filterExprs);
-            naivePath.otherExprs.addAll(filterExprs);
-        }
-
+        List<AbstractExpression> filterExprs = m_parsedStmt.joinTree.m_tableFilterList.get(table);
+        List<AbstractExpression> joinExprs = new ArrayList<AbstractExpression>();
         for (int ii = 0; ii < nextTables.length; ii++) {
             final Table nextTable = nextTables[ii];
             // create a key to search the TablePair->Clause map
             TablePair pair = new TablePair();
             pair.t1 = table;
             pair.t2 = nextTable;
-            List<AbstractExpression> joinExprs = m_parsedStmt.joinSelectionList.get(pair);
-
-            if (joinExprs != null) {
-                allExprs.addAll(joinExprs);
-                naivePath.joinExprs.addAll(joinExprs);
+            List<AbstractExpression> pairExprs = m_parsedStmt.joinTree.m_joinSelectionList.get(pair);
+            if (pairExprs != null) {
+                joinExprs.addAll(pairExprs);
             }
+        }
+        // do the actual work
+        return getRelevantAccessPathsForTable(table, joinExprs, filterExprs);
+    }
+
+    /**
+     * Generate all possible access paths for given sets of join and filter expressions for a table.
+     * The list includes the naive (scan) pass and possible index scans
+     *
+     * @param table Table to generate access pass for
+     * @param joinExprs join expressions this table is part of
+     * @param filterExprs filter expressions this table is part of
+     * @return List of valid access paths
+     */
+    protected ArrayList<AccessPath> getRelevantAccessPathsForTable(Table table, List<AbstractExpression> joinExprs, List<AbstractExpression> filterExprs) {
+        ArrayList<AccessPath> paths = new ArrayList<AccessPath>();        // add the empty seq-scan access path
+        AccessPath naivePath = getRelevantNaivePathForTable(table, joinExprs, filterExprs);
+        paths.add(naivePath);
+
+        List<AbstractExpression> allExprs = new ArrayList<AbstractExpression>();
+        if (filterExprs != null) {
+            allExprs.addAll(filterExprs);
+        }
+        if (joinExprs != null) {
+            allExprs.addAll(joinExprs);
         }
 
         CatalogMap<Index> indexes = table.getIndexes();
@@ -127,6 +139,26 @@ public abstract class SubPlanAssembler {
         }
 
         return paths;
+    }
+
+    /**
+     * Generate the naive (scan) pass for the table
+     *
+     * @param table Table to generate naive pass for
+     * @param joinExprs join expressions this table is part of
+     * @param filterExprs filter expressions this table is part of
+     * @return Naive access path
+     */
+    protected AccessPath getRelevantNaivePathForTable(Table table, List<AbstractExpression> joinExprs, List<AbstractExpression> filterExprs) {
+        AccessPath naivePath = new AccessPath();
+
+        if (filterExprs != null) {
+            naivePath.otherExprs.addAll(filterExprs);
+        }
+        if (joinExprs != null) {
+            naivePath.joinExprs.addAll(joinExprs);
+        }
+        return naivePath;
     }
 
     /**

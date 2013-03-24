@@ -92,6 +92,15 @@ public class TestJoinOrder extends TestCase {
         }
     }
 
+    public void testOuterJoinOrder() {
+        try {
+            List<AbstractPlanNode> pn = aide.compile("select * FROM T1 LEFT JOIN T2 ON T1.A = T2.B", 0, false, "T2, T1");
+            fail();
+        } catch (Exception ex) {
+            assertTrue("The specified join order is invalid for the given query".equals(ex.getMessage()));
+        }
+    }
+
     @Override
     protected void setUp() throws Exception {
         aide = new PlannerTestAideDeCamp(TestJoinOrder.class.getResource("testjoinorder-ddl.sql"),

@@ -402,7 +402,7 @@ public class PlanAssembler {
 
         assert (nextStmt != null);
         addParameters(retval, nextStmt);
-        retval.fullWhereClause = nextStmt.where;
+        retval.fullWhereClause = nextStmt.joinTree.getCombinedExpression();
         retval.fullWinnerPlan = retval.rootPlanGraph;
         // Do a final generateOutputSchema pass.
         retval.rootPlanGraph.generateOutputSchema(m_catalogDb);
