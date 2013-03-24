@@ -56,8 +56,6 @@
 #include <cstdlib>
 #include <stdexcept>
 
-#include "json_spirit/json_spirit.h"
-
 namespace voltdb {
 
 /** Function static helper templated functions to vivify an optimal
@@ -222,36 +220,20 @@ static AbstractExpression* castFactory(ValueType vt,
 /** convert the enumerated value type into a concrete type for
  * constant value expressions templated ctors */
 static AbstractExpression*
-constantValueFactory(json_spirit::Object &obj,
+constantValueFactory(PlannerDomValue obj,
                      ValueType vt, ExpressionType et,
                      AbstractExpression *lc, AbstractExpression *rc)
 {
     // read before ctor - can then instantiate fully init'd obj.
     NValue newvalue;
-    json_spirit::Value isNullValue = json_spirit::find_value( obj, "ISNULL");
-    if (isNullValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "constantValueFactory: Could not find"
-                                      " ISNULL value");
-    }
-    if (isNullValue.type() != json_spirit::bool_type) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "constantValueFactory: ISNULL value"
-                                      " is not a boolean.");
-    }
-    bool isNull = isNullValue.get_bool();
+    bool isNull = obj.valueForKey("ISNULL").asBool();
     if (isNull)
     {
         newvalue = NValue::getNullValue(vt);
         return new ConstantValueExpression(newvalue);
     }
 
-    json_spirit::Value valueValue = json_spirit::find_value( obj, "VALUE");
-    if (valueValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "constantValueFactory: Could not find"
-                                      " VALUE value");
-    }
+    PlannerDomValue valueValue = obj.valueForKey("VALUE");
 
     switch (vt) {
     case VALUE_TYPE_INVALID:
@@ -263,32 +245,32 @@ constantValueFactory(json_spirit::Object &obj,
                                       "constantValueFactory: And they should be"
                                       " never be this either! VALUE_TYPE_NULL");
     case VALUE_TYPE_TINYINT:
-        newvalue = ValueFactory::getTinyIntValue(static_cast<int8_t>(valueValue.get_int64()));
+        newvalue = ValueFactory::getTinyIntValue(static_cast<int8_t>(valueValue.asInt64()));
         break;
     case VALUE_TYPE_SMALLINT:
-        newvalue = ValueFactory::getSmallIntValue(static_cast<int16_t>(valueValue.get_int64()));
+        newvalue = ValueFactory::getSmallIntValue(static_cast<int16_t>(valueValue.asInt64()));
         break;
     case VALUE_TYPE_INTEGER:
-        newvalue = ValueFactory::getIntegerValue(static_cast<int32_t>(valueValue.get_int64()));
+        newvalue = ValueFactory::getIntegerValue(static_cast<int32_t>(valueValue.asInt64()));
         break;
     case VALUE_TYPE_BIGINT:
-        newvalue = ValueFactory::getBigIntValue(static_cast<int64_t>(valueValue.get_int64()));
+        newvalue = ValueFactory::getBigIntValue(static_cast<int64_t>(valueValue.asInt64()));
         break;
     case VALUE_TYPE_DOUBLE:
-        newvalue = ValueFactory::getDoubleValue(static_cast<double>(valueValue.get_real()));
+        newvalue = ValueFactory::getDoubleValue(static_cast<double>(valueValue.asDouble()));
         break;
     case VALUE_TYPE_VARCHAR:
-        newvalue = ValueFactory::getStringValue(valueValue.get_str());
+        newvalue = ValueFactory::getStringValue(valueValue.asStr());
         break;
     case VALUE_TYPE_VARBINARY:
         // uses hex encoding
-        newvalue = ValueFactory::getBinaryValue(valueValue.get_str());
+        newvalue = ValueFactory::getBinaryValue(valueValue.asStr());
         break;
     case VALUE_TYPE_TIMESTAMP:
-        newvalue = ValueFactory::getTimestampValue(static_cast<int64_t>(valueValue.get_int64()));
+        newvalue = ValueFactory::getTimestampValue(static_cast<int64_t>(valueValue.asInt64()));
         break;
     case VALUE_TYPE_DECIMAL:
-        newvalue = ValueFactory::getDecimalValueFromString(valueValue.get_str());
+        newvalue = ValueFactory::getDecimalValueFromString(valueValue.asStr());
         break;
     default:
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
@@ -303,18 +285,12 @@ constantValueFactory(json_spirit::Object &obj,
 /** convert the enumerated value type into a concrete c type for
  * parameter value expression templated ctors */
 static AbstractExpression*
-parameterValueFactory(json_spirit::Object &obj,
+parameterValueFactory(PlannerDomValue obj,
                       ExpressionType et,
                       AbstractExpression *lc, AbstractExpression *rc)
 {
     // read before ctor - can then instantiate fully init'd obj.
-    json_spirit::Value paramIdxValue = json_spirit::find_value( obj, "PARAM_IDX");
-    if (paramIdxValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "parameterValueFactory: Could not find"
-                                      " PARAM_IDX value");
-    }
-    int param_idx = paramIdxValue.get_int();
+    int param_idx = obj.valueForKey("PARAM_IDX").asInt();
     assert (param_idx >= 0);
     return new ParameterValueExpression(param_idx);
 }
@@ -322,45 +298,21 @@ parameterValueFactory(json_spirit::Object &obj,
 /** convert the enumerated value type into a concrete c type for
  * tuple value expression templated ctors */
 static AbstractExpression*
-tupleValueFactory(json_spirit::Object &obj, ExpressionType et,
+tupleValueFactory(PlannerDomValue obj, ExpressionType et,
                   AbstractExpression *lc, AbstractExpression *rc)
 {
     // read the tuple value expression specific data
-    json_spirit::Value valueIdxValue =
-      json_spirit::find_value( obj, "COLUMN_IDX");
-
-    json_spirit::Value tableName =
-      json_spirit::find_value(obj, "TABLE_NAME");
-
-    json_spirit::Value columnName =
-      json_spirit::find_value(obj, "COLUMN_NAME");
+    int columnIndex = obj.valueForKey("COLUMN_IDX").asInt();
+    std::string tableName = obj.valueForKey("TABLE_NAME").asStr();
+    std::string columnName = obj.valueForKey("COLUMN_NAME").asStr();
 
     // verify input
-    if (valueIdxValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "tupleValueFactory: Could not find"
-                                      " COLUMN_IDX value");
-    }
-    if (valueIdxValue.get_int() < 0) {
+    if (columnIndex < 0) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "tupleValueFactory: invalid column_idx.");
     }
 
-    if (tableName == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "tupleValueFactory: no table name in TVE");
-    }
-
-    if (columnName == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "tupleValueFactory: no column name in"
-                                      " TVE");
-    }
-
-
-    return new TupleValueExpression(valueIdxValue.get_int(),
-                                    tableName.get_str(),
-                                    columnName.get_str());
+    return new TupleValueExpression(columnIndex, tableName, columnName);
 }
 
 AbstractExpression *
@@ -383,7 +335,7 @@ ExpressionUtil::conjunctionFactory(ExpressionType et, AbstractExpression *lc, Ab
  * pursuit. Each instantiated expression must consume any
  * class-specific serialization from serialize_io. */
 AbstractExpression*
-ExpressionUtil::expressionFactory(json_spirit::Object &obj,
+ExpressionUtil::expressionFactory(PlannerDomValue obj,
                   ExpressionType et, ValueType vt, int vs,
                   AbstractExpression* lc,
                   AbstractExpression* rc,
@@ -430,31 +382,21 @@ ExpressionUtil::expressionFactory(json_spirit::Object &obj,
     // Functions and pseudo-functions
     case (EXPRESSION_TYPE_FUNCTION): {
         // add the function id
-        json_spirit::Value functionIdValue = json_spirit::find_value(obj, "FUNCTION_ID");
-        if (functionIdValue == json_spirit::Value::null) {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          "ExpressionUtil::"
-                                          "expressionFactory:"
-                                          " Couldn't find FUNCTION_ID value");
-        }
-        int functionId = functionIdValue.get_int();
+        int functionId = obj.valueForKey("FUNCTION_ID").asInt();
 
         ret = functionFactory(functionId, args);
         if ( ! ret) {
-            json_spirit::Value functionNameValue = json_spirit::find_value(obj, "NAME");
             std::string nameString;
-            if (functionNameValue == json_spirit::Value::null) {
+            if (obj.hasNonNullKey("NAME")) {
+                nameString = obj.valueForKey("NAME").asStr();
+            }
+            else {
                 nameString = "?";
-            } else {
-                nameString = functionNameValue.get_str();
             }
 
             char aliasBuffer[256];
-            json_spirit::Value functionAliasValue = json_spirit::find_value(obj, "ALIAS");
-            if (functionAliasValue == json_spirit::Value::null) {
-                aliasBuffer[0] = '\0';
-            } else {
-                std::string aliasString = functionAliasValue.get_str();
+            if (obj.hasNonNullKey("ALIAS")) {
+                std::string aliasString = obj.valueForKey("ALIAS").asStr();
                 snprintf(aliasBuffer, sizeof(aliasBuffer), " aliased to '%s'", aliasString.c_str());
             }
 
@@ -534,12 +476,11 @@ ExpressionUtil::convertIfAllParameterValues(const std::vector<voltdb::AbstractEx
 
 void ExpressionUtil::loadIndexedExprsFromJson(std::vector<AbstractExpression*>& indexed_exprs, const std::string& jsonarraystring)
 {
-    json_spirit::Value jValue;
-    json_spirit::read( jsonarraystring, jValue );
-    json_spirit::Array expressionsArray = jValue.get_array();
-    for (int ii = 0; ii < expressionsArray.size(); ii++) {
-        json_spirit::Object expressionObject = expressionsArray[ii].get_obj();
-        AbstractExpression *expr = AbstractExpression::buildExpressionTree(expressionObject);
+    PlannerDomRoot domRoot(jsonarraystring.c_str());
+    PlannerDomValue expressionsArray = domRoot.rootObject();
+    for (int i = 0; i < expressionsArray.arrayLen(); i++) {
+        PlannerDomValue exprValue = expressionsArray.valueAtIndex(i);
+        AbstractExpression *expr = AbstractExpression::buildExpressionTree(exprValue);
         indexed_exprs.push_back(expr);
     }
 }

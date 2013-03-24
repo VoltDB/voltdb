@@ -54,7 +54,6 @@
 
 #include <boost/shared_ptr.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
-#include <json_spirit/json_spirit.h>
 #include "catalog/database.h"
 #include "common/ids.h"
 #include "common/serializeio.h"

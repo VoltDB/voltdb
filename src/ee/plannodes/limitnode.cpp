@@ -109,37 +109,23 @@ std::string LimitPlanNode::debugInfo(const std::string &spacer) const {
     return (buffer.str());
 }
 
-void LimitPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
-    json_spirit::Value limitValue = json_spirit::find_value( obj, "LIMIT");
-    if (limitValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "LimitPlanNode::loadFromJSONObject:"
-                                      " can't find LIMIT value");
-    }
-    limit = limitValue.get_int();
+void LimitPlanNode::loadFromJSONObject(PlannerDomValue obj) {
+    limit = obj.valueForKey("LIMIT").asInt();
+    offset = obj.valueForKey("OFFSET").asInt();
 
-    json_spirit::Value offsetValue = json_spirit::find_value( obj, "OFFSET");
-    if (offsetValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "LimitPlanNode::loadFromJSONObject:"
-                                      " can't find OFFSET value");
+    if (obj.hasNonNullKey("LIMIT_PARAM_IDX")) {
+        limitParamIdx = obj.valueForKey("LIMIT_PARAM_IDX").asInt();
     }
-    offset = offsetValue.get_int();
-
-    json_spirit::Value paramIdx = json_spirit::find_value(obj, "LIMIT_PARAM_IDX");
-    if (!(paramIdx == json_spirit::Value::null)) {
-        limitParamIdx = paramIdx.get_int();
-    }
-    paramIdx = json_spirit::find_value(obj, "OFFSET_PARAM_IDX");
-    if (!(paramIdx == json_spirit::Value::null)) {
-        offsetParamIdx = paramIdx.get_int();
+    if (obj.hasNonNullKey("OFFSET_PARAM_IDX")) {
+        offsetParamIdx = obj.valueForKey("OFFSET_PARAM_IDX").asInt();
     }
 
-    json_spirit::Value expr = json_spirit::find_value(obj, "LIMIT_EXPRESSION");
-    if (expr == json_spirit::Value::null) {
+    if (obj.hasNonNullKey("LIMIT_EXPRESSION")) {
+        PlannerDomValue expr = obj.valueForKey("LIMIT_EXPRESSION");
+        limitExpression = AbstractExpression::buildExpressionTree(expr);
+    }
+    else {
         limitExpression = NULL;
-    } else {
-        limitExpression = AbstractExpression::buildExpressionTree(expr.get_obj());
     }
 }
 

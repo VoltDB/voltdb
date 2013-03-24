@@ -94,34 +94,25 @@ PlanNodeFragment::createFromCatalog(const string value)
     //cout << "DEBUG PlanNodeFragment::createFromCatalog: value.size() == " << value.size() << endl;
     //cout << "DEBUG PlanNodeFragment::createFromCatalog: value == " << value << endl;
 
-    json_spirit::Value jValue;
-    json_spirit::read( value, jValue );
+    PlannerDomRoot domRoot(value.c_str());
 
-    PlanNodeFragment *retval = PlanNodeFragment::fromJSONObject(jValue.get_obj());
+    PlanNodeFragment *retval = PlanNodeFragment::fromJSONObject(domRoot.rootObject());
     return retval;
 }
 
 PlanNodeFragment *
-PlanNodeFragment::fromJSONObject(json_spirit::Object &obj)
+PlanNodeFragment::fromJSONObject(PlannerDomValue obj)
 {
-    json_spirit::Value planNodesValue = json_spirit::find_value( obj, "PLAN_NODES");
-    if (planNodesValue == json_spirit::Value::null) {
-        throwFatalException("Failure attempting to load plan a plan node fragment from a "
-                                 "json_spirit::Object. There was no value \"PLAN_NODES\"");
-    }
+    auto_ptr<PlanNodeFragment> pnf(new PlanNodeFragment());
 
-    PlanNodeFragment * pnf = new PlanNodeFragment();
     // read and construct plannodes from json object
-    json_spirit::Array planNodesArray = planNodesValue.get_array();
-    for (int ii = 0; ii < planNodesArray.size(); ii++) {
+    PlannerDomValue planNodesArray = obj.valueForKey("PLAN_NODES");
+
+    for (int i = 0; i < planNodesArray.arrayLen(); i++) {
         AbstractPlanNode *node = NULL;
-        try {
-            node = AbstractPlanNode::fromJSONObject(planNodesArray[ii].get_obj());
-        }
-        catch (const SerializableEEException &ex) {
-            delete pnf;
-            throw;
-        }
+        node = AbstractPlanNode::fromJSONObject(planNodesArray.valueAtIndex(i));
+        assert(node);
+
         pnf->m_planNodes.push_back(node);
         pnf->m_idToNodeMap[node->getPlanNodeId()] = node;
     }
@@ -141,48 +132,28 @@ PlanNodeFragment::fromJSONObject(json_spirit::Object &obj)
             parents.push_back(pnf->m_idToNodeMap[parentIds[zz]]);
         }
     }
-    try {
-        pnf->loadFromJSONObject(obj);
-    }
-    catch (const SerializableEEException &eeEx) {
-        delete pnf;
-        throw;
-    }
-    return pnf;
+    pnf->loadFromJSONObject(obj);
+
+    PlanNodeFragment *retval = pnf.get();
+    pnf.release();
+    assert(retval);
+    return retval;
 }
 
 void
-PlanNodeFragment::loadFromJSONObject(json_spirit::Object &obj)
+PlanNodeFragment::loadFromJSONObject(PlannerDomValue obj)
 {
-    json_spirit::Value executeListValue = json_spirit::find_value( obj, "EXECUTE_LIST");
-    if (executeListValue == json_spirit::Value::null) {
-        // throw if list arrived without an execution ordering
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "Failure while loading a PlanNodeList. "
-                                      "Couldn't find value \"EXECUTE_LIST\"");
-    }
-    else {
-        json_spirit::Array executeListArray = executeListValue.get_array();
-        for (int ii = 0; ii < executeListArray.size(); ii++) {
-            m_executionList.push_back(m_idToNodeMap[executeListArray[ii].get_int()]);
-        }
+    PlannerDomValue executeListArray = obj.valueForKey("EXECUTE_LIST");
+    for (int i = 0; i < executeListArray.arrayLen(); i++) {
+        m_executionList.push_back(m_idToNodeMap[executeListArray.valueAtIndex(i).asInt()]);
     }
 
-    json_spirit::Value parametersArrayValue = json_spirit::find_value( obj, "PARAMETERS");
-    if (parametersArrayValue == json_spirit::Value::null) {
-        //throw if list arrived without a parameter mapping
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "Failure while loading a PlanNodeList. "
-                                      "Couldn't find value \"PARAMETERS\"");
-    }
-    else {
-        json_spirit::Array parametersArray = parametersArrayValue.get_array();
-        for (int ii = 0; ii < parametersArray.size(); ii++) {
-            json_spirit::Array parameterArray = parametersArray[ii].get_array();
-            int index = parameterArray[0].get_int();
-            std::string typeString = parameterArray[1].get_str();
-            parameters.push_back(std::pair< int, voltdb::ValueType>(index, stringToValue(typeString)));
-        }
+    PlannerDomValue parametersArray = obj.valueForKey("PARAMETERS");
+    for (int i = 0; i < parametersArray.arrayLen(); i++) {
+        PlannerDomValue parameterArray = parametersArray.valueAtIndex(i);
+        int index = parameterArray.valueAtIndex(0).asInt();
+        std::string typeString = parameterArray.valueAtIndex(1).asStr();
+        parameters.push_back(std::pair< int, voltdb::ValueType>(index, stringToValue(typeString)));
     }
 }
 

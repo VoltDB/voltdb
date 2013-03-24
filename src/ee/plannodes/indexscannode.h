@@ -48,7 +48,6 @@
 
 #include <string>
 #include "abstractscannode.h"
-#include "json_spirit/json_spirit.h"
 
 namespace voltdb {
 
@@ -96,7 +95,7 @@ class IndexScanPlanNode : public AbstractScanPlanNode {
         std::string debugInfo(const std::string &spacer) const;
 
     protected:
-        virtual void loadFromJSONObject(json_spirit::Object &obj);
+        virtual void loadFromJSONObject(PlannerDomValue obj);
         //
         // This is the id of the index to reference during execution
         //

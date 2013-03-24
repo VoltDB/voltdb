@@ -51,8 +51,7 @@
 #include "catalog/database.h"
 #include "common/ids.h"
 #include "common/types.h"
-
-#include "json_spirit/json_spirit.h"
+#include "common/PlannerDomValue.h"
 
 #include <map>
 #include <string>
@@ -134,8 +133,7 @@ public:
     // ------------------------------------------------------------------
     // UTILITY METHODS
     // ------------------------------------------------------------------
-    static AbstractPlanNode*
-    fromJSONObject(json_spirit::Object& obj);
+    static AbstractPlanNode* fromJSONObject(PlannerDomValue obj);
 
     // Debugging convenience methods
     std::string debug() const;
@@ -154,7 +152,7 @@ public:
     }
 
 protected:
-    virtual void loadFromJSONObject(json_spirit::Object& obj) = 0;
+    virtual void loadFromJSONObject(PlannerDomValue obj) = 0;
     AbstractPlanNode(int32_t plannode_id);
     AbstractPlanNode();
 

@@ -53,13 +53,12 @@
 #include "common/common.h"
 #include "expressions/abstractexpression.h"
 
-#include "json_spirit/json_spirit.h"
 namespace voltdb {
 
 class ExpressionUtil {
 public:
 /** instantiate a typed expression */
-    static AbstractExpression* expressionFactory(json_spirit::Object &obj,
+    static AbstractExpression* expressionFactory(PlannerDomValue obj,
                                                  ExpressionType et, ValueType vt, int vs,
                                                  AbstractExpression* lc, AbstractExpression* rc,
                                                  const std::vector<AbstractExpression*>* arguments);
