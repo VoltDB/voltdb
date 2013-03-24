@@ -79,8 +79,6 @@ public interface CommandLog {
     public abstract void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
             int partitionId, long spHandle);
 
-    public abstract void logHeartbeat(final long txnId);
-
     public abstract long getFaultSequenceNumber();
 
     public interface DurabilityListener {

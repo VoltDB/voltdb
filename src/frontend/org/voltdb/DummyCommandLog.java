@@ -42,9 +42,6 @@ public class DummyCommandLog implements CommandLog {
     }
 
     @Override
-    public void logHeartbeat(final long txnId) {}
-
-    @Override
     public long getFaultSequenceNumber() {
         return 0;
     }
