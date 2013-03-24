@@ -70,8 +70,6 @@ public interface CommandLog {
     public abstract void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
             int partitionId, long spHandle);
 
-    public abstract long getFaultSequenceNumber();
-
     public interface DurabilityListener {
         public void onDurability(ArrayList<Object> durableThings);
     }

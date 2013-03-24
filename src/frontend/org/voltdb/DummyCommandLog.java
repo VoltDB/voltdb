@@ -35,11 +35,6 @@ public class DummyCommandLog implements CommandLog {
     public void shutdown() throws InterruptedException {}
 
     @Override
-    public long getFaultSequenceNumber() {
-        return 0;
-    }
-
-    @Override
     public void initForRejoin(CatalogContext context, long txnId, Map<Integer, Long> perPartitionTxnId, boolean isRejoin, String affinity) {}
 
     @Override
