@@ -24,6 +24,7 @@ import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.VoltDB;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.rejoin.TaskLog;
 
@@ -35,6 +36,7 @@ import java.util.concurrent.LinkedBlockingDeque;
 public class JoinProducer extends JoinProducerBase implements TaskLog {
     private final LinkedBlockingDeque<Pair<Integer, ByteBuffer>> m_snapshotData =
             new LinkedBlockingDeque<Pair<Integer, ByteBuffer>>();
+    // true if the site has received the first fragment task message
     private boolean m_receivedFirstFragment = false;
     // true if the site has notified the coordinator about the receipt of the first fragment
     // message
@@ -48,7 +50,7 @@ public class JoinProducer extends JoinProducerBase implements TaskLog {
         }
     }
 
-    JoinProducer(int partitionId, SiteTaskerQueue taskQueue)
+    public JoinProducer(int partitionId, SiteTaskerQueue taskQueue)
     {
         super(partitionId, "Join producer:" + partitionId + " ", taskQueue);
         m_completionAction = new CompletionAction();
@@ -102,6 +104,7 @@ public class JoinProducer extends JoinProducerBase implements TaskLog {
     @Override
     public TaskLog constructTaskLog(String voltroot)
     {
+        m_taskLog = initializeTaskLog(voltroot, m_partitionId);
         return this;
     }
 
@@ -116,7 +119,7 @@ public class JoinProducer extends JoinProducerBase implements TaskLog {
     {
         if (!m_receivedFirstFragment) {
             // no-op, wait for the first fragment
-        } else if (m_receivedFirstFragment && !m_firstFragResponseSent) {
+        } else if (!m_firstFragResponseSent) {
             // Received first fragment but haven't notified the coordinator
             sendFirstFragResponse();
         } else if (m_completionMonitorAwait.isDone()) {
@@ -124,6 +127,7 @@ public class JoinProducer extends JoinProducerBase implements TaskLog {
             SnapshotCompletionInterest.SnapshotCompletionEvent event = null;
             try {
                 event = m_completionMonitorAwait.get();
+                assert(event != null);
             } catch (InterruptedException e) {
                 // isDone() already returned true, this shouldn't happen
                 VoltDB.crashLocalVoltDB("Impossible interruption happend", true, e);
@@ -151,35 +155,37 @@ public class JoinProducer extends JoinProducerBase implements TaskLog {
     @Override
     public void logTask(TransactionInfoBaseMessage message) throws IOException
     {
+        assert(!(message instanceof Iv2InitiateTaskMessage));
         if (message instanceof FragmentTaskMessage) {
             if (JOINLOG.isTraceEnabled()) {
                 JOINLOG.trace("P" + m_partitionId + " received first fragment");
             }
             m_receivedFirstFragment = true;
         }
+        m_taskLog.logTask(message);
     }
 
     @Override
     public TransactionInfoBaseMessage getNextMessage() throws IOException
     {
-        return null;
+        return m_taskLog.getNextMessage();
     }
 
     @Override
     public void setEarliestTxnId(long txnId)
     {
-
+        m_taskLog.setEarliestTxnId(txnId);
     }
 
     @Override
     public boolean isEmpty() throws IOException
     {
-        return true;
+        return m_taskLog.isEmpty();
     }
 
     @Override
     public void close() throws IOException
     {
-
+        m_taskLog.close();
     }
 }
