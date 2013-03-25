@@ -10,7 +10,6 @@ org.voltdb.compiler.TestMilestoneOneCompile junit org.voltdb.compiler.TestMilest
 org.voltdb.compiler.TestVoltCompiler junit org.voltdb.compiler.TestVoltCompiler unsafe 100
 org.voltdb.dtxn.TestDtxnInitiatorMailbox junit org.voltdb.dtxn.TestDtxnInitiatorMailbox unsafe 100
 org.voltdb.dtxn.TestInFlightTxnState junit org.voltdb.dtxn.TestInFlightTxnState unsafe 100
-org.voltdb.dtxn.TestRestrictedPriorityQueue junit org.voltdb.dtxn.TestRestrictedPriorityQueue unsafe 100
 org.voltdb.dtxn.TestSimpleWorkUnit junit org.voltdb.dtxn.TestSimpleWorkUnit unsafe 100
 org.voltdb.dtxn.TestSiteTracker junit org.voltdb.dtxn.TestSiteTracker unsafe 100
 org.voltdb.executionsitefuzz.TestExecutionSiteFuzzChecker junit org.voltdb.executionsitefuzz.TestExecutionSiteFuzzChecker unsafe 100
