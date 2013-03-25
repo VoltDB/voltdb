@@ -20,7 +20,6 @@ package org.voltdb;
 import java.nio.ByteBuffer;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
-import org.voltdb.catalog.Statement;
 
 /**
  * <p>A simple wrapper of a parameterized SQL statement. VoltDB uses this instead of
@@ -33,14 +32,30 @@ import org.voltdb.catalog.Statement;
  */
 public class SQLStmt {
 
+    /**
+     * Per-fragment info
+     */
+    static class Frag {
+        long id;
+        byte[] planHash;
+        boolean transactional;
+    }
+
     // Used for uncompiled SQL.
     byte[] sqlText;
     String joinOrder;
     // hash of the sql string for determinism checks
     byte[] sqlCRC;
 
-    // Used for compiled SQL
-    SQLStmtPlan plan = null;
+    byte statementParamJavaTypes[];
+
+    Frag aggregator;
+    Frag collector;
+
+    boolean isReplicatedTableDML;
+    boolean isReadOnly;
+
+    boolean inCatalog;
 
     /**
      * Construct a SQLStmt instance from a SQL statement.
@@ -75,38 +90,63 @@ public class SQLStmt {
         crc.update(sqlText);
         // ugly hack to get bytes from an int
         this.sqlCRC = ByteBuffer.allocate(4).putInt((int) crc.getValue()).array();
+
+        inCatalog = true;
     }
 
     /**
-     * Factory method to construct a SQLStmt instance with a compiled plan attached.
+     * Factory method to construct a SQLStmt instance from a plan outside the catalog.
      *
      * @param sqlText Valid VoltDB compliant SQL
-     * @param aggregatorFragment Compiled aggregator fragment
-     * @param collectorFragment Compiled collector fragment
-     * @param isReplicatedTableDML Flag set to true if replicated
+     * @param aggFragId Site-local id of the aggregator fragment
+     * @param aggPlanHash 20 byte sha1 hash of the aggregator fragment plan
+     * @param isAggTransactional Does the aggregator fragment read/write tables?
+     * @param collectorFragId Site-local id of the collector fragment
+     * @param collectorPlanHash 20 byte sha1 hash of the collector fragment plan
+     * @param isCollectorTransactional Does the collector fragment read/write tables?
+     * @param isReplicatedTableDML Flag set to true if replicated DML
+     * @param isReadOnly Is SQL read only?
      * @param params Description of parameters expected by the statement
      * @return SQLStmt object with plan added
      */
     static SQLStmt createWithPlan(byte[] sqlText,
-                                  byte[] aggregatorFragment,
-                                  byte[] collectorFragment,
+                                  long aggFragId,
+                                  byte[] aggPlanHash,
+                                  boolean isAggTransactional,
+                                  long collectorFragId,
+                                  byte[] collectorPlanHash,
+                                  boolean isCollectorTransactional,
                                   boolean isReplicatedTableDML,
                                   boolean isReadOnly,
                                   VoltType[] params) {
         SQLStmt stmt = new SQLStmt(sqlText, null);
+
+        stmt.aggregator = new SQLStmt.Frag();
+        stmt.aggregator.id = aggFragId;
+        stmt.aggregator.planHash = aggPlanHash;
+        stmt.aggregator.transactional = isAggTransactional;
+
+        if (collectorFragId > 0) {
+            stmt.collector = new SQLStmt.Frag();
+            stmt.collector.id = collectorFragId;
+            stmt.collector.planHash = collectorPlanHash;
+            stmt.collector.transactional = isCollectorTransactional;
+        }
 
         /*
          * Fill out the parameter types
          */
         if (params != null) {
             stmt.statementParamJavaTypes = new byte[params.length];
-            stmt.numStatementParamJavaTypes = params.length;
             for (int i = 0; i < params.length; i++) {
                 stmt.statementParamJavaTypes[i] = params[i].getValue();
             }
         }
 
-        stmt.plan = new SQLStmtPlan(aggregatorFragment, collectorFragment, isReplicatedTableDML, isReadOnly);
+        stmt.isReadOnly = isReadOnly;
+        stmt.isReplicatedTableDML = isReplicatedTableDML;
+        stmt.inCatalog = false;
+
         return stmt;
     }
 
@@ -120,15 +160,6 @@ public class SQLStmt {
     }
 
     /**
-     * Get the pre-compiled plan, if available.
-     *
-     * @return pre-compiled plan object or null
-     */
-    SQLStmtPlan getPlan() {
-        return plan;
-    }
-
-    /**
      * Get the join order hint supplied in the constructor.
      *
      * @return String containing the join order hint.
@@ -136,29 +167,4 @@ public class SQLStmt {
     public String getJoinOrder() {
         return joinOrder;
     }
-
-    /**
-     * Check if single partition.
-     *
-     * @return true if it is single partition
-     */
-    boolean isSinglePartition() {
-        // Check the catalog or the plan, depending on which (if any) is available.
-        return (   (this.catStmt != null && this.catStmt.getSinglepartition())
-                || (this.plan != null && this.plan.getCollectorFragment() == null));
-    }
-
-    boolean isReadOnly() {
-        // Check the catalog or the plan, depending on which (if any) is available.
-        return (   (this.catStmt != null && this.catStmt.getReadonly())
-                || (this.plan != null && this.plan.isReadOnly()));
-    }
-
-    byte statementParamJavaTypes[];
-    int numStatementParamJavaTypes;
-
-    long fragGUIDs[];
-    int numFragGUIDs;
-
-    Statement catStmt = null;
 }

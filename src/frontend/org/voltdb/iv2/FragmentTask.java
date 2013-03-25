@@ -34,6 +34,7 @@ import org.voltdb.exceptions.SQLException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.rejoin.TaskLog;
+import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
 public class FragmentTask extends TransactionTask
@@ -174,11 +175,14 @@ public class FragmentTask extends TransactionTask
 
         for (int frag = 0; frag < m_task.getFragmentCount(); frag++)
         {
-            long fragmentId = m_task.getFragmentId(frag);
+            byte[] planHash = m_task.getPlanHash(frag);
             final int outputDepId = m_task.getOutputDepId(frag);
 
             ParameterSet params = m_task.getParameterSetForFragment(frag);
             final int inputDepId = m_task.getOnlyInputDepId(frag);
+
+            long fragmentId = 0;
+            byte[] fragmentPlan = null;
 
             /*
              * Currently the error path when executing plan fragments
@@ -193,11 +197,15 @@ public class FragmentTask extends TransactionTask
              */
             try {
                 VoltTable dependency;
-                byte[] fragmentPlan = m_task.getFragmentPlan(frag);
+                fragmentPlan = m_task.getFragmentPlan(frag);
 
-                // if custom fragment, load the plan
+                // if custom fragment, load the plan and get local fragment id
                 if (fragmentPlan != null) {
-                    fragmentId = siteConnection.loadPlanFragment(fragmentPlan);
+                    fragmentId = siteConnection.loadOrAddRefPlanFragment(planHash, fragmentPlan);
+                }
+                // otherwise ask the plan source for a local fragment id
+                else {
+                    fragmentId = siteConnection.getFragmentIdForPlanHash(planHash);
                 }
 
                 dependency = siteConnection.executePlanFragments(
@@ -216,13 +224,19 @@ public class FragmentTask extends TransactionTask
                 }
                 currentFragResponse.addDependency(outputDepId, dependency);
             } catch (final EEException e) {
-                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
+                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 break;
             } catch (final SQLException e) {
-                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
+                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 break;
+            }
+            finally {
+                // ensure adhoc plans are unloaded
+                if (fragmentPlan != null) {
+                    siteConnection.decrefPlanFragmentById(fragmentId);
+                }
             }
         }
         return currentFragResponse;

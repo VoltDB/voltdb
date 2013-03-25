@@ -29,6 +29,7 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.ExecutionSite;
+import org.voltdb.FragmentPlanSource;
 import org.voltdb.ParameterSet;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
@@ -57,12 +58,15 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public static final int ERRORCODE_SUCCESS = 0;
     public static final int ERRORCODE_ERROR = 1; // just error or not so far.
     public static final int ERRORCODE_WRONG_SERIALIZED_BYTES = 101;
+    public static final int ERRORCODE_NEED_PLAN = 110;
 
     /** Partition ID */
     protected final int m_partitionId;
 
     /** Statistics collector (provided later) */
     private PlannerStatsCollector m_plannerStats = null;
+
+    protected FragmentPlanSource m_planSource;
 
     /** Make the EE clean and ready to do new transactional work. */
     public void resetDirtyStatus() {
@@ -76,7 +80,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     /** Utility method to verify return code and throw as required */
     final protected void checkErrorCode(final int errorCode) {
-        if (errorCode != ERRORCODE_SUCCESS) {
+        if ((errorCode != ERRORCODE_SUCCESS) && (errorCode != ERRORCODE_NEED_PLAN)) {
             throwExceptionForError(errorCode);
         }
     }
@@ -93,7 +97,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     /** Create an ee and load the volt shared library */
-    public ExecutionEngine(long siteId, int partitionId) {
+    public ExecutionEngine(long siteId, int partitionId, FragmentPlanSource planSource) {
         m_partitionId = partitionId;
         org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
         // In mock test environments there may be no stats agent.
@@ -102,12 +106,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             m_plannerStats = new PlannerStatsCollector(siteId);
             statsAgent.registerStatsSource(SysProcSelector.PLANNER, siteId, m_plannerStats);
         }
+        m_planSource = planSource;
     }
 
     /** Alternate constructor without planner statistics tracking. */
-    public ExecutionEngine() {
+    public ExecutionEngine(FragmentPlanSource planSource) {
         m_partitionId = 0;  // not used
         m_plannerStats = null;
+        m_planSource = planSource;
     }
 
     /*
@@ -277,6 +283,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
     }
 
+    /**
+     * Called from the execution engine to fetch a plan for a given hash.
+     */
+    public byte[] planForFragmentId(long fragmentId) {
+        return m_planSource.planForFragmentId(fragmentId);
+    }
+
     /*
      * Interface frontend invokes to communicate to CPP execution engine.
      */
@@ -302,9 +315,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     /** Pass diffs to apply to the EE's catalog to update it */
     abstract public void updateCatalog(final long timestamp, final String diffCommands) throws EEException;
-
-    /** Load a fragment, given a plan, into the EE with a specific fragment id */
-    abstract public long loadPlanFragment(byte[] plan) throws EEException;
 
     /** Run multiple plan fragments */
     abstract public VoltTable[] executePlanFragments(int numFragmentIds,
@@ -510,8 +520,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table,
             long spHandle, long lastCommittedSpHandle);
-
-    protected native int nativeLoadPlanFragment(long pointer, byte[] plan);
 
     /**
      * Executes multiple plan fragments with the given parameter sets and gets the results.

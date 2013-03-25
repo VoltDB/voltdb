@@ -67,6 +67,10 @@ public:
         return 0;
     }
 
+    std::string planForFragmentId(int64_t fragmentId) {
+        return "";
+    }
+
     void crashVoltDB(voltdb::FatalException e) {
     }
 

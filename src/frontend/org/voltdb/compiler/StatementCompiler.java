@@ -17,6 +17,9 @@
 
 package org.voltdb.compiler;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
@@ -158,20 +161,39 @@ public abstract class StatementCompiler {
         // set the explain plan output into the catalog (in hex)
         catalogStmt.setExplainplan(Encoder.hexEncode(plan.explainedPlan));
 
+        // compute a hash of the plan
+        MessageDigest md = null;
+        try {
+            md = MessageDigest.getInstance("SHA-1");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+            assert(false);
+            System.exit(-1); // should never happen with healthy jvm
+        }
+
         // Now update our catalog information
         PlanFragment planFragment = catalogStmt.getFragments().add("0");
         planFragment.setHasdependencies(plan.subPlanGraph != null);
         // mark a fragment as non-transactional if it never touches a persistent table
         planFragment.setNontransactional(!fragmentReferencesPersistentTable(plan.rootPlanGraph));
         planFragment.setMultipartition(plan.subPlanGraph != null);
-        writePlanBytes(compiler, planFragment, plan.rootPlanGraph);
+        byte[] planBytes = writePlanBytes(compiler, planFragment, plan.rootPlanGraph);
+        md.update(planBytes, 0, planBytes.length);
+        // compute the 40 bytes of hex from the 20 byte sha1 hash of the plans
+        md.reset();
+        md.update(planBytes);
+        planFragment.setPlanhash(Encoder.hexEncode(md.digest()));
 
         if (plan.subPlanGraph != null) {
             planFragment = catalogStmt.getFragments().add("1");
             planFragment.setHasdependencies(false);
             planFragment.setNontransactional(false);
             planFragment.setMultipartition(true);
-            writePlanBytes(compiler, planFragment, plan.subPlanGraph);
+            byte[] subBytes = writePlanBytes(compiler, planFragment, plan.subPlanGraph);
+            // compute the 40 bytes of hex from the 20 byte sha1 hash of the plans
+            md.reset();
+            md.update(subBytes);
+            planFragment.setPlanhash(Encoder.hexEncode(md.digest()));
         }
 
         // Planner should have rejected with an exception any statement with an unrecognized type.
@@ -179,7 +201,10 @@ public abstract class StatementCompiler {
         assert(validType != QueryType.INVALID.getValue());
     }
 
-    static void writePlanBytes(VoltCompiler compiler, PlanFragment fragment, AbstractPlanNode planGraph)
+    /**
+     * Update the plan fragment and return the bytes of the plan
+     */
+    static byte[] writePlanBytes(VoltCompiler compiler, PlanFragment fragment, AbstractPlanNode planGraph)
     throws VoltCompilerException {
         // get the plan bytes
         PlanNodeList node_list = new PlanNodeList(planGraph);
@@ -188,9 +213,11 @@ public abstract class StatementCompiler {
         // Place serialized version of PlanNodeTree into a PlanFragment
         try {
             FastSerializer fs = new FastSerializer(true, false);
-            fs.write(json.getBytes());
+            byte[] jsonBytes = json.getBytes();
+            fs.write(jsonBytes);
             String hexString = fs.getHexEncodedBytes();
             fragment.setPlannodetree(hexString);
+            return jsonBytes;
         } catch (Exception e) {
             e.printStackTrace();
             throw compiler.new VoltCompilerException(e.getMessage());

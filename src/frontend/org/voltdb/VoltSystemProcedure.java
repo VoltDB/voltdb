@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
@@ -39,6 +40,8 @@ import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+
+import com.google.common.primitives.Longs;
 
 /**
  * System procedures extend VoltSystemProcedure and use its utility methods to
@@ -74,6 +77,30 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     protected SiteProcedureConnection m_site;
     private LoadedProcedureSet m_loadedProcedureSet;
     protected ProcedureRunner m_runner; // overrides private parent var
+
+    /**
+     * Since sysprocs still use long fragids in places (rather than sha1 hashes),
+     * provide a utility method to convert between longs and hashes. This method
+     * is the inverse of {@link VoltSystemProcedure#fragIdToHash(long)}.
+     *
+     * @param hash 20bytes of hash value
+     * @return 8 bytes of fragid
+     */
+    public static long hashToFragId(byte[] hash) {
+        return Longs.fromByteArray(hash);
+    }
+
+    /**
+     * Since sysprocs still use long fragids in places (rather than sha1 hashes),
+     * provide a utility method to convert between longs and hashes. This method
+     * is the inverse of {@link VoltSystemProcedure#hashToFragId(byte[])}.
+     *
+     * @param fragId 8 bytes of frag id
+     * @return
+     */
+    public static byte[] fragIdToHash(long fragId) {
+        return ArrayUtils.addAll(Longs.toByteArray(fragId), new byte[12]);
+    }
 
     @Override
     void init(ProcedureRunner procRunner) {
@@ -236,7 +263,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                             0,
                             0,
                             false,
-                            pf.fragmentId,
+                            fragIdToHash(pf.fragmentId),
                             pf.outputDepId,
                             parambytes,
                             false,
@@ -264,10 +291,10 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
             if (vm instanceof FragmentTaskMessage) {
                 FragmentTaskMessage ftm = (FragmentTaskMessage)vm;
                 DependencyPair dp =
-                        m_runner.executePlanFragment(
+                        m_runner.executeSysProcPlanFragment(
                                 m_runner.getTxnState(),
                                 null,
-                                ftm.getFragmentId(0),
+                                hashToFragId(ftm.getPlanHash(0)),
                                 ftm.getParameterSetForFragment(0));
                 FragmentResponseMessage frm = new FragmentResponseMessage(ftm, m.getHSId());
                 frm.addDependency(dp.depId, dp.dependency);
@@ -324,7 +351,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
          * Executing the last aggregator plan fragment in the list produces the result
          */
         results[0] =
-                m_runner.executePlanFragment(
+                m_runner.executeSysProcPlanFragment(
                         m_runner.getTxnState(),
                         receivedDependencyIds,
                         pfs[pfs.length - 1].fragmentId,
@@ -378,7 +405,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                     txnState.txnId,
                     txnState.uniqueId,
                     txnState.isReadOnly(),
-                    pf.fragmentId,
+                    fragIdToHash(pf.fragmentId),
                     pf.outputDepId,
                     parambytes,
                     false,

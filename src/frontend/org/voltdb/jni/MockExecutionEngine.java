@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Random;
 
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.FragmentPlanSource;
 import org.voltdb.ParameterSet;
 import org.voltdb.SysProcSelector;
 import org.voltdb.TableStreamType;
@@ -33,8 +34,8 @@ import org.voltdb.export.ExportProtoMessage;
 
 public class MockExecutionEngine extends ExecutionEngine {
 
-    public MockExecutionEngine() {
-        super();
+    public MockExecutionEngine(FragmentPlanSource planSource) {
+        super(planSource);
     }
 
     @Override
@@ -42,11 +43,6 @@ public class MockExecutionEngine extends ExecutionEngine {
         if (errorCode == ERRORCODE_ERROR) {
             throw new SQLException("66666");
         }
-    }
-
-    @Override
-    public long loadPlanFragment(byte[] plan) throws EEException {
-        return -1;
     }
 
     @Override

@@ -17,6 +17,7 @@
 
 #ifndef JNITOPEND_H_
 #define JNITOPEND_H_
+#include "boost/shared_array.hpp"
 #include "common/Topend.h"
 #include "common/FatalException.hpp"
 #include "common/Pool.hpp"
@@ -31,6 +32,7 @@ public:
 
     inline JNITopend* updateJNIEnv(JNIEnv *env) { m_jniEnv = env; return this; }
     int loadNextDependency(int32_t dependencyId, Pool *stringPool, Table* destination);
+    std::string planForFragmentId(int64_t fragmentId);
     void crashVoltDB(FatalException e);
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
     void pushExportBuffer(
@@ -51,6 +53,7 @@ private:
     jobject m_javaExecutionEngine;
     jmethodID m_fallbackToEEAllocatedBufferMID;
     jmethodID m_nextDependencyMID;
+    jmethodID m_planForFragmentIdMID;
     jmethodID m_crashVoltDBMID;
     jmethodID m_pushExportBufferMID;
     jmethodID m_getQueuedExportBytesMID;

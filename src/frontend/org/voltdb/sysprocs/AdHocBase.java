@@ -88,27 +88,46 @@ public abstract class AdHocBase extends VoltSystemProcedure {
 
         int currentCatalogVersion = ctx.getCatalogVersion();
 
-        for (AdHocPlannedStatement statement : statements) {
-            if (currentCatalogVersion != statement.core.catalogVersion) {
-                String msg = String.format("AdHoc transaction %d wasn't planned " +
-                        "against the current catalog version. Statement: %s",
-                        ctx.getCurrentTxnId(),
-                        new String(statement.sql, VoltDB.UTF8ENCODING));
-                throw new VoltAbortException(msg);
+        VoltTable[] retval = null;
+        try {
+            for (AdHocPlannedStatement statement : statements) {
+                if (currentCatalogVersion != statement.core.catalogVersion) {
+                    String msg = String.format("AdHoc transaction %d wasn't planned " +
+                            "against the current catalog version. Statement: %s",
+                            ctx.getCurrentTxnId(),
+                            new String(statement.sql, VoltDB.UTF8ENCODING));
+                    throw new VoltAbortException(msg);
+                }
+
+                long aggFragId = m_site.loadOrAddRefPlanFragment(
+                        statement.core.aggregatorHash, statement.core.aggregatorFragment);
+                long collectorFragId = 0;
+                if (statement.core.collectorFragment != null) {
+                    collectorFragId = m_site.loadOrAddRefPlanFragment(
+                            statement.core.collectorHash, statement.core.collectorFragment);
+                }
+
+                SQLStmt stmt = SQLStmtAdHocHelper.createWithPlan(
+                        statement.sql,
+                        aggFragId,
+                        statement.core.aggregatorHash,
+                        true,
+                        collectorFragId,
+                        statement.core.collectorHash,
+                        true,
+                        statement.core.isReplicatedTableDML,
+                        statement.core.readOnly,
+                        statement.core.parameterTypes);
+
+                voltQueueSQL(stmt, statement.extractedParamValues.toArray());
             }
 
-            SQLStmt stmt = SQLStmtAdHocHelper.createWithPlan(
-                    statement.sql,
-                    statement.core.aggregatorFragment,
-                    statement.core.collectorFragment,
-                    statement.core.isReplicatedTableDML,
-                    statement.core.readOnly,
-                    statement.core.parameterTypes);
+            retval = voltExecuteSQL(true);
+        }
+        finally {
 
-            voltQueueSQL(stmt, statement.extractedParamValues.toArray());
         }
 
-        return voltExecuteSQL(true);
+        return retval;
     }
-
 }
