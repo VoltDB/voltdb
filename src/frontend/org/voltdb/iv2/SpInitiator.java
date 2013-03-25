@@ -70,12 +70,12 @@ public class SpInitiator extends BaseInitiator implements Promotable
     };
 
     public SpInitiator(HostMessenger messenger, Integer partition, StatsAgent agent,
-            SnapshotCompletionMonitor snapMonitor, String voltroot,
+            SnapshotCompletionMonitor snapMonitor,
             VoltDB.START_ACTION startAction)
     {
         super(VoltZK.iv2masters, messenger, partition,
                 new SpScheduler(partition, new SiteTaskerQueue(), snapMonitor),
-                "SP", agent, voltroot, startAction);
+                "SP", agent, startAction);
         m_leaderCache = new LeaderCache(messenger.getZK(), VoltZK.iv2appointees, m_leadersChangeHandler);
         m_tickProducer = new TickProducer(m_scheduler.m_tasks);
     }

@@ -85,6 +85,8 @@ public class FragmentTask extends TransactionTask
         // completion?
         response.m_sourceHSId = m_initiator.getHSId();
         m_initiator.deliver(response);
+        completeFragment();
+
         if (hostLog.isDebugEnabled()) {
             hostLog.debug("COMPLETE: " + this);
         }
@@ -117,6 +119,7 @@ public class FragmentTask extends TransactionTask
         }
 
         m_initiator.deliver(response);
+        completeFragment();
     }
 
     /**
@@ -135,8 +138,19 @@ public class FragmentTask extends TransactionTask
         }
         // ignore response.
         processFragmentTask(siteConnection);
+        completeFragment();
     }
 
+    private void completeFragment()
+    {
+        // Check and see if we can flush early
+        // right now, this is just read-only and final task
+        // This
+        if (m_task.isFinalTask() && m_txn.isReadOnly())
+        {
+            doCommonSPICompleteActions();
+        }
+    }
 
     // Cut and pasted from ExecutionSite processFragmentTask(), then
     // modifed to work in the new world

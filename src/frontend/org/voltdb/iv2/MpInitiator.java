@@ -57,7 +57,6 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     new SiteTaskerQueue()),
                 "MP",
                 agent,
-                null, /* never for rejoin, no need for voltroot */
                 VoltDB.START_ACTION.CREATE /* never for rejoin */);
     }
 

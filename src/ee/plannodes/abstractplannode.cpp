@@ -53,7 +53,6 @@
 #include <stdexcept>
 #include <string>
 
-using namespace json_spirit;
 using namespace std;
 using namespace voltdb;
 
@@ -257,115 +256,51 @@ AbstractPlanNode::generateTupleSchema(bool allowNulls)
 //  Serialization Functions
 // ----------------------------------------------------
 AbstractPlanNode*
-AbstractPlanNode::fromJSONObject(Object &obj) {
+AbstractPlanNode::fromJSONObject(PlannerDomValue obj) {
 
-    Value typeValue = find_value(obj, "PLAN_NODE_TYPE");
-    if (typeValue == Value::null)
-    {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AbstractPlanNode::fromJSONObject:"
-                                      " PLAN_NODE_TYPE value is null");
-    }
-    string typeString = typeValue.get_str();
-    AbstractPlanNode* node =
-        plannodeutil::getEmptyPlanNode(stringToPlanNode(typeString));
+    string typeString = obj.valueForKey("PLAN_NODE_TYPE").asStr();
 
-    Value idValue = find_value(obj, "ID");
-    if (idValue == Value::null)
-    {
-        delete node;
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AbstractPlanNode::fromJSONObject:"
-                                      " ID value is null");
-    }
-    node->m_planNodeId = (int32_t) idValue.get_int();
+    std::auto_ptr<AbstractPlanNode> node(
+        plannodeutil::getEmptyPlanNode(stringToPlanNode(typeString)));
 
-    Value inlineNodesValue = find_value(obj,"INLINE_NODES");
-    if (inlineNodesValue == Value::null)
-    {
-        delete node;
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AbstractPlanNode::fromJSONObject:"
-                                      " INLINE_NODES value is null");
-    }
+    node->m_planNodeId = obj.valueForKey("ID").asInt();
 
-    Array inlineNodes = inlineNodesValue.get_array();
-    for (int ii = 0; ii < inlineNodes.size(); ii++)
-    {
-        AbstractPlanNode* newNode = NULL;
-        try {
-            Object obj = inlineNodes[ii].get_obj();
-            newNode = AbstractPlanNode::fromJSONObject(obj);
-        }
-        catch (const SerializableEEException &ex) {
-            delete newNode;
-            delete node;
-            throw;
-        }
+    PlannerDomValue inlineNodesValue = obj.valueForKey("INLINE_NODES");
+    for (int i = 0; i < inlineNodesValue.arrayLen(); i++) {
+        PlannerDomValue inlineNodeObj = inlineNodesValue.valueAtIndex(i);
+        AbstractPlanNode *newNode = AbstractPlanNode::fromJSONObject(inlineNodeObj);
 
         // todo: if this throws, new Node can be leaked.
         // As long as newNode is not NULL, this will not throw.
+        assert(newNode);
         node->addInlinePlanNode(newNode);
     }
 
-    Value parentNodeIdsValue = find_value(obj, "PARENT_IDS");
-    if (parentNodeIdsValue == Value::null)
-    {
-        delete node;
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AbstractPlanNode::fromJSONObject:"
-                                      " PARENT_IDS value is null");
-    }
-
-    Array parentNodeIdsArray = parentNodeIdsValue.get_array();
-    for (int ii = 0; ii < parentNodeIdsArray.size(); ii++)
-    {
-        int32_t parentNodeId = (int32_t) parentNodeIdsArray[ii].get_int();
+    PlannerDomValue parentIdsArray = obj.valueForKey("PARENT_IDS");
+    for (int i = 0; i < parentIdsArray.arrayLen(); i++) {
+        int32_t parentNodeId = parentIdsArray.valueAtIndex(i).asInt();
         node->m_parentIds.push_back(parentNodeId);
     }
 
-    Value childNodeIdsValue = find_value(obj, "CHILDREN_IDS");
-    if (childNodeIdsValue == Value::null)
-    {
-        delete node;
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AbstractPlanNode::fromJSONObject:"
-                                      " CHILDREN_IDS value is null");
-    }
-
-    Array childNodeIdsArray = childNodeIdsValue.get_array();
-    for (int ii = 0; ii < childNodeIdsArray.size(); ii++)
-    {
-        int32_t childNodeId = (int32_t) childNodeIdsArray[ii].get_int();
+    PlannerDomValue childNodeIdsArray = obj.valueForKey("CHILDREN_IDS");
+    for (int i = 0; i < childNodeIdsArray.arrayLen(); i++) {
+        int32_t childNodeId = childNodeIdsArray.valueAtIndex(i).asInt();
         node->m_childIds.push_back(childNodeId);
     }
 
-    Value outputSchemaValue = find_value(obj, "OUTPUT_SCHEMA");
-    if (outputSchemaValue == Value::null)
-    {
-        delete node;
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AbstractPlanNode::loadFromJSONObject:"
-                                      " Can't find OUTPUT_SCHEMA value");
-    }
-    Array outputSchemaArray = outputSchemaValue.get_array();
-
-    for (int ii = 0; ii < outputSchemaArray.size(); ii++)
-    {
-        Value outputColumnValue = outputSchemaArray[ii];
-        SchemaColumn* outputColumn =
-            new SchemaColumn(outputColumnValue.get_obj());
+    PlannerDomValue outputSchemaArray = obj.valueForKey("OUTPUT_SCHEMA");
+    for (int i = 0; i < outputSchemaArray.arrayLen(); i++) {
+        PlannerDomValue outputColumnValue = outputSchemaArray.valueAtIndex(i);
+        SchemaColumn* outputColumn = new SchemaColumn(outputColumnValue);
         node->m_outputSchema.push_back(outputColumn);
     }
 
-    try {
-        node->loadFromJSONObject(obj);
-    }
-    catch (const SerializableEEException &ex) {
-        delete node;
-        throw;
-    }
-    return node;
+    node->loadFromJSONObject(obj);
+
+    AbstractPlanNode* retval = node.get();
+    node.release();
+    assert(retval);
+    return retval;
 }
 
 // ------------------------------------------------------------------

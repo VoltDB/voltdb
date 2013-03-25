@@ -47,7 +47,6 @@
 #define HSTOREOPERATIONNODE_H
 
 #include "abstractplannode.h"
-#include "json_spirit/json_spirit.h"
 
 namespace voltdb {
 
@@ -68,7 +67,7 @@ class AbstractOperationPlanNode : public AbstractPlanNode {
         virtual std::string debugInfo(const std::string &spacer) const;
 
     protected:
-        virtual void loadFromJSONObject(json_spirit::Object &obj);
+        virtual void loadFromJSONObject(PlannerDomValue obj);
         AbstractOperationPlanNode(int32_t id) : AbstractPlanNode(id) {
             target_table = NULL;
             target_table_name = "NOT_SPECIFIED";

@@ -64,8 +64,7 @@ function client() {
         schemachange.SchemaChangeClient \
         --servers=localhost \
         --targetrssmb=0 \
-        --targetrowcount=100000 \
-        --pathtodeployment=`pwd`/deployment.xml
+        --targetrowcount=100000
 }
 
 function help() {

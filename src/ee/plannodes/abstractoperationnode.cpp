@@ -50,7 +50,6 @@
 #include "common/serializeio.h"
 #include "storage/table.h"
 #include "catalog/table.h"
-#include "json_spirit/json_spirit.h"
 
 using namespace std;
 using namespace voltdb;
@@ -81,13 +80,6 @@ string AbstractOperationPlanNode::debugInfo(const string &spacer) const {
     return (buffer.str());
 }
 
-void AbstractOperationPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
-    json_spirit::Value targetTableNameValue = json_spirit::find_value( obj, "TARGET_TABLE_NAME");
-    if (targetTableNameValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AbstractOperationPlanNode::"
-                                      "loadFromJSONObject: "
-                                      "Couldn't find TARGET_TABLE_NAME value");
-    }
-    target_table_name = targetTableNameValue.get_str();
+void AbstractOperationPlanNode::loadFromJSONObject(PlannerDomValue obj) {
+    target_table_name = obj.valueForKey("TARGET_TABLE_NAME").asStr();
 }

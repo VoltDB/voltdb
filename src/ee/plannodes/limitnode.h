@@ -72,7 +72,7 @@ class LimitPlanNode : public AbstractPlanNode {
         std::string debugInfo(const std::string &spacer) const;
 
     private:
-        virtual void loadFromJSONObject(json_spirit::Object &obj);
+        virtual void loadFromJSONObject(PlannerDomValue obj);
         int limit;
         int offset;
         int limitParamIdx;
