@@ -2845,11 +2845,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         return m_partitionDRGateway;
     }
 
-    @Override
-    public long getReplicatedDMLDivisor() {
-        return m_tracker.m_numberOfPartitions;
-    }
-
     public void notifySitesAdded(final SiteTracker st) {
         Runnable r = new Runnable() {
             @Override

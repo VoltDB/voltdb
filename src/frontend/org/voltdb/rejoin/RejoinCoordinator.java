@@ -54,7 +54,7 @@ public abstract class RejoinCoordinator extends LocalMailbox {
                         false, null);
             } else if (resp.getStatus() != ClientResponseImpl.SUCCESS) {
                 VoltDB.crashLocalVoltDB("Failed to initiate rejoin snapshot: "
-                        + resp.getStatusString(), false, null);
+                        + resp.getStatusString(), true, resp.getException());
             }
 
             VoltTable[] results = resp.getResults();
