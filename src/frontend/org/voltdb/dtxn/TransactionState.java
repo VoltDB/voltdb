@@ -54,7 +54,6 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected final TransactionInfoBaseMessage m_notice;
     protected int m_nextDepId = 1;
     protected final Mailbox m_mbox;
-    protected final SiteTransactionConnection m_site;
     volatile protected boolean m_done = false;
     protected long m_beginUndoToken;
     volatile public boolean m_needsRollback = false;
@@ -65,20 +64,6 @@ public abstract class TransactionState extends OrderableTransaction  {
     // is this transaction run during a rejoin
     protected RejoinState m_rejoinState = RejoinState.NORMAL;
 
-    /** Iv2 constructor */
-    protected TransactionState(Mailbox mbox,
-                               TransactionInfoBaseMessage notice)
-    {
-        super(notice.getTxnId(), notice.getSpHandle(), notice.getUniqueId(), notice.getInitiatorHSId());
-        m_mbox = mbox;
-        m_site = null;
-        m_notice = notice;
-        coordinatorSiteId = notice.getCoordinatorHSId();
-        m_isReadOnly = notice.isReadOnly();
-        m_beginUndoToken = Site.kInvalidUndoToken;
-        m_isForReplay = notice.isForReplay();
-    }
-
     /**
      * Set up the final member variables from the parameters. This will
      * be called exclusively by subclasses.
@@ -87,18 +72,14 @@ public abstract class TransactionState extends OrderableTransaction  {
      * @param notice The information about the new transaction.
      */
     protected TransactionState(Mailbox mbox,
-                               ExecutionSite site,
                                TransactionInfoBaseMessage notice)
     {
-        super(notice.getTxnId(), notice.getTxnId(),
-                notice.getTxnId(),
-                notice.getInitiatorHSId());
+        super(notice.getTxnId(), notice.getSpHandle(), notice.getUniqueId(), notice.getInitiatorHSId());
         m_mbox = mbox;
-        m_site = site;
         m_notice = notice;
         coordinatorSiteId = notice.getCoordinatorHSId();
         m_isReadOnly = notice.isReadOnly();
-        m_beginUndoToken = ExecutionSite.kInvalidUndoToken;
+        m_beginUndoToken = Site.kInvalidUndoToken;
         m_isForReplay = notice.isForReplay();
     }
 

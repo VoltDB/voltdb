@@ -68,7 +68,6 @@ import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.dtxn.SiteTransactionConnection;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.TransactionState.RejoinState;
 import org.voltdb.exceptions.EEException;
@@ -113,7 +112,7 @@ import com.google.common.collect.ImmutableMap;
  * do other things, but this is where the good stuff happens.
  */
 public class ExecutionSite
-implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSnapshotConnection
+implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
     private VoltLogger m_txnlog;
     private final VoltLogger m_rejoinLog = new VoltLogger("REJOIN");
@@ -392,7 +391,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         }
     }
 
-    @Override
     public boolean isActiveOrPreviouslyKnownSiteId(long hsid) {
         // if the host id is less than this one, then it existed when this site
         // was created (or it failed before this site existed)
@@ -2328,13 +2326,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         return null;
     }
 
-    /*
-     *
-     *  SiteTransactionConnection Interface (TransactionState -> ExecutionSite)
-     *
-     */
-
-    @Override
     public SiteTracker getSiteTracker() {
         return m_tracker;
     }
@@ -2346,7 +2337,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
      * site to release the undo data in the EE up until the current point
      * when the transaction ID changes.
      */
-    @Override
     public void beginNewTxn(TransactionState txnState)
     {
         if (m_txnlog.isTraceEnabled())
@@ -2381,8 +2371,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         }
     }
 
-
-    @Override
     public FragmentResponseMessage processFragmentTask(
             TransactionState txnState,
             final HashMap<Integer,List<VoltTable>> dependencies,
@@ -2475,8 +2463,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         return currentFragResponse;
     }
 
-
-    @Override
     public InitiateResponseMessage processInitiateTask(
             TransactionState txnState,
             final VoltMessage task)
