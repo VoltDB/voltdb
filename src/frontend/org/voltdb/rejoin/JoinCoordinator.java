@@ -41,7 +41,7 @@ import java.util.Map;
 /**
  * Coordinates the sites to perform rejoin
  */
-public abstract class RejoinCoordinator extends LocalMailbox {
+public abstract class JoinCoordinator extends LocalMailbox {
     protected final HostMessenger m_messenger;
 
     /*
@@ -79,7 +79,7 @@ public abstract class RejoinCoordinator extends LocalMailbox {
         }
     };
 
-    public RejoinCoordinator(HostMessenger hostMessenger) {
+    public JoinCoordinator(HostMessenger hostMessenger) {
         super(hostMessenger, hostMessenger.generateMailboxId(null));
         m_messenger = hostMessenger;
     }

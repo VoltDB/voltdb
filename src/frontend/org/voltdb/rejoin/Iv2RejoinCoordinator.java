@@ -46,7 +46,7 @@ import org.voltdb.messaging.RejoinMessage.Type;
  * must be thread-safe. They use m_lock to do this. DO NOT hold m_lock
  * when leaving this class.
  */
-public class Iv2RejoinCoordinator extends RejoinCoordinator {
+public class Iv2RejoinCoordinator extends JoinCoordinator {
     private static final VoltLogger REJOINLOG = new VoltLogger("REJOIN");
 
     private long m_startTime;
