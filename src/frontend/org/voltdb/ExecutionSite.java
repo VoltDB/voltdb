@@ -2054,7 +2054,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         {
             final long tid = it.next();
             TransactionState ts = m_transactionsById.get(tid);
-            ts.handleSiteFaults(failedSites);
 
             // Fault a transaction that was not globally initiated by a failed initiator
             if (initiatorSafeInitiationPoint.containsKey(ts.initiatorHSId) &&

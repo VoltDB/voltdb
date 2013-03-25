@@ -141,11 +141,6 @@ public class MpTransactionState extends TransactionState
         return m_task.getStoredProcedureInvocation();
     }
 
-    @Override
-    public void handleSiteFaults(HashSet<Long> failedSites)
-    {
-    }
-
     // Overrides needed by MpProcedureRunner
     @Override
     public void setupProcedureResume(boolean isFinal, int[] dependencies)

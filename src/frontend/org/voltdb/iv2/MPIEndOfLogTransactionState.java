@@ -17,8 +17,6 @@
 
 package org.voltdb.iv2;
 
-import java.util.HashSet;
-
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.dtxn.TransactionState;
@@ -67,7 +65,4 @@ public class MPIEndOfLogTransactionState extends TransactionState {
     {
         return null;
     }
-
-    @Override
-    public void handleSiteFaults(HashSet<Long> failedSites) {}
 }

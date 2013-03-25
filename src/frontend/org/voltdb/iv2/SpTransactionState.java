@@ -17,8 +17,6 @@
 
 package org.voltdb.iv2;
 
-import java.util.HashSet;
-
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.dtxn.TransactionState;
@@ -72,11 +70,5 @@ public class SpTransactionState extends TransactionState
     public StoredProcedureInvocation getInvocation()
     {
         return m_task.getStoredProcedureInvocation();
-    }
-
-    @Override
-    public void handleSiteFaults(HashSet<Long> failedSites)
-    {
-        throw new RuntimeException("Do not expect handleSiteFaults in IV2");
     }
 }
