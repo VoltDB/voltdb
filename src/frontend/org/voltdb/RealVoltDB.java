@@ -393,13 +393,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // when we construct it below
             m_globalServiceElector = new GlobalServiceElector(m_messenger.getZK(), m_messenger.getHostId());
 
-            Joiner joinCoordinator = null;
             if (m_joining) {
                 Class<?> joinerClass = MiscUtils.loadProClass("org.voltdb.JoinerImpl", "Elastic", false);
                 try {
                     Constructor<?> constructor = joinerClass.getConstructor(HostMessenger.class);
-                    joinCoordinator = (Joiner) constructor.newInstance(m_messenger);
-                    m_rejoinCoordinator = joinCoordinator;
+                    m_rejoinCoordinator = (RejoinCoordinator) constructor.newInstance(m_messenger);
                     m_messenger.registerMailbox(m_rejoinCoordinator);
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Failed to instantiate joiner", true, e);
@@ -419,7 +417,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
              * Then it does a compare and set of the topology.
              */
             ClusterConfig clusterConfig = null;
-            JSONObject topo = getTopology(config.m_startAction, joinCoordinator);
+            JSONObject topo = getTopology(config.m_startAction, m_rejoinCoordinator);
             m_partitionsToSitesAtStartupForExportInit = new ArrayList<Pair<Integer, Long>>();
             try {
                 clusterConfig = new ClusterConfig(topo);
@@ -440,7 +438,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     }
                     else if (m_joining) {
                         // Ask the joiner for the new partitions to create on this node.
-                        partitions = joinCoordinator.getPartitionsToAdd();
+                        partitions = m_rejoinCoordinator.getPartitionsToAdd();
                     }
                     else {
                         partitions = ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
@@ -491,7 +489,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         hostLog.info("Using blocking rejoin.");
                     }
                 } else if (m_joining) {
-                    joinCoordinator.setSites(hsidsToRejoin);
+                    m_rejoinCoordinator.setSites(hsidsToRejoin);
                 }
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
@@ -732,7 +730,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     // Get topology information.  If rejoining, get it directly from
     // ZK.  Otherwise, try to do the write/read race to ZK on startup.
-    private JSONObject getTopology(START_ACTION startAction, Joiner joinCoordinator)
+    private JSONObject getTopology(START_ACTION startAction, RejoinCoordinator joinCoordinator)
     {
         JSONObject topo = null;
         if (startAction == START_ACTION.JOIN) {
