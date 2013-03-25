@@ -68,7 +68,6 @@ import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.ReplayedTxnState;
-import org.voltdb.dtxn.SinglePartitionTxnState;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.SiteTransactionConnection;
 import org.voltdb.dtxn.TransactionState;
@@ -1557,16 +1556,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 return;
             }
 
-            if (ts == null) {
-                if (info.isSinglePartition()) {
-                    ts = new SinglePartitionTxnState(m_mailbox, this, info);
-                }
-                else {
-                }
-                hostLog.info(
-                        "Dropping txn " + ts.txnId + " data from failed initiatorSiteId: " + ts.initiatorHSId);
-            }
-
             if (ts != null)
             {
                 if (message instanceof FragmentTaskMessage) {
@@ -2622,19 +2611,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             return true;
         }
         else {
-            TransactionState nextTxn = null;
-
-            // only sneak in single partition work
-            if (nextTxn instanceof SinglePartitionTxnState)
-            {
-                boolean success = nextTxn.doWork(m_rejoining);
-                assert(success);
-                return true;
-            }
-            else {
-                // multipartition is next or no work
-                return false;
-            }
+            // multipartition is next or no work
+            return false;
         }
     }
 
