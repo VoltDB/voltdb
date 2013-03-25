@@ -18,6 +18,8 @@ package org.voltdb;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Random;
@@ -35,6 +37,7 @@ import com.google.common.collect.ImmutableSortedMap;
  * to pick what partition to route a particular value.
  */
 public class ElasticHashinator extends TheHashinator {
+    public static int DEFAULT_TOKENS_PER_PARTITION = 8;
 
     /**
      * Tokens on the ring. A value hashes to a token if the token is the first value <=
@@ -72,6 +75,54 @@ public class ElasticHashinator extends TheHashinator {
     }
 
     /**
+     * Private constructor to initialize a hashinator with known tokens. Used for adding/removing
+     * partitions from existing hashinator.
+     * @param tokens
+     */
+    private ElasticHashinator(Map<Long, Integer> tokens) {
+        this.tokens = ImmutableSortedMap.copyOf(tokens);
+        m_configBytes = toBytes();
+    }
+
+    /**
+     * Given an existing elastic hashinator, add a set of new partitions to the existing hash ring.
+     * @param oldHashinator An elastic hashinator
+     * @param newPartitions A set of new partitions to add
+     * @param tokensPerPartition The number of times a partition appears on the ring
+     * @return The config bytes of the new hash ring
+     */
+    public static byte[] addPartitions(TheHashinator oldHashinator,
+                                       Collection<Integer> newPartitions,
+                                       int tokensPerPartition) {
+        Preconditions.checkArgument(oldHashinator instanceof ElasticHashinator);
+        ElasticHashinator oldElasticHashinator = (ElasticHashinator) oldHashinator;
+        Random r = new Random(0);
+        Map<Long, Integer> newConfig = new HashMap<Long, Integer>(oldElasticHashinator.tokens);
+        Set<Integer> existingPartitions = new HashSet<Integer>(oldElasticHashinator.tokens.values());
+        Set<Long> checkSet = new HashSet<Long>(oldElasticHashinator.tokens.keySet());
+
+        for (int pid : newPartitions) {
+            if (existingPartitions.contains(pid)) {
+                throw new RuntimeException("Partition " + pid + " already exists in the " +
+                        "hashinator");
+            }
+
+            for (int i = 0; i < tokensPerPartition; i++) {
+                while (true) {
+                    long candidateToken = MurmurHash3.hash3_x64_128(r.nextLong());
+                    if (!checkSet.add(candidateToken)) {
+                        continue;
+                    }
+                    newConfig.put(candidateToken, pid);
+                    break;
+                }
+            }
+        }
+
+        return new ElasticHashinator(newConfig).toBytes();
+    }
+
+    /**
      * Convenience method for generating a deterministic token distribution for the ring based
      * on a given partition count and tokens per partition. Each partition will have N tokens
      * placed randomly on the ring.
@@ -97,6 +148,24 @@ public class ElasticHashinator extends TheHashinator {
                 }
             }
         }
+        return buf.array();
+    }
+
+    /**
+     * Serializes the configuration into bytes, also updates the currently cached m_configBytes.
+     * @return The byte[] of the current configuration.
+     */
+    private byte[] toBytes() {
+        ByteBuffer buf = ByteBuffer.allocate(4 + (tokens.size() * 12));//long and an int per
+        buf.putInt(tokens.size());
+
+        for (Map.Entry<Long, Integer> e : tokens.entrySet()) {
+            long token = e.getKey();
+            int pid = e.getValue();
+            buf.putLong(token);
+            buf.putInt(pid);
+        }
+
         return buf.array();
     }
 

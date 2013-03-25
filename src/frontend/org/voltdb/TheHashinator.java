@@ -20,6 +20,7 @@ package org.voltdb;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Collection;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.VoltLogger;
@@ -262,6 +263,21 @@ public abstract class TheHashinator {
     }
 
     /**
+     * Add new partitions to create a new hashinator configuration.
+     */
+    public static byte[] addPartitions(Collection<Integer> newPartitions) {
+        HashinatorType type = getConfiguredHashinatorType();
+        switch (type) {
+            case LEGACY:
+                throw new RuntimeException("Legacy hashinator doesn't support adding partitions");
+            case ELASTIC:
+                return ElasticHashinator.addPartitions(instance.get().getSecond(), newPartitions,
+                        ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+        }
+        throw new RuntimeException("Should not reach here");
+    }
+
+    /**
      * Get a basic configuration for the currently selected hashinator type based
      * on the current partition count. If Elastic is in play
      */
@@ -271,7 +287,7 @@ public abstract class TheHashinator {
         case LEGACY:
             return LegacyHashinator.getConfigureBytes(partitionCount);
         case ELASTIC:
-            return ElasticHashinator.getConfigureBytes(partitionCount, 8);
+            return ElasticHashinator.getConfigureBytes(partitionCount, ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
         }
         throw new RuntimeException("Should not reach here");
     }
