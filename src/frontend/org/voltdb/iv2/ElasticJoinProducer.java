@@ -33,7 +33,7 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingDeque;
 
-public class JoinProducer extends JoinProducerBase implements TaskLog {
+public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     private final LinkedBlockingDeque<Pair<Integer, ByteBuffer>> m_snapshotData =
             new LinkedBlockingDeque<Pair<Integer, ByteBuffer>>();
     // true if the site has received the first fragment task message
@@ -50,9 +50,9 @@ public class JoinProducer extends JoinProducerBase implements TaskLog {
         }
     }
 
-    public JoinProducer(int partitionId, SiteTaskerQueue taskQueue)
+    public ElasticJoinProducer(int partitionId, SiteTaskerQueue taskQueue)
     {
-        super(partitionId, "Join producer:" + partitionId + " ", taskQueue);
+        super(partitionId, "Elastic join producer:" + partitionId + " ", taskQueue);
         m_completionAction = new CompletionAction();
     }
 
