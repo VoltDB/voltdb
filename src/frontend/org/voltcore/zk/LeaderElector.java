@@ -22,6 +22,7 @@ import java.util.ListIterator;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -97,18 +98,22 @@ public class LeaderElector {
     private final Watcher childWatcher = new Watcher() {
         @Override
         public void process(WatchedEvent event) {
-            if (!m_done.get()) {
-                es.submit(childrenEventHandler);
-            }
+            try {
+                if (!m_done.get()) {
+                    es.submit(childrenEventHandler);
+                }
+            } catch (RejectedExecutionException e) {}
         }
     };
 
     private final Watcher watcher = new Watcher() {
         @Override
         public void process(WatchedEvent event) {
-            if (!m_done.get()) {
-                es.submit(electionEventHandler);
-            }
+            try {
+                if (!m_done.get()) {
+                    es.submit(electionEventHandler);
+                }
+            } catch (RejectedExecutionException e) {}
         }
     };
 
@@ -159,7 +164,10 @@ public class LeaderElector {
     {
         node = createParticipantNode(zk, dir, prefix, data);
         Future<?> task = es.submit(electionEventHandler);
-        es.submit(childrenEventHandler);
+        //Only do the extra work for watching children if a callback is registered
+        if (cb != null) {
+            es.submit(childrenEventHandler);
+        }
         if (block) {
             task.get();
         }
@@ -189,8 +197,8 @@ public class LeaderElector {
      */
     synchronized public void shutdown() throws InterruptedException, KeeperException {
         m_done.set(true);
-        zk.delete(node, -1);
         es.shutdown();
+        zk.delete(node, -1);
     }
 
     private final static VoltLogger LOG = new VoltLogger("HOST");
