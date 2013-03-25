@@ -609,16 +609,24 @@ public class MiscUtils {
     }
 
     /**
-     * Get the resident set size, in mb for the voltdb server on the other end of the client
+     * Get the resident set size, in mb, for the voltdb server on the other end of the client.
+     * If the client is connected to multiple servers, return the max individual rss across
+     * the cluster.
      */
     public static long getMBRss(Client client) {
         assert(client != null);
+        long rssMax = 0;
         try {
             ClientResponse r = client.callProcedure("@Statistics", "MEMORY", 0);
             VoltTable stats = r.getResults()[0];
-            stats.advanceRow();
-            long rss = stats.getLong("RSS") / 1024;
-            return rss;
+            stats.resetRowPosition();
+            while (stats.advanceRow()) {
+                long rss = stats.getLong("RSS") / 1024;
+                if (rss > rssMax) {
+                    rssMax = rss;
+                }
+            }
+            return rssMax;
         }
         catch (Exception e) {
             e.printStackTrace();

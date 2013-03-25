@@ -37,14 +37,15 @@ function srccompile() {
     javac -classpath $CLASSPATH -d obj \
         src/schemachange/*.java
     # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+    if [ $? != 0 ]; then exit 1; fi
 }
 
 # build an application catalog
 function catalog() {
+    srccompile
     $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql
     # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+    if [ $? != 0 ]; then exit 1; fi
 }
 
 # run the voltdb server locally
@@ -62,8 +63,8 @@ function client() {
     java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
         schemachange.SchemaChangeClient \
         --servers=localhost \
-        --targetrssmb=2048 \
-        --pathtodeployment=`pwd`/deployment.xml
+        --targetrssmb=0 \
+        --targetrowcount=100000
 }
 
 function help() {
@@ -72,5 +73,5 @@ function help() {
 
 # Run the target passed as the first arg on the command line
 # If no first arg, run server
-if [ $# -gt 1 ]; then help; exit; fi
+if [ $# -gt 1 ]; then help; exit 1; fi
 if [ $# = 1 ]; then $1; else server; fi

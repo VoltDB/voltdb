@@ -85,6 +85,7 @@ public class LocalCluster implements VoltServerConfig {
     int m_nextIPCPort = 10000;
     ArrayList<Process> m_cluster = new ArrayList<Process>();
     int perLocalClusterExtProcessIndex = 0;
+    VoltProjectBuilder m_builder;
 
     // Dedicated paths in the filesystem to be used as a root for each process
     ArrayList<File> m_subRoots = new ArrayList<File>();
@@ -458,7 +459,7 @@ public class LocalCluster implements VoltServerConfig {
 
         // create all the out-of-process servers
         for (int i = oopStartIndex; i < m_hostCount; i++) {
-            startOne(i, clearLocalDataDirectories, role);
+            startOne(i, clearLocalDataDirectories, role, START_ACTION.CREATE);
         }
 
         printTiming(logtime, "Pre-witness: " + (System.currentTimeMillis() - startTime) + "ms");
@@ -542,8 +543,9 @@ public class LocalCluster implements VoltServerConfig {
         }
     }
 
-    private void startOne(int hostId, boolean clearLocalDataDirectories, ReplicationRole replicaMode)
+    private void startOne(int hostId, boolean clearLocalDataDirectories, ReplicationRole replicaMode, START_ACTION startAction)
     {
+        PipeToFile ptf = null;
         CommandLine cmdln = (templateCmdLine.makeCopy());
         try {
             cmdln.internalPort(portGenerator.next());
@@ -577,6 +579,12 @@ public class LocalCluster implements VoltServerConfig {
             }
 
             cmdln.zkport(portGenerator.next());
+
+            if (startAction == START_ACTION.JOIN) {
+                cmdln.startCommand(startAction.name());
+                int portNoToRejoin = m_cmdLines.get(0).internalPort();
+                cmdln.leader(":" + portNoToRejoin);
+            }
 
             // If local directories are being cleared
             // generate a new subroot, otherwise reuse the existing directory
@@ -628,7 +636,7 @@ public class LocalCluster implements VoltServerConfig {
                 }
             }
 
-            PipeToFile ptf = new PipeToFile(
+            ptf = new PipeToFile(
                     testoutputdir +
                     File.separator +
                     "LC-" +
@@ -637,7 +645,9 @@ public class LocalCluster implements VoltServerConfig {
                     "idx" + String.valueOf(perLocalClusterExtProcessIndex++) +
                     ".txt",
                     proc.getInputStream(),
-                    PipeToFile.m_initToken, false, proc);
+                    startAction == START_ACTION.JOIN ? PipeToFile.m_rejoinToken : PipeToFile.m_initToken,
+                    false,
+                    proc);
             m_pipes.add(ptf);
             ptf.setName("ClusterPipe:" + String.valueOf(hostId));
             ptf.start();
@@ -645,6 +655,15 @@ public class LocalCluster implements VoltServerConfig {
         catch (IOException ex) {
             log.error("Failed to start cluster process:" + ex.getMessage(), ex);
             assert (false);
+        }
+
+        if (startAction == START_ACTION.JOIN) {
+            waitOnPTFReady(ptf, true, System.currentTimeMillis(), System.currentTimeMillis(), hostId);
+        }
+
+        if (hostId > (m_hostCount - 1)) {
+            m_hostCount++;
+            this.m_compiled = false; //Host count changed, should recompile
         }
     }
 
@@ -662,21 +681,32 @@ public class LocalCluster implements VoltServerConfig {
     }
 
     public boolean recoverOne(int hostId, Integer portOffset, String rejoinHost, boolean liveRejoin) {
-        return recoverOne(false, 0, hostId, portOffset, rejoinHost, liveRejoin);
+        return recoverOne(
+                false,
+                0,
+                hostId,
+                portOffset,
+                rejoinHost,
+                liveRejoin ? START_ACTION.LIVE_REJOIN : START_ACTION.REJOIN);
+    }
+
+    public void joinOne(int hostId) {
+        startOne(hostId, true, ReplicationRole.NONE, START_ACTION.JOIN);
     }
 
     public boolean recoverOne(int hostId, Integer portOffset, String rejoinHost) {
-        return recoverOne(false, 0, hostId, portOffset, rejoinHost, false);
+        return recoverOne(false, 0, hostId, portOffset, rejoinHost, START_ACTION.REJOIN);
     }
 
     private boolean recoverOne(boolean logtime, long startTime, int hostId) {
-        return recoverOne( logtime, startTime, hostId, null, "", false);
+        return recoverOne( logtime, startTime, hostId, null, "", START_ACTION.REJOIN);
     }
 
     // Re-start a (dead) process. HostId is the enumberation of the host
     // in the cluster (0, 1, ... hostCount-1) -- not an hsid, for example.
+    @SuppressWarnings("incomplete-switch")
     private boolean recoverOne(boolean logtime, long startTime, int hostId, Integer rejoinHostId,
-                               String rejoinHost, boolean liveRejoin) {
+                               String rejoinHost, START_ACTION startAction) {
 
         // Lookup the client interface port of the rejoin host
         // I have no idea why this code ignores the user's input
@@ -685,7 +715,9 @@ public class LocalCluster implements VoltServerConfig {
         if (rejoinHostId == null || m_hasLocalServer) {
             rejoinHostId = 0;
         }
+
         int portNoToRejoin = m_cmdLines.get(rejoinHostId).internalPort();
+
         log.info("Rejoining " + hostId + " to hostID: " + rejoinHostId);
 
         // rebuild the EE proc set.
@@ -711,12 +743,8 @@ public class LocalCluster implements VoltServerConfig {
             CommandLine rejoinCmdLn = m_cmdLines.get(hostId);
             // some tests need this
             rejoinCmdLn.javaProperties = templateCmdLine.javaProperties;
+            rejoinCmdLn.startCommand(startAction.name());
 
-            if (liveRejoin) {
-                rejoinCmdLn.startCommand(START_ACTION.LIVE_REJOIN.name());
-            } else {
-                rejoinCmdLn.startCommand(START_ACTION.REJOIN.name());
-            }
             // This shouldn't collide but apparently it sucks.
             // Bump it to avoid collisions on rejoin.
             if (m_debug) {
@@ -780,6 +808,13 @@ public class LocalCluster implements VoltServerConfig {
             assert (false);
         }
 
+        return waitOnPTFReady(ptf, logtime, startTime, start, hostId);
+    }
+
+    /*
+     * Wait for the PTF to report initialization/rejoin
+     */
+    private boolean waitOnPTFReady(PipeToFile ptf, boolean logtime, long startTime, long start, int hostId) {
         // wait for the joining site to be ready
         synchronized (ptf) {
             if (logtime) System.out.println("********** pre witness: " + (System.currentTimeMillis() - startTime) + " ms");
@@ -854,7 +889,9 @@ public class LocalCluster implements VoltServerConfig {
            m_cluster.set(hostNum, null);
            ptf = m_pipes.get(hostNum);
            m_pipes.set(hostNum, null);
-           procs = m_eeProcs.get(hostNum);
+           if (m_eeProcs.size() > hostNum) {
+               procs = m_eeProcs.get(hostNum);
+           }
         }
 
         if (ptf != null && ptf.m_filename != null) {
@@ -869,13 +906,15 @@ public class LocalCluster implements VoltServerConfig {
         //     new File(ptf.m_filename).delete();
         // }
 
-        for (EEProcess eeproc : procs) {
-            if (forceKillEEProcs) {
-                eeproc.destroy();
+        if (procs != null) {
+            for (EEProcess eeproc : procs) {
+                if (forceKillEEProcs) {
+                    eeproc.destroy();
+                }
+                eeproc.waitForShutdown();
             }
-            eeproc.waitForShutdown();
+            procs.clear();
         }
-        procs.clear();
     }
 
     public void shutDownExternal() throws InterruptedException {
@@ -1163,6 +1202,4 @@ public class LocalCluster implements VoltServerConfig {
         }
         return retval;
     }
-
-
 }

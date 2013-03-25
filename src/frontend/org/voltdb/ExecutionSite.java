@@ -85,6 +85,7 @@ import org.voltdb.fault.FaultHandler;
 import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault;
 import org.voltdb.fault.VoltFault.FaultType;
+import org.voltdb.iv2.JoinProducerBase;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
@@ -776,6 +777,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         public SiteTracker getSiteTrackerForSnapshot()          { return m_tracker; }
         @Override
         public int getNumberOfPartitions()                      { return m_tracker.m_numberOfPartitions; }
+
+        @Override
+        public void setNumberOfPartitions(int partitionCount)
+        {
+            throw new UnsupportedOperationException("Changing partition count in legacy is not " +
+                    "supported");
+        }
+
         @Override
         public SiteProcedureConnection getSiteProcedureConnection()
         {
@@ -809,7 +818,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         m_systemProcedureContext = new SystemProcedureContext();
         ee = null;
         hsql = null;
-        m_loadedProcedures = new LoadedProcedureSet(this, null, m_siteId, siteIndex, 2);
+        m_loadedProcedures = new LoadedProcedureSet(this, null, m_siteId, siteIndex);
         m_snapshotter = null;
         m_mailbox = null;
         m_transactionQueue = null;
@@ -850,7 +859,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 new Object[] { String.valueOf(m_siteId) }, null);
 
         m_context = voltdb.getCatalogContext();
-        m_tracker = VoltDB.instance().getSiteTracker();
+        m_tracker = null;//VoltDB.instance().getSiteTracker();
         final int partitionId = m_tracker.getPartitionForSite(m_siteId);
         String txnlog_name = ExecutionSite.class.getName() + "." + m_siteId;
         m_txnlog = new VoltLogger(txnlog_name);
@@ -900,7 +909,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         if (runnerFactory != null) {
             runnerFactory.configure(this, m_systemProcedureContext);
         }
-        m_loadedProcedures = new LoadedProcedureSet(this, runnerFactory, getSiteId(), siteIndex, m_tracker.m_numberOfPartitions);
+        m_loadedProcedures = new LoadedProcedureSet(this, runnerFactory, getSiteId(), siteIndex);
         m_loadedProcedures.loadProcedures(m_context, voltdb.getBackendTargetType(), csp);
 
         int snapshotPriority = 6;
@@ -976,7 +985,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                         hostname,
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getMaxtemptablesize(),
-                        configuredNumberOfPartitions);
+                        TheHashinator.getConfiguredHashinatorType(),
+                        TheHashinator.getConfigureBytes(configuredNumberOfPartitions));
                 eeTemp.loadCatalog( timestamp, serializedCatalog);
                 lastTickTime = EstTime.currentTimeMillis();
                 eeTemp.tick( lastTickTime, txnId);
@@ -994,7 +1004,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                             getSystemsettings().get("systemsettings").getMaxtemptablesize(),
                             target,
                             VoltDB.instance().getConfig().m_ipcPorts.remove(0),
-                            m_tracker.m_numberOfPartitions);
+                            TheHashinator.getConfiguredHashinatorType(),
+                            TheHashinator.getConfigureBytes(configuredNumberOfPartitions));
                 eeTemp.loadCatalog( timestamp, serializedCatalog);
                 lastTickTime = EstTime.currentTimeMillis();
                 eeTemp.tick( lastTickTime, 0);
@@ -1886,7 +1897,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         if (m_rejoining) {
             VoltDB.crashLocalVoltDB("Aborting rejoin due to a remote node failure. Retry again.", false, null);
         }
-        SiteTracker newTracker = VoltDB.instance().getSiteTracker();
+        SiteTracker newTracker = null;//VoltDB.instance().getSiteTracker();
         HashSet<SiteFailureFault> failures = message.m_failedSites;
 
         // Fix context and associated site tracker first - need
@@ -2939,7 +2950,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
     @Override
     public void setRejoinComplete(
-            org.voltdb.iv2.RejoinProducer.ReplayCompletionAction ignored,
+            JoinProducerBase.JoinCompletionAction ignored,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
         throw new RuntimeException("setRejoinComplete is an IV2-only interface.");
     }

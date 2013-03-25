@@ -85,6 +85,8 @@ public class FragmentTask extends TransactionTask
         // completion?
         response.m_sourceHSId = m_initiator.getHSId();
         m_initiator.deliver(response);
+        completeFragment();
+
         if (hostLog.isDebugEnabled()) {
             hostLog.debug("COMPLETE: " + this);
         }
@@ -108,7 +110,16 @@ public class FragmentTask extends TransactionTask
             new FragmentResponseMessage(m_task, m_initiator.getHSId());
         response.setRecovering(true);
         response.setStatus(FragmentResponseMessage.SUCCESS, null);
+
+        // Set the dependencies even if this is a dummy response. This site could be the master
+        // on elastic join, so the fragment response message is actually going to the MPI.
+        for (int frag = 0; frag < m_task.getFragmentCount(); frag++) {
+            final int outputDepId = m_task.getOutputDepId(frag);
+            response.addDependency(outputDepId, null);
+        }
+
         m_initiator.deliver(response);
+        completeFragment();
     }
 
     /**
@@ -127,8 +138,19 @@ public class FragmentTask extends TransactionTask
         }
         // ignore response.
         processFragmentTask(siteConnection);
+        completeFragment();
     }
 
+    private void completeFragment()
+    {
+        // Check and see if we can flush early
+        // right now, this is just read-only and final task
+        // This
+        if (m_task.isFinalTask() && m_txn.isReadOnly())
+        {
+            doCommonSPICompleteActions();
+        }
+    }
 
     // Cut and pasted from ExecutionSite processFragmentTask(), then
     // modifed to work in the new world

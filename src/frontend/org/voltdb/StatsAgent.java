@@ -36,8 +36,9 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
+import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.utils.CompressionService;
 
@@ -67,6 +68,8 @@ public class StatsAgent {
         new HashMap<SysProcSelector, HashMap<Long, ArrayList<StatsSource>>>();
 
     private final HashSet<SysProcSelector> handledSelectors = new HashSet<SysProcSelector>();
+
+    private HostMessenger m_messenger;
 
     private static class PendingStatsRequest {
         private final String selector;
@@ -98,9 +101,11 @@ public class StatsAgent {
         }
         handledSelectors.add(SysProcSelector.PROCEDURE);
         handledSelectors.add(SysProcSelector.PLANNER);
+        m_messenger = null;
     }
 
     public void getMailbox(final HostMessenger hostMessenger, final long hsId) {
+        m_messenger = hostMessenger;
         m_mailbox = new LocalMailbox(hostMessenger, hsId) {
             @Override
             public void deliver(final VoltMessage message) {
@@ -243,7 +248,7 @@ public class StatsAgent {
                 selector,
                 c,
                 clientHandle,
-                new VoltTable[1],
+                new VoltTable[2],
                 System.currentTimeMillis());
             collectTopoStats(psr);
             return;
@@ -272,11 +277,11 @@ public class StatsAgent {
         obj.put("returnAddress", m_mailbox.getHSId());
         obj.put("selector", "DRNODE");
         byte payloadBytes[] = CompressionService.compressBytes(obj.toString(4).getBytes("UTF-8"));
-        final SiteTracker st = VoltDB.instance().getSiteTracker();
-        for (long agent : st.getStatsAgents()) {
+        for (int hostId : m_messenger.getLiveHostIds()) {
+            long agentHsId = CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.STATS_SITE_ID);
             psr.expectedStatsResponses++;
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[] {JSON_PAYLOAD}, payloadBytes);
-            m_mailbox.send(agent, bpm);
+            m_mailbox.send(agentHsId, bpm);
         }
     }
 
@@ -339,6 +344,13 @@ public class StatsAgent {
     {
         List<Long> catalogIds = Arrays.asList(new Long[] { 0L });
         psr.aggregateTables[0] = getStats(SysProcSelector.TOPO, catalogIds, false, psr.startTime);
+        VoltTable vt =
+                new VoltTable(
+                new VoltTable.ColumnInfo("HASHTYPE", VoltType.STRING),
+                new VoltTable.ColumnInfo("HASHCONFIG", VoltType.VARBINARY));
+        psr.aggregateTables[1] = vt;
+        Pair<HashinatorType, byte[]> hashConfig = TheHashinator.getCurrentConfig();
+        vt.addRow(hashConfig.getFirst().toString(), hashConfig.getSecond());
         try {
             sendStatsResponse(psr);
         } catch (Exception e) {

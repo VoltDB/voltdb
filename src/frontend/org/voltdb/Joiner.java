@@ -14,14 +14,22 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.voltdb.dtxn;
+
+package org.voltdb;
+
+import org.json_voltpatches.JSONObject;
+import org.voltcore.messaging.HostMessenger;
+import org.voltdb.rejoin.RejoinCoordinator;
 
 import java.util.List;
-import java.util.Map;
 
-import org.voltdb.MailboxNodeContent;
-import org.voltdb.VoltZK.MailboxType;
+public abstract class Joiner extends RejoinCoordinator {
+    public Joiner(HostMessenger hostMessenger)
+    {
+        super(hostMessenger);
+    }
 
-public interface MailboxUpdateHandler {
-    public void handleMailboxUpdate(Map<MailboxType, List<MailboxNodeContent>> mailboxes);
+    public abstract List<Integer> getPartitionsToAdd();
+    public abstract JSONObject getTopology();
+    public abstract void setSites(List<Long> sites);
 }

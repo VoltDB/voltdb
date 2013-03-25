@@ -126,7 +126,7 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
     try {
         if (!p_init(m_abstractNode, limits))
             return false;
-    } catch (exception& err) {
+    } catch (const exception& err) {
         char message[128];
         snprintf(message, 128, "The Executor failed to initialize PlanNode '%s'",
                 m_abstractNode->debug().c_str());

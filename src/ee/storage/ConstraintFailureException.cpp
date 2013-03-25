@@ -40,7 +40,7 @@ ConstraintFailureException::ConstraintFailureException(
         assert(!tuple.isNullTuple());
 }
 
-void ConstraintFailureException::p_serialize(ReferenceSerializeOutput *output) {
+void ConstraintFailureException::p_serialize(ReferenceSerializeOutput *output) const {
     SQLException::p_serialize(output);
     output->writeInt(m_type);
     output->writeTextString(m_table->name());

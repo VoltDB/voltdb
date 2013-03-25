@@ -19,6 +19,7 @@
 #include <cstdio>
 #include "boost/shared_array.hpp"
 #include "common/types.h"
+#include "common/PlannerDomValue.h"
 #include "common/FatalException.hpp"
 #include "catalog/catalog.h"
 #include "catalog/columnref.h"
@@ -111,13 +112,11 @@ void MaterializedViewMetadata::parsePredicate(catalog::MaterializedViewInfo *met
     int bufferLength = (int)hexString.size() / 2 + 1;
     boost::shared_array<char> buffer(new char[bufferLength]);
     catalog::Catalog::hexDecodeString(hexString, buffer.get());
-    std::string bufferString(buffer.get());
-    json_spirit::Value predicateValue;
-    json_spirit::read( bufferString, predicateValue );
 
-    if (!(predicateValue == json_spirit::Value::null)) {
-        json_spirit::Object predicateObject = predicateValue.get_obj();
-        m_filterPredicate = AbstractExpression::buildExpressionTree(predicateObject);
+    PlannerDomRoot domRoot(buffer.get());
+    if (!domRoot.isNull()) {
+        PlannerDomValue expr = domRoot.rootObject();
+        m_filterPredicate = AbstractExpression::buildExpressionTree(expr);
     }
 }
 

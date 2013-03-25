@@ -25,6 +25,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.iv2.JoinProducerBase;
 
 /**
  * VoltProcedures invoke SiteProcedureConnection methods to
@@ -143,7 +144,7 @@ public interface SiteProcedureConnection {
      * if configured to do so and it will also set export sequence numbers
      */
     public void setRejoinComplete(
-            org.voltdb.iv2.RejoinProducer.ReplayCompletionAction action,
+            JoinProducerBase.JoinCompletionAction action,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers);
 
     public long[] getUSOForExportTable(String signature);

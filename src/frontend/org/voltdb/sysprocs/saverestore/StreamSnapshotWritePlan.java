@@ -21,6 +21,9 @@ import java.io.IOException;
 
 import java.util.ArrayList;
 
+import java.util.HashSet;
+import java.util.ListIterator;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -29,6 +32,8 @@ import java.util.Map;
 
 import java.util.Map.Entry;
 
+import com.google.common.primitives.Longs;
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 
@@ -71,12 +76,11 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     {
         // not empty if targeting only one site (used for rejoin)
         // set later from the "data" JSON string
-        List<Long> sitesToInclude = new ArrayList<Long>();
-        Map<Long, Long> streamPairs = new HashMap<Long, Long>();
+        Map<Long, Long> streamPairs;
 
         assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty());
 
-        final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
+        final List<Table> tables = getTablesToInclude(jsData, context);
 
         final AtomicInteger numTables = new AtomicInteger(tables.size());
         final SnapshotRegistry.Snapshot snapshotRecord =
@@ -95,35 +99,19 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             schemas.put(table.getRelativeIndex(), schemaTable.getSchemaBytes());
         }
 
-        if (jsData != null) {
-            try {
-                List<Long> localHSIds = tracker.getSitesForHost(context.getHostId());
-                JSONObject sp = jsData.getJSONObject("streamPairs");
-                @SuppressWarnings("unchecked")
-                Iterator<String> it = sp.keys();
-                while (it.hasNext()) {
-                    String key = it.next();
-                    long sourceHSId = Long.valueOf(key);
-                    // See whether this source HSID is a local site, if so, we need
-                    // the partition ID
-                    if (localHSIds.contains(sourceHSId)) {
-                        Long destHSId = Long.valueOf(sp.getString(key));
-                        sitesToInclude.add(sourceHSId);
-                        streamPairs.put(sourceHSId, destHSId);
-                    }
-                }
-            }
-            catch (JSONException e) {
-                // Can't proceed without valid JSON, Ned
-                SnapshotRegistry.discardSnapshot(snapshotRecord);
-                return true;
-            }
+        try {
+            streamPairs = getStreamPairs(jsData, tracker);
+        }
+        catch (JSONException e) {
+            // Can't proceed without valid JSON, Ned
+            SnapshotRegistry.discardSnapshot(snapshotRecord);
+            return true;
         }
 
         Map<Long, SnapshotDataTarget> sdts = new HashMap<Long, SnapshotDataTarget>();
         if (streamPairs.size() > 0) {
             SNAP_LOG.debug("Sites to stream from: " +
-                    CoreUtils.hsIdCollectionToString(sitesToInclude));
+                    CoreUtils.hsIdCollectionToString(streamPairs.keySet()));
             for (Entry<Long, Long> entry : streamPairs.entrySet()) {
                 sdts.put(entry.getKey(), new StreamSnapshotDataTarget(entry.getValue(), schemas));
             }
@@ -177,5 +165,67 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             placeReplicatedTasks(replicatedSnapshotTasks, thisOne);
         }
         return false;
+    }
+
+    private List<Table> getTablesToInclude(JSONObject jsData,
+                                           SystemProcedureExecutionContext context)
+    {
+        final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
+        final Set<Integer> tableIdsToInclude = new HashSet<Integer>();
+
+        if (jsData != null) {
+            JSONArray tableIds = jsData.optJSONArray("tableIds");
+            if (tableIds != null) {
+                for (int i = 0; i < tableIds.length(); i++) {
+                    try {
+                        tableIdsToInclude.add(tableIds.getInt(i));
+                    } catch (JSONException e) {
+                        SNAP_LOG.warn("Unable to parse tables to include for stream snapshot", e);
+                    }
+                }
+            }
+        }
+
+        if (tableIdsToInclude.isEmpty()) {
+            // It doesn't make any sense to take a snapshot that doesn't include any table,
+            // it must be that the request doesn't specify a table filter,
+            // so default to all tables.
+            return tables;
+        }
+
+        ListIterator<Table> iter = tables.listIterator();
+        while (iter.hasNext()) {
+            Table table = iter.next();
+            if (!tableIdsToInclude.contains(table.getRelativeIndex())) {
+                // If the table index is not in the list to include, remove it
+                iter.remove();
+            }
+        }
+
+        return tables;
+    }
+
+    private Map<Long, Long> getStreamPairs(JSONObject jsData, SiteTracker tracker) throws JSONException
+    {
+        Map<Long, Long> streamPairs = new HashMap<Long, Long>();
+
+        if (jsData != null) {
+            List<Long> localHSIds = Longs.asList(tracker.getLocalSites());
+            JSONObject sp = jsData.getJSONObject("streamPairs");
+            @SuppressWarnings("unchecked")
+            Iterator<String> it = sp.keys();
+            while (it.hasNext()) {
+                String key = it.next();
+                long sourceHSId = Long.valueOf(key);
+                // See whether this source HSID is a local site, if so, we need
+                // the partition ID
+                if (localHSIds.contains(sourceHSId)) {
+                    Long destHSId = Long.valueOf(sp.getString(key));
+                    streamPairs.put(sourceHSId, destHSId);
+                }
+            }
+        }
+
+        return streamPairs;
     }
 }

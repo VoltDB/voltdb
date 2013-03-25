@@ -40,7 +40,7 @@ CTX = BuildContext(sys.argv)
 # these are the base compile options that get added to every compile step
 # this does not include header/lib search paths or specific flags for
 #  specific targets
-CTX.CPPFLAGS = """-Wall -Wextra -Werror -Woverloaded-virtual
+CTX.CPPFLAGS += """-Wall -Wextra -Werror -Woverloaded-virtual
             -Wpointer-arith -Wcast-qual -Wwrite-strings
             -Winit-self -Wno-sign-compare -Wno-unused-parameter
             -pthread
@@ -55,7 +55,7 @@ if CTX.PROFILE:
     CTX.CPPFLAGS += " -fvisibility=default -DPROFILE_ENABLED"
 
 # linker flags
-CTX.LDFLAGS = """ -g3 -rdynamic"""
+CTX.LDFLAGS += """ -g3 -rdynamic"""
 CTX.LASTLDFLAGS = """ -ldl"""
 
 if CTX.COVERAGE:
@@ -211,6 +211,9 @@ CTX.INPUT['common'] = """
  DefaultTupleSerializer.cpp
  executorcontext.cpp
  serializeio.cpp
+ StreamPredicateList.cpp
+ TupleOutputStream.cpp
+ TupleOutputStreamProcessor.cpp
 """
 
 CTX.INPUT['execution'] = """
@@ -323,6 +326,7 @@ CTX.INPUT['logging'] = """
 CTX.THIRD_PARTY_INPUT['json_spirit'] = """
  json_spirit_reader.cpp
  json_spirit_value.cpp
+ json_spirit_writer.cpp
 """
 
 CTX.THIRD_PARTY_INPUT['jsoncpp'] = """
@@ -331,7 +335,11 @@ CTX.THIRD_PARTY_INPUT['jsoncpp'] = """
 
 CTX.THIRD_PARTY_INPUT['crc'] = """
  crc32c.cc
- crc32ctables.cc 
+ crc32ctables.cc
+"""
+
+CTX.THIRD_PARTY_INPUT['murmur3'] = """
+ MurmurHash3.cpp
 """
 
 ###############################################################################
@@ -367,6 +375,7 @@ if whichtests in ("${eetestsuite}", "common"):
      nvalue_test
      pool_test
      tabletuple_test
+     elastic_hashinator_test
     """
 
 if whichtests in ("${eetestsuite}", "execution"):

@@ -80,7 +80,7 @@ class ProjectionPlanNode : public AbstractPlanNode
     std::string debugInfo(const std::string& spacer) const;
 
  protected:
-    virtual void loadFromJSONObject(json_spirit::Object& obj);
+    virtual void loadFromJSONObject(PlannerDomValue obj);
     //
     // The node must define what the columns in the output table are
     // going to look like

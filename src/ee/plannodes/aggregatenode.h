@@ -89,7 +89,7 @@ public:
     void setAggregateOutputColumns(std::vector<int> outputColumns);
 
 protected:
-    virtual void loadFromJSONObject(json_spirit::Object& obj);
+    virtual void loadFromJSONObject(PlannerDomValue obj);
 
     std::vector<ExpressionType> m_aggregates;
     std::vector<bool> m_distinctAggregates;

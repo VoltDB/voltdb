@@ -33,6 +33,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.FastSerializer;
@@ -68,7 +69,6 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     protected static long STATUS_OK = 0L;
     protected static long STATUS_FAILURE = 1L;
 
-    protected int m_numberOfPartitions;
     protected Procedure m_catProc;
     protected Cluster m_cluster;
     protected SiteProcedureConnection m_site;
@@ -81,11 +81,10 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         m_runner = procRunner;
     }
 
-    void initSysProc(int numberOfPartitions, SiteProcedureConnection site,
+    void initSysProc(SiteProcedureConnection site,
             LoadedProcedureSet loadedProcedureSet,
             Procedure catProc, Cluster cluster) {
 
-        m_numberOfPartitions = numberOfPartitions;
         m_site = site;
         m_catProc = catProc;
         m_cluster = cluster;
@@ -98,31 +97,6 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
      * For Sysproc init tasks like registering plan frags
      */
     abstract public void init();
-
-    /**
-     * Utility to aggregate a list of tables sharing a schema. Common for
-     * sysprocs to do this, to aggregate results.
-     */
-    protected VoltTable unionTables(List<VoltTable> operands) {
-        VoltTable result = null;
-        VoltTable vt = operands.get(0);
-        if (vt != null) {
-            VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[vt
-                                                                        .getColumnCount()];
-            for (int ii = 0; ii < vt.getColumnCount(); ii++) {
-                columns[ii] = new VoltTable.ColumnInfo(vt.getColumnName(ii),
-                                                       vt.getColumnType(ii));
-            }
-            result = new VoltTable(columns);
-            for (Object table : operands) {
-                vt = (VoltTable) (table);
-                while (vt.advanceRow()) {
-                    result.add(vt);
-                }
-            }
-        }
-        return result;
-    }
 
     /** Bundles the data needed to describe a plan fragment. */
     public static class SynthesizedPlanFragment {
@@ -440,5 +414,10 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     public void registerPlanFragment(long fragmentId) {
         assert(m_runner != null);
         m_loadedProcedureSet.registerPlanFragment(fragmentId, m_runner);
+    }
+
+    protected void noteOperationalFailure(String errMsg) {
+        m_runner.m_statusCode = ClientResponse.OPERATIONAL_FAILURE;
+        m_runner.m_statusString = errMsg;
     }
 }

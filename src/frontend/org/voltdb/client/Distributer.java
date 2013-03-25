@@ -50,7 +50,9 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.JdbcDatabaseMetaDataGenerator;
+import org.voltdb.LegacyHashinator;
 import org.voltdb.TheHashinator;
+import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
 
@@ -128,9 +130,8 @@ class Distributer {
             try {
                 synchronized (Distributer.this) {
                     VoltTable results[] = clientResponse.getResults();
-                    if (results != null && results.length == 1) {
-                        VoltTable vt = results[0];
-                        updateAffinityTopology(vt);
+                    if (results != null && results.length > 1) {
+                        updateAffinityTopology(results);
                     }
                 }
             }
@@ -872,10 +873,26 @@ class Distributer {
         return Collections.unmodifiableList(addressList);
     }
 
-    private void updateAffinityTopology(VoltTable vt) {
-        // We're going to get the MPI back in this table, so subtract it out from the number of partitions.
-        int numPartitions = vt.getRowCount() - 1;
-        TheHashinator.initialize(numPartitions);
+    private void updateAffinityTopology(VoltTable tables[]) {
+        //First table contains the description of partition ids master/slave relationships
+        VoltTable vt = tables[0];
+        if (tables.length == 1) {
+            //Just in case the new client connects to the old version of Volt that only returns 1 topology table
+            // We're going to get the MPI back in this table, so subtract it out from the number of partitions.
+            int numPartitions = vt.getRowCount() - 1;
+            TheHashinator.initialize(LegacyHashinator.class, LegacyHashinator.getConfigureBytes(numPartitions));
+        } else {
+            //Second table contains the hash function
+            boolean advanced = tables[1].advanceRow();
+            if (!advanced) {
+                System.err.println("Topology description received from Volt was incomplete " +
+                                   "performance will be lower because transactions can't be routed at this client");
+                return;
+            }
+            TheHashinator.initialize(
+                    HashinatorType.valueOf(tables[1].getString("HASHTYPE")).hashinatorClass,
+                    tables[1].getVarbinary("HASHCONFIG"));
+        }
         m_hashinatorInitialized = true;
         m_partitionMasters.clear();
         m_partitionReplicas.clear();

@@ -33,6 +33,7 @@ import org.voltdb.VoltType;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.VoltFile;
+import org.voltdb.utils.VoltTableUtil;
 
 @ProcInfo(singlePartition = false)
 public class SnapshotDelete extends VoltSystemProcedure {
@@ -102,20 +103,10 @@ public class SnapshotDelete extends VoltSystemProcedure {
 
             return new DependencyPair( DEP_snapshotDelete, result);
         } else if (fragmentId == SysProcFragmentId.PF_snapshotDeleteResults) {
-            final VoltTable results = constructFragmentResultsTable();
             TRACE_LOG.trace("Aggregating Snapshot Delete  results");
             assert (dependencies.size() > 0);
-            List<VoltTable> dep = dependencies.get(DEP_snapshotDelete);
-            for (VoltTable table : dep)
-            {
-                while (table.advanceRow())
-                {
-                    // this will add the active row of table
-                    results.add(table);
-                }
-            }
-            return new
-                DependencyPair( DEP_snapshotDeleteResults, results);
+            final VoltTable results = VoltTableUtil.unionTables(dependencies.get(DEP_snapshotDelete));
+            return new DependencyPair( DEP_snapshotDeleteResults, results);
         }
         assert (false);
         return null;

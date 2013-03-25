@@ -256,7 +256,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         try {
             m_searchKey.setNValue(ctr, candidateValue);
         }
-        catch (SQLException e) {
+        catch (const SQLException &e) {
             // This next bit of logic handles underflow and overflow while
             // setting up the search keys.
             // e.g. TINYINT > 200 or INT <= 6000000000
