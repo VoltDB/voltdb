@@ -67,7 +67,6 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltdb.dtxn.ReplayedTxnState;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.SiteTransactionConnection;
 import org.voltdb.dtxn.TransactionState;
@@ -1161,52 +1160,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
      * @return true if actual work was done, false otherwise
      */
     private boolean replayTransactionForRejoin() {
-        boolean doneWork = false;
-        if (m_rejoinTaskLog == null) {
-            return doneWork;
-        }
-
-        // get the next task to replay
-        TransactionState ts = null;
-        try {
-            TransactionInfoBaseMessage msg = m_rejoinTaskLog.getNextMessage();
-            if (msg != null) {
-                ts = new ReplayedTxnState(this, msg);
-            }
-        } catch (IOException e) {
-            m_rejoinLog.error("Failed to replay logged transactions: " +
-                    e.getMessage());
-        }
-
-        if (ts != null) {
-            // Run the transaction, but don't send response
-            recursableRun(ts);
-            doneWork = true;
-            m_rejoinLog.trace("Replayed " + ts.getNotice().getTxnId());
-            m_executedTaskCount++;
-        } else {
-            boolean rejoinCompleted = false;
-            try {
-                if (m_rejoinTaskLog.isEmpty() && m_rejoinSnapshotFinished) {
-                    rejoinCompleted = true;
-                }
-            } catch (IOException e) {
-                m_rejoinLog.error("Failed to determine if the task log is empty: " +
-                        e.getMessage());
-            }
-
-            if (rejoinCompleted) {
-                try {
-                    m_rejoinTaskLog.close();
-                } catch (IOException e) {
-                    m_rejoinLog.error("Failed to close the task log:" +
-                            e.getMessage());
-                }
-                m_onRejoinCompletion.run();
-            }
-        }
-
-        return doneWork;
+        return false;
     }
 
     /**
