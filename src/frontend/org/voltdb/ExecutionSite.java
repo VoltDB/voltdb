@@ -67,7 +67,6 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
 import org.voltdb.dtxn.ReplayedTxnState;
 import org.voltdb.dtxn.SinglePartitionTxnState;
 import org.voltdb.dtxn.SiteTracker;
@@ -1563,7 +1562,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                     ts = new SinglePartitionTxnState(m_mailbox, this, info);
                 }
                 else {
-                    ts = new MultiPartitionParticipantTxnState(m_mailbox, this, info);
                 }
                 hostLog.info(
                         "Dropping txn " + ts.txnId + " data from failed initiatorSiteId: " + ts.initiatorHSId);
@@ -1623,7 +1621,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             TransactionState txnState = m_transactionsById.get(response.getTxnId());
             // possible in rollback to receive an unnecessary response
             if (txnState != null) {
-                assert (txnState instanceof MultiPartitionParticipantTxnState);
                 txnState.processRemoteWorkResponse(response);
             }
         }
@@ -1636,7 +1633,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             // check for null for now
             if (txnState != null)
             {
-                assert (txnState instanceof MultiPartitionParticipantTxnState);
                 txnState.processCompleteTransactionResponse(response);
             }
         }
@@ -1648,8 +1644,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             TransactionState txnState = m_transactionsById.get(txn_id);
             if (txnState != null)
             {
-                assert(txnState instanceof MultiPartitionParticipantTxnState);
-                ((MultiPartitionParticipantTxnState)txnState).checkWorkUnits();
             }
         }
         else if (message instanceof RawProcessor.ExportInternalMessage) {
@@ -2139,55 +2133,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             // Otherwise, without a coordinator, the transaction can't
             // continue. Must rollback, if in progress, or fault it
             // from the queues if not yet started.
-            else if (ts instanceof MultiPartitionParticipantTxnState &&
-                     failedSites.contains(ts.coordinatorSiteId))
-            {
-                MultiPartitionParticipantTxnState mpts = (MultiPartitionParticipantTxnState) ts;
-                if (ts.isInProgress() && ts.txnId <= globalMultiPartCommitPoint)
-                {
-                    m_rejoinLog.info("Committing in progress multi-partition txn " + ts.txnId +
-                            " even though coordinator was on a failed host because the txnId <= " +
-                            "the global multi-part commit point");
-                    CompleteTransactionMessage ft =
-                        mpts.createCompleteTransactionMessage(false, false);
-                    ft.m_sourceHSId = m_siteId;
-                    m_mailbox.deliverFront(ft);
-                }
-                else if (ts.isInProgress() && ts.txnId > globalMultiPartCommitPoint) {
-                    m_rejoinLog.info("Rolling back in progress multi-partition txn " + ts.txnId +
-                            " because the coordinator was on a failed host and the txnId > " +
-                            "the global multi-part commit point");
-                    CompleteTransactionMessage ft =
-                        mpts.createCompleteTransactionMessage(true, false);
-                    ft.m_sourceHSId = m_siteId;
-                    if (!ts.isReadOnly()) {
-                        faultedTxns.add(ts.txnId);
-                    }
-                    m_mailbox.deliverFront(ft);
-                }
-                else
-                {
-                    m_rejoinLog.info("Faulting multi-part transaction " + ts.txnId +
-                            " because the coordinator was on a failed node");
-                    it.remove();
-                    if (!ts.isReadOnly()) {
-                        faultedTxns.add(ts.txnId);
-                    }
-                }
-            }
-            // If we're the coordinator, then after we clean up our internal
-            // state due to a failed node, we need to poke ourselves to check
-            // to see if all the remaining dependencies are satisfied.  Do this
-            // with a message to our mailbox so that happens in the
-            // execution site thread
-            else if (ts instanceof MultiPartitionParticipantTxnState &&
-                     ts.coordinatorSiteId == m_siteId)
-            {
-                if (ts.isInProgress())
-                {
-                    m_mailbox.deliverFront(new CheckTxnStateCompletionMessage(ts.txnId, m_siteId));
-                }
-            }
         }
         if (m_recoveryProcessor != null) {
             m_recoveryProcessor.handleSiteFaults(failedSites, m_tracker);
