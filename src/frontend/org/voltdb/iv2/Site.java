@@ -704,12 +704,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public long getReplicatedDMLDivisor()
-    {
-        return m_numberOfPartitions;
-    }
-
-    @Override
     public void simulateExecutePlanFragments(long txnId, boolean readOnly)
     {
         throw new RuntimeException("Not supported in IV2.");
