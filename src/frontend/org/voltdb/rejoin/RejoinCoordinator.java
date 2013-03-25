@@ -30,7 +30,9 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.utils.VoltFile;
 
+import java.io.File;
 import java.util.Collection;
 import java.util.Map;
 
@@ -93,6 +95,19 @@ public abstract class RejoinCoordinator extends LocalMailbox {
      */
     public void close() {
         m_messenger.removeMailbox(getHSId());
+    }
+
+    protected void clearOverflowDir(String voltroot)
+    {
+        // clear overflow dir in case there are files left from previous runs
+        try {
+            File overflowDir = new File(voltroot, "join_overflow");
+            if (overflowDir.exists()) {
+                VoltFile.recursivelyDelete(overflowDir);
+            }
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Fail to clear join overflow directory", false, e);
+        }
     }
 
     protected String makeSnapshotNonce(String type, long HSId)

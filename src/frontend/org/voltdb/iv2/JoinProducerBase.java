@@ -27,7 +27,11 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.rejoin.TaskLog;
+import org.voltdb.utils.MiscUtils;
 
+import java.io.File;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -43,6 +47,7 @@ public abstract class JoinProducerBase extends SiteTasker {
     protected final SettableFuture<SnapshotCompletionInterest.SnapshotCompletionEvent>
             m_completionMonitorAwait = SettableFuture.create();
     protected JoinCompletionAction m_completionAction = null;
+    protected TaskLog m_taskLog;
 
     /**
      * SnapshotCompletionAction waits for the completion
@@ -100,7 +105,7 @@ public abstract class JoinProducerBase extends SiteTasker {
             m_snapshotTxnId = txnId;
         }
 
-        protected long getSnapshotTxnId()
+        public long getSnapshotTxnId()
         {
             return m_snapshotTxnId;
         }
@@ -118,8 +123,29 @@ public abstract class JoinProducerBase extends SiteTasker {
         m_mailbox = mailbox;
     }
 
+    // Load the pro task log
+    protected static TaskLog initializeTaskLog(String voltroot, int pid)
+    {
+        // Construct task log and start logging task messages
+        File overflowDir = new File(voltroot, "join_overflow");
+        Class<?> taskLogKlass =
+                MiscUtils.loadProClass("org.voltdb.rejoin.TaskLogImpl", "Join", false);
+        if (taskLogKlass != null) {
+            Constructor<?> taskLogConstructor;
+            try {
+                taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class, boolean.class);
+                return (TaskLog) taskLogConstructor.newInstance(pid, overflowDir, true);
+            } catch (InvocationTargetException e) {
+                VoltDB.crashLocalVoltDB("Unable to construct join task log", true, e.getCause());
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unable to construct join task log", true, e);
+            }
+        }
+        return null;
+    }
+
     // Received a datablock. Reset the watchdog timer and hand the block to the Site.
-    void restoreBlock(Pair<Integer, ByteBuffer> rejoinWork,
+    protected void restoreBlock(Pair<Integer, ByteBuffer> rejoinWork,
                       SiteProcedureConnection siteConnection)
     {
         kickWatchdog(true);
