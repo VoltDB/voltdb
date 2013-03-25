@@ -17,11 +17,11 @@
 
 #include <string>
 #include <limits>
-#include <json_spirit/json_spirit.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include "StreamPredicateList.h"
 #include "expressions/abstractexpression.h"
+#include "common/PlannerDomValue.h"
 
 namespace voltdb
 {
@@ -40,11 +40,9 @@ bool StreamPredicateList::parseStrings(
          iter != predicateStrings.end(); ++iter) {
         bool predFailed = false;
         try {
-            json_spirit::Object json;
-            json_spirit::Value predicateValue;
-            json_spirit::read(*iter, predicateValue);
-            if (!(predicateValue == json_spirit::Value::null)) {
-                json_spirit::Object predicateObject = predicateValue.get_obj();
+            PlannerDomRoot domRoot((*iter).c_str());
+            if (!domRoot.isNull()) {
+                PlannerDomValue predicateObject = domRoot.rootObject();
                 AbstractExpression *expr = AbstractExpression::buildExpressionTree(predicateObject);
                 if (expr != NULL) {
                     // Got ourselves a predicate expression tree!

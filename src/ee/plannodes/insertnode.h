@@ -68,7 +68,7 @@ class InsertPlanNode : public AbstractOperationPlanNode {
         bool isMultiPartition() { return m_multiPartition; }
 
     protected:
-        virtual void loadFromJSONObject(json_spirit::Object &obj);
+        virtual void loadFromJSONObject(PlannerDomValue obj);
 
         bool m_multiPartition;
 };

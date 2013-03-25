@@ -171,7 +171,7 @@ ProjectionPlanNode::debugInfo(const string& spacer) const
 
 
 void
-ProjectionPlanNode::loadFromJSONObject(json_spirit::Object& obj)
+ProjectionPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
     // XXX-IZZY move this to init at some point
     for (int ii = 0; ii < getOutputSchema().size(); ii++)

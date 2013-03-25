@@ -55,8 +55,7 @@ public class CompleteTransactionTask extends TransactionTask
             siteConnection.truncateUndoLog(m_msg.isRollback(), m_txn.getBeginUndoToken(), m_txn.txnId, m_txn.spHandle);
         }
         if (!m_msg.isRestart()) {
-            m_txn.setDone();
-            m_queue.flush();
+            doCommonSPICompleteActions();
 
             // Log invocation to DR
             logToDR();
@@ -79,8 +78,7 @@ public class CompleteTransactionTask extends TransactionTask
     {
         if (!m_msg.isRestart()) {
             // future: offer to siteConnection.IBS for replay.
-            m_txn.setDone();
-            m_queue.flush();
+            doCommonSPICompleteActions();
         }
         // We need to log the restarting message to the task log so we'll replay the whole
         // stream faithfully
@@ -104,7 +102,8 @@ public class CompleteTransactionTask extends TransactionTask
             siteConnection.truncateUndoLog(m_msg.isRollback(), m_txn.getBeginUndoToken(), m_txn.txnId, m_txn.spHandle);
         }
         if (!m_msg.isRestart()) {
-            m_txn.setDone();
+            // this call does the right thing with a null TransactionTaskQueue
+            doCommonSPICompleteActions();
             logToDR();
         }
         else {

@@ -49,7 +49,6 @@
 
 #include <stdexcept>
 
-using namespace json_spirit;
 using namespace std;
 using namespace voltdb;
 
@@ -105,25 +104,14 @@ string AbstractJoinPlanNode::debugInfo(const string& spacer) const
 }
 
 void
-AbstractJoinPlanNode::loadFromJSONObject(Object& obj)
+AbstractJoinPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
-    Value joinTypeValue = find_value(obj, "JOIN_TYPE");
-    if (joinTypeValue == Value::null)
-    {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AbstractJoinPlanNode::loadFromJSONObject:"
-                                      " Couldn't find JOIN_TYPE value");
-    }
-    m_joinType = stringToJoin(joinTypeValue.get_str());
+    m_joinType = stringToJoin(obj.valueForKey("JOIN_TYPE").asStr());
 
-    Value predicateValue = find_value(obj, "PREDICATE");
-    if (predicateValue == Value::null)
-    {
-        m_predicate = NULL;
+    if (obj.hasNonNullKey("PREDICATE")) {
+        m_predicate = AbstractExpression::buildExpressionTree(obj.valueForKey("PREDICATE"));
     }
-    else
-    {
-        Object predicateObject = predicateValue.get_obj();
-        m_predicate = AbstractExpression::buildExpressionTree(predicateObject);
+    else {
+        m_predicate = NULL;
     }
 }

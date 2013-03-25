@@ -54,4 +54,18 @@ public abstract class TransactionTask extends SiteTasker
     public long getTxnId() {
         return m_txn.txnId;
     }
+
+    // Take actions common to all transactions in order to complete a transaction at an SPI
+    // Nebulously defined, I know, but replicating these two lines in a bazillion places
+    // began to offend me.
+    public void doCommonSPICompleteActions()
+    {
+        // Mark the transaction state as DONE
+        m_txn.setDone();
+        // Flush us out of the head of the TransactionTaskQueue.  Null check so we're reusable
+        // for live rejoin replay
+        if (m_queue != null) {
+            m_queue.flush();
+        }
+    }
 }

@@ -81,7 +81,7 @@ class MaterializePlanNode : public ProjectionPlanNode {
         bool isBatched() const { return batched; }
         void setBatched(bool batched) { this->batched = batched; }
     protected:
-        virtual void loadFromJSONObject(json_spirit::Object &obj);
+        virtual void loadFromJSONObject(PlannerDomValue obj);
         bool batched;
 };
 

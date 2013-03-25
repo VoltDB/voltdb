@@ -62,6 +62,15 @@ def buildPro():
         run("VOLTCORE=../voltdb TRIALLICENSE=no ant -f mmt.xml -Dallowreplication=true clean dist.pro")
 
 ################################################
+# MAKE AN ENTERPRISE TRIAL LICENSE
+################################################
+
+# Must be called after buildPro has been done
+def makeTrialLicense(days=30):
+    with cd(builddir + "/pro/tools"):
+        run("./make_trial_licenses.pl -t %d -W" % (days))
+
+################################################
 # COPY FILES
 ################################################
 
@@ -88,6 +97,10 @@ def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
 def copyEnterpriseFilesToReleaseDir(releaseDir, version, operatingsys):
     get("%s/pro/obj/pro/voltdb-ent-%s.tar.gz" % (builddir, version),
         "%s/%s-voltdb-ent-%s.tar.gz" % (releaseDir, operatingsys, version))
+
+def copyTrialLicenseToReleaseDir(releaseDir):
+    get("%s/pro/trial_*.xml" % (builddir),
+        "%s/license.xml" % (releaseDir))
 
 
 ################################################
@@ -189,6 +202,8 @@ with settings(user=username,host_string=volt5f[1],disable_known_hosts=True,key_f
     copyCommunityFilesToReleaseDir(releaseDir, versionVolt5f, "LINUX")
     buildPro()
     copyEnterpriseFilesToReleaseDir(releaseDir, versionVolt5f, "LINUX")
+    makeTrialLicense()
+    copyTrialLicenseToReleaseDir(releaseDir)
 
 # build kits on the mini
 with settings(user=username,host_string=voltmini[1],disable_known_hosts=True,key_filename=voltmini[0]):

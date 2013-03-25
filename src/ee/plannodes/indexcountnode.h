@@ -21,8 +21,8 @@
 
 #include <string>
 #include "abstractscannode.h"
-#include "json_spirit/json_spirit.h"
 #include "common/ValueFactory.hpp"
+
 namespace voltdb {
 
 class AbstractExpression;
@@ -68,7 +68,7 @@ class IndexCountPlanNode : public AbstractScanPlanNode {
         std::string debugInfo(const std::string &spacer) const;
 
     protected:
-        virtual void loadFromJSONObject(json_spirit::Object &obj);
+        virtual void loadFromJSONObject(PlannerDomValue obj);
         //
         // This is the id of the index to reference during execution
         //
