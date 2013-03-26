@@ -166,13 +166,6 @@ public abstract class TransactionState extends OrderableTransaction  {
         throw new UnsupportedOperationException(msg);
     }
 
-    public Map<Integer, List<VoltTable>> getPreviousStackFrameDropDependendencies() {
-        String msg = "The current transaction context of type ";
-        msg += this.getClass().getName();
-        msg += " doesn't support collecting stack frame drop dependencies.";
-        throw new UnsupportedOperationException(msg);
-    }
-
     public int getNextDependencyId() {
         return m_nextDepId++;
     }
