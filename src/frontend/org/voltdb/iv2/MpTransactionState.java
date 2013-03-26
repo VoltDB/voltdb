@@ -111,12 +111,6 @@ public class MpTransactionState extends TransactionState
     }
 
     @Override
-    public boolean hasTransactionalWork()
-    {
-        return false;
-    }
-
-    @Override
     public boolean doWork(boolean recovering)
     {
         return false;

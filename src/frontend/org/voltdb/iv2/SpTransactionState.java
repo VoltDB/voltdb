@@ -41,13 +41,6 @@ public class SpTransactionState extends TransactionState
         return true;
     }
 
-    // Per SinglePartitonTxnState.java
-    @Override
-    public boolean hasTransactionalWork()
-    {
-        return true;
-    }
-
     @Override
     public boolean doWork(boolean recovering)
     {
