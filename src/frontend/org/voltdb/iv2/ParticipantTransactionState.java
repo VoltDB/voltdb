@@ -17,8 +17,6 @@
 
 package org.voltdb.iv2;
 
-import java.util.HashSet;
-
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.dtxn.TransactionState;
@@ -37,37 +35,8 @@ public class ParticipantTransactionState extends TransactionState
     }
 
     @Override
-    public boolean isCoordinator()
-    {
-        return false;
-    }
-
-    @Override
-    public boolean isBlocked()
-    {
-        return false;
-    }
-
-    @Override
-    public boolean hasTransactionalWork()
-    {
-        return false;
-    }
-
-    @Override
-    public boolean doWork(boolean recovering)
-    {
-        return false;
-    }
-
-    @Override
     public StoredProcedureInvocation getInvocation()
     {
         return null;
-    }
-
-    @Override
-    public void handleSiteFaults(HashSet<Long> failedSites)
-    {
     }
 }

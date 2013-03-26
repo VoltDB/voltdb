@@ -17,8 +17,6 @@
 
 package org.voltdb.iv2;
 
-import java.util.HashSet;
-
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.dtxn.TransactionState;
@@ -44,39 +42,8 @@ public class SpTransactionState extends TransactionState
     }
 
     @Override
-    public boolean isCoordinator()
-    {
-        return true;
-    }
-
-    @Override
-    public boolean isBlocked()
-    {
-        return true;
-    }
-
-    // Per SinglePartitonTxnState.java
-    @Override
-    public boolean hasTransactionalWork()
-    {
-        return true;
-    }
-
-    @Override
-    public boolean doWork(boolean recovering)
-    {
-        throw new RuntimeException("Do not expect doWork() in IV2");
-    }
-
-    @Override
     public StoredProcedureInvocation getInvocation()
     {
         return m_task.getStoredProcedureInvocation();
-    }
-
-    @Override
-    public void handleSiteFaults(HashSet<Long> failedSites)
-    {
-        throw new RuntimeException("Do not expect handleSiteFaults in IV2");
     }
 }
