@@ -111,39 +111,9 @@ public class MpTransactionState extends TransactionState
     }
 
     @Override
-    public boolean isCoordinator()
-    {
-        return true;
-    }
-
-    @Override
-    public boolean isBlocked()
-    {
-        // Not clear this method is useful in the new world?
-        return false;
-    }
-
-    @Override
-    public boolean hasTransactionalWork()
-    {
-        return false;
-    }
-
-    @Override
-    public boolean doWork(boolean recovering)
-    {
-        return false;
-    }
-
-    @Override
     public StoredProcedureInvocation getInvocation()
     {
         return m_task.getStoredProcedureInvocation();
-    }
-
-    @Override
-    public void handleSiteFaults(HashSet<Long> failedSites)
-    {
     }
 
     // Overrides needed by MpProcedureRunner
