@@ -1060,7 +1060,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public long getFragmentIdForPlanHash(byte[] planHash) {
         Sha1Wrapper key = new Sha1Wrapper(planHash);
-        FragInfo frag = m_plansByHash.get(key);
+        FragInfo frag = null;
+        synchronized (FragInfo.class) {
+            frag = m_plansByHash.get(key);
+        }
         assert(frag != null);
         return frag.fragId;
     }
@@ -1068,30 +1071,39 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public long loadOrAddRefPlanFragment(byte[] planHash, byte[] plan) {
         Sha1Wrapper key = new Sha1Wrapper(planHash);
-        FragInfo frag = m_plansByHash.get(key);
-        if (frag != null) {
-            frag.refCount++;
-            return frag.fragId;
-        }
-        else {
-            frag = new FragInfo();
-            frag.hash = key;
-            frag.plan = plan;
-            frag.refCount = 1;
-            frag.fragId = m_nextFragId++;
-            m_plansByHash.put(key, frag);
-            m_plansById.put(frag.fragId, frag);
-            return frag.fragId;
+        FragInfo frag = null;
+        synchronized (FragInfo.class) {
+            frag = m_plansByHash.get(key);
+            if (frag != null) {
+                frag.refCount++;
+                return frag.fragId;
+            }
+            else {
+                frag = new FragInfo();
+                frag.hash = key;
+                frag.plan = plan;
+                frag.refCount = 1;
+                frag.fragId = m_nextFragId++;
+                m_plansByHash.put(key, frag);
+                m_plansById.put(frag.fragId, frag);
+                return frag.fragId;
+            }
         }
     }
 
     @Override
     public void decrefPlanFragmentById(long fragmentId) {
-        FragInfo frag = m_plansById.get(fragmentId);
-        assert(frag != null);
-        if (--frag.refCount == 0) {
-            m_plansById.remove(fragmentId);
-            m_plansByHash.remove(frag.hash);
+        // skip dummy/invalid fragment ids
+        if (fragmentId <= 0) return;
+
+        FragInfo frag = null;
+        synchronized (FragInfo.class) {
+            frag = m_plansById.get(fragmentId);
+            assert(frag != null);
+            if (--frag.refCount == 0) {
+                m_plansById.remove(fragmentId);
+                m_plansByHash.remove(frag.hash);
+            }
         }
     }
 
@@ -1100,7 +1112,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      */
     @Override
     public byte[] planForFragmentId(long fragmentId) {
-        FragInfo frag = m_plansById.get(fragmentId);
+        assert(fragmentId > 0);
+
+        FragInfo frag = null;
+        synchronized (FragInfo.class) {
+            frag = m_plansById.get(fragmentId);
+        }
         assert(frag != null);
         return frag.plan;
     }

@@ -57,6 +57,9 @@ public class SQLStmt {
 
     boolean inCatalog;
 
+    // used to clean up plans
+    SiteProcedureConnection site;
+
     /**
      * Construct a SQLStmt instance from a SQL statement.
      *
@@ -94,6 +97,19 @@ public class SQLStmt {
         inCatalog = true;
     }
 
+    /* (non-Javadoc)
+     * @see java.lang.Object#finalize()
+     */
+    @Override
+    protected void finalize() throws Throwable {
+        site.decrefPlanFragmentById(aggregator.id);
+        if (collector != null) {
+            site.decrefPlanFragmentById(collector.id);
+        }
+
+        super.finalize();
+    }
+
     /**
      * Factory method to construct a SQLStmt instance from a plan outside the catalog.
      *
@@ -107,6 +123,7 @@ public class SQLStmt {
      * @param isReplicatedTableDML Flag set to true if replicated DML
      * @param isReadOnly Is SQL read only?
      * @param params Description of parameters expected by the statement
+     * @param site SPC used for cleanup of plans
      * @return SQLStmt object with plan added
      */
     static SQLStmt createWithPlan(byte[] sqlText,
@@ -118,7 +135,8 @@ public class SQLStmt {
                                   boolean isCollectorTransactional,
                                   boolean isReplicatedTableDML,
                                   boolean isReadOnly,
-                                  VoltType[] params) {
+                                  VoltType[] params,
+                                  SiteProcedureConnection site) {
         SQLStmt stmt = new SQLStmt(sqlText, null);
 
         stmt.aggregator = new SQLStmt.Frag();
@@ -146,6 +164,8 @@ public class SQLStmt {
         stmt.isReadOnly = isReadOnly;
         stmt.isReplicatedTableDML = isReplicatedTableDML;
         stmt.inCatalog = false;
+
+        stmt.site = site;
 
         return stmt;
     }

@@ -88,46 +88,39 @@ public abstract class AdHocBase extends VoltSystemProcedure {
 
         int currentCatalogVersion = ctx.getCatalogVersion();
 
-        VoltTable[] retval = null;
-        try {
-            for (AdHocPlannedStatement statement : statements) {
-                if (currentCatalogVersion != statement.core.catalogVersion) {
-                    String msg = String.format("AdHoc transaction %d wasn't planned " +
-                            "against the current catalog version. Statement: %s",
-                            ctx.getCurrentTxnId(),
-                            new String(statement.sql, VoltDB.UTF8ENCODING));
-                    throw new VoltAbortException(msg);
-                }
-
-                long aggFragId = m_site.loadOrAddRefPlanFragment(
-                        statement.core.aggregatorHash, statement.core.aggregatorFragment);
-                long collectorFragId = 0;
-                if (statement.core.collectorFragment != null) {
-                    collectorFragId = m_site.loadOrAddRefPlanFragment(
-                            statement.core.collectorHash, statement.core.collectorFragment);
-                }
-
-                SQLStmt stmt = SQLStmtAdHocHelper.createWithPlan(
-                        statement.sql,
-                        aggFragId,
-                        statement.core.aggregatorHash,
-                        true,
-                        collectorFragId,
-                        statement.core.collectorHash,
-                        true,
-                        statement.core.isReplicatedTableDML,
-                        statement.core.readOnly,
-                        statement.core.parameterTypes);
-
-                voltQueueSQL(stmt, statement.extractedParamValues.toArray());
+        for (AdHocPlannedStatement statement : statements) {
+            if (currentCatalogVersion != statement.core.catalogVersion) {
+                String msg = String.format("AdHoc transaction %d wasn't planned " +
+                        "against the current catalog version. Statement: %s",
+                        ctx.getCurrentTxnId(),
+                        new String(statement.sql, VoltDB.UTF8ENCODING));
+                throw new VoltAbortException(msg);
             }
 
-            retval = voltExecuteSQL(true);
-        }
-        finally {
+            long aggFragId = m_site.loadOrAddRefPlanFragment(
+                    statement.core.aggregatorHash, statement.core.aggregatorFragment);
+            long collectorFragId = 0;
+            if (statement.core.collectorFragment != null) {
+                collectorFragId = m_site.loadOrAddRefPlanFragment(
+                        statement.core.collectorHash, statement.core.collectorFragment);
+            }
 
+            SQLStmt stmt = SQLStmtAdHocHelper.createWithPlan(
+                    statement.sql,
+                    aggFragId,
+                    statement.core.aggregatorHash,
+                    true,
+                    collectorFragId,
+                    statement.core.collectorHash,
+                    true,
+                    statement.core.isReplicatedTableDML,
+                    statement.core.readOnly,
+                    statement.core.parameterTypes,
+                    m_site);
+
+            voltQueueSQL(stmt, statement.extractedParamValues.toArray());
         }
 
-        return retval;
+        return voltExecuteSQL(true);
     }
 }

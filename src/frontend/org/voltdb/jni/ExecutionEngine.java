@@ -60,11 +60,18 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public static final int ERRORCODE_WRONG_SERIALIZED_BYTES = 101;
     public static final int ERRORCODE_NEED_PLAN = 110;
 
+    /** For now sync this value with the value in the EE C++ code to get good stats. */
+    public static final int EE_PLAN_CACHE_SIZE = 10000;
+
     /** Partition ID */
     protected final int m_partitionId;
 
     /** Statistics collector (provided later) */
     private PlannerStatsCollector m_plannerStats = null;
+
+    // used for tracking statistics about the plan cache in the EE
+    private int m_cacheMisses = 0;
+    private int m_eeCacheSize = 0;
 
     protected FragmentPlanSource m_planSource;
 
@@ -285,8 +292,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     /**
      * Called from the execution engine to fetch a plan for a given hash.
+     * Also update cache stats.
      */
     public byte[] planForFragmentId(long fragmentId) {
+        // track cache misses
+        m_cacheMisses++;
+        // estimate the cache size by the number of misses
+        m_eeCacheSize = Math.max(EE_PLAN_CACHE_SIZE, m_eeCacheSize + 1);
+        // get the plan for realz
         return m_planSource.planForFragmentId(fragmentId);
     }
 
@@ -317,14 +330,38 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     abstract public void updateCatalog(final long timestamp, final String diffCommands) throws EEException;
 
     /** Run multiple plan fragments */
-    abstract public VoltTable[] executePlanFragments(int numFragmentIds,
-                                                     long[] planFragmentIds,
-                                                     long[] inputDepIds,
-                                                     ParameterSet[] parameterSets,
-                                                     long spHandle,
-                                                     long lastCommittedSpHandle,
-                                                     long uniqueId,
-                                                     long undoQuantumToken) throws EEException;
+    public VoltTable[] executePlanFragments(int numFragmentIds,
+                                            long[] planFragmentIds,
+                                            long[] inputDepIds,
+                                            ParameterSet[] parameterSets,
+                                            long spHandle,
+                                            long lastCommittedSpHandle,
+                                            long uniqueId,
+                                            long undoQuantumToken) throws EEException
+    {
+        try {
+            VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
+                    parameterSets, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
+            m_plannerStats.updateEECacheStats(m_eeCacheSize, numFragmentIds - m_cacheMisses,
+                    m_cacheMisses, m_partitionId);
+            return results;
+        }
+        finally {
+            // don't count any cache misses when there's an exception. This is a lie and they
+            // will still be used to estimate the cache size, but it's hard to count cache hits
+            // during an exception, so we don't count cache misses either to get the right ratio.
+            m_cacheMisses = 0;
+        }
+    }
+
+    protected abstract VoltTable[] coreExecutePlanFragments(int numFragmentIds,
+                                                            long[] planFragmentIds,
+                                                            long[] inputDepIds,
+                                                            ParameterSet[] parameterSets,
+                                                            long spHandle,
+                                                            long lastCommittedSpHandle,
+                                                            long uniqueId,
+                                                            long undoQuantumToken) throws EEException;
 
     /** Used for test code only (AFAIK jhugg) */
     abstract public VoltTable serializeTable(int tableId) throws EEException;

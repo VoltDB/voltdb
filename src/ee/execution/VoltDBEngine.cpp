@@ -1034,12 +1034,18 @@ VoltDBEngine::ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const
         }
 
         // Initialize the vector of executors for this planfragment, used at runtime.
-        for (int ctr = 0, cnt = (int)pnf->getExecuteList().size();
-             ctr < cnt; ctr++) {
+        for (int ctr = 0, cnt = (int)pnf->getExecuteList().size(); ctr < cnt; ctr++) {
             ev->list.push_back(pnf->getExecuteList()[ctr]->getExecutor());
         }
 
+        // add the plan to the front
         m_plans.get<0>().push_front(ev);
+
+        // remove plans if the cache is full
+        if (m_plans.size() > PLAN_CACHE_SIZE) {
+            PlanSet::iterator iter = m_plans.get<0>().end();
+            m_plans.erase(iter);
+        }
 
         VoltDBEngine::ExecutorVector *retval = ev.get();
         assert(retval);

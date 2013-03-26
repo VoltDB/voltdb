@@ -479,7 +479,8 @@ public class ProcedureRunner {
                     true,
                     plannedStatement.core.isReplicatedTableDML,
                     plannedStatement.core.readOnly,
-                    plannedStatement.core.parameterTypes);
+                    plannedStatement.core.parameterTypes,
+                    m_site);
             if (plannedStatement.extractedParamValues.size() == 0) {
                 // case handles if there were parameters OR
                 // if there were no constants to pull out
@@ -694,6 +695,8 @@ public class ProcedureRunner {
 
         stmt.isReadOnly = catStmt.getReadonly();
         stmt.isReplicatedTableDML = catStmt.getReplicatedtabledml();
+
+        stmt.site = m_site;
 
         int numStatementParamJavaTypes = catStmt.getParameters().size();
         stmt.statementParamJavaTypes = new byte[numStatementParamJavaTypes];

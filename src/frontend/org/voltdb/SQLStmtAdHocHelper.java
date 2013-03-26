@@ -35,6 +35,7 @@ public class SQLStmtAdHocHelper {
      * @param isReplicatedTableDML Flag set to true if replicated DML
      * @param isReadOnly Is SQL read only?
      * @param params Description of parameters expected by the statement
+     * @param site SPC used for cleanup of plans
      * @return SQLStmt object with plan added
      */
     public static SQLStmt createWithPlan(byte[] sqlText,
@@ -46,10 +47,11 @@ public class SQLStmtAdHocHelper {
                                          boolean isCollectorTransactional,
                                          boolean isReplicatedTableDML,
                                          boolean isReadOnly,
-                                         VoltType[] params) {
+                                         VoltType[] params,
+                                         SiteProcedureConnection site) {
         return SQLStmt.createWithPlan(sqlText,
                 aggFragId, aggPlanHash, isAggTransactional,
                 collectorFragId, collectorPlanHash, isCollectorTransactional,
-                isReplicatedTableDML, isReadOnly, params);
+                isReplicatedTableDML, isReadOnly, params, site);
     }
 }
