@@ -26,6 +26,7 @@ package schemachange;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.commons.lang3.time.DateFormatUtils;
 import org.voltdb.CLIConfig;
 import org.voltdb.TableHelper;
 import org.voltdb.VoltDB;
@@ -61,10 +62,14 @@ public class SchemaChangeClient {
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
 
+        @Option(desc = "Run Time.")
+        int duration = 30 * 60;
+
         @Override
         public void validate() {
             if (targetrssmb < 0) exitWithMessageAndUsage("targetrssmb must be >= 0");
             if (targetrowcount < 0) exitWithMessageAndUsage("targetrowcount must be >= 0");
+            if (duration < 0) exitWithMessageAndUsage("duration must be >= 0");
         }
     }
 
@@ -250,11 +255,14 @@ public class SchemaChangeClient {
         // kick this off with a random schema
         VoltTable t = catalogChange(null, true);
 
-        for (int i = 0; i < 50; i++) {
+        long startTime =  System.currentTimeMillis();
+
+        while (config.duration == 0 || (System.currentTimeMillis() - startTime < (config.duration * 1000))) {
             // make sure the table is full and mess around with it
             loadTable(t);
 
-            for (int j = 0; j < 50; j++) {
+            for (int j = 0; j < 3; j++) {
+
                 String tableName = TableHelper.getTableName(t);
 
                 // deterministically sample some rows
