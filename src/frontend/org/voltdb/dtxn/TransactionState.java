@@ -17,21 +17,16 @@
 
 package org.voltdb.dtxn;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.ExecutionSite;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.iv2.Site;
-import org.voltdb.messaging.CompleteTransactionMessage;
-import org.voltdb.messaging.CompleteTransactionResponseMessage;
-import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 
 /**
@@ -49,7 +44,7 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected final Mailbox m_mbox;
     volatile protected boolean m_done = false;
     protected long m_beginUndoToken;
-    volatile public boolean m_needsRollback = false;
+    volatile protected boolean m_needsRollback = false;
     protected ClientResponseImpl m_response = null;
     protected final boolean m_isForReplay;
     protected int m_hash = -1; // -1 shows where the value comes from (they only have to match)
