@@ -2216,54 +2216,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     public Map<Integer, List<VoltTable>>
     recursableRun(TransactionState currentTxnState)
     {
-        while (m_shouldContinue) {
-            /*
-             * when it's replaying transactions during rejoin, we want real work
-             * to be done. If during rejoin, a transaction needs to send a
-             * response, only send a dummy response. A replayed transaction
-             * during rejoin needs real work to be done, but no response to be
-             * sent.
-             */
-            if (currentTxnState.doWork(m_rejoining)) {
-                if (currentTxnState.needsRollback())
-                {
-                    rollbackTransaction(currentTxnState);
-                }
-                completeTransaction(currentTxnState);
-                m_transactionsById.remove(currentTxnState.txnId);
-                return null;
-            }
-            else if (currentTxnState.shouldResumeProcedure()){
-                Map<Integer, List<VoltTable>> retval =
-                    currentTxnState.getPreviousStackFrameDropDependendencies();
-                assert(retval != null);
-                return retval;
-            }
-            else
-            {
-                VoltMessage message = m_mailbox.recvBlocking(5);
-                tick();
-                if (message != null) {
-                    handleMailboxMessage(message);
-                } else {
-                    //idle, do snapshot work
-                    m_snapshotter.doSnapshotWork(ee, EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
-                }
-
-                /**
-                 * If this site is the source for a recovering partition the recovering
-                 * partition might be blocked waiting for the txn to sync at from here.
-                 * Since this site is blocked on the multi-part waiting for the destination to respond
-                 * to a plan fragment it is a deadlock.
-                 * Poke the destination so that it will execute past the current
-                 * multi-part txn.
-                 */
-                if (m_recoveryProcessor != null) {
-                    m_recoveryProcessor.notifyBlockedOnMultiPartTxn( currentTxnState.txnId );
-                }
-            }
-        }
-        // should only get here on shutdown
         return null;
     }
 

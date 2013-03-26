@@ -35,12 +35,6 @@ public class ParticipantTransactionState extends TransactionState
     }
 
     @Override
-    public boolean doWork(boolean recovering)
-    {
-        return false;
-    }
-
-    @Override
     public StoredProcedureInvocation getInvocation()
     {
         return null;

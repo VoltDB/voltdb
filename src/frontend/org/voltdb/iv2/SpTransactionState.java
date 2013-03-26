@@ -42,12 +42,6 @@ public class SpTransactionState extends TransactionState
     }
 
     @Override
-    public boolean doWork(boolean recovering)
-    {
-        throw new RuntimeException("Do not expect doWork() in IV2");
-    }
-
-    @Override
     public StoredProcedureInvocation getInvocation()
     {
         return m_task.getStoredProcedureInvocation();

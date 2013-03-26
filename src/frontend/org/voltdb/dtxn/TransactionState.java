@@ -107,8 +107,6 @@ public abstract class TransactionState extends OrderableTransaction  {
      */
     public abstract boolean isSinglePartition();
 
-    public abstract boolean doWork(boolean rejoining);
-
     public void setHash(Integer hash) {
         m_hash = hash == null ? 0 : hash; // don't allow null
     }

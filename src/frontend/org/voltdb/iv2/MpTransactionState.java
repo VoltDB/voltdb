@@ -111,12 +111,6 @@ public class MpTransactionState extends TransactionState
     }
 
     @Override
-    public boolean doWork(boolean recovering)
-    {
-        return false;
-    }
-
-    @Override
     public StoredProcedureInvocation getInvocation()
     {
         return m_task.getStoredProcedureInvocation();

@@ -37,12 +37,6 @@ public class MPIEndOfLogTransactionState extends TransactionState {
     }
 
     @Override
-    public boolean doWork(boolean rejoining)
-    {
-        return false;
-    }
-
-    @Override
     public StoredProcedureInvocation getInvocation()
     {
         return null;
