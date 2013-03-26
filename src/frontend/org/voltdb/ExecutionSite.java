@@ -1391,7 +1391,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             if ((txnState.getRejoinState() == RejoinState.REJOINING) &&
                 m_rejoinTaskLog != null && !txnState.needsRollback()) {
                 try {
-                    TransactionInfoBaseMessage base = txnState.getTransactionInfoBaseMessageForRejoinLog();
+                    TransactionInfoBaseMessage base = null;
                     if (base != null) {
                         // this is for multi-partition only
                         // sysproc frags should be exempt

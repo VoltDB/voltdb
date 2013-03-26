@@ -87,10 +87,6 @@ public abstract class TransactionState extends OrderableTransaction  {
         return m_notice;
     }
 
-    public TransactionInfoBaseMessage getTransactionInfoBaseMessageForRejoinLog() {
-        return m_notice;
-    }
-
     public RejoinState getRejoinState() {
         return m_rejoinState;
     }
