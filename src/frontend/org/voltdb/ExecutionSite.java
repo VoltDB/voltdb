@@ -1384,48 +1384,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                 }
             }
 
-            /*
-             * log task message for rejoin if it's not a replayed transaction.
-             * Replayed transactions do not send responses.
-             */
-            if ((txnState.getRejoinState() == RejoinState.REJOINING) &&
-                m_rejoinTaskLog != null && !txnState.needsRollback()) {
-                try {
-                    TransactionInfoBaseMessage base = null;
-                    if (base != null) {
-                        // this is for multi-partition only
-                        // sysproc frags should be exempt
-                        if (base instanceof FragmentTaskLogMessage) {
-                            FragmentTaskLogMessage ftlm = (FragmentTaskLogMessage) base;
-                            if (ftlm.getFragmentTasks().size() > 0) {
-                                m_rejoinTaskLog.logTask(ftlm);
-                                m_loggedTaskCount++;
-                            }
-                        }
-                        // this is for single-partition only
-                        else if (base instanceof InitiateTaskMessage) {
-                            InitiateTaskMessage itm = (InitiateTaskMessage) base;
-                            // TODO: this is a pretty horrible hack
-                            if ((itm.getStoredProcedureName().startsWith("@") == false) ||
-                                (itm.getStoredProcedureName().startsWith("@AdHoc") == true)) {
-                                m_rejoinTaskLog.logTask(itm);
-                                m_loggedTaskCount++;
-                            }
-                        }
-                        // the base message should hit one of the ifs above
-                        else {
-                            hostLog.error("Logged a notice of type: " + base.getClass().getCanonicalName() + "for replay.");
-                            assert(false);
-                        }
-                    }
-                    else {
-                        //hostLog.info("not logging transaction that didn't write");
-                    }
-                } catch (IOException e) {
-                    VoltDB.crashLocalVoltDB("Failed to log task message", false, e);
-                }
-            }
-
             // reset for error checking purposes
             txnState.setBeginUndoToken(kInvalidUndoToken);
         }
