@@ -241,6 +241,8 @@ public class CatalogDiffEngine {
             return true;
         if (suspect instanceof Constraint && field.equals("index"))
             return true;
+        if (suspect instanceof Cluster && field.equals("heartbeatTimeout"))
+            return true;
 
         // Support modification of these entire sub-trees
         do {
