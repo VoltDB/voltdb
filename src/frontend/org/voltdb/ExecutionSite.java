@@ -67,13 +67,8 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
-import org.voltdb.dtxn.ReplayedTxnState;
-import org.voltdb.dtxn.SinglePartitionTxnState;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.dtxn.SiteTransactionConnection;
 import org.voltdb.dtxn.TransactionState;
-import org.voltdb.dtxn.TransactionState.RejoinState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.exceptions.SerializableException;
@@ -116,7 +111,7 @@ import com.google.common.collect.ImmutableMap;
  * do other things, but this is where the good stuff happens.
  */
 public class ExecutionSite
-implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSnapshotConnection
+implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
     private VoltLogger m_txnlog;
     private final VoltLogger m_rejoinLog = new VoltLogger("REJOIN");
@@ -395,7 +390,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         }
     }
 
-    @Override
     public boolean isActiveOrPreviouslyKnownSiteId(long hsid) {
         // if the host id is less than this one, then it existed when this site
         // was created (or it failed before this site existed)
@@ -1163,52 +1157,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
      * @return true if actual work was done, false otherwise
      */
     private boolean replayTransactionForRejoin() {
-        boolean doneWork = false;
-        if (m_rejoinTaskLog == null) {
-            return doneWork;
-        }
-
-        // get the next task to replay
-        TransactionState ts = null;
-        try {
-            TransactionInfoBaseMessage msg = m_rejoinTaskLog.getNextMessage();
-            if (msg != null) {
-                ts = new ReplayedTxnState(this, msg);
-            }
-        } catch (IOException e) {
-            m_rejoinLog.error("Failed to replay logged transactions: " +
-                    e.getMessage());
-        }
-
-        if (ts != null) {
-            // Run the transaction, but don't send response
-            recursableRun(ts);
-            doneWork = true;
-            m_rejoinLog.trace("Replayed " + ts.getNotice().getTxnId());
-            m_executedTaskCount++;
-        } else {
-            boolean rejoinCompleted = false;
-            try {
-                if (m_rejoinTaskLog.isEmpty() && m_rejoinSnapshotFinished) {
-                    rejoinCompleted = true;
-                }
-            } catch (IOException e) {
-                m_rejoinLog.error("Failed to determine if the task log is empty: " +
-                        e.getMessage());
-            }
-
-            if (rejoinCompleted) {
-                try {
-                    m_rejoinTaskLog.close();
-                } catch (IOException e) {
-                    m_rejoinLog.error("Failed to close the task log:" +
-                            e.getMessage());
-                }
-                m_onRejoinCompletion.run();
-            }
-        }
-
-        return doneWork;
+        return false;
     }
 
     /**
@@ -1434,48 +1383,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 }
             }
 
-            /*
-             * log task message for rejoin if it's not a replayed transaction.
-             * Replayed transactions do not send responses.
-             */
-            if ((txnState.getRejoinState() == RejoinState.REJOINING) &&
-                m_rejoinTaskLog != null && !txnState.needsRollback()) {
-                try {
-                    TransactionInfoBaseMessage base = txnState.getTransactionInfoBaseMessageForRejoinLog();
-                    if (base != null) {
-                        // this is for multi-partition only
-                        // sysproc frags should be exempt
-                        if (base instanceof FragmentTaskLogMessage) {
-                            FragmentTaskLogMessage ftlm = (FragmentTaskLogMessage) base;
-                            if (ftlm.getFragmentTasks().size() > 0) {
-                                m_rejoinTaskLog.logTask(ftlm);
-                                m_loggedTaskCount++;
-                            }
-                        }
-                        // this is for single-partition only
-                        else if (base instanceof InitiateTaskMessage) {
-                            InitiateTaskMessage itm = (InitiateTaskMessage) base;
-                            // TODO: this is a pretty horrible hack
-                            if ((itm.getStoredProcedureName().startsWith("@") == false) ||
-                                (itm.getStoredProcedureName().startsWith("@AdHoc") == true)) {
-                                m_rejoinTaskLog.logTask(itm);
-                                m_loggedTaskCount++;
-                            }
-                        }
-                        // the base message should hit one of the ifs above
-                        else {
-                            hostLog.error("Logged a notice of type: " + base.getClass().getCanonicalName() + "for replay.");
-                            assert(false);
-                        }
-                    }
-                    else {
-                        //hostLog.info("not logging transaction that didn't write");
-                    }
-                } catch (IOException e) {
-                    VoltDB.crashLocalVoltDB("Failed to log task message", false, e);
-                }
-            }
-
             // reset for error checking purposes
             txnState.setBeginUndoToken(kInvalidUndoToken);
         }
@@ -1534,40 +1441,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
             // Every non-heartbeat notice requires a transaction state.
             TransactionState ts = m_transactionsById.get(info.getTxnId());
-            if (info instanceof CompleteTransactionMessage)
-            {
-                CompleteTransactionMessage complete = (CompleteTransactionMessage)info;
-                if (ts != null)
-                {
-                    ts.processCompleteTransaction(complete);
-                }
-                else
-                {
-                    // if we're getting a CompleteTransactionMessage
-                    // and there's no transaction state, it's because
-                    // we were the cause of the rollback and we bailed
-                    // as soon as we signaled our failure to the coordinator.
-                    // Just generate an ack to keep the coordinator happy.
-                    if (complete.requiresAck())
-                    {
-                        CompleteTransactionResponseMessage ctrm =
-                            new CompleteTransactionResponseMessage(complete, m_siteId);
-                        m_mailbox.send(complete.getCoordinatorHSId(), ctrm);
-                    }
-                }
-                return;
-            }
-
-            if (ts == null) {
-                if (info.isSinglePartition()) {
-                    ts = new SinglePartitionTxnState(m_mailbox, this, info);
-                }
-                else {
-                    ts = new MultiPartitionParticipantTxnState(m_mailbox, this, info);
-                }
-                hostLog.info(
-                        "Dropping txn " + ts.txnId + " data from failed initiatorSiteId: " + ts.initiatorHSId);
-            }
 
             if (ts != null)
             {
@@ -1618,28 +1491,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             RejoinMessage rm = (RejoinMessage) message;
             handleRejoinMessage(rm);
         }
-        else if (message instanceof FragmentResponseMessage) {
-            FragmentResponseMessage response = (FragmentResponseMessage)message;
-            TransactionState txnState = m_transactionsById.get(response.getTxnId());
-            // possible in rollback to receive an unnecessary response
-            if (txnState != null) {
-                assert (txnState instanceof MultiPartitionParticipantTxnState);
-                txnState.processRemoteWorkResponse(response);
-            }
-        }
-        else if (message instanceof CompleteTransactionResponseMessage)
-        {
-            CompleteTransactionResponseMessage response =
-                (CompleteTransactionResponseMessage)message;
-            TransactionState txnState = m_transactionsById.get(response.getTxnId());
-            // I believe a null txnState should eventually be impossible, let's
-            // check for null for now
-            if (txnState != null)
-            {
-                assert (txnState instanceof MultiPartitionParticipantTxnState);
-                txnState.processCompleteTransactionResponse(response);
-            }
-        }
         else if (message instanceof ExecutionSiteNodeFailureMessage) {
             discoverGlobalFaultData((ExecutionSiteNodeFailureMessage)message);
         }
@@ -1648,8 +1499,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             TransactionState txnState = m_transactionsById.get(txn_id);
             if (txnState != null)
             {
-                assert(txnState instanceof MultiPartitionParticipantTxnState);
-                ((MultiPartitionParticipantTxnState)txnState).checkWorkUnits();
             }
         }
         else if (message instanceof RawProcessor.ExportInternalMessage) {
@@ -2119,7 +1968,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         {
             final long tid = it.next();
             TransactionState ts = m_transactionsById.get(tid);
-            ts.handleSiteFaults(failedSites);
 
             // Fault a transaction that was not globally initiated by a failed initiator
             if (initiatorSafeInitiationPoint.containsKey(ts.initiatorHSId) &&
@@ -2139,55 +1987,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             // Otherwise, without a coordinator, the transaction can't
             // continue. Must rollback, if in progress, or fault it
             // from the queues if not yet started.
-            else if (ts instanceof MultiPartitionParticipantTxnState &&
-                     failedSites.contains(ts.coordinatorSiteId))
-            {
-                MultiPartitionParticipantTxnState mpts = (MultiPartitionParticipantTxnState) ts;
-                if (ts.isInProgress() && ts.txnId <= globalMultiPartCommitPoint)
-                {
-                    m_rejoinLog.info("Committing in progress multi-partition txn " + ts.txnId +
-                            " even though coordinator was on a failed host because the txnId <= " +
-                            "the global multi-part commit point");
-                    CompleteTransactionMessage ft =
-                        mpts.createCompleteTransactionMessage(false, false);
-                    ft.m_sourceHSId = m_siteId;
-                    m_mailbox.deliverFront(ft);
-                }
-                else if (ts.isInProgress() && ts.txnId > globalMultiPartCommitPoint) {
-                    m_rejoinLog.info("Rolling back in progress multi-partition txn " + ts.txnId +
-                            " because the coordinator was on a failed host and the txnId > " +
-                            "the global multi-part commit point");
-                    CompleteTransactionMessage ft =
-                        mpts.createCompleteTransactionMessage(true, false);
-                    ft.m_sourceHSId = m_siteId;
-                    if (!ts.isReadOnly()) {
-                        faultedTxns.add(ts.txnId);
-                    }
-                    m_mailbox.deliverFront(ft);
-                }
-                else
-                {
-                    m_rejoinLog.info("Faulting multi-part transaction " + ts.txnId +
-                            " because the coordinator was on a failed node");
-                    it.remove();
-                    if (!ts.isReadOnly()) {
-                        faultedTxns.add(ts.txnId);
-                    }
-                }
-            }
-            // If we're the coordinator, then after we clean up our internal
-            // state due to a failed node, we need to poke ourselves to check
-            // to see if all the remaining dependencies are satisfied.  Do this
-            // with a message to our mailbox so that happens in the
-            // execution site thread
-            else if (ts instanceof MultiPartitionParticipantTxnState &&
-                     ts.coordinatorSiteId == m_siteId)
-            {
-                if (ts.isInProgress())
-                {
-                    m_mailbox.deliverFront(new CheckTxnStateCompletionMessage(ts.txnId, m_siteId));
-                }
-            }
         }
         if (m_recoveryProcessor != null) {
             m_recoveryProcessor.handleSiteFaults(failedSites, m_tracker);
@@ -2374,79 +2173,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     public Map<Integer, List<VoltTable>>
     recursableRun(TransactionState currentTxnState)
     {
-        while (m_shouldContinue) {
-            /*
-             * when it's replaying transactions during rejoin, we want real work
-             * to be done. If during rejoin, a transaction needs to send a
-             * response, only send a dummy response. A replayed transaction
-             * during rejoin needs real work to be done, but no response to be
-             * sent.
-             */
-            if (currentTxnState.doWork(m_rejoining)) {
-                if (currentTxnState.needsRollback())
-                {
-                    rollbackTransaction(currentTxnState);
-                }
-                completeTransaction(currentTxnState);
-                m_transactionsById.remove(currentTxnState.txnId);
-                return null;
-            }
-            else if (currentTxnState.shouldResumeProcedure()){
-                Map<Integer, List<VoltTable>> retval =
-                    currentTxnState.getPreviousStackFrameDropDependendencies();
-                assert(retval != null);
-                return retval;
-            }
-            // This is a bit ugly; more or less a straight-forward
-            // extraction of the logic that used to be in
-            // MultiPartitionParticipantTxnState.doWork()
-            else if (currentTxnState.isBlocked() &&
-                     !currentTxnState.isDone() &&
-                     currentTxnState.isCoordinator() &&
-                     currentTxnState.isReadOnly() &&
-                     !currentTxnState.hasTransactionalWork())
-            {
-                assert(!currentTxnState.isSinglePartition());
-                tryToSneakInASinglePartitionProcedure();
-                if (m_recoveryProcessor != null) {
-                    m_recoveryProcessor.notifyBlockedOnMultiPartTxn( currentTxnState.txnId );
-                }
-            }
-            else
-            {
-                VoltMessage message = m_mailbox.recvBlocking(5);
-                tick();
-                if (message != null) {
-                    handleMailboxMessage(message);
-                } else {
-                    //idle, do snapshot work
-                    m_snapshotter.doSnapshotWork(ee, EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
-                }
-
-                /**
-                 * If this site is the source for a recovering partition the recovering
-                 * partition might be blocked waiting for the txn to sync at from here.
-                 * Since this site is blocked on the multi-part waiting for the destination to respond
-                 * to a plan fragment it is a deadlock.
-                 * Poke the destination so that it will execute past the current
-                 * multi-part txn.
-                 */
-                if (m_recoveryProcessor != null) {
-                    m_recoveryProcessor.notifyBlockedOnMultiPartTxn( currentTxnState.txnId );
-                }
-            }
-        }
-        // should only get here on shutdown
         return null;
     }
 
-    /*
-     *
-     *  SiteTransactionConnection Interface (TransactionState -> ExecutionSite)
-     *
-     */
-
-    @Override
     public SiteTracker getSiteTracker() {
         return m_tracker;
     }
@@ -2458,16 +2187,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
      * site to release the undo data in the EE up until the current point
      * when the transaction ID changes.
      */
-    @Override
     public void beginNewTxn(TransactionState txnState)
     {
-        if (m_txnlog.isTraceEnabled())
-        {
-            m_txnlog.trace("FUZZTEST beginNewTxn " + txnState.txnId + " " +
-                           (txnState.isSinglePartition() ? "single" : "multi") + " " +
-                           (txnState.isReadOnly() ? "readonly" : "readwrite") + " " +
-                           (txnState.isCoordinator() ? "coord" : "part"));
-        }
         if (!txnState.isReadOnly()) {
             assert(txnState.getBeginUndoToken() == kInvalidUndoToken);
             txnState.setBeginUndoToken(latestUndoToken);
@@ -2493,8 +2214,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         }
     }
 
-
-    @Override
     public FragmentResponseMessage processFragmentTask(
             TransactionState txnState,
             final HashMap<Integer,List<VoltTable>> dependencies,
@@ -2587,8 +2306,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         return currentFragResponse;
     }
 
-
-    @Override
     public InitiateResponseMessage processInitiateTask(
             TransactionState txnState,
             final VoltMessage task)
@@ -2677,19 +2394,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             return true;
         }
         else {
-            TransactionState nextTxn = null;
-
-            // only sneak in single partition work
-            if (nextTxn instanceof SinglePartitionTxnState)
-            {
-                boolean success = nextTxn.doWork(m_rejoining);
-                assert(success);
-                return true;
-            }
-            else {
-                // multipartition is next or no work
-                return false;
-            }
+            // multipartition is next or no work
+            return false;
         }
     }
 
