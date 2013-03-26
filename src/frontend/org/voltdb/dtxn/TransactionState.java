@@ -43,7 +43,6 @@ import org.voltdb.messaging.FragmentTaskMessage;
  */
 public abstract class TransactionState extends OrderableTransaction  {
 
-    public final long coordinatorSiteId;
     protected final boolean m_isReadOnly;
     protected final TransactionInfoBaseMessage m_notice;
     protected int m_nextDepId = 1;
@@ -68,7 +67,6 @@ public abstract class TransactionState extends OrderableTransaction  {
         super(notice.getTxnId(), notice.getSpHandle(), notice.getUniqueId(), notice.getInitiatorHSId());
         m_mbox = mbox;
         m_notice = notice;
-        coordinatorSiteId = notice.getCoordinatorHSId();
         m_isReadOnly = notice.isReadOnly();
         m_beginUndoToken = Site.kInvalidUndoToken;
         m_isForReplay = notice.isForReplay();
