@@ -1441,29 +1441,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
             // Every non-heartbeat notice requires a transaction state.
             TransactionState ts = m_transactionsById.get(info.getTxnId());
-            if (info instanceof CompleteTransactionMessage)
-            {
-                CompleteTransactionMessage complete = (CompleteTransactionMessage)info;
-                if (ts != null)
-                {
-                    ts.processCompleteTransaction(complete);
-                }
-                else
-                {
-                    // if we're getting a CompleteTransactionMessage
-                    // and there's no transaction state, it's because
-                    // we were the cause of the rollback and we bailed
-                    // as soon as we signaled our failure to the coordinator.
-                    // Just generate an ack to keep the coordinator happy.
-                    if (complete.requiresAck())
-                    {
-                        CompleteTransactionResponseMessage ctrm =
-                            new CompleteTransactionResponseMessage(complete, m_siteId);
-                        m_mailbox.send(complete.getCoordinatorHSId(), ctrm);
-                    }
-                }
-                return;
-            }
 
             if (ts != null)
             {
@@ -1513,18 +1490,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         else if (message instanceof RejoinMessage) {
             RejoinMessage rm = (RejoinMessage) message;
             handleRejoinMessage(rm);
-        }
-        else if (message instanceof CompleteTransactionResponseMessage)
-        {
-            CompleteTransactionResponseMessage response =
-                (CompleteTransactionResponseMessage)message;
-            TransactionState txnState = m_transactionsById.get(response.getTxnId());
-            // I believe a null txnState should eventually be impossible, let's
-            // check for null for now
-            if (txnState != null)
-            {
-                txnState.processCompleteTransactionResponse(response);
-            }
         }
         else if (message instanceof ExecutionSiteNodeFailureMessage) {
             discoverGlobalFaultData((ExecutionSiteNodeFailureMessage)message);

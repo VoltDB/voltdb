@@ -166,23 +166,6 @@ public abstract class TransactionState extends OrderableTransaction  {
         throw new UnsupportedOperationException(msg);
     }
 
-    public void processCompleteTransaction(CompleteTransactionMessage complete)
-    {
-        String msg = "The current transaction context of type ";
-        msg += this.getClass().getName();
-        msg += " doesn't support receiving CompleteTransactionMessages.";
-        throw new UnsupportedOperationException(msg);
-    }
-
-    public void
-    processCompleteTransactionResponse(CompleteTransactionResponseMessage response)
-    {
-        String msg = "The current transaction context of type ";
-        msg += this.getClass().getName();
-        msg += " doesn't support receiving CompleteTransactionResponseMessages.";
-        throw new UnsupportedOperationException(msg);
-    }
-
     public Map<Integer, List<VoltTable>> getPreviousStackFrameDropDependendencies() {
         String msg = "The current transaction context of type ";
         msg += this.getClass().getName();
