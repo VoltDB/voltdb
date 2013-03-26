@@ -119,10 +119,6 @@ public abstract class TransactionState extends OrderableTransaction  {
         return m_response;
     }
 
-    public boolean shouldResumeProcedure() {
-        return false;
-    }
-
     public void setBeginUndoToken(long undoToken)
     {
         m_beginUndoToken = undoToken;
