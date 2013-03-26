@@ -42,12 +42,6 @@ public class SpTransactionState extends TransactionState
     }
 
     @Override
-    public boolean isCoordinator()
-    {
-        return true;
-    }
-
-    @Override
     public boolean isBlocked()
     {
         return true;

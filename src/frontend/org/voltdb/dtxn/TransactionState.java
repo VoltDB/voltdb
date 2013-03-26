@@ -43,12 +43,6 @@ import org.voltdb.messaging.FragmentTaskMessage;
  */
 public abstract class TransactionState extends OrderableTransaction  {
 
-    public static enum RejoinState {
-        NORMAL,
-        REJOINING,
-        REPLAYING
-    }
-
     public final long coordinatorSiteId;
     protected final boolean m_isReadOnly;
     protected final TransactionInfoBaseMessage m_notice;
@@ -60,9 +54,6 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected ClientResponseImpl m_response = null;
     protected final boolean m_isForReplay;
     protected int m_hash = -1; // -1 shows where the value comes from (they only have to match)
-
-    // is this transaction run during a rejoin
-    protected RejoinState m_rejoinState = RejoinState.NORMAL;
 
     /**
      * Set up the final member variables from the parameters. This will
@@ -96,10 +87,6 @@ public abstract class TransactionState extends OrderableTransaction  {
         return m_done;
     }
 
-    public boolean isInProgress() {
-        return false;
-    }
-
     public boolean isReadOnly()
     {
         return m_isReadOnly;
@@ -119,8 +106,6 @@ public abstract class TransactionState extends OrderableTransaction  {
      * sane results by subclasses.
      */
     public abstract boolean isSinglePartition();
-
-    public abstract boolean isCoordinator();
 
     public abstract boolean isBlocked();
 

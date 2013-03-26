@@ -111,12 +111,6 @@ public class MpTransactionState extends TransactionState
     }
 
     @Override
-    public boolean isCoordinator()
-    {
-        return true;
-    }
-
-    @Override
     public boolean isBlocked()
     {
         // Not clear this method is useful in the new world?

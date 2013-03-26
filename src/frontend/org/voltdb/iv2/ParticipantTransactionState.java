@@ -35,12 +35,6 @@ public class ParticipantTransactionState extends TransactionState
     }
 
     @Override
-    public boolean isCoordinator()
-    {
-        return false;
-    }
-
-    @Override
     public boolean isBlocked()
     {
         return false;

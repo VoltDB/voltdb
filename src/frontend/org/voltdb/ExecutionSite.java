@@ -69,7 +69,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
-import org.voltdb.dtxn.TransactionState.RejoinState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.exceptions.SerializableException;
@@ -2245,7 +2244,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             // MultiPartitionParticipantTxnState.doWork()
             else if (currentTxnState.isBlocked() &&
                      !currentTxnState.isDone() &&
-                     currentTxnState.isCoordinator() &&
                      currentTxnState.isReadOnly() &&
                      !currentTxnState.hasTransactionalWork())
             {
@@ -2296,13 +2294,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
      */
     public void beginNewTxn(TransactionState txnState)
     {
-        if (m_txnlog.isTraceEnabled())
-        {
-            m_txnlog.trace("FUZZTEST beginNewTxn " + txnState.txnId + " " +
-                           (txnState.isSinglePartition() ? "single" : "multi") + " " +
-                           (txnState.isReadOnly() ? "readonly" : "readwrite") + " " +
-                           (txnState.isCoordinator() ? "coord" : "part"));
-        }
         if (!txnState.isReadOnly()) {
             assert(txnState.getBeginUndoToken() == kInvalidUndoToken);
             txnState.setBeginUndoToken(latestUndoToken);
