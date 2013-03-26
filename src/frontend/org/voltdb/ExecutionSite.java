@@ -1514,14 +1514,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             RejoinMessage rm = (RejoinMessage) message;
             handleRejoinMessage(rm);
         }
-        else if (message instanceof FragmentResponseMessage) {
-            FragmentResponseMessage response = (FragmentResponseMessage)message;
-            TransactionState txnState = m_transactionsById.get(response.getTxnId());
-            // possible in rollback to receive an unnecessary response
-            if (txnState != null) {
-                txnState.processRemoteWorkResponse(response);
-            }
-        }
         else if (message instanceof CompleteTransactionResponseMessage)
         {
             CompleteTransactionResponseMessage response =

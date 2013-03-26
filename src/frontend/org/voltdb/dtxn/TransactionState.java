@@ -166,13 +166,6 @@ public abstract class TransactionState extends OrderableTransaction  {
         throw new UnsupportedOperationException(msg);
     }
 
-    public void processRemoteWorkResponse(FragmentResponseMessage response) {
-        String msg = "The current transaction context of type ";
-        msg += this.getClass().getName();
-        msg += " doesn't support receiving fragment responses.";
-        throw new UnsupportedOperationException(msg);
-    }
-
     public void processCompleteTransaction(CompleteTransactionMessage complete)
     {
         String msg = "The current transaction context of type ";
