@@ -107,8 +107,6 @@ public abstract class TransactionState extends OrderableTransaction  {
      */
     public abstract boolean isSinglePartition();
 
-    public abstract boolean isBlocked();
-
     public abstract boolean hasTransactionalWork();
 
     public abstract boolean doWork(boolean rejoining);

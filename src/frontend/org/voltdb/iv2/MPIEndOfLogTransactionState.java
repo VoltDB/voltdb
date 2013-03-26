@@ -37,12 +37,6 @@ public class MPIEndOfLogTransactionState extends TransactionState {
     }
 
     @Override
-    public boolean isBlocked()
-    {
-        return false;
-    }
-
-    @Override
     public boolean hasTransactionalWork()
     {
         return false;

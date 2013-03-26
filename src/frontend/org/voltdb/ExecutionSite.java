@@ -2239,20 +2239,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                 assert(retval != null);
                 return retval;
             }
-            // This is a bit ugly; more or less a straight-forward
-            // extraction of the logic that used to be in
-            // MultiPartitionParticipantTxnState.doWork()
-            else if (currentTxnState.isBlocked() &&
-                     !currentTxnState.isDone() &&
-                     currentTxnState.isReadOnly() &&
-                     !currentTxnState.hasTransactionalWork())
-            {
-                assert(!currentTxnState.isSinglePartition());
-                tryToSneakInASinglePartitionProcedure();
-                if (m_recoveryProcessor != null) {
-                    m_recoveryProcessor.notifyBlockedOnMultiPartTxn( currentTxnState.txnId );
-                }
-            }
             else
             {
                 VoltMessage message = m_mailbox.recvBlocking(5);

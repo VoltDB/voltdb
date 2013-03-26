@@ -111,13 +111,6 @@ public class MpTransactionState extends TransactionState
     }
 
     @Override
-    public boolean isBlocked()
-    {
-        // Not clear this method is useful in the new world?
-        return false;
-    }
-
-    @Override
     public boolean hasTransactionalWork()
     {
         return false;

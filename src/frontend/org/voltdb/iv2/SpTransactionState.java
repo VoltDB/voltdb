@@ -41,12 +41,6 @@ public class SpTransactionState extends TransactionState
         return true;
     }
 
-    @Override
-    public boolean isBlocked()
-    {
-        return true;
-    }
-
     // Per SinglePartitonTxnState.java
     @Override
     public boolean hasTransactionalWork()
