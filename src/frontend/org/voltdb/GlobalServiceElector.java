@@ -43,7 +43,7 @@ class GlobalServiceElector extends LeaderNoticeHandler
     GlobalServiceElector(ZooKeeper zk, int hostId)
     {
         m_leaderElector = new LeaderElector(zk, VoltZK.leaders_globalservice,
-                Integer.toString(hostId), null, this);
+                "globalservice", null, this);
         m_hostId = hostId;
     }
 
