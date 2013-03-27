@@ -58,8 +58,11 @@ import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
+import org.voltcore.logging.VoltLogger;
 
 public class SchemaChangeClient {
+
+    static VoltLogger log = new VoltLogger("HOST");
 
     static subClient client = null;
     static AtomicLong nextKeyToInsert = new AtomicLong(0);
@@ -76,7 +79,7 @@ public class SchemaChangeClient {
     static long startTime;
 
     public static String _F(String str, Object... parameters) {
-        return String.format(DateFormatUtils.format(System.currentTimeMillis(), "MM/dd/yyyy HH:mm:ss") + "\t" + str, parameters);
+        return String.format(str, parameters);
     }
 
     /**
@@ -134,8 +137,7 @@ public class SchemaChangeClient {
         }
 
         @Override
-        public ClientResponse callProcedure(String procName,
-                Object... parameters) throws IOException,
+        public ClientResponse callProcedure(String procName, Object... parameters) throws IOException,
                 NoConnectionsException, ProcCallException {
             ClientResponse r = null;
             while (!noProgressCB) {
@@ -144,17 +146,17 @@ public class SchemaChangeClient {
                     lastSuccessTime = System.currentTimeMillis();
                     return r;
                 } catch (NoConnectionsException e) {
-                    System.err.println(_F("Caught NoConnectionsException: " + e.getMessage()));
+                    System.err.println(_F("Caught NoConnectionsException(s): " + e.getMessage()));
                     // retry this case
                     // throw e
                 } catch (ProcCallException e) {
-                    System.err.println(_F("Caught ProcCallException: " + e.getMessage()));
+                    System.err.println(_F("Caught ProcCallException(s): " + e.getMessage()));
                     // reflect this case
                     // can get 'connection lost before a response was received here' the tx may be committed???
                     if (! e.getMessage().startsWith("Connection to database host"))
                         throw e;
                 } catch (IOException e) {
-                    System.err.println(_F("Caught IOException: " + e.getMessage()));
+                    System.err.println(_F("Caught IOException(s): " + e.getMessage()));
                     // reflect this case
                     throw e;
                 } finally {
@@ -178,8 +180,7 @@ public class SchemaChangeClient {
                 Object[] parameters;
                 long tries;
 
-                Callback(ProcedureCallback callback, String procName,
-                        Object... parameters) {
+                Callback(ProcedureCallback callback, String procName, Object... parameters) {
                     this.callback = callback;
                     this.procName = procName;
                     this.parameters = parameters;
@@ -196,7 +197,7 @@ public class SchemaChangeClient {
                             case ClientResponse.CONNECTION_LOST:
                             case ClientResponse.CONNECTION_TIMEOUT:
                             case ClientResponse.UNEXPECTED_FAILURE:
-                                System.err.printf(_F("retrying lost/timeout connection %d\n", this.tries));
+                                log.error(_F("Retrying lost/timeout connection %d", this.tries));
                                 if (noProgressCB) break; // don't retry if circuit breaker has tripped
                                 Thread.sleep(1);
                                 client.callProcedure(this, procName, parameters); // retry the call
@@ -220,11 +221,10 @@ public class SchemaChangeClient {
                 try {
                     return client.callProcedure(cb, procName, parameters);
                 } catch (NoConnectionsException e) {
-                    System.err.println(_F("Caught NoConnectionsException: "
-                            + e.getMessage()));
+                    System.err.println(_F("Caught NoConnectionsException(a): " + e.getMessage()));
                     // throw e;
                 } catch (IOException e) {
-                    System.err.println(_F("Caught IOException: " + e.getMessage()));
+                    System.err.println(_F("Caught IOException(a): " + e.getMessage()));
                     throw e;
                 } finally {
                     try {
@@ -340,7 +340,7 @@ public class SchemaChangeClient {
             t2 = TableHelper.mutateTable(t1, false, rand);
         }
 
-        System.out.printf(_F("New Schema:\n%s\n", TableHelper.ddlForTable(t2)));
+        log.info(_F("New Schema:\n%s", TableHelper.ddlForTable(t2)));
 
         builder.addLiteralSchema(TableHelper.ddlForTable(t2));
         // make tables name A partitioned and tables named B replicated
@@ -355,10 +355,10 @@ public class SchemaChangeClient {
         long start = System.nanoTime();
 
         if (newTable) {
-            System.out.println(_F("Starting catalog update to swap tables."));
+            log.info(_F("Starting catalog update to swap tables."));
         }
         else {
-            System.out.println(_F("Starting catalog update to change schema."));
+            log.info(_F("Starting catalog update to change schema."));
         }
 
         ClientResponse cr = client.callProcedure("@UpdateApplicationCatalog", catalogData, null);
@@ -368,15 +368,15 @@ public class SchemaChangeClient {
         double seconds = (end - start) / 1000000000.0;
 
         if (newTable) {
-            System.out.printf(_F("Completed catalog update that swapped tables in %.4f seconds\n",
+            log.info(_F("Completed catalog update that swapped tables in %.4f seconds",
                     seconds));
         }
         else {
-            System.out.printf(_F("Completed catalog update of %d tuples in %.4f seconds (%d tuples/sec)\n",
+            log.info(_F("Completed catalog update of %d tuples in %.4f seconds (%d tuples/sec)",
                     count, seconds, (long) (count / seconds)));
         }
 
-        //System.out.println(_F("Sleeping for 5s"));
+        //log.info(_F("Sleeping for 5s"));
         //Thread.sleep(5000);
 
         return t2;
@@ -461,7 +461,7 @@ public class SchemaChangeClient {
             realRowCount /= topo.partitions;
         }
 
-        System.out.printf(_F("loading table\n"));
+        log.info(_F("loading table"));
         long max = maxId(t);
         TableHelper.fillTableWithBigintPkey(t, config.targetrssmb, realRowCount, client, rand, max + 1, 1);
         TableHelper.deleteEveryNRows(t, client, n);
@@ -519,12 +519,12 @@ public class SchemaChangeClient {
                         + client.getInstanceId()[0] + " - "
                         + client.getInstanceId()[1] + ", totalConnections = "
                         + totalConnections.get();
-                System.out.println(_F(msg));
+                log.info(_F(msg));
                 break;
             } catch (Exception e) {
                 msg = "Connection to " + server + " failed - retrying in "
                         + sleep / 1000 + " second(s)";
-                System.out.println(_F(msg));
+                log.info(_F(msg));
                 try {
                     Thread.sleep(sleep);
                 } catch (Exception interruted) {
@@ -555,7 +555,7 @@ public class SchemaChangeClient {
             // if the benchmark is still active
             long currentTime = System.currentTimeMillis();
             if ((currentTime - startTime) < (config.duration * 1000)) {
-                System.err.printf(_F("Lost connection to %s:%d.\n", hostname, port));
+                log.error(_F("Lost connection to %s:%d.", hostname, port));
                 totalConnections.decrementAndGet();
                 // setup for retry
                 final String server = hostname;
@@ -605,12 +605,11 @@ public class SchemaChangeClient {
         timer = new Timer(true); // true means its on a daemon thread
         TimerTask statsPrinting = new TimerTask() {
             @Override
-            public void run() {
-                periodicChecks();
-            }
+            public void run() { periodicChecks(); }
         };
 
-        timer.scheduleAtFixedRate(statsPrinting, config.checkInterval * 1000,
+        timer.scheduleAtFixedRate(statsPrinting,
+                config.checkInterval * 1000,
                 config.checkInterval * 1000);
     }
 
@@ -621,11 +620,11 @@ public class SchemaChangeClient {
     public static synchronized void periodicChecks() {
         if (totalConnections.get() > 0) {
             if (System.currentTimeMillis() - lastSuccessTime > config.noProgressTimeout * 1000) {
-                System.out.println(_F("Periodic cehck - fail: No progress timeout has been reached"));
+                log.info(_F("Periodic cehck - fail: No progress timeout has been reached"));
                 noProgressCB = true;
             }
             else
-                System.out.println(_F("Periodic check - pass"));
+                log.info(_F("Periodic check - pass"));
         }
     }
 
@@ -655,17 +654,17 @@ public class SchemaChangeClient {
 
         startTime = System.currentTimeMillis();
 
-        while (config.duration == 0 || (System.currentTimeMillis() - startTime < (config.duration * 1000))) {
+        while (true) {
             // make sure the table is full and mess around with it
             loadTable(t);
 
-            for (int j = 0; j < 3; j++) {
+            for (int j = 0; j < 50; j++) {
 
                 String tableName = TableHelper.getTableName(t);
 
                 // deterministically sample some rows
                 VoltTable preT = sample(t);
-                //System.out.printf(_F("First sample:\n%s\n", preT.toFormattedString()));
+                //log.info(_F("First sample:\n%s\n", preT.toFormattedString()));
 
                 // move to an entirely new table or migrated schema
                 t = catalogChange(t, (j == 0) && (rand.nextInt(5) == 0));
@@ -673,24 +672,27 @@ public class SchemaChangeClient {
                 // if the table has been migrated, check the data
                 if (TableHelper.getTableName(t).equals(tableName)) {
                     VoltTable guessT = t.clone(4096 * 1024);
-                    //System.out.printf(_F("Empty clone:\n%s\n", guessT.toFormattedString()));
+                    //log.info(_F("Empty clone:\n%s\n", guessT.toFormattedString()));
 
                     TableHelper.migrateTable(preT, guessT);
-                    //System.out.printf(_F("Java migration:\n%s\n", guessT.toFormattedString()));
+                    //log.info(_F("Java migration:\n%s\n", guessT.toFormattedString()));
 
                     // deterministically sample the same rows
                     VoltTable postT = sample(t);
-                    //System.out.printf(_F("Second sample:\n%s\n", postT.toFormattedString()));
+                    //log.info(_F("Second sample:\n%s\n", postT.toFormattedString()));
 
                     postT.resetRowPosition();
                     preT.resetRowPosition();
                     StringBuilder sb = new StringBuilder();
                     if (!TableHelper.deepEqualsWithErrorMsg(postT, guessT, sb)) {
-                        System.err.println(_F(sb.toString()));
+                        log.error(_F(sb.toString()));
                         assert(false);
                     }
                 }
             }
+            // stop the run if our time has run out
+            if (!(config.duration == 0 || (System.currentTimeMillis() - startTime < (config.duration * 1000))))
+                    break;
         }
 
         client.close();
