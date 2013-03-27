@@ -113,7 +113,7 @@ public class SchemaChangeClient {
 
     /**
      * Subclass the VoltDB Client interface
-     * for control of tx failure and connection loss in cases of 
+     * for control of tx failure and connection loss in cases of
      * node and cluster failure.
      */
     public static class subClient implements Client {
@@ -158,7 +158,7 @@ public class SchemaChangeClient {
                     // reflect this case
                     throw e;
                 } finally {
-                    try { Thread.sleep(3); } 
+                    try { Thread.sleep(3); }
                     catch (Exception e) { }
                 }
             }
@@ -491,7 +491,7 @@ public class SchemaChangeClient {
      * Connect to a single server with retry. Limited exponential backoff. No
      * timeout. This will run until the process is killed if it's not able to
      * connect.
-     * 
+     *
      * @param server
      *            hostname:port or just hostname (hostname can be ip).
      */
@@ -572,7 +572,7 @@ public class SchemaChangeClient {
     /**
      * Connect to a set of servers in parallel. Each will retry until
      * connection. This call will block until all have connected.
-     * 
+     *
      * @param servers
      *            A comma separated list of servers using the hostname:port
      *            syntax (where :port is optional).
@@ -599,7 +599,7 @@ public class SchemaChangeClient {
 
     /**
      * Create a Timer task to
-     * 
+     *
      */
     public static void schedulePeriodicChecks() {
         timer = new Timer(true); // true means its on a daemon thread
@@ -624,7 +624,7 @@ public class SchemaChangeClient {
                 System.out.println(_F("Periodic cehck - fail: No progress timeout has been reached"));
                 noProgressCB = true;
             }
-            else 
+            else
                 System.out.println(_F("Periodic check - pass"));
         }
     }
