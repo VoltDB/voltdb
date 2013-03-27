@@ -42,7 +42,8 @@ public class SQLStmt {
     }
 
     // Used for uncompiled SQL.
-    byte[] sqlText;
+    private byte[] sqlText;
+    private String sqlTextStr;
     String joinOrder;
     // hash of the sql string for determinism checks
     byte[] sqlCRC;
@@ -176,7 +177,27 @@ public class SQLStmt {
      * @return String containing the text of the SQL statement represented.
      */
     public String getText() {
-        return new String(sqlText, VoltDB.UTF8ENCODING);
+        if (sqlTextStr == null) {
+            sqlTextStr = new String(sqlText, VoltDB.UTF8ENCODING);
+        }
+        return sqlTextStr;
+    }
+
+    public byte[] getSQLBytes() {
+        if (sqlText == null) {
+            sqlText = sqlTextStr.getBytes(VoltDB.UTF8ENCODING);
+        }
+        return sqlText;
+    }
+
+    public void setSQLBytes(byte[] sql) {
+        sqlText = sql;
+        sqlTextStr = null;
+    }
+
+    public void setSQLStr(String sql) {
+        sqlText = null;
+        sqlTextStr = sql;
     }
 
     /**

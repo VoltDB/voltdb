@@ -595,7 +595,7 @@ public class ProcedureRunner {
 
         // check expectations
         int i = 0; for (QueuedSQL qs : batch) {
-            Expectation.check(m_procedureName, qs.stmt.sqlText,
+            Expectation.check(m_procedureName, qs.stmt,
                     i, qs.expectation, results[i]);
             i++;
         }
@@ -680,7 +680,7 @@ public class ProcedureRunner {
         for (PlanFragment frag : catStmt.getFragments()) {
             SQLStmt.Frag stmtFrag = new SQLStmt.Frag();
             stmtFrag.planHash = Encoder.hexDecode(frag.getPlanhash());
-            byte[] plan = Encoder.hexDecode(frag.getPlannodetree());
+            byte[] plan = Encoder.base64Decode(frag.getPlannodetree());
             stmtFrag.id = m_site.loadOrAddRefPlanFragment(
                     stmtFrag.planHash, plan);
             stmtFrag.transactional = frag.getNontransactional() == false;
@@ -713,7 +713,8 @@ public class ProcedureRunner {
                 SQLStmt stmt = stmtMap.get(VoltDB.ANON_STMT_NAME);
                 assert(stmt != null);
                 Statement statement = m_catProc.getStatements().get(VoltDB.ANON_STMT_NAME);
-                stmt.sqlText = statement.getSqltext().getBytes(VoltDB.UTF8ENCODING);
+                String s = statement.getSqltext();
+                stmt.setSQLStr(s);
                 m_cachedSingleStmt.stmt = stmt;
 
                 int numParams = m_catProc.getParameters().size();
