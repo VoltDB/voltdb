@@ -520,7 +520,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("did not fail on selfjoin");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("not yet support self joins") > 0);
+                assertTrue(pcex.getMessage().indexOf("not support self joins") > 0);
             }
             adHocQuery = "SELECT PNAME \n" +
                     "         FROM PROJ \n" +
