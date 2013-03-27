@@ -1038,12 +1038,12 @@ VoltDBEngine::ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const
             ev->list.push_back(pnf->getExecuteList()[ctr]->getExecutor());
         }
 
-        // add the plan to the front
-        m_plans.get<0>().push_front(ev);
+        // add the plan to the back
+        m_plans.get<0>().push_back(ev);
 
-        // remove plans if the cache is full
+        // remove a plan from the front if the cache is full
         if (m_plans.size() > PLAN_CACHE_SIZE) {
-            PlanSet::iterator iter = m_plans.get<0>().end();
+            PlanSet::iterator iter = m_plans.get<0>().begin();
             m_plans.erase(iter);
         }
 
