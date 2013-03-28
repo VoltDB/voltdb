@@ -58,6 +58,44 @@
 
 namespace voltdb {
 
+/** Parse JSON parameters to create a hash range expression */
+static AbstractExpression*
+hashRangeFactory(json_spirit::Object &obj) {
+    json_spirit::Value hashColumnValue = json_spirit::find_value(obj, "HASH_COLUMN");
+    if (hashColumnValue.is_null()) {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "hashRangeFactory: Could not find"
+                                      " HASH_COLUMN value");
+    }
+
+    json_spirit::Value rangesValue = json_spirit::find_value(obj, "RANGES");
+    if (rangesValue.is_null()) {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "hashRangeFactory: Could not find"
+                                      " RANGES value");
+    }
+
+    json_spirit::Array rangesArray = rangesValue.get_array();
+    srange_type *ranges = new srange_type[rangesArray.size()];
+    for (int ii = 0; ii < rangesArray.size(); ii++) {
+        json_spirit::Object arrayObject = rangesArray[ii].get_obj();
+        json_spirit::Value rangeStartValue = json_spirit::find_value(arrayObject, "RANGE_START");
+        if (rangeStartValue.is_null()) {
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                          "hashRangeFactory: Could not find"
+                                          " RANGE_START value");
+        }
+        json_spirit::Value rangeEndValue = json_spirit::find_value(arrayObject, "RANGE_END");
+        if (rangeEndValue.is_null()) {
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                          "hashRangeFactory: Could not find"
+                                          " RANGE_END value");
+        }
+        ranges[ii] = srange_type(rangeStartValue.get_int64(), rangeEndValue.get_int64());
+    }
+    return new HashRangeExpression(hashColumnValue.get_int(), ranges, static_cast<int64_t>(rangesArray.size()));
+}
+
 /** Function static helper templated functions to vivify an optimal
     comparison class. */
 static AbstractExpression*
@@ -425,7 +463,9 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     case (EXPRESSION_TYPE_VALUE_TUPLE_ADDRESS):
         ret = new TupleAddressExpression();
         break;
-
+    case (EXPRESSION_TYPE_HASH_RANGE):
+        ret = hashRangeFactory(obj);
+        break;
         // must handle all known expressions in this factory
     default:
 
@@ -484,6 +524,5 @@ void ExpressionUtil::loadIndexedExprsFromJson(std::vector<AbstractExpression*>& 
         indexed_exprs.push_back(expr);
     }
 }
-
 
 }

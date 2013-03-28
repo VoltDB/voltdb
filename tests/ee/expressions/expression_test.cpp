@@ -224,30 +224,30 @@ class TV  : public AE {
  */
 class HR : public AE {
 public:
-	HR(int hashColumn, int64_t ranges[][], int numRanges) :
-		AE(EXPRESSION_TYPE_HASH_RANGE, VALUE_TYPE_BIGINT, 8),
-		m_hashColumn(hashColumn),
-		m_ranges(ranges),
-		m_numRanges(numRanges) {
+    HR(int hashColumn, int64_t ranges[][2], int numRanges) :
+        AE(EXPRESSION_TYPE_HASH_RANGE, VALUE_TYPE_BIGINT, 8),
+        m_hashColumn(hashColumn),
+        m_ranges(ranges),
+        m_numRanges(numRanges) {
 
-	}
+    }
 
     virtual void serialize(json_spirit::Object &json) {
         AE::serialize(json);
         json.push_back(json_spirit::Pair("HASH_COLUMN", json_spirit::Value(m_hashColumn)));
         json_spirit::Array array;
         for (int ii = 0; ii < m_numRanges; ii++) {
-        	json_spirit::Object range;
-        	range.push_back(json_spirit::Pair("RANGE_START", m_ranges[ii][0]));
-        	range.push_back(json_spirit::Pair("RANGE_END", m_ranges[ii][0]));
-        	array.push_back(range);
+            json_spirit::Object range;
+            range.push_back(json_spirit::Pair("RANGE_START", m_ranges[ii][0]));
+            range.push_back(json_spirit::Pair("RANGE_END", m_ranges[ii][1]));
+            array.push_back(range);
         }
         json.push_back(json_spirit::Pair("RANGES", array));
     }
 
-	const int m_hashColumn;
-	const int64_t m_ranges[][];
-	const int m_numRanges;
+    const int m_hashColumn;
+    const int64_t (*m_ranges)[2];
+    const int m_numRanges;
 };
 
 /*
@@ -355,7 +355,19 @@ TEST_F(ExpressionTest, SimpleMultiplication) {
 /*
  * Show that the hash range expression correctly selects (or doesn't) rows in ranges
  */
-TEST_F(ExpressionTest, SimpleMultiplication) {
+TEST_F(ExpressionTest, HashRange) {
+    queue<AE*> e;
+    TableTuple t;
+
+    int64_t ranges[][2] = {
+            { 0, numeric_limits<int64_t>::max() / 2},
+            {numeric_limits<int64_t>::min(), -(numeric_limits<int64_t>::max() / 2)}
+    };
+
+    auto_ptr<AE> ae(new HR(0, ranges, 2));
+    json_spirit::Object json = ae->serializeValue();
+    auto_ptr<AbstractExpression> e1(AbstractExpression::buildExpressionTree(json));
+}
 
 int main() {
      return TestSuite::globalInstance()->runAll();
