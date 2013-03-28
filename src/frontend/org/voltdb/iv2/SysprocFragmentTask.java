@@ -43,31 +43,31 @@ import org.voltdb.utils.LogKeys;
 public class SysprocFragmentTask extends TransactionTask
 {
     final Mailbox m_initiator;
-    final FragmentTaskMessage m_task;
+    final FragmentTaskMessage m_fragmentMsg;
     Map<Integer, List<VoltTable>> m_inputDeps;
 
     SysprocFragmentTask(Mailbox mailbox,
-                 ParticipantTransactionState txn,
+                 ParticipantTransactionState txnState,
                  TransactionTaskQueue queue,
                  FragmentTaskMessage message,
                  Map<Integer, List<VoltTable>> inputDeps)
     {
-        super(txn, queue);
+        super(txnState, queue);
         m_initiator = mailbox;
-        m_task = message;
+        m_fragmentMsg = message;
         m_inputDeps = inputDeps;
         if (m_inputDeps == null) {
             m_inputDeps = new HashMap<Integer, List<VoltTable>>();
         }
-        assert(m_task.isSysProcTask());
+        assert(m_fragmentMsg.isSysProcTask());
     }
 
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
-        if (!m_txn.isReadOnly()) {
-            if (m_txn.getBeginUndoToken() == Site.kInvalidUndoToken) {
-                m_txn.setBeginUndoToken(siteConnection.getLatestUndoToken());
+        if (!m_txnState.isReadOnly()) {
+            if (m_txnState.getBeginUndoToken() == Site.kInvalidUndoToken) {
+                m_txnState.setBeginUndoToken(siteConnection.getLatestUndoToken());
             }
         }
 
@@ -79,11 +79,11 @@ public class SysprocFragmentTask extends TransactionTask
         // the rejoin code once all of the site data is synchronized.  This will then
         // allow truncation snapshots necessary to make the node officially rejoined
         // to take place.
-        if (m_task.isSysProcTask() &&
-            SysProcFragmentId.isSnapshotSaveFragment(m_task.getPlanHash(0)) &&
+        if (m_fragmentMsg.isSysProcTask() &&
+            SysProcFragmentId.isSnapshotSaveFragment(m_fragmentMsg.getPlanHash(0)) &&
             VoltDB.instance().rejoinDataPending()) {
             final FragmentResponseMessage response =
-                new FragmentResponseMessage(m_task, m_initiator.getHSId());
+                new FragmentResponseMessage(m_fragmentMsg, m_initiator.getHSId());
             response.setRecovering(true);
             response.setStatus(FragmentResponseMessage.SUCCESS, null);
             m_initiator.deliver(response);
@@ -102,17 +102,17 @@ public class SysprocFragmentTask extends TransactionTask
     public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
     throws IOException
     {
-        taskLog.logTask(m_task);
+        taskLog.logTask(m_fragmentMsg);
 
         final FragmentResponseMessage response =
-            new FragmentResponseMessage(m_task, m_initiator.getHSId());
+            new FragmentResponseMessage(m_fragmentMsg, m_initiator.getHSId());
         response.setRecovering(true);
         response.setStatus(FragmentResponseMessage.SUCCESS, null);
 
         // Set the dependencies even if this is a dummy response. This site could be the master
         // on elastic join, so the fragment response message is actually going to the MPI.
-        for (int frag = 0; frag < m_task.getFragmentCount(); frag++) {
-            final int outputDepId = m_task.getOutputDepId(frag);
+        for (int frag = 0; frag < m_fragmentMsg.getFragmentCount(); frag++) {
+            final int outputDepId = m_fragmentMsg.getOutputDepId(frag);
             response.addDependency(outputDepId, null);
         }
 
@@ -131,22 +131,22 @@ public class SysprocFragmentTask extends TransactionTask
     public FragmentResponseMessage processFragmentTask(SiteProcedureConnection siteConnection)
     {
         final FragmentResponseMessage currentFragResponse =
-            new FragmentResponseMessage(m_task, m_initiator.getHSId());
+            new FragmentResponseMessage(m_fragmentMsg, m_initiator.getHSId());
         currentFragResponse.setStatus(FragmentResponseMessage.SUCCESS, null);
 
-        for (int frag = 0; frag < m_task.getFragmentCount(); frag++)
+        for (int frag = 0; frag < m_fragmentMsg.getFragmentCount(); frag++)
         {
-            final long fragmentId = VoltSystemProcedure.hashToFragId(m_task.getPlanHash(frag));
+            final long fragmentId = VoltSystemProcedure.hashToFragId(m_fragmentMsg.getPlanHash(frag));
             // equivalent to dep.depId:
-            // final int outputDepId = m_task.getOutputDepId(frag);
+            // final int outputDepId = m_fragmentMsg.getOutputDepId(frag);
 
-            ParameterSet params = m_task.getParameterSetForFragment(frag);
+            ParameterSet params = m_fragmentMsg.getParameterSetForFragment(frag);
 
             try {
                 // run the overloaded sysproc planfragment. pass an empty dependency
                 // set since remote (non-aggregator) fragments don't receive dependencies.
                 final DependencyPair dep
-                    = siteConnection.executeSysProcPlanFragment(m_txn,
+                    = siteConnection.executeSysProcPlanFragment(m_txnState,
                                                          m_inputDeps,
                                                          fragmentId,
                                                          params);
@@ -155,13 +155,13 @@ public class SysprocFragmentTask extends TransactionTask
                     currentFragResponse.addDependency(dep.depId, dep.dependency);
                 }
             } catch (final EEException e) {
-                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(),
-                        new Object[] { Encoder.hexEncode(m_task.getFragmentPlan(frag)) }, e);
+                hostLog.l7dlog(Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(),
+                        new Object[] { Encoder.hexEncode(m_fragmentMsg.getFragmentPlan(frag)) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 break;
             } catch (final SQLException e) {
-                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(),
-                        new Object[] { Encoder.hexEncode(m_task.getFragmentPlan(frag)) }, e);
+                hostLog.l7dlog(Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(),
+                        new Object[] { Encoder.hexEncode(m_fragmentMsg.getFragmentPlan(frag)) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 break;
             }

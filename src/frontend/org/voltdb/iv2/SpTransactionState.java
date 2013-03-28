@@ -24,14 +24,14 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class SpTransactionState extends TransactionState
 {
-    final Iv2InitiateTaskMessage m_task;
+    final Iv2InitiateTaskMessage m_initiationMsg;
     protected SpTransactionState(TransactionInfoBaseMessage notice)
     {
         super(null, notice);
         if (notice instanceof Iv2InitiateTaskMessage) {
-            m_task = (Iv2InitiateTaskMessage)notice;
+            m_initiationMsg = (Iv2InitiateTaskMessage)notice;
         } else {
-            m_task = null;
+            m_initiationMsg = null;
         }
     }
 
@@ -44,6 +44,6 @@ public class SpTransactionState extends TransactionState
     @Override
     public StoredProcedureInvocation getInvocation()
     {
-        return m_task.getStoredProcedureInvocation();
+        return m_initiationMsg.getStoredProcedureInvocation();
     }
 }

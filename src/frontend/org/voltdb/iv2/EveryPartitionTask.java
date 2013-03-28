@@ -39,14 +39,14 @@ import org.voltdb.utils.LogKeys;
 public class EveryPartitionTask extends TransactionTask
 {
     final long[] m_initiatorHSIds;
-    final TransactionInfoBaseMessage m_msg;
+    final TransactionInfoBaseMessage m_initiationMsg;
     final Mailbox m_mailbox;
 
     EveryPartitionTask(Mailbox mailbox, TransactionTaskQueue queue,
                   TransactionInfoBaseMessage msg, List<Long> pInitiators)
     {
         super(new SpTransactionState(msg), queue);
-        m_msg = msg;
+        m_initiationMsg = msg;
         m_initiatorHSIds = com.google.common.primitives.Longs.toArray(pInitiators);
         m_mailbox = mailbox;
     }
@@ -56,7 +56,7 @@ public class EveryPartitionTask extends TransactionTask
     public void run(SiteProcedureConnection siteConnection)
     {
         hostLog.debug("STARTING: " + this);
-        m_mailbox.send(m_initiatorHSIds, m_msg);
+        m_mailbox.send(m_initiatorHSIds, m_initiationMsg);
         m_queue.flush();
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
         hostLog.debug("COMPLETE: " + this);
