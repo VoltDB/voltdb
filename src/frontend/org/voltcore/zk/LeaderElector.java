@@ -19,6 +19,7 @@ package org.voltcore.zk;
 import java.util.Collections;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -35,6 +36,8 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltZK;
 
+import com.google.common.collect.ImmutableSet;
+
 public class LeaderElector {
     private final ZooKeeper zk;
     private final String dir;
@@ -42,7 +45,7 @@ public class LeaderElector {
     private final byte[] data;
     private final LeaderNoticeHandler cb;
     private String node = null;
-    private String lastHighest = null;
+    private Set<String> knownChildren = null;
 
     private volatile String leader = null;
     private volatile boolean isLeader = false;
@@ -80,7 +83,7 @@ public class LeaderElector {
         @Override
         public void run() {
             try {
-                checkForNewChildren();
+                checkForChildChanges();
             } catch (KeeperException.ConnectionLossException e) {
                 // lost the full connection. some test cases do this...
                 // means shutdoown without the elector being
@@ -255,36 +258,27 @@ public class LeaderElector {
     }
 
     /*
-     * Check for new nodes and notify that there are new nodes
+     * Check for a change in present nodes
      */
-    private void checkForNewChildren() throws KeeperException, InterruptedException {
+    private void checkForChildChanges() throws KeeperException, InterruptedException {
         /*
          * Iterate through the sorted list of children and find the given node,
          * then setup a watcher on the previous node if it exists, otherwise the
          * previous of the previous...until we reach the beginning, then we are
          * the lowest node.
          */
-        List<String> children = zk.getChildren(dir, childWatcher);
-        Collections.sort(children);
-        ListIterator<String> iter = children.listIterator();
-        boolean newHighest = false;
-        while (iter.hasNext()) {
-            final String node = iter.next();
+        Set<String> children = ImmutableSet.copyOf(zk.getChildren(dir, childWatcher));
 
-            if (lastHighest == null) {
-                lastHighest = node;
-                newHighest = true;
-            } else {
-                if (node.compareTo(lastHighest) > 0) {
-                    lastHighest = node;
-                    newHighest = true;
-                }
+        boolean topologyChange = false;
+        if (knownChildren != null) {
+            if (!knownChildren.equals(children)) {
+                topologyChange = true;
             }
         }
-        if (newHighest) {
-            if (cb != null) {
-                cb.noticedNewNode();
-            }
+        knownChildren = children;
+
+        if (topologyChange && cb != null) {
+            cb.noticedTopologyChange();
         }
     }
 

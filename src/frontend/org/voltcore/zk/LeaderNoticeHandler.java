@@ -18,5 +18,5 @@ package org.voltcore.zk;
 
 public abstract class LeaderNoticeHandler {
     public abstract void becomeLeader();
-    public void noticedNewNode() {}
+    public void noticedTopologyChange() {}
 }
