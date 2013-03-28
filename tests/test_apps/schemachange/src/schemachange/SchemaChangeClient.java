@@ -23,59 +23,37 @@
 
 package schemachange;
 
-import java.io.File;
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
-import java.util.List;
 import java.util.Random;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.lang3.time.DateFormatUtils;
 import org.voltdb.CLIConfig;
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.TableHelper;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ClientStats;
-import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
-import org.voltdb.client.ProcedureCallback;
-import org.voltdb.client.AbstractProcedureArgumentCacher;
-import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
+import org.voltdb.compiler.CatalogBuilder;
 
 public class SchemaChangeClient {
 
-    static subClient client = null;
-    static AtomicLong nextKeyToInsert = new AtomicLong(0);
-    static AtomicLong maxInsertedKey = new AtomicLong(0);
-    static SchemaChangeConfig config = null;
-    static String deploymentString = null;
-    static Random rand = new Random(0);
-    static Topology topo = null;
-    private static AtomicInteger totalConnections = new AtomicInteger(0);
-    private static AtomicInteger fatalLevel = new AtomicInteger(0);
-    static long lastSuccessTime = 0;
-    static Timer timer;
-    static boolean noProgressCB = false;
-    static long startTime;
+    private Client client = null;
+    private SchemaChangeConfig config = null;
+    private Random rand = new Random(0);
+    private Topology topo = null;
+    private AtomicInteger totalConnections = new AtomicInteger(0);
+    private AtomicInteger fatalLevel = new AtomicInteger(0);
 
-    public static String _F(String str, Object... parameters) {
+    private long startTime;
+
+    private static String _F(String str, Object... parameters) {
         return String.format(DateFormatUtils.format(System.currentTimeMillis(), "MM/dd/yyyy HH:mm:ss") + "\t" + str, parameters);
     }
 
@@ -112,221 +90,86 @@ public class SchemaChangeClient {
     }
 
     /**
-     * Subclass the VoltDB Client interface
-     * for control of tx failure and connection loss in cases of
-     * node and cluster failure.
+     * Call a procedure and check the return code.
+     * Success just returns the result to the caller.
+     * Unpossible errors end the process.
+     * Some errors will retry the call until the global progress timeout with various waits.
+     * After the global progress timeout, the process is killed.
      */
-    public static class subClient implements Client {
-        Client client;
+    private ClientResponse callROProcedureWithRetry(String procName, Object... params) {
+        long startTime = System.currentTimeMillis();
+        long now = startTime;
 
-        public subClient(ClientConfig config) {
-            client = ClientFactory.createClient(config);
-        }
+        while (now - startTime < config.noProgressTimeout) {
+            ClientResponse cr = null;
 
-        @Override
-        public void createConnection(String host) throws UnknownHostException, IOException {
-            client.createConnection(host);
-        }
+            try {
+                cr = client.callProcedure(procName, params);
+            }
+            catch (ProcCallException e) {
+                cr = e.getClientResponse();
+            }
+            catch (NoConnectionsException e) {
+                // wait a bit to retry
+                try { Thread.sleep(1000); } catch (InterruptedException e1) {}
+            } catch (IOException e) {
+                // IOException is not cool man
+                e.printStackTrace();
+                System.exit(-1);
+            }
 
-        @Override
-        public void createConnection(String host, int port) throws UnknownHostException, IOException {
-            client.createConnection(host, port);
-        }
-
-        @Override
-        public ClientResponse callProcedure(String procName,
-                Object... parameters) throws IOException,
-                NoConnectionsException, ProcCallException {
-            ClientResponse r = null;
-            while (!noProgressCB) {
-                try {
-                    r = client.callProcedure(procName, parameters);
-                    lastSuccessTime = System.currentTimeMillis();
-                    return r;
-                } catch (NoConnectionsException e) {
-                    System.err.println(_F("Caught NoConnectionsException: " + e.getMessage()));
-                    // retry this case
-                    // throw e
-                } catch (ProcCallException e) {
-                    System.err.println(_F("Caught ProcCallException: " + e.getMessage()));
-                    // reflect this case
-                    // can get 'connection lost before a response was received here' the tx may be committed???
-                    if (! e.getMessage().startsWith("Connection to database host"))
-                        throw e;
-                } catch (IOException e) {
-                    System.err.println(_F("Caught IOException: " + e.getMessage()));
-                    // reflect this case
-                    throw e;
-                } finally {
-                    try { Thread.sleep(3); }
-                    catch (Exception e) { }
+            if (cr != null) {
+                switch (cr.getStatus()) {
+                case ClientResponse.SUCCESS:
+                    // hooray!
+                    return cr;
+                case ClientResponse.CONNECTION_LOST:
+                    // can retry after a delay
+                    try { Thread.sleep(5 * 1000); } catch (Exception e) {}
+                    break;
+                case ClientResponse.CONNECTION_TIMEOUT:
+                    // can retry after a delay
+                    try { Thread.sleep(5 * 1000); } catch (Exception e) {}
+                    break;
+                case ClientResponse.GRACEFUL_FAILURE:
+                    // for starters, I'm assuming this can't happen for reads in a sound system
+                    assert(false);
+                    System.exit(-1);
+                case ClientResponse.RESPONSE_UNKNOWN:
+                    // can try again immediately - cluster is up but a node died
+                    break;
+                case ClientResponse.SERVER_UNAVAILABLE:
+                    // shouldn't be in admin mode (paused) in this app, but can retry after a delay
+                    try { Thread.sleep(60 * 1000); } catch (Exception e) {}
+                    break;
+                case ClientResponse.UNEXPECTED_FAILURE:
+                    // should never happen
+                    assert(false);
+                    System.exit(-1);
+                case ClientResponse.USER_ABORT:
+                    // no user aborts as part of the app
+                    assert(false);
+                    System.exit(-1);
                 }
             }
-            // Exit with an error, a message was already produced
-            terminate(1);
-            return null;
+
+            now = System.currentTimeMillis();
         }
 
-        @Override
-        public boolean callProcedure(ProcedureCallback callback,
-                String procName, Object... parameters) throws IOException,
-                NoConnectionsException {
+        assert(false);
+        System.exit(-1);
+        return null;
+    }
 
-            class Callback implements ProcedureCallback {
-                ProcedureCallback callback;
-                String procName;
-                Object[] parameters;
-                long tries;
-
-                Callback(ProcedureCallback callback, String procName,
-                        Object... parameters) {
-                    this.callback = callback;
-                    this.procName = procName;
-                    this.parameters = parameters;
-                    this.tries = 0;
-                }
-
-                @Override
-                public void clientCallback(ClientResponse clientResponse) throws Exception {
-                    this.tries++;
-                    byte s = clientResponse.getStatus();
-                    if (s != ClientResponse.SUCCESS) {
-                        System.err.println(_F(((ClientResponseImpl) clientResponse).toJSONString()));
-                        switch (s) {
-                            case ClientResponse.CONNECTION_LOST:
-                            case ClientResponse.CONNECTION_TIMEOUT:
-                            case ClientResponse.UNEXPECTED_FAILURE:
-                                System.err.printf(_F("retrying lost/timeout connection %d\n", this.tries));
-                                if (noProgressCB) break; // don't retry if circuit breaker has tripped
-                                Thread.sleep(1);
-                                client.callProcedure(this, procName, parameters); // retry the call
-                                break;
-                            default:
-                                this.callback.clientCallback(clientResponse); // reflect to caller
-                                break;
-                        }
-                    } else {
-                        lastSuccessTime = System.currentTimeMillis();
-                        if (this.tries > 1) System.err.println(_F("success retrying"));
-                        this.callback.clientCallback(clientResponse); // reflect to caller
-                    }
-                }
-            };
-
-            ProcedureCallback cb = new Callback(callback, procName, parameters);
-
-            boolean r = false;
-            while (!noProgressCB) {
-                try {
-                    return client.callProcedure(cb, procName, parameters);
-                } catch (NoConnectionsException e) {
-                    System.err.println(_F("Caught NoConnectionsException: "
-                            + e.getMessage()));
-                    // throw e;
-                } catch (IOException e) {
-                    System.err.println(_F("Caught IOException: " + e.getMessage()));
-                    throw e;
-                } finally {
-                    try {
-                        Thread.sleep(3);
-                    } catch (Exception e) {
-                    }
-                }
-            }
-            // Exit with an error, a message was already produced
-            terminate(1);
-            return false;
-        }
-
-        @Override
-        public boolean callProcedure(ProcedureCallback callback, int expectedSerializedSize, String procName,
-                                        Object... parameters) throws IOException, NoConnectionsException {
-            assert (false); // NI
-            return client.callProcedure(callback, expectedSerializedSize, procName, parameters);
-        }
-
-        @Override
-        public int calculateInvocationSerializedSize(String procName, Object... parameters) {
-            return client.calculateInvocationSerializedSize(procName, parameters);
-        }
-
-        @Override
-        public ClientResponse updateApplicationCatalog(File catalogPath, File deploymentPath) throws IOException,
-                NoConnectionsException, ProcCallException {
-            // TODO Auto-generated method stub
-            return client.updateApplicationCatalog(catalogPath, deploymentPath);
-        }
-
-        @Override
-        public boolean updateApplicationCatalog(ProcedureCallback callback,
-                File catalogPath, File deploymentPath) throws IOException, NoConnectionsException {
-            return false;
-        }
-
-        @Override
-        public void drain() throws NoConnectionsException, InterruptedException {
-            client.drain();
-        }
-
-        @Override
-        public void close() throws InterruptedException {
-            client.close();
-
-        }
-
-        @Override
-        public void backpressureBarrier() throws InterruptedException {
-            client.backpressureBarrier();
-
-        }
-
-        @Override
-        public ClientStatsContext createStatsContext() {
-            return client.createStatsContext();
-        }
-
-        @Override
-        public Object[] getInstanceId() {
-            return client.getInstanceId();
-        }
-
-        @Override
-        public String getBuildString() {
-            return client.getBuildString();
-        }
-
-        @Override
-        public void configureBlocking(boolean blocking) {
-            client.configureBlocking(blocking);
-        }
-
-        @Override
-        public boolean blocking() {
-            return client.blocking();
-        }
-
-        @Override
-        public int[] getThroughputAndOutstandingTxnLimits() {
-            return client.getThroughputAndOutstandingTxnLimits();
-        }
-
-        @Override
-        public List<InetSocketAddress> getConnectedHostList() {
-            return client.getConnectedHostList();
-        }
-
-        @Override
-        public void writeSummaryCSV(ClientStats stats, String path)
-                throws IOException {
-            client.writeSummaryCSV(stats, path);
-        }
+    SchemaChangeClient(SchemaChangeConfig config) {
+        this.config = config;
     }
 
     /**
      * Perform a schema change to a mutated version of the current table (80%) or
      * to a new table entirely (20%, drops and adds the new table).
      */
-    static VoltTable catalogChange(VoltTable t1, boolean newTable) throws Exception {
+    private VoltTable catalogChange(VoltTable t1, boolean newTable) throws Exception {
         CatalogBuilder builder = new CatalogBuilder();
         VoltTable t2 = null;
         String currentName = t1 == null ? "B" : TableHelper.getTableName(t1);
@@ -382,7 +225,7 @@ public class SchemaChangeClient {
         return t2;
     }
 
-    static class Topology {
+    private static class Topology {
         final int hosts;
         final int sites;
         final int partitions;
@@ -397,12 +240,12 @@ public class SchemaChangeClient {
         }
     }
 
-    static Topology getCluterTopology(subClient client) throws Exception {
+    private Topology getCluterTopology() {
         int hosts = -1;
         int sitesPerHost = -1;
         int k = -1;
 
-        VoltTable result = client.callProcedure("@SystemInformation", "DEPLOYMENT").getResults()[0];
+        VoltTable result = callROProcedureWithRetry("@SystemInformation", "DEPLOYMENT").getResults()[0];
         result.resetRowPosition();
         while (result.advanceRow()) {
             String key = result.getString(0);
@@ -424,11 +267,11 @@ public class SchemaChangeClient {
     /**
      * Count the number of tuples in the table.
      */
-    static long tupleCount(VoltTable t) throws Exception {
+    private long tupleCount(VoltTable t) {
         if (t == null) {
             return 0;
         }
-        VoltTable result = client.callProcedure("@AdHoc",
+        VoltTable result = callROProcedureWithRetry("@AdHoc",
                 String.format("select count(*) from %s;", TableHelper.getTableName(t))).getResults()[0];
         return result.asScalarLong();
     }
@@ -436,21 +279,21 @@ public class SchemaChangeClient {
     /**
      * Find the largest pkey value in the table.
      */
-    static long maxId(VoltTable t) throws Exception {
+    private long maxId(VoltTable t) {
         if (t == null) {
             return 0;
         }
-        VoltTable result = client.callProcedure("@AdHoc",
+        VoltTable result = callROProcedureWithRetry("@AdHoc",
                 String.format("select pkey from %s order by pkey desc limit 1;", TableHelper.getTableName(t))).getResults()[0];
         return result.getRowCount() > 0 ? result.asScalarLong() : 0;
     }
 
     /**
-     * Add rows until RSS target met.
-     * Delete all odd rows (triggers compaction).
-     * Re-add odd rows until RSS target met (makes buffers out of order).
+     * Add rows until RSS or rowcount target met.
+     * Delete some rows rows (triggers compaction).
+     * Re-add odd rows until RSS or rowcount target met (makes buffers out of order).
      */
-    static void loadTable(VoltTable t) throws Exception {
+    private void loadTable(VoltTable t) throws Exception {
         // if #partitions is odd, delete every 2 - if even, delete every 3
         int n = 3 - (topo.partitions % 2);
 
@@ -471,10 +314,10 @@ public class SchemaChangeClient {
     /**
      * Grab some random rows that aren't on the first EE page for the table.
      */
-    public static VoltTable sample(VoltTable t) throws Exception {
+    private VoltTable sample(VoltTable t) {
         VoltTable t2 = t.clone(4096 * 1024);
 
-        ClientResponse cr = client.callProcedure("@AdHoc",
+        ClientResponse cr = callROProcedureWithRetry("@AdHoc",
                 String.format("select * from %s where pkey >= 100000 order by pkey limit 100;",
                         TableHelper.getTableName(t)));
         assert(cr.getStatus() == ClientResponse.SUCCESS);
@@ -492,10 +335,9 @@ public class SchemaChangeClient {
      * timeout. This will run until the process is killed if it's not able to
      * connect.
      *
-     * @param server
-     *            hostname:port or just hostname (hostname can be ip).
+     * @param server hostname:port or just hostname (hostname can be ip).
      */
-    static void connectToOneServerWithRetry(String server) {
+    private void connectToOneServerWithRetry(String server) {
         /*
          * Possible exceptions are: 1) Exception: java.net.ConnectException:
          * Connection refused 2) Exception: java.io.IOException: Failed to
@@ -535,21 +377,11 @@ public class SchemaChangeClient {
         }
     }
 
-    // For retry connections
-    private static ExecutorService es = Executors.newCachedThreadPool(new ThreadFactory() {
-        @Override
-        public Thread newThread(Runnable arg0) {
-            Thread thread = new Thread(arg0, "Retry Connection");
-            thread.setDaemon(true);
-            return thread;
-        }
-    });
-
     /**
      * Provides a callback to be notified on node failure.
      * This example only logs the event.
      */
-    static class StatusListener extends ClientStatusListenerExt {
+    private class StatusListener extends ClientStatusListenerExt {
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
             // if the benchmark is still active
@@ -559,12 +391,12 @@ public class SchemaChangeClient {
                 totalConnections.decrementAndGet();
                 // setup for retry
                 final String server = hostname;
-                es.execute(new Runnable() {
+                new Thread(new Runnable() {
                     @Override
                     public void run() {
                         connectToOneServerWithRetry(server);
                     }
-                });
+                }).start();
             }
         }
     }
@@ -579,7 +411,7 @@ public class SchemaChangeClient {
      * @throws InterruptedException
      *             if anything bad happens with the threads.
      */
-    public static void connect(String servers) throws InterruptedException {
+    private void connect(String servers) throws InterruptedException {
         String[] serverArray = servers.split(",");
         final CountDownLatch connections = new CountDownLatch(
                 serverArray.length);
@@ -597,58 +429,14 @@ public class SchemaChangeClient {
         connections.await();
     }
 
-    /**
-     * Create a Timer task to
-     *
-     */
-    public static void schedulePeriodicChecks() {
-        timer = new Timer(true); // true means its on a daemon thread
-        TimerTask statsPrinting = new TimerTask() {
-            @Override
-            public void run() {
-                periodicChecks();
-            }
-        };
-
-        timer.scheduleAtFixedRate(statsPrinting, config.checkInterval * 1000,
-                config.checkInterval * 1000);
-    }
-
-    /**
-     * Prints a one line update on performance that can be printed periodically
-     * during a benchmark.
-     */
-    public static synchronized void periodicChecks() {
-        if (totalConnections.get() > 0) {
-            if (System.currentTimeMillis() - lastSuccessTime > config.noProgressTimeout * 1000) {
-                System.out.println(_F("Periodic cehck - fail: No progress timeout has been reached"));
-                noProgressCB = true;
-            }
-            else
-                System.out.println(_F("Periodic check - pass"));
-        }
-    }
-
-    public static void terminate(int returncode) {
-        timer.cancel();
-        System.exit(returncode);
-    }
-
-    public static void main(String[] args) throws Exception {
-        VoltDB.setDefaultTimezone();
-
-        config = new SchemaChangeConfig();
-        config.parse("SchemaChangeClient", args);
-
+    private void runTestWorkload() throws Exception {
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
-        clientConfig.setProcedureCallTimeout(30 * 60 * 1000); // 30 min
-        Client c = ClientFactory.createClient(clientConfig);
-        client = new subClient(clientConfig);
+        //clientConfig.setProcedureCallTimeout(30 * 60 * 1000); // 30 min
+        client = ClientFactory.createClient(clientConfig);
         connect(config.servers);
-        schedulePeriodicChecks();
 
         // get the topo
-        topo = getCluterTopology(client);
+        topo = getCluterTopology();
 
         // kick this off with a random schema
         VoltTable t = catalogChange(null, true);
@@ -694,5 +482,15 @@ public class SchemaChangeClient {
         }
 
         client.close();
+    }
+
+    public static void main(String[] args) throws Exception {
+        VoltDB.setDefaultTimezone();
+
+        SchemaChangeConfig config = new SchemaChangeConfig();
+        config.parse("SchemaChangeClient", args);
+
+        SchemaChangeClient schemaChange = new SchemaChangeClient(config);
+        schemaChange.runTestWorkload();
     }
 }
