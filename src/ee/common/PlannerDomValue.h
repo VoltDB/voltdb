@@ -43,7 +43,7 @@ namespace voltdb {
     public:
 
         int32_t asInt() const {
-            if (m_value.IsNull() || (m_value.IsInt() == false)) {
+            if (m_value.IsNull()) {
                 throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                               "PlannerDomValue: int value is null");
             }

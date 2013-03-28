@@ -83,7 +83,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
      * provide a utility method to convert between longs and hashes. This method
      * is the inverse of {@link VoltSystemProcedure#fragIdToHash(long)}.
      *
-     * @param hash 20bytes of hash value
+     * @param hash 20bytes of hash value (last 12 bytes ignored)
      * @return 8 bytes of fragid
      */
     public static long hashToFragId(byte[] hash) {
@@ -96,9 +96,10 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
      * is the inverse of {@link VoltSystemProcedure#hashToFragId(byte[])}.
      *
      * @param fragId 8 bytes of frag id
-     * @return
+     * @return 20 bytes of hash padded with 12 empty bytes
      */
     public static byte[] fragIdToHash(long fragId) {
+        // use 12 bytes to pad the fake 20-byte sha1 hash after the 8-byte long
         return ArrayUtils.addAll(Longs.toByteArray(fragId), new byte[12]);
     }
 

@@ -678,12 +678,12 @@ public class ProcedureRunner {
         int fragCount = catStmt.getFragments().size();
 
         for (PlanFragment frag : catStmt.getFragments()) {
-            SQLStmt.Frag stmtFrag = new SQLStmt.Frag();
-            stmtFrag.planHash = Encoder.hexDecode(frag.getPlanhash());
+            byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
             byte[] plan = Encoder.base64Decode(frag.getPlannodetree());
-            stmtFrag.id = m_site.loadOrAddRefPlanFragment(
-                    stmtFrag.planHash, plan);
-            stmtFrag.transactional = frag.getNontransactional() == false;
+            long id = m_site.loadOrAddRefPlanFragment(planHash, plan);
+            boolean transactional = frag.getNontransactional() == false;
+
+            SQLStmt.Frag stmtFrag = new SQLStmt.Frag(id, planHash, transactional);
 
             if (fragCount == 1 || frag.getHasdependencies()) {
                 stmt.aggregator = stmtFrag;
@@ -1054,32 +1054,26 @@ public class ProcedureRunner {
                m_localFragsAreNonTransactional = false;
            }
 
-           // single aggregator fragment
-           if (stmt.collector == null) {
-               m_depsForLocalTask[index] = -1;
-               // Add the local fragment data.
-               if (stmt.inCatalog) {
-                   m_localTask.addFragment(stmt.aggregator.planHash, m_depsToResume[index], params);
-               }
-               else {
-                   byte[] planBytes = site.planForFragmentId(stmt.aggregator.id);
-                   m_localTask.addCustomFragment(stmt.aggregator.planHash, m_depsToResume[index], params, planBytes);
-               }
-           }
+           int outputDepId = -1;
            // two fragments
-           else {
-               int outputDepId =
-                       m_txnState.getNextDependencyId() | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-               m_depsForLocalTask[index] = outputDepId;
-               // Add local and distributed fragments.
-               if (stmt.inCatalog) {
-                   m_localTask.addFragment(stmt.aggregator.planHash, m_depsToResume[index], params);
+           if (stmt.collector != null) {
+               outputDepId = m_txnState.getNextDependencyId() | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+           }
+           m_depsForLocalTask[index] = outputDepId;
+           if (stmt.inCatalog) {
+               // Add the local fragment data.
+               m_localTask.addFragment(stmt.aggregator.planHash, m_depsToResume[index], params);
+               // Add distributed fragment.
+               if (stmt.collector != null) {
                    m_distributedTask.addFragment(stmt.collector.planHash, outputDepId, params);
                }
-               else {
-                   byte[] planBytes = site.planForFragmentId(stmt.aggregator.id);
-                   m_localTask.addCustomFragment(stmt.aggregator.planHash, m_depsToResume[index], params, planBytes);
-                   planBytes = site.planForFragmentId(stmt.collector.id);
+           }
+           else {
+               // Add the local fragment data.
+               byte[] planBytes = site.planForFragmentId(stmt.aggregator.id);
+               m_localTask.addCustomFragment(stmt.aggregator.planHash, m_depsToResume[index], params, planBytes);
+               // Add distributed fragment.
+               if (stmt.collector != null) {
                    m_distributedTask.addCustomFragment(stmt.collector.planHash, outputDepId, params, planBytes);
                }
            }

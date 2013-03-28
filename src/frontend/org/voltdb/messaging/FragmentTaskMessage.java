@@ -432,7 +432,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // Fixed header
         msgsize += 2 + 2 + 1 + 1 + 1 + 1 + 1;
 
-        // Fragment ID block
+        // Fragment ID block (20 bytes per sha1-hash)
         msgsize += 20 * m_items.size();
 
         //nested initiate task message length prefix

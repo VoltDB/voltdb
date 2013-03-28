@@ -95,8 +95,6 @@ class Statement;
 class Cluster;
 }
 
-using namespace boost::multi_index;
-
 class VoltDBIPC;
 
 namespace voltdb {
@@ -447,14 +445,16 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         };
 
         /**
-         * Uses a single set of nodes that both have order, as well as an index
-         * on the plan bytes themselves. Here lies boost-related dragons.
+         * The set of plan bytes is explicitly maintained in MRU-first order, 
+         * while also indexed by the plans' bytes. Here lie boost-related dragons.
          */
-        typedef multi_index_container<
+        typedef boost::multi_index::multi_index_container<
             boost::shared_ptr<ExecutorVector>,
-            indexed_by<
-                sequenced<>,
-                hashed_unique< const_mem_fun<ExecutorVector,int64_t,&ExecutorVector::getFragId> >
+            boost::multi_index::indexed_by<
+                boost::multi_index::sequenced<>,
+                boost::multi_index::hashed_unique<
+                    boost::multi_index::const_mem_fun<ExecutorVector,int64_t,&ExecutorVector::getFragId>
+                >
             >
         > PlanSet;
         PlanSet m_plans;

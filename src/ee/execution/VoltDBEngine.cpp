@@ -977,14 +977,11 @@ VoltDBEngine::ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
         }
 
-        // catalog method plannodetree returns PlanNodeList.java
         PlanNodeFragment *pnf = NULL;
         try {
             pnf = PlanNodeFragment::createFromCatalog(plan);
         }
         catch (SerializableEEException &seee) {
-            printf("SEEE MSG: %s\n", seee.message().c_str());
-            fflush(stdout);
             throw;
         }
         catch (...) {
@@ -992,10 +989,7 @@ VoltDBEngine::ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const
             snprintf(msg, 1024 * 100, "Unable to initialize PlanNodeFragment for PlanFragment '%jd' with plan:\n%s",
                      (intmax_t)fragId, plan.c_str());
             VOLT_ERROR("%s", msg);
-            printf("SEEE MSG(2): %s\n", msg);
-            fflush(stdout);
-            throw;
-            //throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
         }
         VOLT_TRACE("\n%s\n", pnf->debug().c_str());
         assert(pnf->getRootNode());

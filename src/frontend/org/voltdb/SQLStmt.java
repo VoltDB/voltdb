@@ -36,9 +36,15 @@ public class SQLStmt {
      * Per-fragment info
      */
     static class Frag {
-        long id;
-        byte[] planHash;
-        boolean transactional;
+        final long id;
+        final byte[] planHash;
+        final boolean transactional;
+
+        Frag(long id, byte[] planHash, boolean transactional) {
+            this.id = id;
+            this.planHash = planHash;
+            this.transactional = transactional;
+        }
     }
 
     // Used for uncompiled SQL.
@@ -140,16 +146,10 @@ public class SQLStmt {
                                   SiteProcedureConnection site) {
         SQLStmt stmt = new SQLStmt(sqlText, null);
 
-        stmt.aggregator = new SQLStmt.Frag();
-        stmt.aggregator.id = aggFragId;
-        stmt.aggregator.planHash = aggPlanHash;
-        stmt.aggregator.transactional = isAggTransactional;
+        stmt.aggregator = new SQLStmt.Frag(aggFragId, aggPlanHash, isAggTransactional);
 
         if (collectorFragId > 0) {
-            stmt.collector = new SQLStmt.Frag();
-            stmt.collector.id = collectorFragId;
-            stmt.collector.planHash = collectorPlanHash;
-            stmt.collector.transactional = isCollectorTransactional;
+            stmt.collector = new SQLStmt.Frag(collectorFragId, collectorPlanHash, isCollectorTransactional);
         }
 
         /*
