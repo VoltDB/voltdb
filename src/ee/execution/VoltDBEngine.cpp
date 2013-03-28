@@ -58,7 +58,6 @@
 #include "common/executorcontext.hpp"
 #include "common/FatalException.hpp"
 #include "common/RecoveryProtoMessage.h"
-#include "common/TupleOutputStreamProcessor.h"
 #include "common/LegacyHashinator.h"
 #include "common/ElasticHashinator.h"
 #include "catalog/catalogmap.h"
@@ -1388,16 +1387,8 @@ int64_t VoltDBEngine::uniqueIdForFragment(catalog::PlanFragment *frag) {
 
 /**
  * Activate a table stream for the specified table
- * Serialized data:
- *  int: predicate count
- *  string: predicate #1
- *  string: predicate #2
- *  ...
  */
-bool VoltDBEngine::activateTableStream(
-        const CatalogId tableId,
-        TableStreamType streamType,
-        ReferenceSerializeInput &serializeIn) {
+bool VoltDBEngine::activateTableStream(const CatalogId tableId, TableStreamType streamType) {
     map<int32_t, Table*>::iterator it = m_tables.find(tableId);
     if (it == m_tables.end()) {
         return false;
@@ -1410,20 +1401,8 @@ bool VoltDBEngine::activateTableStream(
     }
 
     switch (streamType) {
-    case TABLE_STREAM_SNAPSHOT: {
-        std::vector<std::string> predicate_strings;
-        int npreds = serializeIn.readInt();
-        if (npreds > 0) {
-            predicate_strings.reserve(npreds);
-            for (int ipred = 0; ipred < npreds; ipred++) {
-                std::string spred = serializeIn.readTextString();
-                predicate_strings.push_back(spred);
-            }
-        }
-        //TODO: Hard-code partition count to 7 to match up with test. This needs to be fixed!
-        //      It isn't used unless there are predicate strings, which is only provided
-        //      by one EE test.
-        if (table->activateCopyOnWrite(&m_tupleSerializer, m_partitionId, predicate_strings, 7)) {
+    case TABLE_STREAM_SNAPSHOT:
+        if (table->activateCopyOnWrite(&m_tupleSerializer, m_partitionId)) {
             return false;
         }
 
@@ -1437,7 +1416,6 @@ bool VoltDBEngine::activateTableStream(
         table->incrementRefcount();
         m_snapshottingTables[tableId] = table;
         break;
-    }
 
     case TABLE_STREAM_RECOVERY:
         if (table->activateRecoveryStream(it->first)) {
@@ -1451,84 +1429,20 @@ bool VoltDBEngine::activateTableStream(
 }
 
 /**
- * Serialize tuples to output streams from a table in COW mode.
- * Overload that serializes a stream position array.
- * Returns:
- *  0-n: remaining tuple count
- *  -1: streaming was completed by the previous call
- *  -2: error, e.g. when no longer in COW mode.
- * Note that -1 is only returned once after the previous call serialized all
- * remaining tuples. Further calls are considered errors and will return -2.
+ * Serialize more tuples from the specified table that is in COW mode.
+ * Returns the number of bytes worth of tuple data serialized or 0 if
+ * there are no more.  Returns -1 if the table is no in COW mode. The
+ * table continues to be in COW (although no copies are made) after
+ * all tuples have been serialize until the last call to
+ * cowSerializeMore which returns 0 (and deletes the COW
+ * context). Further calls will return -1
  */
-int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
-                                               const TableStreamType streamType,
-                                               ReferenceSerializeInput &serialize_in)
-{
-    int64_t remaining = -2;
-    try {
-        std::vector<int> positions;
-        remaining = tableStreamSerializeMore(tableId, streamType, serialize_in, positions);
-        if (remaining >= 0) {
-            char *resultBuffer = getReusedResultBuffer();
-            assert(resultBuffer != NULL);
-            int resultBufferCapacity = getReusedResultBufferCapacity();
-            if (resultBufferCapacity < sizeof(jint) * positions.size()) {
-                throwFatalException("tableStreamSerializeMore: result buffer not large enough");
-            }
-            ReferenceSerializeOutput results(resultBuffer, resultBufferCapacity);
-            // Write the array size as a regular integer.
-            assert(positions.size() <= std::numeric_limits<int32_t>::max());
-            results.writeInt((int32_t)positions.size());
-            // Copy the position vector's contiguous storage to the returned results buffer.
-            for (std::vector<int>::const_iterator ipos = positions.begin();
-                 ipos != positions.end(); ++ipos) {
-                results.writeInt(*ipos);
-            }
-        }
-        VOLT_DEBUG("tableStreamSerializeMore: deserialized %d buffers, %ld remaining",
-                   (int)positions.size(), remaining);
-    }
-    catch (SerializableEEException &e) {
-        resetReusedResultOutputBuffer();
-        e.serialize(getExceptionOutputSerializer());
-        remaining = -2; // error
-    }
-    return remaining;
-}
-
-/**
- * Serialize tuples to output streams from a table in COW mode.
- * Overload that populates a position vector provided by the caller.
- * Returns:
- *  0-n: remaining tuple count
- *  -1: streaming was completed by the previous call
- *  -2: error, e.g. when no longer in COW mode.
- * Note that -1 is only returned once after the previous call serialized all
- * remaining tuples. Further calls are considered errors and will return -2.
- */
-int64_t VoltDBEngine::tableStreamSerializeMore(
+int VoltDBEngine::tableStreamSerializeMore(
+        ReferenceSerializeOutput *out,
         const CatalogId tableId,
-        const TableStreamType streamType,
-        ReferenceSerializeInput &serializeIn,
-        std::vector<int> &retPositions)
+        const TableStreamType streamType)
 {
-    // Deserialize the output buffer ptr/offset/length values into a COWStreamProcessor.
-    int nBuffers = serializeIn.readInt();
-    if (nBuffers <= 0) {
-        throwFatalException(
-                "Expected at least one output stream in tableStreamSerializeMore(), received %d",
-                nBuffers);
-    }
-    TupleOutputStreamProcessor outputStreams(nBuffers);
-    for (int iBuffer = 0; iBuffer < nBuffers; iBuffer++) {
-        char *ptr = reinterpret_cast<char*>(serializeIn.readLong());
-        int offset = serializeIn.readInt();
-        int length = serializeIn.readInt();
-        outputStreams.add(ptr + offset, length - offset);
-    }
-    retPositions.reserve(nBuffers);
 
-    int64_t remaining = -2;
     switch (streamType) {
     case TABLE_STREAM_SNAPSHOT: {
         // If a completed table is polled, return 0 bytes serialized. The
@@ -1537,20 +1451,14 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
         // dynamic cast was already verified in activateCopyOnWrite.
         map<int32_t, Table*>::iterator pos = m_snapshottingTables.find(tableId);
         if (pos == m_snapshottingTables.end()) {
-            remaining = -1; // done
+            return 0;
         }
-        else {
-            PersistentTable *table = dynamic_cast<PersistentTable*>(pos->second);
-            remaining = table->serializeMore(outputStreams);
-            if (remaining <= 0) {
-                m_snapshottingTables.erase(tableId);
-                table->decrementRefcount();
-            }
-            // If more was streamed copy current positions for return.
-            // Can this copy be avoided?
-            for (size_t i = 0; i < nBuffers; i++) {
-                retPositions.push_back((int)outputStreams.at(i).position());
-            }
+
+        PersistentTable *table = dynamic_cast<PersistentTable*>(pos->second);
+        bool hasMore = table->serializeMore(out);
+        if (!hasMore) {
+            m_snapshottingTables.erase(tableId);
+            table->decrementRefcount();
         }
         break;
     }
@@ -1560,35 +1468,20 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
          * Table ids don't change during recovery because
          * catalog changes are not allowed.
          */
-        if (outputStreams.size() != 1) {
-            throwFatalException(
-                    "Expected exactly one output stream for recovery, received %ld",
-                    outputStreams.size());
+        map<int32_t, Table*>::iterator pos = m_tables.find(tableId);
+        if (pos == m_tables.end()) {
+            return 0;
         }
-        else {
-            map<int32_t, Table*>::iterator pos = m_tables.find(tableId);
-            if (pos == m_tables.end()) {
-                remaining = -1; // done
-            }
-            else {
-                PersistentTable *table = dynamic_cast<PersistentTable*>(pos->second);
-                bool hasMore = table->nextRecoveryMessage(&outputStreams[0]);
-                // Non-zero if some tuples remain, we're just not sure how many.
-                remaining = (hasMore ? 1 : 0);
-                for (size_t i = 0; i < nBuffers; i++) {
-                    retPositions.push_back((int)outputStreams.at(i).position());
-                }
-            }
-        }
+        PersistentTable *table = dynamic_cast<PersistentTable*>(pos->second);
+        table->nextRecoveryMessage(out);
         break;
     }
-
     default:
-        // Failure
-        remaining = -2;
+        return -1;
     }
 
-    return remaining;
+
+    return static_cast<int>(out->position());
 }
 
 /*

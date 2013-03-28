@@ -17,43 +17,32 @@
 #ifndef COPYONWRITECONTEXT_H_
 #define COPYONWRITECONTEXT_H_
 
-#include <string>
 #include <vector>
 #include <utility>
 #include "common/TupleSerializer.h"
-#include "common/TupleOutputStreamProcessor.h"
-#include "common/StreamPredicateList.h"
 #include "storage/persistenttable.h"
 #include "common/Pool.hpp"
 #include "common/tabletuple.h"
-#include <boost/scoped_ptr.hpp>
-#include <boost/ptr_container/ptr_vector.hpp>
+#include "boost/scoped_ptr.hpp"
 
 namespace voltdb {
 class TupleIterator;
 class TempTable;
-class ParsedPredicate;
-class TupleOutputStreamProcessor;
+class ReferenceSerializeOut;
 
 class CopyOnWriteContext {
-
 public:
     /**
      * Construct a copy on write context for the specified table that will serialize tuples
      * using the provided serializer
      */
-      CopyOnWriteContext(PersistentTable &table,
-                         TupleSerializer &serializer,
-                         int32_t partitionId,
-                         const std::vector<std::string> &predicateStrings,
-                         int32_t totalPartitions,
-                         int64_t totalTuples);
+    CopyOnWriteContext(PersistentTable *m_table, TupleSerializer *m_serializer, int32_t partitionId);
 
     /**
-     * Serialize tuples to the provided output until no more tuples can be serialized.
-     * Return remaining tuple count, 0 if done, or -1 on error.
+     * Serialize tuples to the provided output until no more tuples can be serialized. Returns true
+     * if there are more tuples to serialize and false otherwise.
      */
-    int64_t serializeMore(TupleOutputStreamProcessor &output_targets);
+    bool serializeMore(ReferenceSerializeOutput *out);
 
     /**
      * Mark a tuple as dirty and make a copy if necessary. The new tuple param indicates
@@ -71,11 +60,10 @@ public:
     virtual ~CopyOnWriteContext();
 
 private:
-
     /**
      * Table being copied
      */
-    PersistentTable &m_table;
+    PersistentTable *m_table;
 
     /**
      * Temp table for copies of tuples that were dirtied.
@@ -85,7 +73,7 @@ private:
     /**
      * Serializer for tuples
      */
-    TupleSerializer &m_serializer;
+    TupleSerializer *m_serializer;
 
     /**
      * Memory pool for string allocations
@@ -115,12 +103,7 @@ private:
 
     const int32_t m_partitionId;
 
-    StreamPredicateList m_predicates;
-
-    int32_t m_totalPartitions;
-
-    int64_t m_totalTuples;
-    int64_t m_tuplesRemaining;
+    int32_t m_tuplesSerialized;
 };
 
 }
