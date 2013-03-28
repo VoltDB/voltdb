@@ -34,7 +34,8 @@ CopyOnWriteContext::CopyOnWriteContext(PersistentTable *table, TupleSerializer *
              m_iterator(new CopyOnWriteIterator(table, m_blocks.begin(), m_blocks.end())),
              m_maxTupleLength(serializer->getMaxSerializedTupleSize(table->schema())),
              m_tuple(table->schema()), m_finishedTableScan(false), m_partitionId(partitionId),
-             m_tuplesSerialized(0) {}
+             m_tuplesSerialized(0),
+             m_expectedTupleCount(static_cast<int32_t>(table->activeTupleCount())) {}
 
 bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
     out->writeInt(m_partitionId);
@@ -61,6 +62,11 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
         if (!hadMore) {
             if (m_finishedTableScan) {
                 out->writeIntAt( rowCountPosition, rowsSerialized);
+                if (m_tuplesSerialized != m_expectedTupleCount) {
+                    throwFatalException(
+                            "Expected %d rows but only found %d rows while serializing snapshot",
+                            m_expectedTupleCount, m_tuplesSerialized);
+                }
                 return false;
             } else {
                 m_finishedTableScan = true;
