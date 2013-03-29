@@ -51,7 +51,10 @@
 
 #include <iostream>
 #include <sstream>
+#include <stdlib.h>
+#include <time.h>
 #include <queue>
+#include <boost/scoped_array.hpp>
 
 #include "harness.h"
 #include "json_spirit/json_spirit.h"
@@ -62,8 +65,10 @@
 #include "common/ValuePeeker.hpp"
 #include "common/PlannerDomValue.h"
 
+
 using namespace std;
 using namespace voltdb;
+//using namespace boost;
 
 
 /*
@@ -357,16 +362,63 @@ TEST_F(ExpressionTest, SimpleMultiplication) {
  */
 TEST_F(ExpressionTest, HashRange) {
     queue<AE*> e;
-    TableTuple t;
+
+    const int64_t range1Min = numeric_limits<int64_t>::min();
+    const int64_t range1Max = -(numeric_limits<int64_t>::max() / 2);
+    const int64_t range2Min = 0;
+    const int64_t range2Max = numeric_limits<int64_t>::max() / 2;
 
     int64_t ranges[][2] = {
-            { 0, numeric_limits<int64_t>::max() / 2},
-            {numeric_limits<int64_t>::min(), -(numeric_limits<int64_t>::max() / 2)}
+            { range1Min, range1Max},
+            { range2Min, range2Max}
     };
 
-    auto_ptr<AE> ae(new HR(0, ranges, 2));
+    auto_ptr<AE> ae(new HR(1, ranges, 2));
     json_spirit::Object json = ae->serializeValue();
     auto_ptr<AbstractExpression> e1(AbstractExpression::buildExpressionTree(json));
+
+    vector<std::string> columnNames;
+    columnNames.push_back("foo");
+    columnNames.push_back("bar");
+
+    vector<int32_t> columnSizes;
+    columnSizes.push_back(8);
+    columnSizes.push_back(4);
+
+    vector<bool> allowNull;
+    allowNull.push_back(true);
+    allowNull.push_back(false);
+
+    vector<voltdb::ValueType> types;
+    types.push_back(voltdb::VALUE_TYPE_BIGINT);
+    types.push_back(voltdb::VALUE_TYPE_INTEGER);
+
+    TupleSchema *schema = TupleSchema::createTupleSchema(types,
+                                                               columnSizes,
+                                                               allowNull,
+                                                               true);
+
+    boost::scoped_array<char> tupleStorage(new char[schema->tupleLength() + TUPLE_HEADER_SIZE]);
+
+    TableTuple t(tupleStorage.get(), schema);
+    const time_t seed = time(NULL);
+    std::cout << "Seed " << seed << std::endl;
+    srand(static_cast<unsigned int>(seed));
+
+    for (int ii = 0; ii < 100000; ii++) {
+        NValue val = ValueFactory::getIntegerValue(rand());
+        int64_t out[2];
+        val.murmurHash3(out);
+        t.setNValue(1, val);
+        NValue inrange = e1->eval( &t );
+        if ((out[0] > range1Min && out[0] < range1Max) ||
+             (out[0] > range2Min && out[0] < range2Max)) {
+            ASSERT_TRUE(inrange.isTrue());
+        } else {
+            ASSERT_FALSE(inrange.isTrue());
+        }
+    }
+    TupleSchema::freeTupleSchema(schema);
 }
 
 int main() {

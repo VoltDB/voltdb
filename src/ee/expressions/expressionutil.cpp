@@ -93,7 +93,7 @@ hashRangeFactory(json_spirit::Object &obj) {
         }
         ranges[ii] = srange_type(rangeStartValue.get_int64(), rangeEndValue.get_int64());
     }
-    return new HashRangeExpression(hashColumnValue.get_int(), ranges, static_cast<int64_t>(rangesArray.size()));
+    return new HashRangeExpression(hashColumnValue.get_int(), ranges, static_cast<int>(rangesArray.size()));
 }
 
 /** Function static helper templated functions to vivify an optimal

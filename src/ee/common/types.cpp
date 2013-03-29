@@ -523,7 +523,7 @@ string expressionToString(ExpressionType type)
         return "FUNCTION";
     }
     case EXPRESSION_TYPE_HASH_RANGE: {
-    	return "HASH_RANGE";
+        return "HASH_RANGE";
     }
     }
     return "INVALID";
@@ -594,7 +594,7 @@ ExpressionType stringToExpression(string str )
     } else if (str == "FUNCTION") {
         return EXPRESSION_TYPE_FUNCTION;
     } else if (str == "HASH_RANGE") {
-    	return EXPRESSION_TYPE_HASH_RANGE;
+        return EXPRESSION_TYPE_HASH_RANGE;
     }
 
     return EXPRESSION_TYPE_INVALID;

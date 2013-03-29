@@ -1,10 +1,6 @@
 /* This file is part of VoltDB.
  * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * This file contains original code and/or modifications of original code.
- * Any modifications made by VoltDB Inc. are licensed under the following
- * terms and conditions:
- *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
  * published by the Free Software Foundation, either version 3 of the
@@ -18,7 +14,6 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 #ifndef VOLTDBHASHRANGEEXPRESSION_H
 #define VOLTDBHASHRANGEEXPRESSION_H
 
@@ -40,7 +35,23 @@ public:
     HashRangeExpression(int value_idx, srange_type *ranges, int num_ranges )
 : AbstractExpression(EXPRESSION_TYPE_HASH_RANGE), value_idx(value_idx), ranges(ranges), num_ranges(num_ranges)
 {
-        VOLT_TRACE("OptimizedTupleValueExpression %d %d", m_type, value_idx);
+        VOLT_TRACE("HashRangeExpression %d %d", m_type, value_idx);
+        if (num_ranges > 1) {
+            for (int ii = 1; ii < num_ranges; ii++) {
+                if (ranges[ii - 1].first > ranges[ii - 1].second) {
+                    throwFatalException(
+                            "Invalid range %jd to %jd",
+                            (intmax_t)ranges[ii - 1].first,
+                            (intmax_t)ranges[ii - 1].first);
+                }
+                if (ranges[ii - 1].first >= ranges[ii].first) {
+                    throwFatalException("Ranges overlap or are out of order");
+                }
+                if (ranges[ii - 1].second > ranges[ii].first) {
+                    throwFatalException("Ranges overlap or are out of order");
+                }
+            }
+        }
 };
 
     virtual voltdb::NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
@@ -54,10 +65,14 @@ public:
         int64_t out[2];
         tuple1->getNValue(this->value_idx).murmurHash3(out);
         const int64_t hash = out[0];
+        /*
+         * Bottom of a range is inclusive, top is exclusive
+         */
         for (int ii = 0; ii < num_ranges; ii++) {
-            if (ranges[ii].first <= hash && hash < ranges[ii].second) {
+            const srange_type range = ranges[ii];
+            if (range.first <= hash && hash < range.second) {
                 return NValue::getTrue();
-            } else if (hash < ranges[ii].first) {
+            } else if (hash < range.first) {
                 return NValue::getFalse();
             }
         }
