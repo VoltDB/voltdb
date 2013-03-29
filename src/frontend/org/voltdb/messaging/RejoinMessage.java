@@ -40,6 +40,7 @@ public class RejoinMessage extends VoltMessage {
         REPLAY_FINISHED, // sent from a local site to the coordinator
 
         // Join specific message types
+        PARTITION_SNAPSHOT_INITIATION, // sent from the coordinator to local sites
         SNAPSHOT_DATA, // sent from the coordinator to local sites
         FIRST_FRAGMENT_RECEIVED, // sent from a local site to the coordinator
     }
