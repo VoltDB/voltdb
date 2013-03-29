@@ -391,12 +391,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             m_ee = initializeEE(serializedCatalog, timestamp);
         }
 
-        m_snapshotter = new SnapshotSiteProcessor(new Runnable() {
-            @Override
-            public void run() {
-                m_scheduler.offer(new SnapshotTask());
-            }
-        },
+        m_snapshotter = new SnapshotSiteProcessor(m_scheduler,
         m_snapshotPriority,
         new SnapshotSiteProcessor.IdlePredicate() {
             @Override

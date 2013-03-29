@@ -917,13 +917,15 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             snapshotPriority = m_context.cluster.getDeployment().get("deployment").
                 getSystemsettings().get("systemsettings").getSnapshotpriority();
         }
-        m_snapshotter = new SnapshotSiteProcessor(new Runnable() {
-            @Override
-            public void run() {
-                m_mailbox.deliver(new PotentialSnapshotWorkMessage());
-            }
-        },
-         snapshotPriority);
+        // TODO: Commented out because the constructor no longer takes a runnable.
+//        m_snapshotter = new SnapshotSiteProcessor(new Runnable() {
+//            @Override
+//            public void run() {
+//                m_mailbox.deliver(new PotentialSnapshotWorkMessage());
+//            }
+//        },
+//         snapshotPriority);
+        m_snapshotter = null;
 
         final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
         m_starvationTracker = new StarvationTracker(getCorrespondingSiteId());
