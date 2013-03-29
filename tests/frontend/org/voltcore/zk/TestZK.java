@@ -28,16 +28,9 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import org.voltcore.messaging.HostMessenger;
-import org.voltcore.zk.LeaderElector;
-import org.apache.zookeeper_voltpatches.*;
-import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
-import org.apache.zookeeper_voltpatches.Watcher.Event.EventType;
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
-import org.apache.zookeeper_voltpatches.data.Stat;
-
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Semaphore;
@@ -229,7 +222,7 @@ public class TestZK extends ZKTestBase {
         nodes.add("/a/b/node0000000000");
         nodes.add("/a/b/node0000010234");
         nodes.add("/a/b/node0000000234");
-        ZKUtil.sortSequentialNodes(nodes);
+        Collections.sort(nodes);
 
         Iterator<String> iter = nodes.iterator();
         assertEquals("/a/b/node0000000000", iter.next());
@@ -301,17 +294,17 @@ public class TestZK extends ZKTestBase {
         assertFalse(elector3.isLeader());
 
         // 2 should become the leader
-        zk.close();
+        elector1.shutdown();
         assertTrue(sem2.tryAcquire(5, TimeUnit.SECONDS));
         assertTrue(elector2.isLeader());
         assertEquals(0, sem3.availablePermits());
 
         // 3 should become the leader now
-        zk2.close();
+        elector2.shutdown();
         assertTrue(sem3.tryAcquire(5, TimeUnit.SECONDS));
         assertTrue(elector3.isLeader());
 
-        zk3.close();
+        elector3.shutdown();
     }
 
     @Test
@@ -320,7 +313,7 @@ public class TestZK extends ZKTestBase {
         ZooKeeper zk = getClient(0);
         ZooKeeper zk2 = getClient(1);
         ZooKeeper zk3 = getClient(2);
-        ZooKeeper zk4 = getClient(2);
+        ZooKeeper zk4 = getClient(3);
 
         zk.create("/election", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 
@@ -361,15 +354,16 @@ public class TestZK extends ZKTestBase {
         assertFalse(elector4.isLeader());
 
         // 4 should become the leader
-        zk3.close();
-        zk2.close();
-        zk.close();
+        elector3.shutdown();
+        elector2.shutdown();
+        elector1.shutdown();
+
 
         assertTrue(sem4.tryAcquire(5, TimeUnit.SECONDS));
         assertTrue(elector4.isLeader());
 
         // cleanup.
-        zk4.close();
+        elector4.shutdown();
     }
 
 
@@ -402,17 +396,17 @@ public class TestZK extends ZKTestBase {
         assertFalse(elector3.isLeader());
 
         // 1 is still the leader
-        zk2.close();
+        elector2.shutdown();
         assertTrue(elector1.isLeader());
         assertFalse(elector3.isLeader());
 
         // 3 should become the leader now
-        zk.close();
+        elector1.shutdown();
         assertTrue(sem3.tryAcquire(5, TimeUnit.SECONDS));
         assertTrue(elector3.isLeader());
         assertEquals(0, sem3.availablePermits());
 
-        zk3.close();
+        elector3.shutdown();
     }
 
     @Test
