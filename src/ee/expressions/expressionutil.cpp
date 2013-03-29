@@ -60,40 +60,20 @@ namespace voltdb {
 
 /** Parse JSON parameters to create a hash range expression */
 static AbstractExpression*
-hashRangeFactory(json_spirit::Object &obj) {
-    json_spirit::Value hashColumnValue = json_spirit::find_value(obj, "HASH_COLUMN");
-    if (hashColumnValue.is_null()) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "hashRangeFactory: Could not find"
-                                      " HASH_COLUMN value");
-    }
+hashRangeFactory(PlannerDomValue obj) {
+    PlannerDomValue hashColumnValue = obj.valueForKey("HASH_COLUMN");
 
-    json_spirit::Value rangesValue = json_spirit::find_value(obj, "RANGES");
-    if (rangesValue.is_null()) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "hashRangeFactory: Could not find"
-                                      " RANGES value");
-    }
+    PlannerDomValue rangesArray = obj.valueForKey("RANGES");
 
-    json_spirit::Array rangesArray = rangesValue.get_array();
-    srange_type *ranges = new srange_type[rangesArray.size()];
-    for (int ii = 0; ii < rangesArray.size(); ii++) {
-        json_spirit::Object arrayObject = rangesArray[ii].get_obj();
-        json_spirit::Value rangeStartValue = json_spirit::find_value(arrayObject, "RANGE_START");
-        if (rangeStartValue.is_null()) {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          "hashRangeFactory: Could not find"
-                                          " RANGE_START value");
-        }
-        json_spirit::Value rangeEndValue = json_spirit::find_value(arrayObject, "RANGE_END");
-        if (rangeEndValue.is_null()) {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          "hashRangeFactory: Could not find"
-                                          " RANGE_END value");
-        }
-        ranges[ii] = srange_type(rangeStartValue.get_int64(), rangeEndValue.get_int64());
+    srange_type *ranges = new srange_type[rangesArray.arrayLen()];
+    for (int ii = 0; ii < rangesArray.arrayLen(); ii++) {
+        PlannerDomValue arrayObject = rangesArray.valueAtIndex(ii);
+        PlannerDomValue rangeStartValue = arrayObject.valueForKey("RANGE_START");
+        PlannerDomValue rangeEndValue = arrayObject.valueForKey("RANGE_END");
+
+        ranges[ii] = srange_type(rangeStartValue.asInt64(), rangeEndValue.asInt64());
     }
-    return new HashRangeExpression(hashColumnValue.get_int(), ranges, static_cast<int>(rangesArray.size()));
+    return new HashRangeExpression(hashColumnValue.asInt(), ranges, static_cast<int>(rangesArray.arrayLen()));
 }
 
 /** Function static helper templated functions to vivify an optimal

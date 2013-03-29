@@ -375,7 +375,9 @@ TEST_F(ExpressionTest, HashRange) {
 
     auto_ptr<AE> ae(new HR(1, ranges, 2));
     json_spirit::Object json = ae->serializeValue();
-    auto_ptr<AbstractExpression> e1(AbstractExpression::buildExpressionTree(json));
+    std::string jsonText = json_spirit::write(json);
+    PlannerDomRoot domRoot(jsonText.c_str());
+    auto_ptr<AbstractExpression> e1(AbstractExpression::buildExpressionTree(domRoot.rootObject()));
 
     vector<std::string> columnNames;
     columnNames.push_back("foo");
