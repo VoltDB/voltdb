@@ -621,7 +621,7 @@ public class TableHelper {
     /**
      * Helper method for RandomFill
      */
-    protected static Object[] randomRow(VoltTable table, int maxStringSize, Random rand) {
+    public static Object[] randomRow(VoltTable table, int maxStringSize, Random rand) {
         Object[] row = new Object[table.getColumnCount()];
         for (int col = 0; col < table.getColumnCount(); col++) {
             boolean allowNulls = table.getColumnNullable(col);

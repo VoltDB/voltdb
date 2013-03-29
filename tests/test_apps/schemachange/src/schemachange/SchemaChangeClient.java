@@ -44,12 +44,14 @@ import org.voltdb.compiler.CatalogBuilder;
 
 public class SchemaChangeClient {
 
-    private Client client = null;
+    Client client = null;
     private SchemaChangeConfig config = null;
     private Random rand = new Random(0);
     private Topology topo = null;
     private AtomicInteger totalConnections = new AtomicInteger(0);
     private AtomicInteger fatalLevel = new AtomicInteger(0);
+
+    private int schemaVersionNo = 0;
 
     private long startTime;
 
@@ -63,9 +65,6 @@ public class SchemaChangeClient {
      * and validation.
      */
     static class SchemaChangeConfig extends CLIConfig {
-        @Option(desc = "Target RSS per server in MB.")
-        int targetrssmb = 1024 * 4;
-
         @Option(desc = "Maximum number of rows to load (times sites for replicated tables).")
         long targetrowcount = Long.MAX_VALUE;
 
@@ -83,8 +82,7 @@ public class SchemaChangeClient {
 
         @Override
         public void validate() {
-            if (targetrssmb < 0) exitWithMessageAndUsage("targetrssmb must be >= 0");
-            if (targetrowcount < 0) exitWithMessageAndUsage("targetrowcount must be >= 0");
+            if (targetrowcount <= 0) exitWithMessageAndUsage("targetrowcount must be > 0");
             if (duration < 0) exitWithMessageAndUsage("duration must be >= 0");
         }
     }
@@ -96,11 +94,11 @@ public class SchemaChangeClient {
      * Some errors will retry the call until the global progress timeout with various waits.
      * After the global progress timeout, the process is killed.
      */
-    private ClientResponse callROProcedureWithRetry(String procName, Object... params) {
+    ClientResponse callROProcedureWithRetry(String procName, Object... params) {
         long startTime = System.currentTimeMillis();
         long now = startTime;
 
-        while (now - startTime < config.noProgressTimeout) {
+        while (now - startTime < (config.noProgressTimeout * 1000)) {
             ClientResponse cr = null;
 
             try {
@@ -124,30 +122,21 @@ public class SchemaChangeClient {
                     // hooray!
                     return cr;
                 case ClientResponse.CONNECTION_LOST:
-                    // can retry after a delay
-                    try { Thread.sleep(5 * 1000); } catch (Exception e) {}
-                    break;
                 case ClientResponse.CONNECTION_TIMEOUT:
                     // can retry after a delay
                     try { Thread.sleep(5 * 1000); } catch (Exception e) {}
                     break;
-                case ClientResponse.GRACEFUL_FAILURE:
-                    // for starters, I'm assuming this can't happen for reads in a sound system
-                    assert(false);
-                    System.exit(-1);
                 case ClientResponse.RESPONSE_UNKNOWN:
                     // can try again immediately - cluster is up but a node died
                     break;
                 case ClientResponse.SERVER_UNAVAILABLE:
                     // shouldn't be in admin mode (paused) in this app, but can retry after a delay
-                    try { Thread.sleep(60 * 1000); } catch (Exception e) {}
+                    try { Thread.sleep(30 * 1000); } catch (Exception e) {}
                     break;
+                case ClientResponse.GRACEFUL_FAILURE:
                 case ClientResponse.UNEXPECTED_FAILURE:
-                    // should never happen
-                    assert(false);
-                    System.exit(-1);
                 case ClientResponse.USER_ABORT:
-                    // no user aborts as part of the app
+                    // for starters, I'm assuming these errors can't happen for reads in a sound system
                     assert(false);
                     System.exit(-1);
                 }
@@ -175,6 +164,9 @@ public class SchemaChangeClient {
         String currentName = t1 == null ? "B" : TableHelper.getTableName(t1);
         String newName = currentName;
 
+        // add an empty table with the schema version number in it
+        VoltTable versionT = TableHelper.quickTable(String.format("V%s (BIGINT)", schemaVersionNo + 1));
+
         if (newTable) {
             newName = currentName.equals("A") ? "B" : "A";
             t2 = TableHelper.getTotallyRandomTable(newName, rand);
@@ -186,6 +178,7 @@ public class SchemaChangeClient {
         System.out.printf(_F("New Schema:\n%s\n", TableHelper.ddlForTable(t2)));
 
         builder.addLiteralSchema(TableHelper.ddlForTable(t2));
+        builder.addLiteralSchema(TableHelper.ddlForTable(versionT));
         // make tables name A partitioned and tables named B replicated
         if (newName.equalsIgnoreCase("A")) {
             int pkeyIndex = TableHelper.getBigintPrimaryKeyIndexIfExists(t2);
@@ -204,25 +197,70 @@ public class SchemaChangeClient {
             System.out.println(_F("Starting catalog update to change schema."));
         }
 
-        ClientResponse cr = client.callProcedure("@UpdateApplicationCatalog", catalogData, null);
-        assert(cr.getStatus() == ClientResponse.SUCCESS);
-
-        long end = System.nanoTime();
-        double seconds = (end - start) / 1000000000.0;
-
-        if (newTable) {
-            System.out.printf(_F("Completed catalog update that swapped tables in %.4f seconds\n",
-                    seconds));
+        boolean success = false;
+        ClientResponse cr = null;
+        try {
+            cr = client.callProcedure("@UpdateApplicationCatalog", catalogData, null);
         }
+        catch (NoConnectionsException e) {
+            // failure
+        } catch (IOException e) {
+            // IOException is not cool man
+            e.printStackTrace();
+            System.exit(-1);
+        }
+
+        if (cr != null) {
+            switch (cr.getStatus()) {
+            case ClientResponse.SUCCESS:
+                // hooray!
+                success = true;
+                break;
+            case ClientResponse.CONNECTION_LOST:
+            case ClientResponse.CONNECTION_TIMEOUT:
+            case ClientResponse.RESPONSE_UNKNOWN:
+            case ClientResponse.SERVER_UNAVAILABLE:
+                // can try again after a break
+                break;
+            case ClientResponse.UNEXPECTED_FAILURE:
+            case ClientResponse.GRACEFUL_FAILURE:
+            case ClientResponse.USER_ABORT:
+                // should never happen
+                assert(false);
+                System.exit(-1);
+            }
+        }
+
+        // don't actually trust the call... manually verify
+        int versionObserved = verifyAndGetSchemaVersion();
+
+        // did not update
+        if (versionObserved == schemaVersionNo) {
+            // make sure the system didn't say it worked
+            assert(success == false);
+
+            // signal to the caller this didn't work
+            return null;
+        }
+        // success!
         else {
-            System.out.printf(_F("Completed catalog update of %d tuples in %.4f seconds (%d tuples/sec)\n",
-                    count, seconds, (long) (count / seconds)));
+            assert(versionObserved == (schemaVersionNo + 1));
+            schemaVersionNo++;
+
+            long end = System.nanoTime();
+            double seconds = (end - start) / 1000000000.0;
+
+            if (newTable) {
+                System.out.printf(_F("Completed catalog update that swapped tables in %.4f seconds\n",
+                        seconds));
+            }
+            else {
+                System.out.printf(_F("Completed catalog update of %d tuples in %.4f seconds (%d tuples/sec)\n",
+                        count, seconds, (long) (count / seconds)));
+            }
+
+            return t2;
         }
-
-        //System.out.println(_F("Sleeping for 5s"));
-        //Thread.sleep(5000);
-
-        return t2;
     }
 
     private static class Topology {
@@ -265,6 +303,28 @@ public class SchemaChangeClient {
     }
 
     /**
+     * Get a list of tables from the system and verify that the dummy table added for versioning
+     * is the right one.
+     */
+    private int verifyAndGetSchemaVersion() {
+        VoltTable result = callROProcedureWithRetry("@Statistics", "TABLE", 0).getResults()[0];
+        result.resetRowPosition();
+        int version = -1;
+        while (result.advanceRow()) {
+            String tableName = result.getString("TABLE_NAME");
+            if (tableName.startsWith("V")) {
+                int rowVersion = Integer.parseInt(tableName.substring(1));
+                if (version >= 0) {
+                    assert(rowVersion == version);
+                }
+                version = rowVersion;
+            }
+        }
+        assert(version >= 0);
+        return version;
+    }
+
+    /**
      * Count the number of tuples in the table.
      */
     private long tupleCount(VoltTable t) {
@@ -293,7 +353,7 @@ public class SchemaChangeClient {
      * Delete some rows rows (triggers compaction).
      * Re-add odd rows until RSS or rowcount target met (makes buffers out of order).
      */
-    private void loadTable(VoltTable t) throws Exception {
+    private void loadTable(VoltTable t) {
         // if #partitions is odd, delete every 2 - if even, delete every 3
         int n = 3 - (topo.partitions % 2);
 
@@ -306,9 +366,11 @@ public class SchemaChangeClient {
 
         System.out.printf(_F("loading table\n"));
         long max = maxId(t);
-        TableHelper.fillTableWithBigintPkey(t, config.targetrssmb, realRowCount, client, rand, max + 1, 1);
-        TableHelper.deleteEveryNRows(t, client, n);
-        TableHelper.fillTableWithBigintPkey(t, config.targetrssmb, realRowCount, client, rand, 1, n);
+
+        TableLoader loader = new TableLoader(this, t, rand);
+        loader.load(max + 1, realRowCount, 1);
+        loader.delete(1, realRowCount, n);
+        loader.load(1, realRowCount, n);
     }
 
     /**
@@ -439,7 +501,10 @@ public class SchemaChangeClient {
         topo = getCluterTopology();
 
         // kick this off with a random schema
-        VoltTable t = catalogChange(null, true);
+        VoltTable t = null;
+        while (t == null) {
+            t = catalogChange(null, true);
+        }
 
         startTime = System.currentTimeMillis();
 
@@ -456,7 +521,12 @@ public class SchemaChangeClient {
                 //System.out.printf(_F("First sample:\n%s\n", preT.toFormattedString()));
 
                 // move to an entirely new table or migrated schema
-                t = catalogChange(t, (j == 0) && (rand.nextInt(5) == 0));
+                VoltTable newT = null;
+                boolean isNewTable = (j == 0) && (rand.nextInt(5) == 0);
+                while (newT == null) {
+                    newT = catalogChange(t, isNewTable);
+                }
+                t = newT;
 
                 // if the table has been migrated, check the data
                 if (TableHelper.getTableName(t).equals(tableName)) {
