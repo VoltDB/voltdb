@@ -70,8 +70,6 @@ import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
-import org.voltdb.exceptions.SQLException;
-import org.voltdb.exceptions.SerializableException;
 import org.voltdb.export.processors.RawProcessor;
 import org.voltdb.fault.FaultDistributorInterface.PPDPolicyDecision;
 import org.voltdb.fault.FaultHandler;
@@ -80,12 +78,9 @@ import org.voltdb.fault.VoltFault;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.iv2.JoinProducerBase;
 import org.voltdb.jni.ExecutionEngine;
-import org.voltdb.jni.ExecutionEngineIPC;
-import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.jni.MockExecutionEngine;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
-import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskLogMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -852,12 +847,12 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             PartitionDRGateway.getInstance(partitionId, nodeDRGateway, false, m_rejoining);
 
         if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
-            ee = new MockExecutionEngine();
+            ee = new MockExecutionEngine(null);
             hsql = null;
         }
         else if (voltdb.getBackendTargetType() == BackendTarget.HSQLDB_BACKEND) {
             hsql = HsqlBackend.initializeHSQLBackend(m_siteId, m_context);
-            ee = new MockExecutionEngine();
+            ee = new MockExecutionEngine(null);
         }
         else {
             String serializedCatalog = serializedCatalogIn;
@@ -921,53 +916,8 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             final long timestamp,
             int configuredNumberOfPartitions)
     {
-        String hostname = CoreUtils.getHostnameOrAddress();
-
-        ExecutionEngine eeTemp = null;
-        try {
-            if (target == BackendTarget.NATIVE_EE_JNI) {
-                eeTemp =
-                    new ExecutionEngineJNI(
-                        m_context.cluster.getRelativeIndex(),
-                        getSiteId(),
-                        m_tracker.getPartitionForSite(getSiteId()),
-                        SiteTracker.getHostForSite(getSiteId()),
-                        hostname,
-                        m_context.cluster.getDeployment().get("deployment").
-                        getSystemsettings().get("systemsettings").getMaxtemptablesize(),
-                        TheHashinator.getConfiguredHashinatorType(),
-                        TheHashinator.getConfigureBytes(configuredNumberOfPartitions));
-                eeTemp.loadCatalog( timestamp, serializedCatalog);
-                lastTickTime = EstTime.currentTimeMillis();
-                eeTemp.tick( lastTickTime, txnId);
-            }
-            else {
-                // set up the EE over IPC
-                eeTemp =
-                    new ExecutionEngineIPC(
-                            m_context.cluster.getRelativeIndex(),
-                            getSiteId(),
-                            m_tracker.getPartitionForSite(getSiteId()),
-                            SiteTracker.getHostForSite(getSiteId()),
-                            hostname,
-                            m_context.cluster.getDeployment().get("deployment").
-                            getSystemsettings().get("systemsettings").getMaxtemptablesize(),
-                            target,
-                            VoltDB.instance().getConfig().m_ipcPorts.remove(0),
-                            TheHashinator.getConfiguredHashinatorType(),
-                            TheHashinator.getConfigureBytes(configuredNumberOfPartitions));
-                eeTemp.loadCatalog( timestamp, serializedCatalog);
-                lastTickTime = EstTime.currentTimeMillis();
-                eeTemp.tick( lastTickTime, 0);
-            }
-        }
-        // just print error info an bail if we run into an error here
-        catch (final Exception ex) {
-            hostLog.l7dlog( Level.FATAL, LogKeys.host_ExecutionSite_FailedConstruction.name(),
-                            new Object[] { getSiteId(), siteIndex }, ex);
-            VoltDB.crashLocalVoltDB(ex.getMessage(), true, ex);
-        }
-        return eeTemp;
+        // ExecutionSite is dead code!
+        return null;
     }
 
     public boolean updateClusterState() {
@@ -1993,60 +1943,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         }
     }
 
-
-    private FragmentResponseMessage processSysprocFragmentTask(
-            final TransactionState txnState,
-            final HashMap<Integer,List<VoltTable>> dependencies,
-            final long fragmentId, final FragmentResponseMessage currentFragResponse,
-            final ParameterSet params)
-    {
-        // assume success. errors correct this assumption as they occur
-        currentFragResponse.setStatus(FragmentResponseMessage.SUCCESS, null);
-        ProcedureRunner runner = m_loadedProcedures.getSysproc(fragmentId);
-
-        try {
-            final DependencyPair dep
-                = runner.executePlanFragment(txnState,
-                                             dependencies,
-                                             fragmentId,
-                                             params);
-
-            if (dep != null) {
-                sendDependency(currentFragResponse, dep.depId, dep.dependency);
-            }
-        }
-        catch (final EEException e)
-        {
-            hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
-            currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
-        }
-        catch (final SQLException e)
-        {
-            hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
-            currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
-        }
-        catch (final Exception e)
-        {
-            // Just indicate that we failed completely
-            currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, new SerializableException(e));
-        }
-
-        return currentFragResponse;
-    }
-
-    private void sendDependency(
-            final FragmentResponseMessage currentFragResponse,
-            final int dependencyId,
-            final VoltTable dependency)
-    {
-        if (log.isTraceEnabled()) {
-            log.l7dlog(Level.TRACE,
-                       LogKeys.org_voltdb_ExecutionSite_SendingDependency.name(),
-                       new Object[] { dependencyId }, null);
-        }
-        currentFragResponse.addDependency(dependencyId, dependency);
-    }
-
     @Override
     public void initiateSnapshots(
             Deque<SnapshotTableTask> tasks,
@@ -2121,12 +2017,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         ee.loadTable(tableId, data,
                      txnId,
                      lastCommittedTxnId);
-    }
-
-    @Override
-    public long loadPlanFragment(byte[] plan)
-    {
-        return ee.loadPlanFragment(plan);
     }
 
     @Override
@@ -2219,91 +2109,8 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             final HashMap<Integer,List<VoltTable>> dependencies,
             final VoltMessage task)
     {
-        final FragmentTaskMessage ftask = (FragmentTaskMessage) task;
-        final FragmentResponseMessage currentFragResponse = new FragmentResponseMessage(ftask, getSiteId());
-        currentFragResponse.setStatus(FragmentResponseMessage.SUCCESS, null);
-
-        if (!ftask.isSysProcTask())
-        {
-            if (dependencies != null)
-            {
-                stashWorkUnitDependencies(dependencies);
-            }
-        }
-
-        for (int frag = 0; frag < ftask.getFragmentCount(); frag++)
-        {
-            long fragmentId = ftask.getFragmentId(frag);
-            final int outputDepId = ftask.getOutputDepId(frag);
-
-            // this is a horrible performance hack, and can be removed with small changes
-            // to the ee interface layer.. (rtb: not sure what 'this' encompasses...)
-            ParameterSet params = null;
-            final ByteBuffer paramData = ftask.getParameterDataForFragment(frag);
-            if (paramData != null) {
-                final FastDeserializer fds = new FastDeserializer(paramData);
-                try {
-                    params = fds.readObject(ParameterSet.class);
-                }
-                catch (final IOException e) {
-                    hostLog.l7dlog( Level.FATAL,
-                                    LogKeys.host_ExecutionSite_FailedDeserializingParamsForFragmentTask.name(), e);
-                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-                }
-            }
-            else {
-                params = new ParameterSet();
-            }
-
-            byte[] fragmentPlan = ftask.getFragmentPlan(frag);
-            if (ftask.isSysProcTask()) {
-                return processSysprocFragmentTask(txnState, dependencies, fragmentId,
-                                                  currentFragResponse, params);
-            }
-            else {
-                final int inputDepId = ftask.getOnlyInputDepId(frag);
-
-                /*
-                 * Currently the error path when executing plan fragments
-                 * does not adequately distinguish between fatal errors and
-                 * abort type errors that should result in a roll back.
-                 * Assume that it is ninja: succeeds or doesn't return.
-                 * No roll back support.
-                 *
-                 * AW in 2012, the preceding comment might be wrong,
-                 * I am pretty sure what we don't support is partial rollback.
-                 * The entire procedure will roll back successfully on failure
-                 */
-                try {
-                    // if custom fragment, load the plan
-                    if (fragmentPlan != null) {
-                        fragmentId = ee.loadPlanFragment(fragmentPlan);
-                    }
-
-                    final VoltTable dependency = ee.executePlanFragments(
-                            1,
-                            new long[] { fragmentId },
-                            new long[] { inputDepId },
-                            new ParameterSet[] { params },
-                            txnState.txnId,
-                            lastCommittedTxnId,
-                            txnState.txnId,
-                            txnState.isReadOnly() ? Long.MAX_VALUE : getNextUndoToken())[0];
-
-                    sendDependency(currentFragResponse, outputDepId, dependency);
-
-                } catch (final EEException e) {
-                    hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
-                    currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
-                    break;
-                } catch (final SQLException e) {
-                    hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
-                    currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
-                    break;
-                }
-            }
-        }
-        return currentFragResponse;
+        // assuming ExecutionSite is dead code
+        return null;
     }
 
     public InitiateResponseMessage processInitiateTask(
@@ -2515,5 +2322,28 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     @Override
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds) {
         //A noop pre-IV2
+    }
+
+    @Override
+    public long getFragmentIdForPlanHash(byte[] planHash) {
+        //A noop pre-IV2
+        return 0;
+    }
+
+    @Override
+    public long loadOrAddRefPlanFragment(byte[] planHash, byte[] plan) {
+        //A noop pre-IV2
+        return 0;
+    }
+
+    @Override
+    public void decrefPlanFragmentById(long fragmentId) {
+        //A noop pre-IV2
+    }
+
+    @Override
+    public byte[] planForFragmentId(long fragmentId) {
+        // TODO Auto-generated method stub
+        return null;
     }
 }

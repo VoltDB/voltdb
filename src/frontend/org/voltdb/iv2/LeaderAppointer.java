@@ -17,60 +17,46 @@
 
 package org.voltdb.iv2;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
-
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
-import com.google.common.util.concurrent.MoreExecutors;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-
 import org.voltcore.logging.VoltLogger;
-
 import org.voltcore.messaging.HostMessenger;
-
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
-
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.LeaderElector;
-
 import org.voltcore.zk.ZKUtil;
-import org.voltdb.catalog.SnapshotSchedule;
-
-import org.voltdb.client.ClientResponse;
-
 import org.voltdb.Promotable;
 import org.voltdb.SnapshotFormat;
-
-import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.MoreExecutors;
 
 /**
  * LeaderAppointer handles centralized appointment of partition leaders across
@@ -359,7 +345,8 @@ public class LeaderAppointer implements Promotable
             m_startupLatch = new CountDownLatch(1);
             writeKnownLiveNodes(m_hostMessenger.getLiveHostIds());
             try {
-                for (int i = 0; i < getInitialPartitionCount(); i++) {
+                final int initialPartitionCount = getInitialPartitionCount();
+                for (int i = 0; i < initialPartitionCount; i++) {
                     addPartitionZKNode(m_zk, i);
                     watchPartition(i, m_es);
                 }

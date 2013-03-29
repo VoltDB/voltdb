@@ -34,12 +34,13 @@ import org.voltdb.exceptions.SQLException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.rejoin.TaskLog;
+import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
 public class FragmentTask extends TransactionTask
 {
     final Mailbox m_initiator;
-    final FragmentTaskMessage m_task;
+    final FragmentTaskMessage m_fragmentMsg;
     final Map<Integer, List<VoltTable>> m_inputDeps;
 
     // This constructor is used during live rejoin log replay.
@@ -56,14 +57,14 @@ public class FragmentTask extends TransactionTask
 
     // This constructor is used during normal operation.
     FragmentTask(Mailbox mailbox,
-                 ParticipantTransactionState txn,
+                 ParticipantTransactionState txnState,
                  TransactionTaskQueue queue,
                  FragmentTaskMessage message,
                  Map<Integer, List<VoltTable>> inputDeps)
     {
-        super(txn, queue);
+        super(txnState, queue);
         m_initiator = mailbox;
-        m_task = message;
+        m_fragmentMsg = message;
         m_inputDeps = inputDeps;
     }
 
@@ -76,9 +77,9 @@ public class FragmentTask extends TransactionTask
         // Set the begin undo token if we haven't already
         // In the future we could record a token per batch
         // and do partial rollback
-        if (!m_txn.isReadOnly()) {
-            if (m_txn.getBeginUndoToken() == Site.kInvalidUndoToken) {
-                m_txn.setBeginUndoToken(siteConnection.getLatestUndoToken());
+        if (!m_txnState.isReadOnly()) {
+            if (m_txnState.getBeginUndoToken() == Site.kInvalidUndoToken) {
+                m_txnState.setBeginUndoToken(siteConnection.getLatestUndoToken());
             }
         }
         final FragmentResponseMessage response = processFragmentTask(siteConnection);
@@ -95,7 +96,7 @@ public class FragmentTask extends TransactionTask
     @Override
     public long getSpHandle()
     {
-        return m_task.getSpHandle();
+        return m_fragmentMsg.getSpHandle();
     }
 
     /**
@@ -105,16 +106,16 @@ public class FragmentTask extends TransactionTask
     public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
     throws IOException
     {
-        taskLog.logTask(m_task);
+        taskLog.logTask(m_fragmentMsg);
         final FragmentResponseMessage response =
-            new FragmentResponseMessage(m_task, m_initiator.getHSId());
+            new FragmentResponseMessage(m_fragmentMsg, m_initiator.getHSId());
         response.setRecovering(true);
         response.setStatus(FragmentResponseMessage.SUCCESS, null);
 
         // Set the dependencies even if this is a dummy response. This site could be the master
         // on elastic join, so the fragment response message is actually going to the MPI.
-        for (int frag = 0; frag < m_task.getFragmentCount(); frag++) {
-            final int outputDepId = m_task.getOutputDepId(frag);
+        for (int frag = 0; frag < m_fragmentMsg.getFragmentCount(); frag++) {
+            final int outputDepId = m_fragmentMsg.getOutputDepId(frag);
             response.addDependency(outputDepId, null);
         }
 
@@ -131,9 +132,9 @@ public class FragmentTask extends TransactionTask
         // Set the begin undo token if we haven't already
         // In the future we could record a token per batch
         // and do partial rollback
-        if (!m_txn.isReadOnly()) {
-            if (m_txn.getBeginUndoToken() == Site.kInvalidUndoToken) {
-                m_txn.setBeginUndoToken(siteConnection.getLatestUndoToken());
+        if (!m_txnState.isReadOnly()) {
+            if (m_txnState.getBeginUndoToken() == Site.kInvalidUndoToken) {
+                m_txnState.setBeginUndoToken(siteConnection.getLatestUndoToken());
             }
         }
         // ignore response.
@@ -146,7 +147,7 @@ public class FragmentTask extends TransactionTask
         // Check and see if we can flush early
         // right now, this is just read-only and final task
         // This
-        if (m_task.isFinalTask() && m_txn.isReadOnly())
+        if (m_fragmentMsg.isFinalTask() && m_txnState.isReadOnly())
         {
             doCommonSPICompleteActions();
         }
@@ -158,27 +159,30 @@ public class FragmentTask extends TransactionTask
     {
         // IZZY: actually need the "executor" HSId these days?
         final FragmentResponseMessage currentFragResponse =
-            new FragmentResponseMessage(m_task, m_initiator.getHSId());
+            new FragmentResponseMessage(m_fragmentMsg, m_initiator.getHSId());
         currentFragResponse.setStatus(FragmentResponseMessage.SUCCESS, null);
 
         if (m_inputDeps != null) {
             siteConnection.stashWorkUnitDependencies(m_inputDeps);
         }
 
-        if (m_task.isEmptyForRestart()) {
-            int outputDepId = m_task.getOutputDepId(0);
+        if (m_fragmentMsg.isEmptyForRestart()) {
+            int outputDepId = m_fragmentMsg.getOutputDepId(0);
             currentFragResponse.addDependency(outputDepId,
                     new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
             return currentFragResponse;
         }
 
-        for (int frag = 0; frag < m_task.getFragmentCount(); frag++)
+        for (int frag = 0; frag < m_fragmentMsg.getFragmentCount(); frag++)
         {
-            long fragmentId = m_task.getFragmentId(frag);
-            final int outputDepId = m_task.getOutputDepId(frag);
+            byte[] planHash = m_fragmentMsg.getPlanHash(frag);
+            final int outputDepId = m_fragmentMsg.getOutputDepId(frag);
 
-            ParameterSet params = m_task.getParameterSetForFragment(frag);
-            final int inputDepId = m_task.getOnlyInputDepId(frag);
+            ParameterSet params = m_fragmentMsg.getParameterSetForFragment(frag);
+            final int inputDepId = m_fragmentMsg.getOnlyInputDepId(frag);
+
+            long fragmentId = 0;
+            byte[] fragmentPlan = null;
 
             /*
              * Currently the error path when executing plan fragments
@@ -193,11 +197,15 @@ public class FragmentTask extends TransactionTask
              */
             try {
                 VoltTable dependency;
-                byte[] fragmentPlan = m_task.getFragmentPlan(frag);
+                fragmentPlan = m_fragmentMsg.getFragmentPlan(frag);
 
-                // if custom fragment, load the plan
+                // if custom fragment, load the plan and get local fragment id
                 if (fragmentPlan != null) {
-                    fragmentId = siteConnection.loadPlanFragment(fragmentPlan);
+                    fragmentId = siteConnection.loadOrAddRefPlanFragment(planHash, fragmentPlan);
+                }
+                // otherwise ask the plan source for a local fragment id
+                else {
+                    fragmentId = siteConnection.getFragmentIdForPlanHash(planHash);
                 }
 
                 dependency = siteConnection.executePlanFragments(
@@ -205,9 +213,9 @@ public class FragmentTask extends TransactionTask
                         new long[] { fragmentId },
                         new long [] { inputDepId },
                         new ParameterSet[] { params },
-                        m_txn.spHandle,
-                        m_txn.uniqueId,
-                        m_txn.isReadOnly())[0];
+                        m_txnState.spHandle,
+                        m_txnState.uniqueId,
+                        m_txnState.isReadOnly())[0];
 
                 if (hostLog.isTraceEnabled()) {
                     hostLog.l7dlog(Level.TRACE,
@@ -216,13 +224,19 @@ public class FragmentTask extends TransactionTask
                 }
                 currentFragResponse.addDependency(outputDepId, dependency);
             } catch (final EEException e) {
-                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
+                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 break;
             } catch (final SQLException e) {
-                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
+                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 break;
+            }
+            finally {
+                // ensure adhoc plans are unloaded
+                if (fragmentPlan != null) {
+                    siteConnection.decrefPlanFragmentById(fragmentId);
+                }
             }
         }
         return currentFragResponse;

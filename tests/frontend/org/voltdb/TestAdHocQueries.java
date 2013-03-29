@@ -45,10 +45,6 @@ public class TestAdHocQueries extends AdHocQueryTester {
     Client m_client;
     private final static boolean m_debug = false;
 
-    // IMPORTANT SAFETY TIP
-    // The use of junit parameters to toggle between iv2 and non-iv2 cases
-    // means that all test cases MUST BE annotated with @Test or THEY WILL NOT RUN.
-
     @Test
     public void testProcedureAdhoc() throws Exception {
         VoltDB.Configuration config = setUpSPDB();
