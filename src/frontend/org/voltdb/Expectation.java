@@ -45,17 +45,17 @@ public class Expectation {
         m_scalar = scalar;
     }
 
-    static void fail(String procedureName, byte[] stmtName, int batchIndex,
+    static void fail(String procedureName, SQLStmt stmt, int batchIndex,
             String errMsg) throws VoltAbortException {
 
         String fullMsg = "Expectation failing in procedure: " + procedureName + "\n";
-        fullMsg += "  Running SQL: " + new String(stmtName, VoltDB.UTF8ENCODING) + "\n";
+        fullMsg += "  Running SQL: " + stmt.getText() + "\n";
         fullMsg += "  Error message: " + errMsg;
 
         throw new VoltAbortException(fullMsg);
     }
 
-    static void check(String procedureName, byte[] stmtName, int batchIndex,
+    static void check(String procedureName, SQLStmt stmt, int batchIndex,
             Expectation expectation, VoltTable table) throws VoltAbortException {
         if (expectation == null)
             return;
@@ -66,44 +66,44 @@ public class Expectation {
         switch (expectation.m_type) {
         case EXPECT_EMPTY:
             if (rowCount != 0) {
-                fail(procedureName, stmtName, batchIndex,
+                fail(procedureName, stmt, batchIndex,
                      String.format("Expected zero row, but got %d", rowCount));
             }
             return;
         case EXPECT_ONE_ROW:
             if (rowCount != 1) {
-                fail(procedureName, stmtName, batchIndex,
+                fail(procedureName, stmt, batchIndex,
                      String.format("Expected one row, but got %d", rowCount));
             }
             return;
         case EXPECT_ZERO_OR_ONE_ROW:
             if (rowCount > 1) {
-                fail(procedureName, stmtName, batchIndex,
+                fail(procedureName, stmt, batchIndex,
                      String.format("Expected zero or one rows, but got %d", rowCount));
             }
             return;
         case EXPECT_NON_EMPTY:
             if (rowCount == 0) {
-                fail(procedureName, stmtName, batchIndex,
+                fail(procedureName, stmt, batchIndex,
                      String.format("Expected one or more rows, but got %d", rowCount));
             }
             return;
         case EXPECT_SCALAR:
             if (checkScalar(table) == false) {
-                fail(procedureName, stmtName, batchIndex, "Expected scalar value");
+                fail(procedureName, stmt, batchIndex, "Expected scalar value");
             }
             return;
         case EXPECT_SCALAR_LONG:
             if (checkScalarLong(table) == false) {
-                fail(procedureName, stmtName, batchIndex, "Expected scalar long value");
+                fail(procedureName, stmt, batchIndex, "Expected scalar long value");
             }
             return;
         case EXPECT_SCALAR_MATCH:
             if (checkScalarLong(table) == false) {
-                fail(procedureName, stmtName, batchIndex, "Expected scalar long value");
+                fail(procedureName, stmt, batchIndex, "Expected scalar long value");
             }
             if (table.asScalarLong() != expectation.m_scalar) {
-                fail(procedureName, stmtName, batchIndex,
+                fail(procedureName, stmt, batchIndex,
                         String.format("Expected scalar %d, but got %d", expectation.m_scalar, table.asScalarLong()));
             }
             return;

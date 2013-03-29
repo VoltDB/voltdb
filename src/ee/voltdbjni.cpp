@@ -516,66 +516,6 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetBu
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
 }
 
-/*
- * Class:     org_voltdb_jni_ExecutionEngine
- * Method:    nativeLoadPlanFragment
- * Signature: (JJ[B)I
- */
-SHAREDLIB_JNIEXPORT jint JNICALL
-Java_org_voltdb_jni_ExecutionEngine_nativeLoadPlanFragment (
-    JNIEnv *env,
-    jobject obj,
-    jlong engine_ptr,
-    jbyteArray plan) {
-
-    VOLT_DEBUG("nativeUnloadPlanFragment() start");
-
-    // setup
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    assert(engine);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-
-    //JNIEnv pointer can change between calls, must be updated
-    updateJNILogProxy(engine);
-
-    // convert java plan string to stdc++ string plan
-    jbyte *str = env->GetByteArrayElements(plan, NULL);
-    assert(str);
-
-    // get the buffer to write results to
-    engine->resetReusedResultOutputBuffer();
-    ReferenceSerializeOutput* out = engine->getResultOutputSerializer();
-
-    // output from the engine's loadFragment method
-    int64_t fragId = 0;
-    bool wasHit = 0;
-    int64_t cacheSize = 0;
-
-    // load
-    int result = 1;
-    try {
-        result = engine->loadFragment(reinterpret_cast<char *>(str),
-                                      env->GetArrayLength(plan),
-                                      fragId, wasHit, cacheSize);
-    } catch (const FatalException &e) {
-        topend->crashVoltDB(e);
-    }
-    assert((result == 1) || (fragId != 0));
-
-    // release plan memory
-    env->ReleaseByteArrayElements(plan, str, JNI_ABORT);
-
-    // write results back to java
-    out->writeLong(fragId);
-    out->writeBool(wasHit);
-    out->writeLong(cacheSize);
-
-    if (result == 1)
-        return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
-    else
-        return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
-}
-
 /**
  * Executes multiple plan fragments with the given parameter sets and gets the results.
  * @param pointer the VoltDBEngine pointer
@@ -647,7 +587,6 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
 
         // cleanup
         stringPool->purge();
-        engine->resizePlanCache();
 
         if (failures > 0)
             return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;

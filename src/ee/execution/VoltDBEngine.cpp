@@ -238,7 +238,7 @@ VoltDBEngine::~VoltDBEngine() {
     // --izzy 8/19/2009
 
     // clean up execution plans
-    m_executorMap.clear();
+    m_plans.clear();
 
     // Get rid of any dummy undo quantum first so m_undoLog.clear()
     // doesn't wipe this out before we do it.
@@ -366,10 +366,20 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
     ++m_pfCount;
 
     // execution lists for planfragments are cached by planfragment id
-    //printf("Looking to execute fragid %jd\n", (intmax_t)planfragmentId);
-    map<int64_t, boost::shared_ptr<ExecutorVector> >::const_iterator iter = m_executorMap.find(planfragmentId);
-    assert (iter != m_executorMap.end());
-    boost::shared_ptr<ExecutorVector> execsForFrag = iter->second;
+    ExecutorVector *execsForFrag = NULL;
+    try {
+        execsForFrag = getExecutorVectorForFragmentId(planfragmentId);
+    }
+    catch (const SerializableEEException &e) {
+        resetReusedResultOutputBuffer();
+        e.serialize(getExceptionOutputSerializer());
+
+        // set these back to -1 for error handling
+        m_currentOutputDepId = -1;
+        m_currentInputDepId = -1;
+        return ENGINE_ERRORCODE_ERROR;
+    }
+    assert(execsForFrag);
 
     // Walk through the queue and execute each plannode.  The query
     // planner guarantees that for a given plannode, all of its
@@ -446,49 +456,6 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
 
     VOLT_DEBUG("Finished executing.");
     return ENGINE_ERRORCODE_SUCCESS;
-}
-
-int VoltDBEngine::loadFragment(const char *plan, int32_t length, int64_t &fragId, bool &wasHit, int64_t &cacheSize)
-{
-    fragId = 0;
-
-    wasHit = m_fragmentManager.upsert(plan, length, fragId);
-    cacheSize = m_fragmentManager.size();
-    if (!wasHit) {
-        try
-        {
-            std::string fragmentString(plan, length);
-            if (!initPlanFragment(fragId, fragmentString))
-            {
-                char message[128];
-                snprintf(message, 128, "Unable to load plan fragment for"
-                         " fragment id %jd.", (intmax_t)fragId);
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                              message);
-            }
-        }
-        catch (const SerializableEEException &e)
-        {
-            VOLT_TRACE("loadFragment: failed to initialize plan fragment");
-            e.serialize(getExceptionOutputSerializer());
-            fragId = 0;
-            return 1;
-        }
-    }
-
-    // nonzero on failure
-    return fragId == 0 ? 1 : 0;
-}
-
-void VoltDBEngine::resizePlanCache() {
-    while (int64_t purgeFragId = m_fragmentManager.purgeNext()) {
-        std::map<int64_t, boost::shared_ptr<ExecutorVector> >::const_iterator iter;
-        iter = m_executorMap.find(purgeFragId);
-        if (iter != m_executorMap.end()) {
-            // clean up stuff
-            m_executorMap.erase(purgeFragId);
-        }
-    }
 }
 
 // -------------------------------------------------
@@ -572,10 +539,6 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
 
     // load up all the materialized views
     initMaterializedViews(true);
-
-    // load the plan fragments from the catalog
-    if (!rebuildPlanFragmentCollections())
-        return false;
 
     VOLT_DEBUG("Loaded catalog...");
     return true;
@@ -889,12 +852,6 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const string &catalogPayloa
         return false;
     }
 
-    // stored procedure catalog changes aren't written using delegates
-    if (!rebuildPlanFragmentCollections()) {
-        VOLT_ERROR("Error updating catalog planfragments");
-        return false;
-    }
-
     m_catalog->purgeDeletions();
     VOLT_DEBUG("Updated catalog...");
     return true;
@@ -995,118 +952,105 @@ bool VoltDBEngine::rebuildTableCollections() {
     return true;
 }
 
-/*
- * Delete and rebuild all plan fragments.
- */
-bool VoltDBEngine::rebuildPlanFragmentCollections() {
-    m_executorMap.clear();
-    m_fragmentManager.clear();
+VoltDBEngine::ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const int64_t fragId) {
+    typedef PlanSet::nth_index<1>::type plansById;
+    plansById::iterator iter = m_plans.get<1>().find(fragId);
 
-    // initialize all the planfragments.
-    map<string, catalog::Procedure*>::const_iterator proc_iterator;
-    for (proc_iterator = m_database->procedures().begin();
-         proc_iterator != m_database->procedures().end(); proc_iterator++) {
-        // Procedure
-        const catalog::Procedure *catalog_proc = proc_iterator->second;
-        VOLT_DEBUG("proc: %s", catalog_proc->name().c_str());
-        map<string, catalog::Statement*>::const_iterator stmt_iterator;
-        for (stmt_iterator = catalog_proc->statements().begin();
-             stmt_iterator != catalog_proc->statements().end();
-             stmt_iterator++) {
-            // PlanFragment
-            const catalog::Statement *catalogStmt = stmt_iterator->second;
-            VOLT_DEBUG("  stmt: %s : %s", catalogStmt->name().c_str(),
-                       catalogStmt->sqltext().c_str());
+    // found it, move it to the front
+    if (iter != m_plans.get<1>().end()) {
+        // move it to the front of the list
+        PlanSet::iterator iter2 = m_plans.project<0>(iter);
+        m_plans.get<0>().relocate(m_plans.begin(), iter2);
+        VoltDBEngine::ExecutorVector *retval = (*iter).get();
+        assert(retval);
+        return retval;
+    }
+    else {
+        std::string plan = m_topend->planForFragmentId(fragId);
 
-            map<string, catalog::PlanFragment*>::const_iterator pf_iterator;
-            for (pf_iterator = catalogStmt->fragments().begin();
-                 pf_iterator!= catalogStmt->fragments().end(); pf_iterator++) {
-                int64_t fragId = uniqueIdForFragment(pf_iterator->second);
-                string planNodeTree = pf_iterator->second->plannodetree();
+        if (plan.length() == 0) {
+            char msg[1024];
+            snprintf(msg, 1024, "Fetched empty plan from frontend for PlanFragment '%jd'",
+                     (intmax_t)fragId);
+            VOLT_ERROR("%s", msg);
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
+        }
 
-                // hex decode the string
-                assert (planNodeTree.size() % 2 == 0);
-                int buffer_length = (int)planNodeTree.size() / 2 + 1;
-                boost::shared_array<char> buffer(new char[buffer_length]);
-                catalog::Catalog::hexDecodeString(planNodeTree, buffer.get());
-                std::string bufferString( buffer.get() );
+        PlanNodeFragment *pnf = NULL;
+        try {
+            pnf = PlanNodeFragment::createFromCatalog(plan);
+        }
+        catch (SerializableEEException &seee) {
+            throw;
+        }
+        catch (...) {
+            char msg[1024 * 100];
+            snprintf(msg, 1024 * 100, "Unable to initialize PlanNodeFragment for PlanFragment '%jd' with plan:\n%s",
+                     (intmax_t)fragId, plan.c_str());
+            VOLT_ERROR("%s", msg);
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
+        }
+        VOLT_TRACE("\n%s\n", pnf->debug().c_str());
+        assert(pnf->getRootNode());
 
-                if (!initPlanFragment(fragId, bufferString)) {
-                    VOLT_ERROR("Failed to initialize plan fragment '%s' from"
-                               " catalogs\nFailed SQL Statement: %s",
-                               pf_iterator->second->name().c_str(),
-                               catalogStmt->sqltext().c_str());
-                    return false;
-                }
+        if (!pnf->getRootNode()) {
+            char msg[1024];
+            snprintf(msg, 1024, "Deserialized PlanNodeFragment for PlanFragment '%jd' does not have a root PlanNode",
+                     (intmax_t)fragId);
+            VOLT_ERROR("%s", msg);
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
+        }
+
+        // ENG-1333 HACK.  If the plan node fragment has a delete node,
+        // then turn off the governors
+        int64_t frag_temptable_log_limit = (m_tempTableMemoryLimit * 3) / 4;
+        int64_t frag_temptable_limit = m_tempTableMemoryLimit;
+        if (pnf->hasDelete())
+        {
+            frag_temptable_log_limit = DEFAULT_TEMP_TABLE_MEMORY;
+            frag_temptable_limit = -1;
+        }
+
+        boost::shared_ptr<ExecutorVector> ev(new ExecutorVector(fragId, frag_temptable_log_limit, frag_temptable_limit, pnf));
+
+        // Initialize each node!
+        for (int ctr = 0, cnt = (int)pnf->getExecuteList().size();
+             ctr < cnt; ctr++) {
+            if (!initPlanNode(fragId, pnf->getExecuteList()[ctr], &(ev->limits)))
+            {
+                char msg[1024 * 10];
+                snprintf(msg, 1024 * 10, "Failed to initialize PlanNode '%s' at position '%d' for PlanFragment '%jd'",
+                         pnf->getExecuteList()[ctr]->debug().c_str(), ctr, (intmax_t)fragId);
+                VOLT_ERROR("%s", msg);
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
             }
         }
+
+        // Initialize the vector of executors for this planfragment, used at runtime.
+        for (int ctr = 0, cnt = (int)pnf->getExecuteList().size(); ctr < cnt; ctr++) {
+            ev->list.push_back(pnf->getExecuteList()[ctr]->getExecutor());
+        }
+
+        // add the plan to the back
+        m_plans.get<0>().push_back(ev);
+
+        // remove a plan from the front if the cache is full
+        if (m_plans.size() > PLAN_CACHE_SIZE) {
+            PlanSet::iterator iter = m_plans.get<0>().begin();
+            m_plans.erase(iter);
+        }
+
+        VoltDBEngine::ExecutorVector *retval = ev.get();
+        assert(retval);
+        return retval;
     }
 
-    return true;
+    return NULL;
 }
 
 // -------------------------------------------------
 // Initialization Functions
 // -------------------------------------------------
-bool VoltDBEngine::initPlanFragment(const int64_t fragId,
-                                    const string planNodeTree) {
-
-    // Deserialize the PlanFragment and stick in our local map
-
-    map<int64_t, boost::shared_ptr<ExecutorVector> >::const_iterator iter = m_executorMap.find(fragId);
-    if (iter != m_executorMap.end()) {
-        VOLT_ERROR("Duplicate PlanNodeList entry for PlanFragment '%jd' during"
-                   " initialization", (intmax_t)fragId);
-        return false;
-    }
-
-    // catalog method plannodetree returns PlanNodeList.java
-    PlanNodeFragment *pnf = PlanNodeFragment::createFromCatalog(planNodeTree);
-    VOLT_TRACE("\n%s\n", pnf->debug().c_str());
-    assert(pnf->getRootNode());
-
-    if (!pnf->getRootNode()) {
-        VOLT_ERROR("Deserialized PlanNodeFragment for PlanFragment '%jd' "
-                   "does not have a root PlanNode", (intmax_t)fragId);
-        return false;
-    }
-
-    // ENG-1333 HACK.  If the plan node fragment has a delete node,
-    // then turn off the governors
-    int64_t frag_temptable_log_limit = (m_tempTableMemoryLimit * 3) / 4;
-    int64_t frag_temptable_limit = m_tempTableMemoryLimit;
-    if (pnf->hasDelete())
-    {
-        frag_temptable_log_limit = DEFAULT_TEMP_TABLE_MEMORY;
-        frag_temptable_limit = -1;
-    }
-
-    boost::shared_ptr<ExecutorVector> ev =
-        boost::shared_ptr<ExecutorVector>
-        (new ExecutorVector(frag_temptable_log_limit, frag_temptable_limit, pnf));
-
-    // Initialize each node!
-    for (int ctr = 0, cnt = (int)pnf->getExecuteList().size();
-         ctr < cnt; ctr++) {
-        if (!initPlanNode(fragId, pnf->getExecuteList()[ctr], &(ev->limits)))
-        {
-            VOLT_ERROR("Failed to initialize PlanNode '%s' at position '%d'"
-                       " for PlanFragment '%jd'",
-                       pnf->getExecuteList()[ctr]->debug().c_str(), ctr,
-                       (intmax_t)fragId);
-            return false;
-        }
-    }
-
-    // Initialize the vector of executors for this planfragment, used at runtime.
-    for (int ctr = 0, cnt = (int)pnf->getExecuteList().size();
-         ctr < cnt; ctr++) {
-        ev->list.push_back(pnf->getExecuteList()[ctr]->getExecutor());
-    }
-    m_executorMap[fragId] = ev;
-
-    return true;
-}
 
 bool VoltDBEngine::initPlanNode(const int64_t fragId,
                                 AbstractPlanNode* node,
@@ -1248,17 +1192,19 @@ void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle) {
 
 string VoltDBEngine::debug(void) const {
     stringstream output(stringstream::in | stringstream::out);
-    map<int64_t, boost::shared_ptr<ExecutorVector> >::const_iterator iter;
+    PlanSet::const_iterator iter;
     vector<AbstractExecutor*>::const_iterator executorIter;
 
-    for (iter = m_executorMap.begin(); iter != m_executorMap.end(); iter++) {
-        output << "Fragment ID: " << iter->first << ", "
-               << "Executor list size: " << iter->second->list.size() << ", "
-               << "Temp table memory in bytes: "
-               << iter->second->limits.getAllocated() << endl;
+    for (iter = m_plans.begin(); iter != m_plans.end(); iter++) {
+        boost::shared_ptr<ExecutorVector> ev = *iter;
 
-        for (executorIter = iter->second->list.begin();
-             executorIter != iter->second->list.end();
+        output << "Fragment ID: " << ev->fragId << ", "
+               << "Executor list size: " << ev->list.size() << ", "
+               << "Temp table memory in bytes: "
+               << ev->limits.getAllocated() << endl;
+
+        for (executorIter = ev->list.begin();
+             executorIter != ev->list.end();
              executorIter++) {
             output << (*executorIter)->getPlanNode()->debug(" ") << endl;
         }
@@ -1373,16 +1319,6 @@ void VoltDBEngine::setCurrentUndoQuantum(voltdb::UndoQuantum* undoQuantum)
 ExecutorContext * VoltDBEngine::getExecutorContext() {
     m_executorContext->setupForPlanFragments(m_currentUndoQuantum);
     return m_executorContext;
-}
-
-int64_t VoltDBEngine::uniqueIdForFragment(catalog::PlanFragment *frag) {
-    int64_t retval = 0;
-    catalog::CatalogType *parent = frag->parent();
-    retval = static_cast<int64_t>(parent->parent()->relativeIndex()) << 32;
-    retval += static_cast<int64_t>(parent->relativeIndex()) << 16;
-    retval += static_cast<int64_t>(frag->relativeIndex());
-
-    return retval;
 }
 
 /**

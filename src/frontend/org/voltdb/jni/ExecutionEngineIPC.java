@@ -29,8 +29,8 @@ import java.util.logging.Logger;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.BackendTarget;
+import org.voltdb.FragmentPlanSource;
 import org.voltdb.ParameterSet;
-import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SysProcSelector;
 import org.voltdb.TableStreamType;
@@ -120,7 +120,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         Hashinate(23),
         GetPoolAllocations(24),
         GetUSOs(25),
-        LoadFragment(26),
         updateHashinator(27);
         Commands(final int id) {
             m_id = id;
@@ -504,8 +503,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final BackendTarget target,
             final int port,
             final HashinatorType type,
-            final byte config[]) {
-        super(siteId, partitionId);
+            final byte config[],
+            FragmentPlanSource planSource) {
+        super(siteId, partitionId, planSource);
 
         // m_counter = 0;
         m_clusterIndex = clusterIndex;
@@ -747,57 +747,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public long loadPlanFragment(byte[] plan) throws EEException
-    {
-        m_data.clear();
-        m_data.putInt(Commands.LoadFragment.m_id);
-        m_data.putInt(plan.length);
-        m_data.put(plan);
-
-        try {
-            m_data.flip();
-            m_connection.write();
-        } catch (final Exception e) {
-            System.out.println("Exception: " + e.getMessage());
-            throw new RuntimeException(e);
-        }
-
-        int result = ExecutionEngine.ERRORCODE_ERROR;
-        long planFragId = 0;
-        long cacheSize = 0;
-        PlannerStatsCollector.CacheUse cacheUse = PlannerStatsCollector.CacheUse.FAIL;
-
-        // Start collecting statistics
-        startStatsCollection();
-
-        try {
-            try {
-                result = m_connection.readStatusByte();
-                planFragId = m_connection.readLong();
-                cacheSize = m_connection.readLong();
-                if (m_connection.readLong() != 0) {
-                    cacheUse = PlannerStatsCollector.CacheUse.HIT1;
-                }
-                else {
-                    cacheUse = PlannerStatsCollector.CacheUse.MISS;
-                }
-            } catch (final IOException e) {
-                System.out.println("Exception: " + e.getMessage());
-                throw new RuntimeException(e);
-            }
-            if (result != ExecutionEngine.ERRORCODE_SUCCESS) {
-                throw new EEException(ExecutionEngine.ERRORCODE_ERROR);
-            }
-        }
-        finally {
-            // Stop collecting statistics.
-            endStatsCollection(cacheSize, cacheUse);
-        }
-        return planFragId;
-    }
-
-    @Override
-    public VoltTable[] executePlanFragments(
+    protected VoltTable[] coreExecutePlanFragments(
             final int numFragmentIds,
             final long[] planFragmentIds,
             final long[] inputDepIds,
@@ -810,26 +760,41 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 numFragmentIds, planFragmentIds, inputDepIds, parameterSets,
                 spHandle, lastCommittedSpHandle, uniqueId, undoToken);
         int result = ExecutionEngine.ERRORCODE_ERROR;
-        try {
-            result = m_connection.readStatusByte();
-        } catch (final IOException e) {
-            System.out.println("Exception: " + e.getMessage());
-            throw new RuntimeException(e);
-        }
-        if (result == ExecutionEngine.ERRORCODE_SUCCESS) {
-            final VoltTable resultTables[] = new VoltTable[numFragmentIds];
-            for (int ii = 0; ii < numFragmentIds; ii++) {
-                resultTables[ii] = PrivateVoltTableFactory.createUninitializedVoltTable();
-            }
+
+        while (true) {
             try {
-                m_connection.readResultTables(resultTables);
+                result = m_connection.readStatusByte();
+
+                if (result == ExecutionEngine.ERRORCODE_NEED_PLAN) {
+                    long fragmentId = m_connection.readLong();
+                    byte[] plan = planForFragmentId(fragmentId);
+                    m_data.clear();
+                    m_data.put(plan);
+                    m_data.flip();
+                    m_connection.write();
+                }
+                else if (result == ExecutionEngine.ERRORCODE_SUCCESS) {
+                    final VoltTable resultTables[] = new VoltTable[numFragmentIds];
+                    for (int ii = 0; ii < numFragmentIds; ii++) {
+                        resultTables[ii] = PrivateVoltTableFactory.createUninitializedVoltTable();
+                    }
+                    try {
+                        m_connection.readResultTables(resultTables);
+                    } catch (final IOException e) {
+                        throw new EEException(
+                                ExecutionEngine.ERRORCODE_WRONG_SERIALIZED_BYTES);
+                    }
+                    return resultTables;
+                }
+                else {
+                    // failure
+                    return null;
+                }
             } catch (final IOException e) {
-                throw new EEException(
-                        ExecutionEngine.ERRORCODE_WRONG_SERIALIZED_BYTES);
+                System.out.println("Exception: " + e.getMessage());
+                throw new RuntimeException(e);
             }
-            return resultTables;
         }
-        return null;
     }
 
     @Override

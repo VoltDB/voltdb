@@ -321,10 +321,6 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
           threadLocalPoolAllocations();
           result = kErrorCode_None;
           break;
-      case 26:
-          loadFragment(cmd);
-          result = kErrorCode_None;
-          break;
       case 27:
           updateHashinator(cmd);
           result = kErrorCode_None;
@@ -596,7 +592,6 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
             }
         }
         pool->purge();
-        m_engine->resizePlanCache(); // shrink cache if need be
     }
     catch (const FatalException &e) {
         crashVoltDB(e);
@@ -626,47 +621,6 @@ void VoltDBIPC::sendException(int8_t errorCode) {
 
     const std::size_t expectedSize = exceptionLength + sizeof(int32_t);
     writeOrDie(m_fd, (const unsigned char*)exceptionData, expectedSize);
-}
-
-/**
- * Ensure a plan fragment is loaded.
- * Return error code, fragmentid for plan, and cache stats
- */
-void VoltDBIPC::loadFragment(struct ipc_command *cmd) {
-    int errors = 0;
-
-    loadfrag *load = (loadfrag*)cmd;
-
-    int32_t planFragLength = ntohl(load->planFragLength);
-
-    int64_t fragId;
-    bool wasHit;
-    int64_t cacheSize;
-
-    try {
-        // execute
-        if (m_engine->loadFragment(load->data, planFragLength, fragId, wasHit, cacheSize)) {
-            ++errors;
-        }
-    } catch (const FatalException &e) {
-        crashVoltDB(e);
-    }
-
-    // make network suitable
-    fragId = htonll(fragId);
-    int64_t wasHitLong = htonll((wasHit ? 1L : 0L));
-    cacheSize = htonll(cacheSize);
-
-    // write the results array back across the wire
-    const int8_t successResult = kErrorCode_Success;
-    if (errors == 0) {
-        writeOrDie(m_fd, (const unsigned char*)&successResult, sizeof(int8_t));
-        writeOrDie(m_fd, (const unsigned char*)&fragId, sizeof(int64_t));
-        writeOrDie(m_fd, (const unsigned char*)&wasHitLong, sizeof(int64_t));
-        writeOrDie(m_fd, (const unsigned char*)&cacheSize, sizeof(int64_t));
-    } else {
-        sendException(kErrorCode_Error);
-    }
 }
 
 int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
@@ -787,6 +741,54 @@ char *VoltDBIPC::retrieveDependency(int32_t dependencyId, size_t *dependencySz) 
         exit(-1);
     }
     return dependencyData;
+}
+
+std::string VoltDBIPC::planForFragmentId(int64_t fragmentId) {
+    char message[sizeof(int8_t) + sizeof(int64_t)];
+
+    message[0] = static_cast<int8_t>(kErrorCode_needPlan);
+    *reinterpret_cast<int64_t*>(&message[1]) = htonll(fragmentId);
+    writeOrDie(m_fd, (unsigned char*)message, sizeof(int8_t) + sizeof(int64_t));
+
+    int32_t length;
+    ssize_t bytes = read(m_fd, &length, sizeof(int32_t));
+    if (bytes != sizeof(int32_t)) {
+        printf("Error - blocking read failed. %jd read %jd attempted",
+               (intmax_t)bytes, (intmax_t)sizeof(int32_t));
+        fflush(stdout);
+        assert(false);
+        exit(-1);
+    }
+    length = ntohl(length) - sizeof(int32_t);
+    assert(length > 0);
+
+    boost::scoped_array<char> planBytes(new char[length + 1]);
+    bytes = 0;
+    while (bytes != length) {
+        ssize_t oldBytes = bytes;
+        bytes += read(m_fd, planBytes.get() + bytes, length - bytes);
+        if (oldBytes == bytes) {
+            break;
+        }
+        if (oldBytes > bytes) {
+            bytes++;
+            break;
+        }
+    }
+
+    if (bytes != length) {
+        printf("Error - blocking read failed. %jd read %jd attempted",
+               (intmax_t)bytes, (intmax_t)length);
+        fflush(stdout);
+        assert(false);
+        exit(-1);
+    }
+
+    // null terminate
+    planBytes[length] = '\0';
+
+    // need to return a string
+    return std::string(planBytes.get());
 }
 
 void VoltDBIPC::crashVoltDB(voltdb::FatalException e) {
@@ -1161,7 +1163,7 @@ int main(int argc, char **argv) {
     /* max message size that can be read from java */
     int max_ipc_message_size = (1024 * 1024 * 2);
 
-    int port = 0;
+    int port = 10000;
 
     // allow called to override port with the first argument
     if (argc == 2) {
