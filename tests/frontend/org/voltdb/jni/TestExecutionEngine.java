@@ -159,7 +159,8 @@ public class TestExecutionEngine extends TestCase {
                                 "",
                                 100,
                                 HashinatorType.LEGACY,
-                                configBytes));
+                                configBytes,
+                                null));
             }
         };
         destEEThread.start();
@@ -291,7 +292,8 @@ public class TestExecutionEngine extends TestCase {
                             "",
                             100,
                             HashinatorType.LEGACY,
-                            configBytes);
+                            configBytes,
+                            null);
                 destinationReference.set(destinationEngine);
                 destinationEngine.loadCatalog( 0, serializedCatalog);
                 RecoverySiteProcessorDestination destinationProcess =
@@ -331,7 +333,8 @@ public class TestExecutionEngine extends TestCase {
                                 "",
                                 100,
                                 HashinatorType.LEGACY,
-                                configBytes);
+                                configBytes,
+                                null);
                 sourceReference.set(sourceEngine);
                 sourceEngine.loadCatalog( 0, serializedCatalog);
 
@@ -422,7 +425,8 @@ public class TestExecutionEngine extends TestCase {
                         "",
                         100,
                         HashinatorType.LEGACY,
-                        LegacyHashinator.getConfigureBytes(1));
+                        LegacyHashinator.getConfigureBytes(1),
+                        null);
         m_project = new TPCCProjectBuilder();
         m_catalog = m_project.createTPCCSchemaCatalog();
     }

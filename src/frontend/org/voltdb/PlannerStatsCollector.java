@@ -159,6 +159,16 @@ public class PlannerStatsCollector extends StatsSource {
     }
 
     /**
+     * Used to update EE cache stats without changing tracked time
+     */
+    public void updateEECacheStats(long eeCacheSize, long hits, long misses, int partitionId) {
+        m_cache1Level = eeCacheSize;
+        m_cache1Hits += hits;
+        m_cacheMisses += misses;
+        m_partitionId = partitionId;
+    }
+
+    /**
      * Called before doing planning. Starts timer.
      */
     public void startStatsCollection() {

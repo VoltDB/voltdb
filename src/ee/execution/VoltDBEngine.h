@@ -52,8 +52,12 @@
 #include <vector>
 #include <cassert>
 
-#include <boost/shared_ptr.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
+#include "boost/shared_ptr.hpp"
+#include <boost/multi_index_container.hpp>
+#include <boost/multi_index/hashed_index.hpp>
+#include <boost/multi_index/member.hpp>
+#include <boost/multi_index/mem_fun.hpp>
 #include "catalog/database.h"
 #include "common/ids.h"
 #include "common/serializeio.h"
@@ -106,6 +110,7 @@ class ExecutorContext;
 class RecoveryProtoMsg;
 
 const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
+const size_t PLAN_CACHE_SIZE = 1024 * 10;
 
 /**
  * Represents an Execution Engine which holds catalog objects (i.e. table) and executes
@@ -160,12 +165,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int executeQuery(int64_t planfragmentId, int32_t outputDependencyId, int32_t inputDependencyId,
                          const NValueArray &params, int64_t spHandle, int64_t lastCommittedSpHandle, int64_t uniqueId, bool first, bool last);
 
-        // ensure a plan fragment is loaded, given a graph
-        // return the fragid and cache statistics
-        int loadFragment(const char *plan, int32_t length, int64_t &fragId, bool &wasHit, int64_t &cacheSize);
-        // purge cached plans over the specified cache size
-        void resizePlanCache();
-
         inline int getUsedParamcnt() const { return m_usedParamcnt;}
         inline void setUsedParamcnt(int usedParamcnt) { m_usedParamcnt = usedParamcnt;}
 
@@ -187,7 +186,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         bool updateCatalog(const int64_t timestamp, const std::string &catalogPayload);
         bool processCatalogAdditions(bool addAll, int64_t timestamp);
         bool processCatalogDeletes(int64_t timestamp);
-        bool rebuildPlanFragmentCollections();
         bool rebuildTableCollections();
 
 
@@ -342,12 +340,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         inline Topend* getTopend() { return m_topend; }
 
         /**
-         * Get a unique id for a plan fragment by munging the indices of it's parents
-         * and grandparents in the catalog.
-         */
-        static int64_t uniqueIdForFragment(catalog::PlanFragment *frag);
-
-        /**
          * Activate a table stream of the specified type for the specified table.
          * Returns true on success and false on failure
          */
@@ -435,18 +427,45 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * Keep a list of executors for runtime - intentionally near the top of VoltDBEngine
          */
         struct ExecutorVector {
-            ExecutorVector(int64_t logThreshold,
+            ExecutorVector(int64_t fragmentId,
+                           int64_t logThreshold,
                            int64_t memoryLimit,
-                           PlanNodeFragment *fragment) : planFragment(fragment)
+                           PlanNodeFragment *fragment) : fragId(fragmentId), planFragment(fragment)
             {
                 limits.setLogThreshold(logThreshold);
                 limits.setMemoryLimit(memoryLimit);
             }
+
+            int64_t getFragId() const { return fragId; }
+
+            const int64_t fragId;
             boost::shared_ptr<PlanNodeFragment> planFragment;
             std::vector<AbstractExecutor*> list;
             TempTableLimits limits;
         };
-        std::map<int64_t, boost::shared_ptr<ExecutorVector> > m_executorMap;
+
+        /**
+         * The set of plan bytes is explicitly maintained in MRU-first order,
+         * while also indexed by the plans' bytes. Here lie boost-related dragons.
+         */
+        typedef boost::multi_index::multi_index_container<
+            boost::shared_ptr<ExecutorVector>,
+            boost::multi_index::indexed_by<
+                boost::multi_index::sequenced<>,
+                boost::multi_index::hashed_unique<
+                    boost::multi_index::const_mem_fun<ExecutorVector,int64_t,&ExecutorVector::getFragId>
+                >
+            >
+        > PlanSet;
+        PlanSet m_plans;
+
+        /**
+         * Get a vector of executors for a given fragment id.
+         * Get the vector from the cache if the fragment id is there.
+         * If not, get a plan from the Java topend and load it up,
+         * putting it in the cache and possibly bumping something else.
+         */
+        ExecutorVector *getExecutorVectorForFragmentId(const int64_t fragId);
 
         voltdb::UndoLog m_undoLog;
         voltdb::UndoQuantum *m_currentUndoQuantum;
@@ -570,8 +589,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         ExecutorContext *m_executorContext;
 
         DefaultTupleSerializer m_tupleSerializer;
-
-        FragmentManager m_fragmentManager;
 
     private:
         ThreadLocalPool m_tlPool;

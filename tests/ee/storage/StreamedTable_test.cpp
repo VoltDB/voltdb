@@ -77,6 +77,10 @@ class MockTopend : public Topend {
         return 0;
     }
 
+    virtual std::string planForFragmentId(int64_t fragmentId) {
+        return "";
+    }
+
     virtual void crashVoltDB(FatalException e) {
 
     }

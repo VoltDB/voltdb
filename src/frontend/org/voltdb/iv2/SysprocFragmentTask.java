@@ -24,20 +24,20 @@ import java.util.Map;
 
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
-
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.SiteProcedureConnection;
-
-import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.rejoin.TaskLog;
+import org.voltdb.sysprocs.SysProcFragmentId;
+import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
 public class SysprocFragmentTask extends TransactionTask
@@ -80,7 +80,7 @@ public class SysprocFragmentTask extends TransactionTask
         // allow truncation snapshots necessary to make the node officially rejoined
         // to take place.
         if (m_fragmentMsg.isSysProcTask() &&
-            SysProcFragmentId.isSnapshotSaveFragment(m_fragmentMsg.getFragmentId(0)) &&
+            SysProcFragmentId.isSnapshotSaveFragment(m_fragmentMsg.getPlanHash(0)) &&
             VoltDB.instance().rejoinDataPending()) {
             final FragmentResponseMessage response =
                 new FragmentResponseMessage(m_fragmentMsg, m_initiator.getHSId());
@@ -136,9 +136,9 @@ public class SysprocFragmentTask extends TransactionTask
 
         for (int frag = 0; frag < m_fragmentMsg.getFragmentCount(); frag++)
         {
-            final long fragmentId = m_fragmentMsg.getFragmentId(frag);
+            final long fragmentId = VoltSystemProcedure.hashToFragId(m_fragmentMsg.getPlanHash(frag));
             // equivalent to dep.depId:
-            // final int outputDepId = m_task.getOutputDepId(frag);
+            // final int outputDepId = m_fragmentMsg.getOutputDepId(frag);
 
             ParameterSet params = m_fragmentMsg.getParameterSetForFragment(frag);
 
@@ -156,12 +156,12 @@ public class SysprocFragmentTask extends TransactionTask
                 }
             } catch (final EEException e) {
                 hostLog.l7dlog(Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(),
-                        new Object[] { fragmentId }, e);
+                        new Object[] { Encoder.hexEncode(m_fragmentMsg.getFragmentPlan(frag)) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 break;
             } catch (final SQLException e) {
                 hostLog.l7dlog(Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(),
-                        new Object[] { fragmentId }, e);
+                        new Object[] { Encoder.hexEncode(m_fragmentMsg.getFragmentPlan(frag)) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 break;
             }

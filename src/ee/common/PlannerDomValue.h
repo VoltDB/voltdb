@@ -24,6 +24,8 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <climits>
+#include <inttypes.h>
 
 namespace voltdb {
 
@@ -41,11 +43,18 @@ namespace voltdb {
     public:
 
         int32_t asInt() const {
-            if (m_value.IsNull() || (m_value.IsInt() == false)) {
+            if (m_value.IsNull()) {
                 throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                              "PlannerDomValue: int value is null or not an integer");
+                                              "PlannerDomValue: int value is null");
             }
-            return m_value.GetInt();
+            else if (m_value.IsInt()) {
+                return m_value.GetInt();
+            }
+            else if (m_value.IsString()) {
+                return (int32_t) strtoimax(m_value.GetString(), NULL, 10);
+            }
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                          "PlannerDomValue: int value is not an integer");
         }
 
         int64_t asInt64() const {
@@ -58,6 +67,9 @@ namespace voltdb {
             }
             else if (m_value.IsInt()) {
                 return m_value.GetInt();
+            }
+            else if (m_value.IsString()) {
+                return (int64_t) strtoimax(m_value.GetString(), NULL, 10);
             }
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                           "PlannerDomValue: int64 value is non-integral");
@@ -76,6 +88,9 @@ namespace voltdb {
             }
             else if (m_value.IsInt64()) {
                 return (double) m_value.GetInt64();
+            }
+            else if (m_value.IsString()) {
+                return std::strtod(m_value.GetString(), NULL);
             }
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                           "PlannerDomValue: double value is not a number");
