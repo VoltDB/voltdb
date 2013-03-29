@@ -127,7 +127,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
 
     private String makeSnapshotRequest(Map<Long, Long> sourceToDests)
     {
-        return makeSnapshotRequest(sourceToDests, null);
+        return makeSnapshotRequest(sourceToDests, null, null);
     }
 
     @Override

@@ -73,7 +73,7 @@ public abstract class JoinCoordinator extends LocalMailbox {
                     return;
                 }
             } else {
-                VoltDB.crashLocalVoltDB("Snapshot request for rejoin failed",
+                VoltDB.crashLocalVoltDB("Snapshot request for rejoin failed: " + results[0].toJSONString(),
                         false, null);
             }
         }
@@ -126,7 +126,8 @@ public abstract class JoinCoordinator extends LocalMailbox {
     }
 
     protected String makeSnapshotRequest(Map<Long, Long> sourceToDests,
-                                         Collection<Integer> tableIds)
+                                         Collection<Integer> tableIds,
+                                         Map<String, JSONObject> postSnapshotTasks)
     {
         try {
             JSONStringer jsStringer = new JSONStringer();
@@ -147,6 +148,15 @@ public abstract class JoinCoordinator extends LocalMailbox {
                 }
             }
             jsStringer.endArray();
+
+            if (postSnapshotTasks != null) {
+                jsStringer.key("postSnapshotTasks");
+                jsStringer.object();
+                for (Map.Entry<String, JSONObject> e : postSnapshotTasks.entrySet()) {
+                    jsStringer.key(e.getKey()).value(e.getValue());
+                }
+                jsStringer.endObject();
+            }
 
             jsStringer.endObject();
             return jsStringer.toString();
