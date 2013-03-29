@@ -160,4 +160,9 @@ public interface SiteProcedureConnection {
     // Snapshot services provided by the site
     public Future<?> doSnapshotWork(boolean ignoreQuietPeriod);
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds);
+
+    /**
+     * Update the EE hashinator with the given configuration.
+     */
+    public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config);
 }

@@ -2959,4 +2959,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds) {
         //A noop pre-IV2
     }
+
+    @Override
+    public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config)
+    {
+        // A noop pre-IV2
+    }
 }
