@@ -445,7 +445,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         };
 
         /**
-         * The set of plan bytes is explicitly maintained in MRU-first order, 
+         * The set of plan bytes is explicitly maintained in MRU-first order,
          * while also indexed by the plans' bytes. Here lie boost-related dragons.
          */
         typedef boost::multi_index::multi_index_container<

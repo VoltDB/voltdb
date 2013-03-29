@@ -1054,26 +1054,32 @@ public class ProcedureRunner {
                m_localFragsAreNonTransactional = false;
            }
 
-           int outputDepId = -1;
-           // two fragments
-           if (stmt.collector != null) {
-               outputDepId = m_txnState.getNextDependencyId() | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-           }
-           m_depsForLocalTask[index] = outputDepId;
-           if (stmt.inCatalog) {
+           // single aggregator fragment
+           if (stmt.collector == null) {
+               m_depsForLocalTask[index] = -1;
                // Add the local fragment data.
-               m_localTask.addFragment(stmt.aggregator.planHash, m_depsToResume[index], params);
-               // Add distributed fragment.
-               if (stmt.collector != null) {
-                   m_distributedTask.addFragment(stmt.collector.planHash, outputDepId, params);
+               if (stmt.inCatalog) {
+                   m_localTask.addFragment(stmt.aggregator.planHash, m_depsToResume[index], params);
+               }
+               else {
+                   byte[] planBytes = site.planForFragmentId(stmt.aggregator.id);
+                   m_localTask.addCustomFragment(stmt.aggregator.planHash, m_depsToResume[index], params, planBytes);
                }
            }
+           // two fragments
            else {
-               // Add the local fragment data.
-               byte[] planBytes = site.planForFragmentId(stmt.aggregator.id);
-               m_localTask.addCustomFragment(stmt.aggregator.planHash, m_depsToResume[index], params, planBytes);
-               // Add distributed fragment.
-               if (stmt.collector != null) {
+               int outputDepId =
+                       m_txnState.getNextDependencyId() | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+               m_depsForLocalTask[index] = outputDepId;
+               // Add local and distributed fragments.
+               if (stmt.inCatalog) {
+                   m_localTask.addFragment(stmt.aggregator.planHash, m_depsToResume[index], params);
+                   m_distributedTask.addFragment(stmt.collector.planHash, outputDepId, params);
+               }
+               else {
+                   byte[] planBytes = site.planForFragmentId(stmt.aggregator.id);
+                   m_localTask.addCustomFragment(stmt.aggregator.planHash, m_depsToResume[index], params, planBytes);
+                   planBytes = site.planForFragmentId(stmt.collector.id);
                    m_distributedTask.addCustomFragment(stmt.collector.planHash, outputDepId, params, planBytes);
                }
            }
