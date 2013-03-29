@@ -87,10 +87,6 @@
 #define MAX_BATCH_COUNT 1000
 #define MAX_PARAM_COUNT 1000 // or whatever
 
-namespace boost {
-template <typename T> class shared_ptr;
-}
-
 namespace catalog {
 class Catalog;
 class PlanFragment;
