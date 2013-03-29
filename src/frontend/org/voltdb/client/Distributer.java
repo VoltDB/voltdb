@@ -55,6 +55,7 @@ import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
+import org.voltdb.iv2.MpInitiator;
 
 /**
  *   De/multiplexes transactions across a cluster
@@ -85,9 +86,11 @@ class Distributer {
     private final boolean m_useClientAffinity;
 
     private static final class Procedure {
+        private final boolean multiPart;
         private final boolean readOnly;
         private final int partitionParameter;
-        private Procedure(boolean readOnly, int partitionParameter) {
+        private Procedure(boolean multiPart,boolean readOnly, int partitionParameter) {
+            this.multiPart = multiPart;
             this.readOnly = readOnly;
             this.partitionParameter = partitionParameter;
         }
@@ -686,11 +689,14 @@ class Distributer {
              */
             if (m_useClientAffinity && m_hashinatorInitialized) {
                 final Procedure procedureInfo = m_procedureInfo.get(invocation.getProcName());
-                if (procedureInfo != null) {
-                    Integer hashedPartition = invocation.getHashinatedParam(procedureInfo.partitionParameter);
 
+                if (procedureInfo != null) {
+                    Integer hashedPartition = MpInitiator.MP_INIT_PID;
+                    if (!procedureInfo.multiPart) {
+                        hashedPartition = invocation.getHashinatedParam(procedureInfo.partitionParameter);
+                    }
                     /*
-                     * If the procedure is read only, load balance across replicas
+                     * If the procedure is read only (never the case for MPI), load balance across replicas
                      */
                     if (procedureInfo.readOnly) {
                         NodeConnection partitionReplicas[] = m_partitionReplicas.get(hashedPartition);
@@ -925,13 +931,16 @@ class Distributer {
             try {
                 //Data embedded in JSON object in remarks column
                 String jsString = vt.getString(6);
+                String procedureName = vt.getString(2);
                 JSONObject jsObj = new JSONObject(jsString);
                 if (jsObj.getBoolean(JdbcDatabaseMetaDataGenerator.JSON_SINGLE_PARTITION)) {
                     int partitionParameter = jsObj.getInt(JdbcDatabaseMetaDataGenerator.JSON_PARTITION_PARAMETER);
                     boolean readOnly = jsObj.getBoolean(JdbcDatabaseMetaDataGenerator.JSON_READ_ONLY);
-                    String procedureName = vt.getString(2);
-                    m_procedureInfo.put(procedureName, new Procedure(readOnly, partitionParameter));
+                    m_procedureInfo.put(procedureName, new Procedure(false,readOnly, partitionParameter));
+                } else {
+                    m_procedureInfo.put(procedureName, new Procedure(true, false, MpInitiator.MP_INIT_PID));
                 }
+
             } catch (JSONException e) {
                 e.printStackTrace();
             }
