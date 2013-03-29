@@ -652,7 +652,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         }
 
         // do other periodic work
-        m_snapshotter.doSnapshotWork(ee, false);
+        m_snapshotter.doSnapshotWork(getCorrespondingPartitionId(), ee, false);
 
         /*
          * grab the table statistics from ee and put it into the statistics
@@ -1089,7 +1089,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                     if (message == null) {
                         //Will return null if there is no work, safe to block on the mailbox if there is no work
                         boolean hadWork =
-                            (m_snapshotter.doSnapshotWork(
+                            (m_snapshotter.doSnapshotWork(getCorrespondingPartitionId(),
                                     ee,
                                     EstTime.currentTimeMillis() - lastCommittedTxnTime > 5) != null);
 
@@ -1118,7 +1118,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                         handleMailboxMessage(message);
                     } else {
                         //idle, do snapshot work
-                        m_snapshotter.doSnapshotWork(ee, EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
+                        m_snapshotter.doSnapshotWork(getCorrespondingPartitionId(), ee, EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
                         // do some rejoin work
                         doRejoinWork();
                     }
@@ -1779,14 +1779,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                 exportm.m_m.getPartitionId(),
                                 exportm.m_m.getSignature());
         } else if (message instanceof PotentialSnapshotWorkMessage) {
-            m_snapshotter.doSnapshotWork(ee, false);
+            m_snapshotter.doSnapshotWork(getCorrespondingPartitionId(), ee, false);
         }
         else if (message instanceof ExecutionSiteLocalSnapshotMessage) {
             hostLog.info("Executing local snapshot. Completing any on-going snapshots.");
 
             // first finish any on-going snapshot
             try {
-                HashSet<Exception> completeSnapshotWork = m_snapshotter.completeSnapshotWork(ee);
+                HashSet<Exception> completeSnapshotWork = m_snapshotter.completeSnapshotWork(getCorrespondingPartitionId(), ee);
                 if (completeSnapshotWork != null && !completeSnapshotWork.isEmpty()) {
                     for (Exception e : completeSnapshotWork) {
                         hostLog.error("Error completing in progress snapshot.", e);
@@ -2414,7 +2414,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
      */
     @Override
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException {
-        return m_snapshotter.completeSnapshotWork(ee);
+        return m_snapshotter.completeSnapshotWork(getCorrespondingPartitionId(), ee);
     }
 
 
@@ -2570,7 +2570,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                     handleMailboxMessage(message);
                 } else {
                     //idle, do snapshot work
-                    m_snapshotter.doSnapshotWork(ee, EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
+                    m_snapshotter.doSnapshotWork(getCorrespondingPartitionId(), ee, EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
                 }
 
                 /**

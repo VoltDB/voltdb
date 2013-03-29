@@ -640,7 +640,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      */
     @Override
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException {
-        return m_snapshotter.completeSnapshotWork(m_ee);
+        return m_snapshotter.completeSnapshotWork(m_partitionId, m_ee);
     }
 
     //
@@ -883,7 +883,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public Future<?> doSnapshotWork(boolean ignoreQuietPeriod)
     {
-        return m_snapshotter.doSnapshotWork(m_ee, ignoreQuietPeriod);
+        return m_snapshotter.doSnapshotWork(m_partitionId, m_ee, ignoreQuietPeriod);
     }
 
     @Override
@@ -985,7 +985,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             hostLog.info(String.format("Site %d performing schema change operation must block until snapshot is locally complete.",
                     CoreUtils.getSiteIdFromHSId(m_siteId)));
             try {
-                m_snapshotter.completeSnapshotWork(m_ee);
+                m_snapshotter.completeSnapshotWork(m_partitionId, m_ee);
                 hostLog.info(String.format("Site %d locally finished snapshot. Will update catalog now.",
                         CoreUtils.getSiteIdFromHSId(m_siteId)));
             }

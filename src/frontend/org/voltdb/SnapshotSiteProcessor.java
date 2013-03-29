@@ -127,6 +127,13 @@ public class SnapshotSiteProcessor {
     public static final ConcurrentLinkedQueue<Runnable> m_tasksOnSnapshotCompletion =
         new ConcurrentLinkedQueue<Runnable>();
 
+    /*
+     * Random tasks performed on each site after the snapshot tasks are finished but
+     * before the snapshot transaction is finished.
+     */
+    public static final Map<Integer, SiteTasker> m_siteTasksPostSnapshotting =
+            Collections.synchronizedMap(new HashMap<Integer, SiteTasker>());
+
 
     /** Number of snapshot buffers to keep */
     static final int m_numSnapshotBuffers = 5;
@@ -433,7 +440,7 @@ public class SnapshotSiteProcessor {
             m_quietUntil = System.currentTimeMillis() + (5 * m_snapshotPriority) + ((long)(m_random.nextDouble() * 15));
         }
     }
-    public Future<?> doSnapshotWork(ExecutionEngine ee, boolean ignoreQuietPeriod) {
+    public Future<?> doSnapshotWork(int partitionId, ExecutionEngine ee, boolean ignoreQuietPeriod) {
         ListenableFuture<?> retval = null;
 
         /*
@@ -548,6 +555,12 @@ public class SnapshotSiteProcessor {
          */
         if (m_snapshotTableTasks.isEmpty()) {
             SNAP_LOG.debug("Finished with tasks");
+            // Offer the post-snapshot task if there is one to the site tasker queue
+            SiteTasker postSnapshotTask = m_siteTasksPostSnapshotting.remove(partitionId);
+            if (postSnapshotTask != null) {
+                m_siteTaskerQueue.offer(postSnapshotTask);
+            }
+
             final ArrayList<SnapshotDataTarget> snapshotTargets = m_snapshotTargets;
             m_snapshotTargets = null;
             m_snapshotTableTasks = null;
@@ -789,10 +802,10 @@ public class SnapshotSiteProcessor {
      * Do snapshot work exclusively until there is no more. Also blocks
      * until the fsync() and close() of snapshot data targets has completed.
      */
-    public HashSet<Exception> completeSnapshotWork(ExecutionEngine ee) throws InterruptedException {
+    public HashSet<Exception> completeSnapshotWork(int partitionId, ExecutionEngine ee) throws InterruptedException {
         HashSet<Exception> retval = new HashSet<Exception>();
         while (m_snapshotTableTasks != null) {
-            Future<?> result = doSnapshotWork(ee, true);
+            Future<?> result = doSnapshotWork(partitionId, ee, true);
             if (result != null) {
                 try {
                     result.get();
