@@ -815,12 +815,12 @@ public class SnapshotRestore extends VoltSystemProcedure
                     FragmentTaskMessage ftm = (FragmentTaskMessage)vm;
                     TRACE_LOG.trace(
                             CoreUtils.hsIdToString(context.getSiteId()) + " received fragment id " +
-                    ftm.getFragmentId(0));
+                    VoltSystemProcedure.hashToFragId(ftm.getPlanHash(0)));
                     DependencyPair dp =
-                            m_runner.executePlanFragment(
+                            m_runner.executeSysProcPlanFragment(
                                     m_runner.getTxnState(),
                                     null,
-                                    ftm.getFragmentId(0),
+                                    VoltSystemProcedure.hashToFragId(ftm.getPlanHash(0)),
                                     ftm.getParameterSetForFragment(0));
                     FragmentResponseMessage frm = new FragmentResponseMessage(ftm, m.getHSId());
                     frm.addDependency(dp.depId, dp.dependency);

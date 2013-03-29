@@ -174,6 +174,7 @@ begin PlanFragment               "Instructions to the executor to execute part o
   bool multipartition            "Should this plan fragment be sent to all partitions"
   string plannodetree            "A serialized representation of the plan-graph/plan-pipeline"
   bool nontransactional          "True if this fragment doesn't read from or write to any persistent tables"
+  string planhash                "SHA-1 Hash of the plan assumed to be unique"
 end
 
 begin Index          "A index structure on a database table's columns"
