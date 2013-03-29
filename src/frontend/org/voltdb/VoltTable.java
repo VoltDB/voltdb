@@ -1198,7 +1198,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                     valueStr = value.toString();
                 }
                 // truncate long values
-                if (valueStr.length() > MAX_PRINTABLE_CHARS) {
+                if ((this.getColumnType(i) == VoltType.VARBINARY) && (valueStr.length() > MAX_PRINTABLE_CHARS)) {
                     valueStr = valueStr.substring(0, MAX_PRINTABLE_CHARS - ELIPSIS.length()) + ELIPSIS;
                 }
                 sb.append(String.format(fmt[i], valueStr));

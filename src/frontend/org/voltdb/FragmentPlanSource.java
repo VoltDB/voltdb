@@ -14,9 +14,14 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.voltcore.zk;
 
-public abstract class LeaderNoticeHandler {
-    public abstract void becomeLeader();
-    public void noticedTopologyChange() {}
+package org.voltdb;
+
+/**
+ * Interface for objects that, given an Id, can return a plan. A plan in this
+ * case is the raw bytes representing a UTF-8 JSON plan. This is mainly for
+ * {@link org.voltdb.iv2.Site}, but can also be used for test code.
+ */
+public interface FragmentPlanSource {
+    public byte[] planForFragmentId(long fragmentId);
 }

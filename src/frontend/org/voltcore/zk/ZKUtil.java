@@ -23,8 +23,6 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -267,22 +265,6 @@ public class ZKUtil {
             Throwables.propagate(t);
         }
         return lastCallback;
-    }
-    /**
-     * Sorts the sequential nodes based on their sequence numbers.
-     * @param nodes
-     */
-    public static void sortSequentialNodes(List<String> nodes) {
-        Collections.sort(nodes, new Comparator<String>() {
-            @Override
-            public int compare(String o1, String o2) {
-                int len1 = o1.length();
-                int len2 = o2.length();
-                int seq1 = Integer.parseInt(o1.substring(len1 - 10, len1));
-                int seq2 = Integer.parseInt(o2.substring(len2 - 10, len2));
-                return Integer.signum(seq1 - seq2);
-            }
-        });
     }
 
     public static class StatCallback implements org.apache.zookeeper_voltpatches.AsyncCallback.StatCallback {
