@@ -88,6 +88,9 @@ class TableLoader {
     }
 
     void load(long startPkey, long stopPkey, long jump) {
+        assert(outstandingPkeys.isEmpty());
+        assert(!hadError.get());
+
         if (startPkey >= stopPkey) return;
 
         long lastSuccessfullyLoadedKey = -1;
@@ -105,6 +108,9 @@ class TableLoader {
     }
 
     void delete(long startPkey, long stopPkey, long jump) {
+        assert(outstandingPkeys.isEmpty());
+        assert(!hadError.get());
+
         if (startPkey > stopPkey) return;
         do {
             startPkey = deleteChunk(startPkey, stopPkey, jump) + jump;
@@ -122,12 +128,10 @@ class TableLoader {
 
         long maxSentPkey = -1;
         while ((nextPkey <= stopPkey) && (!hadError.get())) {
-            Object[] row = TableHelper.randomRow(table, Integer.MAX_VALUE, rand);
-            row[pkeyColIndex] = nextPkey;
             try {
                 outstandingPkeys.add(nextPkey);
                 maxSentPkey = nextPkey;
-                client.callProcedure(new Callback(nextPkey), deleteCRUD, row);
+                client.callProcedure(new Callback(nextPkey), deleteCRUD, nextPkey);
             }
             catch (Exception e) {
                 break;
@@ -143,7 +147,7 @@ class TableLoader {
         }
         catch (NoSuchElementException e) {
             // we inserted all rows
-            assert(maxSentPkey == stopPkey);
+            assert((maxSentPkey + jump) > stopPkey);
             return stopPkey;
         }
         assert(minOutstandingPkey >= 0);
@@ -186,7 +190,7 @@ class TableLoader {
         }
         catch (NoSuchElementException e) {
             // we inserted all rows
-            assert(maxSentPkey == stopPkey);
+            assert((maxSentPkey + jump) > stopPkey);
             return stopPkey;
         }
         assert(minOutstandingPkey >= 0);

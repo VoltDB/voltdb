@@ -66,13 +66,13 @@ public class SchemaChangeClient {
      */
     static class SchemaChangeConfig extends CLIConfig {
         @Option(desc = "Maximum number of rows to load (times sites for replicated tables).")
-        long targetrowcount = Long.MAX_VALUE;
+        long targetrowcount = 100000;
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
 
         @Option(desc = "Run Time.")
-        int duration = 30 * 60;
+        int duration = 300 * 60;
 
         @Option(desc = "Time (secs) to end run if no progress is being made.")
         int noProgressTimeout = 600;
@@ -364,12 +364,15 @@ public class SchemaChangeClient {
             realRowCount /= topo.partitions;
         }
 
-        System.out.printf(_F("loading table\n"));
         long max = maxId(t);
 
         TableLoader loader = new TableLoader(this, t, rand);
+
+        System.out.printf(_F("loading table\n"));
         loader.load(max + 1, realRowCount, 1);
+        System.out.printf(_F("deleting from table\n"));
         loader.delete(1, realRowCount, n);
+        System.out.printf(_F("reloading table\n"));
         loader.load(1, realRowCount, n);
     }
 
