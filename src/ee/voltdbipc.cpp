@@ -131,7 +131,6 @@ typedef struct {
     struct ipc_command cmd;
     voltdb::CatalogId tableId;
     voltdb::TableStreamType streamType;
-    char data[0];
 }__attribute__((packed)) activate_tablestream;
 
 /*
@@ -141,8 +140,7 @@ typedef struct {
     struct ipc_command cmd;
     voltdb::CatalogId tableId;
     voltdb::TableStreamType streamType;
-    int bufferCount;
-    char data[0];
+    int bufferSize;
 }__attribute__((packed)) tablestream_serialize_more;
 
 /*
@@ -238,8 +236,6 @@ VoltDBIPC::VoltDBIPC(int fd) : m_fd(fd) {
     m_engine = NULL;
     m_counter = 0;
     m_reusedResultBuffer = NULL;
-    m_tupleBuffer = NULL;
-    m_tupleBufferSize = 0;
     m_terminate = false;
 
     setupSigHandler();
@@ -248,7 +244,6 @@ VoltDBIPC::VoltDBIPC(int fd) : m_fd(fd) {
 VoltDBIPC::~VoltDBIPC() {
     delete m_engine;
     delete [] m_reusedResultBuffer;
-    delete [] m_tupleBuffer;
     delete [] m_exceptionBuffer;
 }
 
@@ -440,10 +435,6 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         m_reusedResultBuffer = new char[MAX_MSG_SZ];
         m_exceptionBuffer = new char[MAX_MSG_SZ];
         m_engine->setBuffers( NULL, 0, m_reusedResultBuffer, MAX_MSG_SZ, m_exceptionBuffer, MAX_MSG_SZ);
-        // The tuple buffer gets expanded (doubled) as needed, but never compacted.
-        m_tupleBufferSize = MAX_MSG_SZ;
-        m_tupleBuffer = new char[m_tupleBufferSize];
-
         if (m_engine->initialize(cs->clusterId,
                                  cs->siteId,
                                  cs->partitionId,
@@ -909,19 +900,13 @@ int8_t VoltDBIPC::activateTableStream(struct ipc_command *cmd) {
     const voltdb::CatalogId tableId = ntohl(activateTableStreamCommand->tableId);
     const voltdb::TableStreamType streamType =
             static_cast<voltdb::TableStreamType>(ntohl(activateTableStreamCommand->streamType));
-
-    // Provide access to the serialized message data, i.e. the predicates.
-    void* offset = activateTableStreamCommand->data;
-    int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(activate_tablestream));
-    ReferenceSerializeInput serialize_in(offset, sz);
-
     try {
-        if (m_engine->activateTableStream(tableId, streamType, serialize_in)) {
+        if (m_engine->activateTableStream(tableId, streamType)) {
             return kErrorCode_Success;
         } else {
             return kErrorCode_Error;
         }
-    } catch (const FatalException &e) {
+    } catch (FatalException e) {
         crashVoltDB(e);
     }
     return kErrorCode_Error;
@@ -932,90 +917,32 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
     const voltdb::CatalogId tableId = ntohl(tableStreamSerializeMore->tableId);
     const voltdb::TableStreamType streamType =
             static_cast<voltdb::TableStreamType>(ntohl(tableStreamSerializeMore->streamType));
-    // Need to adapt the simpler incoming data describing buffers to conform to
-    // what VoltDBEngine::tableStreamSerializeMore() needs. The incoming data
-    // is an array of buffer lengths. The outgoing data must be an array of
-    // ptr/offset/length triplets referencing segments of m_tupleBuffer, which
-    // is reallocated as needed.
-    const int bufferCount = ntohl(tableStreamSerializeMore->bufferCount);
+    const int bufferLength = ntohl(tableStreamSerializeMore->bufferSize);
+    assert(bufferLength < MAX_MSG_SZ - 5);
+
+    if (bufferLength >= MAX_MSG_SZ - 5) {
+        char msg[3];
+        msg[0] = kErrorCode_Error;
+        *reinterpret_cast<int16_t*>(&msg[1]) = 0;//exception length 0
+        writeOrDie(m_fd, (unsigned char*)msg, sizeof(int8_t) + sizeof(int16_t));
+    }
+
     try {
+        ReferenceSerializeOutput out(m_reusedResultBuffer + 5, bufferLength);
+        int serialized = m_engine->tableStreamSerializeMore( &out, tableId, streamType);
+        m_reusedResultBuffer[0] = kErrorCode_Success;
+        *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[1]) = htonl(serialized);
 
-        if (bufferCount <= 0) {
-            throwFatalException("Bad buffer count in tableStreamSerializeMore: %d", bufferCount);
+        /*
+         * Already put the -1 code into the message.
+         * Set it 0 so toWrite has the correct number of bytes
+         */
+        if (serialized == -1) {
+            serialized = 0;
         }
-
-        // Need two passes, one to determine size, the other to populate buffer
-        // data. Can't do this until the base buffer is properly allocated.
-        // Note that m_reusedResultBuffer is used for input data and
-        // m_tupleBuffer is used for output data.
-
-        void *inptr = tableStreamSerializeMore->data;
-        int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(tablestream_serialize_more));
-        ReferenceSerializeInput in1(inptr, sz);
-
-        // Pass 1 - calculate size and allow for status code byte and count length integers.
-        size_t outputSize = 1;
-        for (size_t i = 0; i < bufferCount; i++) {
-            outputSize += in1.readInt() + 4;
-        }
-
-        // Reallocate buffer as needed.
-        // Avoid excessive thrashing by over-allocating in powers of 2.
-        if (outputSize > m_tupleBufferSize) {
-            while (outputSize > m_tupleBufferSize) {
-                m_tupleBufferSize *= 2;
-            }
-            delete [] m_tupleBuffer;
-            m_tupleBuffer = new char[m_tupleBufferSize];
-        }
-
-        // Pass 2 - rescan input stream and generate final buffer data.
-        ReferenceSerializeInput in2(inptr, sz);
-        // 1 byte status and 4 byte count
-        int offset = 5;
-        ReferenceSerializeOutput out1(m_reusedResultBuffer, MAX_MSG_SZ);
-        out1.writeInt(bufferCount);
-        for (size_t i = 0; i < bufferCount; i++) {
-            int length = in2.readInt();
-            out1.writeLong((long)m_tupleBuffer);
-            // Allow for the length int written later.
-            offset += 4;
-            out1.writeInt(offset);
-            out1.writeInt(length);
-            offset += length;
-        }
-
-        // Perform table stream serialization.
-        ReferenceSerializeInput out2(m_reusedResultBuffer, MAX_MSG_SZ);
-        std::vector<int> positions;
-        int64_t remaining = m_engine->tableStreamSerializeMore(tableId, streamType, out2, positions);
-
-        // Finalize the tuple buffer by adding the status code, buffer count,
-        // and remaining tuple count.
-        // Inject positions (lengths) into previously skipped int-size gaps.
-        m_tupleBuffer[0] = kErrorCode_Success;
-        if (remaining > 0) {
-            *reinterpret_cast<int32_t*>(&m_tupleBuffer[1]) = htonl(bufferCount);
-            offset = 1 + sizeof(int32_t);
-            *reinterpret_cast<int64_t*>(&m_tupleBuffer[offset]) = htonll(remaining);
-            offset += static_cast<int>(sizeof(int64_t));
-            std::vector<int>::const_iterator ipos;
-            for (ipos = positions.begin(); ipos != positions.end(); ++ipos) {
-                int length = *ipos;
-                *reinterpret_cast<int32_t*>(&m_tupleBuffer[offset]) = htonl(length);
-                offset += length + static_cast<int>(sizeof(int32_t));
-            }
-        } else {
-            *reinterpret_cast<int32_t*>(&m_tupleBuffer[1]) = htonl(bufferCount);
-            // If we failed or finished just set the count and stop right there.
-            *reinterpret_cast<int64_t*>(&m_tupleBuffer[5]) = htonll(remaining);
-            outputSize = 1 + sizeof(int32_t) + sizeof(int64_t);
-        }
-
-        // Ship it.
-        writeOrDie(m_fd, (unsigned char*)m_tupleBuffer, outputSize);
-
-    } catch (const FatalException &e) {
+        const ssize_t toWrite = serialized + 5;
+        writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, toWrite);
+    } catch (FatalException e) {
         crashVoltDB(e);
     }
 }

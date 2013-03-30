@@ -420,59 +420,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public boolean activateTableStream(int tableId, TableStreamType streamType) {
-        FastSerializer fs = new FastSerializer();
-        try {
-            fs.writeInt(0);                 // Predicate count
-        }
-        catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        return nativeActivateTableStream(pointer, tableId, streamType.ordinal(), fs.getBytes());
+        return nativeActivateTableStream( pointer, tableId, streamType.ordinal());
     }
 
     @Override
     public int tableStreamSerializeMore(BBContainer c, int tableId, TableStreamType streamType) {
-        FastSerializer fs = new FastSerializer();
-        try {
-            fs.writeInt(1);                 // Buffer count
-            fs.writeLong(c.address);        // Pointer
-            fs.writeInt(c.b.position());    // Offset
-            fs.writeInt(c.b.remaining());   // Length
-        }
-        catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        long remaining = nativeTableStreamSerializeMore(pointer, tableId, streamType.ordinal(), fs.getBytes());
-        int[] positions = null;
-        //TODO: Pass remaining count back to caller.
-        // -1 is end of stream.
-        if (remaining == -1) {
-            return 0;
-        }
-        // -2 is an error.
-        if (remaining == -2) {
-            return -1;
-        }
-        assert(deserializer != null);
-        deserializer.clear();
-        int count;
-        try {
-            count = deserializer.readInt();
-            if (count > 0) {
-                positions = new int[count];
-                for (int i = 0; i < count; i++) {
-                    positions[i] = deserializer.readInt();
-                }
-                //TODO: Support multiple streams.
-                assert(positions.length == 1);
-                return positions[0];
-            }
-        } catch (final IOException ex) {
-            LOG.error("Failed to deserialize position array" + ex);
-            throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
-        }
-
-        return 0;
+        return nativeTableStreamSerializeMore(pointer, c.address, c.b.position(), c.b.remaining(), tableId, streamType.ordinal());
     }
 
     /**
