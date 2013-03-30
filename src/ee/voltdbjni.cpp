@@ -97,7 +97,6 @@
 
 #include "boost/shared_ptr.hpp"
 #include "boost/scoped_array.hpp"
-#include "boost/ptr_container/ptr_vector.hpp"
 #include "common/debuglog.h"
 #include "common/serializeio.h"
 #include "common/TheHashinator.h"
@@ -950,116 +949,52 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeS
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    nativeActivateTableStream
- * Signature: (JIII[B)Z
+ * Signature: (JII)Z
  */
-SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeActivateTableStream(
-        JNIEnv *env, jobject obj, jlong engine_ptr, jint tableId, jint streamType,
-        jbyteArray serialized_predicates)
-{
+SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeActivateTableStream
+  (JNIEnv *env, jobject obj, jlong engine_ptr, jint tableId, jint streamType) {
     VOLT_DEBUG("nativeActivateTableStream in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-
-    // deserialize predicates.
-    jsize length = env->GetArrayLength(serialized_predicates);
-    VOLT_DEBUG("deserializing %d predicate bytes ...", (int) length);
-    jbyte *bytes = env->GetByteArrayElements(serialized_predicates, NULL);
-    ReferenceSerializeInput serialize_in(bytes, length);
     try {
-        try {
-            voltdb::TableStreamType tableStreamType = static_cast<voltdb::TableStreamType>(streamType);
-            bool success = engine->activateTableStream(tableId, tableStreamType, serialize_in);
-            env->ReleaseByteArrayElements(serialized_predicates, bytes, JNI_ABORT);
-            VOLT_DEBUG("deserialized predicates (success=%d)", (int)success);
-            return success;
-        } catch (SerializableEEException &e) {
-            engine->resetReusedResultOutputBuffer();
-            e.serialize(engine->getExceptionOutputSerializer());
-        }
-    } catch (const FatalException& e) {
+        return engine->activateTableStream(tableId, static_cast<voltdb::TableStreamType>(streamType));
+    } catch (FatalException e) {
         topend->crashVoltDB(e);
     }
-
     return false;
 }
 
-// Templated utility function to convert a Java array to a C array with error
-// checking.  Use overloaded adapter functions to allow the template to call
-// different JNIEnv method names for different types.
-// Return true if successful.
-inline jlong *envGetArrayElements(JNIEnv *env, jlongArray jarray, jboolean *isCopy) {
-    return env->GetLongArrayElements(jarray, isCopy);
-}
-inline jint *envGetArrayElements(JNIEnv *env, jintArray jarray, jboolean *isCopy) {
-    return env->GetIntArrayElements(jarray, isCopy);
-}
-inline void envReleaseArrayElements(JNIEnv *env, jlongArray jarray, jlong *carray, jint mode) {
-    return env->ReleaseLongArrayElements(jarray, carray, mode);
-}
-inline void envReleaseArrayElements(JNIEnv *env, jintArray jarray, jint *carray, jint mode) {
-    return env->ReleaseIntArrayElements(jarray, carray, mode);
-}
-template <typename Tin, typename Tout>
-static bool getArrayElements(
-        JNIEnv *env,
-        Tin jarray,
-        Tout *&retarray,
-        jint &retlength) {
-    if (jarray == NULL) {
-        VOLT_ERROR("getArrayElements: NULL array received");
-        return false;
-    }
-    retarray = envGetArrayElements(env, jarray, NULL);
-    if (retarray == NULL) {
-        env->ExceptionDescribe();
-        VOLT_ERROR("getArrayElements: NULL array extracted");
-        return false;
-    }
-    retlength = env->GetArrayLength(jarray);
-    if (env->ExceptionCheck()) {
-        env->ExceptionDescribe();
-        envReleaseArrayElements(env, jarray, retarray, JNI_ABORT);
-        VOLT_ERROR("getLongArrayElements: exception while extracting long array");
-        return false;
-    }
-    return true;
-}
-
 /*
- * Serialize more tuples to one or more output streams.
- * Returns a long for the remaining tuple count, -1 when done, or -2 for an error.
- * Streams an int position array through the reused result buffer.
  * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    nativeTableStreamSerializeMore
- * Signature: (JII[B)J;
+ * Signature: (JJIIII)I
  */
-SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTableStreamSerializeMore
-(JNIEnv *env,
- jobject obj,
- jlong engine_ptr,
- jint tableId,
- jint streamType,
- jbyteArray serialized_buffers) {
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTableStreamSerializeMore
+  (JNIEnv *env,
+   jobject obj,
+   jlong engine_ptr,
+   jlong bufferPtr,
+   jint offset,
+   jint length,
+   jint tableId,
+   jint streamType) {
     VOLT_DEBUG("nativeTableStreamSerializeMore in C++ called");
+    ReferenceSerializeOutput out(reinterpret_cast<char*>(bufferPtr) + offset, length - offset);
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-    jsize length = env->GetArrayLength(serialized_buffers);
-    VOLT_DEBUG("nativeTableStreamSerializeMore: deserializing %d buffer bytes ...", (int) length);
-    jbyte *bytes = env->GetByteArrayElements(serialized_buffers, NULL);
-    ReferenceSerializeInput serialize_in(bytes, length);
     try {
         try {
-            voltdb::TableStreamType tst = static_cast<voltdb::TableStreamType>(streamType);
-            jlong tuplesRemaining = engine->tableStreamSerializeMore(tableId, tst, serialize_in);
-            return tuplesRemaining;
-        } catch (const SQLException &e) {
+            return engine->tableStreamSerializeMore(
+                    &out,
+                    tableId,
+                    static_cast<voltdb::TableStreamType>(streamType));
+        } catch (SQLException e) {
             throwFatalException("%s", e.message().c_str());
         }
-    } catch (const FatalException &e) {
+    } catch (FatalException e) {
         topend->crashVoltDB(e);
     }
-    // Won't get here, but -2 is an error.
-    return -2;
+    return 0;
 }
 
 /*
