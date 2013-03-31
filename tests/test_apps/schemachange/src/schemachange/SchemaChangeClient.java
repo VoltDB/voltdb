@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.lang3.time.DateFormatUtils;
 import org.voltdb.CLIConfig;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.TableHelper;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -136,6 +137,8 @@ public class SchemaChangeClient {
                 case ClientResponse.GRACEFUL_FAILURE:
                 case ClientResponse.UNEXPECTED_FAILURE:
                 case ClientResponse.USER_ABORT:
+                    System.out.printf("Error in procedure call for: %s\n", procName);
+                    System.out.println(((ClientResponseImpl)cr).toJSONString());
                     // for starters, I'm assuming these errors can't happen for reads in a sound system
                     assert(false);
                     System.exit(-1);
@@ -183,6 +186,10 @@ public class SchemaChangeClient {
         if (newName.equalsIgnoreCase("A")) {
             int pkeyIndex = TableHelper.getBigintPrimaryKeyIndexIfExists(t2);
             builder.addPartitionInfo(newName, t2.getColumnName(pkeyIndex));
+            builder.addProcedures(VerifySchemaChangedA.class);
+        }
+        else {
+            builder.addProcedures(VerifySchemaChangedB.class);
         }
         byte[] catalogData = builder.compileToBytes();
         assert(catalogData != null);
@@ -379,12 +386,12 @@ public class SchemaChangeClient {
     /**
      * Grab some random rows that aren't on the first EE page for the table.
      */
-    private VoltTable sample(VoltTable t) {
+    private VoltTable sample(long offset, VoltTable t) {
         VoltTable t2 = t.clone(4096 * 1024);
 
         ClientResponse cr = callROProcedureWithRetry("@AdHoc",
-                String.format("select * from %s where pkey >= 100000 order by pkey limit 100;",
-                        TableHelper.getTableName(t)));
+                String.format("select * from %s where pkey >= %d order by pkey limit 100;",
+                        TableHelper.getTableName(t), offset));
         assert(cr.getStatus() == ClientResponse.SUCCESS);
         VoltTable result = cr.getResults()[0];
         result.resetRowPosition();
@@ -512,6 +519,9 @@ public class SchemaChangeClient {
         startTime = System.currentTimeMillis();
 
         while (config.duration == 0 || (System.currentTimeMillis() - startTime < (config.duration * 1000))) {
+
+            long sampleOffset = Math.min((long) (config.targetrowcount * .75), 111000);
+
             // make sure the table is full and mess around with it
             loadTable(t);
 
@@ -520,7 +530,13 @@ public class SchemaChangeClient {
                 String tableName = TableHelper.getTableName(t);
 
                 // deterministically sample some rows
-                VoltTable preT = sample(t);
+                VoltTable preT = null;
+                long max = maxId(t);
+                if (max > 0) {
+                    max = Math.min((long) (max * .75), max - 100);
+                    assert(max >= 0);
+                    preT = sample(sampleOffset, t);
+                }
                 //System.out.printf(_F("First sample:\n%s\n", preT.toFormattedString()));
 
                 // move to an entirely new table or migrated schema
@@ -532,7 +548,7 @@ public class SchemaChangeClient {
                 t = newT;
 
                 // if the table has been migrated, check the data
-                if (TableHelper.getTableName(t).equals(tableName)) {
+                if (!isNewTable && (preT != null)) {
                     VoltTable guessT = t.clone(4096 * 1024);
                     //System.out.printf(_F("Empty clone:\n%s\n", guessT.toFormattedString()));
 
@@ -540,14 +556,12 @@ public class SchemaChangeClient {
                     //System.out.printf(_F("Java migration:\n%s\n", guessT.toFormattedString()));
 
                     // deterministically sample the same rows
-                    VoltTable postT = sample(t);
-                    //System.out.printf(_F("Second sample:\n%s\n", postT.toFormattedString()));
-
-                    postT.resetRowPosition();
-                    preT.resetRowPosition();
-                    StringBuilder sb = new StringBuilder();
-                    if (!TableHelper.deepEqualsWithErrorMsg(postT, guessT, sb)) {
-                        System.err.println(_F(sb.toString()));
+                    VoltTable result = callROProcedureWithRetry(
+                            "VerifySchemaChanged" + tableName, sampleOffset, guessT).getResults()[0];
+                    boolean success = result.fetchRow(0).getLong(0) == 1;
+                    String err = result.fetchRow(0).getString(1);
+                    if (!success) {
+                        System.err.println(_F(err));
                         assert(false);
                     }
                 }
