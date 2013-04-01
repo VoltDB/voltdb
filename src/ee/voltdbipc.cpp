@@ -759,7 +759,7 @@ std::string VoltDBIPC::planForFragmentId(int64_t fragmentId) {
         assert(false);
         exit(-1);
     }
-    length = ntohl(length) - sizeof(int32_t);
+    length = static_cast<int32_t>(ntohl(length) - sizeof(int32_t));
     assert(length > 0);
 
     boost::scoped_array<char> planBytes(new char[length + 1]);
