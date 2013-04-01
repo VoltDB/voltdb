@@ -30,9 +30,6 @@ class CopyOnWriteIterator : public TupleIterator {
 
 public:
 
-    /**
-     * Normal constructor
-     */
     CopyOnWriteIterator(
         PersistentTable *table,
         TBMapI start,
@@ -60,8 +57,6 @@ public:
             return false;
         }
     }
-
-    TBPtr getCurrentBlock() const { return m_currentBlock; }
 
     bool next(TableTuple &out);
 
