@@ -71,7 +71,6 @@ Table::Table(int tableAllocationTargetSize) :
     m_columnHeaderData(NULL),
     m_columnHeaderSize(-1),
     m_tupleCount(0),
-    m_usedTupleCount(0),
     m_tuplesPinnedByUndo(0),
     m_columnCount(0),
     m_tuplesPerBlock(0),
@@ -101,7 +100,6 @@ Table::~Table() {
     }
 
     m_schema = NULL;
-    m_tempTuple.m_data = NULL;
 
     // clear any cached column serializations
     if (m_columnHeaderData)
@@ -157,19 +155,7 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string>
     // set the data to be empty
     m_tupleCount = 0;
 
-    m_tmpTarget1 = TableTuple(m_schema);
-    m_tmpTarget2 = TableTuple(m_schema);
-
     onSetColumns(); // for more initialization
-}
-
-// ------------------------------------------------------------------
-// OPERATIONS
-// ------------------------------------------------------------------
-
-bool Table::updateTuple(TableTuple &targetTupleToUpdate, TableTuple &sourceTupleWithNewValues) {
-    std::vector<TableIndex*> indexes = allIndexes();
-    return updateTupleWithSpecificIndexes(targetTupleToUpdate, sourceTupleWithNewValues, indexes);
 }
 
 // ------------------------------------------------------------------
@@ -397,28 +383,23 @@ bool Table::equals(voltdb::Table *other) {
     return true;
 }
 
-voltdb::TableStats* Table::getTableStats() {
-    return NULL;
-}
-
 void Table::loadTuplesFromNoHeader(SerializeInput &serialize_io,
                                    Pool *stringPool) {
     int tupleCount = serialize_io.readInt();
     assert(tupleCount >= 0);
 
+    TableTuple target(m_schema);
+
     for (int i = 0; i < tupleCount; ++i) {
-        nextFreeTuple(&m_tmpTarget1);
-        m_tmpTarget1.setActiveTrue();
-        m_tmpTarget1.setDirtyFalse();
-        m_tmpTarget1.setPendingDeleteFalse();
-        m_tmpTarget1.setPendingDeleteOnUndoReleaseFalse();
-        m_tmpTarget1.deserializeFrom(serialize_io, stringPool);
+        nextFreeTuple(&target);
+        target.setActiveTrue();
+        target.setDirtyFalse();
+        target.setPendingDeleteFalse();
+        target.setPendingDeleteOnUndoReleaseFalse();
+        target.deserializeFrom(serialize_io, stringPool);
 
-        processLoadedTuple(m_tmpTarget1);
+        processLoadedTuple(target);
     }
-
-    m_tupleCount += tupleCount;
-    m_usedTupleCount += tupleCount;
 }
 
 void Table::loadTuplesFrom(SerializeInput &serialize_io,

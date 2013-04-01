@@ -46,13 +46,15 @@ public:
      * Called when the source table is inserting a tuple. This will update the materialized view
      * destination table to reflect this change.
      */
-    void processTupleInsert(TableTuple &newTuple);
+    void processTupleInsert(TableTuple &newTuple, bool fallible);
 
     /**
      * Called when the source table is deleting a tuple. This will update the materialized view
      * destination table to reflect this change.
      */
-    void processTupleDelete(TableTuple &oldTuple);
+    void processTupleDelete(TableTuple &oldTuple, bool fallible);
+
+    PersistentTable * targetTable() const { return m_target; }
 
 private:
 

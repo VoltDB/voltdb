@@ -63,6 +63,10 @@
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
 
+class CopyOnWriteTest_CopyOnWriteIterator;
+class CompactionTest_BasicCompaction;
+class CompactionTest_CompactionWithCopyOnWrite;
+
 namespace voltdb {
 
 class TableColumn;
@@ -75,7 +79,6 @@ class Topend;
 class ReferenceSerializeOutput;
 class MaterializedViewMetadata;
 class RecoveryProtoMsg;
-class PersistentTableUndoDeleteAction;
 
 /**
  * Represents a non-temporary table which permanently resides in
@@ -108,10 +111,11 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     friend class CopyOnWriteIterator;
     friend class TableFactory;
     friend class TableTuple;
-    friend class TableIndex;
     friend class TableIterator;
     friend class PersistentTableStats;
     friend class PersistentTableUndoDeleteAction;
+    friend class PersistentTableUndoInsertAction;
+    friend class PersistentTableUndoUpdateAction;
     friend class ::CopyOnWriteTest_CopyOnWriteIterator;
     friend class ::CompactionTest_BasicCompaction;
     friend class ::CompactionTest_CompactionWithCopyOnWrite;
@@ -144,43 +148,31 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     }
 
     // ------------------------------------------------------------------
-    // OPERATIONS
+    // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
-    void deleteAllTuples(bool freeAllocatedStrings);
-    bool insertTuple(TableTuple &source);
-    bool insertTuple(TableTuple &source, bool createUndoQuantum);
+    virtual void deleteAllTuples(bool freeAllocatedStrings);
+    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
+    virtual bool deleteTuple(TableTuple &tuple, bool fallible=true);
+    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
+    virtual bool insertTuple(TableTuple &tuple);
+    // Optimized version of update that only updates specific indexes.
+    // The caller knows which indexes MAY need to be updated.
+    // Note that inside update tuple the order of sourceTuple and
+    // targetTuple is swapped when making calls on the indexes. This
+    // is just an inconsistency in the argument ordering.
+    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
+    virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+                                                TableTuple &sourceTupleWithNewValues,
+                                                std::vector<TableIndex*> const &indexesToUpdate,
+                                                bool fallible=true);
 
-    /*
-     * Inserts a Tuple without performing an allocation for the
-     * uninlined strings.
-     */
-    void insertTupleForUndo(char *tuple);
 
-    /*
-     * Note that inside update tuple the order of sourceTuple and
-     * targetTuple is swapped when making calls on the indexes. This
-     * is just an inconsistency in the argument ordering.
-     */
-    bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
-                                        TableTuple &sourceTupleWithNewValues,
-                                        std::vector<TableIndex*> &indexesToUpdate);
-
-    /*
-     * Identical to regular updateTuple except no memory management
-     * for unlined columns is performed because that will be handled
-     * by the UndoAction.
-     */
-    void updateTupleForUndo(TableTuple &targetTupleToUpdate,
-                            TableTuple &sourceTupleWithNewValues,
-                            bool revertIndexes);
-
-    /*
-     * Delete a tuple by looking it up via table scan or a primary key
-     * index lookup.
-     */
-    bool deleteTuple(TableTuple &tuple, bool freeAllocatedStrings);
-    void deleteTupleForUndo(voltdb::TableTuple &tupleCopy);
+    // ------------------------------------------------------------------
+    // PERSISTENT TABLE OPERATIONS
+    // ------------------------------------------------------------------
     void deleteTupleForSchemaChange(TableTuple &target);
+
+    void insertPersistentTuple(TableTuple &source, bool fallible);
 
     /*
      * Lookup the address of the tuple that is identical to the specified tuple.
@@ -200,8 +192,11 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      */
     TableTuple& getTempTupleInlined(TableTuple &source);
 
-    /** Add a view to this table */
+    /** Add/drop/list materialized views to this table */
     void addMaterializedView(MaterializedViewMetadata *view);
+    void dropMaterializedView(MaterializedViewMetadata *targetView);
+    std::vector<MaterializedViewMetadata *> const & allMaterializedViews() const { return m_views; }
+
 
     /**
      * Switch the table to copy on write mode. Returns true if the table was already in copy on write mode.
@@ -257,6 +252,8 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
         return m_data.size();
     }
 
+    // This is a testability feature not intended for use in product logic.
+    int getTuplesPendingDeleteCount() const { return m_tuplesPendingDeleteCount; }
   private:
 
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
@@ -278,15 +275,12 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     bool doCompactionWithinSubset(TBBucketMap *bucketMap);
     void doForcedCompaction();
 
-    // ------------------------------------------------------------------
-    // FROM PIMPL
-    // ------------------------------------------------------------------
     void insertIntoAllIndexes(TableTuple *tuple);
     void deleteFromAllIndexes(TableTuple *tuple);
     bool tryInsertOnAllIndexes(TableTuple *tuple);
     bool checkUpdateOnUniqueIndexes(TableTuple &targetTupleToUpdate,
                                     const TableTuple &sourceTupleWithNewValues,
-                                    std::vector<TableIndex*> &indexesToUpdate);
+                                    std::vector<TableIndex*> const &indexesToUpdate);
 
     bool checkNulls(TableTuple &tuple) const;
 
@@ -296,6 +290,13 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     void notifyBlockWasCompactedAway(TBPtr block);
     void swapTuples(TableTuple &sourceTupleWithNewValues, TableTuple &destinationTuple);
 
+    void insertTupleForUndo(char *tuple);
+    void updateTupleForUndo(char* targetTupleToUpdate,
+                            char* sourceTupleWithNewValues,
+                            bool revertIndexes);
+    void deleteTupleForUndo(char* tupleData);
+    void deleteTupleRelease(char* tuple);
+    void deleteTupleFinalize(TableTuple &tuple);
     /**
      * Normally this will return the tuple storage to the free list.
      * In the memcheck build it will return the storage to the heap.
@@ -357,6 +358,8 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
     TBMap m_data;
     int m_failedCompactionCount;
+    // This is a testability feature not intended for use in product logic.
+    int m_tuplesPendingDeleteCount;
 };
 
 inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {
@@ -366,12 +369,29 @@ inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {
 }
 
 
-inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block) {
-    tuple.setActiveFalse(); // does NOT free strings
+inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
+{
+    // May not delete an already deleted tuple.
+    assert(tuple.isActive());
+
+    // The tempTuple is forever!
+    assert(&tuple != &m_tempTuple);
+
+    // This frees referenced strings -- when could possibly be a better time?
+    if (m_schema->getUninlinedObjectColumnCount() != 0) {
+        decreaseStringMemCount(tuple.getNonInlinedMemorySize());
+        tuple.freeObjectColumns();
+    }
+
+    tuple.setActiveFalse();
 
     // add to the free list
     m_tupleCount--;
-    //m_tuplesPendingDelete--;
+    if (tuple.isPendingDelete()) {
+        tuple.setPendingDeleteFalse();
+        // This count is a testability feature not intended for use in product logic.
+        --m_tuplesPendingDeleteCount;
+    }
 
     if (block.get() == NULL) {
        block = findBlock(tuple.address());

@@ -500,7 +500,7 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
             }
 
             // insert into the new table
-            newTable->insertTuple(tupleToInsert, false);
+            newTable->insertPersistentTuple(tupleToInsert, false);
 
             // delete from the old table
             existingTable->deleteTupleForSchemaChange(scannedTuple);

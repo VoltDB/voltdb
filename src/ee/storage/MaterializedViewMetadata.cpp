@@ -35,8 +35,11 @@ namespace voltdb {
 
 MaterializedViewMetadata::MaterializedViewMetadata(
         PersistentTable *srcTable, PersistentTable *destTable, catalog::MaterializedViewInfo *metadata)
-        : m_target(destTable), m_filterPredicate(NULL) {
-
+        : m_target(destTable), m_filterPredicate(NULL)
+{
+    // best not to have to worry about the destination table disappearing out from under the source table that feeds it.
+    m_target->incrementRefcount();
+    srcTable->addMaterializedView(this);
     // try to load the predicate from the catalog view
     parsePredicate(metadata);
 
@@ -91,6 +94,14 @@ MaterializedViewMetadata::MaterializedViewMetadata(
     m_emptyTupleBackingStore = new char[m_target->schema()->tupleLength() + 1];
     memset(m_emptyTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
     m_emptyTuple.move(m_emptyTupleBackingStore);
+
+    if (srcTable->activeTupleCount() != 0) {
+        TableTuple scannedTuple(srcTable->schema());
+        TableIterator &iterator = srcTable->iterator();
+        while (iterator.next(scannedTuple)) {
+            processTupleInsert(scannedTuple, false);
+        }
+    }
 }
 
 MaterializedViewMetadata::~MaterializedViewMetadata() {
@@ -101,6 +112,7 @@ MaterializedViewMetadata::~MaterializedViewMetadata() {
     delete[] m_outputColumnSrcTableIndexes;
     delete[] m_outputColumnAggTypes;
     delete m_filterPredicate;
+    m_target->decrementRefcount();
 }
 
 void MaterializedViewMetadata::parsePredicate(catalog::MaterializedViewInfo *metadata) {
@@ -120,7 +132,7 @@ void MaterializedViewMetadata::parsePredicate(catalog::MaterializedViewInfo *met
     }
 }
 
-void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple) {
+void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple, bool fallible) {
     // don't change the view if this tuple doesn't match the predicate
     if (m_filterPredicate
         && (m_filterPredicate->eval(&newTuple, NULL).isFalse()))
@@ -181,14 +193,14 @@ void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple) {
     if (exists) {
         // shouldn't need to update indexes as this shouldn't ever change the
         // key
-        m_target->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple, m_emptyIndexUpdateList);
+        m_target->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple, m_emptyIndexUpdateList, fallible);
     }
     else {
-        m_target->insertTuple(m_updatedTuple);
+        m_target->insertPersistentTuple(m_updatedTuple, fallible);
     }
 }
 
-void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple) {
+void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fallible) {
     // don't change the view if this tuple doesn't match the predicate
     if (m_filterPredicate && (m_filterPredicate->eval(&oldTuple, NULL).isFalse()))
         return;
@@ -248,7 +260,7 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple) {
 
     // update the row
     // shouldn't need to update indexes as this shouldn't ever change the key
-    m_target->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple, m_emptyIndexUpdateList);
+    m_target->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple, m_emptyIndexUpdateList, fallible);
 }
 
 bool MaterializedViewMetadata::findExistingTuple(TableTuple &oldTuple, bool expected) {

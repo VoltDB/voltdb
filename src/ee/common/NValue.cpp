@@ -111,6 +111,11 @@ TTInt NValue::s_minDecimalValue("-9999999999"   //10 digits
                                  "9999999999"   //30 digits
                                  "99999999");    //38 digits
 
+// Reset this value in the debugger to dynamically control the error responses that depend on it.
+int NValue::fall_through_or_throw_fatal_or_crash_123 = /* fall through to throw something softer */ 1; //default
+                                                       // throw fatal                            *-/ 2;
+                                                       // crash on the spot                      */ 3;
+
 /*
  * Produce a debugging string describing an NValue.
  */

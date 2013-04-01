@@ -63,10 +63,6 @@
 #include "stx/btree_set.h"
 #include "common/ThreadLocalPool.h"
 
-class CopyOnWriteTest_CopyOnWriteIterator;
-class CompactionTest_BasicCompaction;
-class CompactionTest_CompactionWithCopyOnWrite;
-
 namespace voltdb {
 
 class TableIndex;
@@ -144,15 +140,26 @@ class Table {
     // OPERATIONS
     // ------------------------------------------------------------------
     virtual void deleteAllTuples(bool freeAllocatedStrings) = 0;
+    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
+    virtual bool deleteTuple(TableTuple &tuple, bool fallible=true) = 0;
+    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
+    // -- Most callers should be using TempTable::insertTempTuple, anyway.
     virtual bool insertTuple(TableTuple &tuple) = 0;
-    virtual bool updateTuple(TableTuple &targetTupleToUpdate,
-                             TableTuple &sourceTupleWithNewValues);
-    // optimized version of update that only updates specific indexes
-    // if the caller knows which indexes need to be updated
+    // Optimized version of update that only updates specific indexes.
+    // The caller knows which indexes MAY need to be updated.
+    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
                                                 TableTuple &sourceTupleWithNewValues,
-                                                std::vector<TableIndex*> &indexesToUpdate) = 0;
-    virtual bool deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings) = 0;
+                                                std::vector<TableIndex*> const &indexesToUpdate,
+                                                bool fallible=true) = 0;
+
+    /// This is not used in any production code path
+    /// -- it has been DEPRECATED to a convenient wrapper until tests can be weaned off it.
+    bool updateTuple(TableTuple &targetTupleToUpdate, TableTuple &sourceTupleWithNewValues)
+    {
+        updateTupleWithSpecificIndexes(targetTupleToUpdate, sourceTupleWithNewValues, m_indexes, true);
+        return true;
+    }
 
     // ------------------------------------------------------------------
     // TUPLES AND MEMORY USAGE
@@ -174,13 +181,6 @@ class Table {
      */
     virtual int64_t activeTupleCount() const {
         return m_tupleCount;
-    }
-
-    /*
-     * Count of tuples that actively contain user data
-     */
-    int64_t usedTupleCount() const {
-        return m_usedTupleCount;
     }
 
     virtual int64_t allocatedTupleMemory() const {
@@ -228,11 +228,8 @@ class Table {
         return static_cast<int>(m_uniqueIndexes.size());
     }
 
-    virtual std::vector<TableIndex*> allIndexes() const {
-        std::vector<TableIndex*> retval;
-        retval.insert(retval.begin(), m_indexes.begin(), m_indexes.end());
-        return retval;
-    }
+    // returned via shallow vector copy -- seems good enough.
+    std::vector<TableIndex*> allIndexes() const { return m_indexes; }
 
     virtual TableIndex *index(std::string name);
 
@@ -361,7 +358,7 @@ protected:
 public:
 
     virtual bool equals(voltdb::Table *other);
-    virtual voltdb::TableStats* getTableStats();
+    virtual voltdb::TableStats* getTableStats() = 0;
 
 protected:
     // virtual block management functions
@@ -395,8 +392,6 @@ protected:
     TableTuple m_tempTuple;
     boost::scoped_array<char> m_tempTupleMemory;
 
-    // not temptuple. these are for internal use.
-    TableTuple m_tmpTarget1, m_tmpTarget2;
     TupleSchema* m_schema;
 
     // schema as array of string names
@@ -405,7 +400,6 @@ protected:
     int32_t m_columnHeaderSize;
 
     uint32_t m_tupleCount;
-    uint32_t m_usedTupleCount;
     uint32_t m_tuplesPinnedByUndo;
     uint32_t m_columnCount;
     uint32_t m_tuplesPerBlock;

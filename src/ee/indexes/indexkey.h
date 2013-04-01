@@ -432,7 +432,7 @@ struct GenericKey
 
     GenericKey(const TableTuple *tuple) {
         assert(tuple);
-        ::memcpy(data, tuple->m_data + TUPLE_HEADER_SIZE, tuple->getSchema()->tupleLength());
+        ::memcpy(data, tuple->address() + TUPLE_HEADER_SIZE, tuple->getSchema()->tupleLength());
     }
 
     GenericKey(const TableTuple *tuple, const std::vector<int> &indices,

@@ -23,9 +23,12 @@
 #include "common/ids.h"
 #include "logging/LogDefs.h"
 #include "logging/LogProxy.h"
-#include "execution/VoltDBEngine.h"
 #include "common/FatalException.hpp"
 #include "storage/StreamBlock.h"
+
+namespace voltdb {
+class VoltDBEngine;
+}
 
 class VoltDBIPC {
 public:
