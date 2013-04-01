@@ -494,9 +494,6 @@ bool VoltDBEngine::updateCatalogDatabaseReference() {
 }
 
 bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPayload) {
-    // clean up execution plans when the tables underneath might change
-    m_plans.clear();
-
     assert(m_executorContext != NULL);
     ExecutorContext* executorContext = ExecutorContext::getExecutorContext();
     if (executorContext == NULL) {
@@ -822,6 +819,9 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
 bool
 VoltDBEngine::updateCatalog(const int64_t timestamp, const string &catalogPayload)
 {
+    // clean up execution plans when the tables underneath might change
+    m_plans.clear();
+
     assert(m_catalog != NULL); // the engine must be initialized
 
     VOLT_DEBUG("Updating catalog...");
