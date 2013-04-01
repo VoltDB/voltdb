@@ -86,13 +86,14 @@ class Distributer {
     private final boolean m_useClientAffinity;
 
     private static final class Procedure {
+        final static int PARAMETER_NONE = -1;
         private final boolean multiPart;
         private final boolean readOnly;
         private final int partitionParameter;
         private Procedure(boolean multiPart,boolean readOnly, int partitionParameter) {
             this.multiPart = multiPart;
-            this.readOnly = readOnly;
-            this.partitionParameter = partitionParameter;
+            this.readOnly = multiPart ? false: readOnly;
+            this.partitionParameter = multiPart? PARAMETER_NONE : partitionParameter;
         }
     }
 
@@ -938,7 +939,7 @@ class Distributer {
                     boolean readOnly = jsObj.getBoolean(JdbcDatabaseMetaDataGenerator.JSON_READ_ONLY);
                     m_procedureInfo.put(procedureName, new Procedure(false,readOnly, partitionParameter));
                 } else {
-                    m_procedureInfo.put(procedureName, new Procedure(true, false, MpInitiator.MP_INIT_PID));
+                    m_procedureInfo.put(procedureName, new Procedure(true, false, Procedure.PARAMETER_NONE));
                 }
 
             } catch (JSONException e) {
