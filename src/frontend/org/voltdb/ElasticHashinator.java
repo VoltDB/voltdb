@@ -130,25 +130,14 @@ public class ElasticHashinator extends TheHashinator {
     public static byte[] getConfigureBytes(int partitionCount, int tokensPerPartition) {
         Preconditions.checkArgument(partitionCount > 0);
         Preconditions.checkArgument(tokensPerPartition > 0);
-        Random r = new Random(0);
-        ByteBuffer buf = ByteBuffer.allocate(4 + (partitionCount * tokensPerPartition * 12));//long and an int per
-        buf.putInt(partitionCount * tokensPerPartition);
+        ElasticHashinator emptyHashinator = new ElasticHashinator(new HashMap<Long, Integer>());
+        Set<Integer> partitions = new HashSet<Integer>();
 
-        Set<Long> checkSet = new HashSet<Long>();
         for (int ii = 0; ii < partitionCount; ii++) {
-            for (int zz = 0; zz < tokensPerPartition; zz++) {
-                while (true) {
-                    long candidateToken = MurmurHash3.hash3_x64_128(r.nextLong());
-                    if (!checkSet.add(candidateToken)) {
-                        continue;
-                    }
-                    buf.putLong(candidateToken);
-                    buf.putInt(ii);
-                    break;
-                }
-            }
+            partitions.add(ii);
         }
-        return buf.array();
+
+        return addPartitions(emptyHashinator, partitions, tokensPerPartition);
     }
 
     /**
