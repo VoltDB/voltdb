@@ -140,7 +140,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     int m_configuredNumberOfPartitions;
     CatalogContext m_catalogContext;
     private String m_buildString;
-    private static final String m_defaultVersionString = "3.1";
+    private static final String m_defaultVersionString = "3.2";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();

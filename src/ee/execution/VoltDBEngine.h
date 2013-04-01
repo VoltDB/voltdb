@@ -52,8 +52,13 @@
 #include <vector>
 #include <cassert>
 
-#include <boost/shared_ptr.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
+#include "json_spirit/json_spirit.h"
+#include "boost/shared_ptr.hpp"
+#include <boost/multi_index_container.hpp>
+#include <boost/multi_index/hashed_index.hpp>
+#include <boost/multi_index/member.hpp>
+#include <boost/multi_index/mem_fun.hpp>
 #include "catalog/database.h"
 #include "common/ids.h"
 #include "common/serializeio.h"
@@ -65,7 +70,6 @@
 #include "common/SerializableEEException.h"
 #include "common/Topend.h"
 #include "common/DefaultTupleSerializer.h"
-#include "common/TupleOutputStream.h"
 #include "common/TheHashinator.h"
 #include "execution/FragmentManager.h"
 #include "logging/LogManager.h"
@@ -101,11 +105,14 @@ class SerializeInput;
 class SerializeOutput;
 class Table;
 class CatalogDelegate;
+class ReferenceSerializeInput;
+class ReferenceSerializeOutput;
 class PlanNodeFragment;
 class ExecutorContext;
 class RecoveryProtoMsg;
 
 const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
+const size_t PLAN_CACHE_SIZE = 1024 * 10;
 
 /**
  * Represents an Execution Engine which holds catalog objects (i.e. table) and executes
@@ -160,12 +167,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int executeQuery(int64_t planfragmentId, int32_t outputDependencyId, int32_t inputDependencyId,
                          const NValueArray &params, int64_t spHandle, int64_t lastCommittedSpHandle, int64_t uniqueId, bool first, bool last);
 
-        // ensure a plan fragment is loaded, given a graph
-        // return the fragid and cache statistics
-        int loadFragment(const char *plan, int32_t length, int64_t &fragId, bool &wasHit, int64_t &cacheSize);
-        // purge cached plans over the specified cache size
-        void resizePlanCache();
-
         inline int getUsedParamcnt() const { return m_usedParamcnt;}
         inline void setUsedParamcnt(int usedParamcnt) { m_usedParamcnt = usedParamcnt;}
 
@@ -187,7 +188,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         bool updateCatalog(const int64_t timestamp, const std::string &catalogPayload);
         bool processCatalogAdditions(bool addAll, int64_t timestamp);
         bool processCatalogDeletes(int64_t timestamp);
-        bool rebuildPlanFragmentCollections();
         bool rebuildTableCollections();
 
 
@@ -342,48 +342,22 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         inline Topend* getTopend() { return m_topend; }
 
         /**
-         * Get a unique id for a plan fragment by munging the indices of it's parents
-         * and grandparents in the catalog.
-         */
-        static int64_t uniqueIdForFragment(catalog::PlanFragment *frag);
-
-        /**
          * Activate a table stream of the specified type for the specified table.
          * Returns true on success and false on failure
          */
-        bool activateTableStream(
-                const CatalogId tableId,
-                const TableStreamType streamType,
-                ReferenceSerializeInput &serializeIn);
+        bool activateTableStream(const CatalogId tableId, const TableStreamType streamType);
 
         /**
-         * Serialize tuples to output streams from a table in COW mode.
-         * Overload that serializes a stream position array.
-         * Returns:
-         *  0-n: remaining tuple count
-         *  -1: streaming was completed by the previous call
-         *  -2: error, e.g. when no longer in COW mode.
-         * Note that -1 is only returned once after the previous call serialized all
-         * remaining tuples. Further calls are considered errors and will return -2.
+         * Serialize more tuples from the specified table that has an active stream of the specified type
+         * Returns the number of bytes worth of tuple data serialized or 0 if there are no more.
+         * Returns -1 if the table is not in COW mode. The table continues to be in COW (although no copies are made)
+         * after all tuples have been serialize until the last call to cowSerializeMore which returns 0 (and deletes
+         * the COW context). Further calls will return -1
          */
-        int64_t tableStreamSerializeMore(const CatalogId tableId,
-                                         const TableStreamType streamType,
-                                         ReferenceSerializeInput &serializeIn);
-
-        /**
-         * Serialize tuples to output streams from a table in COW mode.
-         * Overload that populates a position vector provided by the caller.
-         * Returns:
-         *  0-n: remaining tuple count
-         *  -1: streaming was completed by the previous call
-         *  -2: error, e.g. when no longer in COW mode.
-         * Note that -1 is only returned once after the previous call serialized all
-         * remaining tuples. Further calls are considered errors and will return -2.
-         */
-        int64_t tableStreamSerializeMore(const CatalogId tableId,
-                                         const TableStreamType streamType,
-                                         ReferenceSerializeInput &serializeIn,
-                                         std::vector<int> &retPositions);
+        int tableStreamSerializeMore(
+                ReferenceSerializeOutput *out,
+                CatalogId tableId,
+                const TableStreamType streamType);
 
         /*
          * Apply the updates in a recovery message.
@@ -431,22 +405,50 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void printReport();
 
+
         /**
          * Keep a list of executors for runtime - intentionally near the top of VoltDBEngine
          */
         struct ExecutorVector {
-            ExecutorVector(int64_t logThreshold,
+            ExecutorVector(int64_t fragmentId,
+                           int64_t logThreshold,
                            int64_t memoryLimit,
-                           PlanNodeFragment *fragment) : planFragment(fragment)
+                           PlanNodeFragment *fragment) : fragId(fragmentId), planFragment(fragment)
             {
                 limits.setLogThreshold(logThreshold);
                 limits.setMemoryLimit(memoryLimit);
             }
+
+            int64_t getFragId() const { return fragId; }
+
+            const int64_t fragId;
             boost::shared_ptr<PlanNodeFragment> planFragment;
             std::vector<AbstractExecutor*> list;
             TempTableLimits limits;
         };
-        std::map<int64_t, boost::shared_ptr<ExecutorVector> > m_executorMap;
+
+        /**
+         * The set of plan bytes is explicitly maintained in MRU-first order,
+         * while also indexed by the plans' bytes. Here lie boost-related dragons.
+         */
+        typedef boost::multi_index::multi_index_container<
+            boost::shared_ptr<ExecutorVector>,
+            boost::multi_index::indexed_by<
+                boost::multi_index::sequenced<>,
+                boost::multi_index::hashed_unique<
+                    boost::multi_index::const_mem_fun<ExecutorVector,int64_t,&ExecutorVector::getFragId>
+                >
+            >
+        > PlanSet;
+        PlanSet m_plans;
+
+        /**
+         * Get a vector of executors for a given fragment id.
+         * Get the vector from the cache if the fragment id is there.
+         * If not, get a plan from the Java topend and load it up,
+         * putting it in the cache and possibly bumping something else.
+         */
+        ExecutorVector *getExecutorVectorForFragmentId(const int64_t fragId);
 
         voltdb::UndoLog m_undoLog;
         voltdb::UndoQuantum *m_currentUndoQuantum;
@@ -570,8 +572,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         ExecutorContext *m_executorContext;
 
         DefaultTupleSerializer m_tupleSerializer;
-
-        FragmentManager m_fragmentManager;
 
     private:
         ThreadLocalPool m_tlPool;

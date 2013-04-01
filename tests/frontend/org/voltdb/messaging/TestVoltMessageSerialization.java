@@ -154,7 +154,7 @@ public class TestVoltMessageSerialization extends TestCase {
 
     public void testFragmentTask() throws IOException {
         FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, 99, true, true, false);
-        ft.addFragment(5, 12, ByteBuffer.allocate(0));
+        ft.addFragment(new byte[20], 12, ByteBuffer.allocate(0));
         ft.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_PARTITION);
 
         FragmentTaskMessage ft2 = (FragmentTaskMessage) checkVoltMessage(ft);
@@ -190,8 +190,8 @@ public class TestVoltMessageSerialization extends TestCase {
         ByteBuffer param2_buf = param2_fs.getBuffer();
 
         FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, 99, true, true, false);
-        ft.addFragment(5, 12, param1_buf);
-        ft.addFragment(10, 24, param2_buf);
+        ft.addFragment(new byte[20], 12, param1_buf);
+        ft.addFragment(new byte[20], 24, param2_buf);
         ft.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_PARTITION);
 
         FragmentTaskMessage ft2 = (FragmentTaskMessage) checkVoltMessage(ft);
@@ -231,7 +231,7 @@ public class TestVoltMessageSerialization extends TestCase {
     public void testFragmentTaskWithInitiateTask() throws IOException {
         // The fragment task.
         FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, 99, true, true, false);
-        ft.addFragment(5, 12, ByteBuffer.allocate(0));
+        ft.addFragment(new byte[20], 12, ByteBuffer.allocate(0));
         ft.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_PARTITION);
 
         // The initiate task.

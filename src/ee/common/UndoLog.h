@@ -27,7 +27,6 @@
 #include <iostream>
 #include <cassert>
 
-
 namespace voltdb
 {
     class UndoLog
@@ -78,7 +77,12 @@ namespace voltdb
             //          << " lastUndo: " << m_lastUndoToken
             //          << " lastRelease: " << m_lastReleaseToken << std::endl;
             // This ensures that undo is only ever called after
-            assert(m_lastReleaseToken < m_lastUndoToken);
+
+            // commenting out this assertion because it isn't valid (hugg 3/29/13)
+            // if you roll back a proc that hasn't done any work, you can run
+            // into this situation. Needs a better fix than this.
+            // assert(m_lastReleaseToken < m_lastUndoToken);
+
             // This ensures that we don't attempt to undo something in
             // the distant past.  In some cases ExecutionSite may hand
             // us the largest token value that definitely doesn't

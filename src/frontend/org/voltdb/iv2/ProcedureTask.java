@@ -98,11 +98,11 @@ abstract public class ProcedureTask extends TransactionTask
                 }
 
                 // Check partitioning of the invocation
-                if (runner.checkPartition(m_txn)) {
-                    runner.setupTransaction(m_txn);
+                if (runner.checkPartition(m_txnState)) {
+                    runner.setupTransaction(m_txnState);
                     cr = runner.call(task.getParameters());
 
-                    m_txn.setHash(cr.getHash());
+                    m_txnState.setHash(cr.getHash());
 
                     response.setResults(cr);
                     // record the results of write transactions to the transaction state
@@ -110,7 +110,7 @@ abstract public class ProcedureTask extends TransactionTask
                     // skip for multi-partition txns because only 1 of k+1 partitions will
                     //  have the real results
                     if ((!task.isReadOnly()) && task.isSinglePartition()) {
-                        m_txn.storeResults(cr);
+                        m_txnState.storeResults(cr);
                     }
                 } else {
                     // mis-partitioned invocation, reject it and let the ClientInterface restart it

@@ -97,18 +97,30 @@ public abstract class AdHocBase extends VoltSystemProcedure {
                 throw new VoltAbortException(msg);
             }
 
+            long aggFragId = m_site.loadOrAddRefPlanFragment(
+                    statement.core.aggregatorHash, statement.core.aggregatorFragment);
+            long collectorFragId = 0;
+            if (statement.core.collectorFragment != null) {
+                collectorFragId = m_site.loadOrAddRefPlanFragment(
+                        statement.core.collectorHash, statement.core.collectorFragment);
+            }
+
             SQLStmt stmt = SQLStmtAdHocHelper.createWithPlan(
                     statement.sql,
-                    statement.core.aggregatorFragment,
-                    statement.core.collectorFragment,
+                    aggFragId,
+                    statement.core.aggregatorHash,
+                    true,
+                    collectorFragId,
+                    statement.core.collectorHash,
+                    true,
                     statement.core.isReplicatedTableDML,
                     statement.core.readOnly,
-                    statement.core.parameterTypes);
+                    statement.core.parameterTypes,
+                    m_site);
 
             voltQueueSQL(stmt, statement.extractedParamValues.toArray());
         }
 
         return voltExecuteSQL(true);
     }
-
 }

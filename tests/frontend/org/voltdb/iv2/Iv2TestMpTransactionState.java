@@ -47,6 +47,7 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltdb.ParameterSet;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
@@ -120,7 +121,7 @@ public class Iv2TestMpTransactionState extends TestCase
                                                   false, false);  // IV2 doesn't use final task (yet)
 
         for (int i = 0; i < distributedOutputDepIds.size(); i++) {
-            plan.remoteWork.addFragment(Long.MIN_VALUE,
+            plan.remoteWork.addFragment(VoltSystemProcedure.fragIdToHash(Long.MIN_VALUE),
                     distributedOutputDepIds.get(i), createDummyParameterSet());
         }
         System.out.println("REMOTE TASK: " + plan.remoteWork.toString());
@@ -157,7 +158,8 @@ public class Iv2TestMpTransactionState extends TestCase
                 false);
 
         for (int i = 0; i < batchSize; i++) {
-            plan.localWork.addFragment(0L, depsToResumeList.get(i), createDummyParameterSet());
+            plan.localWork.addFragment(VoltSystemProcedure.fragIdToHash(0L),
+                    depsToResumeList.get(i), createDummyParameterSet());
         }
 
        for (int i = 0; i < depsForLocalTask.size(); i++) {

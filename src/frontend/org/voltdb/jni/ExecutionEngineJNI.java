@@ -23,8 +23,8 @@ import java.nio.ByteBuffer;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.FragmentPlanSource;
 import org.voltdb.ParameterSet;
-import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SysProcSelector;
 import org.voltdb.TableStreamType;
@@ -94,10 +94,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final String hostname,
             final int tempTableMemory,
             final TheHashinator.HashinatorType hashinatorType,
-            final byte hashinatorConfig[])
+            final byte hashinatorConfig[],
+            final FragmentPlanSource planSource)
     {
         // base class loads the volt shared library.
-        super(siteId, partitionId);
+        super(siteId, partitionId, planSource);
 
         //exceptionBuffer.order(ByteOrder.nativeOrder());
         LOG.trace("Creating Execution Engine on clusterIndex=" + clusterIndex
@@ -203,51 +204,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         checkErrorCode(errorCode);
     }
 
-    @Override
-    public long loadPlanFragment(byte[] plan) throws EEException
-    {
-        deserializer.clear();
-
-        long cacheSize = 0;
-        CacheUse cacheUse = CacheUse.FAIL;
-
-        // Start collecting statistics
-        startStatsCollection();
-
-        //C++ JSON deserializer is not thread safe, must synchronize
-        int errorCode = 0;
-        synchronized (ExecutionEngineJNI.class) {
-            errorCode = nativeLoadPlanFragment(pointer, plan);
-        }
-        try {
-            checkErrorCode(errorCode);
-            FastDeserializer fds = fallbackBuffer == null ? deserializer : new FastDeserializer(fallbackBuffer);
-            try {
-                final long fragId = fds.readLong();
-                final boolean wasHit = fds.readBoolean();
-                cacheSize = fds.readLong();
-                if (fragId == 0) {
-                    throw new EEException(ERRORCODE_ERROR);
-                }
-                if (wasHit) {
-                    cacheUse = CacheUse.HIT1;
-                }
-                else {
-                    cacheUse = CacheUse.MISS;
-                }
-                return fragId;
-            } catch (final IOException ex) {
-                LOG.error("Failed to deserialze loadPlanFragment results" + ex);
-                throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
-            }
-        } finally {
-            // Stop collecting statistics.
-            endStatsCollection(cacheSize, cacheUse);
-
-            fallbackBuffer = null;
-        }
-    }
-
     private static byte[] getStringBytes(String string) {
         try {
             return string.getBytes("UTF-8");
@@ -260,7 +216,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * @param undoToken Token identifying undo quantum for generated undo info
      */
     @Override
-    public VoltTable[] executePlanFragments(
+    protected VoltTable[] coreExecutePlanFragments(
             final int numFragmentIds,
             final long[] planFragmentIds,
             final long[] inputDepIds,
@@ -464,59 +420,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public boolean activateTableStream(int tableId, TableStreamType streamType) {
-        FastSerializer fs = new FastSerializer();
-        try {
-            fs.writeInt(0);                 // Predicate count
-        }
-        catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        return nativeActivateTableStream(pointer, tableId, streamType.ordinal(), fs.getBytes());
+        return nativeActivateTableStream( pointer, tableId, streamType.ordinal());
     }
 
     @Override
     public int tableStreamSerializeMore(BBContainer c, int tableId, TableStreamType streamType) {
-        FastSerializer fs = new FastSerializer();
-        try {
-            fs.writeInt(1);                 // Buffer count
-            fs.writeLong(c.address);        // Pointer
-            fs.writeInt(c.b.position());    // Offset
-            fs.writeInt(c.b.remaining());   // Length
-        }
-        catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        long remaining = nativeTableStreamSerializeMore(pointer, tableId, streamType.ordinal(), fs.getBytes());
-        int[] positions = null;
-        //TODO: Pass remaining count back to caller.
-        // -1 is end of stream.
-        if (remaining == -1) {
-            return 0;
-        }
-        // -2 is an error.
-        if (remaining == -2) {
-            return -1;
-        }
-        assert(deserializer != null);
-        deserializer.clear();
-        int count;
-        try {
-            count = deserializer.readInt();
-            if (count > 0) {
-                positions = new int[count];
-                for (int i = 0; i < count; i++) {
-                    positions[i] = deserializer.readInt();
-                }
-                //TODO: Support multiple streams.
-                assert(positions.length == 1);
-                return positions[0];
-            }
-        } catch (final IOException ex) {
-            LOG.error("Failed to deserialize position array" + ex);
-            throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
-        }
-
-        return 0;
+        return nativeTableStreamSerializeMore(pointer, c.address, c.b.position(), c.b.remaining(), tableId, streamType.ordinal());
     }
 
     /**

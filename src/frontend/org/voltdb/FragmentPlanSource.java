@@ -15,24 +15,13 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.dtxn;
+package org.voltdb;
 
-public interface RPQInterface {
-    /**
-     * Only return transaction state objects that are ready to run.
-     */
-    public OrderableTransaction poll();
-
-    public boolean add(OrderableTransaction txnState);
-
-    public long noteTransactionRecievedAndReturnLastSeen(long initiatorHSId, long txnId,
-            boolean isHeartbeat, long lastSafeTxnIdFromInitiator);
-
-    public Long getNewestSafeTransactionForInitiator(long initiator);
-
-    public void gotFaultForInitiator(long initiatorId);
-
-    public int ensureInitiatorIsKnown(long initiatorId);
-
-    public boolean isEmpty();
+/**
+ * Interface for objects that, given an Id, can return a plan. A plan in this
+ * case is the raw bytes representing a UTF-8 JSON plan. This is mainly for
+ * {@link org.voltdb.iv2.Site}, but can also be used for test code.
+ */
+public interface FragmentPlanSource {
+    public byte[] planForFragmentId(long fragmentId);
 }

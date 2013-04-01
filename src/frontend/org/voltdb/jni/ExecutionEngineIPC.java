@@ -29,8 +29,8 @@ import java.util.logging.Logger;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.BackendTarget;
+import org.voltdb.FragmentPlanSource;
 import org.voltdb.ParameterSet;
-import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SysProcSelector;
 import org.voltdb.TableStreamType;
@@ -120,7 +120,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         Hashinate(23),
         GetPoolAllocations(24),
         GetUSOs(25),
-        LoadFragment(26),
         updateHashinator(27);
         Commands(final int id) {
             m_id = id;
@@ -140,42 +139,30 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         private Socket m_socket = null;
         private SocketChannel m_socketChannel = null;
         Connection(BackendTarget target, int port) {
-            boolean connected = false;
-            int retries = 0;
-            while (!connected) {
+            if (target == BackendTarget.NATIVE_EE_IPC) {
+                System.out.printf("Ready to connect to voltdbipc process on port %d\n", port);
+                System.out
+                        .println("Press enter after you have started the EE process to initiate the connection to the EE");
                 try {
-                    System.out.println("Connecting to localhost:" + port);
-                    m_socketChannel = SocketChannel.open(new InetSocketAddress(
-                            "localhost", port));
-                    m_socketChannel.configureBlocking(true);
-                    m_socket = m_socketChannel.socket();
-                    m_socket.setTcpNoDelay(true);
-                    connected = true;
-                } catch (final Exception e) {
-                    System.out.println(e.getMessage());
-                    if (retries++ <= 10) {
-                        if (retries > 1) {
-                            System.out.printf("Failed to connect to IPC EE on port %d. Retry #%d of 10\n", port, retries-1);
-                            try {
-                                Thread.sleep(10000);
-                            }
-                            catch (InterruptedException e1) {}
-                        }
-                    }
-                    else {
-                        System.out.printf("Failed to initialize IPC EE connection on port %d. Quitting.\n", port);
-                        System.exit(-1);
-                    }
+                    System.in.read();
+                } catch (final IOException e1) {
+                    e1.printStackTrace();
                 }
-                if (!connected && retries == 1 && target == BackendTarget.NATIVE_EE_IPC) {
-                    System.out.printf("Ready to connect to voltdbipc process on port %d\n", port);
-                    System.out.println("Press Enter after you have started the EE process to initiate the connection to the EE");
-                    try {
-                        System.in.read();
-                    } catch (final IOException e1) {
-                        e1.printStackTrace();
-                    }
-                }
+            }
+            try {
+                System.out.println("Connecting to localhost:" + port);
+                m_socketChannel = SocketChannel.open(new InetSocketAddress(
+                        "localhost", port));
+                m_socketChannel.configureBlocking(true);
+                m_socket = m_socketChannel.socket();
+                m_socket.setTcpNoDelay(true);
+            } catch (final Exception e) {
+                System.out.println(e.getMessage());
+                System.out
+                        .println("Failed to initialize IPC EE connection. Quitting.");
+                while (true) {}
+
+                //System.exit(-1);
             }
             System.out.println("Created IPC connection for site.");
         }
@@ -516,8 +503,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final BackendTarget target,
             final int port,
             final HashinatorType type,
-            final byte config[]) {
-        super(siteId, partitionId);
+            final byte config[],
+            FragmentPlanSource planSource) {
+        super(siteId, partitionId, planSource);
 
         // m_counter = 0;
         m_clusterIndex = clusterIndex;
@@ -759,57 +747,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public long loadPlanFragment(byte[] plan) throws EEException
-    {
-        m_data.clear();
-        m_data.putInt(Commands.LoadFragment.m_id);
-        m_data.putInt(plan.length);
-        m_data.put(plan);
-
-        try {
-            m_data.flip();
-            m_connection.write();
-        } catch (final Exception e) {
-            System.out.println("Exception: " + e.getMessage());
-            throw new RuntimeException(e);
-        }
-
-        int result = ExecutionEngine.ERRORCODE_ERROR;
-        long planFragId = 0;
-        long cacheSize = 0;
-        PlannerStatsCollector.CacheUse cacheUse = PlannerStatsCollector.CacheUse.FAIL;
-
-        // Start collecting statistics
-        startStatsCollection();
-
-        try {
-            try {
-                result = m_connection.readStatusByte();
-                planFragId = m_connection.readLong();
-                cacheSize = m_connection.readLong();
-                if (m_connection.readLong() != 0) {
-                    cacheUse = PlannerStatsCollector.CacheUse.HIT1;
-                }
-                else {
-                    cacheUse = PlannerStatsCollector.CacheUse.MISS;
-                }
-            } catch (final IOException e) {
-                System.out.println("Exception: " + e.getMessage());
-                throw new RuntimeException(e);
-            }
-            if (result != ExecutionEngine.ERRORCODE_SUCCESS) {
-                throw new EEException(ExecutionEngine.ERRORCODE_ERROR);
-            }
-        }
-        finally {
-            // Stop collecting statistics.
-            endStatsCollection(cacheSize, cacheUse);
-        }
-        return planFragId;
-    }
-
-    @Override
-    public VoltTable[] executePlanFragments(
+    protected VoltTable[] coreExecutePlanFragments(
             final int numFragmentIds,
             final long[] planFragmentIds,
             final long[] inputDepIds,
@@ -822,26 +760,41 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 numFragmentIds, planFragmentIds, inputDepIds, parameterSets,
                 spHandle, lastCommittedSpHandle, uniqueId, undoToken);
         int result = ExecutionEngine.ERRORCODE_ERROR;
-        try {
-            result = m_connection.readStatusByte();
-        } catch (final IOException e) {
-            System.out.println("Exception: " + e.getMessage());
-            throw new RuntimeException(e);
-        }
-        if (result == ExecutionEngine.ERRORCODE_SUCCESS) {
-            final VoltTable resultTables[] = new VoltTable[numFragmentIds];
-            for (int ii = 0; ii < numFragmentIds; ii++) {
-                resultTables[ii] = PrivateVoltTableFactory.createUninitializedVoltTable();
-            }
+
+        while (true) {
             try {
-                m_connection.readResultTables(resultTables);
+                result = m_connection.readStatusByte();
+
+                if (result == ExecutionEngine.ERRORCODE_NEED_PLAN) {
+                    long fragmentId = m_connection.readLong();
+                    byte[] plan = planForFragmentId(fragmentId);
+                    m_data.clear();
+                    m_data.put(plan);
+                    m_data.flip();
+                    m_connection.write();
+                }
+                else if (result == ExecutionEngine.ERRORCODE_SUCCESS) {
+                    final VoltTable resultTables[] = new VoltTable[numFragmentIds];
+                    for (int ii = 0; ii < numFragmentIds; ii++) {
+                        resultTables[ii] = PrivateVoltTableFactory.createUninitializedVoltTable();
+                    }
+                    try {
+                        m_connection.readResultTables(resultTables);
+                    } catch (final IOException e) {
+                        throw new EEException(
+                                ExecutionEngine.ERRORCODE_WRONG_SERIALIZED_BYTES);
+                    }
+                    return resultTables;
+                }
+                else {
+                    // failure
+                    return null;
+                }
             } catch (final IOException e) {
-                throw new EEException(
-                        ExecutionEngine.ERRORCODE_WRONG_SERIALIZED_BYTES);
+                System.out.println("Exception: " + e.getMessage());
+                throw new RuntimeException(e);
             }
-            return resultTables;
         }
-        return null;
     }
 
     @Override
@@ -1091,7 +1044,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putInt(Commands.ActivateTableStream.m_id);
         m_data.putInt(tableId);
         m_data.putInt(streamType.ordinal());
-        m_data.putInt(0);       // Predicate count
 
         try {
             m_data.flip();
@@ -1124,45 +1076,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             m_data.putInt(Commands.TableStreamSerializeMore.m_id);
             m_data.putInt(tableId);
             m_data.putInt(streamType.ordinal());
-            m_data.putInt(1);                   // Number of buffers
-            m_data.putInt(c.b.remaining());     // Byte limit
+            m_data.putInt(c.b.remaining());
 
             m_data.flip();
             m_connection.write();
 
             m_connection.readStatusByte();
 
-            // Get the count.
-            ByteBuffer countBuffer = ByteBuffer.allocate(4);
-            while (countBuffer.hasRemaining()) {
-                int read = m_connection.m_socketChannel.read(countBuffer);
-                if (read == -1) {
-                    throw new EOFException();
-                }
-            }
-            countBuffer.flip();
-            final int count = countBuffer.getInt();
-
-            /*
-             * Error or no more tuple data for this table.
-             */
-            if (count == -1 || count == 0) {
-                return count;
-            }
-
-            // Get the remaining tuple count.
-            ByteBuffer remainingBuffer = ByteBuffer.allocate(8);
-            while (remainingBuffer.hasRemaining()) {
-                int read = m_connection.m_socketChannel.read(remainingBuffer);
-                if (read == -1) {
-                    throw new EOFException();
-                }
-            }
-            remainingBuffer.flip();
-            //TODO: Do something useful with the remaining count.
-            /*final long remaining = */ remainingBuffer.getLong();
-
-            // Get the first length.
             ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
             while (lengthBuffer.hasRemaining()) {
                 int read = m_connection.m_socketChannel.read(lengthBuffer);
@@ -1172,8 +1092,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
             lengthBuffer.flip();
             final int length = lengthBuffer.getInt();
-
             bytesReturned = length;
+            /*
+             * Error or no more tuple data for this table.
+             */
+            if (length == -1 || length == 0) {
+                return length;
+            }
             view.limit(view.position() + length);
             while (view.hasRemaining()) {
                 m_connection.m_socketChannel.read(view);

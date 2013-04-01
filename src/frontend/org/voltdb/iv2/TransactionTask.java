@@ -26,12 +26,12 @@ public abstract class TransactionTask extends SiteTasker
     protected static final VoltLogger execLog = new VoltLogger("EXEC");
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    final protected TransactionState m_txn;
+    final protected TransactionState m_txnState;
     final protected TransactionTaskQueue m_queue;
 
-    public TransactionTask(TransactionState txn, TransactionTaskQueue queue)
+    public TransactionTask(TransactionState txnState, TransactionTaskQueue queue)
     {
-        m_txn = txn;
+        m_txnState = txnState;
         m_queue = queue;
     }
 
@@ -43,25 +43,25 @@ public abstract class TransactionTask extends SiteTasker
 
     public TransactionState getTransactionState()
     {
-        return m_txn;
+        return m_txnState;
     }
 
     public long getSpHandle()
     {
-        return m_txn.spHandle;
+        return m_txnState.spHandle;
     }
 
     public long getTxnId() {
-        return m_txn.txnId;
+        return m_txnState.txnId;
     }
 
     // Take actions common to all transactions in order to complete a transaction at an SPI
     // Nebulously defined, I know, but replicating these two lines in a bazillion places
     // began to offend me.
-    public void doCommonSPICompleteActions()
+    void doCommonSPICompleteActions()
     {
         // Mark the transaction state as DONE
-        m_txn.setDone();
+        m_txnState.setDone();
         // Flush us out of the head of the TransactionTaskQueue.  Null check so we're reusable
         // for live rejoin replay
         if (m_queue != null) {

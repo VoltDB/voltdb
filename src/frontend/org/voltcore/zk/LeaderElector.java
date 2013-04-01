@@ -16,12 +16,14 @@
  */
 package org.voltcore.zk;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -34,6 +36,8 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltZK;
 
+import com.google.common.collect.ImmutableSet;
+
 public class LeaderElector {
     private final ZooKeeper zk;
     private final String dir;
@@ -41,13 +45,14 @@ public class LeaderElector {
     private final byte[] data;
     private final LeaderNoticeHandler cb;
     private String node = null;
+    private Set<String> knownChildren = null;
 
     private volatile String leader = null;
     private volatile boolean isLeader = false;
     private final ExecutorService es;
     private final AtomicBoolean m_done = new AtomicBoolean(false);
 
-    private final Runnable eventHandler = new Runnable() {
+    private final Runnable electionEventHandler = new Runnable() {
         @Override
         public void run() {
             try {
@@ -74,12 +79,44 @@ public class LeaderElector {
         }
     };
 
+    private final Runnable childrenEventHandler = new Runnable() {
+        @Override
+        public void run() {
+            try {
+                checkForChildChanges();
+            } catch (KeeperException.ConnectionLossException e) {
+                // lost the full connection. some test cases do this...
+                // means shutdoown without the elector being
+                // shutdown; ignore.
+                e.printStackTrace();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } catch (Exception e) {
+                org.voltdb.VoltDB.crashLocalVoltDB(
+                        "Unexepected failure in LeaderElector.", true, e);
+            }
+        }
+    };
+
+    private final Watcher childWatcher = new Watcher() {
+        @Override
+        public void process(WatchedEvent event) {
+            try {
+                if (!m_done.get()) {
+                    es.submit(childrenEventHandler);
+                }
+            } catch (RejectedExecutionException e) {}
+        }
+    };
+
     private final Watcher watcher = new Watcher() {
         @Override
         public void process(WatchedEvent event) {
-            if (!m_done.get()) {
-                es.submit(eventHandler);
-            }
+            try {
+                if (!m_done.get()) {
+                    es.submit(electionEventHandler);
+                }
+            } catch (RejectedExecutionException e) {}
         }
     };
 
@@ -129,7 +166,11 @@ public class LeaderElector {
     public void start(boolean block) throws KeeperException, InterruptedException, ExecutionException
     {
         node = createParticipantNode(zk, dir, prefix, data);
-        Future<?> task = es.submit(eventHandler);
+        Future<?> task = es.submit(electionEventHandler);
+        //Only do the extra work for watching children if a callback is registered
+        if (cb != null) {
+            es.submit(childrenEventHandler);
+        }
         if (block) {
             task.get();
         }
@@ -159,8 +200,8 @@ public class LeaderElector {
      */
     synchronized public void shutdown() throws InterruptedException, KeeperException {
         m_done.set(true);
-        zk.delete(node, -1);
         es.shutdown();
+        zk.delete(node, -1);
     }
 
     private final static VoltLogger LOG = new VoltLogger("HOST");
@@ -181,12 +222,13 @@ public class LeaderElector {
          * the lowest node.
          */
         List<String> children = zk.getChildren(dir, false);
-        ZKUtil.sortSequentialNodes(children);
+        Collections.sort(children);
         String lowest = null;
         String previous = null;
         ListIterator<String> iter = children.listIterator();
         while (iter.hasNext()) {
             String child = ZKUtil.joinZKPath(dir, iter.next());
+
             if (lowest == null) {
                 lowest = child;
                 previous = child;
@@ -213,6 +255,31 @@ public class LeaderElector {
         }
 
         return lowest;
+    }
+
+    /*
+     * Check for a change in present nodes
+     */
+    private void checkForChildChanges() throws KeeperException, InterruptedException {
+        /*
+         * Iterate through the sorted list of children and find the given node,
+         * then setup a watcher on the previous node if it exists, otherwise the
+         * previous of the previous...until we reach the beginning, then we are
+         * the lowest node.
+         */
+        Set<String> children = ImmutableSet.copyOf(zk.getChildren(dir, childWatcher));
+
+        boolean topologyChange = false;
+        if (knownChildren != null) {
+            if (!knownChildren.equals(children)) {
+                topologyChange = true;
+            }
+        }
+        knownChildren = children;
+
+        if (topologyChange && cb != null) {
+            cb.noticedTopologyChange();
+        }
     }
 
     public static String electionDirForPartition(int partition) {
