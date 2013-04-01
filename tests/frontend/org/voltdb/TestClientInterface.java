@@ -285,6 +285,8 @@ public class TestClientInterface {
                 (VoltDB.UTF8ENCODING),
                 new CorePlan(new byte[0],
                         null,
+                        new byte[20],
+                        null,
                         false,
                         false,
                         true,
