@@ -134,7 +134,7 @@ public class GCInspector
 
                 if (memoryUsed > .5 * memoryMax)
                 {
-                    logger.warn("Heap is " + usage + " full.");
+                    logger.warn("Heap is " + usage + " full out of " + memoryMax + ".");
                 }
             }
         }
