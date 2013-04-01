@@ -250,16 +250,17 @@ public abstract class TheHashinator {
 
     /**
      * By default returns HashinatorType.LEGACY, but for development another hashinator
-     * can be specified using the environment variable HASHINATOR
+     * can be specified using the environment variable or the Java property HASHINATOR
      */
     public static HashinatorType getConfiguredHashinatorType() {
         String hashinatorType = System.getenv("HASHINATOR");
         if (hashinatorType == null) {
-            return HashinatorType.LEGACY;
-        } else {
-            hostLogger.info("Overriding hashinator to use " + hashinatorType);
-            return HashinatorType.valueOf(hashinatorType.trim().toUpperCase());
+            hashinatorType = System.getProperty("HASHINATOR", HashinatorType.LEGACY.name());
         }
+        if (hostLogger.isDebugEnabled()) {
+            hostLogger.debug("Overriding hashinator to use " + hashinatorType);
+        }
+        return HashinatorType.valueOf(hashinatorType.trim().toUpperCase());
     }
 
     /**
