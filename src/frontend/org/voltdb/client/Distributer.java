@@ -92,7 +92,7 @@ class Distributer {
         private final int partitionParameter;
         private Procedure(boolean multiPart,boolean readOnly, int partitionParameter) {
             this.multiPart = multiPart;
-            this.readOnly = multiPart ? false: readOnly;
+            this.readOnly = readOnly;
             this.partitionParameter = multiPart? PARAMETER_NONE : partitionParameter;
         }
     }
@@ -697,9 +697,9 @@ class Distributer {
                         hashedPartition = invocation.getHashinatedParam(procedureInfo.partitionParameter);
                     }
                     /*
-                     * If the procedure is read only (never the case for MPI), load balance across replicas
+                     * If the procedure is read only and single part, load balance across replicas
                      */
-                    if (procedureInfo.readOnly) {
+                    if (!procedureInfo.multiPart && procedureInfo.readOnly) {
                         NodeConnection partitionReplicas[] = m_partitionReplicas.get(hashedPartition);
                         if (partitionReplicas != null && partitionReplicas.length > 0) {
                             cxn = partitionReplicas[ThreadLocalRandom.current().nextInt(partitionReplicas.length)];
@@ -934,12 +934,13 @@ class Distributer {
                 String jsString = vt.getString(6);
                 String procedureName = vt.getString(2);
                 JSONObject jsObj = new JSONObject(jsString);
+                boolean readOnly = jsObj.getBoolean(JdbcDatabaseMetaDataGenerator.JSON_READ_ONLY);
                 if (jsObj.getBoolean(JdbcDatabaseMetaDataGenerator.JSON_SINGLE_PARTITION)) {
                     int partitionParameter = jsObj.getInt(JdbcDatabaseMetaDataGenerator.JSON_PARTITION_PARAMETER);
-                    boolean readOnly = jsObj.getBoolean(JdbcDatabaseMetaDataGenerator.JSON_READ_ONLY);
                     m_procedureInfo.put(procedureName, new Procedure(false,readOnly, partitionParameter));
                 } else {
-                    m_procedureInfo.put(procedureName, new Procedure(true, false, Procedure.PARAMETER_NONE));
+                    // Multi Part procedure JSON descriptors omit the partitionParameter
+                    m_procedureInfo.put(procedureName, new Procedure(true, readOnly, Procedure.PARAMETER_NONE));
                 }
 
             } catch (JSONException e) {
