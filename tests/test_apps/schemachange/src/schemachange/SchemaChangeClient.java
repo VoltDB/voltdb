@@ -530,8 +530,6 @@ public class SchemaChangeClient {
 
         while (config.duration == 0 || (System.currentTimeMillis() - startTime < (config.duration * 1000))) {
 
-            long sampleOffset = Math.min((long) (config.targetrowcount * .75), 111000);
-
             // make sure the table is full and mess around with it
             loadTable(t);
 
@@ -542,10 +540,14 @@ public class SchemaChangeClient {
                 // deterministically sample some rows
                 VoltTable preT = null;
                 long max = maxId(t);
+                long sampleOffset = -1;
                 if (max > 0) {
-                    max = Math.min((long) (max * .75), max - 100);
+                    sampleOffset = Math.min((long) (max * .75), max - 100);
                     assert(max >= 0);
                     preT = sample(sampleOffset, t);
+                    assert(preT.getRowCount() > 0);
+                    log.info(_F("Sampled table %s from offset %d limit 100 and found %d rows.",
+                            tableName, sampleOffset, preT.getRowCount()));
                 }
                 //log.info(_F("First sample:\n%s", preT.toFormattedString()));
 
@@ -566,6 +568,7 @@ public class SchemaChangeClient {
                     //log.info(_F("Java migration:\n%s", guessT.toFormattedString()));
 
                     // deterministically sample the same rows
+                    assert(sampleOffset >= 0);
                     VoltTable result = callROProcedureWithRetry(
                             "VerifySchemaChanged" + tableName, sampleOffset, guessT).getResults()[0];
                     boolean success = result.fetchRow(0).getLong(0) == 1;
