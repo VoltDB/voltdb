@@ -77,7 +77,7 @@ public class RejoinMessage extends VoltMessage {
     public RejoinMessage(long sourceHSId, Type type, String snapshotNonce)
     {
         this(sourceHSId, type);
-        assert(type == Type.INITIATION || type == Type.INITIATION_COMMUNITY);
+        assert(type == Type.INITIATION || type == Type.INITIATION_COMMUNITY || type == Type.PARTITION_SNAPSHOT_INITIATION);
         m_snapshotNonce = snapshotNonce;
     }
 
