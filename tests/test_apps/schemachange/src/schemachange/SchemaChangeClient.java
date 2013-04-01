@@ -24,11 +24,13 @@
 package schemachange;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.commons.lang3.time.DateFormatUtils;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.TableHelper;
@@ -45,6 +47,8 @@ import org.voltdb.compiler.CatalogBuilder;
 
 public class SchemaChangeClient {
 
+    static VoltLogger log = new VoltLogger("HOST");
+
     Client client = null;
     private SchemaChangeConfig config = null;
     private Random rand = new Random(0);
@@ -57,7 +61,14 @@ public class SchemaChangeClient {
     private long startTime;
 
     private static String _F(String str, Object... parameters) {
-        return String.format(DateFormatUtils.format(System.currentTimeMillis(), "MM/dd/yyyy HH:mm:ss") + "\t" + str, parameters);
+        return String.format(str, parameters);
+    }
+
+    static void logStackTrace(Throwable t) {
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw, true);
+        t.printStackTrace(pw);
+        log.error(sw.toString());
     }
 
     /**
@@ -113,7 +124,7 @@ public class SchemaChangeClient {
                 try { Thread.sleep(1000); } catch (InterruptedException e1) {}
             } catch (IOException e) {
                 // IOException is not cool man
-                e.printStackTrace();
+                logStackTrace(e);
                 System.exit(-1);
             }
 
@@ -137,8 +148,8 @@ public class SchemaChangeClient {
                 case ClientResponse.GRACEFUL_FAILURE:
                 case ClientResponse.UNEXPECTED_FAILURE:
                 case ClientResponse.USER_ABORT:
-                    System.out.printf("Error in procedure call for: %s\n", procName);
-                    System.out.println(((ClientResponseImpl)cr).toJSONString());
+                    log.error(_F("Error in procedure call for: %s", procName));
+                    log.error(((ClientResponseImpl)cr).toJSONString());
                     // for starters, I'm assuming these errors can't happen for reads in a sound system
                     assert(false);
                     System.exit(-1);
@@ -178,7 +189,7 @@ public class SchemaChangeClient {
             t2 = TableHelper.mutateTable(t1, false, rand);
         }
 
-        System.out.printf(_F("New Schema:\n%s\n", TableHelper.ddlForTable(t2)));
+        log.info(_F("New Schema:\n%s", TableHelper.ddlForTable(t2)));
 
         builder.addLiteralSchema(TableHelper.ddlForTable(t2));
         builder.addLiteralSchema(TableHelper.ddlForTable(versionT));
@@ -198,10 +209,10 @@ public class SchemaChangeClient {
         long start = System.nanoTime();
 
         if (newTable) {
-            System.out.println(_F("Starting catalog update to swap tables."));
+            log.info(_F("Starting catalog update to swap tables."));
         }
         else {
-            System.out.println(_F("Starting catalog update to change schema."));
+            log.info(_F("Starting catalog update to change schema."));
         }
 
         boolean success = false;
@@ -213,7 +224,7 @@ public class SchemaChangeClient {
             // failure
         } catch (IOException e) {
             // IOException is not cool man
-            e.printStackTrace();
+            logStackTrace(e);
             System.exit(-1);
         }
 
@@ -258,11 +269,11 @@ public class SchemaChangeClient {
             double seconds = (end - start) / 1000000000.0;
 
             if (newTable) {
-                System.out.printf(_F("Completed catalog update that swapped tables in %.4f seconds\n",
+                log.info(_F("Completed catalog update that swapped tables in %.4f seconds",
                         seconds));
             }
             else {
-                System.out.printf(_F("Completed catalog update of %d tuples in %.4f seconds (%d tuples/sec)\n",
+                log.info(_F("Completed catalog update of %d tuples in %.4f seconds (%d tuples/sec)",
                         count, seconds, (long) (count / seconds)));
             }
 
@@ -375,11 +386,11 @@ public class SchemaChangeClient {
 
         TableLoader loader = new TableLoader(this, t, rand);
 
-        System.out.printf(_F("loading table\n"));
+        log.info(_F("loading table"));
         loader.load(max + 1, realRowCount, 1);
-        System.out.printf(_F("deleting from table\n"));
+        log.info(_F("deleting from table"));
         loader.delete(1, realRowCount, n);
-        System.out.printf(_F("reloading table\n"));
+        log.info(_F("reloading table"));
         loader.load(1, realRowCount, n);
     }
 
@@ -420,8 +431,7 @@ public class SchemaChangeClient {
         boolean flag = true;
         String msg;
         if (fatalLevel.get() > 0) {
-            System.err
-                    .printf(_F("In connectToOneServerWithRetry, don't bother to try reconnecting to this host: %s\n",
+            log.error(_F("In connectToOneServerWithRetry, don't bother to try reconnecting to this host: %s",
                             server));
             flag = false;
         }
@@ -433,12 +443,12 @@ public class SchemaChangeClient {
                         + client.getInstanceId()[0] + " - "
                         + client.getInstanceId()[1] + ", totalConnections = "
                         + totalConnections.get();
-                System.out.println(_F(msg));
+                log.info(_F(msg));
                 break;
             } catch (Exception e) {
                 msg = "Connection to " + server + " failed - retrying in "
                         + sleep / 1000 + " second(s)";
-                System.out.println(_F(msg));
+                log.info(_F(msg));
                 try {
                     Thread.sleep(sleep);
                 } catch (Exception interruted) {
@@ -459,7 +469,7 @@ public class SchemaChangeClient {
             // if the benchmark is still active
             long currentTime = System.currentTimeMillis();
             if ((currentTime - startTime) < (config.duration * 1000)) {
-                System.err.printf(_F("Lost connection to %s:%d.\n", hostname, port));
+                log.warn(_F("Lost connection to %s:%d.", hostname, port));
                 totalConnections.decrementAndGet();
                 // setup for retry
                 final String server = hostname;
@@ -537,7 +547,7 @@ public class SchemaChangeClient {
                     assert(max >= 0);
                     preT = sample(sampleOffset, t);
                 }
-                //System.out.printf(_F("First sample:\n%s\n", preT.toFormattedString()));
+                //log.info(_F("First sample:\n%s", preT.toFormattedString()));
 
                 // move to an entirely new table or migrated schema
                 VoltTable newT = null;
@@ -550,10 +560,10 @@ public class SchemaChangeClient {
                 // if the table has been migrated, check the data
                 if (!isNewTable && (preT != null)) {
                     VoltTable guessT = t.clone(4096 * 1024);
-                    //System.out.printf(_F("Empty clone:\n%s\n", guessT.toFormattedString()));
+                    //log.info(_F("Empty clone:\n%s", guessT.toFormattedString()));
 
                     TableHelper.migrateTable(preT, guessT);
-                    //System.out.printf(_F("Java migration:\n%s\n", guessT.toFormattedString()));
+                    //log.info(_F("Java migration:\n%s", guessT.toFormattedString()));
 
                     // deterministically sample the same rows
                     VoltTable result = callROProcedureWithRetry(
@@ -561,7 +571,7 @@ public class SchemaChangeClient {
                     boolean success = result.fetchRow(0).getLong(0) == 1;
                     String err = result.fetchRow(0).getString(1);
                     if (!success) {
-                        System.err.println(_F(err));
+                        log.error(_F(err));
                         assert(false);
                     }
                 }

@@ -30,6 +30,7 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.TableHelper;
 import org.voltdb.VoltTable;
@@ -38,6 +39,8 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 
 class TableLoader {
+
+    static VoltLogger log = new VoltLogger("HOST");
 
     final SchemaChangeClient scc;
     final VoltTable table;
@@ -75,14 +78,27 @@ class TableLoader {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
-            if (clientResponse.getStatus() == ClientResponse.SUCCESS) {
+            switch (clientResponse.getStatus()) {
+            case ClientResponse.SUCCESS:
+                // hooray!
                 boolean success = outstandingPkeys.remove(pkey);
                 assert(success);
-            }
-            else {
+                break;
+            case ClientResponse.CONNECTION_LOST:
+            case ClientResponse.CONNECTION_TIMEOUT:
+            case ClientResponse.RESPONSE_UNKNOWN:
+            case ClientResponse.SERVER_UNAVAILABLE:
+                // no need to be verbose, as there might be many messages
                 hadError.set(true);
-                System.out.println("Error in loader callback:");
-                System.out.println(((ClientResponseImpl)clientResponse).toJSONString());
+                break;
+            case ClientResponse.UNEXPECTED_FAILURE:
+            case ClientResponse.GRACEFUL_FAILURE:
+            case ClientResponse.USER_ABORT:
+                // should never happen
+                log.error("Error in loader callback:");
+                log.error(((ClientResponseImpl)clientResponse).toJSONString());
+                assert(false);
+                System.exit(-1);
             }
         }
     }
