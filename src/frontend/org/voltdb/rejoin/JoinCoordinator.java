@@ -19,6 +19,7 @@ package org.voltdb.rejoin;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.ClientInterface;
@@ -34,12 +35,13 @@ import org.voltdb.utils.VoltFile;
 
 import java.io.File;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 /**
  * Coordinates the sites to perform rejoin
  */
-public abstract class RejoinCoordinator extends LocalMailbox {
+public abstract class JoinCoordinator extends LocalMailbox {
     protected final HostMessenger m_messenger;
 
     /*
@@ -71,18 +73,26 @@ public abstract class RejoinCoordinator extends LocalMailbox {
                     return;
                 }
             } else {
-                VoltDB.crashLocalVoltDB("Snapshot request for rejoin failed",
+                VoltDB.crashLocalVoltDB("Snapshot request for rejoin failed: " + results[0].toJSONString(),
                         false, null);
             }
         }
     };
 
-    public RejoinCoordinator(HostMessenger hostMessenger) {
+    public JoinCoordinator(HostMessenger hostMessenger) {
         super(hostMessenger, hostMessenger.generateMailboxId(null));
         m_messenger = hostMessenger;
     }
 
     public void setClientInterface(ClientInterface ci) {}
+    public void setSites(List<Long> sites) {}
+    public List<Integer> getPartitionsToAdd() {
+        throw new UnsupportedOperationException("getPartitionsToAdd is only supported for " +
+                "elastic join");
+    }
+    public JSONObject getTopology() {
+        throw new UnsupportedOperationException("getTopology is only supported for elastic join");
+    }
 
     /**
      * Starts the rejoin process.
@@ -116,7 +126,8 @@ public abstract class RejoinCoordinator extends LocalMailbox {
     }
 
     protected String makeSnapshotRequest(Map<Long, Long> sourceToDests,
-                                         Collection<Integer> tableIds)
+                                         Collection<Integer> tableIds,
+                                         Map<String, JSONObject> postSnapshotTasks)
     {
         try {
             JSONStringer jsStringer = new JSONStringer();
@@ -137,6 +148,15 @@ public abstract class RejoinCoordinator extends LocalMailbox {
                 }
             }
             jsStringer.endArray();
+
+            if (postSnapshotTasks != null) {
+                jsStringer.key("postSnapshotTasks");
+                jsStringer.object();
+                for (Map.Entry<String, JSONObject> e : postSnapshotTasks.entrySet()) {
+                    jsStringer.key(e.getKey()).value(e.getValue());
+                }
+                jsStringer.endObject();
+            }
 
             jsStringer.endObject();
             return jsStringer.toString();

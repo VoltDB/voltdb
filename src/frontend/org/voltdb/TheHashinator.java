@@ -20,6 +20,7 @@ package org.voltdb;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Collection;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.VoltLogger;
@@ -249,16 +250,32 @@ public abstract class TheHashinator {
 
     /**
      * By default returns HashinatorType.LEGACY, but for development another hashinator
-     * can be specified using the environment variable HASHINATOR
+     * can be specified using the environment variable or the Java property HASHINATOR
      */
     public static HashinatorType getConfiguredHashinatorType() {
         String hashinatorType = System.getenv("HASHINATOR");
         if (hashinatorType == null) {
-            return HashinatorType.LEGACY;
-        } else {
-            hostLogger.info("Overriding hashinator to use " + hashinatorType);
-            return HashinatorType.valueOf(hashinatorType.trim().toUpperCase());
+            hashinatorType = System.getProperty("HASHINATOR", HashinatorType.LEGACY.name());
         }
+        if (hostLogger.isDebugEnabled()) {
+            hostLogger.debug("Overriding hashinator to use " + hashinatorType);
+        }
+        return HashinatorType.valueOf(hashinatorType.trim().toUpperCase());
+    }
+
+    /**
+     * Add new partitions to create a new hashinator configuration.
+     */
+    public static byte[] addPartitions(Collection<Integer> newPartitions) {
+        HashinatorType type = getConfiguredHashinatorType();
+        switch (type) {
+            case LEGACY:
+                throw new RuntimeException("Legacy hashinator doesn't support adding partitions");
+            case ELASTIC:
+                return ElasticHashinator.addPartitions(instance.get().getSecond(), newPartitions,
+                        ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+        }
+        throw new RuntimeException("Should not reach here");
     }
 
     /**
@@ -271,7 +288,7 @@ public abstract class TheHashinator {
         case LEGACY:
             return LegacyHashinator.getConfigureBytes(partitionCount);
         case ELASTIC:
-            return ElasticHashinator.getConfigureBytes(partitionCount, 8);
+            return ElasticHashinator.getConfigureBytes(partitionCount, ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
         }
         throw new RuntimeException("Should not reach here");
     }

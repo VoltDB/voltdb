@@ -48,6 +48,9 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.iv2.SiteTasker;
+import org.voltdb.iv2.SiteTaskerQueue;
+import org.voltdb.iv2.SnapshotTask;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.utils.CatalogUtil;
 
@@ -124,6 +127,13 @@ public class SnapshotSiteProcessor {
     public static final ConcurrentLinkedQueue<Runnable> m_tasksOnSnapshotCompletion =
         new ConcurrentLinkedQueue<Runnable>();
 
+    /*
+     * Random tasks performed on each site after the snapshot tasks are finished but
+     * before the snapshot transaction is finished.
+     */
+    public static final Map<Integer, SiteTasker> m_siteTasksPostSnapshotting =
+            Collections.synchronizedMap(new HashMap<Integer, SiteTasker>());
+
 
     /** Number of snapshot buffers to keep */
     static final int m_numSnapshotBuffers = 5;
@@ -170,10 +180,10 @@ public class SnapshotSiteProcessor {
     private ArrayList<Thread> m_snapshotTargetTerminators = null;
 
     /**
-     * When a buffer is returned to the pool this is invoked to ensure the EE wakes up
-     * and does any potential snapshot work with that buffer
+     * When a buffer is returned to the pool a new snapshot task will be offered to the queue
+     * to ensure the EE wakes up and does any potential snapshot work with that buffer
      */
-    private final Runnable m_onPotentialSnapshotWork;
+    private final SiteTaskerQueue m_siteTaskerQueue;
 
     private final boolean m_isIV2Enabled = VoltDB.instance().isIV2Enabled();
 
@@ -237,8 +247,8 @@ public class SnapshotSiteProcessor {
         }
     }
 
-    public SnapshotSiteProcessor(Runnable onPotentialSnapshotWork, int snapshotPriority) {
-        this(onPotentialSnapshotWork, snapshotPriority, new IdlePredicate() {
+    public SnapshotSiteProcessor(SiteTaskerQueue siteQueue, int snapshotPriority) {
+        this(siteQueue, snapshotPriority, new IdlePredicate() {
             @Override
             public boolean idle(long now) {
                 throw new UnsupportedOperationException();
@@ -246,8 +256,8 @@ public class SnapshotSiteProcessor {
         });
     }
 
-    public SnapshotSiteProcessor(Runnable onPotentialSnapshotWork, int snapshotPriority, IdlePredicate idlePredicate) {
-        m_onPotentialSnapshotWork = onPotentialSnapshotWork;
+    public SnapshotSiteProcessor(SiteTaskerQueue siteQueue, int snapshotPriority, IdlePredicate idlePredicate) {
+        m_siteTaskerQueue = siteQueue;
         m_snapshotPriority = snapshotPriority;
         initializeBufferPool();
         m_idlePredicate = idlePredicate;
@@ -297,7 +307,7 @@ public class SnapshotSiteProcessor {
                         final long now = System.currentTimeMillis();
                         //Ask if the site is idle, and if it is queue the work immediately
                         if (m_idlePredicate.idle(now)) {
-                            m_onPotentialSnapshotWork.run();
+                            m_siteTaskerQueue.offer(new SnapshotTask());
                             return;
                         }
 
@@ -315,7 +325,7 @@ public class SnapshotSiteProcessor {
                          * needs to be calculated
                          */
                         if (now > quietUntil) {
-                            m_onPotentialSnapshotWork.run();
+                            m_siteTaskerQueue.offer(new SnapshotTask());
                             //Now push the quiet period further into the future,
                             //generally no threads will be racing to do this
                             //since the execution site only interacts with one snapshot data target at a time
@@ -327,7 +337,13 @@ public class SnapshotSiteProcessor {
                         } else {
                             //Schedule it to happen after the quiet period has elapsed
                             VoltDB.instance().schedulePriorityWork(
-                                    m_onPotentialSnapshotWork,
+                                    new Runnable() {
+                                        @Override
+                                        public void run()
+                                        {
+                                            m_siteTaskerQueue.offer(new SnapshotTask());
+                                        }
+                                    },
                                     quietUntil - now,
                                     0,
                                     TimeUnit.MILLISECONDS);
@@ -343,7 +359,7 @@ public class SnapshotSiteProcessor {
                                     (5 * m_snapshotPriority) + ((long)(m_random.nextDouble() * 15));
                         }
                     } else {
-                        m_onPotentialSnapshotWork.run();
+                        m_siteTaskerQueue.offer(new SnapshotTask());
                     }
                 }
             });
@@ -404,7 +420,13 @@ public class SnapshotSiteProcessor {
         if (m_isIV2Enabled) {
             for (int ii = 0; ii < m_availableSnapshotBuffers.size(); ii++) {
                 VoltDB.instance().schedulePriorityWork(
-                        m_onPotentialSnapshotWork,
+                        new Runnable() {
+                            @Override
+                            public void run()
+                            {
+                                m_siteTaskerQueue.offer(new SnapshotTask());
+                            }
+                        },
                         (m_quietUntil + (5 * m_snapshotPriority) - now),
                         0,
                         TimeUnit.MILLISECONDS);
@@ -418,7 +440,7 @@ public class SnapshotSiteProcessor {
             m_quietUntil = System.currentTimeMillis() + (5 * m_snapshotPriority) + ((long)(m_random.nextDouble() * 15));
         }
     }
-    public Future<?> doSnapshotWork(ExecutionEngine ee, boolean ignoreQuietPeriod) {
+    public Future<?> doSnapshotWork(int partitionId, ExecutionEngine ee, boolean ignoreQuietPeriod) {
         ListenableFuture<?> retval = null;
 
         /*
@@ -533,6 +555,12 @@ public class SnapshotSiteProcessor {
          */
         if (m_snapshotTableTasks.isEmpty()) {
             SNAP_LOG.debug("Finished with tasks");
+            // Offer the post-snapshot task if there is one to the site tasker queue
+            SiteTasker postSnapshotTask = m_siteTasksPostSnapshotting.remove(partitionId);
+            if (postSnapshotTask != null) {
+                m_siteTaskerQueue.offer(postSnapshotTask);
+            }
+
             final ArrayList<SnapshotDataTarget> snapshotTargets = m_snapshotTargets;
             m_snapshotTargets = null;
             m_snapshotTableTasks = null;
@@ -774,10 +802,10 @@ public class SnapshotSiteProcessor {
      * Do snapshot work exclusively until there is no more. Also blocks
      * until the fsync() and close() of snapshot data targets has completed.
      */
-    public HashSet<Exception> completeSnapshotWork(ExecutionEngine ee) throws InterruptedException {
+    public HashSet<Exception> completeSnapshotWork(int partitionId, ExecutionEngine ee) throws InterruptedException {
         HashSet<Exception> retval = new HashSet<Exception>();
         while (m_snapshotTableTasks != null) {
-            Future<?> result = doSnapshotWork(ee, true);
+            Future<?> result = doSnapshotWork(partitionId, ee, true);
             if (result != null) {
                 try {
                     result.get();
