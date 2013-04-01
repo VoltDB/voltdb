@@ -27,7 +27,12 @@ class PersistentTable;
 
 class CopyOnWriteIterator : public TupleIterator {
     friend class CopyOnWriteContext;
+
 public:
+
+    /**
+     * Normal constructor
+     */
     CopyOnWriteIterator(
         PersistentTable *table,
         TBMapI start,
@@ -56,9 +61,14 @@ public:
         }
     }
 
+    TBPtr getCurrentBlock() const { return m_currentBlock; }
+
     bool next(TableTuple &out);
 
     virtual ~CopyOnWriteIterator() {}
+
+    int64_t countRemaining() const;
+
 private:
     /**
      * Table being iterated over
