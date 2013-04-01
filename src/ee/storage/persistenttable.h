@@ -49,8 +49,8 @@
 #include <string>
 #include <vector>
 #include <cassert>
-#include <boost/shared_ptr.hpp>
-#include <boost/scoped_ptr.hpp>
+#include "boost/shared_ptr.hpp"
+#include "boost/scoped_ptr.hpp"
 #include "common/ids.h"
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
@@ -72,10 +72,10 @@ class TableFactory;
 class TupleSerializer;
 class SerializeInput;
 class Topend;
+class ReferenceSerializeOutput;
 class MaterializedViewMetadata;
 class RecoveryProtoMsg;
 class PersistentTableUndoDeleteAction;
-class TupleOutputStreamProcessor;
 
 /**
  * Represents a non-temporary table which permanently resides in
@@ -205,21 +205,8 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
 
     /**
      * Switch the table to copy on write mode. Returns true if the table was already in copy on write mode.
-     * Support predicates for filtering results.
      */
-    bool activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId,
-                             const std::vector<std::string> &predicate_strings,
-                             int32_t totalPartitions);
-
-    /**
-     * COW activation wrapper for backward compatibility with some tests.
-     * It's okay for totalPartitions to be zero because it only feeds into hashing for predicates.
-     * Total tuple count is not used when it's set to -1.
-     */
-    bool activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId) {
-        std::vector<std::string> predicate_strings;
-        return activateCopyOnWrite(serializer, partitionId, predicate_strings, 0);
-    }
+    bool activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId);
 
     /**
      * Create a recovery stream for this table. Returns true if the table already has an active recovery stream
@@ -230,7 +217,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      * Serialize the next message in the stream of recovery messages. Returns true if there are
      * more messages and false otherwise.
      */
-    bool nextRecoveryMessage(ReferenceSerializeOutput *out);
+    void nextRecoveryMessage(ReferenceSerializeOutput *out);
 
     /**
      * Process the updates from a recovery message
@@ -239,10 +226,10 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
 
     /**
      * Attempt to serialize more tuples from the table to the provided
-     * output stream.
-     * Return remaining tuple count, 0 if done, or -1 on error.
+     * output stream.  Returns true if there are more tuples and false
+     * if there are no more tuples waiting to be serialized.
      */
-    int64_t serializeMore(TupleOutputStreamProcessor &outputStreams);
+    bool serializeMore(ReferenceSerializeOutput *out);
 
     /**
      * Create a tree index on the primary key and then iterate it and hash

@@ -29,6 +29,7 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.ExecutionSite;
+import org.voltdb.FragmentPlanSource;
 import org.voltdb.ParameterSet;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
@@ -58,12 +59,22 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public static final int ERRORCODE_SUCCESS = 0;
     public static final int ERRORCODE_ERROR = 1; // just error or not so far.
     public static final int ERRORCODE_WRONG_SERIALIZED_BYTES = 101;
+    public static final int ERRORCODE_NEED_PLAN = 110;
+
+    /** For now sync this value with the value in the EE C++ code to get good stats. */
+    public static final int EE_PLAN_CACHE_SIZE = 10000;
 
     /** Partition ID */
     protected final int m_partitionId;
 
     /** Statistics collector (provided later) */
     private PlannerStatsCollector m_plannerStats = null;
+
+    // used for tracking statistics about the plan cache in the EE
+    private int m_cacheMisses = 0;
+    private int m_eeCacheSize = 0;
+
+    protected FragmentPlanSource m_planSource;
 
     /** Make the EE clean and ready to do new transactional work. */
     public void resetDirtyStatus() {
@@ -77,7 +88,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     /** Utility method to verify return code and throw as required */
     final protected void checkErrorCode(final int errorCode) {
-        if (errorCode != ERRORCODE_SUCCESS) {
+        if ((errorCode != ERRORCODE_SUCCESS) && (errorCode != ERRORCODE_NEED_PLAN)) {
             throwExceptionForError(errorCode);
         }
     }
@@ -94,7 +105,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     /** Create an ee and load the volt shared library */
-    public ExecutionEngine(long siteId, int partitionId) {
+    public ExecutionEngine(long siteId, int partitionId, FragmentPlanSource planSource) {
         m_partitionId = partitionId;
         org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
         // In mock test environments there may be no stats agent.
@@ -103,12 +114,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             m_plannerStats = new PlannerStatsCollector(siteId);
             statsAgent.registerStatsSource(SysProcSelector.PLANNER, siteId, m_plannerStats);
         }
+        m_planSource = planSource;
     }
 
     /** Alternate constructor without planner statistics tracking. */
-    public ExecutionEngine() {
+    public ExecutionEngine(FragmentPlanSource planSource) {
         m_partitionId = 0;  // not used
         m_plannerStats = null;
+        m_planSource = planSource;
     }
 
     /*
@@ -283,6 +296,19 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
     }
 
+    /**
+     * Called from the execution engine to fetch a plan for a given hash.
+     * Also update cache stats.
+     */
+    public byte[] planForFragmentId(long fragmentId) {
+        // track cache misses
+        m_cacheMisses++;
+        // estimate the cache size by the number of misses
+        m_eeCacheSize = Math.max(EE_PLAN_CACHE_SIZE, m_eeCacheSize + 1);
+        // get the plan for realz
+        return m_planSource.planForFragmentId(fragmentId);
+    }
+
     /*
      * Interface frontend invokes to communicate to CPP execution engine.
      */
@@ -291,7 +317,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     /**
      * Serialize more tuples from the specified table that already has a stream enabled
-     * @param bbcontainers Buffers to receive serialized tuple data
+     * @param c Buffer to serialize tuple data too
      * @param tableId Catalog ID of the table to serialize
      * @return A positive number indicating the number of bytes serialized or 0 if there is no more data.
      *        -1 is returned if there is an error (such as the table not having the specified stream type activated).
@@ -309,18 +335,39 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Pass diffs to apply to the EE's catalog to update it */
     abstract public void updateCatalog(final long timestamp, final String diffCommands) throws EEException;
 
-    /** Load a fragment, given a plan, into the EE with a specific fragment id */
-    abstract public long loadPlanFragment(byte[] plan) throws EEException;
-
     /** Run multiple plan fragments */
-    abstract public VoltTable[] executePlanFragments(int numFragmentIds,
-                                                     long[] planFragmentIds,
-                                                     long[] inputDepIds,
-                                                     ParameterSet[] parameterSets,
-                                                     long spHandle,
-                                                     long lastCommittedSpHandle,
-                                                     long uniqueId,
-                                                     long undoQuantumToken) throws EEException;
+    public VoltTable[] executePlanFragments(int numFragmentIds,
+                                            long[] planFragmentIds,
+                                            long[] inputDepIds,
+                                            ParameterSet[] parameterSets,
+                                            long spHandle,
+                                            long lastCommittedSpHandle,
+                                            long uniqueId,
+                                            long undoQuantumToken) throws EEException
+    {
+        try {
+            VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
+                    parameterSets, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
+            m_plannerStats.updateEECacheStats(m_eeCacheSize, numFragmentIds - m_cacheMisses,
+                    m_cacheMisses, m_partitionId);
+            return results;
+        }
+        finally {
+            // don't count any cache misses when there's an exception. This is a lie and they
+            // will still be used to estimate the cache size, but it's hard to count cache hits
+            // during an exception, so we don't count cache misses either to get the right ratio.
+            m_cacheMisses = 0;
+        }
+    }
+
+    protected abstract VoltTable[] coreExecutePlanFragments(int numFragmentIds,
+                                                            long[] planFragmentIds,
+                                                            long[] inputDepIds,
+                                                            ParameterSet[] parameterSets,
+                                                            long spHandle,
+                                                            long lastCommittedSpHandle,
+                                                            long uniqueId,
+                                                            long undoQuantumToken) throws EEException;
 
     /** Used for test code only (AFAIK jhugg) */
     abstract public VoltTable serializeTable(int tableId) throws EEException;
@@ -517,8 +564,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table,
             long spHandle, long lastCommittedSpHandle);
 
-    protected native int nativeLoadPlanFragment(long pointer, byte[] plan);
-
     /**
      * Executes multiple plan fragments with the given parameter sets and gets the results.
      * @param pointer the VoltDBEngine pointer
@@ -630,23 +675,22 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param pointer Pointer to an engine instance
      * @param tableId Catalog ID of the table
      * @param streamType type of stream to activate
-     * @param data serialized predicates
      * @return <code>true</code> on success and <code>false</code> on failure
      */
-    protected native boolean nativeActivateTableStream(long pointer, int tableId, int streamType, byte[] data);
+    protected native boolean nativeActivateTableStream(long pointer, int tableId, int streamType);
 
     /**
      * Serialize more tuples from the specified table that has an active stream of the specified type
      * @param pointer Pointer to an engine instance
+     * @param bufferPointer Buffer to serialize data to
+     * @param offset Offset into the buffer to start serializing to
+     * @param length length of the buffer
      * @param tableId Catalog ID of the table to serialize
      * @param streamType type of stream to pull data from
-     * @param data Serialized buffer count and array
-     * @return remaining tuple count, 0 when done, or -1 for an error.
-     * array of per-buffer byte counts with an extra leading int that is set to
-     *         the count of unstreamed tuples, 0 when done, or -1 indicating an error
-     *         (such as the table not being COW mode).
+     * @return A positive number indicating the number of bytes serialized or 0 if there is no more data.
+     *         -1 is returned if there is an error (such as the table not being COW mode).
      */
-    protected native long nativeTableStreamSerializeMore(long pointer, int tableId, int streamType, byte[] data);
+    protected native int nativeTableStreamSerializeMore(long pointer, long bufferPointer, int offset, int length, int tableId, int streamType);
 
     /**
      * Process a recovery message and load the data it contains.

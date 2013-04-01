@@ -97,6 +97,13 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
+    m_planForFragmentIdMID = m_jniEnv->GetMethodID(jniClass, "planForFragmentId", "(J)[B");
+    if (m_planForFragmentIdMID == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_planForFragmentIdMID != 0);
+        throw std::exception();
+    }
+
     m_crashVoltDBMID =
         m_jniEnv->GetStaticMethodID(
             jniClass,
@@ -204,6 +211,45 @@ int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
     }
     else {
         return 0;
+    }
+}
+
+std::string JNITopend::planForFragmentId(int64_t fragmentId) {
+    VOLT_DEBUG("fetching plan for id %d", (int) fragmentId);
+
+    JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, 10);
+    if (jni_frame.checkResult() < 0) {
+        VOLT_ERROR("Unable to load dependency: jni frame error.");
+        throw std::exception();
+    }
+
+    jbyteArray jbuf = (jbyteArray)(m_jniEnv->CallObjectMethod(m_javaExecutionEngine,
+                                                              m_planForFragmentIdMID,
+                                                              fragmentId));
+
+    if (!jbuf) {
+        // this will be trapped later ;-)
+        return std::string("");
+    }
+
+    jsize length = m_jniEnv->GetArrayLength(jbuf);
+    if (length > 0) {
+        jboolean is_copy;
+        jbyte *bytes = m_jniEnv->GetByteArrayElements(jbuf, &is_copy);
+        // Add the plan buffer info to the stack object
+        // so it'll get cleaned up if loadTuplesFrom throws
+        jni_frame.addDependencyRef(is_copy, jbuf, bytes);
+
+        // make a null terminated copy
+        boost::scoped_array<char> strdata(new char[length + 1]);
+        memcpy(strdata.get(), bytes, length);
+        strdata.get()[length] = '\0';
+
+        return std::string(strdata.get());
+    }
+    else {
+        // this will be trapped later ;-)
+        return std::string("");
     }
 }
 

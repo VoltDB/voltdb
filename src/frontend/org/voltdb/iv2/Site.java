@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 import java.io.IOException;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DependencyPair;
+import org.voltdb.FragmentPlanSource;
 import org.voltdb.HsqlBackend;
 import org.voltdb.IndexStats;
 import org.voltdb.LoadedProcedureSet;
@@ -66,6 +68,7 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.jni.MockExecutionEngine;
+import org.voltdb.jni.Sha1Wrapper;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -76,7 +79,7 @@ import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 import com.google.common.collect.ImmutableMap;
 
-public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
+public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection, FragmentPlanSource
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
@@ -379,12 +382,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     {
         if (m_backend == BackendTarget.NONE) {
             m_hsql = null;
-            m_ee = new MockExecutionEngine();
+            m_ee = new MockExecutionEngine(this);
         }
         else if (m_backend == BackendTarget.HSQLDB_BACKEND) {
             m_hsql = HsqlBackend.initializeHSQLBackend(m_siteId,
                                                        m_context);
-            m_ee = new MockExecutionEngine();
+            m_ee = new MockExecutionEngine(this);
         }
         else {
             m_hsql = null;
@@ -423,7 +426,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getMaxtemptablesize(),
                         TheHashinator.getConfiguredHashinatorType(),
-                        TheHashinator.getConfigureBytes(m_numberOfPartitions));
+                        TheHashinator.getConfigureBytes(m_numberOfPartitions),
+                        this);
                 eeTemp.loadCatalog( timestamp, serializedCatalog);
             }
             else {
@@ -440,7 +444,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPorts.remove(0),
                             TheHashinator.getConfiguredHashinatorType(),
-                            TheHashinator.getConfigureBytes(m_numberOfPartitions));
+                            TheHashinator.getConfigureBytes(m_numberOfPartitions),
+                            this);
                 eeTemp.loadCatalog( timestamp, serializedCatalog);
             }
         }
@@ -751,7 +756,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             ParameterSet params)
     {
         ProcedureRunner runner = m_loadedProcedures.getSysproc(fragmentId);
-        return runner.executePlanFragment(txnState, dependencies, fragmentId, params);
+        return runner.executeSysProcPlanFragment(txnState, dependencies, fragmentId, params);
     }
 
     @Override
@@ -944,11 +949,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public long loadPlanFragment(byte[] plan) throws EEException {
-        return m_ee.loadPlanFragment(plan);
-    }
-
-    @Override
     public VoltTable[] executePlanFragments(int numFragmentIds,
             long[] planFragmentIds, long[] inputDepIds,
             ParameterSet[] parameterSets, long spHandle, long uniqueId, boolean readOnly)
@@ -1039,5 +1039,80 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_numberOfPartitions = partitionCount;
         m_ee.updateHashinator(TheHashinator.getConfiguredHashinatorType(),
                 TheHashinator.getConfigureBytes(m_numberOfPartitions));
+    }
+
+    class FragInfo {
+        Sha1Wrapper hash;
+        long fragId;
+        byte[] plan;
+        int refCount;
+    }
+    HashMap<Sha1Wrapper, FragInfo> m_plansByHash = new HashMap<Sha1Wrapper, FragInfo>();
+    HashMap<Long, FragInfo> m_plansById = new HashMap<Long, FragInfo>();
+    long m_nextFragId = 5000;
+
+    @Override
+    public long getFragmentIdForPlanHash(byte[] planHash) {
+        Sha1Wrapper key = new Sha1Wrapper(planHash);
+        FragInfo frag = null;
+        synchronized (FragInfo.class) {
+            frag = m_plansByHash.get(key);
+        }
+        assert(frag != null);
+        return frag.fragId;
+    }
+
+    @Override
+    public long loadOrAddRefPlanFragment(byte[] planHash, byte[] plan) {
+        Sha1Wrapper key = new Sha1Wrapper(planHash);
+        FragInfo frag = null;
+        synchronized (FragInfo.class) {
+            frag = m_plansByHash.get(key);
+            if (frag != null) {
+                frag.refCount++;
+                return frag.fragId;
+            }
+            else {
+                frag = new FragInfo();
+                frag.hash = key;
+                frag.plan = plan;
+                frag.refCount = 1;
+                frag.fragId = m_nextFragId++;
+                m_plansByHash.put(key, frag);
+                m_plansById.put(frag.fragId, frag);
+                return frag.fragId;
+            }
+        }
+    }
+
+    @Override
+    public void decrefPlanFragmentById(long fragmentId) {
+        // skip dummy/invalid fragment ids
+        if (fragmentId <= 0) return;
+
+        FragInfo frag = null;
+        synchronized (FragInfo.class) {
+            frag = m_plansById.get(fragmentId);
+            assert(frag != null);
+            if (--frag.refCount == 0) {
+                m_plansById.remove(fragmentId);
+                m_plansByHash.remove(frag.hash);
+            }
+        }
+    }
+
+    /**
+     * Called from the execution engine to fetch a plan for a given hash.
+     */
+    @Override
+    public byte[] planForFragmentId(long fragmentId) {
+        assert(fragmentId > 0);
+
+        FragInfo frag = null;
+        synchronized (FragInfo.class) {
+            frag = m_plansById.get(fragmentId);
+        }
+        assert(frag != null);
+        return frag.plan;
     }
 }

@@ -331,6 +331,8 @@ public class TestClientInterface {
         AdHocPlannedStatement s = new AdHocPlannedStatement("select * from a".getBytes(VoltDB.UTF8ENCODING),
                                                             new CorePlan(new byte[0],
                                                                          new byte[0],
+                                                                         new byte[20],
+                                                                         new byte[20],
                                                                          false,
                                                                          false,
                                                                          true,
