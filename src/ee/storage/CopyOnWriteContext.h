@@ -121,6 +121,10 @@ private:
 
     int64_t m_totalTuples;
     int64_t m_tuplesRemaining;
+    int64_t m_blocksCompacted;
+
+    void checkRemainingTuples(const std::string &label);
+
 };
 
 }

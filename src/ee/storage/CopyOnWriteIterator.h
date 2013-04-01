@@ -27,7 +27,9 @@ class PersistentTable;
 
 class CopyOnWriteIterator : public TupleIterator {
     friend class CopyOnWriteContext;
+
 public:
+
     CopyOnWriteIterator(
         PersistentTable *table,
         TBMapI start,
@@ -59,6 +61,9 @@ public:
     bool next(TableTuple &out);
 
     virtual ~CopyOnWriteIterator() {}
+
+    int64_t countRemaining() const;
+
 private:
     /**
      * Table being iterated over
