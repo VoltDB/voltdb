@@ -53,6 +53,10 @@ class TableLoader {
     final AtomicBoolean hadError = new AtomicBoolean(false);
     final SortedSet<Long> outstandingPkeys = Collections.synchronizedSortedSet(new TreeSet<Long>());
 
+    private static String _F(String str, Object... parameters) {
+        return String.format(str, parameters);
+    }
+
     TableLoader(SchemaChangeClient scc, VoltTable t, Random rand) {
         this.scc = scc;
         this.table = t;
@@ -111,7 +115,7 @@ class TableLoader {
         long lastSuccessfullyLoadedKey = -1;
 
         while (lastSuccessfullyLoadedKey < stopPkey) {
-            long nextKey = lastSuccessfullyLoadedKey >= 0 ? lastSuccessfullyLoadedKey : startPkey;
+            long nextKey = lastSuccessfullyLoadedKey >= 0 ? lastSuccessfullyLoadedKey + jump : startPkey;
             nextKey = loadChunk(nextKey, stopPkey, jump);
             if (nextKey >= 0) {
                 lastSuccessfullyLoadedKey = nextKey;
@@ -133,6 +137,8 @@ class TableLoader {
     }
 
     private long deleteChunk(long startPkey, long stopPkey, long jump) {
+        log.info(_F("deleteChunk | startPkey:%d stopPkey:%d jump:%d", startPkey, stopPkey, jump));
+
         assert(startPkey < stopPkey);
         assert(startPkey >= 0);
 
@@ -175,6 +181,9 @@ class TableLoader {
     }
 
     private long loadChunk(long startPkey, long stopPkey, long jump) {
+
+        log.info(_F("loadChunk | startPkey:%d stopPkey:%d jump:%d", startPkey, stopPkey, jump));
+
         assert(startPkey < stopPkey);
         assert(startPkey >= 0);
 
