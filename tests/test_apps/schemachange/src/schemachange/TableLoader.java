@@ -105,7 +105,6 @@ class TableLoader {
 
     void load(long startPkey, long stopPkey, long jump) {
         assert(outstandingPkeys.isEmpty());
-        assert(!hadError.get());
 
         if (startPkey >= stopPkey) return;
 
@@ -119,20 +118,17 @@ class TableLoader {
             }
         }
 
-        hadError.set(false);
         outstandingPkeys.clear();
     }
 
     void delete(long startPkey, long stopPkey, long jump) {
         assert(outstandingPkeys.isEmpty());
-        assert(!hadError.get());
 
         if (startPkey > stopPkey) return;
         do {
             startPkey = deleteChunk(startPkey, stopPkey, jump) + jump;
         } while (startPkey <= stopPkey);
 
-        hadError.set(false);
         outstandingPkeys.clear();
     }
 
@@ -143,6 +139,7 @@ class TableLoader {
         long nextPkey = startPkey;
 
         long maxSentPkey = -1;
+        hadError.set(false);
         while ((nextPkey <= stopPkey) && (!hadError.get())) {
             try {
                 outstandingPkeys.add(nextPkey);
@@ -184,6 +181,7 @@ class TableLoader {
         long nextPkey = startPkey;
 
         long maxSentPkey = -1;
+        hadError.set(false);
         while ((nextPkey <= stopPkey) && (!hadError.get())) {
             Object[] row = TableHelper.randomRow(table, Integer.MAX_VALUE, rand);
             row[pkeyColIndex] = nextPkey;
