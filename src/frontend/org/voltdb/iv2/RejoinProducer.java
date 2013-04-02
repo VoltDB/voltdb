@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google.common.util.concurrent.SettableFuture;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
@@ -49,6 +50,8 @@ public class RejoinProducer extends JoinProducerBase {
     private final AtomicBoolean m_currentlyRejoining;
     private ScheduledFuture<?> m_timeFuture;
     private RejoinSiteProcessor m_rejoinSiteProcessor;
+    private final SettableFuture<SnapshotCompletionEvent> m_completionMonitorAwait =
+            SettableFuture.create();
 
     // True: use live rejoin; false use community blocking implementation.
     private final boolean m_liveRejoin;
@@ -258,7 +261,7 @@ public class RejoinProducer extends JoinProducerBase {
                 + " and snapshot nonce is: "
                 + snapshotNonce);
 
-        SnapshotCompletionAction interest = new SnapshotCompletionAction(snapshotNonce);
+        SnapshotCompletionAction interest = new SnapshotCompletionAction(snapshotNonce, m_completionMonitorAwait);
         interest.register();
         // Tell the RejoinCoordinator everything it will need to know to get us our snapshot stream.
         RejoinMessage initResp = new RejoinMessage(m_mailbox.getHSId(), sourceSite, hsId);
@@ -356,6 +359,7 @@ public class RejoinProducer extends JoinProducerBase {
                 REJOINLOG.debug(m_whoami
                         + "waiting on snapshot completion monitor.");
                 event = m_completionMonitorAwait.get();
+                m_completionAction.setSnapshotTxnId(event.multipartTxnId);
                 REJOINLOG.debug(m_whoami
                         + "snapshot monitor completed. "
                         + "Sending SNAPSHOT_FINISHED and Handing off to site.");
@@ -424,6 +428,7 @@ public class RejoinProducer extends JoinProducerBase {
             REJOINLOG.debug(m_whoami
                     + "waiting on snapshot completion monitor.");
             event = m_completionMonitorAwait.get();
+            m_completionAction.setSnapshotTxnId(event.multipartTxnId);
             REJOINLOG.debug(m_whoami + " monitor completed. Sending SNAPSHOT_FINISHED "
                     + "and handing off to site.");
             RejoinMessage snap_complete = new RejoinMessage(

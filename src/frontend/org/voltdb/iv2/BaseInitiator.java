@@ -71,7 +71,7 @@ public abstract class BaseInitiator implements Initiator
         JoinProducerBase joinProducer;
 
         if (startAction == VoltDB.START_ACTION.JOIN) {
-            joinProducer = new JoinProducer(m_partitionId, scheduler.m_tasks);
+            joinProducer = new ElasticJoinProducer(m_partitionId, scheduler.m_tasks);
         } else if (VoltDB.createForRejoin(startAction)) {
             joinProducer = new RejoinProducer(m_partitionId, scheduler.m_tasks, isLiveRejoin);
         } else {

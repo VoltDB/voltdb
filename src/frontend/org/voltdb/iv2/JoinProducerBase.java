@@ -44,8 +44,6 @@ public abstract class JoinProducerBase extends SiteTasker {
     protected final SiteTaskerQueue m_taskQueue;
     protected InitiatorMailbox m_mailbox = null;
     protected long m_coordinatorHsId = Long.MIN_VALUE;
-    protected final SettableFuture<SnapshotCompletionInterest.SnapshotCompletionEvent>
-            m_completionMonitorAwait = SettableFuture.create();
     protected JoinCompletionAction m_completionAction = null;
     protected TaskLog m_taskLog;
 
@@ -59,10 +57,12 @@ public abstract class JoinProducerBase extends SiteTasker {
     protected class SnapshotCompletionAction implements SnapshotCompletionInterest
     {
         private final String m_snapshotNonce;
+        private final SettableFuture<SnapshotCompletionEvent> m_future;
 
-        protected SnapshotCompletionAction(String nonce)
+        protected SnapshotCompletionAction(String nonce, SettableFuture<SnapshotCompletionEvent> future)
         {
             m_snapshotNonce = nonce;
+            m_future = future;
         }
 
         protected void register()
@@ -83,10 +83,9 @@ public abstract class JoinProducerBase extends SiteTasker {
             if (event.nonce.equals(m_snapshotNonce)) {
                 JOINLOG.debug(m_whoami + "counting down snapshot monitor completion. "
                         + "Snapshot txnId is: " + event.multipartTxnId);
-                m_completionAction.setSnapshotTxnId(event.multipartTxnId);
                 deregister();
                 kickWatchdog(true);
-                m_completionMonitorAwait.set(event);
+                m_future.set(event);
             } else {
                 JOINLOG.debug(m_whoami
                         + " observed completion of irrelevant snapshot nonce: "
@@ -100,7 +99,7 @@ public abstract class JoinProducerBase extends SiteTasker {
     {
         protected long m_snapshotTxnId = Long.MIN_VALUE;
 
-        private void setSnapshotTxnId(long txnId)
+        protected void setSnapshotTxnId(long txnId)
         {
             m_snapshotTxnId = txnId;
         }

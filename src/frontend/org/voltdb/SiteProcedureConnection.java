@@ -156,6 +156,11 @@ public interface SiteProcedureConnection {
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds);
 
     /**
+     * Update the EE hashinator with the given configuration.
+     */
+    public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config);
+
+    /**
      * Get the site-local fragment id for a given plan identified by 20-byte sha-1 hash
      */
     public long getFragmentIdForPlanHash(byte[] planHash);

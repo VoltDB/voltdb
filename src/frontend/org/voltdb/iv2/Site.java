@@ -394,12 +394,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             m_ee = initializeEE(serializedCatalog, timestamp);
         }
 
-        m_snapshotter = new SnapshotSiteProcessor(new Runnable() {
-            @Override
-            public void run() {
-                m_scheduler.offer(new SnapshotTask());
-            }
-        },
+        m_snapshotter = new SnapshotSiteProcessor(m_scheduler,
         m_snapshotPriority,
         new SnapshotSiteProcessor.IdlePredicate() {
             @Override
@@ -650,7 +645,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      */
     @Override
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException {
-        return m_snapshotter.completeSnapshotWork(m_ee);
+        return m_snapshotter.completeSnapshotWork(m_partitionId, m_ee);
     }
 
     //
@@ -893,7 +888,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public Future<?> doSnapshotWork(boolean ignoreQuietPeriod)
     {
-        return m_snapshotter.doSnapshotWork(m_ee, ignoreQuietPeriod);
+        return m_snapshotter.doSnapshotWork(m_partitionId, m_ee, ignoreQuietPeriod);
     }
 
     @Override
@@ -990,7 +985,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             hostLog.info(String.format("Site %d performing schema change operation must block until snapshot is locally complete.",
                     CoreUtils.getSiteIdFromHSId(m_siteId)));
             try {
-                m_snapshotter.completeSnapshotWork(m_ee);
+                m_snapshotter.completeSnapshotWork(m_partitionId, m_ee);
                 hostLog.info(String.format("Site %d locally finished snapshot. Will update catalog now.",
                         CoreUtils.getSiteIdFromHSId(m_siteId)));
             }
@@ -1037,8 +1032,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public void setNumberOfPartitions(int partitionCount)
     {
         m_numberOfPartitions = partitionCount;
-        m_ee.updateHashinator(TheHashinator.getConfiguredHashinatorType(),
-                TheHashinator.getConfigureBytes(m_numberOfPartitions));
+    }
+
+    @Override
+    public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config)
+    {
+        m_ee.updateHashinator(config.getFirst(), config.getSecond());
     }
 
     class FragInfo {
