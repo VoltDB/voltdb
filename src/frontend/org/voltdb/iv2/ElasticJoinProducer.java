@@ -32,6 +32,11 @@ import org.voltdb.rejoin.TaskLog;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicReference;
@@ -54,8 +59,8 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     // first block of partitioned table data
     private final AtomicReference<Pair<Integer, ByteBuffer>> m_firstWork =
             new AtomicReference<Pair<Integer, ByteBuffer>>();
-    // snapshot sink used to stream partitioned table data
-    private StreamSnapshotSink m_dataSink = null;
+    // a list of snapshot sinks used to stream partitioned table data from multiple sources
+    private final List<StreamSnapshotSink> m_dataSinks = new ArrayList<StreamSnapshotSink>();
     // partitioned table snapshot completion monitor
     private final SettableFuture<SnapshotCompletionEvent> m_partitionedCompletionMonitor =
             SettableFuture.create();
@@ -84,10 +89,15 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
                 new SnapshotCompletionAction(snapshotNonce, m_replicatedCompletionMonitor);
         interest.register();
 
-        m_dataSink = new StreamSnapshotSink();
-        long hsid = m_dataSink.initialize();
-        // don't pick the source for this partition, let the coordinator decide
-        RejoinMessage msg = new RejoinMessage(m_mailbox.getHSId(), Long.MIN_VALUE, hsid);
+        Set<Long> sinkHSIds = new HashSet<Long>();
+        for (int i = 0; i < message.getSnapshotSinkCount(); i++) {
+            StreamSnapshotSink sink = new StreamSnapshotSink();
+            m_dataSinks.add(sink);
+            sinkHSIds.add(sink.initialize());
+        }
+
+        // respond to the coordinator with the sink HSIDs
+        RejoinMessage msg = new RejoinMessage(m_mailbox.getHSId(), sinkHSIds);
         m_mailbox.send(m_coordinatorHsId, msg);
 
         m_taskQueue.offer(this);
@@ -125,9 +135,11 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     {
         Pair<Integer, ByteBuffer> dataPair = m_snapshotData.poll();
         if (dataPair != null) {
-            JOINLOG.debug("P" + m_partitionId + " restoring table " + dataPair.getFirst() +
+            if (JOINLOG.isTraceEnabled()) {
+                JOINLOG.trace(m_whoami + "restoring replicated table " + dataPair.getFirst() +
                                   " block of (" + dataPair.getSecond().position() + "," +
                                   dataPair.getSecond().limit() + ")");
+            }
             restoreBlock(dataPair, siteConnection);
         }
     }
@@ -159,7 +171,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
             {
                 Pair<Integer, ByteBuffer> rejoinWork = null;
                 try {
-                    rejoinWork = m_dataSink.take();
+                    rejoinWork = m_dataSinks.get(0).take();
                 } catch (InterruptedException e) {
                     VoltDB.crashLocalVoltDB(
                             "Interrupted in take()ing first snapshot block for rejoin",
@@ -178,19 +190,51 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
      */
     private void runForBlockingDataTransfer(SiteProcedureConnection siteConnection)
     {
-        // Block until all blocks for partitioned table is streamed over
+        /*
+         * Block until all blocks for partitioned tables are streamed over. There may
+         * be more than one data sinks for partitioned snapshot transfer, each from a
+         * different source partition.
+         */
         JOINLOG.info("P" + m_partitionId + " blocking partitioned table transfer starts");
         Pair<Integer, ByteBuffer> tableBlock = m_firstWork.get();
-        while (tableBlock != null){
-            restoreBlock(tableBlock, siteConnection);
-            try {
-                tableBlock = m_dataSink.take();
-            } catch (InterruptedException e) {
-                JOINLOG.warn("ElasticJoinProducer interrupted at take()");
-                tableBlock = null;
+        while (!m_dataSinks.isEmpty()){
+            if (tableBlock != null) {
+                if (JOINLOG.isTraceEnabled()) {
+                    JOINLOG.trace(m_whoami + "restoring partitioned table " + tableBlock.getFirst() +
+                                      " block of (" + tableBlock.getSecond().position() + "," +
+                                      tableBlock.getSecond().limit() + ")");
+                }
+
+                restoreBlock(tableBlock, siteConnection);
+            }
+
+            /*
+             * Try all data sinks to see if there is a data block ready. If not, the outer
+             * while loop will run again.
+             *
+             * Don't use take() here because it blocks. If one sink has reached the end,
+             * it may block until the other sinks have finished. However, without reading
+             * stuff from the other sinks, it will deadlock.
+             */
+            tableBlock = null;
+            ListIterator<StreamSnapshotSink> sinkIter = m_dataSinks.listIterator();
+            while (tableBlock == null && sinkIter.hasNext()) {
+                StreamSnapshotSink sink = sinkIter.next();
+                if (sink.isEOF()) {
+                    // No more data from this data sink, close and remove it from the list
+                    sink.close();
+                    sinkIter.remove();
+
+                    if (JOINLOG.isTraceEnabled()) {
+                        JOINLOG.trace(m_whoami +
+                                          " finished transfering partitioned table data from one partition");
+                    }
+                } else {
+                    tableBlock = sink.poll();
+                }
             }
         }
-        m_dataSink.close();
+
         JOINLOG.debug(m_whoami + " partitioned table snapshot transfer is finished");
 
         SnapshotCompletionEvent event = null;
