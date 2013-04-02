@@ -3108,20 +3108,14 @@ inline void NValue::murmurHash3(void * out) const {
     case VALUE_TYPE_TIMESTAMP:
     case VALUE_TYPE_DOUBLE:
     case VALUE_TYPE_BIGINT:
-        MurmurHash3_x64_128( m_data, 8, 0, out);
-        break;
     case VALUE_TYPE_INTEGER:
-        MurmurHash3_x64_128( m_data, 4, 0, out);
+    case VALUE_TYPE_SMALLINT:
+    case VALUE_TYPE_TINYINT:
+        MurmurHash3_x64_128( m_data, 8, 0, out);
         break;
     case VALUE_TYPE_VARBINARY:
     case VALUE_TYPE_VARCHAR:
         MurmurHash3_x64_128( getObjectValue(), getObjectLength(), 0, out);
-        break;
-    case VALUE_TYPE_SMALLINT:
-        MurmurHash3_x64_128( m_data, 2, 0, out);
-        break;
-    case VALUE_TYPE_TINYINT:
-        MurmurHash3_x64_128( m_data, 1, 0, out);
         break;
     default:
         throwFatalException("Unknown type for murmur hashing %d", type);
