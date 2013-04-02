@@ -27,14 +27,15 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.TreeMap;
-import java.util.Iterator;
 
-import com.google.common.base.Joiner;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
+
+import com.google.common.base.Joiner;
 
 /**
  * A deque that specializes in providing persistence of binary objects to disk. Any object placed
@@ -245,7 +246,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
                             try {
                                 closeAndDelete();
                             } catch (IOException e) {
-                                exportLog.error(e);
+                                exportLog.error("Error closing and deleting binary deque segment", e);
                             }
                         }
                     } else {

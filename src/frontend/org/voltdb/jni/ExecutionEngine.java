@@ -43,6 +43,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.VoltTableUtil;
 
 /**
  * Wrapper for native Execution Engine library. There are two implementations,
@@ -183,7 +184,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                 // to avoid any changes to the WorkUnit's list. But do not
                 // copy the table data.
                 final ArrayDeque<VoltTable> deque = new ArrayDeque<VoltTable>();
-                deque.addAll(e.getValue());
+                for (VoltTable depTable : e.getValue()) {
+                    // A joining node will respond with a table that has this status code
+                    if (depTable.getStatusCode() != VoltTableUtil.NULL_DEPENDENCY_STATUS) {
+                        deque.add(depTable);
+                    }
+                }
                 // intentionally overwrite the previous dependency id.
                 // would a lookup and a clear() be faster?
                 m_depsById.put(e.getKey(), deque);

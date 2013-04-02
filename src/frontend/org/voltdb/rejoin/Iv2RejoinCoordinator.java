@@ -17,7 +17,6 @@
 
 package org.voltdb.rejoin;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -41,14 +40,13 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
-import org.voltdb.utils.VoltFile;
 
 /**
  * Thread Safety: this is a reentrant class. All mutable datastructures
  * must be thread-safe. They use m_lock to do this. DO NOT hold m_lock
  * when leaving this class.
  */
-public class Iv2RejoinCoordinator extends RejoinCoordinator {
+public class Iv2RejoinCoordinator extends JoinCoordinator {
     private static final VoltLogger REJOINLOG = new VoltLogger("REJOIN");
 
     private long m_startTime;
@@ -89,14 +87,7 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
             }
 
             // clear overflow dir in case there are files left from previous runs
-            try {
-                File overflowDir = new File(voltroot, "rejoin_overflow");
-                if (overflowDir.exists()) {
-                    VoltFile.recursivelyDelete(overflowDir);
-                }
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Fail to clear rejoin overflow directory", false, e);
-            }
+            clearOverflowDir(voltroot);
         }
     }
 
@@ -136,7 +127,7 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
 
     private String makeSnapshotRequest(Map<Long, Long> sourceToDests)
     {
-        return makeSnapshotRequest(sourceToDests, null);
+        return makeSnapshotRequest(sourceToDests, null, null);
     }
 
     @Override

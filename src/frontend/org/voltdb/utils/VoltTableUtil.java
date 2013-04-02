@@ -46,6 +46,10 @@ public class VoltTableUtil {
      */
     public static TimeZone tz = VoltDB.VOLT_TIMEZONE;
 
+    // VoltTable status code to indicate null dependency table. Joining SPI replies to fragment
+    // task messages with this.
+    public static byte NULL_DEPENDENCY_STATUS = -1;
+
     private static final ThreadLocal<SimpleDateFormat> m_sdf = new ThreadLocal<SimpleDateFormat>() {
         @Override
         public SimpleDateFormat initialValue() {

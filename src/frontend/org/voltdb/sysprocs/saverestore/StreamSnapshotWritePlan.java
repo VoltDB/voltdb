@@ -21,6 +21,7 @@ import java.io.IOException;
 
 import java.util.ArrayList;
 
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.ListIterator;
 import java.util.Set;
@@ -32,6 +33,7 @@ import java.util.Map;
 
 import java.util.Map.Entry;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Longs;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -40,10 +42,13 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 
+import org.voltdb.SiteProcedureConnection;
+import org.voltdb.TheHashinator;
 import org.voltdb.catalog.Table;
 
 import org.voltdb.dtxn.SiteTracker;
 
+import org.voltdb.iv2.SiteTasker;
 import org.voltdb.rejoin.StreamSnapshotDataTarget;
 
 import org.voltdb.SnapshotDataFilter;
@@ -52,6 +57,7 @@ import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
 
+import org.voltdb.rejoin.TaskLog;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.SystemProcedureExecutionContext;
 
@@ -80,6 +86,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
 
         assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty());
 
+        createPostSnapshotTasks(tracker.getPartitionsForHost(context.getHostId()), jsData);
         final List<Table> tables = getTablesToInclude(jsData, context);
 
         final AtomicInteger numTables = new AtomicInteger(tables.size());
@@ -227,5 +234,77 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         }
 
         return streamPairs;
+    }
+
+    private static void createPostSnapshotTasks(Collection<Integer> partitions,
+                                                JSONObject jsData)
+    {
+        if (jsData != null) {
+            try {
+                JSONObject cts = jsData.optJSONObject("postSnapshotTasks");
+                if (cts != null) {
+                    Iterator keys = cts.keys();
+                    while (keys.hasNext()) {
+                        String key = (String) keys.next();
+                        if (key.equalsIgnoreCase("updateHashinator")) {
+                            createUpdateHashinatorTasksForSites(partitions, cts.getJSONObject(key));
+                        }
+                    }
+                }
+            } catch (JSONException e) {
+                SNAP_LOG.warn("Failed to parse completion task information", e);
+            }
+        }
+    }
+
+    private static void createUpdateHashinatorTasksForSites(Collection<Integer> partitions,
+                                                            JSONObject jsData) throws JSONException
+    {
+        // Get the set of new partitions to add
+        JSONArray newPartitionsArray = jsData.getJSONArray("config");
+        Set<Integer> newPartitions = new HashSet<Integer>();
+        for (int i = 0; i < newPartitionsArray.length(); i++) {
+            newPartitions.add(newPartitionsArray.getInt(i));
+        }
+
+        SiteTasker task = new UpdateEEHashinator(ImmutableSet.copyOf(newPartitions));
+        for (int partition : partitions) {
+            SnapshotSiteProcessor.m_siteTasksPostSnapshotting.put(partition, task);
+        }
+    }
+
+    /**
+     * A post-snapshot site task that updates the hashinator in Java and EE.
+     */
+    private static class UpdateEEHashinator extends SiteTasker {
+        private final Set<Integer> m_newPartitions;
+
+        public UpdateEEHashinator(Set<Integer> newPartitions)
+        {
+            m_newPartitions = newPartitions;
+        }
+
+        @Override
+        public void run(SiteProcedureConnection siteConnection)
+        {
+            // TODO: This is not thread-safe, sites will race to update it. Once we support
+            // adding multiple partitions, this must check if the new partitions are already
+            // before changing the Java hashinator.
+            TheHashinator.HashinatorType type = TheHashinator.getConfiguredHashinatorType();
+            byte[] configBytes = TheHashinator.addPartitions(m_newPartitions);
+            TheHashinator.initialize(TheHashinator.getConfiguredHashinatorType().hashinatorClass, configBytes);
+            if (SNAP_LOG.isDebugEnabled()) {
+                SNAP_LOG.debug("P" + siteConnection.getCorrespondingPartitionId() +
+                               " updated the hashinator with new partitions: " + m_newPartitions);
+            }
+            siteConnection.updateHashinator(Pair.of(type, configBytes));
+        }
+
+        @Override
+        public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
+                throws IOException
+        {
+            throw new RuntimeException("Update EE hashinator task attempted on partial rejoin state.");
+        }
     }
 }

@@ -91,6 +91,18 @@ public class TestTheHashinator extends TestCase {
         throw new RuntimeException();
     }
 
+    private Map<Long, Integer> deserializeElasticConfig(byte[] config) {
+        Map<Long, Integer> tokens = new HashMap<Long, Integer>();
+        ByteBuffer buf = ByteBuffer.wrap(config);
+        int count = buf.getInt();
+
+        for (int i = 0; i < count; i++) {
+            tokens.put(buf.getLong(), buf.getInt());
+        }
+
+        return tokens;
+    }
+
     /*
      * This test validates that not all values hash to 0. Most of the other
      * tests will pass even if everything hashes to a single partition.
@@ -115,7 +127,7 @@ public class TestTheHashinator extends TestCase {
         TheHashinator.initialize(getHashinatorClass(), configBytes);
 
         int eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
-        int javahash = TheHashinator.hashinateLong(valueToHash);
+        int javahash = TheHashinator.hashToPartition(valueToHash);
         if (eehash != javahash) {
             System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
         }
@@ -147,7 +159,7 @@ public class TestTheHashinator extends TestCase {
 
         long valueToHash = 0;
         int eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
-        int javahash = TheHashinator.hashinateLong(valueToHash);
+        int javahash = TheHashinator.hashToPartition(valueToHash);
         if (eehash != javahash) {
             System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
         }
@@ -157,7 +169,7 @@ public class TestTheHashinator extends TestCase {
 
         valueToHash = 1;
         eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
-        javahash = TheHashinator.hashinateLong(valueToHash);
+        javahash = TheHashinator.hashToPartition(valueToHash);
         if (eehash != javahash) {
             System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
         }
@@ -167,7 +179,7 @@ public class TestTheHashinator extends TestCase {
 
         valueToHash = 2;
         eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
-        javahash = TheHashinator.hashinateLong(valueToHash);
+        javahash = TheHashinator.hashToPartition(valueToHash);
         if (eehash != javahash) {
             System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
         }
@@ -177,7 +189,7 @@ public class TestTheHashinator extends TestCase {
 
         valueToHash = 3;
         eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
-        javahash = TheHashinator.hashinateLong(valueToHash);
+        javahash = TheHashinator.hashToPartition(valueToHash);
         if (eehash != javahash) {
             System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
         }
@@ -216,7 +228,7 @@ public class TestTheHashinator extends TestCase {
             TheHashinator.initialize(getHashinatorClass(), configBytes);
             for (long valueToHash : values) {
                 int eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
-                int javahash = TheHashinator.hashinateLong(valueToHash);
+                int javahash = TheHashinator.hashToPartition(valueToHash);
                 if (eehash != javahash) {
                     System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
                 }
@@ -244,7 +256,7 @@ public class TestTheHashinator extends TestCase {
             TheHashinator.initialize(getHashinatorClass(), configBytes);
             // this will produce negative values, which is desired here.
             final long valueToHash = r.nextLong();
-            final int javahash = TheHashinator.hashinateLong(valueToHash);
+            final int javahash = TheHashinator.hashToPartition(valueToHash);
             final int eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
             if (eehash != javahash) {
                 System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
@@ -279,7 +291,7 @@ public class TestTheHashinator extends TestCase {
             TheHashinator.initialize(getHashinatorClass(), configBytes);
 
             int eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
-            int javahash = TheHashinator.hashinateString(valueToHash);
+            int javahash = TheHashinator.hashToPartition(valueToHash);
             if (eehash != javahash) {
                 partitionCount++;
             }
@@ -555,5 +567,41 @@ public class TestTheHashinator extends TestCase {
         assertEquals( 2, hashinator.partitionForToken(Long.MAX_VALUE - 1));
     }
 
+    @Test
+    public void testElasticAddPartitions() {
+        if (hashinatorType == HashinatorType.LEGACY) return;
+
+        ElasticHashinator hashinator = new ElasticHashinator(ElasticHashinator.getConfigureBytes(3,
+                ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION));
+
+        byte[] newConfig = ElasticHashinator.addPartitions(hashinator, Arrays.asList(3, 4, 5),
+                ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+
+        Map<Long, Integer> oldTokens = deserializeElasticConfig(hashinator.pGetCurrentConfig().getSecond());
+        Map<Long, Integer> newTokens = deserializeElasticConfig(newConfig);
+
+        for (Map.Entry<Long, Integer> entry : oldTokens.entrySet()) {
+            assertEquals(entry.getValue(), newTokens.get(entry.getKey()));
+        }
+
+        Map<Integer, Integer> newPidCounts = new HashMap<Integer, Integer>();
+        for (Map.Entry<Long, Integer> entry : newTokens.entrySet()) {
+            switch (entry.getValue()) {
+            case 3:
+            case 4:
+            case 5:
+                Integer count = newPidCounts.get(entry.getValue());
+                if (count == null) {
+                    count = 0;
+                }
+                newPidCounts.put(entry.getValue(), ++count);
+            }
+        }
+
+        assertEquals(3, newPidCounts.size());
+        assertEquals(ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION, (int) newPidCounts.get(3));
+        assertEquals(ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION, (int) newPidCounts.get(4));
+        assertEquals(ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION, (int) newPidCounts.get(5));
+    }
 }
 

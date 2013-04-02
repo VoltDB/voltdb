@@ -44,6 +44,7 @@
 #include "common/types.h"
 #include "common/value_defs.h"
 #include "utf8.h"
+#include "murmur3/MurmurHash3.h"
 
 namespace voltdb {
 
@@ -335,6 +336,11 @@ class NValue {
      * This NValue is the value and the rhs is the pattern
      */
     NValue like(const NValue rhs) const;
+
+    /*
+     * Out must have space for 16 bytes
+     */
+    void murmurHash3(void *out) const;
 
     /*
      * callConstant, callUnary, and call are templates for arbitrary NValue member functions that implement
@@ -3091,6 +3097,36 @@ inline NValue NValue::op_divide(const NValue rhs) const {
     throwDynamicSQLException("Promotion of %s and %s failed in op_divide.",
                getValueTypeString().c_str(),
                rhs.getValueTypeString().c_str());
+}
+
+/*
+ * Out must have storage for 16 bytes
+ */
+inline void NValue::murmurHash3(void * out) const {
+    const ValueType type = getValueType();
+    switch(type) {
+    case VALUE_TYPE_TIMESTAMP:
+    case VALUE_TYPE_DOUBLE:
+    case VALUE_TYPE_BIGINT:
+        MurmurHash3_x64_128( m_data, 8, 0, out);
+        break;
+    case VALUE_TYPE_INTEGER:
+        MurmurHash3_x64_128( m_data, 4, 0, out);
+        break;
+    case VALUE_TYPE_VARBINARY:
+    case VALUE_TYPE_VARCHAR:
+        MurmurHash3_x64_128( getObjectValue(), getObjectLength(), 0, out);
+        break;
+    case VALUE_TYPE_SMALLINT:
+        MurmurHash3_x64_128( m_data, 2, 0, out);
+        break;
+    case VALUE_TYPE_TINYINT:
+        MurmurHash3_x64_128( m_data, 1, 0, out);
+        break;
+    default:
+        throwFatalException("Unknown type for murmur hashing %d", type);
+        break;
+    }
 }
 
 /*

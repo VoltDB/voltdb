@@ -275,12 +275,58 @@ public class TestClientInterface {
         assertTrue(captor.getValue().payload.toString().contains("partition param: 3"));
     }
 
+    @Test
+    public void testFinishedSPAdHocPlanning() throws Exception {
+        // Need a batch and a statement
+        AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
+                "select * from a where i = 3", 3, 0, 0, "localhost", false,
+                ProcedureInvocationType.ORIGINAL, 0, 0, null);
+        AdHocPlannedStatement s = new AdHocPlannedStatement("select * from a where i = 3".getBytes
+                (VoltDB.UTF8ENCODING),
+                new CorePlan(new byte[0],
+                        null,
+                        new byte[20],
+                        null,
+                        false,
+                        false,
+                        true,
+                        new VoltType[0],
+                        0),
+                new ParameterSet(),
+                null,
+                null,
+                3);
+        plannedStmtBatch.addStatement(s);
+        m_ci.processFinishedCompilerWork(plannedStmtBatch).run();
+
+        ArgumentCaptor<Long> destinationCaptor =
+                ArgumentCaptor.forClass(Long.class);
+        ArgumentCaptor<Iv2InitiateTaskMessage> messageCaptor =
+                ArgumentCaptor.forClass(Iv2InitiateTaskMessage.class);
+        verify(m_messenger).send(destinationCaptor.capture(), messageCaptor.capture());
+        Iv2InitiateTaskMessage message = messageCaptor.getValue();
+
+        assertTrue(message.isReadOnly());  // readonly
+        assertTrue(message.isSinglePartition()); // single-part
+        assertEquals("@AdHoc_RO_SP", message.getStoredProcedureName());
+
+        // SP AdHoc should have partitioning parameter serialized in the parameter set
+        Object partitionParam = message.getStoredProcedureInvocation().getParameterAtIndex(0);
+        byte[] serializedData = (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(1);
+        AdHocPlannedStatement[] statements = AdHocPlannedStmtBatch.planArrayFromBuffer(ByteBuffer.wrap(serializedData));
+        assertTrue(partitionParam instanceof byte[]);
+        assertTrue(Arrays.equals(TheHashinator.valueToBytes(3), (byte[]) partitionParam));
+        assertEquals(1, statements.length);
+        String sql = new String(statements[0].sql, VoltDB.UTF8ENCODING);
+        assertEquals("select * from a where i = 3", sql);
+    }
+
     /**
      * Fake an adhoc compiler result and return it to the CI, see if CI
      * initiates the txn.
      */
     @Test
-    public void testFinishedAdHocPlanning() throws Exception {
+    public void testFinishedMPAdHocPlanning() throws Exception {
         // Need a batch and a statement
         AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
                 "select * from a", null, 0, 0, "localhost", false, ProcedureInvocationType.ORIGINAL, 0, 0, null);
@@ -432,8 +478,8 @@ public class TestClientInterface {
     public void testLoadSinglePartTable() throws IOException {
         VoltTable table = new VoltTable(new ColumnInfo("i", VoltType.INTEGER));
         table.addRow(1);
-        ByteBuffer msg = createMsg("@LoadSinglepartitionTable", "a", table);
-        readAndCheck(msg, "@LoadSinglepartitionTable", 1, false, false, true, false);
+        ByteBuffer msg = createMsg("@LoadSinglepartitionTable", new byte[] {4}, "a", table);
+        readAndCheck(msg, "@LoadSinglepartitionTable", new byte[] {4}, false, false, true, false);
     }
 
     @Test

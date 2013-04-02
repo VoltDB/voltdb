@@ -56,6 +56,7 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltTableUtil;
 
 public class ProcedureRunner {
 
@@ -353,6 +354,46 @@ public class ProcedureRunner {
         }
 
         return retval;
+    }
+
+    /**
+     * Check if the txn hashes to this partition. If not, it should be restarted.
+     * @param txnState
+     * @return true if the txn hashes to the current partition, false otherwise
+     */
+    public boolean checkPartition(TransactionState txnState) {
+        TheHashinator.HashinatorType hashinatorType = TheHashinator.getConfiguredHashinatorType();
+        if (hashinatorType == TheHashinator.HashinatorType.LEGACY) {
+            // Legacy hashinator is not used for elastic, no need to check partitioning. In fact,
+            // since SP sysprocs all pass partitioning parameters as bytes,
+            // they will hash to different partitions using the legacy hashinator. So don't do it.
+            return true;
+        }
+
+        if (m_catProc.getSinglepartition()) {
+            StoredProcedureInvocation invocation = txnState.getInvocation();
+            int parameterType = m_catProc.getPartitioncolumn().getType();
+            int partitionparameter = m_catProc.getPartitionparameter();
+            Object parameterAtIndex = invocation.getParameterAtIndex(partitionparameter);
+
+            try {
+                int partition = TheHashinator.getPartitionForParameter(parameterType, parameterAtIndex);
+                if (partition == m_site.getCorrespondingPartitionId()) {
+                    return true;
+                } else {
+                    // Wrong partition, should restart the txn
+                    if (log.isTraceEnabled()) {
+                        log.trace("Txn " + txnState.getInvocation().getProcName() +
+                                " will be restarted");
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Unable to check partitioning of transaction " + txnState.spHandle, e);
+            }
+            return false;
+        } else {
+            return true;
+        }
     }
 
     public void setupTransaction(TransactionState txnState) {
@@ -1160,19 +1201,6 @@ public class ProcedureRunner {
            assert(matchingTablesForId != null);
            assert(matchingTablesForId.size() == 1);
            state.m_results[i] = matchingTablesForId.get(0);
-
-           // get isReplicated flag from either the catalog statement or the plan,
-           // depending on whether it's pre-planned or unplanned
-           final SQLStmt stmt = batch.get(i).stmt;
-           boolean isReplicated;
-           isReplicated = stmt.isReplicatedTableDML;
-
-           // if replicated divide by the replication factor
-           if (isReplicated) {
-               long newVal = state.m_results[i].asScalarLong() / m_site.getReplicatedDMLDivisor();
-               state.m_results[i] = new VoltTable(new VoltTable.ColumnInfo("modified_tuples", VoltType.BIGINT));
-               state.m_results[i].addRow(newVal);
-           }
        }
 
        return state.m_results;
