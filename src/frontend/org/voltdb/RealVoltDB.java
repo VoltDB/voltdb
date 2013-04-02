@@ -1202,6 +1202,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             if (hbt != null) {
                 m_config.m_deadHostTimeoutMS = hbt.getTimeout() * 1000;
                 m_messenger.setDeadHostTimeout(m_config.m_deadHostTimeoutMS);
+            } else {
+                hostLog.info("Dead host timeout set to " + m_config.m_deadHostTimeoutMS + " milliseconds");
             }
 
 
