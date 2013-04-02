@@ -626,7 +626,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         }
 
         // do other periodic work
-        m_snapshotter.doSnapshotWork(ee, false);
+        m_snapshotter.doSnapshotWork(getCorrespondingPartitionId(), ee, false);
 
         /*
          * grab the table statistics from ee and put it into the statistics
@@ -884,13 +884,15 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             snapshotPriority = m_context.cluster.getDeployment().get("deployment").
                 getSystemsettings().get("systemsettings").getSnapshotpriority();
         }
-        m_snapshotter = new SnapshotSiteProcessor(new Runnable() {
-            @Override
-            public void run() {
-                m_mailbox.deliver(new PotentialSnapshotWorkMessage());
-            }
-        },
-         snapshotPriority);
+        // TODO: Commented out because the constructor no longer takes a runnable.
+//        m_snapshotter = new SnapshotSiteProcessor(new Runnable() {
+//            @Override
+//            public void run() {
+//                m_mailbox.deliver(new PotentialSnapshotWorkMessage());
+//            }
+//        },
+//         snapshotPriority);
+        m_snapshotter = null;
 
         final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
         m_starvationTracker = new StarvationTracker(getCorrespondingSiteId());
@@ -963,7 +965,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                     if (message == null) {
                         //Will return null if there is no work, safe to block on the mailbox if there is no work
                         boolean hadWork =
-                            (m_snapshotter.doSnapshotWork(
+                            (m_snapshotter.doSnapshotWork(getCorrespondingPartitionId(),
                                     ee,
                                     EstTime.currentTimeMillis() - lastCommittedTxnTime > 5) != null);
 
@@ -992,7 +994,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                         handleMailboxMessage(message);
                     } else {
                         //idle, do snapshot work
-                        m_snapshotter.doSnapshotWork(ee, EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
+                        m_snapshotter.doSnapshotWork(getCorrespondingPartitionId(), ee, EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
                         // do some rejoin work
                         doRejoinWork();
                     }
@@ -1460,14 +1462,14 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                                 exportm.m_m.getPartitionId(),
                                 exportm.m_m.getSignature());
         } else if (message instanceof PotentialSnapshotWorkMessage) {
-            m_snapshotter.doSnapshotWork(ee, false);
+            m_snapshotter.doSnapshotWork(getCorrespondingPartitionId(), ee, false);
         }
         else if (message instanceof ExecutionSiteLocalSnapshotMessage) {
             hostLog.info("Executing local snapshot. Completing any on-going snapshots.");
 
             // first finish any on-going snapshot
             try {
-                HashSet<Exception> completeSnapshotWork = m_snapshotter.completeSnapshotWork(ee);
+                HashSet<Exception> completeSnapshotWork = m_snapshotter.completeSnapshotWork(getCorrespondingPartitionId(), ee);
                 if (completeSnapshotWork != null && !completeSnapshotWork.isEmpty()) {
                     for (Exception e : completeSnapshotWork) {
                         hostLog.error("Error completing in progress snapshot.", e);
@@ -1959,7 +1961,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
      */
     @Override
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException {
-        return m_snapshotter.completeSnapshotWork(ee);
+        return m_snapshotter.completeSnapshotWork(getCorrespondingPartitionId(), ee);
     }
 
 
@@ -2317,6 +2319,12 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     @Override
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds) {
         //A noop pre-IV2
+    }
+
+    @Override
+    public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config)
+    {
+        // A noop pre-IV2
     }
 
     @Override
