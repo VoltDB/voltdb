@@ -25,6 +25,10 @@
 #include <dlfcn.h>
 #include <stdio.h> // for fopen, fprintf, fclose
 #include <string.h>
+
+#ifdef MACOSX // mac os requires _XOPEN_SOURCE for ucontext for some reason
+#define _XOPEN_SOURCE
+#endif
 #include <ucontext.h>
 
 namespace voltdb {
