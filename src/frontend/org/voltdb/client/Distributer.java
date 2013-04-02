@@ -300,6 +300,8 @@ class Distributer {
                     } catch (Exception e) {
                         uncaughtException(callback, r, e);
                     }
+                    // for bookkeeping, but it feels dishonest to call this here
+                    m_rateLimiter.transactionResponseReceived(now, -1);
                     return;
                 }
 
@@ -504,6 +506,7 @@ class Distributer {
                     m_rateLimiter.transactionResponseReceived(System.currentTimeMillis(), -1);
                     m_callbacksToInvoke.decrementAndGet();
                 }
+                m_callbacks.clear();
             }
         }
 
