@@ -522,6 +522,9 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_FUNCTION: {
         return "FUNCTION";
     }
+    case EXPRESSION_TYPE_HASH_RANGE: {
+        return "HASH_RANGE";
+    }
     }
     return "INVALID";
 }
@@ -590,6 +593,8 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_AGGREGATE_AVG;
     } else if (str == "FUNCTION") {
         return EXPRESSION_TYPE_FUNCTION;
+    } else if (str == "HASH_RANGE") {
+        return EXPRESSION_TYPE_HASH_RANGE;
     }
 
     return EXPRESSION_TYPE_INVALID;
