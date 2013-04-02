@@ -27,6 +27,7 @@ import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConjunctionExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.FunctionExpression;
+import org.voltdb.expressions.HashRangeExpression;
 import org.voltdb.expressions.InComparisonExpression;
 import org.voltdb.expressions.NullValueExpression;
 import org.voltdb.expressions.OperatorExpression;
@@ -114,6 +115,11 @@ public enum ExpressionType {
     // maybe based on their support for optimization methods?
     //TODO: Should there be multiple FunctionExpression ExpressionTypes?
     FUNCTION                      (FunctionExpression.class,  100),
+
+    // -----------------------------
+    // Internals added for Elastic
+    // -----------------------------
+    HASH_RANGE    (HashRangeExpression.class, 200)
     ;
 
     private final int val;
