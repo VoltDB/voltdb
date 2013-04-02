@@ -468,18 +468,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 hostLog.info("Registering stats mailbox id " + CoreUtils.hsIdToString(statsHSId));
 
                 // Make a list of HDIds to join
-                List<Long> hsidsToRejoin = new ArrayList<Long>();
+                Map<Integer, Long> partsToHSIdsToRejoin = new HashMap<Integer, Long>();
                 for (Initiator init : m_iv2Initiators) {
                     if (init.isRejoinable()) {
-                        hsidsToRejoin.add(init.getInitiatorHSId());
+                        partsToHSIdsToRejoin.put(init.getPartitionId(), init.getInitiatorHSId());
                     }
                 }
 
                 if (isRejoin && isIV2Enabled()) {
-                    SnapshotSaveAPI.recoveringSiteCount.set(hsidsToRejoin.size());
-                    hostLog.info("Set recovering site count to " + hsidsToRejoin.size());
+                    SnapshotSaveAPI.recoveringSiteCount.set(partsToHSIdsToRejoin.size());
+                    hostLog.info("Set recovering site count to " + partsToHSIdsToRejoin.size());
 
-                    m_joinCoordinator = new Iv2RejoinCoordinator(m_messenger, hsidsToRejoin,
+                    m_joinCoordinator = new Iv2RejoinCoordinator(m_messenger, partsToHSIdsToRejoin.values(),
                             m_catalogContext.cluster.getVoltroot(),
                             m_config.m_startAction == START_ACTION.LIVE_REJOIN);
                     m_messenger.registerMailbox(m_joinCoordinator);
@@ -490,7 +490,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         hostLog.info("Using blocking rejoin.");
                     }
                 } else if (m_joining) {
-                    m_joinCoordinator.setSites(hsidsToRejoin);
+                    m_joinCoordinator.setPartitionsToHSIds(partsToHSIdsToRejoin);
                 }
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);

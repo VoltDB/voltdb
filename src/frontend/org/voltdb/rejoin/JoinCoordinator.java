@@ -85,7 +85,7 @@ public abstract class JoinCoordinator extends LocalMailbox {
     }
 
     public void setClientInterface(ClientInterface ci) {}
-    public void setSites(List<Long> sites) {}
+    public void setPartitionsToHSIds(Map<Integer, Long> partsToHSIds) {}
     public List<Integer> getPartitionsToAdd() {
         throw new UnsupportedOperationException("getPartitionsToAdd is only supported for " +
                 "elastic join");
