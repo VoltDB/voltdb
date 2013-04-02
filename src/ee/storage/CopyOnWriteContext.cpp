@@ -29,6 +29,23 @@
 
 namespace voltdb {
 
+void CopyOnWriteContext::checkRemainingTuples(const std::string &label) {
+    int64_t count = static_cast<CopyOnWriteIterator*>(m_iterator.get())->countRemaining();
+    if (!m_finishedTableScan) {
+        TableTuple tuple(m_table.schema());
+        boost::scoped_ptr<TupleIterator> iter(m_backedUpTuples.get()->makeIterator());
+        while (iter->next(tuple)) {
+            count++;
+        }
+    }
+    if (m_tuplesRemaining != count) {
+        VOLT_ERROR("CopyOnWriteContext::%s remaining tuple count mismatch: "
+                   "table=%s partcol=%d counted=%jd recalculated=%jd compacted=%jd",
+                   label.c_str(), m_table.name().c_str(), m_table.partitionColumn(),
+                   (intmax_t)m_tuplesRemaining, (intmax_t)count, (intmax_t)m_blocksCompacted);
+    }
+}
+
 CopyOnWriteContext::CopyOnWriteContext(
         PersistentTable &table,
         TupleSerializer &serializer,
@@ -50,7 +67,8 @@ CopyOnWriteContext::CopyOnWriteContext(
              m_partitionId(partitionId),
              m_totalPartitions(totalPartitions),
              m_totalTuples(totalTuples),
-             m_tuplesRemaining(totalTuples)
+             m_tuplesRemaining(totalTuples),
+             m_blocksCompacted(0)
 {
     // Parse predicate strings. The factory type determines the kind of
     // predicates that get generated.
@@ -66,6 +84,7 @@ CopyOnWriteContext::CopyOnWriteContext(
  * Return remaining tuple count, 0 if done, or -1 on error.
  */
 int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStreams) {
+    checkRemainingTuples("serializeMore");
 
     // Don't expect to be re-called after streaming all the tuples.
     if (m_tuplesRemaining == 0) {
@@ -131,9 +150,21 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
              * persistent table.
              */
             if (m_tuplesRemaining > 0) {
-                throwFatalException("serializeMore(): Non-zero remaining tuple count (%jd). "
-                                    "Original count was %jd",
-                                    (intmax_t)m_tuplesRemaining, (intmax_t)m_totalTuples);
+                throwFatalException("serializeMore():\n"
+                                    "Table name: %s\n"
+                                    "Table type: %s\n"
+                                    "Original tuple count: %jd\n"
+                                    "Active tuple count: %jd\n"
+                                    "Remaining tuple count: %jd\n"
+                                    "Compacted block count: %jd\n"
+                                    "Partition column: %d",
+                                    m_table.name().c_str(),
+                                    m_table.tableType().c_str(),
+                                    (intmax_t)m_totalTuples,
+                                    (intmax_t)m_table.activeTupleCount(),
+                                    (intmax_t)m_tuplesRemaining,
+                                    (intmax_t)m_blocksCompacted,
+                                    m_table.partitionColumn());
             }
             m_tuplesRemaining = 0;
             yield = true;
@@ -161,8 +192,7 @@ bool CopyOnWriteContext::canSafelyFreeTuple(TableTuple tuple) {
      * in the previous entry. If it doesn't then the block is something new.
      */
     char *address = tuple.address();
-    TBMapI i =
-                            m_blocks.lower_bound(address);
+    TBMapI i = m_blocks.lower_bound(address);
     if (i == m_blocks.end() && m_blocks.empty()) {
         return true;
     }
@@ -259,6 +289,7 @@ void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
 
 void CopyOnWriteContext::notifyBlockWasCompactedAway(TBPtr block) {
     assert(!m_finishedTableScan);
+    m_blocksCompacted++;
     CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
     if (iter->m_blockIterator != m_blocks.end()) {
         TBPtr nextBlock = iter->m_blockIterator.data();
