@@ -363,17 +363,20 @@ TEST_F(ExpressionTest, SimpleMultiplication) {
 TEST_F(ExpressionTest, HashRange) {
     queue<AE*> e;
 
-    const int64_t range1Min = numeric_limits<int64_t>::min();
     const int64_t range1Max = -(numeric_limits<int64_t>::max() / 2);
+    const int64_t range1Min = numeric_limits<int64_t>::min() - (range1Max / 2);
     const int64_t range2Min = 0;
     const int64_t range2Max = numeric_limits<int64_t>::max() / 2;
+    const int64_t range3Min = range2Max + (range2Max / 2);
+    const int64_t range3Max = range1Min - 1;
 
     int64_t ranges[][2] = {
             { range1Min, range1Max},
-            { range2Min, range2Max}
+            { range2Min, range2Max},
+            { range3Min, range3Max}
     };
 
-    auto_ptr<AE> ae(new HR(1, ranges, 2));
+    auto_ptr<AE> ae(new HR(1, ranges, 3));
     json_spirit::Object json = ae->serializeValue();
     std::string jsonText = json_spirit::write(json);
     PlannerDomRoot domRoot(jsonText.c_str());
@@ -413,8 +416,10 @@ TEST_F(ExpressionTest, HashRange) {
         val.murmurHash3(out);
         t.setNValue(1, val);
         NValue inrange = e1->eval( &t );
-        if ((out[0] > range1Min && out[0] < range1Max) ||
-             (out[0] > range2Min && out[0] < range2Max)) {
+        const int64_t hash = out[0];
+        if ((hash >= range1Min && hash < range1Max) ||
+             (hash >= range2Min && hash < range2Max) ||
+             (hash >= range3Min || hash < range3Max)) {
             ASSERT_TRUE(inrange.isTrue());
         } else {
             ASSERT_FALSE(inrange.isTrue());

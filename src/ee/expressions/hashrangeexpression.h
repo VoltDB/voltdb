@@ -22,11 +22,9 @@
 
 #include <string>
 #include <sstream>
+#include <boost/scoped_array.hpp>
 
 namespace voltdb {
-
-const int HASH_RANGE_START = 0;
-const int HASH_RANGE_END = 1;
 
 typedef std::pair<int64_t, int64_t> srange_type;
 
@@ -36,20 +34,18 @@ public:
 : AbstractExpression(EXPRESSION_TYPE_HASH_RANGE), value_idx(value_idx), ranges(ranges), num_ranges(num_ranges)
 {
         VOLT_TRACE("HashRangeExpression %d %d", m_type, value_idx);
-        if (num_ranges > 1) {
-            for (int ii = 1; ii < num_ranges; ii++) {
-                if (ranges[ii - 1].first > ranges[ii - 1].second) {
-                    throwFatalException(
-                            "Invalid range %jd to %jd",
-                            (intmax_t)ranges[ii - 1].first,
-                            (intmax_t)ranges[ii - 1].first);
-                }
+        for (int ii = 0; ii < num_ranges; ii++) {
+            if (ii > 0) {
                 if (ranges[ii - 1].first >= ranges[ii].first) {
                     throwFatalException("Ranges overlap or are out of order");
                 }
                 if (ranges[ii - 1].second > ranges[ii].first) {
                     throwFatalException("Ranges overlap or are out of order");
                 }
+            }
+            if (ranges[ii].first >= ranges[ii].second && ii != num_ranges - 1) {
+                throwFatalException("Range begin is >= range end and it isn't the last "
+                        "range that might span Long.MAX_VALUE to Long.MIN_VALUE");
             }
         }
 };
@@ -70,11 +66,21 @@ public:
          */
         for (int ii = 0; ii < num_ranges; ii++) {
             const srange_type range = ranges[ii];
-            if (range.first <= hash && hash < range.second) {
-                return NValue::getTrue();
-            } else if (hash < range.first) {
-                return NValue::getFalse();
+            if (range.first < range.second) {
+                /*
+                 * The common case where the range doesn't span Long.MAX_VALUE to Long.MIN_VALUE
+                 */
+                if (range.first <= hash && hash < range.second) {
+                    return NValue::getTrue();
+                }
+            } else {
+                assert(ii == num_ranges - 1); //Always should be the last range
+                if (hash >= range.first || hash < range.second) {
+                    return NValue::getTrue();
+                }
+                //The loop will terminate and return false
             }
+
         }
         return NValue::getFalse();
     }
@@ -92,13 +98,8 @@ public:
     int getColumnId() const {return this->value_idx;}
 
 private:
-
-    ~HashRangeExpression() {
-        delete(ranges);
-    }
-
     const int value_idx;           // which (offset) column of the tuple
-    const srange_type *ranges;
+    boost::scoped_array<srange_type> ranges;
     const int num_ranges;
 };
 
