@@ -18,6 +18,7 @@ package org.voltdb;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Set;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
@@ -61,5 +62,11 @@ public class LegacyHashinator extends TheHashinator {
     @Override
     protected Pair<HashinatorType, byte[]> pGetCurrentConfig() {
         return Pair.of(HashinatorType.LEGACY, m_configBytes);
+    }
+
+    @Override
+    protected Set<Integer> pPredecessors(int partition)
+    {
+        throw new RuntimeException("Legacy hashinator doesn't support predecessors");
     }
 }

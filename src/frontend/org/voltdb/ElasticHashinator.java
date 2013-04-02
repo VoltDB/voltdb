@@ -26,6 +26,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
 
+import com.google.common.collect.UnmodifiableIterator;
 import org.apache.cassandra_voltpatches.MurmurHash3;
 import org.voltcore.utils.Pair;
 
@@ -197,5 +198,44 @@ public class ElasticHashinator extends TheHashinator {
     @Override
     protected Pair<HashinatorType, byte[]> pGetCurrentConfig() {
         return Pair.of(HashinatorType.ELASTIC, m_configBytes);
+    }
+
+    /**
+     * Find the predecessors of the given partition on the ring. This method runs in linear time,
+     * use with caution when the set of partitions is large.
+     * @param partition
+     * @return The IDs of the partitions that are the predecessors of the given partition.
+     * If the given partition doesn't exist or it's the only partition on the ring, the
+     * set is empty.
+     */
+    @Override
+    protected Set<Integer> pPredecessors(int partition) {
+        Set<Integer> predecessors = new HashSet<Integer>();
+        UnmodifiableIterator<Map.Entry<Long,Integer>> iter = tokens.entrySet().iterator();
+        Set<Long> pTokens = new HashSet<Long>();
+        while (iter.hasNext()) {
+            Map.Entry<Long, Integer> next = iter.next();
+            if (next.getValue() == partition) {
+                pTokens.add(next.getKey());
+            }
+        }
+
+        for (Long token : pTokens) {
+            Map.Entry<Long, Integer> predecessor = null;
+            if (token != null) {
+                predecessor = tokens.headMap(token).lastEntry();
+                // If null, it means partition is the first one on the ring, so predecessor
+                // should be the last entry on the ring because it wraps around.
+                if (predecessor == null) {
+                    predecessor = tokens.lastEntry();
+                }
+            }
+
+            if (predecessor != null && predecessor.getValue() != partition) {
+                predecessors.add(predecessor.getValue());
+            }
+        }
+
+        return predecessors;
     }
 }
