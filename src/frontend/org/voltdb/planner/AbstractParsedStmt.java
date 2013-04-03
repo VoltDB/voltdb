@@ -700,8 +700,8 @@ public abstract class AbstractParsedStmt {
         whereList.addAll(ExpressionUtil.uncombineAny(joinNode.m_leftNode.m_whereExpr));
         whereList.addAll(ExpressionUtil.uncombineAny(joinNode.m_rightNode.m_whereExpr));
 
-        Collection<Table> innerTables = joinNode.m_rightNode.generateJoinOrder();
-        Collection<Table> outerTables = joinNode.m_leftNode.generateJoinOrder();
+        Collection<Table> innerTables = joinNode.m_rightNode.generateTableJoinOrder();
+        Collection<Table> outerTables = joinNode.m_leftNode.generateTableJoinOrder();
 
         // Classify join expressions into the following categories:
         // 1. The OUTER-only join conditions. If any are false for a given outer tuple,

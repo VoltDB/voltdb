@@ -63,7 +63,6 @@ public class TestPlansJoin extends TestCase {
         return pn.get(0);
     }
 
-
     public void testBasicInnerJoin() {
         // select * with ON clause should return all columns from all tables
         AbstractPlanNode pn = compile("select * FROM R1 JOIN R2 ON R1.C = R2.C", 0, false, null);

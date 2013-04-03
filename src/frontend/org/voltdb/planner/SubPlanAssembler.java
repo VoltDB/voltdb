@@ -117,8 +117,9 @@ public abstract class SubPlanAssembler {
      * @return List of valid access paths
      */
     protected ArrayList<AccessPath> getRelevantAccessPathsForTable(Table table, List<AbstractExpression> joinExprs, List<AbstractExpression> filterExprs) {
-        ArrayList<AccessPath> paths = new ArrayList<AccessPath>();        // add the empty seq-scan access path
-        AccessPath naivePath = getRelevantNaivePathForTable(table, joinExprs, filterExprs);
+        ArrayList<AccessPath> paths = new ArrayList<AccessPath>();
+        // add the empty seq-scan access path
+        AccessPath naivePath = getRelevantNaivePathForTable(joinExprs, filterExprs);
         paths.add(naivePath);
 
         List<AbstractExpression> allExprs = new ArrayList<AbstractExpression>();
@@ -149,7 +150,7 @@ public abstract class SubPlanAssembler {
      * @param filterExprs filter expressions this table is part of
      * @return Naive access path
      */
-    protected AccessPath getRelevantNaivePathForTable(Table table, List<AbstractExpression> joinExprs, List<AbstractExpression> filterExprs) {
+    protected AccessPath getRelevantNaivePathForTable(List<AbstractExpression> joinExprs, List<AbstractExpression> filterExprs) {
         AccessPath naivePath = new AccessPath();
 
         if (filterExprs != null) {

@@ -318,7 +318,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         boolean deferSendReceivePair = m_partitioning.getCountOfPartitionedTables() > 1;
 
         if (m_parsedStmt.joinTree.m_hasOuterJoin == false) {
-            generateMorePlansForInnerJoinOrder(joinTree.m_joinOrder, deferSendReceivePair);
+            generateMorePlansForInnerJoinOrder(joinTree, deferSendReceivePair);
         } else {
             generateMorePlansForOuterJoinOrder(joinTree, deferSendReceivePair);
         }
@@ -336,31 +336,74 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         assert(joinNode.m_leftNode.m_table != null);
         assert(joinNode.m_rightNode.m_table != null);
 
-        // The outer table can only have the naive access path.
-        Table outerTable = joinNode.m_leftNode.m_table;
-        // Optimizations - outer-table-only where expressions can be pushed down to the child node
-        // to pre-qualify the outer tuples before they enter the join.
-        AccessPath outerPath = getRelevantNaivePathForTable(outerTable, null, joinNode.m_whereOuterList);
+        // generate the access paths for all nodes
+        generateAccessPaths(null, joinTree.m_root);
 
-        // Inner tables join expressions
-        ArrayList<AbstractExpression> joinExprList = new ArrayList<AbstractExpression>();
-        joinExprList.addAll(joinNode.m_joinInnerList);
-        joinExprList.addAll(joinNode.m_joinInnerOuterList);
+        List<JoinNode> nodes = joinNode.generateJoinOrder();
+        generateSubPlanForJoinNodeRecursively(joinNode, nodes, deferSendReceivePair);
+    }
 
-        // The inner table can have multiple index access paths plus the naive one
-        Table innerTable = joinNode.m_rightNode.m_table;
-        ArrayList<AccessPath> innerPaths  = getRelevantAccessPathsForTable(innerTable, joinExprList, null);
-        assert(innerPaths.size() > 0);
+    /**
+     * generate all possible access paths for all nodes in the tree.
+     *
+     * @param parentNode A parent node to the node to generate paths to.
+     * @param childNode A node to generate paths to.
+     */
+    private void generateAccessPaths(JoinNode parentNode, JoinNode childNode) {
+        assert(childNode != null);
+        if (childNode.m_leftNode != null) {
+            generateAccessPaths(childNode, childNode.m_leftNode);
+        }
+        if (childNode.m_rightNode != null) {
+            generateAccessPaths(childNode, childNode.m_rightNode);
+        }
 
-        // Filter (post-join) expressions
-        ArrayList<AbstractExpression> filterExprList = new ArrayList<AbstractExpression>();
-        filterExprList.addAll(joinNode.m_whereInnerList);
-        filterExprList.addAll(joinNode.m_whereInnerOuterList);
-        // generate the index plans
-        for (AccessPath innerPath : innerPaths) {
-            innerPath.whereExprs.addAll(filterExprList);
-            AbstractPlanNode indexPlan = getSelectSubPlanForJoinNode(joinNode, outerPath, innerPath, deferSendReceivePair);
-            m_plans.add(indexPlan);
+        if (childNode.m_table != null) {
+            // @TODO ENG_3038For now
+            assert(parentNode != null);
+            if (parentNode.m_leftNode == childNode) {
+                // This is the outer table which can only have the naive access path.
+                // Optimizations - outer-table-only where expressions can be pushed down to the child node
+                // to pre-qualify the outer tuples before they enter the join.
+                childNode.m_accessPaths.add(getRelevantNaivePathForTable(null, parentNode.m_whereOuterList));
+            } else {
+                // This is the inner node
+                assert(parentNode.m_rightNode == childNode);
+                // Inner tables join expressions
+                ArrayList<AbstractExpression> joinExprList = new ArrayList<AbstractExpression>();
+                joinExprList.addAll(parentNode.m_joinInnerList);
+                joinExprList.addAll(parentNode.m_joinInnerOuterList);
+
+                // The inner table can have multiple index access paths plus the naive one
+                childNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(childNode.m_table, joinExprList, null));
+                assert(childNode.m_accessPaths.size() > 0);
+            }
+        } else {
+            // @TODO ENG_3038 For now The node can only have naive plans without any expressions
+            childNode.m_accessPaths.add(getRelevantNaivePathForTable(null, null));
+        }
+    }
+    /**
+     * generate all possible plans for the tree.
+     *
+     * @param rootNode The root node for the whole join tree.
+     * @param nodes The node list to iterate over.
+     * @param deferSendReceivePair
+     */
+    private void generateSubPlanForJoinNodeRecursively(JoinNode rootNode, List<JoinNode> nodes, boolean deferSendReceivePair) {
+        assert(nodes.size() > 0);
+        JoinNode joinNode = nodes.get(0);
+        if (nodes.size() == 1) {
+            for (AccessPath path : joinNode.m_accessPaths) {
+                joinNode.m_currentAccessPath = path;
+                AbstractPlanNode plan = getSelectSubPlanForJoinNode(rootNode, deferSendReceivePair);
+                m_plans.add(plan);
+            }
+        } else {
+            for (AccessPath path : joinNode.m_accessPaths) {
+                joinNode.m_currentAccessPath = path;
+                generateSubPlanForJoinNodeRecursively(rootNode, nodes.subList(1, nodes.size()), deferSendReceivePair);
+            }
         }
     }
 
@@ -369,19 +412,19 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      *
      * @param joinOrder An array of tables in the join order.
      */
-    private void generateMorePlansForInnerJoinOrder(Table[] joinOrder, boolean deferSendReceivePair) {
-        assert(joinOrder != null);
+    private void generateMorePlansForInnerJoinOrder(JoinTree joinTree, boolean deferSendReceivePair) {
+        assert(joinTree.m_joinOrder != null);
         assert(m_plans.size() == 0);
 
         // compute the reasonable access paths for all tables
         //HashMap<Table, ArrayList<Index[]>> accessPathOptions = generateAccessPathsForEachTable(joinOrder);
         // compute all combinations of access paths for this particular join order
-        ArrayList<AccessPath[]> listOfAccessPathCombos = generateAllAccessPathCombinationsForJoinOrder(joinOrder);
+        ArrayList<AccessPath[]> listOfAccessPathCombos = generateAllAccessPathCombinationsForJoinOrder(joinTree.m_joinOrder);
 
         // for each access path
         for (AccessPath[] accessPath : listOfAccessPathCombos) {
             // get a plan
-            AbstractPlanNode scanPlan = getSelectSubPlanForAccessPath(joinOrder, accessPath, deferSendReceivePair);
+            AbstractPlanNode scanPlan = getSelectSubPlanForAccessPath(joinTree.m_joinOrder, accessPath, deferSendReceivePair);
             m_plans.add(scanPlan);
         }
     }
@@ -412,37 +455,41 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
     /**
      * Given a specific join node and access path set for inner and outer tables, construct the plan
-     * that gives the right tuples. This method is the meat for two table outer join only.
+     * that gives the right tuples.
      *
-     * @param joinNode Outer join node.
-     * @param outerPath An access path for the outer table.
-     * @param suppressSendReceivePair A flag preventing the usual injection of Receive and Send nodes above scans of non-replicated tables.
+     * @param joinNode The join node to build the plan for.
+     * @param deferSendReceivePair A flag preventing the usual injection of Receive and Send nodes above scans of non-replicated tables.
      * @return A completed plan-sub-graph that should match the correct tuples from the
      * correct tables.
      */
-    private AbstractPlanNode getSelectSubPlanForJoinNode(JoinNode joinNode, AccessPath outerPath, AccessPath innerPath, boolean deferSendReceivePair) {
-        Table joinOrder[] = new Table[1];
-        AccessPath accessPath[] = new AccessPath[1];
-        // Outer node
-        joinOrder[0] = joinNode.m_leftNode.m_table;
-        accessPath[0] = outerPath;
-        AbstractPlanNode outerScanPlan = getSelectSubPlanForAccessPathsIterative(joinOrder, accessPath, deferSendReceivePair);
+    private AbstractPlanNode getSelectSubPlanForJoinNode(JoinNode joinNode, boolean deferSendReceivePair) {
+        assert(joinNode != null);
+        if (joinNode.m_table != null) {
+            // End of recursion
+            Table joinOrder[] = new Table[1];
+            AccessPath accessPath[] = new AccessPath[1];
+            joinOrder[0] = joinNode.m_table;
+            accessPath[0] = joinNode.m_currentAccessPath;
+            return getSelectSubPlanForAccessPathsIterative(joinOrder, accessPath, deferSendReceivePair);
+        } else {
+            assert(joinNode.m_leftNode != null && joinNode.m_rightNode != null);
+            // Outer node
+            AbstractPlanNode outerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_leftNode, deferSendReceivePair);
 
-        // Inner Node
-        joinOrder[0] = joinNode.m_rightNode.m_table;
-        accessPath[0] = innerPath;
-        AbstractPlanNode innerScanPlan = getSelectSubPlanForAccessPathsIterative(joinOrder, accessPath, deferSendReceivePair);
+            // Inner Node
+            AbstractPlanNode innerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_rightNode, deferSendReceivePair);
 
-        // Join Node
-        AbstractPlanNode resultPlan = getSelectSubPlanForOuterAccessPathStep(joinNode, innerPath, outerScanPlan, innerScanPlan);
-        /*
-         * If the access plan for the table in the join order was for a
-         * distributed table scan there will be a send/receive pair at the top.
-         */
-        if (deferSendReceivePair && m_partitioning.requiresTwoFragments()) {
-            resultPlan = addSendReceivePair(resultPlan);
+            // Join Node
+            AbstractPlanNode resultPlan = getSelectSubPlanForOuterAccessPathStep(joinNode, outerScanPlan, innerScanPlan);
+            /*
+             * If the access plan for the table in the join order was for a
+             * distributed table scan there will be a send/receive pair at the top.
+             */
+            if (deferSendReceivePair && m_partitioning.requiresTwoFragments()) {
+                resultPlan = addSendReceivePair(resultPlan);
+            }
+            return resultPlan;
         }
-        return resultPlan;
     }
 
 
@@ -486,10 +533,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     }
 
     private AbstractPlanNode getSelectSubPlanForAccessPathStep(AccessPath accessPath, AbstractPlanNode subPlan, AbstractPlanNode nljAccessPlan) {
-
-        // get all the where expressions for the applicable two tables
-        ArrayList<AbstractExpression> whereClauses = accessPath.whereExprs;
-
         AbstractJoinPlanNode retval = null;
         if (nljAccessPlan instanceof IndexScanPlanNode) {
             NestLoopIndexPlanNode nlijNode = new NestLoopIndexPlanNode();
@@ -525,19 +568,18 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
             retval = nljNode;
         }
-
-        if ((whereClauses != null) && (whereClauses.size() > 0)) {
-            retval.setWherePredicate(ExpressionUtil.combine(whereClauses));
-        }
         return retval;
     }
 
     // @TODO ENG_3038 just for now. Can be merged with the above version fir inner joins
     // if the order of inner/outer tables for NLJ can be reversed
-    private AbstractPlanNode getSelectSubPlanForOuterAccessPathStep(JoinNode joinNode, AccessPath innerAccessPath, AbstractPlanNode outerPlan, AbstractPlanNode innerPlan) {
+    private AbstractPlanNode getSelectSubPlanForOuterAccessPathStep(JoinNode joinNode, AbstractPlanNode outerPlan, AbstractPlanNode innerPlan) {
+        // Filter (post-join) expressions
+        ArrayList<AbstractExpression> whereClauses  = new ArrayList<AbstractExpression>();
+        whereClauses.addAll(joinNode.m_whereInnerList);
+        whereClauses.addAll(joinNode.m_whereInnerOuterList);
 
-        // get all the where expressions for the applicable two tables
-        ArrayList<AbstractExpression> whereClauses = innerAccessPath.whereExprs;
+        AccessPath innerAccessPath = joinNode.m_rightNode.m_currentAccessPath;
 
         AbstractJoinPlanNode retval = null;
         if (innerPlan instanceof IndexScanPlanNode) {

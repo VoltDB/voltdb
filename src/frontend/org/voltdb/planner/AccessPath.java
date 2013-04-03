@@ -36,7 +36,6 @@ public class AccessPath {
     final ArrayList<AbstractExpression> endExprs = new ArrayList<AbstractExpression>();
     final ArrayList<AbstractExpression> otherExprs = new ArrayList<AbstractExpression>();
     final ArrayList<AbstractExpression> joinExprs = new ArrayList<AbstractExpression>();
-    final ArrayList<AbstractExpression> whereExprs = new ArrayList<AbstractExpression>();
     final ArrayList<AbstractExpression> bindings = new ArrayList<AbstractExpression>();
 
     @Override
@@ -68,11 +67,6 @@ public class AccessPath {
         retval += "JOIN EXPRS:\n";
         i = 0;
         for (AbstractExpression expr : joinExprs)
-            retval += "\t(" + String.valueOf(i++) + ") " + expr.toString() + "\n";
-
-        retval += "WHERE EXPRS:\n";
-        i = 0;
-        for (AbstractExpression expr : whereExprs)
             retval += "\t(" + String.valueOf(i++) + ") " + expr.toString() + "\n";
 
         return retval;

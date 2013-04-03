@@ -74,7 +74,7 @@ public class JoinTree {
         public JoinType m_joinType = JoinType.INNER;
         // Join expression associated with this node
         public AbstractExpression m_joinExpr = null;
-        // Additional filter expresssion (WHERE) associated with this node
+        // Additional filter expression (WHERE) associated with this node
         public AbstractExpression m_whereExpr = null;
 
         // Buckets for children expression classification
@@ -84,6 +84,11 @@ public class JoinTree {
         public ArrayList<AbstractExpression> m_whereOuterList = new ArrayList<AbstractExpression>();
         public ArrayList<AbstractExpression> m_whereInnerList = new ArrayList<AbstractExpression>();
         public ArrayList<AbstractExpression> m_whereInnerOuterList = new ArrayList<AbstractExpression>();
+
+        // All possible access paths for this node
+        List<AccessPath> m_accessPaths = new ArrayList<AccessPath>();
+        // Access path under the evaluation
+        AccessPath m_currentAccessPath = null;
 
         /**
          * Construct a leaf node
@@ -132,24 +137,45 @@ public class JoinTree {
         /**
          * Returns tables in the order they are joined in the tree by iterating the tree depth-first
          */
-        List<Table> generateJoinOrder() {
+        List<Table> generateTableJoinOrder() {
             ArrayList<Table> tables = new ArrayList<Table>();
-            generateJoinOrderRecursive(this, tables);
+            generateTableJoinOrderRecursive(this, tables);
             return tables;
         }
 
-        private void generateJoinOrderRecursive(JoinNode node, ArrayList<Table> tables) {
+        private void generateTableJoinOrderRecursive(JoinNode node, ArrayList<Table> tables) {
             if (node == null) {
                 return;
             }
             if (node.m_leftNode != null || node.m_rightNode != null) {
                 assert(node.m_leftNode != null && node.m_rightNode != null);
-                generateJoinOrderRecursive(node.m_leftNode, tables);
-                generateJoinOrderRecursive(node.m_rightNode, tables);
+                generateTableJoinOrderRecursive(node.m_leftNode, tables);
+                generateTableJoinOrderRecursive(node.m_rightNode, tables);
             } else {
                 assert(node.m_table != null);
                 tables.add(node.m_table);
             }
+        }
+
+        /**
+         * Returns nodes in the order they are joined in the tree by iterating the tree depth-first
+         */
+        List<JoinNode> generateJoinOrder() {
+            ArrayList<JoinNode> nodes = new ArrayList<JoinNode>();
+            generateJoinOrderRecursive(this, nodes);
+            return nodes;
+        }
+
+        private void generateJoinOrderRecursive(JoinNode node, ArrayList<JoinNode> nodes) {
+            if (node == null) {
+                return;
+            }
+            if (node.m_leftNode != null || node.m_rightNode != null) {
+                assert(node.m_leftNode != null && node.m_rightNode != null);
+                generateJoinOrderRecursive(node.m_leftNode, nodes);
+                generateJoinOrderRecursive(node.m_rightNode, nodes);
+            }
+            nodes.add(node);
         }
 
     }
@@ -231,7 +257,7 @@ public class JoinTree {
      */
     List<Table> generateJoinOrder() {
         if (m_root != null) {
-            return m_root.generateJoinOrder();
+            return m_root.generateTableJoinOrder();
         }
         return new ArrayList<Table>();
     }
