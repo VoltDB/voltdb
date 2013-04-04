@@ -20,6 +20,7 @@
 #include "storage/CopyOnWriteIterator.h"
 #include "storage/tableiterator.h"
 #include "common/FatalException.hpp"
+#include "logging/LogManager.h"
 #include <algorithm>
 #include <cassert>
 
@@ -63,9 +64,10 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
             if (m_finishedTableScan) {
                 out->writeIntAt( rowCountPosition, rowsSerialized);
                 if (m_tuplesSerialized != m_expectedTupleCount) {
-                    throwFatalException(
-                            "Expected %d rows but only found %d rows while serializing snapshot",
+                    char message[1024 * 16];
+                    snprintf(message, 1024 * 16, "Expected %d rows but only found %d rows while serializing snapshot",
                             m_expectedTupleCount, m_tuplesSerialized);
+                    LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, message);
                 }
                 return false;
             } else {
