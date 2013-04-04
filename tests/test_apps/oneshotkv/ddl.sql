@@ -12,4 +12,5 @@ CREATE PROCEDURE FROM CLASS oneshotkv.procedures.Get;
 CREATE PROCEDURE FROM CLASS oneshotkv.procedures.GetMP;
 CREATE PROCEDURE FROM CLASS oneshotkv.procedures.Put;
 CREATE PROCEDURE FROM CLASS oneshotkv.procedures.PutsMP;
+CREATE PROCEDURE FROM CLASS oneshotkv.procedures.OptimisticPutsMP;
 CREATE PROCEDURE FROM CLASS oneshotkv.procedures.Remove;

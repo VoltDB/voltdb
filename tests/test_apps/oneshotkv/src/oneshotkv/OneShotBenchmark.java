@@ -155,6 +155,9 @@ public class OneShotBenchmark {
         @Option(desc = "Number of partitions the multi partitition put writes two.")
         int mpputpartitions = 1;
 
+        @Option(desc = "Use optimistic update for multi partition put. (enables preload)")
+        boolean mpputoptimistic = true;
+
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
@@ -166,8 +169,6 @@ public class OneShotBenchmark {
             if (poolsize <= 0) exitWithMessageAndUsage("poolsize must be > 0");
             if (getputratio < 0) exitWithMessageAndUsage("getputratio must be >= 0");
             if (getputratio > 1) exitWithMessageAndUsage("getputratio must be <= 1");
-            if (mpgetputratio < 0) exitWithMessageAndUsage("mpgetputratio must be >= 0");
-            if (mpgetputratio > 1) exitWithMessageAndUsage("mpgetputratio must be <= 1");
 
             if (keysize <= 0) exitWithMessageAndUsage("keysize must be > 0");
             if (keysize > 250) exitWithMessageAndUsage("keysize must be <= 250");
@@ -178,7 +179,12 @@ public class OneShotBenchmark {
 
             if (threads < 0) exitWithMessageAndUsage("threads must be => 0");
             if (mpthreads < 0) exitWithMessageAndUsage("mpthreads must be => 0");
+            if (mpgetputratio < 0) exitWithMessageAndUsage("mpgetputratio must be >= 0");
+            if (mpgetputratio > 1) exitWithMessageAndUsage("mpgetputratio must be <= 1");
             if (mpputpartitions < 0) exitWithMessageAndUsage("mpputpartitions must be => 0");
+            if (mpthreads > 0 && mpgetputratio < 1.0 && mpputoptimistic) {
+                preload = true;
+            }
         }
     }
 
@@ -524,7 +530,11 @@ public class OneShotBenchmark {
                         final PayloadProcessor.Pair pair = processor.generateForStore();
 
                         try {
-                            m_client.callProcedure("PutsMP", pair.getStoreValue(), keys);
+                            m_client.callProcedure(
+                                    (config.mpputoptimistic ? "OptimisticPutsMP" : "PutsMP"),
+                                    pair.getStoreValue(),
+                                    keys
+                                    );
                             successfulPuts.incrementAndGet();
                         }
                         catch (Exception e) {
