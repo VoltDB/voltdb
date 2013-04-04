@@ -607,16 +607,19 @@ VoltDBEngine::hasSameSchema(catalog::Table *t1, voltdb::Table *t2) {
             return false;
         }
 
-        if (t2->schema()->columnLength(index) != size) {
-            return false;
-        }
-
         if (t2->schema()->columnAllowNull(index) != nullable) {
             return false;
         }
 
         if (t2->schema()->columnType(index) != type) {
             return false;
+        }
+
+        // check the size of types where size matters
+        if ((type == VALUE_TYPE_VARCHAR) || (type == VALUE_TYPE_VARBINARY)) {
+            if (t2->schema()->columnLength(index) != size) {
+                return false;
+            }
         }
     }
 

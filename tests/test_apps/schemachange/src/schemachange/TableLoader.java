@@ -53,6 +53,10 @@ class TableLoader {
     final AtomicBoolean hadError = new AtomicBoolean(false);
     final SortedSet<Long> outstandingPkeys = Collections.synchronizedSortedSet(new TreeSet<Long>());
 
+    private static String _F(String str, Object... parameters) {
+        return String.format(str, parameters);
+    }
+
     TableLoader(SchemaChangeClient scc, VoltTable t, Random rand) {
         this.scc = scc;
         this.table = t;
@@ -105,44 +109,43 @@ class TableLoader {
 
     void load(long startPkey, long stopPkey, long jump) {
         assert(outstandingPkeys.isEmpty());
-        assert(!hadError.get());
 
         if (startPkey >= stopPkey) return;
 
         long lastSuccessfullyLoadedKey = -1;
 
         while (lastSuccessfullyLoadedKey < stopPkey) {
-            long nextKey = lastSuccessfullyLoadedKey >= 0 ? lastSuccessfullyLoadedKey : startPkey;
+            long nextKey = lastSuccessfullyLoadedKey >= 0 ? lastSuccessfullyLoadedKey + jump : startPkey;
             nextKey = loadChunk(nextKey, stopPkey, jump);
             if (nextKey >= 0) {
                 lastSuccessfullyLoadedKey = nextKey;
             }
         }
 
-        hadError.set(false);
         outstandingPkeys.clear();
     }
 
     void delete(long startPkey, long stopPkey, long jump) {
         assert(outstandingPkeys.isEmpty());
-        assert(!hadError.get());
 
         if (startPkey > stopPkey) return;
         do {
             startPkey = deleteChunk(startPkey, stopPkey, jump) + jump;
         } while (startPkey <= stopPkey);
 
-        hadError.set(false);
         outstandingPkeys.clear();
     }
 
     private long deleteChunk(long startPkey, long stopPkey, long jump) {
+        log.info(_F("deleteChunk | startPkey:%d stopPkey:%d jump:%d", startPkey, stopPkey, jump));
+
         assert(startPkey < stopPkey);
         assert(startPkey >= 0);
 
         long nextPkey = startPkey;
 
         long maxSentPkey = -1;
+        hadError.set(false);
         while ((nextPkey <= stopPkey) && (!hadError.get())) {
             try {
                 outstandingPkeys.add(nextPkey);
@@ -178,12 +181,16 @@ class TableLoader {
     }
 
     private long loadChunk(long startPkey, long stopPkey, long jump) {
+
+        log.info(_F("loadChunk | startPkey:%d stopPkey:%d jump:%d", startPkey, stopPkey, jump));
+
         assert(startPkey < stopPkey);
         assert(startPkey >= 0);
 
         long nextPkey = startPkey;
 
         long maxSentPkey = -1;
+        hadError.set(false);
         while ((nextPkey <= stopPkey) && (!hadError.get())) {
             Object[] row = TableHelper.randomRow(table, Integer.MAX_VALUE, rand);
             row[pkeyColIndex] = nextPkey;

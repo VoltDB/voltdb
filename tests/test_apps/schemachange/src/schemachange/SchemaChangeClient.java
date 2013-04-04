@@ -186,7 +186,7 @@ public class SchemaChangeClient {
             t2 = TableHelper.getTotallyRandomTable(newName, rand);
         }
         else {
-            t2 = TableHelper.mutateTable(t1, false, rand);
+            t2 = TableHelper.mutateTable(t1, true, rand);
         }
 
         log.info(_F("New Schema:\n%s", TableHelper.ddlForTable(t2)));
