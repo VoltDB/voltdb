@@ -185,10 +185,22 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
                                     (intmax_t)m_updates,
                                     m_table.partitionColumn());
             }
-            m_tuplesRemaining = 0;
-            yield = true;
         }
 
+        // All tuples serialized, bail
+        if (m_tuplesRemaining == 0) {
+            /*
+             * CAUTION: m_iterator->next() is NOT side-effect free!!! It also
+             * returns the block back to the table if the call causes it to go
+             * over the boundary of used tuples. In case it actually returned
+             * the very last tuple in the table last time it's called, the block
+             * is still hanging around. So we need to call it again to return
+             * the block here.
+             */
+            bool hasMore = m_iterator->next(tuple);
+            assert(!hasMore);
+            yield = true;
+        }
     }
     // end tuple processing while loop
 
@@ -198,7 +210,7 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
     m_serializationBatches++;
 
     // Done when the table scan is finished and iteration is complete.
-    return (m_tuplesRemaining >= 0 ? m_tuplesRemaining : std::numeric_limits<int32_t>::max());
+    return m_tuplesRemaining;
 }
 
 bool CopyOnWriteContext::canSafelyFreeTuple(TableTuple tuple) {
