@@ -123,6 +123,7 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
         // Next tuple?
         if (m_iterator->next(tuple)) {
 
+            // -1 is used as a sentinel value to disable counting for tests.
             if (m_tuplesRemaining > 0) {
                 m_tuplesRemaining--;
             }
@@ -185,6 +186,10 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
                                     (intmax_t)m_updates,
                                     m_table.partitionColumn());
             }
+            // -1 is used for tests when we don't bother counting. Need to force it to 0 here.
+            if (m_tuplesRemaining < 0)  {
+                m_tuplesRemaining = 0;
+            }
         }
 
         // All tuples serialized, bail
@@ -198,7 +203,9 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
              * the block here.
              */
             bool hasMore = m_iterator->next(tuple);
-            assert(!hasMore);
+            if (!hasMore) {
+                assert(false);
+            }
             yield = true;
         }
     }
@@ -208,6 +215,13 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
     outputStreams.close();
 
     m_serializationBatches++;
+
+    // Handle the sentinel value of -1 which is passed in from tests that don't
+    // care about the active tuple count. Return max int as if there are always
+    // tuples remaining (until the counter is forced to zero when done).
+    if (m_tuplesRemaining < 0) {
+        return std::numeric_limits<int32_t>::max();
+    }
 
     // Done when the table scan is finished and iteration is complete.
     return m_tuplesRemaining;
