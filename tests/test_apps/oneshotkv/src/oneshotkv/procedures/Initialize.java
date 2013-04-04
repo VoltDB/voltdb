@@ -20,45 +20,48 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+package oneshotkv.procedures;
 
-package voltkv.procedures;
-
-import org.voltdb.ProcInfo;
-import org.voltdb.SQLStmt;
-import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
+import org.voltdb.*;
 
 @ProcInfo
 (
- singlePartition = false
+  singlePartition = false
 )
-public class PutsMP extends VoltProcedure {
-    // Checks if key exists
-    public final SQLStmt checkStmt = new SQLStmt("SELECT key FROM store WHERE key = ?;");
 
-    // Updates a key/value pair
-    public final SQLStmt updateStmt = new SQLStmt("UPDATE store SET value = ? WHERE key = ?;");
+public class Initialize extends VoltProcedure
+{
+    // Delete everything
+    public final SQLStmt cleanStmt = new SQLStmt("DELETE FROM store;");
 
     // Inserts a key/value pair
     public final SQLStmt insertStmt = new SQLStmt("INSERT INTO store (key, value) VALUES (?, ?);");
 
-    public VoltTable[] run(byte[] value, String [] keys) {
-        for (String key: keys) {
-            // Check whether the pair exists
-            voltQueueSQL(checkStmt, key);
+    public long run(int startIndex, int stopIndex, String keyFormat, byte[] defaultValue)
+    {
+        // Wipe out the data store to re-initialize
+        if (startIndex == 0)
+        {
+            voltQueueSQL(cleanStmt);
+            voltExecuteSQL();
         }
 
-        VoltTable [] checkResults = voltExecuteSQL();
-
-        for (int i = 0; i < keys.length; ++i) {
-            String key = keys[i];
-            // Insert new or update existing key depending on result
-            if (checkResults[i].getRowCount() == 0)
-                voltQueueSQL(insertStmt, key, value);
-            else
-                voltQueueSQL(updateStmt, value, key);
+        // Initialize the data store with given parameters
+        int batchSize = 0;
+        for(int i=startIndex;i<stopIndex;i++)
+        {
+            voltQueueSQL(insertStmt, String.format(keyFormat, i), defaultValue);
+            batchSize++;
+            if (batchSize > 499) // We can batch up to 500 statements to push in one single execution call
+            {
+                voltExecuteSQL();
+                batchSize = 0;
+            }
         }
+        // Make sure we post the last batch!
+        if (batchSize > 0)
+            voltExecuteSQL(true);
 
-        return voltExecuteSQL(true);
+        return stopIndex;
     }
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-APPNAME="voltkv"
+APPNAME="oneshotkv"
 
 # find voltdb binaries in either installation or distribution directory.
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
@@ -38,8 +38,8 @@ function clean() {
 function srccompile() {
     mkdir -p obj
     javac -target 1.6 -source 1.6 -classpath $APPCLASSPATH -d obj \
-        src/voltkv/*.java \
-        src/voltkv/procedures/*.java
+        src/oneshotkv/*.java \
+        src/oneshotkv/procedures/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -70,13 +70,13 @@ function client() {
 # Use this target for argument help
 function async-benchmark-help() {
     srccompile
-    java -classpath obj:$APPCLASSPATH:obj voltkv.AsyncBenchmark --help
+    java -classpath obj:$APPCLASSPATH:obj oneshotkv.AsyncBenchmark --help
 }
 
 function async-benchmark() {
     srccompile
     java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        voltkv.AsyncBenchmark \
+        oneshotkv.AsyncBenchmark \
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
@@ -97,13 +97,13 @@ function async-benchmark() {
 # Use this target for argument help
 function sync-benchmark-help() {
     srccompile
-    java -classpath obj:$APPCLASSPATH:obj voltkv.SyncBenchmark --help
+    java -classpath obj:$APPCLASSPATH:obj oneshotkv.SyncBenchmark --help
 }
 
 function sync-benchmark() {
     srccompile
     java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        voltkv.SyncBenchmark \
+        oneshotkv.SyncBenchmark \
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
@@ -120,7 +120,7 @@ function sync-benchmark() {
 function oneshot-benchmark() {
     srccompile
     java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        voltkv.OneShotBenchmark \
+        oneshotkv.OneShotBenchmark \
         --displayinterval=5 \
         --duration=60 \
         --servers=localhost \
@@ -139,13 +139,13 @@ function oneshot-benchmark() {
 # Use this target for argument help
 function jdbc-benchmark-help() {
     srccompile
-    java -classpath obj:$APPCLASSPATH:obj voltkv.JDBCBenchmark --help
+    java -classpath obj:$APPCLASSPATH:obj oneshotkv.JDBCBenchmark --help
 }
 
 function jdbc-benchmark() {
     srccompile
     java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        voltkv.JDBCBenchmark \
+        oneshotkv.JDBCBenchmark \
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost:21212 \

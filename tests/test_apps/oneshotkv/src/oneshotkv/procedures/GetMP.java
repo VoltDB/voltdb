@@ -20,48 +20,23 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package voltkv.procedures;
+package oneshotkv.procedures;
 
 import org.voltdb.*;
 
 @ProcInfo
 (
-  singlePartition = false
+ singlePartition = false
 )
 
-public class Initialize extends VoltProcedure
+public class GetMP extends VoltProcedure
 {
-    // Delete everything
-    public final SQLStmt cleanStmt = new SQLStmt("DELETE FROM store;");
+    // Selects a key/value pair's value
+    public final SQLStmt selectStmt = new SQLStmt("SELECT key, value FROM store WHERE key = ?;");
 
-    // Inserts a key/value pair
-    public final SQLStmt insertStmt = new SQLStmt("INSERT INTO store (key, value) VALUES (?, ?);");
-
-    public long run(int startIndex, int stopIndex, String keyFormat, byte[] defaultValue)
+    public VoltTable[] run(String key)
     {
-        // Wipe out the data store to re-initialize
-        if (startIndex == 0)
-        {
-            voltQueueSQL(cleanStmt);
-            voltExecuteSQL();
-        }
-
-        // Initialize the data store with given parameters
-        int batchSize = 0;
-        for(int i=startIndex;i<stopIndex;i++)
-        {
-            voltQueueSQL(insertStmt, String.format(keyFormat, i), defaultValue);
-            batchSize++;
-            if (batchSize > 499) // We can batch up to 500 statements to push in one single execution call
-            {
-                voltExecuteSQL();
-                batchSize = 0;
-            }
-        }
-        // Make sure we post the last batch!
-        if (batchSize > 0)
-            voltExecuteSQL(true);
-
-        return stopIndex;
+        voltQueueSQL(selectStmt, key);
+        return voltExecuteSQL(true);
     }
 }

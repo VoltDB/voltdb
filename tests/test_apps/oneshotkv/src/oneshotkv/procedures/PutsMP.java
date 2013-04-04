@@ -20,24 +20,45 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package voltkv.procedures;
 
-import org.voltdb.*;
+package oneshotkv.procedures;
+
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
 @ProcInfo
 (
-  partitionInfo   = "store.key:0"
-, singlePartition = true
+ singlePartition = false
 )
+public class PutsMP extends VoltProcedure {
+    // Checks if key exists
+    public final SQLStmt checkStmt = new SQLStmt("SELECT key FROM store WHERE key = ?;");
 
-public class Get extends VoltProcedure
-{
-    // Selects a key/value pair's value
-    public final SQLStmt selectStmt = new SQLStmt("SELECT key, value FROM store WHERE key = ?;");
+    // Updates a key/value pair
+    public final SQLStmt updateStmt = new SQLStmt("UPDATE store SET value = ? WHERE key = ?;");
 
-    public VoltTable[] run(String key)
-    {
-        voltQueueSQL(selectStmt, key);
+    // Inserts a key/value pair
+    public final SQLStmt insertStmt = new SQLStmt("INSERT INTO store (key, value) VALUES (?, ?);");
+
+    public VoltTable[] run(byte[] value, String [] keys) {
+        for (String key: keys) {
+            // Check whether the pair exists
+            voltQueueSQL(checkStmt, key);
+        }
+
+        VoltTable [] checkResults = voltExecuteSQL();
+
+        for (int i = 0; i < keys.length; ++i) {
+            String key = keys[i];
+            // Insert new or update existing key depending on result
+            if (checkResults[i].getRowCount() == 0)
+                voltQueueSQL(insertStmt, key, value);
+            else
+                voltQueueSQL(updateStmt, value, key);
+        }
+
         return voltExecuteSQL(true);
     }
 }

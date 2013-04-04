@@ -20,7 +20,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package voltkv.procedures;
+package oneshotkv.procedures;
 
 import org.voltdb.*;
 
@@ -30,14 +30,14 @@ import org.voltdb.*;
 , singlePartition = true
 )
 
-public class Remove extends VoltProcedure
+public class Get extends VoltProcedure
 {
-    // Deletes a key/value pair
-    public final SQLStmt deleteStmt = new SQLStmt("DELETE FROM store WHERE key = ?;");
+    // Selects a key/value pair's value
+    public final SQLStmt selectStmt = new SQLStmt("SELECT key, value FROM store WHERE key = ?;");
 
     public VoltTable[] run(String key)
     {
-        voltQueueSQL(deleteStmt, key);
+        voltQueueSQL(selectStmt, key);
         return voltExecuteSQL(true);
     }
 }
