@@ -1451,12 +1451,13 @@ public abstract class CatalogUtil {
     }
 
     public static void
-        uploadCatalogToZK(ZooKeeper zk, int catalogVersion, long txnId, long uniqueId, byte catalogBytes[])
+        uploadCatalogToZK(ZooKeeper zk, int catalogVersion, long txnId, long uniqueId, byte[] catalogHash, byte catalogBytes[])
                 throws KeeperException, InterruptedException {
-        ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 20);
+        ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 20 + 20);
         versionAndBytes.putInt(catalogVersion);
         versionAndBytes.putLong(txnId);
         versionAndBytes.putLong(uniqueId);
+        versionAndBytes.put(catalogHash);
         versionAndBytes.put(catalogBytes);
         zk.create(VoltZK.catalogbytes,
                 versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
@@ -1465,7 +1466,7 @@ public abstract class CatalogUtil {
     public static void
         setCatalogToZK(ZooKeeper zk, int catalogVersion, long txnId, long uniqueId, byte[] catalogHash, byte catalogBytes[])
             throws KeeperException, InterruptedException {
-        ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 20);
+        ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 20 + 20);
         versionAndBytes.putInt(catalogVersion);
         versionAndBytes.putLong(txnId);
         versionAndBytes.putLong(uniqueId);
