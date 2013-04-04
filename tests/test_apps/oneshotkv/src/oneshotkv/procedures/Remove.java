@@ -20,23 +20,24 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package voltkv.procedures;
+package oneshotkv.procedures;
 
 import org.voltdb.*;
 
 @ProcInfo
 (
- singlePartition = false
+  partitionInfo   = "store.key:0"
+, singlePartition = true
 )
 
-public class GetMP extends VoltProcedure
+public class Remove extends VoltProcedure
 {
-    // Selects a key/value pair's value
-    public final SQLStmt selectStmt = new SQLStmt("SELECT key, value FROM store WHERE key = ?;");
+    // Deletes a key/value pair
+    public final SQLStmt deleteStmt = new SQLStmt("DELETE FROM store WHERE key = ?;");
 
     public VoltTable[] run(String key)
     {
-        voltQueueSQL(selectStmt, key);
+        voltQueueSQL(deleteStmt, key);
         return voltExecuteSQL(true);
     }
 }
