@@ -59,8 +59,6 @@ import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NullCallback;
 
-import voltkv.PayloadProcessor;
-
 public class OneShotBenchmark {
 
     // handy, rather than typing this out several times

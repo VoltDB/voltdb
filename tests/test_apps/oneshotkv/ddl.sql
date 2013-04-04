@@ -7,9 +7,9 @@ CREATE TABLE store
 
 PARTITION TABLE store ON COLUMN key;
 
-CREATE PROCEDURE FROM CLASS voltkv.procedures.Initialize;
-CREATE PROCEDURE FROM CLASS voltkv.procedures.Get;
-CREATE PROCEDURE FROM CLASS voltkv.procedures.GetMP;
-CREATE PROCEDURE FROM CLASS voltkv.procedures.Put;
-CREATE PROCEDURE FROM CLASS voltkv.procedures.PutsMP;
-CREATE PROCEDURE FROM CLASS voltkv.procedures.Remove;
+CREATE PROCEDURE FROM CLASS oneshotkv.procedures.Initialize;
+CREATE PROCEDURE FROM CLASS oneshotkv.procedures.Get;
+CREATE PROCEDURE FROM CLASS oneshotkv.procedures.GetMP;
+CREATE PROCEDURE FROM CLASS oneshotkv.procedures.Put;
+CREATE PROCEDURE FROM CLASS oneshotkv.procedures.PutsMP;
+CREATE PROCEDURE FROM CLASS oneshotkv.procedures.Remove;
