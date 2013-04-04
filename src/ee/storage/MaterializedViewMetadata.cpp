@@ -82,7 +82,8 @@ DEBUG_STREAM_HERE("table " << m_target->name() << "@" << m_target << " has prima
 
     allocateBackedTuples();
 
-    if (srcTable->activeTupleCount() != 0) {
+    // Catch up on pre-existing source tuples UNLESS target tuples have already been migrated in.
+    if (srcTable->activeTupleCount() != 0 && m_target->activeTupleCount() == 0) {
         TableTuple scannedTuple(srcTable->schema());
         TableIterator &iterator = srcTable->iterator();
         while (iterator.next(scannedTuple)) {
