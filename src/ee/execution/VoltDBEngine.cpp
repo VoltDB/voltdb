@@ -818,15 +818,40 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                 persistenttable->dropMaterializedView(toDrop);
             }
 
-            // At this point, the database schema may not be ready to deal with materialized
-            // views that must be added or that survive intact to be migrated or that may have
-            // been modified.
-            // When this function returns, any materialized view "target" tables will have been
-            // defined or redefined, and the remainder of the view (re)definition work can proceed.
-            // Reference counting of tables keeps any "old" target tables mostly intact while they
-            // are temporarily referenced by views.
-            // Deletion of the "old" target tables is delayed until views can get re-targeted to
-            // any "new" replacement target tables.
+            // This process temporarily duplicates the materialized view definitions and their
+            // target table reference counts for all the right materialized view tables,
+            // leaving the others to go away with the existingTable.
+            // Since this is happening "mid-stream" in the redefinition of all of the source and target tables,
+            // there needs to be a way to handle cases where the target table HAS been redefined already and
+            // cases where it HAS NOT YET been redefined (and cases where it just survives intact).
+            // At this point, the materialized view makes a best effort to use the
+            // current/latest version of the table -- particularly, because it will have made off with the
+            // "old" version's primary key index, which is used in the MaterializedViewMetadata constructor.
+            // Once ALL tables have been added/(re)defined, any materialized view definitions that still use
+            // an obsolete target table needs to be brought forward to reference the replacement table.
+            // See initMaterializedViews
+
+            for (int ii = 0; ii < survivingInfos.size(); ++ii) {
+                catalog::MaterializedViewInfo * currInfo = survivingInfos[ii];
+                PersistentTable* oldTargetTable = survivingViews[ii]->targetTable();
+                // Use the now-current definiton of the target table, to be updated later, if needed.
+                TableCatalogDelegate* targetDelegate =
+                    dynamic_cast<TableCatalogDelegate*>(findInMapOrNull(oldTargetTable->name(),
+                                                                        m_catalogDelegates));
+                PersistentTable* targetTable = oldTargetTable; // fallback value if not (yet) redefined.
+                if (targetDelegate) {
+                    PersistentTable* newTargetTable =
+                        dynamic_cast<PersistentTable*>(targetDelegate->getTable());
+                    if (newTargetTable) {
+                        targetTable = newTargetTable;
+                    }
+                }
+DEBUG_STREAM_HERE("Adding new mat view " << targetTable->name() << "@" << targetTable <<
+                  " was @" << oldTargetTable << " on " << persistenttable->name() << "@" << persistenttable);
+                // This is not a leak -- the materialized view metadata is self-installing into the new table.
+                // Also, it guards its targetTable from accidental deletion with a refcount bump.
+                new MaterializedViewMetadata(persistenttable, targetTable, currInfo);
+            }
         }
     }
 
@@ -1122,21 +1147,19 @@ void VoltDBEngine::initMaterializedViews(bool addAll) {
         map<string, catalog::MaterializedViewInfo*>::const_iterator begin = views.begin();
         map<string, catalog::MaterializedViewInfo*>::const_iterator end = views.end();
         for (matviewIterator = begin; matviewIterator != end; ++matviewIterator) {
+            assert(srcTable);
             catalog::MaterializedViewInfo *catalogView = matviewIterator->second;
+            const catalog::Table *destCatalogTable = catalogView->dest();
+            PersistentTable *destTable = dynamic_cast<PersistentTable*>(m_tables[destCatalogTable->relativeIndex()]);
             // connect source and destination tables
             if (addAll || catalogView->wasAdded()) {
-                const catalog::Table *destCatalogTable = catalogView->dest();
-                PersistentTable *destTable = dynamic_cast<PersistentTable*>(m_tables[destCatalogTable->relativeIndex()]);
-#ifdef DEBUG
-                if ( ! srcTable ) {
-                    DEBUG_STREAM_HERE("Hitting it in reality.");
-                }
-#endif
-                assert(srcTable);
 DEBUG_STREAM_HERE("Adding new mat view " << destTable->name() << " on " << srcTable->name());
                 // This is not a leak -- the materialized view is self-installing into srcTable.
                 new MaterializedViewMetadata(srcTable, destTable, catalogView);
             } else {
+DEBUG_STREAM_HERE("Surviving mat view " << destTable->name() << " on " << srcTable->name());
+                // Ensure that the materialized view is using the latest version of the target table.
+                srcTable->updateMaterializedViewTargetTable(destTable);
             }
         }
     }

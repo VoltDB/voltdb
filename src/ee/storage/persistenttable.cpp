@@ -786,6 +786,29 @@ DEBUG_STREAM_HERE("Intending to drop mat view " << currentViewId << " on " << na
     }
 }
 
+void
+PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target)
+{
+    std::string targetName = target->name();
+    // find the materialized view that uses the table or its precursor (by the same name).
+    BOOST_FOREACH(MaterializedViewMetadata* currView, m_views) {
+        PersistentTable* currTarget = currView->targetTable();
+        if (currTarget == target) {
+            // The view is already up to date.
+            return;
+        }
+
+        std::string currName = currTarget->name();
+        if (currName == targetName) {
+            // A match on name only indicates that the target table has been re-defined since
+            // the view was initialized, so re-initialize the view.
+            currView->migrateTargetTable(target);
+            return;
+        }
+    }
+    assert(false); // Should have found an existing view for the table.
+}
+
 // ------------------------------------------------------------------
 // UTILITY
 // ------------------------------------------------------------------

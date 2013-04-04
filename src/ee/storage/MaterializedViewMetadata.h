@@ -56,8 +56,12 @@ public:
 
     PersistentTable * targetTable() const { return m_target; }
 
+    void migrateTargetTable(PersistentTable * target);
 private:
 
+    void freeBackedTuples();
+    void allocateBackedTuples();
+    
     /** load a predicate from the catalog structure if it's there */
     void parsePredicate(catalog::MaterializedViewInfo *metadata);
 

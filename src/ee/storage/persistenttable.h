@@ -206,6 +206,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
                                     std::vector<catalog::MaterializedViewInfo*> &changingInfosOut,
                                     std::vector<MaterializedViewMetadata*> &changingViewsOut,
                                     std::vector<MaterializedViewMetadata*> &obsoleteViewsOut);
+    void updateMaterializedViewTargetTable(PersistentTable* target);
     /**
      * Switch the table to copy on write mode. Returns true if the table was already in copy on write mode.
      */

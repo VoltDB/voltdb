@@ -430,6 +430,7 @@ void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & vie
     // "old" version's primary key index, which is used in the MaterializedViewMetadata constructor.
     // Once ALL tables have been added/(re)defined, any materialized view definitions that still use
     // an obsolete target table needs to be brought forward to reference the replacement table.
+    // See initMaterializedViews
 
     for (int ii = 0; ii < survivingInfos.size(); ++ii) {
         catalog::MaterializedViewInfo * currInfo = survivingInfos[ii];

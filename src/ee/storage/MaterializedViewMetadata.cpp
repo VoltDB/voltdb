@@ -79,6 +79,54 @@ MaterializedViewMetadata::MaterializedViewMetadata(
 
     m_index = m_target->primaryKeyIndex();
 DEBUG_STREAM_HERE("table " << m_target->name() << "@" << m_target << " has primary index @" << m_index);
+
+    allocateBackedTuples();
+
+    if (srcTable->activeTupleCount() != 0) {
+        TableTuple scannedTuple(srcTable->schema());
+        TableIterator &iterator = srcTable->iterator();
+        while (iterator.next(scannedTuple)) {
+            processTupleInsert(scannedTuple, false);
+        }
+    }
+}
+
+MaterializedViewMetadata::~MaterializedViewMetadata() {
+    freeBackedTuples();
+    delete[] m_groupByColumns;
+    delete[] m_outputColumnSrcTableIndexes;
+    delete[] m_outputColumnAggTypes;
+    delete m_filterPredicate;
+DEBUG_STREAM_HERE("down @" << m_target);
+    m_target->decrementRefcount();
+}
+
+void MaterializedViewMetadata::migrateTargetTable(PersistentTable * target)
+{
+    PersistentTable * oldTarget = m_target;
+
+    m_target = target;
+    target->incrementRefcount();
+
+    // Re-initialize dependencies on the target table, allowing for widened columns
+    m_index = m_target->primaryKeyIndex();
+DEBUG_STREAM_HERE("table " << m_target->name() << "@" << m_target << " has primary index @" << m_index);
+
+    freeBackedTuples();
+    allocateBackedTuples();
+
+    oldTarget->decrementRefcount();
+}
+
+void MaterializedViewMetadata::freeBackedTuples()
+{
+    delete[] m_searchKeyBackingStore;
+    delete[] m_updatedTupleBackingStore;
+    delete[] m_emptyTupleBackingStore;
+}
+
+void MaterializedViewMetadata::allocateBackedTuples()
+{
     m_searchKey = TableTuple(m_index->getKeySchema());
     m_searchKeyBackingStore = new char[m_index->getKeySchema()->tupleLength() + 1];
     memset(m_searchKeyBackingStore, 0, m_index->getKeySchema()->tupleLength() + 1);
@@ -95,27 +143,8 @@ DEBUG_STREAM_HERE("table " << m_target->name() << "@" << m_target << " has prima
     m_emptyTupleBackingStore = new char[m_target->schema()->tupleLength() + 1];
     memset(m_emptyTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
     m_emptyTuple.move(m_emptyTupleBackingStore);
-
-    if (srcTable->activeTupleCount() != 0) {
-        TableTuple scannedTuple(srcTable->schema());
-        TableIterator &iterator = srcTable->iterator();
-        while (iterator.next(scannedTuple)) {
-            processTupleInsert(scannedTuple, false);
-        }
-    }
 }
 
-MaterializedViewMetadata::~MaterializedViewMetadata() {
-    delete[] m_searchKeyBackingStore;
-    delete[] m_updatedTupleBackingStore;
-    delete[] m_emptyTupleBackingStore;
-    delete[] m_groupByColumns;
-    delete[] m_outputColumnSrcTableIndexes;
-    delete[] m_outputColumnAggTypes;
-    delete m_filterPredicate;
-DEBUG_STREAM_HERE("down @" << m_target);
-    m_target->decrementRefcount();
-}
 
 void MaterializedViewMetadata::parsePredicate(catalog::MaterializedViewInfo *metadata) {
     std::string hexString = metadata->predicate();
