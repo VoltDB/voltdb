@@ -359,6 +359,7 @@ public class TestClientInterface {
         catalogResult.adminConnection = false;
         catalogResult.hostname = "localhost";
         // catalog change specific boiler plate
+        catalogResult.catalogHash = "blah".getBytes();
         catalogResult.catalogBytes = "blah".getBytes();
         catalogResult.deploymentString = "blah";
         catalogResult.deploymentCRC = 1234l;
@@ -381,10 +382,10 @@ public class TestClientInterface {
         //assertFalse(boolValues.get(3)); // every site
         assertEquals("@UpdateApplicationCatalog", message.getStoredProcedureName());
         assertEquals("diff", message.getStoredProcedureInvocation().getParameterAtIndex(0));
-        assertTrue(Arrays.equals("blah".getBytes(), (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(1)));
-        assertEquals(3, message.getStoredProcedureInvocation().getParameterAtIndex(2));
-        assertEquals("blah", message.getStoredProcedureInvocation().getParameterAtIndex(3));
-        assertEquals(1234l, message.getStoredProcedureInvocation().getParameterAtIndex(4));
+        assertTrue(Arrays.equals("blah".getBytes(), (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(2)));
+        assertEquals(3, message.getStoredProcedureInvocation().getParameterAtIndex(3));
+        assertEquals("blah", message.getStoredProcedureInvocation().getParameterAtIndex(4));
+        assertEquals(1234l, message.getStoredProcedureInvocation().getParameterAtIndex(5));
         assertEquals(ProcedureInvocationType.REPLICATED, message.getStoredProcedureInvocation().getType());
         assertEquals(12345678l, message.getStoredProcedureInvocation().getOriginalTxnId());
         assertEquals(87654321l, message.getStoredProcedureInvocation().getOriginalUniqueId());
