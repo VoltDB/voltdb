@@ -100,6 +100,10 @@ public class MpProcedureTask extends ProcedureTask
         // Check for restarting sysprocs
         String spName = txn.m_initiationMsg.getStoredProcedureName();
 
+        // certain system procs can and can't be restarted
+        // Right now this is adhoc and catalog update. Since these are treated specially
+        // in a few places (here, recovery, dr), maybe we should add another metadata
+        // property the sysproc registry about whether a proc can be restarted/recovered/dr-ed
         if (m_isRestart &&
                 spName.startsWith("@") &&
                 !spName.startsWith("@AdHoc") &&
