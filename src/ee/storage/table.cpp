@@ -90,6 +90,7 @@ Table::~Table() {
 
     // clean up indexes
     BOOST_FOREACH(TableIndex *index, m_indexes) {
+DEBUG_STREAM_HERE("table " << name() << "@" << this << " deleting index " << (index == m_pkeyIndex ? "(primary) " : "") << index);
         delete index;
     }
     m_pkeyIndex = NULL;

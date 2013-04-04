@@ -67,6 +67,10 @@ class CopyOnWriteTest_CopyOnWriteIterator;
 class CompactionTest_BasicCompaction;
 class CompactionTest_CompactionWithCopyOnWrite;
 
+namespace catalog {
+class MaterializedViewInfo;
+}
+
 namespace voltdb {
 
 class TableColumn;
@@ -195,9 +199,13 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     /** Add/drop/list materialized views to this table */
     void addMaterializedView(MaterializedViewMetadata *view);
     void dropMaterializedView(MaterializedViewMetadata *targetView);
-    std::vector<MaterializedViewMetadata *> const & allMaterializedViews() const { return m_views; }
-
-
+    void segregateMaterializedViews(std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & start,
+                                    std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & end,
+                                    std::vector<catalog::MaterializedViewInfo*> &survivingInfosOut,
+                                    std::vector<MaterializedViewMetadata*> &survivingViewsOut,
+                                    std::vector<catalog::MaterializedViewInfo*> &changingInfosOut,
+                                    std::vector<MaterializedViewMetadata*> &changingViewsOut,
+                                    std::vector<MaterializedViewMetadata*> &obsoleteViewsOut);
     /**
      * Switch the table to copy on write mode. Returns true if the table was already in copy on write mode.
      */

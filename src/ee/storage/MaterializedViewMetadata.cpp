@@ -78,6 +78,7 @@ MaterializedViewMetadata::MaterializedViewMetadata(
     }
 
     m_index = m_target->primaryKeyIndex();
+DEBUG_STREAM_HERE("table " << m_target->name() << "@" << m_target << " has primary index @" << m_index);
     m_searchKey = TableTuple(m_index->getKeySchema());
     m_searchKeyBackingStore = new char[m_index->getKeySchema()->tupleLength() + 1];
     memset(m_searchKeyBackingStore, 0, m_index->getKeySchema()->tupleLength() + 1);
@@ -112,6 +113,7 @@ MaterializedViewMetadata::~MaterializedViewMetadata() {
     delete[] m_outputColumnSrcTableIndexes;
     delete[] m_outputColumnAggTypes;
     delete m_filterPredicate;
+DEBUG_STREAM_HERE("down @" << m_target);
     m_target->decrementRefcount();
 }
 

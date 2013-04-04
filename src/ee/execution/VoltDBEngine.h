@@ -121,6 +121,9 @@ const size_t PLAN_CACHE_SIZE = 1024 * 10;
 // TODO(evanj): Used by JNI so must be exported. Remove when we only one .so
 class __attribute__((visibility("default"))) VoltDBEngine {
     public:
+
+        typedef std::pair<std::string, CatalogDelegate*> NamedCDPair;
+
         /** Constructor for test code: this does not enable JNI callbacks. */
         VoltDBEngine() :
           m_currentUndoQuantum(NULL),
@@ -184,8 +187,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         bool loadCatalog(const int64_t timestamp, const std::string &catalogPayload);
         bool updateCatalog(const int64_t timestamp, const std::string &catalogPayload);
         bool processCatalogAdditions(bool addAll, int64_t timestamp);
-        bool processCatalogDeletes(int64_t timestamp);
-        bool rebuildTableCollections();
 
 
         /**
@@ -384,6 +385,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                           AbstractPlanNode* node,
                           TempTableLimits* limits);
         bool initCluster();
+        void processCatalogDeletes(int64_t timestamp);
+        void rebuildTableCollections();
         void initMaterializedViews(bool addAll);
         bool updateCatalogDatabaseReference();
 

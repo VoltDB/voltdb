@@ -121,10 +121,12 @@ class Table {
      */
     void incrementRefcount() {
         m_refcount += 1;
+DEBUG_STREAM_HERE("@" << this << " up to " << m_refcount);
     }
 
     void decrementRefcount() {
         m_refcount -= 1;
+DEBUG_STREAM_HERE("@" << this << " down to " << m_refcount);
         if (m_refcount == 0) {
             delete this;
         }
