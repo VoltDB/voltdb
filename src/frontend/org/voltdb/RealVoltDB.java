@@ -42,8 +42,10 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
@@ -118,7 +120,6 @@ import com.google.common.util.concurrent.SettableFuture;
  */
 public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 {
-    private static final VoltLogger log = new VoltLogger(VoltDB.class.getName());
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
@@ -933,8 +934,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
             }
 
-            long depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_deployment,
-                    true, true);
+            long depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_deployment, true);
             assert(depCRC != -1);
 
             m_catalogContext = new CatalogContext(
@@ -1148,7 +1148,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         javamaxheapmem /= (1024 * 1024);
         hostLog.info(String.format("Maximum usable Java heap set to %d mb.", javamaxheapmem));
 
-        m_catalogContext.logDebuggingInfoFromCatalog();
+        SortedMap<String, String> dbgMap = m_catalogContext.getDebuggingInfoFromCatalog();
+        for (String line : dbgMap.values()) {
+            hostLog.info(line);
+        }
 
         // print out a bunch of useful system info
         PlatformProperties pp = PlatformProperties.getPlatformProperties();
@@ -1270,7 +1273,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
             }
             catch (Exception ignored2) {
-                log.l7dlog( Level.ERROR, LogKeys.org_voltdb_VoltDB_FailedToRetrieveBuildString.name(), null);
+                hostLog.l7dlog( Level.ERROR, LogKeys.org_voltdb_VoltDB_FailedToRetrieveBuildString.name(), null);
             }
         }
         return new String[] { versionString, buildString };
@@ -1436,7 +1439,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     try {
                         m_nodeDRGateway.shutdown();
                     } catch (InterruptedException e) {
-                        log.warn("Interrupted shutting down invocation buffer server", e);
+                        hostLog.warn("Interrupted shutting down invocation buffer server", e);
                     }
                 }
 
@@ -1561,6 +1564,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalogVersion);
             }
 
+            // get old debugging info
+            SortedMap<String, String> oldDbgMap = m_catalogContext.getDebuggingInfoFromCatalog();
+
             // 0. A new catalog! Update the global context and the context tracker
             m_catalogContext =
                 m_catalogContext.update(
@@ -1575,7 +1581,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     new ContextTracker(
                             m_catalogContext,
                             csp));
-            m_catalogContext.logDebuggingInfoFromCatalog();
+
+            // log the stuff that's changed in this new catalog update
+            SortedMap<String, String> newDbgMap = m_catalogContext.getDebuggingInfoFromCatalog();
+            for (Entry<String, String> e : newDbgMap.entrySet()) {
+                // skip log lines that are unchanged
+                if (oldDbgMap.containsKey(e.getKey()) && oldDbgMap.get(e.getKey()).equals(e.getValue())) {
+                    continue;
+                }
+                hostLog.info(e.getValue());
+            }
 
             //Construct the list of partitions and sites because it simply doesn't exist anymore
             SiteTracker siteTracker = VoltDB.instance().getSiteTrackerForSnapshot();

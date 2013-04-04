@@ -19,12 +19,15 @@ package org.voltdb;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
@@ -187,20 +190,52 @@ public class CatalogContext {
     // Generate helpful status messages based on configuration present in the
     // catalog.  Used to generated these messages at startup and after an
     // @UpdateApplicationCatalog
-    void logDebuggingInfoFromCatalog()
+    SortedMap<String, String> getDebuggingInfoFromCatalog()
     {
-        VoltLogger hostLog = new VoltLogger("HOST");
-        if (cluster.getSecurityenabled()) {
-            hostLog.info("Client authentication is enabled.");
+        SortedMap<String, String> logLines = new TreeMap<String, String>();
+
+        // topology
+        Deployment deployment = cluster.getDeployment().iterator().next();
+        int hostCount = deployment.getHostcount();
+        int sitesPerHost = deployment.getSitesperhost();
+        int kFactor = deployment.getKfactor();
+        logLines.put("deployment1",
+                String.format("Cluster has %d hosts with leader hostname: \"%s\". %d sites per host. K = %d.",
+                hostCount, VoltDB.instance().getConfig().m_leader, sitesPerHost, kFactor));
+
+        int replicas = kFactor + 1;
+        int partitionCount = sitesPerHost * hostCount / replicas;
+        logLines.put("deployment2",
+                String.format("The entire cluster has %d %s of%s %d logical partition%s.",
+                replicas,
+                replicas > 1 ? "copies" : "copy",
+                partitionCount > 1 ? " each of the" : "",
+                partitionCount,
+                partitionCount > 1 ? "s" : ""));
+
+        // voltdb root
+        logLines.put("voltdbroot", "Using \"" + cluster.getVoltroot() + "\" for voltdbroot directory.");
+
+        // partition detection
+        if (cluster.getNetworkpartition()) {
+            logLines.put("partition-detection", "Detection of network partitions in the cluster is enabled.");
         }
         else {
-            hostLog.info("Client authentication is not enabled. Anonymous clients accepted.");
+            logLines.put("partition-detection", "Detection of network partitions in the cluster is not enabled.");
+        }
+
+        // security info
+        if (cluster.getSecurityenabled()) {
+            logLines.put("sec-enabled", "Client authentication is enabled.");
+        }
+        else {
+            logLines.put("sec-enabled", "Client authentication is not enabled. Anonymous clients accepted.");
         }
 
         // auto snapshot info
         SnapshotSchedule ssched = database.getSnapshotschedule().get("default");
         if (ssched == null || !ssched.getEnabled()) {
-            hostLog.info("No schedule set for automated snapshots.");
+            logLines.put("snapshot-schedule1", "No schedule set for automated snapshots.");
         }
         else {
             final String frequencyUnitString = ssched.getFrequencyunit().toLowerCase();
@@ -217,11 +252,13 @@ public class CatalogContext {
                 msg = String.valueOf(ssched.getFrequencyvalue()) + " hours";
                 break;
             }
-            hostLog.info("Automatic snapshots enabled, saved to " + ssched.getPath() +
+            logLines.put("snapshot-schedule1", "Automatic snapshots enabled, saved to " + ssched.getPath() +
                          " and named with prefix '" + ssched.getPrefix() + "'.");
-            hostLog.info("Database will retain a history of " + ssched.getRetain() +
+            logLines.put("snapshot-schedule2", "Database will retain a history of " + ssched.getRetain() +
                          " snapshots, generated every " + msg + ".");
         }
+
+        return logLines;
     }
 
     public long getCatalogCRC() {
