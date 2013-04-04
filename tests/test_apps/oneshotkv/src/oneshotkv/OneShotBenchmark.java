@@ -37,10 +37,9 @@
  * blazing speeds when many clients are connected to it.
  */
 
-package voltkv;
+package oneshotkv;
 
 import java.util.ArrayList;
-
 import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Timer;
@@ -126,8 +125,11 @@ public class OneShotBenchmark {
         @Option(desc = "Whether to preload a specified number of keys and values.")
         boolean preload = true;
 
-        @Option(desc = "Fraction of ops that are gets (vs puts).")
+        @Option(desc = "Fraction of SP ops that are gets (vs puts).")
         double getputratio = 0.90;
+
+        @Option(desc = "Fraction of MP ops that are gets (vs puts).")
+        double mpgetputratio = 1.00;
 
         @Option(desc = "Size of keys in bytes.")
         int keysize = 32;
@@ -150,6 +152,12 @@ public class OneShotBenchmark {
         @Option(desc = "Number of concurrent threads synchronously calling MP procedures.")
         int mpthreads = 3;
 
+        @Option(desc = "Number of partitions the multi partitition put writes two.")
+        int mpputpartitions = 1;
+
+        @Option(desc = "Use optimistic update for multi partition put. (enables preload)")
+        boolean mpputoptimistic = true;
+
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
@@ -171,6 +179,12 @@ public class OneShotBenchmark {
 
             if (threads < 0) exitWithMessageAndUsage("threads must be => 0");
             if (mpthreads < 0) exitWithMessageAndUsage("mpthreads must be => 0");
+            if (mpgetputratio < 0) exitWithMessageAndUsage("mpgetputratio must be >= 0");
+            if (mpgetputratio > 1) exitWithMessageAndUsage("mpgetputratio must be <= 1");
+            if (mpputpartitions < 0) exitWithMessageAndUsage("mpputpartitions must be => 0");
+            if (mpthreads > 0 && mpgetputratio < 1.0 && mpputoptimistic) {
+                preload = true;
+            }
         }
     }
 
@@ -198,12 +212,14 @@ public class OneShotBenchmark {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        clientConfig.setClientAffinity(true);
         client = ClientFactory.createClient(clientConfig);
 
         periodicStatsContext = client.createStatsContext();
         fullStatsContext = client.createStatsContext();
 
         ClientConfig mpClientConfig = new ClientConfig("", "", new StatusListener());
+        mpClientConfig.setClientAffinity(true);
         mpClient = ClientFactory.createClient(mpClientConfig);
         mpPeriodicStatsContext = mpClient.createStatsContext();
         mpFullStatsContext = mpClient.createStatsContext();
@@ -429,10 +445,20 @@ public class OneShotBenchmark {
                     }
                 }
                 else {
-                    try {
-                        m_client.callProcedure("GetMP", processor.generateRandomKeyForRetrieval());
+                    if (rand.nextDouble() < config.mpgetputratio) {
+                        try {
+                            m_client.callProcedure("GetMP", processor.generateRandomKeyForRetrieval());
+                        }
+                        catch (Exception e) {}
                     }
-                    catch (Exception e) {}
+                    else {
+                        try {
+                            String [] keys = processor.generateAdjecentKeys(config.mpputpartitions);
+                            final PayloadProcessor.Pair pair = processor.generateForStore();
+                            m_client.callProcedure("PutsMP", pair.getStoreValue(), keys);
+                        }
+                        catch (Exception e) {}
+                    }
                 }
             }
 
@@ -477,25 +503,45 @@ public class OneShotBenchmark {
                     }
                 }
                 else {
-                    try {
-                        ClientResponse response = m_client.callProcedure("GetMP",
-                                processor.generateRandomKeyForRetrieval());
+                    if (rand.nextDouble() < config.mpgetputratio) {
+                        try {
+                            ClientResponse response = m_client.callProcedure("GetMP",
+                                    processor.generateRandomKeyForRetrieval());
 
-                        final VoltTable pairData = response.getResults()[0];
-                        // Cache miss (Key does not exist)
-                        if (pairData.getRowCount() == 0)
-                            missedGets.incrementAndGet();
-                        else {
-                            final PayloadProcessor.Pair pair =
-                                processor.retrieveFromStore(pairData.fetchRow(0).getString(0),
-                                        pairData.fetchRow(0).getVarbinary(1));
-                            successfulGets.incrementAndGet();
-                            networkGetData.addAndGet(pair.getStoreValueLength());
-                            rawGetData.addAndGet(pair.getRawValueLength());
+                            final VoltTable pairData = response.getResults()[0];
+                            // Cache miss (Key does not exist)
+                            if (pairData.getRowCount() == 0)
+                                missedGets.incrementAndGet();
+                            else {
+                                final PayloadProcessor.Pair pair =
+                                        processor.retrieveFromStore(pairData.fetchRow(0).getString(0),
+                                                pairData.fetchRow(0).getVarbinary(1));
+                                successfulGets.incrementAndGet();
+                                networkGetData.addAndGet(pair.getStoreValueLength());
+                                rawGetData.addAndGet(pair.getRawValueLength());
+                            }
+                        }
+                        catch (Exception e) {
+                            failedGets.incrementAndGet();
                         }
                     }
-                    catch (Exception e) {
-                        failedGets.incrementAndGet();
+                    else {
+                        final String [] keys = processor.generateAdjecentKeys(config.mpputpartitions);
+                        final PayloadProcessor.Pair pair = processor.generateForStore();
+
+                        try {
+                            m_client.callProcedure(
+                                    (config.mpputoptimistic ? "OptimisticPutsMP" : "PutsMP"),
+                                    pair.getStoreValue(),
+                                    keys
+                                    );
+                            successfulPuts.incrementAndGet();
+                        }
+                        catch (Exception e) {
+                            failedPuts.incrementAndGet();
+                        }
+                        networkPutData.addAndGet(pair.getStoreValueLength());
+                        rawPutData.addAndGet(pair.getRawValueLength());
                     }
                 }
             }
