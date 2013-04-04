@@ -472,6 +472,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             }
         }, 0, 1, TimeUnit.HOURS);
         try {
+            m_zk.delete(VoltZK.request_truncation_snapshot, -1);
             truncationRequestExistenceCheck();
             userSnapshotRequestExistenceCheck(false);
         } catch (Exception e) {
