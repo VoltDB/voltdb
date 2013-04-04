@@ -1451,24 +1451,26 @@ public abstract class CatalogUtil {
     }
 
     public static void
-        uploadCatalogToZK(ZooKeeper zk, int catalogVersion, long txnId, long uniqueId, byte catalogBytes[])
+        uploadCatalogToZK(ZooKeeper zk, int catalogVersion, long txnId, long uniqueId, byte[] catalogHash, byte catalogBytes[])
                 throws KeeperException, InterruptedException {
-        ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 20);
+        ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 20 + 20);
         versionAndBytes.putInt(catalogVersion);
         versionAndBytes.putLong(txnId);
         versionAndBytes.putLong(uniqueId);
+        versionAndBytes.put(catalogHash);
         versionAndBytes.put(catalogBytes);
         zk.create(VoltZK.catalogbytes,
                 versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
     }
 
     public static void
-        setCatalogToZK(ZooKeeper zk, int catalogVersion, long txnId, long uniqueId, byte catalogBytes[])
+        setCatalogToZK(ZooKeeper zk, int catalogVersion, long txnId, long uniqueId, byte[] catalogHash, byte catalogBytes[])
             throws KeeperException, InterruptedException {
-        ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 20);
+        ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 20 + 20);
         versionAndBytes.putInt(catalogVersion);
         versionAndBytes.putLong(txnId);
         versionAndBytes.putLong(uniqueId);
+        versionAndBytes.put(catalogHash);
         versionAndBytes.put(catalogBytes);
         zk.setData(VoltZK.catalogbytes,
                 versionAndBytes.array(), -1);
@@ -1478,12 +1480,14 @@ public abstract class CatalogUtil {
         public final long txnId;
         public final long uniqueId;
         public final int version;
+        public final byte hash[];
         public final byte bytes[];
 
-        public CatalogAndIds(long txnId, long uniqueId, int catalogVersion, byte catalogBytes[]) {
+        public CatalogAndIds(long txnId, long uniqueId, int catalogVersion, byte[] catalogHash, byte[] catalogBytes) {
             this.txnId = txnId;
             this.uniqueId = uniqueId;
             this.version = catalogVersion;
+            this.hash = catalogHash;
             this.bytes = catalogBytes;
         }
     }
@@ -1494,10 +1498,12 @@ public abstract class CatalogUtil {
         int version = versionAndBytes.getInt();
         long catalogTxnId = versionAndBytes.getLong();
         long catalogUniqueId = versionAndBytes.getLong();
-        byte catalogBytes[] = new byte[versionAndBytes.remaining()];
+        byte[] catalogHash = new byte[20]; // sha-1 hash size
+        versionAndBytes.get(catalogHash);
+        byte[] catalogBytes = new byte[versionAndBytes.remaining()];
         versionAndBytes.get(catalogBytes);
         versionAndBytes = null;
-        return new CatalogAndIds(catalogTxnId, catalogUniqueId, version, catalogBytes);
+        return new CatalogAndIds(catalogTxnId, catalogUniqueId, version, catalogHash, catalogBytes);
     }
 
 }

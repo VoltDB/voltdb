@@ -19,9 +19,8 @@ package org.voltdb.iv2;
 
 import java.io.IOException;
 import java.util.ArrayList;
-
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -99,9 +98,17 @@ public class MpProcedureTask extends ProcedureTask
         // Cast up. Could avoid ugliness with Iv2TransactionClass baseclass
         MpTransactionState txn = (MpTransactionState)m_txnState;
         // Check for restarting sysprocs
+        String spName = txn.m_initiationMsg.getStoredProcedureName();
+
+        // certain system procs can and can't be restarted
+        // Right now this is adhoc and catalog update. Since these are treated specially
+        // in a few places (here, recovery, dr), maybe we should add another metadata
+        // property the sysproc registry about whether a proc can be restarted/recovered/dr-ed
         if (m_isRestart &&
-            (txn.m_initiationMsg.getStoredProcedureName().startsWith("@") &&
-             !txn.m_initiationMsg.getStoredProcedureName().startsWith("@AdHoc"))) {
+                spName.startsWith("@") &&
+                !spName.startsWith("@AdHoc") &&
+                !spName.equals("@UpdateApplicationCatalog"))
+        {
             InitiateResponseMessage errorResp = new InitiateResponseMessage(txn.m_initiationMsg);
             errorResp.setResults(new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
                         new VoltTable[] {},
