@@ -19,10 +19,9 @@ import sys
 
 import jiratools
 
+# set exclusions if there are any branches that should not be listed
 exclusions = []
-
 jira_url = 'https://issues.voltdb.com/'
-#server_url = 'http://localhost:8080'
 
 def run_cmd(cmd):
     proc = Popen(cmd.split(' '),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
@@ -43,11 +42,12 @@ def get_current_branch():
 def get_branch_list(merged):
     branches = []
 
-    print ('git branch -r %s' % '--merged' if merged else '--no-merged' )
-    (returncode, stdout, stderr) = run_cmd ('git branch -r %s' % ('--merged' if merged else '--no-merged' ))
+    git_cmd = 'git branch -r %s' % ('--merged' if merged else '--no-merged')
+    print ('#\n# git command: %s\n#' % git_cmd)
+    (returncode, stdout, stderr) = run_cmd (git_cmd)
 
     branches = [b.strip() for b in stdout.splitlines() if b.strip().find('origin/') == 0 and b.find('/master') < 0]
-    #print branches
+
     #Filter others from list
     branches = list(set(branches) - set(exclusions))
     branches.sort()
@@ -62,7 +62,7 @@ def make_delete_branches_script(branches, do_it):
         cmd = 'git push origin --delete %s%s' % \
             (b.split('origin/')[1], other_args)
         comment = get_jira_info(b)
-        print "%30s %s" %(cmd, comment)
+        print "%-40s %s" %(cmd, comment)
 
 def get_jira_info(b):
 
@@ -79,9 +79,9 @@ def get_jira_info(b):
                 assignee = ticket['fields']['assignee']['name']
             summary = ticket['fields']['summary']
             #issue_url = jira_url +  'browse/' + issue_key
-            comment = "%s: %s" % (assignee, summary)
+            comment = " # %s: %s" % (assignee, summary)
 
-    return "   # " + comment
+    return comment
 
 def make_archive_branches_script(branches):
     for b in branches:
@@ -103,8 +103,8 @@ def weed_out_newer_branches(branches,maxage):
             if (date.today() - d) > timedelta(days = maxage):
                 old_branches.append(b)
             else:
-                print "#  %s is too new: %s" % (b, stdout.strip())
-
+                print ("#  %-25s last checkin %-2d days ago - %s" %
+                       (b, (date.today()-d).days, d))
     return old_branches
 
 if __name__ == "__main__":
@@ -134,16 +134,15 @@ if __name__ == "__main__":
 
     user = options.username
     password = options.password or getpass.getpass('Enter your Jira password: ')
-    
+
+    print ('# Branches with checkins within %d days will not be listed'
+           % options.olderthan)
+
     branch_list = get_branch_list(options.merged)
 
     if options.merged:
-        #print ('\n#----------------\n#dry-run script:\n#----------------')
-        #make_delete_branches_script(branch_list, False)
-        print ('\n#----------------\n#real script:\n#----------------')
         make_delete_branches_script(branch_list, True)
     else:
-        print ('\n#----------------\n#tag- script:\n#----------------')
         old_branches = weed_out_newer_branches(branch_list, options.olderthan)
         make_archive_branches_script(old_branches)
         print ('\n#----------------\n#Don\'t forget to git push --tags\n#----------------')
