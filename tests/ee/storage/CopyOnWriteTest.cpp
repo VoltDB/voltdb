@@ -922,61 +922,23 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
  * many there are so it yields even if no more tuples will be delivered.
  */
 TEST_F(CopyOnWriteTest, BufferBoundaryCondition) {
+    const size_t tupleCount = 3;
+    const size_t bufferSize = 12 + ((m_tupleWidth + sizeof(int32_t)) * tupleCount);
     initTable(true);
     TableTuple tuple(m_table->schema());
-    const size_t tupleCount = 3;
-    // See second inner loop ii counter for how buffer size is calculated.
-    const size_t bufferSize = 12 + ((m_tupleWidth + sizeof(int32_t)) * tupleCount);
     addRandomUniqueTuples(m_table, tupleCount);
+    size_t origPendingCount = m_table->getBlocksNotPendingSnapshotCount();
+    // This should succeed in one call to serializeMore().
     DefaultTupleSerializer serializer;
-    // Second repetition would fail.
-    for (int qq = 0; qq < 2; qq++) {
-        stx::btree_set<int64_t> originalTuples;
-        voltdb::TableIterator& iterator = m_table->iterator();
-        while (iterator.next(tuple)) {
-            const std::pair<stx::btree_set<int64_t>::iterator, bool> p =
-                    originalTuples.insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
-            const bool inserted = p.second;
-            if (!inserted) {
-                    int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
-                    printf("Failed to insert %d\n", primaryKey);
-            }
-            ASSERT_TRUE(inserted);
-        }
-
-        m_table->activateCopyOnWrite(&serializer, 0);
-
-        stx::btree_set<int64_t> COWTuples;
-        char serializationBuffer[bufferSize];
-        int totalInserted = 0;
-        while (true) {
-            TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
-            TupleOutputStream &outputStream = outputStreams.at(0);
-            m_table->serializeMore(outputStreams);
-            const int serialized = static_cast<int>(outputStream.position());
-            if (serialized == 0) {
-                break;
-            }
-            int ii = 12;//skip partition id and row count and first tuple length
-            while (ii < (serialized - 4)) {
-                int values[2];
-                values[0] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
-                values[1] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii + 4]));
-                const bool inserted =
-                        COWTuples.insert(*reinterpret_cast<int64_t*>(values)).second;
-                if (!inserted) {
-                    printf("Failed in iteration %d, total inserted %d, with values %d and %d\n", qq, totalInserted, values[0], values[1]);
-                }
-                ASSERT_TRUE(inserted);
-                totalInserted++;
-                ii += static_cast<int>(m_tupleWidth + sizeof(int32_t));
-            }
-            for (int jj = 0; jj < NUM_MUTATIONS; jj++) {
-                doRandomTableMutation(m_table);
-            }
-        }
-        checkTuples(tupleCount + (m_tuplesInserted - m_tuplesDeleted), originalTuples, COWTuples);
-    }
+    char serializationBuffer[bufferSize];
+    m_table->activateCopyOnWrite(&serializer, 0);
+    TupleOutputStreamProcessor outputStreams(serializationBuffer, bufferSize);
+    int64_t remaining = m_table->serializeMore(outputStreams);
+    ASSERT_EQ(0, remaining);
+    // Expect the same pending count, because it should get reset when
+    // serialization finishes cleanly.
+    size_t curPendingCount = m_table->getBlocksNotPendingSnapshotCount();
+    ASSERT_EQ(origPendingCount, curPendingCount);
 }
 
 int main() {
