@@ -11,33 +11,20 @@
 from optparse import OptionParser
 from datetime import date, datetime, timedelta
 import getpass
-import os
 import re
 from subprocess import Popen
 import subprocess
-import sys
 
 import jiratools
 
 # set exclusions if there are any branches that should not be listed
-exclusions = []
+exclusions = ['master',]
 jira_url = 'https://issues.voltdb.com/'
 
 def run_cmd(cmd):
     proc = Popen(cmd.split(' '),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
     (out, err) = proc.communicate(input=None)
     return (proc.returncode, out, err)
-
-def get_current_branch():
-    current_branch=''
-    (returncode, stdout, stderr) = run_cmd ('git branch --no-color')
-    if returncode:
-        sys.exit('Can\'t get current branch: ' + stderr)
-    # Current branch is marked by '* ' at the start
-    branch = [b for b in stdout.splitlines() if b.find('* ') == 0]
-    if branch:
-        branch = branch[0][2:]
-    return branch
 
 def get_branch_list(merged):
     branches = []
@@ -46,10 +33,12 @@ def get_branch_list(merged):
     print ('#\n# git command: %s\n#' % git_cmd)
     (returncode, stdout, stderr) = run_cmd (git_cmd)
 
-    branches = [b.strip() for b in stdout.splitlines() if b.strip().find('origin/') == 0 and b.find('/master') < 0]
+    #only want branches at origin and don't want HEAD listed
+    branches = [b.strip() for b in stdout.splitlines()if b.strip().find('origin/') == 0 and b.find('HEAD') < 0]
 
     #Filter others from list
-    branches = list(set(branches) - set(exclusions))
+    origin_exclusions = ['origin/' + b for b in exclusions]
+    branches = list(set(branches) - set(origin_exclusions))
     branches.sort()
 
     return branches
@@ -58,6 +47,7 @@ def make_delete_branches_script(branches, do_it):
     other_args = ''
     if not do_it:
         other_args = ' --dry-run'
+
     for b in branches:
         cmd = 'git push origin --delete %s%s' % \
             (b.split('origin/')[1], other_args)
@@ -91,7 +81,6 @@ def make_archive_branches_script(branches):
         print 'git tag -m "archiving branch %s" archive/%s %s' % (shortname, shortname, b)
         print 'git push origin --delete %s %s' % (shortname, comment)
 
-
 def weed_out_newer_branches(branches,maxage):
     old_branches = []
     for b in branches:
@@ -108,13 +97,6 @@ def weed_out_newer_branches(branches,maxage):
     return old_branches
 
 if __name__ == "__main__":
-
-    delete = False
-    #Only run from master
-    current_branch = get_current_branch()
-    if current_branch != 'master':
-        sys.exit('You must be on master. Your current branch is %s.' % current_branch)
-
 
     parser = OptionParser()
     parser.add_option('-u', '--username', dest = 'username', action = 'store',
@@ -135,8 +117,9 @@ if __name__ == "__main__":
     user = options.username
     password = options.password or getpass.getpass('Enter your Jira password: ')
 
-    print ('# Branches with checkins within %d days will not be listed'
-           % options.olderthan)
+    if not options.merged:
+        print ('# Branches with checkins within %d days will not be listed'
+               % options.olderthan)
 
     branch_list = get_branch_list(options.merged)
 
