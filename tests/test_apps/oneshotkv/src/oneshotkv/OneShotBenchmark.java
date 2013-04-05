@@ -404,7 +404,7 @@ public class OneShotBenchmark {
                 mpFullStatsContext.getStats().getAverageInternalLatency());
 
         // 3. Write stats to file if requested
-        mpClient.writeSummaryCSV(stats, config.statsfile);
+        client.writeSummaryCSV(stats, config.statsfile);
     }
 
     /**
