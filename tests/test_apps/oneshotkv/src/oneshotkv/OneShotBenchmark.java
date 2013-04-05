@@ -455,7 +455,11 @@ public class OneShotBenchmark {
                         try {
                             String [] keys = processor.generateAdjecentKeys(config.mpputpartitions);
                             final PayloadProcessor.Pair pair = processor.generateForStore();
-                            m_client.callProcedure("PutsMP", pair.getStoreValue(), keys);
+                            m_client.callProcedure(
+                                    (config.mpputoptimistic ? "OptimisticPutsMP" : "PutsMP"),
+                                    pair.getStoreValue(),
+                                    keys
+                                    );
                         }
                         catch (Exception e) {}
                     }
