@@ -278,9 +278,9 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
         }
     }
 
-DEBUG_STREAM_HERE("Updating " << m_views.size() << " mat view(s) on " << name() << "@" << this);
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
+DEBUG_STREAM_HERE("Updating " << i+1 << "/" << m_views.size() << " mat view(s) on " << name() << "@" << this);
         m_views[i]->processTupleInsert(source, fallible);
     }
 }
@@ -802,10 +802,11 @@ PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target)
         if (currName == targetName) {
             // A match on name only indicates that the target table has been re-defined since
             // the view was initialized, so re-initialize the view.
-            currView->migrateTargetTable(target);
+            currView->setTargetTable(target);
             return;
         }
     }
+DEBUG_STREAM_HERE("Failed to find mat view " << targetName << "@" << target << " in " << m_views.size() << " on " << name() << "@" << this);
     assert(false); // Should have found an existing view for the table.
 }
 

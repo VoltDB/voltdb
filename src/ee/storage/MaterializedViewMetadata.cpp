@@ -78,7 +78,7 @@ MaterializedViewMetadata::MaterializedViewMetadata(
     }
 
     m_index = m_target->primaryKeyIndex();
-DEBUG_STREAM_HERE("table " << m_target->name() << "@" << m_target << " has primary index @" << m_index);
+DEBUG_STREAM_HERE("on source table " << srcTable->name() << "@" << srcTable << " view table " << m_target->name() << "@" << m_target << " has primary index @" << m_index);
 
     allocateBackedTuples();
 
@@ -102,7 +102,7 @@ DEBUG_STREAM_HERE("down @" << m_target);
     m_target->decrementRefcount();
 }
 
-void MaterializedViewMetadata::migrateTargetTable(PersistentTable * target)
+void MaterializedViewMetadata::setTargetTable(PersistentTable * target)
 {
     PersistentTable * oldTarget = m_target;
 

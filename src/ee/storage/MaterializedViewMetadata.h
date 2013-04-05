@@ -56,7 +56,7 @@ public:
 
     PersistentTable * targetTable() const { return m_target; }
 
-    void migrateTargetTable(PersistentTable * target);
+    void setTargetTable(PersistentTable * target);
 private:
 
     void freeBackedTuples();
