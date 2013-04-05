@@ -8,7 +8,7 @@
 
 #TODO: Make it handle incorrect password the 1st time, then abort
 
-
+from optparse import OptionParser
 from datetime import date, datetime, timedelta
 import getpass
 import os
@@ -21,8 +21,6 @@ import jiratools
 
 exclusions = []
 
-user = getpass.getuser()
-password = getpass.getpass('Enter your Jira password: ')
 jira_url = 'https://issues.voltdb.com/'
 #server_url = 'http://localhost:8080'
 
@@ -118,23 +116,35 @@ if __name__ == "__main__":
         sys.exit('You must be on master. Your current branch is %s.' % current_branch)
 
 
-    merged=True
-    if len(sys.argv) >= 2 and sys.argv[1] == 'unmerged':
-        merged=False
-        cutoffday=21
-        #if len(sys.argv) == 3:
-        #    cutoffday=sys.argv[2]
+    parser = OptionParser()
+    parser.add_option('-u', '--username', dest = 'username', action = 'store',
+                      help = 'username to use for Jira lookups',
+                      default = getpass.getuser())
+    parser.add_option('-p', '--password', dest = 'password', action = 'store',
+                      help = 'password to use for Jira lookups')
+    parser.add_option('--no-merged', dest = 'merged', action = 'store_false',
+                      help = "find branches that are not merged to master",
+                      default = True)
+    parser.add_option('--older', dest = 'olderthan', action = 'store',
+                      help = "age of unmerged branches to list",
+                      default = 21);
 
-    branch_list = get_branch_list(merged)
 
-    if merged:
+    (options,args) = parser.parse_args()
+
+    user = options.username
+    password = options.password or getpass.getpass('Enter your Jira password: ')
+    
+    branch_list = get_branch_list(options.merged)
+
+    if options.merged:
         #print ('\n#----------------\n#dry-run script:\n#----------------')
         #make_delete_branches_script(branch_list, False)
         print ('\n#----------------\n#real script:\n#----------------')
         make_delete_branches_script(branch_list, True)
     else:
         print ('\n#----------------\n#tag- script:\n#----------------')
-        old_branches = weed_out_newer_branches(branch_list,cutoffday)
+        old_branches = weed_out_newer_branches(branch_list, options.olderthan)
         make_archive_branches_script(old_branches)
         print ('\n#----------------\n#Don\'t forget to git push --tags\n#----------------')
 
