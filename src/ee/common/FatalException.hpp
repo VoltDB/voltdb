@@ -19,20 +19,16 @@
 #define FATALEXCEPTION_HPP_
 
 #include <cstdio>
+#include <ostream>
 #include <string>
-#include <string.h>
-#include <execinfo.h>
-#include <cxxabi.h>
+#include <sstream>
+#include <stdexcept>
 #include <vector>
-#include "boost/scoped_array.hpp"
 
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <stdio.h>
+#include "common/debuglog.h"
 
 #define throwFatalException(...) { char reallysuperbig_nonce_message[8192]; snprintf(reallysuperbig_nonce_message, 8192, __VA_ARGS__); throw voltdb::FatalException( reallysuperbig_nonce_message, __FILE__, __LINE__); }
+#define HACK_HARDCODED_BACKTRACE_PATH "/tmp/voltdb_backtrace.txt"
 namespace voltdb {
 class FatalException {
 public:
@@ -40,72 +36,123 @@ public:
      * Stack trace code from http://tombarta.wordpress.com/2008/08/01/c-stack-traces-with-gcc/
      *
      */
-    FatalException(std::string message, const char *filename, unsigned long lineno) :
-        m_reason(message), m_filename(filename), m_lineno(lineno) {
+    FatalException(std::string message, const char *filename, unsigned long lineno,
+                   std::string backtrace_path = HACK_HARDCODED_BACKTRACE_PATH);
 
-      FILE *bt = fopen("/tmp/voltdb_backtrace.txt", "a+");
+    void reportAnnotations(const std::string& str);
 
-      void *traces[128];
-      for (int i=0; i < 128; i++) traces[i] = NULL; // silence valgrind
-      const int numTraces = backtrace( traces, 128);
-      char** traceSymbols = backtrace_symbols( traces, numTraces);
-
-      // write header for backtrace file
-      fprintf(bt, "VoltDB Backtrace (%d)\n", numTraces);
-
-      for (int ii = 0; ii < numTraces; ii++) {
-    std::size_t sz = 200;
-    char *function = static_cast<char*>(malloc(sz));
-    char *begin = NULL, *end = NULL;
-
-    // write original symbol to file.
-    fprintf(bt, "raw[%d]: %s\n", ii, traceSymbols[ii]);
-
-    //Find parens surrounding mangled name
-    for (char *j = traceSymbols[ii]; *j; ++j) {
-      if (*j == '(') {
-        begin = j;
-      }
-      else if (*j == '+') {
-        end = j;
-      }
-    }
-
-    if (begin && end) {
-      *begin++ = '\0';
-      *end = '\0';
-
-      int status;
-      char *ret = abi::__cxa_demangle(begin, function, &sz, &status);
-      if (ret) {
-        //return value may be a realloc of input
-        function = ret;
-      } else {
-        // demangle failed, treat it like a C function with no args
-        strncpy(function, begin, sz);
-        strncat(function, "()", sz);
-        function[sz-1] = '\0';
-      }
-      m_traces.push_back(std::string(function));
-    } else {
-      //didn't find the mangled name in the trace
-      m_traces.push_back(std::string(traceSymbols[ii]));
-    }
-    free(function);
-      }
-
-      for (int ii=0; ii < m_traces.size(); ii++) {
-    const char* str = m_traces[ii].c_str();
-    fprintf(bt, "demangled[%d]: %s\n", ii, str);
-      }
-
-      fclose(bt);
-      free(traceSymbols);
-    }
-  const std::string m_reason;
-  const char *m_filename;
-  const unsigned long m_lineno;
-  std::vector<std::string> m_traces;
+    const std::string m_reason;
+    const char *m_filename;
+    const unsigned long m_lineno;
+    const std::string m_backtracepath;
+    std::vector<std::string> m_traces;
 };
+
+
+inline std::ostream& operator<<(std::ostream& out, const FatalException& fe)
+{
+    out << fe.m_reason << fe.m_filename << ':' << fe.m_lineno << std::endl;
+    for (int ii=0; ii < fe.m_traces.size(); ii++) {
+        out << fe.m_traces[ii] << std::endl;
+    }
+    return out;
+}
+
+//TODO: The long-term intent is that there be a ubiquitous exception class that can be thrown from anywhere we
+// detect evidence of a significant bug -- worth reporting and crashing the executable, exporting any remotely
+// relevent detail, including stack trace AND whatever context information can be piled on at the point
+// of the original throw AND any context that can be added via catch/re-throws as the stack is unwound.
+// There should be a major distinction between this case and other cases:
+// This type should NOT be used for resource issues that can arise unavoidably in production, no matter how
+// curious we might be about details when that happens -- that should have its own somewhat separate handling.
+// This type should NOT be used to react to user actions that conflict with known system limitations
+// -- those should be raised as non-fatal "user error".
+// Right now, FatalException seems to be very close to what's needed except that:
+//   It is being sometimes used to flag resource issues (in Pool.hpp, maybe elsewhere?).
+//   It lacks a friendly API for adding annotations after the initial construction/throw
+//   (in a way that allows including the information in reports and feedback).
+// This is a little hacky but it's a way of showing the intent at the points of throw/catch/re-throw.
+
+// Purposely avoiding inheritance from FatalException for now, because the handling seems just a little dodgy.
+// Instead, FatalException functionality is accessed via a data member that never actually gets thrown/caught.
+// In contrast, exception is working out well as a base class, in the normal case when (re)throw goes uncaught.
+
+// Macro-ized base class to aid experimentation
+#define FatalLogicErrorBase std::runtime_error
+// This is how FatalLogicError ctors initialize their base class.
+#define FatalLogicErrorBaseInitializer(NAME) FatalLogicErrorBase(NAME)
+
+class FatalLogicError : public FatalLogicErrorBase {
+public:
+// ctor wrapper macro supports caller's __FILE__ and __LINE__ and any number of printf-like __VARARGS__ arguments
+#define throwFatalLogicErrorFormatted(...) { \
+    char reallysuperbig_nonce_message[8192]; \
+    snprintf(reallysuperbig_nonce_message, 8192, __VA_ARGS__); \
+    throw voltdb::FatalLogicError(reallysuperbig_nonce_message, __FILE__, __LINE__); }
+
+    FatalLogicError(const char* buffer, const char *filename, unsigned long lineno);
+
+// ctor wrapper macro supports caller's __FILE__ and __LINE__ and any number of STREAMABLES separated by '<<'
+#define throwFatalLogicErrorStreamed(STREAMABLES) { \
+    std::ostringstream tFLESbuffer; tFLESbuffer << STREAMABLES << std::endl; \
+    throw voltdb::FatalLogicError(tFLESbuffer.str(), __FILE__, __LINE__); }
+
+    FatalLogicError(const std::string buffer, const char *filename, unsigned long lineno);
+
+    ~FatalLogicError() throw (); // signature required by exception base class?
+
+// member function wrapper macro supports any number of STREAMABLES separated by '<<'
+#define appendAnnotationToFatalLogicError(ERROR_AS_CAUGHT, STREAMABLES) { \
+    std::ostringstream aATFLEbuffer; \
+    aATFLEbuffer << "rethrown from " << __FILE__ << ':' << __LINE__ << ':' << STREAMABLES << std::endl; \
+    ERROR_AS_CAUGHT.appendAnnotation(aATFLEbuffer.str()); }
+
+    void appendAnnotation(const std::string& buffer);
+
+    virtual const char* what() const throw();
+
+private:
+    void initWhat();
+
+    // FatalLogicError(const voltdb::FatalLogicError&); // Purposely undefined.
+
+    FatalException m_fatality;
+    std::string m_whatwhat;
+};
+
+// It's probably going to be easier to just use/remember the values 1, 2, 3, but...
+const int VOLTDB_DEBUG_IGNORE_123 = 1;
+const int VOLTDB_DEBUG_ASSERT_123 = 1;
+const int VOLTDB_DEBUG_THROW_123 = 2;
+const int VOLTDB_DEBUG_CRASH_123 = 3;
+// Enable configurable response to unpossibilies, choosing by convention from a menu of:
+// 1 assert/ignore in the caller vs.
+// 2 throw in the caller vs.
+// 3 crash here and now
+inline bool debug_false_or_true_or_crash_123(int one_or_two_or_three) {
+    // Get a crash (div by 0) for 3, true for 2, false for 1 (and true for anything else).
+    return ( 2 / (3 - one_or_two_or_three) ) == 2;
+}
+#ifdef NDEBUG
+#define DEBUG_ASSERT_OR_THROW_OR_CRASH_123(CONDITION, ONE_OR_TWO_OR_THREE, STREAMBLES) {}
+#define DEBUG_IGNORE_OR_THROW_OR_CRASH_123(ONE_OR_TWO_OR_THREE, STREAMABLES) {}
+#else
+#define DEBUG_ASSERT_OR_THROW_OR_CRASH_123(CONDITION, ONE_OR_TWO_OR_THREE, STREAMABLES) {\
+    if ( ! (CONDITION) ) {                                                               \
+        if (debug_false_or_true_or_crash_123(ONE_OR_TWO_OR_THREE)) {                     \
+            throwFatalLogicErrorStreamed(STREAMABLES);                                   \
+        }                                                                                \
+        assert(CONDITION);                                                               \
+    }                                                                                    \
+}
+
+#define DEBUG_IGNORE_OR_THROW_OR_CRASH_123(ONE_OR_TWO_OR_THREE, STREAMABLES) {\
+    if (debug_false_or_true_or_crash_123(ONE_OR_TWO_OR_THREE)) {              \
+        throwFatalLogicErrorStreamed(STREAMABLES);                            \
+    }                                                                         \
+}
+
+#endif
+
 }
 #endif /* FATALEXCEPTION_HPP_ */

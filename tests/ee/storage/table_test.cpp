@@ -187,6 +187,7 @@ TEST_F(TableTest, TupleInsert) {
     }
 }
 
+/* updateTuple in TempTable is not supported because it is not required in the product.
 TEST_F(TableTest, TupleUpdate) {
     //
     // Loop through and randomly update values
@@ -197,14 +198,8 @@ TEST_F(TableTest, TupleUpdate) {
     //      (2) Updating a tuple without changing the values doesn't do anything
     //
 
-    vector<int64_t> totals;
-    vector<int64_t> totalsNotSlim;
-    totals.reserve(NUM_OF_COLUMNS);
-    totalsNotSlim.reserve(NUM_OF_COLUMNS);
-    for (int col_ctr = 0; col_ctr < NUM_OF_COLUMNS; col_ctr++) {
-        totals[col_ctr] = 0;
-        totalsNotSlim[col_ctr] = 0;
-    }
+    vector<int64_t> totals(NUM_OF_COLUMNS, 0);
+    vector<int64_t> totalsNotSlim(NUM_OF_COLUMNS, 0);
 
     TableIterator iterator = this->table->iterator();
     TableTuple tuple(table->schema());
@@ -251,6 +246,7 @@ TEST_F(TableTest, TupleUpdate) {
         }
     }
 }
+*/
 
 // I can't for the life of me make this pass using Valgrind.  I
 // suspect that there's an extra reference to the ThreadLocalPool
@@ -334,11 +330,7 @@ TEST_F(TableTest, TupleDelete) {
     TableTuple *tuple;
     TableTuple *temp_tuple;
 
-    vector<int64_t> totals;
-    totals.reserve(NUM_OF_COLUMNS);
-    for (int col_ctr = 0; col_ctr < NUM_OF_COLUMNS; col_ctr++) {
-        totals[col_ctr] = 0;
-    }
+    vector<int64_t> totals(NUM_OF_COLUMNS, 0);
 
     //
     // Interweave the transactions. Only keep the total

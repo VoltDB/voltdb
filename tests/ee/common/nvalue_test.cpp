@@ -773,8 +773,6 @@ TEST_F(NValueTest, TestCastToDecimal) {
     EXPECT_EQ(0, decimalValue.compare(castBigInt));
 
     NValue castDouble = ValueFactory::castAsDecimal(doubleValue);
-    printf("DEBUG: %s\n", ValuePeeker::peekDecimalString(castDouble).c_str());
-    printf("DEBUG: %s\n", ValuePeeker::peekDecimalString(decimalValue).c_str());
 
     EXPECT_EQ(0, decimalValue.compare(castDouble));
 

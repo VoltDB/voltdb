@@ -94,16 +94,24 @@ class TempTable : public Table {
     virtual ~TempTable();
 
     // ------------------------------------------------------------------
-    // OPERATIONS
+    // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
-    void deleteAllTuples(bool freeAllocatedStrings);
-    bool insertTuple(TableTuple &source);
-    bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
-                                        TableTuple &sourceTupleWithNewValues,
-                                        std::vector<TableIndex*> &indexesToUpdate);
+    virtual void deleteAllTuples(bool freeAllocatedStrings);
+    // Deleting a tuple from temp table is not supported. use deleteAllTuples instead
+    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
+    virtual bool deleteTuple(TableTuple &tuple, bool fallible=true);
+    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
+    // -- Most callers should be using TempTable::insertTempTuple, anyway.
+    virtual bool insertTuple(TableTuple &tuple);
+    // Updating temp tuples is not required in production code
+    // -- it may be used in tests, though, for no especially good reason.
+    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
+    virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+                                                TableTuple &sourceTupleWithNewValues,
+                                                std::vector<TableIndex*> const &indexesToUpdate,
+                                                bool fallible=true);
 
-    // deleting tuple from temp table is not supported. use deleteAllTuples instead
-    bool deleteTuple(TableTuple &tuple, bool);
+
     void deleteAllTuplesNonVirtual(bool freeAllocatedStrings);
 
     /**
@@ -116,8 +124,9 @@ class TempTable : public Table {
     /**
      * Does a shallow copy that copies the pointer to uninlined columns.
      */
-    void insertTupleNonVirtual(TableTuple &source);
-    void updateTupleNonVirtual(TableTuple &target, TableTuple &source);
+    void insertTempTuple(TableTuple &source);
+    // Deprecating this ugly name, and bogus return value. For now it's a wrapper.
+    bool insertTupleNonVirtual(TableTuple &source) { insertTempTuple(source); return true; };
 
     // ------------------------------------------------------------------
     // INDEXES
@@ -128,12 +137,10 @@ class TempTable : public Table {
     // ------------------------------------------------------------------
     // UTILITIY
     // ------------------------------------------------------------------
-    std::string tableType() const;
-    void getNextFreeTupleInlined(TableTuple *tuple);
-    voltdb::TableStats* getTableStats();
+    virtual std::string tableType() const;
+    virtual voltdb::TableStats* getTableStats();
 
     // ptr to global integer tracking temp table memory allocated per frag
-    // should be null for persistent tables
     TempTableLimits* m_limits;
 
   protected:
@@ -160,45 +167,36 @@ inline void TempTable::insertTupleNonVirtualWithDeepCopy(TableTuple &source, Poo
 
     // First get the next free tuple by
     // grabbing a tuple at the end of our chunk of memory
-
-     nextFreeTuple(&m_tmpTarget1);
-    ++m_tupleCount;
-    m_usedTupleCount++;
+    TableTuple target(m_schema);
+    TempTable::nextFreeTuple(&target);
 
     //
     // Then copy the source into the target. Pass false for heapAllocateStrings.
     // Don't allocate space for the strings on the heap because the strings are being copied from the source
     // are owned by a PersistentTable or part of the EE string pool.
     //
-    m_tmpTarget1.copyForPersistentInsert(source, pool); // tuple in freelist must be already cleared
-    m_tmpTarget1.setActiveTrue();
+    target.copyForPersistentInsert(source, pool); // tuple in freelist must be already cleared
+    target.setActiveTrue();
 }
 
-inline void TempTable::insertTupleNonVirtual(TableTuple &source) {
+inline void TempTable::insertTempTuple(TableTuple &source) {
     //
     // First get the next free tuple
     // This will either give us one from the free slot list, or
     // grab a tuple at the end of our chunk of memory
     //
-    nextFreeTuple(&m_tmpTarget1);
-    ++m_tupleCount;
-    m_usedTupleCount++;
+    TableTuple target(m_schema);
+    TempTable::nextFreeTuple(&target);
 
     //
     // Then copy the source into the target. Pass false for heapAllocateStrings.
     // Don't allocate space for the strings on the heap because the strings are being copied from the source
     // are owned by a PersistentTable or part of the EE string pool.
     //
-    m_tmpTarget1.copy(source); // tuple in freelist must be already cleared
-    m_tmpTarget1.setActiveTrue();
-    m_tmpTarget1.setPendingDeleteFalse();
-    m_tmpTarget1.setPendingDeleteOnUndoReleaseFalse();
-}
-
-inline void TempTable::updateTupleNonVirtual(TableTuple &targetTupleToUpdate,
-                                             TableTuple &sourceTupleWithNewValues) {
-    // Copy the source tuple into the target
-    targetTupleToUpdate.copy(sourceTupleWithNewValues);
+    target.copy(source); // tuple in freelist must be already cleared
+    target.setActiveTrue();
+    target.setPendingDeleteFalse();
+    target.setPendingDeleteOnUndoReleaseFalse();
 }
 
 inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
@@ -211,10 +209,11 @@ inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
     // Don't call deleteTuple() here.
     const uint16_t uninlinedStringColumnCount = m_schema->getUninlinedObjectColumnCount();
     if (freeAllocatedStrings && uninlinedStringColumnCount > 0) {
+        TableTuple target(m_schema);
         TableIterator iter(this, m_data.begin());
         while (iter.hasNext()) {
-            iter.next(m_tmpTarget1);
-            m_tmpTarget1.freeObjectColumns();
+            iter.next(target);
+            target.freeObjectColumns();
         }
     }
 
@@ -256,6 +255,7 @@ inline void TempTable::nextFreeTuple(TableTuple *tuple) {
 
     std::pair<char*, int> pair = block->nextFreeTuple();
     tuple->move(pair.first);
+    ++m_tupleCount;
     return;
 }
 
