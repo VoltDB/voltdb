@@ -755,17 +755,18 @@ PersistentTable::segregateMaterializedViews(std::map<std::string, catalog::Mater
                                             std::vector<MaterializedViewMetadata*> &changingViewsOut,
                                             std::vector<MaterializedViewMetadata*> &obsoleteViewsOut)
 {
+DEBUG_STREAM_HERE("Segregating " << m_views.size() << " mat views on " << name());
     //////////////////////////////////////////////////////////
     // find all of the materialized views to remove or keep
     //////////////////////////////////////////////////////////
 
-    bool viewfound = false;
     // iterate through all of the existing views
     BOOST_FOREACH(MaterializedViewMetadata* currView, m_views) {
         std::string currentViewId = currView->targetTable()->name();
 
         // iterate through all of the catalog views, looking for a match.
         std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator viewIter;
+        bool viewfound = false;
         for (viewIter = start; viewIter != end; ++viewIter) {
             catalog::MaterializedViewInfo* catalogViewInfo = viewIter->second;
             if (currentViewId == catalogViewInfo->name()) {
