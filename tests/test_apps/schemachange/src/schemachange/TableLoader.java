@@ -24,7 +24,6 @@
 package schemachange;
 
 import java.util.Collections;
-import java.util.NoSuchElementException;
 import java.util.Random;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -52,6 +51,7 @@ class TableLoader {
 
     final AtomicBoolean hadError = new AtomicBoolean(false);
     final SortedSet<Long> outstandingPkeys = Collections.synchronizedSortedSet(new TreeSet<Long>());
+    long lastSentPkey = 0;
 
     private static String _F(String str, Object... parameters) {
         return String.format(str, parameters);
@@ -95,8 +95,12 @@ class TableLoader {
                 // no need to be verbose, as there might be many messages
                 hadError.set(true);
                 break;
-            case ClientResponse.UNEXPECTED_FAILURE:
             case ClientResponse.GRACEFUL_FAILURE:
+                // all graceful failures but this one fall through to death
+                if (clientResponse.getStatusString().contains("CONSTRAINT VIOLATION")) {
+                    break;
+                }
+            case ClientResponse.UNEXPECTED_FAILURE:
             case ClientResponse.USER_ABORT:
                 // should never happen
                 log.error("Error in loader callback:");
@@ -107,123 +111,84 @@ class TableLoader {
         }
     }
 
-    void load(long startPkey, long stopPkey, long jump) {
-        assert(outstandingPkeys.isEmpty());
+    long countKeys(long max) {
+        return scc.callROProcedureWithRetry("@AdHoc",
+                String.format("select count(*) from %s where pkey <= %d;",
+                        TableHelper.getTableName(table), max)).getResults()[0].asScalarLong();
+    }
 
-        if (startPkey >= stopPkey) return;
+    long safeStartPkey(long min, long max) {
+        long low = min;
+        long high = max;
 
-        long lastSuccessfullyLoadedKey = -1;
-
-        while (lastSuccessfullyLoadedKey < stopPkey) {
-            long nextKey = lastSuccessfullyLoadedKey >= 0 ? lastSuccessfullyLoadedKey + jump : startPkey;
-            nextKey = loadChunk(nextKey, stopPkey, jump);
-            if (nextKey >= 0) {
-                lastSuccessfullyLoadedKey = nextKey;
+        while (low < high) {
+            long mid = (high + low) / 2;
+            long count = countKeys(mid);
+            if (count == mid) {
+                low = mid + 1;
             }
+            else {
+                high = mid;
+            }
+        }
+
+        return Math.min(low, max);
+    }
+
+    void load(long startPkey, long stopPkey) {
+        while (!loadChunk(startPkey, stopPkey)) {
+            startPkey = safeStartPkey(startPkey, stopPkey);
+        }
+    }
+
+    private boolean loadChunk(long startPkey, long stopPkey) {
+        assert(startPkey >= 0);
+        assert(stopPkey >= 0);
+
+        if (startPkey >= stopPkey) {
+            return true;
         }
 
         outstandingPkeys.clear();
-    }
 
-    void delete(long startPkey, long stopPkey, long jump) {
-        assert(outstandingPkeys.isEmpty());
-
-        if (startPkey > stopPkey) return;
-        do {
-            startPkey = deleteChunk(startPkey, stopPkey, jump) + jump;
-        } while (startPkey <= stopPkey);
-
-        outstandingPkeys.clear();
-    }
-
-    private long deleteChunk(long startPkey, long stopPkey, long jump) {
-        log.info(_F("deleteChunk | startPkey:%d stopPkey:%d jump:%d", startPkey, stopPkey, jump));
-
-        assert(startPkey < stopPkey);
-        assert(startPkey >= 0);
-
-        long nextPkey = startPkey;
+        log.info(_F("loadChunk | startPkey:%d stopPkey:%d", startPkey, stopPkey));
 
         long maxSentPkey = -1;
         hadError.set(false);
-        while ((nextPkey <= stopPkey) && (!hadError.get())) {
-            try {
-                outstandingPkeys.add(nextPkey);
-                maxSentPkey = nextPkey;
-                client.callProcedure(new Callback(nextPkey), deleteCRUD, nextPkey);
+        for (long key = startPkey; key <= stopPkey; key++) {
+            if (hadError.get()) {
+                log.info("loadChunk exiting (failed) due to callback error");
+                return false;
             }
-            catch (Exception e) {
-                break;
-            }
-            nextPkey += jump;
-        }
 
-        try { client.drain(); } catch (Exception e) {}
-
-        long minOutstandingPkey = -1;
-        try {
-            minOutstandingPkey = outstandingPkeys.first();
-        }
-        catch (NoSuchElementException e) {
-            // we inserted all rows
-            assert((maxSentPkey + jump) > stopPkey);
-            return stopPkey;
-        }
-        assert(minOutstandingPkey >= 0);
-
-        // delete any messiness beyond where the errors started
-        for (long pkey = minOutstandingPkey; pkey <= maxSentPkey; pkey += jump) {
-            long modCount = scc.callROProcedureWithRetry(deleteCRUD, pkey).getResults()[0].asScalarLong();
-            assert((modCount >= 0) && (modCount <= 1));
-        }
-
-        return maxSentPkey;
-    }
-
-    private long loadChunk(long startPkey, long stopPkey, long jump) {
-
-        log.info(_F("loadChunk | startPkey:%d stopPkey:%d jump:%d", startPkey, stopPkey, jump));
-
-        assert(startPkey < stopPkey);
-        assert(startPkey >= 0);
-
-        long nextPkey = startPkey;
-
-        long maxSentPkey = -1;
-        hadError.set(false);
-        while ((nextPkey <= stopPkey) && (!hadError.get())) {
             Object[] row = TableHelper.randomRow(table, Integer.MAX_VALUE, rand);
-            row[pkeyColIndex] = nextPkey;
+            row[pkeyColIndex] = key;
             try {
-                outstandingPkeys.add(nextPkey);
-                maxSentPkey = nextPkey;
-                client.callProcedure(new Callback(nextPkey), insertCRUD, row);
+                outstandingPkeys.add(key);
+                maxSentPkey = key;
+                client.callProcedure(new Callback(key), insertCRUD, row);
             }
             catch (Exception e) {
-                break;
+                log.info("loadChunk exiting (failed) due to thrown exception: " + e.getMessage());
+                return false;
             }
-            nextPkey += jump;
         }
 
-        try { client.drain(); } catch (Exception e) {}
-
-        long minOutstandingPkey = -1;
         try {
-            minOutstandingPkey = outstandingPkeys.first();
+            client.drain();
         }
-        catch (NoSuchElementException e) {
-            // we inserted all rows
-            assert((maxSentPkey + jump) > stopPkey);
-            return stopPkey;
-        }
-        assert(minOutstandingPkey >= 0);
-
-        // delete any messiness beyond where the errors started
-        for (long pkey = minOutstandingPkey; pkey <= maxSentPkey; pkey += jump) {
-            long modCount = scc.callROProcedureWithRetry(deleteCRUD, pkey).getResults()[0].asScalarLong();
-            assert((modCount >= 0) && (modCount <= 1));
+        catch (Exception e) {
+            log.info("loadChunk exiting (failed) due to thrown exception during drain: " + e.getMessage());
+            return false;
         }
 
-        return Math.max(minOutstandingPkey - jump, -1);
+        if ((outstandingPkeys.size() == 0) && (maxSentPkey == stopPkey)) {
+            return true;
+        }
+        else {
+            log.info(_F("loadChunk exiting (failed) due to thrown condition %d, %d, %d",
+                    outstandingPkeys.size(), maxSentPkey, stopPkey));
+            return false;
+        }
     }
 }

@@ -356,7 +356,7 @@ public class SchemaChangeClient {
     /**
      * Find the largest pkey value in the table.
      */
-    private long maxId(VoltTable t) {
+    public long maxId(VoltTable t) {
         if (t == null) {
             return 0;
         }
@@ -372,7 +372,7 @@ public class SchemaChangeClient {
      */
     private void loadTable(VoltTable t) {
         // if #partitions is odd, delete every 2 - if even, delete every 3
-        int n = 3 - (topo.partitions % 2);
+        //int n = 3 - (topo.partitions % 2);
 
         int redundancy = topo.sites / topo.partitions;
         long realRowCount = (config.targetrowcount * topo.hosts) / redundancy;
@@ -386,11 +386,7 @@ public class SchemaChangeClient {
         TableLoader loader = new TableLoader(this, t, rand);
 
         log.info(_F("loading table"));
-        loader.load(max + 1, realRowCount, 1);
-        log.info(_F("deleting from table"));
-        loader.delete(1, realRowCount, n);
-        log.info(_F("reloading table"));
-        loader.load(1, realRowCount, n);
+        loader.load(max + 1, realRowCount);
     }
 
     /**
