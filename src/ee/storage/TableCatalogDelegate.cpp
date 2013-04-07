@@ -395,7 +395,6 @@ TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
     // configure for stats tables
     int32_t databaseId = catalogDatabase.relativeIndex();
     m_table->configureIndexStats(databaseId);
-DEBUG_STREAM_HERE("up @" << m_table);
 
     m_table->incrementRefcount();
     return 0;
@@ -404,7 +403,7 @@ DEBUG_STREAM_HERE("up @" << m_table);
 
 
 void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & views,
-                  PersistentTable *newTable, PersistentTable *existingTable,
+                  PersistentTable *existingTable, PersistentTable *newTable,
                   std::map<std::string, CatalogDelegate*> const &delegatesByName)
 {
     std::vector<catalog::MaterializedViewInfo*> survivingInfos;
@@ -446,9 +445,13 @@ void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & vie
             if (newTargetTable) {
                 targetTable = newTargetTable;
             }
+            else {
+                DEBUG_STREAM_HERE("ERROR? Found non-PersistentTable delegate for view target table");
+            }
         }
-DEBUG_STREAM_HERE("Adding new mat view " << targetTable->name() << "@" << targetTable <<
-                  " was @" << oldTargetTable << " on " << newTable->name() << "@" << newTable);
+        else {
+            DEBUG_STREAM_HERE("ERROR? Found no delegate for view target table");
+        }
         // This is not a leak -- the materialized view metadata is self-installing into the new table.
         // Also, it guards its targetTable from accidental deletion with a refcount bump.
         new MaterializedViewMetadata(newTable, targetTable, currInfo);
@@ -481,8 +484,7 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatab
     // Drop the old table
     ///////////////////////////////////////////////
     deleteCommand();
-        
-DEBUG_STREAM_HERE("Migrated table " << newTable->name() << " from down @" << existingTable << " to up @" << newTable);
+
     ///////////////////////////////////////////////
     // Patch up the new table as a replacement
     ///////////////////////////////////////////////

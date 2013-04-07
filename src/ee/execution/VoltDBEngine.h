@@ -102,6 +102,7 @@ class AbstractExecutor;
 class AbstractPlanNode;
 class SerializeInput;
 class SerializeOutput;
+class PersistentTable;
 class Table;
 class CatalogDelegate;
 class ReferenceSerializeInput;
@@ -122,7 +123,7 @@ const size_t PLAN_CACHE_SIZE = 1024 * 10;
 class __attribute__((visibility("default"))) VoltDBEngine {
     public:
 
-        typedef std::pair<std::string, CatalogDelegate*> NamedCDPair;
+        typedef std::pair<std::string, CatalogDelegate*> LabeledCDPair;
 
         /** Constructor for test code: this does not enable JNI callbacks. */
         VoltDBEngine() :
@@ -456,6 +457,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * Catalog delegates hashed by path.
          */
         std::map<std::string, CatalogDelegate*> m_catalogDelegates;
+        std::map<std::string, CatalogDelegate*> m_delegatesByName;
 
         // map catalog table id to table pointers
         std::map<int32_t, Table*> m_tables;
@@ -473,7 +475,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * to try to map this tableId back to catalog::Table via
          * the catalog, at least w/o comparing table names.
          */
-        std::map<int32_t, Table*> m_snapshottingTables;
+        std::map<int32_t, PersistentTable*> m_snapshottingTables;
 
         /*
          * Map of table signatures to exporting tables.

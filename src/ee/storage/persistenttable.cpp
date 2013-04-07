@@ -278,7 +278,6 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
         }
     }
 
-DEBUG_STREAM_HERE("Updating " << m_views.size() << " mat view(s) on " << name() << "@" << this);
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
         m_views[i]->processTupleInsert(source, fallible);
@@ -759,19 +758,18 @@ PersistentTable::segregateMaterializedViews(std::map<std::string, catalog::Mater
     // find all of the materialized views to remove or keep
     //////////////////////////////////////////////////////////
 
-    bool viewfound = false;
     // iterate through all of the existing views
     BOOST_FOREACH(MaterializedViewMetadata* currView, m_views) {
         std::string currentViewId = currView->targetTable()->name();
 
         // iterate through all of the catalog views, looking for a match.
         std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator viewIter;
+        bool viewfound = false;
         for (viewIter = start; viewIter != end; ++viewIter) {
             catalog::MaterializedViewInfo* catalogViewInfo = viewIter->second;
             if (currentViewId == catalogViewInfo->name()) {
                 viewfound = true;
                 //TODO: This MIGHT be a good place to identify the need for view re-definition.
-DEBUG_STREAM_HERE("Intending to add/keep mat view " << currentViewId << " on " << name());
                 survivingInfosOut.push_back(catalogViewInfo);
                 survivingViewsOut.push_back(currView);
                 break;
@@ -780,7 +778,6 @@ DEBUG_STREAM_HERE("Intending to add/keep mat view " << currentViewId << " on " <
 
         // if the table has a view that the catalog doesn't, then prepare to remove (or fail to migrate) the view
         if (!viewfound) {
-DEBUG_STREAM_HERE("Intending to drop mat view " << currentViewId << " on " << name());
             obsoleteViewsOut.push_back(currView);
         }
     }
@@ -802,10 +799,12 @@ PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target)
         if (currName == targetName) {
             // A match on name only indicates that the target table has been re-defined since
             // the view was initialized, so re-initialize the view.
-            currView->migrateTargetTable(target);
+            currView->setTargetTable(target);
             return;
         }
     }
+    DEBUG_STREAM_HERE("Failed to find mat view " << targetName << "@" << target <<
+                      " in " << m_views.size() << " on " << name() << "@" << this);
     assert(false); // Should have found an existing view for the table.
 }
 

@@ -182,7 +182,7 @@ inline void outputLogHeader_(const char *file, int line, const char *func, int l
 #ifdef DEBUG
     #define DEBUG_STREAM_HERE(STREAMABLES) { \
         std::cout << "DEBUG_STREAM_HERE: " << STREAMABLES << " in: " << __PRETTY_FUNCTION__ \
-                  << " @ " << __FILE__ << " -l " << __LINE__ << " " << std::endl; \
+                  << " @ " << __FILE__ << ":" << __LINE__ << std::endl; \
     }
 #else
     // #define DEBUG_STREAM_HERE(STREAMABLES) { }
