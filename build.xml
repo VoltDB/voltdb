@@ -1144,6 +1144,15 @@ NATIVE EE STUFF
     </exec>
 </target>
 
+<target name="eebuild" depends="voltdbipc"
+    description="Build but do not run test cases for C++ JNI library.">
+    <exec dir='.' executable='python' failonerror='true'>
+        <env key="TEST_DIR" value="${build.testobjects.dir}" />
+        <env key="EETESTSUITE" value="${eetestsuite}"/>
+        <arg line="build.py ${build} build" />
+    </exec>
+</target>
+
 <target name='voltdbipc' depends="ee"
     description="Build the IPC client.">
     <exec dir='.' executable='python' failonerror='true'>

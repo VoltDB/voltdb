@@ -210,6 +210,9 @@ class NValue {
     /* Release memory associated to object type NValues */
     void free() const;
 
+    /* Release memory associated to object type tuple columns */
+    static void freeObjectsFromTupleStorage(std::vector<char*> const &oldObjects);
+
     /* Set value to the correct SQL NULL representation. */
     void setNull();
 
@@ -497,6 +500,8 @@ class NValue {
     // closest but not equal to +/-1E26 within the accuracy of a double.
     static const double s_gtMaxDecimalAsDouble = 1E26;
     static const double s_ltMinDecimalAsDouble = -1E26;
+
+    static int fall_through_or_throw_fatal_or_crash_123;
 
     static ValueType promoteForOp(ValueType vta, ValueType vtb) {
         ValueType rt;
@@ -2098,6 +2103,17 @@ inline void NValue::free() const {
     }
 }
 
+inline void NValue::freeObjectsFromTupleStorage(std::vector<char*> const &oldObjects)
+{
+
+    for (std::vector<char*>::const_iterator it = oldObjects.begin(); it != oldObjects.end(); ++it) {
+        StringRef* sref = reinterpret_cast<StringRef*>(*it);
+        if (sref != NULL) {
+            StringRef::destroy(sref);
+        }
+    }
+}
+
 /**
  * Get the amount of storage necessary to store a value of the specified type
  * in a tuple
@@ -2867,6 +2883,10 @@ inline NValue NValue::castAs(ValueType type) const {
       case VALUE_TYPE_DECIMAL:
         return castAsDecimal();
       default:
+          DEBUG_IGNORE_OR_THROW_OR_CRASH_123(fall_through_or_throw_fatal_or_crash_123,
+                                             "Fallout from planner error."
+                                             " The invalid target value type for a cast is " << getTypeName(type))
+
           char message[128];
           snprintf(message, 128, "Type %d not a recognized type for casting",
                   (int) type);
