@@ -395,7 +395,6 @@ TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
     // configure for stats tables
     int32_t databaseId = catalogDatabase.relativeIndex();
     m_table->configureIndexStats(databaseId);
-DEBUG_STREAM_HERE("up @" << m_table);
 
     m_table->incrementRefcount();
     return 0;
@@ -407,8 +406,6 @@ void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & vie
                   PersistentTable *existingTable, PersistentTable *newTable,
                   std::map<std::string, CatalogDelegate*> const &delegatesByName)
 {
-DEBUG_STREAM_HERE("Migrating up to " << views.size() <<
-                  " catalog mat views on " << existingTable->name() << "@" << existingTable);
     std::vector<catalog::MaterializedViewInfo*> survivingInfos;
     std::vector<catalog::MaterializedViewInfo*> changingInfos;
     std::vector<MaterializedViewMetadata*> survivingViews;
@@ -443,22 +440,18 @@ DEBUG_STREAM_HERE("Migrating up to " << views.size() <<
                                                                 delegatesByName));
         PersistentTable* targetTable = oldTargetTable; // fallback value if not (yet) redefined.
         if (targetDelegate) {
-DEBUG_STREAM_HERE("Found delegate @" << targetDelegate);
             PersistentTable* newTargetTable =
                 dynamic_cast<PersistentTable*>(targetDelegate->getTable());
             if (newTargetTable) {
                 targetTable = newTargetTable;
             }
             else {
-DEBUG_STREAM_HERE("Found non-PersistentTable delegate");
+                DEBUG_STREAM_HERE("ERROR? Found non-PersistentTable delegate for view target table");
             }
         }
         else {
-DEBUG_STREAM_HERE("Found no delegate");
+            DEBUG_STREAM_HERE("ERROR? Found no delegate for view target table");
         }
-DEBUG_STREAM_HERE("Migrating to new mat view "
-                  << targetTable->name() << "@" << targetTable << " was @" << oldTargetTable << " on "
-                   << newTable->name() << "@" << newTable << " was @" << existingTable);
         // This is not a leak -- the materialized view metadata is self-installing into the new table.
         // Also, it guards its targetTable from accidental deletion with a refcount bump.
         new MaterializedViewMetadata(newTable, targetTable, currInfo);
@@ -491,8 +484,7 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatab
     // Drop the old table
     ///////////////////////////////////////////////
     deleteCommand();
-        
-DEBUG_STREAM_HERE("Migrated table " << newTable->name() << " from down @" << existingTable << " to up @" << newTable);
+
     ///////////////////////////////////////////////
     // Patch up the new table as a replacement
     ///////////////////////////////////////////////

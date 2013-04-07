@@ -61,7 +61,7 @@ private:
 
     void freeBackedTuples();
     void allocateBackedTuples();
-    
+
     /** load a predicate from the catalog structure if it's there */
     void parsePredicate(catalog::MaterializedViewInfo *metadata);
 

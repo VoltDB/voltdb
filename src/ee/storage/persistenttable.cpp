@@ -280,7 +280,6 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
 
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
-DEBUG_STREAM_HERE("Updating " << i+1 << "/" << m_views.size() << " mat view(s) on " << name() << "@" << this);
         m_views[i]->processTupleInsert(source, fallible);
     }
 }
@@ -755,7 +754,6 @@ PersistentTable::segregateMaterializedViews(std::map<std::string, catalog::Mater
                                             std::vector<MaterializedViewMetadata*> &changingViewsOut,
                                             std::vector<MaterializedViewMetadata*> &obsoleteViewsOut)
 {
-DEBUG_STREAM_HERE("Segregating " << m_views.size() << " mat views on " << name());
     //////////////////////////////////////////////////////////
     // find all of the materialized views to remove or keep
     //////////////////////////////////////////////////////////
@@ -772,7 +770,6 @@ DEBUG_STREAM_HERE("Segregating " << m_views.size() << " mat views on " << name()
             if (currentViewId == catalogViewInfo->name()) {
                 viewfound = true;
                 //TODO: This MIGHT be a good place to identify the need for view re-definition.
-DEBUG_STREAM_HERE("Intending to add/keep mat view " << currentViewId << " on " << name());
                 survivingInfosOut.push_back(catalogViewInfo);
                 survivingViewsOut.push_back(currView);
                 break;
@@ -781,7 +778,6 @@ DEBUG_STREAM_HERE("Intending to add/keep mat view " << currentViewId << " on " <
 
         // if the table has a view that the catalog doesn't, then prepare to remove (or fail to migrate) the view
         if (!viewfound) {
-DEBUG_STREAM_HERE("Intending to drop mat view " << currentViewId << " on " << name());
             obsoleteViewsOut.push_back(currView);
         }
     }
@@ -807,7 +803,8 @@ PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target)
             return;
         }
     }
-DEBUG_STREAM_HERE("Failed to find mat view " << targetName << "@" << target << " in " << m_views.size() << " on " << name() << "@" << this);
+    DEBUG_STREAM_HERE("Failed to find mat view " << targetName << "@" << target <<
+                      " in " << m_views.size() << " on " << name() << "@" << this);
     assert(false); // Should have found an existing view for the table.
 }
 

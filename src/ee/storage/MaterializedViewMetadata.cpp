@@ -37,6 +37,7 @@ MaterializedViewMetadata::MaterializedViewMetadata(
         PersistentTable *srcTable, PersistentTable *destTable, catalog::MaterializedViewInfo *metadata)
         : m_target(destTable), m_filterPredicate(NULL)
 {
+DEBUG_STREAM_HERE("New mat view on source table " << srcTable->name() << " @" << srcTable << " view table " << m_target->name() << " @" << m_target);
     // best not to have to worry about the destination table disappearing out from under the source table that feeds it.
     m_target->incrementRefcount();
     srcTable->addMaterializedView(this);
@@ -78,7 +79,6 @@ MaterializedViewMetadata::MaterializedViewMetadata(
     }
 
     m_index = m_target->primaryKeyIndex();
-DEBUG_STREAM_HERE("on source table " << srcTable->name() << "@" << srcTable << " view table " << m_target->name() << "@" << m_target << " has primary index @" << m_index);
 
     allocateBackedTuples();
 
@@ -93,12 +93,12 @@ DEBUG_STREAM_HERE("on source table " << srcTable->name() << "@" << srcTable << "
 }
 
 MaterializedViewMetadata::~MaterializedViewMetadata() {
+DEBUG_STREAM_HERE("Delete mat view " << m_target->name() << " w/ table @" << m_target);
     freeBackedTuples();
     delete[] m_groupByColumns;
     delete[] m_outputColumnSrcTableIndexes;
     delete[] m_outputColumnAggTypes;
     delete m_filterPredicate;
-DEBUG_STREAM_HERE("down @" << m_target);
     m_target->decrementRefcount();
 }
 
@@ -111,7 +111,6 @@ void MaterializedViewMetadata::setTargetTable(PersistentTable * target)
 
     // Re-initialize dependencies on the target table, allowing for widened columns
     m_index = m_target->primaryKeyIndex();
-DEBUG_STREAM_HERE("table " << m_target->name() << "@" << m_target << " has primary index @" << m_index);
 
     freeBackedTuples();
     allocateBackedTuples();

@@ -252,15 +252,13 @@ VoltDBEngine::~VoltDBEngine() {
     // Delete table delegates and release any table reference counts.
     typedef pair<int64_t, Table*> TIDPair;
 
-    BOOST_FOREACH (NamedCDPair cdPair, m_catalogDelegates) {
+    BOOST_FOREACH (LabeledCDPair cdPair, m_catalogDelegates) {
         delete cdPair.second;
     }
-    m_catalogDelegates.clear();
 
     BOOST_FOREACH (TIDPair tidPair, m_snapshottingTables) {
         tidPair.second->decrementRefcount();
     }
-    m_snapshottingTables.clear();
 
     delete m_topend;
     delete m_executorContext;
@@ -544,7 +542,8 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp )
         if (pos == m_catalogDelegates.end()) {
            continue;
         }
-        TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(pos->second);
+        CatalogDelegate *delegate = pos->second;
+        TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(delegate);
         /*
          * Instruct the table to flush all export data
          * Then tell it about the new export generation/catalog txnid
@@ -553,15 +552,16 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp )
          */
         if (tcd) {
             Table *table = tcd->getTable();
+            m_delegatesByName.erase(table->name());
             StreamedTable *streamedtable = dynamic_cast<StreamedTable*>(table);
             if (streamedtable) {
                 m_exportingTables.erase(tcd->signature());
                 streamedtable->setSignatureAndGeneration( tcd->signature(), timestamp);
             }
         }
-        pos->second->deleteCommand();
-        delete pos->second;
-        m_catalogDelegates.erase(pos++);
+        delegate->deleteCommand();
+        delete delegate;
+        m_catalogDelegates.erase(pos);
     }
 }
 
@@ -642,15 +642,10 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
             if (tcd->init(*m_database, *catalogTable) != 0) {
                 VOLT_ERROR("Failed to initialize table '%s' from catalog",
                            catTableIter->second->name().c_str());
-#if DEBUG
-                DEBUG_STREAM_HERE("Potential source table " << tcd->getTable()->name() << " missed as tcd with index " << catalogTable->relativeIndex());
-#endif
                 return false;
             }
-#if DEBUG
-            DEBUG_STREAM_HERE("Potential source table " << tcd->getTable()->name() << " added as tcd with index " << catalogTable->relativeIndex());
-#endif
             m_catalogDelegates[tcd->path()] = tcd;
+            m_delegatesByName[tcd->getTable()->name()] = tcd;
 
             // set export info on the new table
             if (tcd->exportEnabled()) {
@@ -669,11 +664,8 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
 
             // get the delegate and bail if it's not here
             // - JHH: I'm not sure why not finding a delegate is safe to ignore
-            map<string, CatalogDelegate*>::iterator pos = m_catalogDelegates.find(catalogTable->path());
-            if (pos == m_catalogDelegates.end()) {
-                continue;
-            }
-            TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(pos->second);
+            CatalogDelegate* delegate = findInMapOrNull(catalogTable->path(), m_catalogDelegates);
+            TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(delegate);
             if (!tcd) {
                 continue;
             }
@@ -708,7 +700,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                          catalogTable->name().c_str());
                 LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
 
-                tcd->processSchemaChanges(*m_database, *catalogTable, m_catalogDelegates);
+                tcd->processSchemaChanges(*m_database, *catalogTable, m_delegatesByName);
 
                 // don't continue on to modify/add/remove indexes/views, because the
                 // call above should rebuild them all anyway
@@ -837,7 +829,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                 // Use the now-current definiton of the target table, to be updated later, if needed.
                 TableCatalogDelegate* targetDelegate =
                     dynamic_cast<TableCatalogDelegate*>(findInMapOrNull(oldTargetTable->name(),
-                                                                        m_catalogDelegates));
+                                                                        m_delegatesByName));
                 PersistentTable* targetTable = oldTargetTable; // fallback value if not (yet) redefined.
                 if (targetDelegate) {
                     PersistentTable* newTargetTable =
@@ -846,9 +838,10 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                         targetTable = newTargetTable;
                     }
                 }
-DEBUG_STREAM_HERE("Adding new mat view " << targetTable->name() << "@" << targetTable <<
-                  " was @" << oldTargetTable << " on " << persistenttable->name() << "@" << persistenttable);
-                // This is not a leak -- the materialized view metadata is self-installing into the new table.
+                DEBUG_STREAM_HERE("Adding new mat view " << targetTable->name() << "@" << targetTable <<
+                                  " was @" << oldTargetTable <<
+                                  " on " << persistenttable->name() << "@" << persistenttable);
+                // This is not a leak -- the view metadata is self-installing into the new table.
                 // Also, it guards its targetTable from accidental deletion with a refcount bump.
                 new MaterializedViewMetadata(persistenttable, targetTable, currInfo);
             }
@@ -954,13 +947,10 @@ void VoltDBEngine::rebuildTableCollections()
     getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_INDEX);
 
     // walk the table delegates and update local table collections
-    BOOST_FOREACH (NamedCDPair cdPair, m_catalogDelegates) {
+    BOOST_FOREACH (LabeledCDPair cdPair, m_catalogDelegates) {
         TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(cdPair.second);
         if (tcd) {
             catalog::Table *catTable = m_database->tables().get(tcd->getTable()->name());
-#if DEBUG
-            DEBUG_STREAM_HERE("Potential source table " << tcd->getTable()->name() << " added at index " << catTable->relativeIndex());
-#endif
             m_tables[catTable->relativeIndex()] = tcd->getTable();
             m_tablesByName[tcd->getTable()->name()] = tcd->getTable();
 
@@ -1153,11 +1143,11 @@ void VoltDBEngine::initMaterializedViews(bool addAll) {
             PersistentTable *destTable = dynamic_cast<PersistentTable*>(m_tables[destCatalogTable->relativeIndex()]);
             // connect source and destination tables
             if (addAll || catalogView->wasAdded()) {
-DEBUG_STREAM_HERE("Adding new mat view " << destTable->name() << " on " << srcTable->name());
+                DEBUG_STREAM_HERE("Adding new mat view " << destTable->name() <<
+                                  " on " << srcTable->name());
                 // This is not a leak -- the materialized view is self-installing into srcTable.
                 new MaterializedViewMetadata(srcTable, destTable, catalogView);
             } else {
-DEBUG_STREAM_HERE("Surviving mat view " << destTable->name() << " on " << srcTable->name());
                 // Ensure that the materialized view is using the latest version of the target table.
                 srcTable->updateMaterializedViewTargetTable(destTable);
             }
@@ -1422,12 +1412,11 @@ int VoltDBEngine::tableStreamSerializeMore(
         // Java engine will always poll a fully serialized table one more
         // time (it doesn't see the hasMore return code).  Note that the
         // dynamic cast was already verified in activateCopyOnWrite.
-        map<int32_t, Table*>::iterator pos = m_snapshottingTables.find(tableId);
-        if (pos == m_snapshottingTables.end()) {
+        PersistentTable* table = findInMapOrNull(tableId, m_snapshottingTables);
+        if ( ! table) {
             return 0;
         }
 
-        PersistentTable *table = dynamic_cast<PersistentTable*>(pos->second);
         bool hasMore = table->serializeMore(out);
         if (!hasMore) {
             m_snapshottingTables.erase(tableId);
