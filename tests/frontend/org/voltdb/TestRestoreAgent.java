@@ -23,6 +23,8 @@
 
 package org.voltdb;
 
+import java.io.FileOutputStream;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -444,6 +446,27 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                 f.delete();
             }
         }
+    }
+
+    void deleteCatalog(String nonce) throws Exception {
+        String path = context.cluster.getVoltroot() + File.separator + "snapshots";
+        File snappath = new File(path);
+        for (File f : snappath.listFiles()) {
+            if (f.getName().equals(nonce + ".jar")) {
+                f.delete();
+            }
+        }
+    }
+
+    void corruptCatalog(String nonce) throws Exception {
+        deleteCatalog(nonce);
+        String path = context.cluster.getVoltroot() + File.separator + "snapshots";
+        File catpath = new File(path, nonce + ".jar");
+        FileOutputStream fos = new FileOutputStream(catpath);
+        fos.write(0);
+        fos.write(1);
+        fos.flush();
+        fos.close();
     }
 
     /**
@@ -906,6 +929,92 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
         // Delete the digest file for oolalacestcher
         deleteDigest("oolalacestcher");
+
+        HashSet<String> procs = new HashSet<String>();
+        procs.add("@SnapshotRestore");
+        MockInitiator initiator = new MockInitiator(procs);
+        RestoreAgent restoreAgent = getRestoreAgent(initiator, 0);
+        restoreAgent.restore();
+        while (!m_done) {
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {}
+        }
+
+        if (action != START_ACTION.CREATE) {
+            Long count = initiator.getProcCounts().get("@SnapshotRestore");
+            assertEquals(new Long(1), count);
+            assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
+            // We'd better have restored the newest snapshot
+            assertEquals("sacrebleu", (String)(initiator.getProcParams().get("@SnapshotRestore").toArray()[1]));
+        } else {
+            createCheck(initiator);
+        }
+    }
+
+    @Test
+    public void testMissingCatalogSnapshotConsistency() throws Exception {
+        m_hostCount = 1;
+        buildCatalog(m_hostCount, 8, 0, newVoltRoot(null), false, true);
+        ServerThread server = new ServerThread(catalogJarFile.getAbsolutePath(),
+                                               deploymentPath,
+                                               TEST_SERVER_BASE_PORT + 2,
+                                               TEST_SERVER_BASE_PORT + 1,
+                                               TEST_ZK_BASE_PORT,
+                                               BackendTarget.NATIVE_EE_JNI);
+        server.start();
+        server.waitForInitialization();
+        snapshot("bonjour");
+        // Now take a couple more for good measure
+        snapshot("sacrebleu");
+        snapshot("oolalacestcher");
+        server.shutdown();
+
+        // Delete the digest file for oolalacestcher
+        deleteCatalog("oolalacestcher");
+
+        HashSet<String> procs = new HashSet<String>();
+        procs.add("@SnapshotRestore");
+        MockInitiator initiator = new MockInitiator(procs);
+        RestoreAgent restoreAgent = getRestoreAgent(initiator, 0);
+        restoreAgent.restore();
+        while (!m_done) {
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {}
+        }
+
+        if (action != START_ACTION.CREATE) {
+            Long count = initiator.getProcCounts().get("@SnapshotRestore");
+            assertEquals(new Long(1), count);
+            assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
+            // We'd better have restored the newest snapshot
+            assertEquals("sacrebleu", (String)(initiator.getProcParams().get("@SnapshotRestore").toArray()[1]));
+        } else {
+            createCheck(initiator);
+        }
+    }
+
+    @Test
+    public void testCorruptCatalogSnapshotConsistency() throws Exception {
+        m_hostCount = 1;
+        buildCatalog(m_hostCount, 8, 0, newVoltRoot(null), false, true);
+        ServerThread server = new ServerThread(catalogJarFile.getAbsolutePath(),
+                                               deploymentPath,
+                                               TEST_SERVER_BASE_PORT + 2,
+                                               TEST_SERVER_BASE_PORT + 1,
+                                               TEST_ZK_BASE_PORT,
+                                               BackendTarget.NATIVE_EE_JNI);
+        server.start();
+        server.waitForInitialization();
+        snapshot("bonjour");
+        // Now take a couple more for good measure
+        snapshot("sacrebleu");
+        snapshot("oolalacestcher");
+        server.shutdown();
+
+        // Delete the digest file for oolalacestcher
+        corruptCatalog("oolalacestcher");
 
         HashSet<String> procs = new HashSet<String>();
         procs.add("@SnapshotRestore");
