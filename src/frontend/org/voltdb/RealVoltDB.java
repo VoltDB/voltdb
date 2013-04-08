@@ -339,7 +339,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 isRejoin = true;
             }
             m_rejoining = isRejoin;
-            m_rejoinDataPending = isRejoin;
+            m_rejoinDataPending = isRejoin || config.m_startAction == START_ACTION.JOIN;
 
             m_joining = config.m_startAction == START_ACTION.JOIN;
 
