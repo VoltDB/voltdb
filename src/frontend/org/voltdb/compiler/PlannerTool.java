@@ -84,7 +84,7 @@ public class PlannerTool {
             }
         }
 
-        hostLog.info("hsql loaded");
+        hostLog.debug("hsql loaded");
 
         // Create and register a singleton planner stats collector, if this is the first time.
         // In mock test environments there may be no stats agent.
