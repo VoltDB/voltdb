@@ -435,6 +435,17 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         assertEquals("SUCCESS", response.getResults()[0].getString("RESULT"));
     }
 
+    void deleteDigest(String nonce) throws Exception {
+        String path = context.cluster.getVoltroot() + File.separator + "snapshots";
+        File snappath = new File(path);
+        for (File f : snappath.listFiles()) {
+            if (f.getName().equals(nonce + ".digest") || //old style digest name
+                (f.getName().startsWith(nonce + "-host_") && f.getName().endsWith(".digest"))) {//new style
+                f.delete();
+            }
+        }
+    }
+
     /**
      * Generate a new voltroot with the given suffix. Will be automatically
      * cleaned after the test.
@@ -873,5 +884,48 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         System.out.println("Got: " + rt.toJSONObject().toString());
         assertEquals(dut.partitionToTxnId.get(1), rt.partitionToTxnId.get(1));
         assertEquals(id, rt.instanceId);
+    }
+
+    @Test
+    public void testMissingDigestSnapshotConsistency() throws Exception {
+        m_hostCount = 1;
+        buildCatalog(m_hostCount, 8, 0, newVoltRoot(null), false, true);
+        ServerThread server = new ServerThread(catalogJarFile.getAbsolutePath(),
+                                               deploymentPath,
+                                               TEST_SERVER_BASE_PORT + 2,
+                                               TEST_SERVER_BASE_PORT + 1,
+                                               TEST_ZK_BASE_PORT,
+                                               BackendTarget.NATIVE_EE_JNI);
+        server.start();
+        server.waitForInitialization();
+        snapshot("bonjour");
+        // Now take a couple more for good measure
+        snapshot("sacrebleu");
+        snapshot("oolalacestcher");
+        server.shutdown();
+
+        // Delete the digest file for oolalacestcher
+        deleteDigest("oolalacestcher");
+
+        HashSet<String> procs = new HashSet<String>();
+        procs.add("@SnapshotRestore");
+        MockInitiator initiator = new MockInitiator(procs);
+        RestoreAgent restoreAgent = getRestoreAgent(initiator, 0);
+        restoreAgent.restore();
+        while (!m_done) {
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {}
+        }
+
+        if (action != START_ACTION.CREATE) {
+            Long count = initiator.getProcCounts().get("@SnapshotRestore");
+            assertEquals(new Long(1), count);
+            assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
+            // We'd better have restored the newest snapshot
+            assertEquals("sacrebleu", (String)(initiator.getProcParams().get("@SnapshotRestore").toArray()[1]));
+        } else {
+            createCheck(initiator);
+        }
     }
 }

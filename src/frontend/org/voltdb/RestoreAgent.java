@@ -664,6 +664,10 @@ SnapshotCompletionInterest
             }
         }
 
+        if (s.m_digests.isEmpty()) {
+            LOG.debug("Rejecting snapshot because it had no valid digest file.");
+            return null;
+        }
         File digest = s.m_digests.get(0);
         Long catalog_crc = null;
         Map<Integer,Long> pidToTxnMap = new TreeMap<Integer,Long>();
