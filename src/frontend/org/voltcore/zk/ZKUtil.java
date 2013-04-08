@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -465,4 +466,33 @@ public class ZKUtil {
         }
     }
 
+    /*
+     * A watcher that can be cancelled. Requires a single threaded executor service
+     * to serialize the cancellation with the watch firing.
+     */
+    public static abstract class CancellableWatcher implements Watcher {
+        volatile boolean canceled = false;
+        final ExecutorService es;
+
+        public CancellableWatcher(ExecutorService es) {
+            this.es = es;
+        }
+
+        public void cancel() {
+            canceled = true;
+        }
+
+        @Override
+        public void process(final WatchedEvent event) {
+           es.execute(new Runnable() {
+               @Override
+               public void run() {
+                   if (canceled) return;
+                   pProcess(event);
+               }
+           });
+        }
+
+        abstract protected void pProcess(final WatchedEvent event);
+    }
 }
