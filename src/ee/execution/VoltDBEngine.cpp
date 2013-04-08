@@ -723,8 +723,6 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                          catalogTable->name().c_str());
                 LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
 
-                tcd->processSchemaChanges(*m_database, *catalogTable);
-
                 // don't continue on to modify/add/remove indexes, because the
                 // call above should rebuild them all anyway
                 continue;
