@@ -547,7 +547,10 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
 
     // check tuple counts are sane
     assert(newTable->activeTupleCount() == existingTupleCount);
-    assert(tuplesMigrated == existingTupleCount);
+    // dumb way to structure an assert avoids unused variable warning (lame)
+    if (tuplesMigrated != existingTupleCount) {
+        assert(tuplesMigrated == existingTupleCount);
+    }
 
     return 0;
 }
