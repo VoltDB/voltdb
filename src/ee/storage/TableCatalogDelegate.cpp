@@ -416,6 +416,7 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
     ///////////////////////////////////////////////
 
     PersistentTable *existingTable = dynamic_cast<PersistentTable*>(m_table);
+    int64_t existingTupleCount = existingTable->activeTupleCount();
 
     // remove all indexes from the current table
     vector<TableIndex*> currentIndexes = existingTable->allIndexes();
@@ -474,6 +475,8 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
 
     TableTuple scannedTuple(m_table->schema());
 
+    int64_t tuplesMigrated = 0;
+
     // going to run until the source table has no allocated blocks
     size_t blocksLeft = existingTable->allocatedBlockCount();
     while (blocksLeft) {
@@ -504,6 +507,9 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
 
             // delete from the old table
             existingTable->deleteTupleForSchemaChange(scannedTuple);
+
+            // note one tuple moved
+            ++tuplesMigrated;
 
             // if a block was just deleted, start the iterator again on the next block
             // this avoids using the block iterator over a changing set of blocks
@@ -538,6 +544,13 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
     m_table->configureIndexStats(catalogDatabase.relativeIndex());
 
     m_table->incrementRefcount();
+
+    // check tuple counts are sane
+    assert(newTable->activeTupleCount() == existingTupleCount);
+    // dumb way to structure an assert avoids unused variable warning (lame)
+    if (tuplesMigrated != existingTupleCount) {
+        assert(tuplesMigrated == existingTupleCount);
+    }
 
     return 0;
 }

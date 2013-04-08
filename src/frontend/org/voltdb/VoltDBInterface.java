@@ -98,8 +98,9 @@ public interface VoltDBInterface
      * @param currentTxnId  The transaction ID at which this method is called
      * @param deploymentCRC The CRC of the deployment file
      */
-    public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands, byte[] newCatalogBytes,
-           int expectedCatalogVersion, long currentTxnId, long currentTxnTimestamp, long deploymentCRC);
+    public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands,
+            byte[] newCatalogBytes, byte[] catalogBytesHash, int expectedCatalogVersion,
+            long currentTxnId, long currentTxnTimestamp, long deploymentCRC);
 
    /**
      * Tells if the VoltDB is running. m_isRunning needs to be set to true
