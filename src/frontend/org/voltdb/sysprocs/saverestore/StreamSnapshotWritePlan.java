@@ -277,6 +277,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         assert !partitions.isEmpty();
         Iterator<Integer> iter = partitions.iterator();
         int firstPartition = iter.next();
+        SNAP_LOG.debug("Picked partition " + firstPartition + " to do Java hashinator update");
         // Only one site updates the Java hashinator
         SnapshotSiteProcessor.m_siteTasksPostSnapshotting.put(firstPartition, javaAndEETask);
         while (iter.hasNext()) {
@@ -309,6 +310,9 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         public void run(SiteProcedureConnection siteConnection)
         {
             if (m_updateJava) {
+                SNAP_LOG.debug("P" + siteConnection.getCorrespondingPartitionId() +
+                                   " updating Java hashinator with new partitions: " +
+                                   m_newPartitions);
                 // Update the Java hashinator
                 byte[] configBytes = TheHashinator.addPartitions(m_newPartitions);
                 TheHashinator.initialize(TheHashinator.getConfiguredHashinatorType().hashinatorClass, configBytes);
