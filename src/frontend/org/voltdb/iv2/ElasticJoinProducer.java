@@ -39,7 +39,6 @@ import java.util.ListIterator;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.atomic.AtomicReference;
 
 public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     private final LinkedBlockingDeque<Pair<Integer, ByteBuffer>> m_snapshotData =
@@ -56,9 +55,6 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     // set to true when the coordinator is notified the completion of the replicated table snapshot
     private boolean m_replicatedStreamFinished = false;
 
-    // first block of partitioned table data
-    private final AtomicReference<Pair<Integer, ByteBuffer>> m_firstWork =
-            new AtomicReference<Pair<Integer, ByteBuffer>>();
     // a list of snapshot sinks used to stream partitioned table data from multiple sources
     private final List<StreamSnapshotSink> m_dataSinks = new ArrayList<StreamSnapshotSink>();
     // partitioned table snapshot completion monitor
@@ -162,28 +158,8 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         m_mailbox.send(m_coordinatorHsId, rm);
         m_replicatedStreamFinished = true;
 
-        // Wait for the first block of partitioned table data before running self again
-        // Hack: just like RejoinProducer, wait for the first block in a separate thread so
-        // that it doesn't block the site from starting the snapshot.
-        Thread firstSnapshotBlock = new Thread() {
-            @Override
-            public void run()
-            {
-                JOINLOG.debug(m_whoami + "waiting for first partitioned table data block");
-                Pair<Integer, ByteBuffer> rejoinWork = null;
-                try {
-                    rejoinWork = m_dataSinks.get(0).take();
-                } catch (InterruptedException e) {
-                    VoltDB.crashLocalVoltDB(
-                            "Interrupted in take()ing first snapshot block for rejoin",
-                            true, e);
-                }
-                m_firstWork.set(rejoinWork);
-                JOINLOG.debug(m_whoami + "received first partitioned table data block, queuing self");
-                m_taskQueue.offer(ElasticJoinProducer.this);
-            }
-        };
-        firstSnapshotBlock.start();
+        // Queue itself to start waiting for snapshot data
+        m_taskQueue.offer(this);
     }
 
     /**
@@ -192,13 +168,20 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
      */
     private void runForBlockingDataTransfer(SiteProcedureConnection siteConnection)
     {
+        Pair<Integer, ByteBuffer> tableBlock = m_dataSinks.get(0).poll();
+        if (tableBlock == null) {
+            m_taskQueue.offer(this);
+            // The sources are not set up yet, don't block the site,
+            // return here and retry later.
+            return;
+        }
+
         /*
          * Block until all blocks for partitioned tables are streamed over. There may
          * be more than one data sinks for partitioned snapshot transfer, each from a
          * different source partition.
          */
         JOINLOG.info("P" + m_partitionId + " blocking partitioned table transfer starts");
-        Pair<Integer, ByteBuffer> tableBlock = m_firstWork.get();
         while (!m_dataSinks.isEmpty()){
             if (tableBlock != null) {
                 if (JOINLOG.isTraceEnabled()) {
