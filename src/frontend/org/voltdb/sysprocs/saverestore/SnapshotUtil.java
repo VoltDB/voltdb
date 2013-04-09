@@ -483,7 +483,8 @@ public class SnapshotUtil {
             for (String snapshotName : snapshotNames) {
                 // izzy: change this to use parseNonceFromSnapshotFilename at some point
                 if (pathname.getName().startsWith(snapshotName + "-")  ||
-                        pathname.getName().equals(snapshotName + ".digest")) {
+                    pathname.getName().equals(snapshotName + ".digest") ||
+                    pathname.getName().equals(snapshotName + ".jar")) {
                     return true;
                 }
             }
