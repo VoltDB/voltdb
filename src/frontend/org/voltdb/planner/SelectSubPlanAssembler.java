@@ -137,8 +137,12 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      */
     private boolean isValidJoinOrder(List<String> tableNames){
         if (m_parsedStmt.joinTree.m_hasOuterJoin == true) {
-            // @TODO ENG_3038 For now the only valid join order is the one that matches
-            // the original SQL order
+            // In general, the outer joins are associative but changing the join order precedence
+            // includes moving ON clauses to preserve the initial SQL semantics. For example,
+            // T1 right join T2 on T1.C1 = T2.C1 left join T3 on T2.C2=T3.C2 can be rewritten as
+            // T1 right join (T2 left join T3 on T2.C2=T3.C2) on T1.C1 = T2.C1
+            // At the moment, such transformations are not supported. The specified joined order must
+            // match the SQL order
             Table[] joinOrder = m_parsedStmt.joinTree.generateJoinOrder().toArray(new Table[0]);
             assert(joinOrder.length == tableNames.size());
             int i = 0;
@@ -180,9 +184,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             queueInnerSubJoinOrders();
             return;
         }
-        // @TODO ENG_3038 Only two table outer joins are currently supported
+
         // The execution engine expects to see the outer table on the left side only
-        // which means that RIGHT join needs to be converted to the LEFT one
+        // which means that RIGHT joins need to be converted to the LEFT ones
         simplifiedJoinTree.m_root.toLeftJoin();
         m_joinOrders.add(simplifiedJoinTree);
     }
@@ -218,10 +222,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         //
         // stop when there is only one place and one table to permute
         if (place == inputTables.length) {
-            // @TODO ENG_3038 Short circuit for all inner join - we don't need the tree at all
-            // All is required is the the flat list of joined table. Their join and where conditions
-            // are already merged and analyzed - AbstractParsedStmt.joinSelectionList and the likes
-            // Need to consolidated them
+            // The inner join doesn't need a tree at all, only the the flat list of joined table.
+            // The join and where conditions are always the same regardless of the table order need to be
+            // analyzed only once.
             JoinTree joinNode = new JoinTree();
             joinNode.m_joinOrder = outputTables.clone();
             m_joinOrders.add(joinNode);
@@ -330,11 +333,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @param joinTree A join tree.
      */
     private void generateMorePlansForOuterJoinOrder(JoinTree joinTree, boolean deferSendReceivePair) {
-        // @TODO ENG_3038 Two tables join only so far
         JoinNode joinNode = joinTree.m_root;
         assert(joinNode != null);
-        assert(joinNode.m_leftNode.m_table != null);
-        assert(joinNode.m_rightNode.m_table != null);
 
         // generate the access paths for all nodes
         generateAccessPaths(null, joinTree.m_root);
@@ -357,32 +357,55 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         if (childNode.m_rightNode != null) {
             generateAccessPaths(childNode, childNode.m_rightNode);
         }
-
-        if (childNode.m_table != null) {
-            // @TODO ENG_3038For now
-            assert(parentNode != null);
+        // The join and filter expressions are kept at the parent node
+        // 1- The OUTER-only join conditions - Testing the outer-only conditions COULD be considered as an
+        // optimal first step to processing each outer tuple - PreJoin predicate for NLJ or NLIJ
+        // 2 -The INNER-only and INNER_OUTER join conditions are used for finding a matching inner tuple(s) for a
+        // given outer tuple. Index and end-Index expressions for NLIJ and join predicate for NLJ.
+        // 3 -The OUTER-only filter conditions. - Can be pushed down to pre-qualify the outer tuples before they enter
+        // the join - Where condition for the left child
+        // 4. The INNER-only and INNER_OUTER where conditions are used for filtering joined tuples. -
+        // Post join predicate for NLIJ and NLJ
+        // Possible optimization - if INNER-only condition is NULL-rejecting (inner_tuple is NOT NULL or
+        // inner_tuple > 0) it can be pushed down as a filter expression to the inner child
+        if (parentNode != null) {
             if (parentNode.m_leftNode == childNode) {
                 // This is the outer table which can only have the naive access path.
                 // Optimizations - outer-table-only where expressions can be pushed down to the child node
                 // to pre-qualify the outer tuples before they enter the join.
                 childNode.m_accessPaths.add(getRelevantNaivePathForTable(null, parentNode.m_whereOuterList));
             } else {
-                // This is the inner node
                 assert(parentNode.m_rightNode == childNode);
-                // Inner tables join expressions
+                // This is the inner node
+                // Inner and Inner-Outer join expressions are associated with the inner node access path
                 ArrayList<AbstractExpression> joinExprList = new ArrayList<AbstractExpression>();
                 joinExprList.addAll(parentNode.m_joinInnerList);
                 joinExprList.addAll(parentNode.m_joinInnerOuterList);
-
-                // The inner table can have multiple index access paths plus the naive one
-                childNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(childNode.m_table, joinExprList, null));
-                assert(childNode.m_accessPaths.size() > 0);
+                // If inner table is non-replicated the join node will be the NLJ and not the NLIJ unless
+                // the left child is also non-replicated. If the join is not going to be a NLIJ,
+                // the inner node won't be inlined which means that we can't use join expressions
+                // for index access (they will be pushed down to the
+                // IndexScanNode instead of staying at the NL level)
+                boolean canNLIJ = false;
+                if (childNode.m_table != null) {
+                        if (childNode.m_table.getIsreplicated() || (parentNode.m_leftNode.m_table != null &&
+                                !parentNode.m_leftNode.m_table.getIsreplicated())) {
+                            canNLIJ = true;
+                        }
+                }
+                if (canNLIJ) {
+                    // The inner table can have multiple index access paths plus the naive one
+                    childNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(childNode.m_table, joinExprList, null));
+                } else {
+                    // The inner node can have only a naive path
+                    childNode.m_accessPaths.add(getRelevantNaivePathForTable(joinExprList, null));
+                }
             }
         } else {
-            // @TODO ENG_3038 For now The node can only have naive plans without any expressions
             childNode.m_accessPaths.add(getRelevantNaivePathForTable(null, null));
         }
-    }
+        assert(childNode.m_accessPaths.size() > 0);
+   }
     /**
      * generate all possible plans for the tree.
      *

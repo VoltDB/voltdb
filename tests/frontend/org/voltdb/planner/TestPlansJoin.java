@@ -639,6 +639,37 @@ public class TestPlansJoin extends TestCase {
 
     }
 
+    public void testDistrebutedIndexJoinConditions() {
+        List<AbstractPlanNode> lpn =  aide.compile("select *  FROM P2 RIGHT JOIN R3 ON R3.A = P2.A AND P2.A < 0 WHERE P2.A > 0", 0, false, null);
+        assertTrue(lpn.size() == 2);
+        AbstractPlanNode n = lpn.get(0).getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        assertTrue(((NestLoopPlanNode) n).getJoinPredicate() != null);
+        assertTrue(((NestLoopPlanNode) n).getWherePredicate() != null);
+        AbstractPlanNode c = n.getChild(0);
+        assertTrue(c instanceof SeqScanPlanNode);
+        c = n.getChild(1);
+        assertTrue(c instanceof ReceivePlanNode);
+        n = lpn.get(1).getChild(0);
+        assertTrue(n instanceof SeqScanPlanNode);
+        assertTrue(((SeqScanPlanNode) n).getPredicate() == null);
+
+        lpn = aide.compile("select *  FROM P2 RIGHT JOIN P3 ON P3.A = P2.A AND P2.A < 0 WHERE P2.A > 0", 0, false, null);
+        assertTrue(lpn.size() == 2);
+        n = lpn.get(1).getChild(0);
+        assertTrue(n instanceof NestLoopIndexPlanNode);
+        assertTrue(((NestLoopIndexPlanNode) n).getJoinPredicate() == null);
+        assertTrue(((NestLoopIndexPlanNode) n).getWherePredicate() != null);
+        AbstractExpression w = ((NestLoopIndexPlanNode) n).getWherePredicate();
+        assertTrue(w.getExpressionType() == ExpressionType.COMPARE_GREATERTHAN);
+        IndexScanPlanNode indexScan = (IndexScanPlanNode)n.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assertTrue(indexScan.getLookupType().equals(IndexLookupType.EQ));
+        assertTrue(indexScan.getEndExpression().getExpressionType() == ExpressionType.COMPARE_EQUAL);
+        w = indexScan.getPredicate();
+        assertTrue(w != null);
+        assertTrue(w.getExpressionType() == ExpressionType.COMPARE_LESSTHAN);
+    }
+
 
    public void testNonSupportedJoin() {
        // JOIN with parentheses (HSQL limitation)

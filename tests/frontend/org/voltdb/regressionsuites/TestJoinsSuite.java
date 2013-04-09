@@ -299,6 +299,17 @@ public void testThreeTableIndexInnerMultiJoin() throws NoConnectionsException, I
     System.out.println(result.toString());
     assertEquals(4, result.getRowCount());
 
+    // Same as above but with partitioned table
+    client.callProcedure("InsertP1", 1, 1);
+    client.callProcedure("InsertP1", 1, 2);
+    client.callProcedure("InsertP1", 2, 2);
+    client.callProcedure("InsertP1", -1, 3);
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM P1 LEFT JOIN R2 ON P1.A = R2.C")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(4, result.getRowCount());
+
     // R1 1st joined with R2 with R2 1st
     // R1 2nd joined with R2 null (failed R1.C = 1)
     // R1 3rd joined with R2 null (failed  R1.A = R2.C)
@@ -309,6 +320,12 @@ public void testThreeTableIndexInnerMultiJoin() throws NoConnectionsException, I
     assertEquals(4, result.getRowCount());
     result = client.callProcedure(
             "@AdHoc", "select * FROM R2 RIGHT JOIN R1 ON R1.A = R2.C AND R1.C = 1")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(4, result.getRowCount());
+    // Same as above but with partitioned table
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM R2 RIGHT JOIN P1 ON P1.A = R2.C AND P1.C = 1")
                              .getResults()[0];
     System.out.println(result.toString());
     assertEquals(4, result.getRowCount());
@@ -332,6 +349,11 @@ public void testThreeTableIndexInnerMultiJoin() throws NoConnectionsException, I
                              .getResults()[0];
     System.out.println(result.toString());
     assertEquals(0, result.getRowCount());
+    // Same as above but with partitioned table
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM P1 LEFT JOIN R2 ON P1.A = R2.C WHERE R2.A = 100")
+                             .getResults()[0];
+    System.out.println(result.toString());
 
     // R1 1st - joined with R2 1st row
     // R1 2nd - joined with R2 null eliminated by the filter condition
@@ -349,6 +371,12 @@ public void testThreeTableIndexInnerMultiJoin() throws NoConnectionsException, I
     // R1 3rd - joined with the R2 null
     result = client.callProcedure(
             "@AdHoc", "select * FROM R1 LEFT JOIN R2 ON R1.A = R2.C WHERE R1.A = -1")
+                             .getResults()[0];
+    assertEquals(1, result.getRowCount());
+    System.out.println(result.toString());
+    // Same as above but with partitioned table
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM P1 LEFT JOIN R2 ON P1.A = R2.C WHERE P1.A = -1")
                              .getResults()[0];
     assertEquals(1, result.getRowCount());
     System.out.println(result.toString());
@@ -426,6 +454,16 @@ public void testThreeTableIndexInnerMultiJoin() throws NoConnectionsException, I
                              .getResults()[0];
     System.out.println(result.toString());
     assertEquals(4, result.getRowCount());
+    // Same as above but with partitioned table
+    client.callProcedure("InsertP2", 1, 1);
+    client.callProcedure("InsertP2", 2, 2);
+    client.callProcedure("InsertP2", 3, 3);
+    client.callProcedure("InsertP2", 4, 4);
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM P2 LEFT JOIN R3 ON R3.A = P2.A")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(4, result.getRowCount());
 
     // R2 1st joined with R3 NULL R2.C < 0
     // R2 2nd joined with R3 null R2.C < 0
@@ -441,6 +479,12 @@ public void testThreeTableIndexInnerMultiJoin() throws NoConnectionsException, I
                              .getResults()[0];
     System.out.println(result.toString());
     assertEquals(4, result.getRowCount());
+    // Same as above but with partitioned table
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM P2 LEFT JOIN R3 ON R3.A = P2.A AND P2.E < 0")
+                             .getResults()[0];
+    System.out.println(result.toString());
+
 
     // R2 1st joined with R3 null (eliminated by  R3.A > 1
     // R2 2nd joined with R3 2nd
@@ -471,6 +515,12 @@ public void testThreeTableIndexInnerMultiJoin() throws NoConnectionsException, I
                              .getResults()[0];
     System.out.println(result.toString());
     assertEquals(1, result.getRowCount());
+    // Same as above but with partitioned table
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM R3 RIGHT JOIN P2 ON R3.A = P2.A WHERE R3.A > 1")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(1, result.getRowCount());
 
     // R2 1st eliminated by R2.C < 0
     // R2 2nd eliminated by R2.C < 0
@@ -481,7 +531,56 @@ public void testThreeTableIndexInnerMultiJoin() throws NoConnectionsException, I
                              .getResults()[0];
     System.out.println(result.toString());
     assertEquals(0, result.getRowCount());
+    // Same as above but with partitioned table
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM P2 LEFT JOIN R3 ON R3.A = P2.A WHERE P2.E < 0")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(0, result.getRowCount());
 }
+
+  /**
+  * Two table left and right NLIJ
+  * @throws NoConnectionsException
+  * @throws IOException
+  * @throws ProcCallException
+  */
+  public void testDistributedOuterJoin() throws NoConnectionsException, IOException, ProcCallException {
+    Client client = this.getClient();
+    client.callProcedure("InsertP2", 1, 1);
+    client.callProcedure("InsertP2", 2, 2);
+    client.callProcedure("InsertP2", 3, 3);
+    client.callProcedure("InsertP2", 4, 4);
+    client.callProcedure("InsertR3", 1, 1);
+    client.callProcedure("InsertR3", 2, 2);
+    client.callProcedure("InsertR3", 4, 4);
+    client.callProcedure("InsertR3", 5, 5);
+    // R3 1st eliminated by P2.A > 1
+    // R3 2nd in the results
+    // R3 3rd eliminated by P2.A > 1 (P2 null)
+    // R3 4th eliminated by P2.A > 1 (P2 null)
+
+    VoltTable result = client.callProcedure(
+            "@AdHoc", "select *  FROM P2 RIGHT JOIN R3 ON R3.A = P2.A AND P2.A < 3 WHERE P2.A > 1")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(1, result.getRowCount());
+
+    client.callProcedure("InsertP3", 1, 1);
+    client.callProcedure("InsertP3", 2, 2);
+    client.callProcedure("InsertP3", 4, 4);
+    client.callProcedure("InsertP3", 5, 5);
+    // P3 1st eliminated by P2.A > 1
+    // P3 2nd in the results
+    // P3 3rd eliminated by P2.A > 1 (P2 null)
+    // P3 4th eliminated by P2.A > 1 (P2 null)
+    result = client.callProcedure(
+            "@AdHoc", "select *  FROM P2 RIGHT JOIN P3 ON P3.A = P2.A AND P2.A < 3 WHERE P2.A > 1")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(1, result.getRowCount());
+
+  }
 
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
@@ -494,6 +593,7 @@ public void testThreeTableIndexInnerMultiJoin() throws NoConnectionsException, I
         project.addStmtProcedure("InsertR2", "INSERT INTO R2 VALUES(?, ?);");
         project.addStmtProcedure("InsertR3", "INSERT INTO R3 VALUES(?, ?);");
         project.addStmtProcedure("InsertP1", "INSERT INTO P1 VALUES(?, ?);");
+        project.addStmtProcedure("InsertP2", "INSERT INTO P2 VALUES(?, ?);");
         project.addStmtProcedure("InsertP3", "INSERT INTO P3 VALUES(?, ?);");
 
         // local
