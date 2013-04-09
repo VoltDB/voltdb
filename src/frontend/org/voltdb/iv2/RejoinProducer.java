@@ -235,9 +235,6 @@ public class RejoinProducer extends JoinProducerBase {
         }
     }
 
-    final AtomicReference<Pair<Integer, ByteBuffer>> firstWork =
-        new AtomicReference<Pair<Integer, ByteBuffer>>();
-
     /**
      * Runs when the RejoinCoordinator decides this site should start
      * rejoin.
@@ -267,30 +264,8 @@ public class RejoinProducer extends JoinProducerBase {
         RejoinMessage initResp = new RejoinMessage(m_mailbox.getHSId(), sourceSite, hsId);
         m_mailbox.send(m_coordinatorHsId, initResp);
 
-        // A little awkward here...
-        // The site must stay unblocked until the first snapshot data block arrrives.
-        // Do a messy blocking poll on the first unit of work (by spinning!).
-        // Save that first unit in "m_firstWork" and then enter the taskQueue.
-        // Future: need a blocking peek on rejoinSiteProcessor(); then firstWork
-        // can go away and the weird special casing of the first block in
-        // run() can also go away.
-        Thread firstSnapshotBlock = new Thread() {
-            @Override
-            public void run()
-            {
-                Pair<Integer, ByteBuffer> rejoinWork = null;
-                try {
-                    rejoinWork = m_rejoinSiteProcessor.take();
-                } catch (InterruptedException e) {
-                    VoltDB.crashLocalVoltDB(
-                            "Interrupted in take()ing first snapshot block for rejoin",
-                            true, e);
-                }
-                firstWork.set(rejoinWork);
-                m_taskQueue.offer(RejoinProducer.this);
-            }
-        };
-        firstSnapshotBlock.start();
+        // Start waiting for snapshot data
+        m_taskQueue.offer(this);
     }
 
     /**
@@ -327,15 +302,7 @@ public class RejoinProducer extends JoinProducerBase {
      */
     void runForLiveRejoin(SiteProcedureConnection siteConnection)
     {
-        // the first block is a special case.
-        Pair<Integer, ByteBuffer> rejoinWork = firstWork.get();
-        if (rejoinWork != null) {
-            REJOINLOG.debug(m_whoami
-                    + " executing first snapshot transfer for live rejoin.");
-            firstWork.set(null);
-        } else {
-            rejoinWork = m_rejoinSiteProcessor.poll();
-        }
+        Pair<Integer, ByteBuffer> rejoinWork = m_rejoinSiteProcessor.poll();
         if (rejoinWork != null) {
             restoreBlock(rejoinWork, siteConnection);
         }
@@ -386,10 +353,16 @@ public class RejoinProducer extends JoinProducerBase {
      */
     void runForCommunityRejoin(SiteProcedureConnection siteConnection)
     {
-        Pair<Integer, ByteBuffer> rejoinWork = firstWork.get();
-        REJOINLOG.debug(m_whoami
-                + " executing first snapshot transfer for community rejoin.");
-        firstWork.set(null);
+        Pair<Integer, ByteBuffer> rejoinWork = m_rejoinSiteProcessor.poll();
+        if (rejoinWork == null) {
+            m_taskQueue.offer(this);
+            // The source is not set up yet, don't block the site,
+            // return here and retry later.
+            return;
+        }
+
+        // By the time we get here, the snapshot has been successfully started.
+        // We can safely block the site until all snapshot blocks are received.
         while (rejoinWork != null) {
             restoreBlock(rejoinWork, siteConnection);
             try {
