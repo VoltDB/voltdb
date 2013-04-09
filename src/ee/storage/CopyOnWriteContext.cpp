@@ -60,7 +60,6 @@ CopyOnWriteContext::CopyOnWriteContext(
         TupleSerializer &serializer,
         int32_t partitionId,
         const std::vector<std::string> &predicateStrings,
-        int32_t totalPartitions,
         int64_t totalTuples) :
              m_table(table),
              m_backedUpTuples(TableFactory::getCopiedTempTable(table.databaseId(),
@@ -74,7 +73,6 @@ CopyOnWriteContext::CopyOnWriteContext(
              m_tuple(table.schema()),
              m_finishedTableScan(false),
              m_partitionId(partitionId),
-             m_totalPartitions(totalPartitions),
              m_totalTuples(totalTuples),
              m_tuplesRemaining(totalTuples),
              m_blocksCompacted(0),
@@ -109,7 +107,7 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
     if (outputStreams.empty()) {
         throwFatalException("serializeMore() expects at least one output stream.");
     }
-    outputStreams.open(m_table, m_maxTupleLength, m_partitionId, m_predicates, m_totalPartitions);
+    outputStreams.open(m_table, m_maxTupleLength, m_partitionId, m_predicates);
 
     //=== Tuple processing loop
 
@@ -121,7 +119,8 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
     while (!yield) {
 
         // Next tuple?
-        if (m_iterator->next(tuple)) {
+        bool hasMore = m_iterator->next(tuple);
+        if (hasMore) {
 
             // -1 is used as a sentinel value to disable counting for tests.
             if (m_tuplesRemaining > 0) {
@@ -202,9 +201,11 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
              * is still hanging around. So we need to call it again to return
              * the block here.
              */
-            bool hasMore = m_iterator->next(tuple);
-            if (!hasMore) {
-                assert(false);
+            if (hasMore) {
+                hasMore = m_iterator->next(tuple);
+                if (hasMore) {
+                    assert(false);
+                }
             }
             yield = true;
         }

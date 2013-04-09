@@ -797,7 +797,7 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
 
         tool.context("activate");
 
-        bool alreadyActivated = m_table->activateCopyOnWrite(&serializer, 0, strings, npartitions);
+        bool alreadyActivated = m_table->activateCopyOnWrite(&serializer, 0, strings);
         if (alreadyActivated) {
             tool.error("COW was previously activated");
         }

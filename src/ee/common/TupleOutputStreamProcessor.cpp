@@ -65,8 +65,7 @@ TupleOutputStream &TupleOutputStreamProcessor::add(void *data, std::size_t lengt
 void TupleOutputStreamProcessor::open(PersistentTable &table,
                                       std::size_t maxTupleLength,
                                       int32_t partitionId,
-                                      StreamPredicateList &predicates,
-                                      int32_t totalPartitions)
+                                      StreamPredicateList &predicates)
 {
     m_table = &table;
     m_maxTupleLength = maxTupleLength;
@@ -76,7 +75,6 @@ void TupleOutputStreamProcessor::open(PersistentTable &table,
         throwFatalException("serializeMore() expects either no predicates or one per output stream.");
     }
     m_predicates = &predicates;
-    m_totalPartitions = totalPartitions;
     for (TupleOutputStreamProcessor::iterator iter = begin(); iter != end(); ++iter) {
         iter->startRows(partitionId);
     }

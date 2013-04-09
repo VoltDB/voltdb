@@ -46,7 +46,6 @@ public:
                          TupleSerializer &serializer,
                          int32_t partitionId,
                          const std::vector<std::string> &predicateStrings,
-                         int32_t totalPartitions,
                          int64_t totalTuples);
 
     /**
@@ -116,8 +115,6 @@ private:
     const int32_t m_partitionId;
 
     StreamPredicateList m_predicates;
-
-    int32_t m_totalPartitions;
 
     int64_t m_totalTuples;
     int64_t m_tuplesRemaining;

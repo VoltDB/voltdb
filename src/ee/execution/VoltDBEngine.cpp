@@ -1359,10 +1359,8 @@ bool VoltDBEngine::activateTableStream(
                 predicate_strings.push_back(spred);
             }
         }
-        //TODO: Hard-code partition count to 7 to match up with test. This needs to be fixed!
-        //      It isn't used unless there are predicate strings, which is only provided
-        //      by one EE test.
-        if (table->activateCopyOnWrite(&m_tupleSerializer, m_partitionId, predicate_strings, 7)) {
+
+        if (table->activateCopyOnWrite(&m_tupleSerializer, m_partitionId, predicate_strings)) {
             return false;
         }
 

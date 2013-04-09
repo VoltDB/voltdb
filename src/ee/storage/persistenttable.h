@@ -208,17 +208,14 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      * Support predicates for filtering results.
      */
     bool activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId,
-                             const std::vector<std::string> &predicate_strings,
-                             int32_t totalPartitions);
+                             const std::vector<std::string> &predicate_strings);
 
     /**
-     * COW activation wrapper for backward compatibility with some tests.
-     * It's okay for totalPartitions to be zero because it only feeds into hashing for predicates.
-     * Total tuple count is not used when it's set to -1.
+     * COW activation wrapper for backward compatibility with some tests that don't provide predicates.
      */
     bool activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId) {
         std::vector<std::string> predicate_strings;
-        return activateCopyOnWrite(serializer, partitionId, predicate_strings, 0);
+        return activateCopyOnWrite(serializer, partitionId, predicate_strings);
     }
 
     /**
