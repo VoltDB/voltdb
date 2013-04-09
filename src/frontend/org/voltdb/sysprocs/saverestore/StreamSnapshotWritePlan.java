@@ -43,6 +43,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 
+import org.voltdb.PostSnapshotTask;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
@@ -270,10 +271,10 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         }
 
         CountDownLatch barrier = new CountDownLatch(1);
-        SiteTasker javaAndEETask = new UpdateHashinator(ImmutableSet.copyOf(newPartitions),
-                                                        barrier, true);
-        SiteTasker eeTask = new UpdateHashinator(ImmutableSet.copyOf(newPartitions),
-                                                 barrier, false);
+        PostSnapshotTask javaAndEETask = new UpdateHashinator(ImmutableSet.copyOf(newPartitions),
+                                                              barrier, true);
+        PostSnapshotTask eeTask = new UpdateHashinator(ImmutableSet.copyOf(newPartitions),
+                                                       barrier, false);
         assert !partitions.isEmpty();
         Iterator<Integer> iter = partitions.iterator();
         int firstPartition = iter.next();
@@ -291,7 +292,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
      * runs on all sites. Only one site will update the Java hashinator. The other
      * sites will wait until the Java hashinator is updated.
      */
-    private static class UpdateHashinator extends SiteTasker {
+    private static class UpdateHashinator implements PostSnapshotTask {
         private final Set<Integer> m_newPartitions;
         // Barrier to wait for the Java hashinator update
         private final CountDownLatch m_barrier;
@@ -307,10 +308,10 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         }
 
         @Override
-        public void run(SiteProcedureConnection siteConnection)
+        public void run(SystemProcedureExecutionContext context)
         {
             if (m_updateJava) {
-                SNAP_LOG.debug("P" + siteConnection.getCorrespondingPartitionId() +
+                SNAP_LOG.debug("P" + context.getPartitionId() +
                                    " updating Java hashinator with new partitions: " +
                                    m_newPartitions);
                 // Update the Java hashinator
@@ -322,25 +323,18 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             try {
                 m_barrier.await();
             } catch (InterruptedException e) {
-                VoltDB.crashLocalVoltDB("P" + siteConnection.getCorrespondingPartitionId() +
+                VoltDB.crashLocalVoltDB("P" + context.getPartitionId() +
                                             " was interrupted waiting for the Java hashinator to be updated",
                                         false, null);
             }
 
             if (SNAP_LOG.isDebugEnabled()) {
-                SNAP_LOG.debug("P" + siteConnection.getCorrespondingPartitionId() +
+                SNAP_LOG.debug("P" + context.getPartitionId() +
                                " updated the hashinator with new partitions: " + m_newPartitions);
             }
             // Update EE hashinator
             Pair<TheHashinator.HashinatorType, byte[]> currentConfig = TheHashinator.getCurrentConfig();
-            siteConnection.updateHashinator(currentConfig);
-        }
-
-        @Override
-        public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
-                throws IOException
-        {
-            throw new RuntimeException("Update EE hashinator task attempted on partial rejoin state.");
+            context.updateHashinator(currentConfig);
         }
     }
 }

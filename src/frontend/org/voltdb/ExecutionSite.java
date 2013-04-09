@@ -626,7 +626,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         }
 
         // do other periodic work
-        m_snapshotter.doSnapshotWork(getCorrespondingPartitionId(), ee, false);
+        m_snapshotter.doSnapshotWork(m_systemProcedureContext, ee, false);
 
         /*
          * grab the table statistics from ee and put it into the statistics
@@ -778,6 +778,12 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation)
         {
             return ExecutionSite.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation);
+        }
+
+        @Override
+        public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config)
+        {
+            //To change body of implemented methods use File | Settings | File Templates.
         }
     }
 
@@ -965,7 +971,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                     if (message == null) {
                         //Will return null if there is no work, safe to block on the mailbox if there is no work
                         boolean hadWork =
-                            (m_snapshotter.doSnapshotWork(getCorrespondingPartitionId(),
+                            (m_snapshotter.doSnapshotWork(m_systemProcedureContext,
                                     ee,
                                     EstTime.currentTimeMillis() - lastCommittedTxnTime > 5) != null);
 
@@ -994,7 +1000,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                         handleMailboxMessage(message);
                     } else {
                         //idle, do snapshot work
-                        m_snapshotter.doSnapshotWork(getCorrespondingPartitionId(), ee, EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
+                        m_snapshotter.doSnapshotWork(m_systemProcedureContext, ee, EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
                         // do some rejoin work
                         doRejoinWork();
                     }
@@ -1462,14 +1468,14 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                                 exportm.m_m.getPartitionId(),
                                 exportm.m_m.getSignature());
         } else if (message instanceof PotentialSnapshotWorkMessage) {
-            m_snapshotter.doSnapshotWork(getCorrespondingPartitionId(), ee, false);
+            m_snapshotter.doSnapshotWork(m_systemProcedureContext, ee, false);
         }
         else if (message instanceof ExecutionSiteLocalSnapshotMessage) {
             hostLog.info("Executing local snapshot. Completing any on-going snapshots.");
 
             // first finish any on-going snapshot
             try {
-                HashSet<Exception> completeSnapshotWork = m_snapshotter.completeSnapshotWork(getCorrespondingPartitionId(), ee);
+                HashSet<Exception> completeSnapshotWork = m_snapshotter.completeSnapshotWork(m_systemProcedureContext, ee);
                 if (completeSnapshotWork != null && !completeSnapshotWork.isEmpty()) {
                     for (Exception e : completeSnapshotWork) {
                         hostLog.error("Error completing in progress snapshot.", e);
@@ -1961,7 +1967,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
      */
     @Override
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException {
-        return m_snapshotter.completeSnapshotWork(getCorrespondingPartitionId(), ee);
+        return m_snapshotter.completeSnapshotWork(m_systemProcedureContext, ee);
     }
 
 
@@ -2319,12 +2325,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     @Override
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds) {
         //A noop pre-IV2
-    }
-
-    @Override
-    public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config)
-    {
-        // A noop pre-IV2
     }
 
     @Override
