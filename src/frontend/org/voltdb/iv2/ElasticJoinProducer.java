@@ -169,6 +169,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
             @Override
             public void run()
             {
+                JOINLOG.debug(m_whoami + "waiting for first partitioned table data block");
                 Pair<Integer, ByteBuffer> rejoinWork = null;
                 try {
                     rejoinWork = m_dataSinks.get(0).take();
@@ -178,6 +179,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
                             true, e);
                 }
                 m_firstWork.set(rejoinWork);
+                JOINLOG.debug(m_whoami + "received first partitioned table data block, queuing self");
                 m_taskQueue.offer(ElasticJoinProducer.this);
             }
         };
