@@ -358,16 +358,16 @@ public class TableHelper {
 
         // nullable or default valued?
         Object defaultValue = null;
-        //if (rand.nextBoolean()) {
-        //    column.nullable = true;
-        //    defaultValue = VoltTypeUtil.getRandomValue(column.type, Math.max(column.size % 128, 1), 0.8, rand);
-        //}
-        //else {
+        if (rand.nextBoolean()) {
+            column.nullable = true;
+            defaultValue = VoltTypeUtil.getRandomValue(column.type, Math.max(column.size % 128, 1), 0.8, rand);
+        }
+        else {
             column.nullable = false;
             defaultValue = VoltTypeUtil.getRandomValue(column.type, Math.max(column.size % 128, 1), 0.0, rand);
             // no uniques for now, as the random fill becomes too slow
             //column.unique = (r.nextDouble() > 0.3); // 30% of non-nullable cols unique (15% total)
-        //}
+        }
         if (defaultValue != null) {
             column.defaultValue = String.valueOf(defaultValue);
         }
