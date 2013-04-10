@@ -641,5 +641,36 @@ public class TestTheHashinator extends TestCase {
         }
         assertEquals(0, predecessors.size());
     }
+
+    @Test
+    public void testElasticAddPartitionDeterminism() {
+        if (hashinatorType == HashinatorType.LEGACY) return;
+
+        ElasticHashinator hashinator = new ElasticHashinator(ElasticHashinator.getConfigureBytes(3,
+                ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION));
+
+        // Add 3 partitions in a batch to the original hashinator
+        byte[] batchAddConfig = ElasticHashinator.addPartitions(hashinator, Arrays.asList(3, 4, 5),
+                                                                ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+        Map<Long, Integer> batchAddTokens = deserializeElasticConfig(batchAddConfig);
+
+        // Add the same 3 partitions one at a time to the original hashinator
+        byte[] add3Config = ElasticHashinator.addPartitions(hashinator, Arrays.asList(3),
+                                                            ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+        ElasticHashinator add3Hashinator = new ElasticHashinator(add3Config);
+        byte[] add4Config = ElasticHashinator.addPartitions(add3Hashinator, Arrays.asList(4),
+                                                            ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+        ElasticHashinator add4Hashinator = new ElasticHashinator(add4Config);
+        byte[] seqAddConfig = ElasticHashinator.addPartitions(add4Hashinator, Arrays.asList(5),
+                                                              ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+        Map<Long, Integer> seqAddTokens = deserializeElasticConfig(seqAddConfig);
+
+        // The two approaches should produce the same hash ring
+        assertFalse(seqAddTokens.isEmpty());
+        assertTrue(seqAddTokens.values().contains(3));
+        assertTrue(seqAddTokens.values().contains(4));
+        assertTrue(seqAddTokens.values().contains(5));
+        assertEquals(batchAddTokens, seqAddTokens);
+    }
 }
 
