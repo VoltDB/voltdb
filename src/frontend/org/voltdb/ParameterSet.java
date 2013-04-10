@@ -41,10 +41,10 @@ import org.voltdb.types.VoltDecimalHelper;
  * a stored procedure OR a plan fragment.
  *
  */
- public class ParameterSet implements FastSerializable, JSONString {
+public class ParameterSet implements FastSerializable, JSONString {
 
-     @SuppressWarnings("unused")
-     private static final VoltLogger hostLog = new VoltLogger("HOST");
+    @SuppressWarnings("unused")
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     static final byte ARRAY = -99;
 
@@ -103,10 +103,11 @@ import org.voltdb.types.VoltDecimalHelper;
         // this is a very awkward path, but you can get here when round-tripping things
         // De-serialization of param sets doesn't seem to set m_serializedSize
         // comment out this fix for testing only
-        if ((m_params.length > 0) && (m_serializedSize == 2)) {
+        // commented out for test because not sure this is threadsafe yet
+        /*if ((m_params.length > 0) && (m_serializedSize == 2)) {
             //hostLog.warn("ParameterSet.getSerializedSize() forced to build serialized size.");
             m_serializedSize = calculateSerializedSize();
-        }
+        }*/
         return m_serializedSize;
     }
 

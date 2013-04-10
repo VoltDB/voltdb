@@ -633,17 +633,22 @@ public class ProcedureRunner {
         return sysproc.executePlanFragment(dependencies, fragmentId, params, m_systemProcedureContext);
     }
 
-    protected ParameterSet getCleanParams(SQLStmt stmt, Object... args) {
+    protected ParameterSet getCleanParams(SQLStmt stmt, Object... inArgs) {
         final int numParamTypes = stmt.statementParamJavaTypes.length;
         final byte stmtParamTypes[] = stmt.statementParamJavaTypes;
-        if (args.length != numParamTypes) {
+        final Object[] args = new Object[numParamTypes];
+        if (inArgs.length != numParamTypes) {
             throw new ExpectedProcedureException(
-                    "Number of arguments provided was " + args.length  +
+                    "Number of arguments provided was " + inArgs.length  +
                     " where " + numParamTypes + " was expected for statement " + stmt.getText());
         }
         for (int ii = 0; ii < numParamTypes; ii++) {
-            // this only handles null values
-            if (args[ii] != null) continue;
+            // this handles non-null values
+            if (inArgs[ii] != null) {
+                args[ii] = inArgs[ii];
+                continue;
+            }
+            // this handles null values
             VoltType type = VoltType.get(stmtParamTypes[ii]);
             if (type == VoltType.TINYINT)
                 args[ii] = Byte.MIN_VALUE;
