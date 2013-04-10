@@ -96,6 +96,11 @@ import org.voltdb.types.VoltDecimalHelper;
     }
 
     public int getSerializedSize() {
+        // this should fail if calculateSerializedSize has not been called
+        if ((m_params.length > 0) && (m_serializedSize == 2)) {
+            throw new IllegalStateException(
+                    "ParameterSet.getSerializedSize() called without a calculated serialized size.");
+        }
         return m_serializedSize;
     }
 
