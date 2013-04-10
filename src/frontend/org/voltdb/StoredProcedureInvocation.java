@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.io.IOException;
+import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -224,7 +225,14 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
             }
         }
         else if (params != null) {
-            getParams().flattenToBuffer(buf);
+            try {
+                getParams().flattenToBuffer(buf);
+            }
+            catch (BufferOverflowException e) {
+                hostLog.info("SP \"" + procName + "\" has thrown BufferOverflowException");
+                hostLog.info(toString());
+                throw e;
+            }
         }
     }
 
