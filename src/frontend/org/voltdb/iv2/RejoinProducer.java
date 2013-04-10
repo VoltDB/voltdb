@@ -354,7 +354,9 @@ public class RejoinProducer extends JoinProducerBase {
     void runForCommunityRejoin(SiteProcedureConnection siteConnection)
     {
         Pair<Integer, ByteBuffer> rejoinWork = m_rejoinSiteProcessor.poll();
-        if (rejoinWork == null) {
+        // poll() could return null if the source indicated enf of stream,
+        // need to check on that before retry
+        if (rejoinWork == null && !m_rejoinSiteProcessor.isEOF()) {
             m_taskQueue.offer(this);
             // The source is not set up yet, don't block the site,
             // return here and retry later.
