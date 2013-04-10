@@ -80,7 +80,14 @@ public class TestParameterSet extends TestCase {
         ParameterSet out = new ParameterSet();
         out.readExternal(new FastDeserializer(buf));
 
-        assertEquals(3, out.toArray().length);
+        buf = ByteBuffer.allocate(out.getSerializedSize());
+        out.flattenToBuffer(buf);
+        buf.rewind();
+
+        ParameterSet out2 = new ParameterSet();
+        out2.readExternal(new FastDeserializer(buf));
+
+        assertEquals(3, out2.toArray().length);
         assertNull(out.toArray()[0]);
     }
 
@@ -109,6 +116,28 @@ public class TestParameterSet extends TestCase {
 
         byte[] bin = (byte[]) out.toArray()[0];
         assertEquals(bin[0], 'f'); assertEquals(bin[1], 'o'); assertEquals(bin[2], 'o');
+    }
+
+    public void testNullSigils() throws IOException {
+        params = new ParameterSet();
+        params.setParameters(VoltType.NULL_STRING_OR_VARBINARY, VoltType.NULL_DECIMAL, VoltType.NULL_INTEGER);
+        ByteBuffer buf = ByteBuffer.allocate(params.getSerializedSize());
+        params.flattenToBuffer(buf);
+        buf.rewind();
+
+        ParameterSet out = new ParameterSet();
+        out.readExternal(new FastDeserializer(buf));
+        assertEquals(3, out.toArray().length);
+
+        buf = ByteBuffer.allocate(out.getSerializedSize());
+        out.flattenToBuffer(buf);
+        buf.rewind();
+
+        ParameterSet out2 = new ParameterSet();
+        out2.readExternal(new FastDeserializer(buf));
+        assertEquals(3, out2.toArray().length);
+
+        System.out.println(out2.toJSONString());
     }
 
     private boolean arrayLengthTester(Object[] objs)

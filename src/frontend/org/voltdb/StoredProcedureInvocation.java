@@ -39,13 +39,10 @@ import org.voltdb.utils.Encoder;
  *
  */
 public class StoredProcedureInvocation implements FastSerializable, JSONString {
-    @SuppressWarnings("unused")
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     ProcedureInvocationType type = ProcedureInvocationType.ORIGINAL;
     String procName = null;
-
-    boolean debug = false;
 
     public static final long UNITIALIZED_ID = -1L;
     /*
@@ -77,7 +74,6 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         copy.procName = procName;
         copy.originalTxnId = originalTxnId;
         copy.originalUniqueId = originalUniqueId;
-        copy.debug = debug;
         if (serializedParams != null)
         {
             copy.serializedParams = serializedParams.duplicate();
@@ -100,7 +96,6 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
 
     public void setProcName(String name) {
         procName = name;
-        debug = procName.equals("@UpdateApplicationCatalog");
     }
 
     public void setOriginalTxnId(long txnId) {
@@ -174,12 +169,6 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
 
     public int getSerializedSize()
     {
-        if (debug) {
-            hostLog.info("UAC getSerializedSize for: " + toStringLite());
-        }
-
-        int paramSize = 0;
-
         int size = 1 // Version/type
             + 4 // proc name string length
             + procName.length()
@@ -193,7 +182,6 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
 
         if (serializedParams != null)
         {
-            paramSize = serializedParams.remaining();
             size += serializedParams.remaining();
         }
         else if (params != null)
@@ -207,12 +195,6 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
                         getProcName(), serializedSize));
             }
             size += pset.getSerializedSize();
-            paramSize = pset.getSerializedSize();
-        }
-
-        if (debug) {
-            hostLog.info(String.format("Calculating the length of UAC: %d param bytes and %d total.",
-                    paramSize, size));
         }
 
         return size;
@@ -220,15 +202,8 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
 
     public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
-        if (debug) {
-            hostLog.info("UAC flattenToBuffer for: " + toStringLite());
-        }
-
         assert(!((params == null) && (serializedParams == null)));
         assert((params != null) || (serializedParams != null));
-
-        int startPos = buf.position();
-
         buf.put(type.getValue()); //version and type, version is currently 0
         if (type == ProcedureInvocationType.REPLICATED) {
             buf.putLong(originalTxnId);
@@ -237,14 +212,6 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         buf.putInt(procName.length());
         buf.put(procName.getBytes());
         buf.putLong(clientHandle);
-
-        int beforeParamPos = buf.position();
-
-        if (debug) {
-            hostLog.info(String.format("UAC Invocation flattenToBuffer serialized %d bytes before it got to params.",
-                    beforeParamPos - startPos));
-        }
-
         if (serializedParams != null)
         {
             if (!serializedParams.isReadOnly())
@@ -275,13 +242,6 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
                 throw e;
             }
         }
-
-        int endPos = buf.position();
-
-        if (debug) {
-            hostLog.info(String.format("UAC Invocation flattenToBuffer serialized %d param bytes and %d total.",
-                    endPos - beforeParamPos, endPos - startPos));
-        }
     }
 
     public void initFromBuffer(ByteBuffer buf) throws IOException
@@ -290,8 +250,6 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         byte version = in.readByte();// version number also embeds the type
         type = ProcedureInvocationType.typeFromByte(version);
 
-        int startPos = buf.position();
-
         /*
          * If it's a replicated invocation, there should be two txn IDs
          * following the version byte. The first txn ID is the new txn ID, the
@@ -303,13 +261,8 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         }
 
         procName = in.readString().intern();
-        debug = procName.equals("@UpdateApplicationCatalog");
-
         clientHandle = in.readLong();
         // do not deserialize parameters in ClientInterface context
-
-        int beforeParamPos = buf.position();
-
         serializedParams = in.remainder();
         final ByteBuffer duplicate = serializedParams.duplicate();
         params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
@@ -319,14 +272,6 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
                 return fds.readObject(ParameterSet.class);
             }
         });
-
-        int endPos = beforeParamPos + serializedParams.remaining();
-
-        if (debug) {
-            hostLog.info("UAC initFromBuffer called for: " + toStringLite());
-            hostLog.info(String.format("UAC Invocation initFromBuffer deserialized %d param bytes and %d total.",
-                    endPos - beforeParamPos, endPos - startPos));
-        }
     }
 
     @Override
@@ -334,8 +279,6 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         byte version = in.readByte();// version number also embeds the type
         type = ProcedureInvocationType.typeFromByte(version);
 
-        int startPos = in.getPosition();
-
         /*
          * If it's a replicated invocation, there should be two txn IDs
          * following the version byte. The first txn ID is the new txn ID, the
@@ -347,12 +290,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         }
 
         procName = in.readString().intern();
-        debug = procName.equals("@UpdateApplicationCatalog");
-
         clientHandle = in.readLong();
-
-        int beforeParamPos = in.getPosition();
-
         // do not deserialize parameters in ClientInterface context
         serializedParams = in.remainder();
         final ByteBuffer duplicate = serializedParams.duplicate();
@@ -363,24 +301,10 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
                 return fds.readObject(ParameterSet.class);
             }
         });
-
-        int endPos = beforeParamPos + serializedParams.remaining();
-
-        if (debug) {
-            hostLog.info("UAC readExternal called for: " + toStringLite());
-            hostLog.info(String.format("UAC Invocation readExternal deserialized %d param bytes and %d total.",
-                    endPos - beforeParamPos, endPos - startPos));
-        }
     }
 
     @Override
     public void writeExternal(FastSerializer out) throws IOException {
-        if (debug) {
-            hostLog.info("UAC writeExternal for: " + toStringLite());
-        }
-
-        int startPos = out.getPosition();
-
         assert(!((params == null) && (serializedParams == null)));
         assert((params != null) || (serializedParams != null));
         out.write(type.getValue());//version and type, version is currently 0
@@ -390,20 +314,10 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         }
         out.writeString(procName);
         out.writeLong(clientHandle);
-
-        int beforeParamPos = out.getPosition();
-
         if (serializedParams != null)
             out.write(serializedParams.duplicate());
         else if (params != null) {
             out.writeObject(getParams());
-        }
-
-        int endPos = out.getPosition();
-
-        if (debug) {
-            hostLog.info(String.format("UAC Invocation writeExternal serialized %d param bytes and %d total.",
-                    endPos - beforeParamPos, endPos - startPos));
         }
     }
 

@@ -29,6 +29,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.FastSerializer;
@@ -41,6 +42,9 @@ import org.voltdb.types.VoltDecimalHelper;
  *
  */
  public class ParameterSet implements FastSerializable, JSONString {
+
+     @SuppressWarnings("unused")
+     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     static final byte ARRAY = -99;
 
@@ -99,9 +103,10 @@ import org.voltdb.types.VoltDecimalHelper;
         // this is a very awkward path, but you can get here when round-tripping things
         // De-serialization of param sets doesn't seem to set m_serializedSize
         // comment out this fix for testing only
-        /*if ((m_params.length > 0) && (m_serializedSize == 2)) {
-            calculateSerializedSize();
-        }*/
+        if ((m_params.length > 0) && (m_serializedSize == 2)) {
+            //hostLog.warn("ParameterSet.getSerializedSize() forced to build serialized size.");
+            m_serializedSize = calculateSerializedSize();
+        }
         return m_serializedSize;
     }
 
