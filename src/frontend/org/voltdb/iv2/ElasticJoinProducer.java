@@ -169,7 +169,9 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     private void runForBlockingDataTransfer(SiteProcedureConnection siteConnection)
     {
         Pair<Integer, ByteBuffer> tableBlock = m_dataSinks.get(0).poll();
-        if (tableBlock == null) {
+        // poll() could return null if the source indicated enf of stream,
+        // need to check on that before retry
+        if (tableBlock == null && !m_dataSinks.get(0).isEOF()) {
             m_taskQueue.offer(this);
             // The sources are not set up yet, don't block the site,
             // return here and retry later.
