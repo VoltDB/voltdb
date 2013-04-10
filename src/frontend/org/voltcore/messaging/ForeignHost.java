@@ -180,24 +180,31 @@ public class ForeignHost {
             return;
         }
 
+        int len = 4            /* length prefix */
+                + 8            /* source hsid */
+                + 4            /* destinationCount */
+                + 8 * destinations.length  /* destination list */
+                + message.getSerializedSize();
+        final ByteBuffer buf = ByteBuffer.allocate(len);
+        buf.putInt(len - 4);
+        buf.putLong(message.m_sourceHSId);
+        buf.putInt(destinations.length);
+        for (int ii = 0; ii < destinations.length; ii++) {
+            buf.putLong(destinations[ii]);
+        }
+        try {
+            message.flattenToBuffer(buf);
+        }
+        catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+        buf.flip();
+
         m_connection.writeStream().enqueue(
             new DeferredSerialization() {
+
                 @Override
                 public final ByteBuffer[] serialize() throws IOException{
-                    int len = 4            /* length prefix */
-                            + 8            /* source hsid */
-                            + 4            /* destinationCount */
-                            + 8 * destinations.length  /* destination list */
-                            + message.getSerializedSize();
-                    ByteBuffer buf = ByteBuffer.allocate(len);
-                    buf.putInt(len - 4);
-                    buf.putLong(message.m_sourceHSId);
-                    buf.putInt(destinations.length);
-                    for (int ii = 0; ii < destinations.length; ii++) {
-                        buf.putLong(destinations[ii]);
-                    }
-                    message.flattenToBuffer(buf);
-                    buf.flip();
                     return new ByteBuffer[] { buf };
                 }
 
