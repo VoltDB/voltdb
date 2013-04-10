@@ -94,10 +94,6 @@ CopyOnWriteContext::CopyOnWriteContext(
  * Return remaining tuple count, 0 if done, or -1 on error.
  */
 int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStreams) {
-    if (!m_finishedTableScan) {
-        checkRemainingTuples("serializeMore(start)");
-    }
-
     // Don't expect to be re-called after streaming all the tuples.
     if (m_tuplesRemaining == 0) {
         throwFatalException("serializeMore() was called again after streaming completed.")
@@ -155,7 +151,6 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
              * After scanning the persistent table switch to scanning the temp
              * table with the tuples that were backed up.
              */
-            checkRemainingTuples("serializeMore(start temp)");
             m_finishedTableScan = true;
             m_iterator.reset(m_backedUpTuples.get()->makeIterator());
 
