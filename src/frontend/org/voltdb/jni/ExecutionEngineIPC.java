@@ -1056,7 +1056,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putInt(Commands.ActivateTableStream.m_id);
         m_data.putInt(tableId);
         m_data.putInt(streamType.ordinal());
-        m_data.putInt(0);       // Predicate count
+        m_data.put((byte)0);        // Delete flag
+        m_data.putInt(0);           // Predicate count
 
         try {
             m_data.flip();

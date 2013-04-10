@@ -1351,6 +1351,7 @@ bool VoltDBEngine::activateTableStream(
     switch (streamType) {
     case TABLE_STREAM_SNAPSHOT: {
         std::vector<std::string> predicate_strings;
+        bool doDelete = (serializeIn.readByte() != 0);
         int npreds = serializeIn.readInt();
         if (npreds > 0) {
             predicate_strings.reserve(npreds);
@@ -1360,7 +1361,7 @@ bool VoltDBEngine::activateTableStream(
             }
         }
 
-        if (table->activateCopyOnWrite(&m_tupleSerializer, m_partitionId, predicate_strings)) {
+        if (table->activateCopyOnWrite(&m_tupleSerializer, m_partitionId, predicate_strings, doDelete)) {
             return false;
         }
 

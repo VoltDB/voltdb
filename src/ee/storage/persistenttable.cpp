@@ -751,7 +751,8 @@ TableStats* PersistentTable::getTableStats() {
  * Switch the table to copy on write mode. Returns true if the table was already in copy on write mode.
  */
 bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId,
-                                          const std::vector<std::string> &predicate_strings) {
+                                          const std::vector<std::string> &predicate_strings,
+                                          bool doDelete) {
     if (m_COWContext != NULL) {
         // true => COW already active
         return true;
@@ -773,7 +774,7 @@ bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t p
         assert(serializer != NULL);
         CopyOnWriteContext *newCOW =
             new CopyOnWriteContext(*this, *serializer, partitionId,
-                                   predicate_strings, activeTupleCount());
+                                   predicate_strings, activeTupleCount(), doDelete);
         m_COWContext.reset(newCOW);
     }
     catch(SerializableEEException &e) {

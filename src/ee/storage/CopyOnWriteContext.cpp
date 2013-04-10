@@ -60,7 +60,8 @@ CopyOnWriteContext::CopyOnWriteContext(
         TupleSerializer &serializer,
         int32_t partitionId,
         const std::vector<std::string> &predicateStrings,
-        int64_t totalTuples) :
+        int64_t totalTuples,
+        bool doDelete) :
              m_table(table),
              m_backedUpTuples(TableFactory::getCopiedTempTable(table.databaseId(),
                                                                "COW of " + table.name(),
@@ -78,7 +79,8 @@ CopyOnWriteContext::CopyOnWriteContext(
              m_blocksCompacted(0),
              m_serializationBatches(0),
              m_inserts(0),
-             m_updates(0)
+             m_updates(0),
+             m_doDelete(doDelete)
 {
     // Parse predicate strings. The factory type determines the kind of
     // predicates that get generated.
@@ -133,7 +135,7 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
              * If this is the table scan, check to see if the tuple is pending
              * delete and return the tuple if it is
              */
-            if (!m_finishedTableScan && tuple.isPendingDelete()) {
+            if (!m_finishedTableScan && (m_doDelete || tuple.isPendingDelete())) {
                 assert(!tuple.isPendingDeleteOnUndoRelease());
                 if (m_table.m_schema->getUninlinedObjectColumnCount() != 0)
                 {

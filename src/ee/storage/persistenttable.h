@@ -204,18 +204,21 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     void addMaterializedView(MaterializedViewMetadata *view);
 
     /**
-     * Switch the table to copy on write mode. Returns true if the table was already in copy on write mode.
+     * Switch the table to copy on write mode.
+     * doDelete==true causes the tuple to be deleted after streaming.
+     * Returns true if the table was already in copy on write mode.
      * Support predicates for filtering results.
      */
     bool activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId,
-                             const std::vector<std::string> &predicate_strings);
+                             const std::vector<std::string> &predicate_strings,
+                             bool doDelete);
 
     /**
      * COW activation wrapper for backward compatibility with some tests that don't provide predicates.
      */
     bool activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId) {
         std::vector<std::string> predicate_strings;
-        return activateCopyOnWrite(serializer, partitionId, predicate_strings);
+        return activateCopyOnWrite(serializer, partitionId, predicate_strings, false);
     }
 
     /**
