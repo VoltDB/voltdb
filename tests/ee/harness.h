@@ -109,7 +109,8 @@ template <typename T>
 class RegisterTest {
 public:
     RegisterTest(TestSuite* suite) {
-        suite->registerTest(&RegisterTest<T>::create);
+        if (suite != NULL)
+            suite->registerTest(&RegisterTest<T>::create);
     }
 
     static Test* create() {
@@ -118,7 +119,7 @@ public:
 };
 
 // Creates a test subclass.
-#define MAGIC_TEST_MACRO(parent_class, suite_name, test_name) \
+#define MAGIC_TEST_MACRO(parent_class, suite_name, test_name, _suite_) \
     class suite_name ## _ ## test_name : public parent_class { \
     public: \
         virtual ~suite_name ## _ ## test_name() {} \
@@ -132,14 +133,25 @@ public:
     }; \
     const char suite_name ## _ ## test_name::suite_name_[] =  #suite_name; \
     const char suite_name ## _ ## test_name::test_name_[] =  #test_name; \
-    static RegisterTest<suite_name ## _ ## test_name> suite_name ## _ ## test_name ## _register(TestSuite::globalInstance()); \
+    static RegisterTest<suite_name ## _ ## test_name> suite_name ## _ ## test_name ## _register(_suite_); \
     void suite_name ## _ ## test_name::run()
 
 // A magic macro to make a test part of a user-defined test subclass.
-#define TEST_F(harness_name, test_name) MAGIC_TEST_MACRO(harness_name, harness_name, test_name)
+#define TEST_F(harness_name, test_name) MAGIC_TEST_MACRO(harness_name, harness_name, test_name, TestSuite::globalInstance())
 
 // A magic macro to make a test subclass for a block of code.
-#define TEST(suite_name, test_name) MAGIC_TEST_MACRO(Test, suite_name, test_name)
+#define TEST(suite_name, test_name) MAGIC_TEST_MACRO(Test, suite_name, test_name, TestSuite::globalInstance())
+
+/*
+ * Macros for easily disabling tests. Use by prepending macro names with "NO".
+ * IMPORTANT: The build will intentionally fail if STUPIDUNIT_TWEAK is not defined.
+ * This prevents accidentally leaving tests disabled.
+ *** DO NOT PUT a STUPIDUNIT_TWEAK #define in the code! ***
+ */
+#ifdef STUPIDUNIT_TWEAK
+#define NOTEST_F(harness_name, test_name) MAGIC_TEST_MACRO(harness_name, harness_name, test_name, NULL)
+#define NOTEST(suite_name, test_name) MAGIC_TEST_MACRO(Test, suite_name, test_name, NULL)
+#endif
 
 // Abuse macros to easily define all the EXPECT and ASSERT variants
 #define STUPIDUNIT_MAKE_EXPECT_MACRO(operation, one, two) do { \
