@@ -332,10 +332,12 @@ public class TableHelper {
      * Helper function for getTotallyRandomTable that makes random columns.
      */
     protected static VoltTable.ColumnInfo getRandomColumn(String name, Random rand) {
-        VoltType[] allTypes = { VoltType.BIGINT, VoltType.DECIMAL, VoltType.FLOAT,
+        /*VoltType[] allTypes = { VoltType.BIGINT, VoltType.DECIMAL, VoltType.FLOAT,
                 VoltType.INTEGER, VoltType.SMALLINT, VoltType.STRING,
-                VoltType.TIMESTAMP, VoltType.TINYINT, VoltType.VARBINARY };
-        //VoltType[] allTypes = { VoltType.INTEGER };
+                VoltType.TIMESTAMP, VoltType.TINYINT, VoltType.VARBINARY };*/
+        VoltType[] allTypes = { VoltType.BIGINT, VoltType.FLOAT,
+                VoltType.INTEGER, VoltType.SMALLINT, VoltType.STRING,
+                VoltType.TIMESTAMP, VoltType.TINYINT };
 
         // random type
         VoltTable.ColumnInfo column = new VoltTable.ColumnInfo(name, allTypes[rand.nextInt(allTypes.length)]);
