@@ -97,7 +97,7 @@ public class HashRangeExpression extends AbstractValueExpression {
     /**
      * @param ranges the column_alias to set
      */
-    public void setColumnAlias(Map<Long, Long> ranges) {
+    public void setRanges(Map<Long, Long> ranges) {
         m_ranges = ImmutableMap.copyOf(ranges);
     }
 
