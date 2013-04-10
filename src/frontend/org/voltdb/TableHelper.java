@@ -335,9 +335,7 @@ public class TableHelper {
         /*VoltType[] allTypes = { VoltType.BIGINT, VoltType.DECIMAL, VoltType.FLOAT,
                 VoltType.INTEGER, VoltType.SMALLINT, VoltType.STRING,
                 VoltType.TIMESTAMP, VoltType.TINYINT, VoltType.VARBINARY };*/
-        VoltType[] allTypes = { VoltType.BIGINT, VoltType.FLOAT,
-                VoltType.INTEGER, VoltType.SMALLINT,
-                VoltType.TIMESTAMP, VoltType.TINYINT };
+        VoltType[] allTypes = { VoltType.INTEGER };
 
         // random type
         VoltTable.ColumnInfo column = new VoltTable.ColumnInfo(name, allTypes[rand.nextInt(allTypes.length)]);
@@ -501,7 +499,7 @@ public class TableHelper {
         do {
             columnDrops =    Math.min((int) (Math.abs(rand.nextGaussian()) * 1.5), table.m_colCount);
             columnAdds =     Math.min((int) (Math.abs(rand.nextGaussian()) * 1.5), table.m_colCount);
-            columnGrows =    Math.min((int) (Math.abs(rand.nextGaussian()) * 1.5), table.m_colCount);
+            columnGrows =    0;//Math.min((int) (Math.abs(rand.nextGaussian()) * 1.5), table.m_colCount);
             columnReorders = Math.min((int) (Math.abs(rand.nextGaussian()) * 1.5), table.m_colCount);
             totalMutations = columnDrops + columnAdds + columnGrows + columnReorders;
         }
