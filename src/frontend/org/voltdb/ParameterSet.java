@@ -98,9 +98,10 @@ import org.voltdb.types.VoltDecimalHelper;
     public int getSerializedSize() {
         // this is a very awkward path, but you can get here when round-tripping things
         // De-serialization of param sets doesn't seem to set m_serializedSize
-        if ((m_params.length > 0) && (m_serializedSize == 2)) {
+        // comment out this fix for testing only
+        /*if ((m_params.length > 0) && (m_serializedSize == 2)) {
             calculateSerializedSize();
-        }
+        }*/
         return m_serializedSize;
     }
 

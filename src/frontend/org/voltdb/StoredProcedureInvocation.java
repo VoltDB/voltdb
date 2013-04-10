@@ -186,7 +186,15 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         }
         else if (params != null)
         {
-            size += getParams().getSerializedSize();
+            ParameterSet pset = getParams();
+            assert(pset != null);
+            int serializedSize = pset.getSerializedSize();
+            if ((pset.toArray().length > 0) && (serializedSize <= 2)) {
+                throw new IllegalStateException(String.format("Parameter set for invocation " +
+                        "%s doesn't have the proper size (currently = %s)",
+                        getProcName(), serializedSize));
+            }
+            size += pset.getSerializedSize();
         }
 
         return size;
