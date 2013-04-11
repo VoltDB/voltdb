@@ -60,58 +60,47 @@ import junit.framework.TestCase;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.json_voltpatches.JSONException;
-import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.types.TimestampType;
 
 public class TestParameterSet extends TestCase {
     ParameterSet params;
 
-    @Override
-    public void setUp() {
-        params = new ParameterSet();
-    }
-
     public void testNull() throws IOException {
-        params.setParameters(new Object[]{null, null, null});
+        params = ParameterSet.fromArrayNoCopy(new Object[]{null, null, null});
         ByteBuffer buf = ByteBuffer.allocate(params.getSerializedSize());
         params.flattenToBuffer(buf);
         buf.rewind();
 
-        ParameterSet out = new ParameterSet();
-        out.readExternal(new FastDeserializer(buf));
+        ParameterSet out = ParameterSet.fromByteBuffer(buf);
 
         buf = ByteBuffer.allocate(out.getSerializedSize());
         out.flattenToBuffer(buf);
         buf.rewind();
 
-        ParameterSet out2 = new ParameterSet();
-        out2.readExternal(new FastDeserializer(buf));
+        ParameterSet out2 = ParameterSet.fromByteBuffer(buf);
 
         assertEquals(3, out2.toArray().length);
         assertNull(out.toArray()[0]);
     }
 
     public void testStrings() throws IOException {
-        params.setParameters(new Object[]{"foo"});
+        params = ParameterSet.fromArrayNoCopy(new Object[]{"foo"});
         ByteBuffer buf = ByteBuffer.allocate(params.getSerializedSize());
         params.flattenToBuffer(buf);
         buf.rewind();
 
-        ParameterSet out = new ParameterSet();
-        out.readExternal(new FastDeserializer(buf));
+        ParameterSet out = ParameterSet.fromByteBuffer(buf);
         assertEquals(1, out.toArray().length);
         assertEquals("foo", out.toArray()[0]);
     }
 
     public void testStringsAsByteArray() throws IOException {
-        params = new ParameterSet();
-        params.setParameters(new Object[]{new byte[]{'f', 'o', 'o'}});
+        params = ParameterSet.fromArrayNoCopy(new Object[]{new byte[]{'f', 'o', 'o'}});
         ByteBuffer buf = ByteBuffer.allocate(params.getSerializedSize());
         params.flattenToBuffer(buf);
         buf.rewind();
 
-        ParameterSet out = new ParameterSet();
-        out.readExternal(new FastDeserializer(buf));
+        ParameterSet out = ParameterSet.fromByteBuffer(buf);
         assertEquals(1, out.toArray().length);
 
         byte[] bin = (byte[]) out.toArray()[0];
@@ -119,22 +108,19 @@ public class TestParameterSet extends TestCase {
     }
 
     public void testNullSigils() throws IOException {
-        params = new ParameterSet();
-        params.setParameters(VoltType.NULL_STRING_OR_VARBINARY, VoltType.NULL_DECIMAL, VoltType.NULL_INTEGER);
+        params = ParameterSet.fromArrayNoCopy(VoltType.NULL_STRING_OR_VARBINARY, VoltType.NULL_DECIMAL, VoltType.NULL_INTEGER);
         ByteBuffer buf = ByteBuffer.allocate(params.getSerializedSize());
         params.flattenToBuffer(buf);
         buf.rewind();
 
-        ParameterSet out = new ParameterSet();
-        out.readExternal(new FastDeserializer(buf));
+        ParameterSet out = ParameterSet.fromByteBuffer(buf);
         assertEquals(3, out.toArray().length);
 
         buf = ByteBuffer.allocate(out.getSerializedSize());
         out.flattenToBuffer(buf);
         buf.rewind();
 
-        ParameterSet out2 = new ParameterSet();
-        out2.readExternal(new FastDeserializer(buf));
+        ParameterSet out2 = ParameterSet.fromByteBuffer(buf);
         assertEquals(3, out2.toArray().length);
 
         System.out.println(out2.toJSONString());
@@ -142,8 +128,7 @@ public class TestParameterSet extends TestCase {
 
     private boolean arrayLengthTester(Object[] objs)
     {
-        params = new ParameterSet();
-        params.setParameters(objs);
+        params = ParameterSet.fromArrayNoCopy(objs);
         ByteBuffer buf = ByteBuffer.allocate(params.getSerializedSize());
         boolean threw = false;
         try
@@ -175,22 +160,19 @@ public class TestParameterSet extends TestCase {
     }
 
     public void testFloatsInsteadOfDouble() throws IOException {
-        params = new ParameterSet();
-        params.setParameters(5.5f);
+        params = ParameterSet.fromArrayNoCopy(5.5f);
         ByteBuffer buf = ByteBuffer.allocate(params.getSerializedSize());
         params.flattenToBuffer(buf);
         buf.rewind();
 
-        ParameterSet out = new ParameterSet();
-        out.readExternal(new FastDeserializer(buf));
+        ParameterSet out = ParameterSet.fromByteBuffer(buf);
         Object value = out.toArray()[0];
         assertTrue(value instanceof Double);
         assertTrue((5.5f - ((Double) value).doubleValue()) < 0.01);
     }
 
     public void testJSONEncodesBinary() throws JSONException, IOException {
-        params = new ParameterSet();
-        params.setParameters(new Object[]{ 123,
+        params = ParameterSet.fromArrayNoCopy(new Object[]{ 123,
                                            12345,
                                            1234567,
                                            12345678901L,
@@ -215,6 +197,7 @@ public class TestParameterSet extends TestCase {
     public void testGetCRCWithoutCrash() throws IOException {
         ParameterSet pset;
         PureJavaCrc32C crc;
+        ByteBuffer buf;
 
         Object[] psetObjs = new Object[] {
                 null, VoltType.INTEGER.getNullValue(), VoltType.DECIMAL.getNullValue(), // null values
@@ -225,30 +208,34 @@ public class TestParameterSet extends TestCase {
                 new TimestampType(new Date()) // timestamp
         };
 
-        pset = new ParameterSet();
-        pset.setParameters(psetObjs);
+        pset = ParameterSet.fromArrayNoCopy(psetObjs);
         crc = new PureJavaCrc32C();
-        pset.addToCRC(crc);
+        buf = ByteBuffer.allocate(pset.getSerializedSize());
+        pset.flattenToBuffer(buf);
+        crc.update(buf.array());
         long crc1 = crc.getValue();
 
         ArrayUtils.reverse(psetObjs);
 
-        pset = new ParameterSet();
-        pset.setParameters(psetObjs);
+        pset = ParameterSet.fromArrayNoCopy(psetObjs);
         crc = new PureJavaCrc32C();
-        pset.addToCRC(crc);
+        buf = ByteBuffer.allocate(pset.getSerializedSize());
+        pset.flattenToBuffer(buf);
+        crc.update(buf.array());
         long crc2 = crc.getValue();
 
-        pset = new ParameterSet();
-        pset.setParameters(new Object[0]);
+        pset = ParameterSet.fromArrayNoCopy(new Object[0]);
         crc = new PureJavaCrc32C();
-        pset.addToCRC(crc);
+        buf = ByteBuffer.allocate(pset.getSerializedSize());
+        pset.flattenToBuffer(buf);
+        crc.update(buf.array());
         long crc3 = crc.getValue();
 
-        pset = new ParameterSet();
-        pset.setParameters(new Object[] { 1 });
+        pset = ParameterSet.fromArrayNoCopy(new Object[] { 1 });
         crc = new PureJavaCrc32C();
-        pset.addToCRC(crc);
+        buf = ByteBuffer.allocate(pset.getSerializedSize());
+        pset.flattenToBuffer(buf);
+        crc.update(buf.array());
         long crc4 = crc.getValue();
 
         assertNotSame(crc1, crc2);

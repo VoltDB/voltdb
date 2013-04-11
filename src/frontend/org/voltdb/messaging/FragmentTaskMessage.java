@@ -80,7 +80,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 FastDeserializer fds = new FastDeserializer(m_parameterSet.asReadOnlyBuffer());
                 ParameterSet pset = null;
                 try {
-                    pset = fds.readObject(ParameterSet.class);
+                    pset = ParameterSet.fromFastDeserializer(fds);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -367,7 +367,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         if (paramData != null) {
             final FastDeserializer fds = new FastDeserializer(paramData);
             try {
-                params = fds.readObject(ParameterSet.class);
+                params = ParameterSet.fromFastDeserializer(fds);
             }
             catch (final IOException e) {
                 hostLog.l7dlog(Level.FATAL,
@@ -376,7 +376,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             }
         }
         else {
-            params = new ParameterSet();
+            params = ParameterSet.emptyParameterSet();
         }
         return params;
     }

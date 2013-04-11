@@ -113,8 +113,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
             @Override
             public ParameterSet call() {
-                ParameterSet params = new ParameterSet();
-                params.setParameters(parameters);
+                ParameterSet params = ParameterSet.fromArrayWithCopy(parameters);
                 return params;
             }
         });
@@ -269,7 +268,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
             @Override
             public ParameterSet call() throws Exception {
                 FastDeserializer fds = new FastDeserializer(duplicate);
-                return fds.readObject(ParameterSet.class);
+                return ParameterSet.fromFastDeserializer(fds);
             }
         });
     }
@@ -298,7 +297,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
             @Override
             public ParameterSet call() throws Exception {
                 FastDeserializer fds = new FastDeserializer(duplicate);
-                return fds.readObject(ParameterSet.class);
+                return ParameterSet.fromFastDeserializer(fds);
             }
         });
     }
@@ -317,7 +316,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         if (serializedParams != null)
             out.write(serializedParams.duplicate());
         else if (params != null) {
-            out.writeObject(getParams());
+            getParams().writeExternal(out);
         }
     }
 

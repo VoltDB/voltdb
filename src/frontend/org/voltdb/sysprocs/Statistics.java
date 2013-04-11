@@ -23,13 +23,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
 import org.voltdb.ClientInterface;
 import org.voltdb.DependencyPair;
-import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.LiveClientStats;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SysProcSelector;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
@@ -38,8 +40,6 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.Pair;
 import org.voltdb.utils.VoltTableUtil;
 
 /**
@@ -508,8 +508,7 @@ public class Statistics extends VoltSystemProcedure {
         pfs[1].outputDepId = DEP_ioData;
         pfs[1].inputDepIds = new int[]{};
         pfs[1].multipartition = true;
-        pfs[1].parameters = new ParameterSet();
-        pfs[1].parameters.setParameters((byte)interval, now);
+        pfs[1].parameters = ParameterSet.fromArrayNoCopy((byte)interval, now);
 
         // create a work fragment to aggregate the results.
         // Set the MULTIPARTITION_DEPENDENCY bit to require a dependency from every site.
@@ -518,7 +517,7 @@ public class Statistics extends VoltSystemProcedure {
         pfs[0].outputDepId = DEP_ioDataAggregator;
         pfs[0].inputDepIds = new int[]{DEP_ioData};
         pfs[0].multipartition = false;
-        pfs[0].parameters = new ParameterSet();
+        pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.
@@ -535,7 +534,7 @@ public class Statistics extends VoltSystemProcedure {
         pfs[0].outputDepId = DEP_partitionCount;
         pfs[0].inputDepIds = new int[]{};
         pfs[0].multipartition = false;
-        pfs[0].parameters = new ParameterSet();
+        pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         results = executeSysProcPlanFragments(pfs, DEP_partitionCount);
         return results;
@@ -550,8 +549,7 @@ public class Statistics extends VoltSystemProcedure {
         pfs[1].outputDepId = DEP_initiatorData;
         pfs[1].inputDepIds = new int[]{};
         pfs[1].multipartition = true;
-        pfs[1].parameters = new ParameterSet();
-        pfs[1].parameters.setParameters((byte)interval, now);
+        pfs[1].parameters = ParameterSet.fromArrayNoCopy((byte)interval, now);
 
         // create a work fragment to aggregate the results.
         // Set the MULTIPARTITION_DEPENDENCY bit to require a dependency from every site.
@@ -560,7 +558,7 @@ public class Statistics extends VoltSystemProcedure {
         pfs[0].outputDepId = DEP_initiatorAggregator;
         pfs[0].inputDepIds = new int[]{DEP_initiatorData};
         pfs[0].multipartition = false;
-        pfs[0].parameters = new ParameterSet();
+        pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.
@@ -577,8 +575,7 @@ public class Statistics extends VoltSystemProcedure {
         pfs[1].outputDepId = DEP_nodeMemory;
         pfs[1].inputDepIds = new int[]{};
         pfs[1].multipartition = true;
-        pfs[1].parameters = new ParameterSet();
-        pfs[1].parameters.setParameters((byte)interval, now);
+        pfs[1].parameters = ParameterSet.fromArrayNoCopy((byte)interval, now);
 
         // create a work fragment to aggregate the results.
         // Set the MULTIPARTITION_DEPENDENCY bit to require a dependency from every site.
@@ -587,7 +584,7 @@ public class Statistics extends VoltSystemProcedure {
         pfs[0].outputDepId = DEP_nodeMemoryAggregator;
         pfs[0].inputDepIds = new int[]{DEP_nodeMemory};
         pfs[0].multipartition = false;
-        pfs[0].parameters = new ParameterSet();
+        pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.
@@ -604,8 +601,7 @@ public class Statistics extends VoltSystemProcedure {
         pfs[1].outputDepId = DEP_procedureData;
         pfs[1].inputDepIds = new int[]{};
         pfs[1].multipartition = true;
-        pfs[1].parameters = new ParameterSet();
-        pfs[1].parameters.setParameters((byte)interval, now);
+        pfs[1].parameters = ParameterSet.fromArrayNoCopy((byte)interval, now);
 
         // create a work fragment to aggregate the results.
         // Set the MULTIPARTITION_DEPENDENCY bit to require a dependency from every site.
@@ -614,7 +610,7 @@ public class Statistics extends VoltSystemProcedure {
         pfs[0].outputDepId = DEP_procedureAggregator;
         pfs[0].inputDepIds = new int[]{DEP_procedureData};
         pfs[0].multipartition = false;
-        pfs[0].parameters = new ParameterSet();
+        pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.
@@ -631,8 +627,7 @@ public class Statistics extends VoltSystemProcedure {
         pfs[1].outputDepId = DEP_plannerData;
         pfs[1].inputDepIds = new int[]{};
         pfs[1].multipartition = true;
-        pfs[1].parameters = new ParameterSet();
-        pfs[1].parameters.setParameters((byte)interval, now);
+        pfs[1].parameters = ParameterSet.fromArrayNoCopy((byte)interval, now);
 
         // create a work fragment to aggregate the results.
         // Set the MULTIPARTITION_DEPENDENCY bit to require a dependency from every site.
@@ -641,7 +636,7 @@ public class Statistics extends VoltSystemProcedure {
         pfs[0].outputDepId = DEP_plannerAggregator;
         pfs[0].inputDepIds = new int[]{DEP_plannerData};
         pfs[0].multipartition = false;
-        pfs[0].parameters = new ParameterSet();
+        pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.
@@ -658,8 +653,7 @@ public class Statistics extends VoltSystemProcedure {
         pfs[1].outputDepId = DEP_starvationData;
         pfs[1].inputDepIds = new int[]{};
         pfs[1].multipartition = true;
-        pfs[1].parameters = new ParameterSet();
-        pfs[1].parameters.setParameters((byte)interval, now);
+        pfs[1].parameters = ParameterSet.fromArrayNoCopy((byte)interval, now);
 
         // create a work fragment to aggregate the results.
         // Set the MULTIPARTITION_DEPENDENCY bit to require a dependency from every site.
@@ -668,7 +662,7 @@ public class Statistics extends VoltSystemProcedure {
         pfs[0].outputDepId = DEP_starvationDataAggregator;
         pfs[0].inputDepIds = new int[]{DEP_starvationData};
         pfs[0].multipartition = false;
-        pfs[0].parameters = new ParameterSet();
+        pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.
@@ -685,8 +679,7 @@ public class Statistics extends VoltSystemProcedure {
         pfs[1].outputDepId = DEP_tableData;
         pfs[1].inputDepIds = new int[]{};
         pfs[1].multipartition = true;
-        pfs[1].parameters = new ParameterSet();
-        pfs[1].parameters.setParameters((byte)interval, now);
+        pfs[1].parameters = ParameterSet.fromArrayNoCopy((byte)interval, now);
 
         // create a work fragment to aggregate the results.
         // Set the MULTIPARTITION_DEPENDENCY bit to require a dependency from every site.
@@ -695,7 +688,7 @@ public class Statistics extends VoltSystemProcedure {
         pfs[0].outputDepId = DEP_tableAggregator;
         pfs[0].inputDepIds = new int[]{DEP_tableData};
         pfs[0].multipartition = false;
-        pfs[0].parameters = new ParameterSet();
+        pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.
@@ -712,8 +705,7 @@ public class Statistics extends VoltSystemProcedure {
         pfs[1].outputDepId = DEP_indexData;
         pfs[1].inputDepIds = new int[]{};
         pfs[1].multipartition = true;
-        pfs[1].parameters = new ParameterSet();
-        pfs[1].parameters.setParameters((byte)interval, now);
+        pfs[1].parameters = ParameterSet.fromArrayNoCopy((byte)interval, now);
 
         // create a work fragment to aggregate the results.
         // Set the MULTIPARTITION_DEPENDENCY bit to require a dependency from every site.
@@ -722,7 +714,7 @@ public class Statistics extends VoltSystemProcedure {
         pfs[0].outputDepId = DEP_indexAggregator;
         pfs[0].inputDepIds = new int[]{DEP_indexData};
         pfs[0].multipartition = false;
-        pfs[0].parameters = new ParameterSet();
+        pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.
@@ -739,8 +731,7 @@ public class Statistics extends VoltSystemProcedure {
         pfs[1].outputDepId = DEP_liveClientData;
         pfs[1].inputDepIds = new int[]{};
         pfs[1].multipartition = true;
-        pfs[1].parameters = new ParameterSet();
-        pfs[1].parameters.setParameters((byte)interval, now);
+        pfs[1].parameters = ParameterSet.fromArrayNoCopy((byte)interval, now);
 
         // create a work fragment to aggregate the results.
         // Set the MULTIPARTITION_DEPENDENCY bit to require a dependency from every site.
@@ -749,7 +740,7 @@ public class Statistics extends VoltSystemProcedure {
         pfs[0].outputDepId = DEP_liveClientDataAggregator;
         pfs[0].inputDepIds = new int[]{DEP_liveClientData};
         pfs[0].multipartition = false;
-        pfs[0].parameters = new ParameterSet();
+        pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.

@@ -53,14 +53,13 @@ import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
 import org.voltdb.SystemProcedureCatalog.Config;
-
-import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.TransactionCreator;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.TableFiles;
+import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 
 /**
@@ -1090,8 +1089,7 @@ SnapshotCompletionInterest
         spi.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
             @Override
             public ParameterSet call() throws Exception {
-                ParameterSet params = new ParameterSet();
-                params.setParameters(invocation.getSecond());
+                ParameterSet params = ParameterSet.fromArrayWithCopy(invocation.getSecond());
                 return params;
             }
         });

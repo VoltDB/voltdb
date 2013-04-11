@@ -465,8 +465,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     public int hashinate(Object value, TheHashinator.HashinatorType hashinatorType, byte hashinatorConfig[])
     {
-        ParameterSet parameterSet = new ParameterSet();
-        parameterSet.setParameters(value, hashinatorType.typeId(), hashinatorConfig);
+        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(value, hashinatorType.typeId(), hashinatorConfig);
 
         // serialize the param set
         fsForParameterSet.clear();
@@ -482,8 +481,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     public void updateHashinator(TheHashinator.HashinatorType type, byte[] config)
     {
-        ParameterSet parameterSet = new ParameterSet();
-        parameterSet.setParameters(type.typeId(), config);
+        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(type.typeId(), config);
 
         // serialize the param set
         fsForParameterSet.clear();

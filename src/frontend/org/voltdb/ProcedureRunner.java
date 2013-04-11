@@ -412,7 +412,9 @@ public class ProcedureRunner {
         if (!queuedSQL.stmt.isReadOnly) {
             m_inputCRC.update(queuedSQL.stmt.sqlCRC);
             try {
-                queuedSQL.params.addToCRC(m_inputCRC);
+                ByteBuffer buf = ByteBuffer.allocate(queuedSQL.params.getSerializedSize());
+                queuedSQL.params.flattenToBuffer(buf);
+                m_inputCRC.update(buf.array());
             } catch (IOException e) {
                 log.error("Unable to compute CRC of parameters to " +
                         "a SQL statement in procedure: " + m_procedureName, e);
@@ -673,9 +675,7 @@ public class ProcedureRunner {
                  " can not be converted to NULL representation for arg " + ii + " for SQL stmt " + stmt.getText());
         }
 
-        final ParameterSet params = new ParameterSet();
-        params.setParameters(args);
-        return params;
+        return ParameterSet.fromArrayNoCopy(args);
     }
 
     public void initSQLStmt(SQLStmt stmt, Statement catStmt) {
@@ -1111,7 +1111,7 @@ public class ProcedureRunner {
            // Build the set of params for the frags
            FastSerializer fs = new FastSerializer();
            try {
-               fs.writeObject(queuedSQL.params);
+               queuedSQL.params.writeExternal(fs);
            } catch (IOException e) {
                throw new RuntimeException("Error serializing parameters for SQL statement: " +
                                           queuedSQL.stmt.getText() + " with params: " +

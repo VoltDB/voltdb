@@ -172,8 +172,7 @@ public class TestTwoSitePlans extends TestCase implements FragmentPlanSource {
 
         for (PlanFragment f : insertStmt.getFragments())
             insertFrag = f;
-        ParameterSet params = new ParameterSet();
-        params.setParameters(1L, 1L, 1L);
+        ParameterSet params = ParameterSet.fromArrayNoCopy(1L, 1L, 1L);
 
         VoltTable[] results = ee2.executePlanFragments(
                 1,
@@ -187,8 +186,7 @@ public class TestTwoSitePlans extends TestCase implements FragmentPlanSource {
         assert(results.length == 1);
         assert(results[0].asScalarLong() == 1L);
 
-        params = new ParameterSet();
-        params.setParameters(2L, 2L, 2L);
+        params = ParameterSet.fromArrayNoCopy(2L, 2L, 2L);
 
         results = ee1.executePlanFragments(
                 1,
@@ -204,8 +202,7 @@ public class TestTwoSitePlans extends TestCase implements FragmentPlanSource {
     }
 
     public void testMultiSiteSelectAll() {
-        ParameterSet params = new ParameterSet();
-        params.setParameters();
+        ParameterSet params = ParameterSet.emptyParameterSet();
 
         int outDepId = 1 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
         VoltTable dependency1 = ee1.executePlanFragments(
