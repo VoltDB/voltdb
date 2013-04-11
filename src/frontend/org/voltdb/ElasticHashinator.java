@@ -238,4 +238,55 @@ public class ElasticHashinator extends TheHashinator {
 
         return predecessors;
     }
+
+    /**
+     * This runs in linear time with respect to the number of tokens on the ring.
+     */
+    @Override
+    protected Map<Long, Long> pGetRanges(int partition) {
+        Map<Long, Long> ranges = new HashMap<Long, Long>();
+        Long first = null; // start of the very first token on the ring
+        Long start = null; // start of a range
+        UnmodifiableIterator<Map.Entry<Long,Integer>> iter = tokens.entrySet().iterator();
+
+        // Iterate through the token map to find the ranges assigned to
+        // the given partition
+        while (iter.hasNext()) {
+            Map.Entry<Long, Integer> next = iter.next();
+            long token = next.getKey();
+            int pid = next.getValue();
+
+            if (first == null) {
+                first = token;
+            }
+
+            if (pid == partition) {
+                // if start is null, there's no open range, start one.
+                // else there is already an open range, leave it open.
+                if (start == null) {
+                    start = token;
+                }
+            } else {
+                // hit a token that belongs to a different partition.
+                // if start is not null, there's an open range, now is
+                // the time to close it.
+                // else there is no open range, keep on going.
+                if (start != null) {
+                    ranges.put(start, token);
+                    start = null;
+                }
+            }
+        }
+
+        // if there is an open range when we get here, it means that
+        // the last token on the ring belongs to the partition, and
+        // it wraps around the origin of the ring, so close the range
+        // with the the very first token on the ring.
+        if (start != null) {
+            assert first != null;
+            ranges.put(start, first);
+        }
+
+        return ranges;
+    }
 }

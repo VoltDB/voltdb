@@ -19,6 +19,7 @@ package org.voltdb;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Set;
+import java.util.Map;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
@@ -68,5 +69,11 @@ public class LegacyHashinator extends TheHashinator {
     protected Set<Integer> pPredecessors(int partition)
     {
         throw new RuntimeException("Legacy hashinator doesn't support predecessors");
+    }
+
+    @Override
+    protected Map<Long, Long> pGetRanges(int partition)
+    {
+        throw new RuntimeException("Getting ranges is not supported in the legacy hashinator");
     }
 }

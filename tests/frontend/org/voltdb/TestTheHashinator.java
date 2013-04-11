@@ -672,5 +672,52 @@ public class TestTheHashinator extends TestCase {
         assertTrue(seqAddTokens.values().contains(5));
         assertEquals(batchAddTokens, seqAddTokens);
     }
+
+    @Test
+    public void testElasticGetRanges() {
+        if (hashinatorType == HashinatorType.LEGACY) return;
+
+        ElasticHashinator hashinator = new ElasticHashinator(ElasticHashinator.getConfigureBytes(24,
+                ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION));
+        Map<Long, Long> range1 = hashinator.pGetRanges(15);
+        assertFalse(range1.isEmpty());
+
+        // make sure that every range hashes to partition 15
+        for (Map.Entry<Long, Long> entry : range1.entrySet()) {
+            long start = entry.getKey();
+            long end = entry.getValue();
+            assertEquals(15, hashinator.partitionForToken(start));
+            if (end != Long.MIN_VALUE) {
+                assertEquals(15, hashinator.partitionForToken(end - 1));
+            } else {
+                assertEquals(15, hashinator.partitionForToken(Long.MAX_VALUE));
+            }
+            assertNotSame(15, hashinator.partitionForToken(end));
+        }
+
+        // make sure that every token for partition 15 appears in the range map
+        byte[] config = hashinator.pGetCurrentConfig().getSecond();
+        Map<Long, Integer> tokens = deserializeElasticConfig(config);
+        for (Map.Entry<Long, Integer> entry : tokens.entrySet()) {
+            long token = entry.getKey();
+            int partition = entry.getValue();
+
+            if (partition == 15) {
+                boolean foundRange = false;
+                for (Map.Entry<Long, Long> rangeEntry : range1.entrySet()) {
+                    long start = rangeEntry.getKey();
+                    long end = rangeEntry.getValue();
+                    if (start <= token && token < end) {
+                        foundRange = true;
+                        break;
+                    }
+                }
+                assertTrue(foundRange);
+            }
+        }
+
+        // non-existing partition should have an empty range
+        assertTrue(hashinator.pGetRanges(32).isEmpty());
+    }
 }
 

@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Collection;
 import java.util.Set;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.VoltLogger;
@@ -96,6 +97,7 @@ public abstract class TheHashinator {
     abstract protected int pHashinateBytes(byte[] bytes);
     abstract protected Pair<HashinatorType, byte[]> pGetCurrentConfig();
     abstract protected Set<Integer> pPredecessors(int partition);
+    abstract protected Map<Long, Long> pGetRanges(int partition);
 
     /**
      * Given a long value, pick a partition to store the data. It's only called for legacy
@@ -275,7 +277,7 @@ public abstract class TheHashinator {
                 throw new RuntimeException("Legacy hashinator doesn't support adding partitions");
             case ELASTIC:
                 return ElasticHashinator.addPartitions(instance.get().getSecond(), newPartitions,
-                        ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+                                                       ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
         }
         throw new RuntimeException("Should not reach here");
     }
@@ -301,5 +303,16 @@ public abstract class TheHashinator {
 
     public static Set<Integer> predecessors(int partition) {
         return instance.get().getSecond().pPredecessors(partition);
+    }
+
+    /**
+     * Get the ranges the given partition is assigned to.
+     * @param partition
+     * @return A map of ranges, the key is the start of a range, the value is
+     * the corresponding end. Ranges returned in the map are [start, end).
+     * The ranges may or may not be contiguous.
+     */
+    public static Map<Long, Long> getRanges(int partition) {
+        return instance.get().getSecond().pGetRanges(partition);
     }
 }
