@@ -134,6 +134,13 @@ public class ProcessData {
         m_err.m_expectDeath.set(true);
         int retval = -255;
         synchronized(m_channel) {
+            /*
+            try { m_channel.sendSignal("HUP"); }
+            catch (Exception e) {
+                System.err.print("WARN: Caught exception while terminating remote server\n");
+                e.printStackTrace();
+            }
+            */
             m_channel.disconnect();
             m_ssh_session.disconnect();
         }
@@ -143,7 +150,7 @@ public class ProcessData {
 
     public boolean isAlive() {
         synchronized(m_channel) {
-            return m_ssh_session.isConnected();
+            return (m_ssh_session.isConnected() && m_channel.getExitStatus() == -1);
         }
     }
 }
