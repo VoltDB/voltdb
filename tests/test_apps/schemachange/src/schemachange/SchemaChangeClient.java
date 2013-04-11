@@ -31,6 +31,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
 import org.voltdb.CLIConfig;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.TableHelper;
@@ -39,11 +40,13 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.utils.MiscUtils;
 
 public class SchemaChangeClient {
 
@@ -88,9 +91,6 @@ public class SchemaChangeClient {
 
         @Option(desc = "Time (secs) to end run if no progress is being made.")
         int noProgressTimeout = 600;
-
-        @Option(desc = "Interval (secs) to check if progress is being made")
-        int checkInterval = 60;
 
         @Override
         public void validate() {
@@ -172,7 +172,7 @@ public class SchemaChangeClient {
      * Perform a schema change to a mutated version of the current table (80%) or
      * to a new table entirely (20%, drops and adds the new table).
      */
-    private VoltTable catalogChange(VoltTable t1, boolean newTable) throws Exception {
+    private Pair<VoltTable,TableHelper.ViewRep> catalogChange(VoltTable t1, boolean newTable, TableHelper.ViewRep view) throws Exception {
         CatalogBuilder builder = new CatalogBuilder();
         VoltTable t2 = null;
         String currentName = t1 == null ? "B" : TableHelper.getTableName(t1);
@@ -191,7 +191,26 @@ public class SchemaChangeClient {
 
         log.info(_F("New Schema:\n%s", TableHelper.ddlForTable(t2)));
 
+        // handle views
+        if (view == null) {
+            view = TableHelper.ViewRep.viewRepForTable("MV", t2, rand);
+        }
+        else {
+            if (!view.compatibleWithTable(t2)) {
+                view = null;
+            }
+        }
+        if (view != null) {
+            log.info(_F("New View:\n%s", view.ddlForView()));
+        }
+        else {
+            log.info("New View: NULL");
+        }
+
         builder.addLiteralSchema(TableHelper.ddlForTable(t2));
+        if (view != null) {
+            builder.addLiteralSchema(view.ddlForView());
+        }
         builder.addLiteralSchema(TableHelper.ddlForTable(versionT));
         // make tables name A partitioned and tables named B replicated
         if (newName.equalsIgnoreCase("A")) {
@@ -277,7 +296,7 @@ public class SchemaChangeClient {
                         count, seconds, (long) (count / seconds)));
             }
 
-            return t2;
+            return new Pair<VoltTable,TableHelper.ViewRep>(t2, view, false);
         }
     }
 
@@ -357,7 +376,7 @@ public class SchemaChangeClient {
     /**
      * Find the largest pkey value in the table.
      */
-    private long maxId(VoltTable t) {
+    public long maxId(VoltTable t) {
         if (t == null) {
             return 0;
         }
@@ -373,7 +392,7 @@ public class SchemaChangeClient {
      */
     private void loadTable(VoltTable t) {
         // if #partitions is odd, delete every 2 - if even, delete every 3
-        int n = 3 - (topo.partitions % 2);
+        //int n = 3 - (topo.partitions % 2);
 
         int redundancy = topo.sites / topo.partitions;
         long realRowCount = (config.targetrowcount * topo.hosts) / redundancy;
@@ -387,11 +406,7 @@ public class SchemaChangeClient {
         TableLoader loader = new TableLoader(this, t, rand);
 
         log.info(_F("loading table"));
-        loader.load(max + 1, realRowCount, 1);
-        log.info(_F("deleting from table"));
-        loader.delete(1, realRowCount, n);
-        log.info(_F("reloading table"));
-        loader.load(1, realRowCount, n);
+        loader.load(max + 1, realRowCount);
     }
 
     /**
@@ -412,6 +427,8 @@ public class SchemaChangeClient {
 
         return t2;
     }
+
+
 
     /**
      * Connect to a single server with retry. Limited exponential backoff. No
@@ -471,8 +488,15 @@ public class SchemaChangeClient {
             if ((currentTime - startTime) < (config.duration * 1000)) {
                 log.warn(_F("Lost connection to %s:%d.", hostname, port));
                 totalConnections.decrementAndGet();
+
+                // reset the connection id so the client will connect to a recovered cluster
+                // this is a bit of a hack
+                if (connectionsLeft == 0) {
+                    ((ClientImpl) client).resetInstanceId();
+                }
+
                 // setup for retry
-                final String server = hostname;
+                final String server = MiscUtils.getHostnameColonPortString(hostname, port);
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
@@ -522,8 +546,11 @@ public class SchemaChangeClient {
 
         // kick this off with a random schema
         VoltTable t = null;
+        TableHelper.ViewRep v = null;
         while (t == null) {
-            t = catalogChange(null, true);
+            Pair<VoltTable, TableHelper.ViewRep> schema = catalogChange(null, true, null);
+            t = schema.getFirst();
+            v = schema.getSecond();
         }
 
         startTime = System.currentTimeMillis();
@@ -553,11 +580,15 @@ public class SchemaChangeClient {
 
                 // move to an entirely new table or migrated schema
                 VoltTable newT = null;
+                TableHelper.ViewRep newV = null;
                 boolean isNewTable = (j == 0) && (rand.nextInt(5) == 0);
                 while (newT == null) {
-                    newT = catalogChange(t, isNewTable);
+                    Pair<VoltTable, TableHelper.ViewRep> schema = catalogChange(t, isNewTable, v);
+                    newT = schema.getFirst();
+                    newV = schema.getSecond();
                 }
                 t = newT;
+                v = newV;
 
                 // if the table has been migrated, check the data
                 if (!isNewTable && (preT != null)) {
