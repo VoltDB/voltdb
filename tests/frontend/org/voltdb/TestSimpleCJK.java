@@ -130,11 +130,10 @@ public class TestSimpleCJK extends TestCase {
         assertEquals(0, j.compareTo(POORLY_TRANSLATED_JAPANESE));
         assertEquals(0, k.compareTo(POORLY_TRANSLATED_KOREAN));
 
-        ParameterSet pset = new ParameterSet();
+        ParameterSet pset = ParameterSet.emptyParameterSet();
         String responseJSON;
         Response response2;
 
-        pset.setParameters();
         responseJSON = TestJSONInterface.callProcOverJSON("Select", pset, null, null, false);
         System.out.println(responseJSON);
         response2 = TestJSONInterface.responseFromJSON(responseJSON);
@@ -164,7 +163,7 @@ public class TestSimpleCJK extends TestCase {
     public void testRoundTripCJKWithJSONInsert() throws Exception {
         ServerThread server = startup();
 
-        ParameterSet pset = new ParameterSet();
+        ParameterSet pset;
         String responseJSON;
         Response response;
         VoltTable[] results;
@@ -172,15 +171,14 @@ public class TestSimpleCJK extends TestCase {
         String c,j,k;
 
         // Call insert
-        pset.setParameters(POORLY_TRANSLATED_CHINESE, POORLY_TRANSLATED_JAPANESE, POORLY_TRANSLATED_KOREAN);
+        pset = ParameterSet.fromArrayNoCopy(POORLY_TRANSLATED_CHINESE, POORLY_TRANSLATED_JAPANESE, POORLY_TRANSLATED_KOREAN);
         responseJSON = TestJSONInterface.callProcOverJSON("Insert", pset, null, null, false);
         System.out.println(responseJSON);
         response = TestJSONInterface.responseFromJSON(responseJSON);
         assertTrue(response.status == ClientResponse.SUCCESS);
 
         // Call select
-        pset = new ParameterSet();
-        pset.setParameters();
+        pset = ParameterSet.emptyParameterSet();
         responseJSON = TestJSONInterface.callProcOverJSON("Select", pset, null, null, false);
         System.out.println(responseJSON);
         response = TestJSONInterface.responseFromJSON(responseJSON);

@@ -501,7 +501,7 @@ public class ProcedureRunner {
                 else {
                     assert(qs.stmt.plan != null);
                     //TODO: For now extracted ad hoc SQL parameters are discarded
-                    qs.params = new ParameterSet();
+                    qs.params = ParameterSet.emptyParameterSet();
                     sparams = new ArrayList<StmtParameter>();
                 }
                 results[i++] = getHsqlBackendIfExists().runSQLWithSubstitutions(
@@ -590,9 +590,7 @@ public class ProcedureRunner {
                  " can not be converted to NULL representation for arg " + ii + " for SQL stmt " + stmt.getText());
         }
 
-        final ParameterSet params = new ParameterSet();
-        params.setParameters(args);
-        return params;
+        return ParameterSet.fromArrayNoCopy(args);
     }
 
     public static void initSQLStmt(SQLStmt stmt, Statement catStmt) {
@@ -1079,7 +1077,7 @@ public class ProcedureRunner {
            // Build the set of params for the frags
            FastSerializer fs = new FastSerializer();
            try {
-               fs.writeObject(queuedSQL.params);
+               queuedSQL.params.writeExternal(fs);
            } catch (IOException e) {
                throw new RuntimeException("Error serializing parameters for SQL statement: " +
                                           queuedSQL.stmt.getText() + " with params: " +

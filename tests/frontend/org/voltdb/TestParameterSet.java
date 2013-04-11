@@ -57,51 +57,41 @@ import java.nio.ByteBuffer;
 import junit.framework.TestCase;
 
 import org.json_voltpatches.JSONException;
-import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.types.TimestampType;
 
 public class TestParameterSet extends TestCase {
     ParameterSet params;
 
-    @Override
-    public void setUp() {
-        params = new ParameterSet();
-    }
-
     public void testNull() throws IOException {
-        params.setParameters(new Object[]{null, null, null});
+        params = ParameterSet.fromArrayNoCopy(new Object[]{null, null, null});
         ByteBuffer buf = ByteBuffer.allocate(params.getSerializedSize());
         params.flattenToBuffer(buf);
         buf.rewind();
 
-        ParameterSet out = new ParameterSet();
-        out.readExternal(new FastDeserializer(buf));
+        ParameterSet out = ParameterSet.fromByteBuffer(buf);
 
         assertEquals(3, out.toArray().length);
         assertNull(out.toArray()[0]);
     }
 
     public void testStrings() throws IOException {
-        params.setParameters(new Object[]{"foo"});
+        params = ParameterSet.fromArrayNoCopy(new Object[]{"foo"});
         ByteBuffer buf = ByteBuffer.allocate(params.getSerializedSize());
         params.flattenToBuffer(buf);
         buf.rewind();
 
-        ParameterSet out = new ParameterSet();
-        out.readExternal(new FastDeserializer(buf));
+        ParameterSet out = ParameterSet.fromByteBuffer(buf);
         assertEquals(1, out.toArray().length);
         assertEquals("foo", out.toArray()[0]);
     }
 
     public void testStringsAsByteArray() throws IOException {
-        params = new ParameterSet();
-        params.setParameters(new Object[]{new byte[]{'f', 'o', 'o'}});
+        params = ParameterSet.fromArrayNoCopy(new Object[]{new byte[]{'f', 'o', 'o'}});
         ByteBuffer buf = ByteBuffer.allocate(params.getSerializedSize());
         params.flattenToBuffer(buf);
         buf.rewind();
 
-        ParameterSet out = new ParameterSet();
-        out.readExternal(new FastDeserializer(buf));
+        ParameterSet out = ParameterSet.fromByteBuffer(buf);
         assertEquals(1, out.toArray().length);
 
         byte[] bin = (byte[]) out.toArray()[0];
@@ -110,8 +100,7 @@ public class TestParameterSet extends TestCase {
 
     private boolean arrayLengthTester(Object[] objs)
     {
-        params = new ParameterSet();
-        params.setParameters(objs);
+        params = ParameterSet.fromArrayNoCopy(objs);
         ByteBuffer buf = ByteBuffer.allocate(params.getSerializedSize());
         boolean threw = false;
         try
@@ -143,22 +132,19 @@ public class TestParameterSet extends TestCase {
     }
 
     public void testFloatsInsteadOfDouble() throws IOException {
-        params = new ParameterSet();
-        params.setParameters(5.5f);
+        params = ParameterSet.fromArrayNoCopy(5.5f);
         ByteBuffer buf = ByteBuffer.allocate(params.getSerializedSize());
         params.flattenToBuffer(buf);
         buf.rewind();
 
-        ParameterSet out = new ParameterSet();
-        out.readExternal(new FastDeserializer(buf));
+        ParameterSet out = ParameterSet.fromByteBuffer(buf);
         Object value = out.toArray()[0];
         assertTrue(value instanceof Double);
         assertTrue((5.5f - ((Double) value).doubleValue()) < 0.01);
     }
 
     public void testJSONEncodesBinary() throws JSONException, IOException {
-        params = new ParameterSet();
-        params.setParameters(new Object[]{ 123,
+        params = ParameterSet.fromArrayNoCopy(new Object[]{ 123,
                                            12345,
                                            1234567,
                                            12345678901L,

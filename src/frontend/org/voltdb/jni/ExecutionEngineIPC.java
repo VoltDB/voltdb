@@ -1242,8 +1242,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     @Override
     public int hashinate(Object value, int partitionCount)
     {
-        ParameterSet parameterSet = new ParameterSet();
-        parameterSet.setParameters(value);
+        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(value);
 
         final FastSerializer fser = new FastSerializer();
         try {

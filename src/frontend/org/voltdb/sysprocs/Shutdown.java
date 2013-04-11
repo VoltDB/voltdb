@@ -20,15 +20,15 @@ package org.voltdb.sysprocs;
 import java.util.List;
 import java.util.Map;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
-import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltcore.logging.VoltLogger;
 
 /**
  * A wholly improper shutdown. No promise is given to return a result to a client,
@@ -92,7 +92,7 @@ public class Shutdown extends VoltSystemProcedure {
         pfs[0].outputDepId = (int) SysProcFragmentId.PF_procedureDone | DtxnConstants.MULTIPARTITION_DEPENDENCY;
         pfs[0].inputDepIds = new int[]{};
         pfs[0].multipartition = true;
-        pfs[0].parameters = new ParameterSet();
+        pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         executeSysProcPlanFragments(pfs, (int) SysProcFragmentId.PF_procedureDone);
         return new VoltTable[0];

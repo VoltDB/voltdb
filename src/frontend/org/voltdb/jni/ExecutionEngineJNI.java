@@ -511,8 +511,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     public int hashinate(Object value, int partitionCount)
     {
-        ParameterSet parameterSet = new ParameterSet();
-        parameterSet.setParameters(value);
+        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(value);
 
         // serialize the param set
         fsForParameterSet.clear();

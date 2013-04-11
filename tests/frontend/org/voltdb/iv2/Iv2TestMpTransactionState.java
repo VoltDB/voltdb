@@ -67,10 +67,9 @@ public class Iv2TestMpTransactionState extends TestCase
 
     ByteBuffer createDummyParameterSet() throws IOException
     {
-        ParameterSet blah = new ParameterSet();
-        blah.setParameters(new Long(4321), new Long(5678));
+        ParameterSet blah = ParameterSet.fromArrayNoCopy(new Long(4321), new Long(5678));
         FastSerializer fs = new FastSerializer();
-        fs.writeObject(blah);
+        blah.writeExternal(fs);
         ByteBuffer params = fs.getBuffer();
         return params;
     }

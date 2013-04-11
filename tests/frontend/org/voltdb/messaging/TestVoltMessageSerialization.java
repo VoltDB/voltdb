@@ -152,17 +152,15 @@ public class TestVoltMessageSerialization extends TestCase {
         Object[] params1 = {10, 10.1};
         Object[] params2 = {20, 20.2};
 
-        ParameterSet param_set1 = new ParameterSet();
-        param_set1.setParameters(params1);
-        ParameterSet param_set2 = new ParameterSet();
-        param_set2.setParameters(params2);
+        ParameterSet param_set1 = ParameterSet.fromArrayNoCopy(params1);
+        ParameterSet param_set2 = ParameterSet.fromArrayNoCopy(params2);
 
         FastSerializer param1_fs = new FastSerializer();
-        param1_fs.writeObject(param_set1);
+        param_set1.writeExternal(param1_fs);
         ByteBuffer param1_buf = param1_fs.getBuffer();
 
         FastSerializer param2_fs = new FastSerializer();
-        param2_fs.writeObject(param_set2);
+        param_set2.writeExternal(param2_fs);
         ByteBuffer param2_buf = param2_fs.getBuffer();
 
         FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, 99, true, true, false);
@@ -189,7 +187,7 @@ public class TestVoltMessageSerialization extends TestCase {
         ByteBuffer paramData = ft2.getParameterDataForFragment(0);
         if (paramData != null) {
             final FastDeserializer fds = new FastDeserializer(paramData);
-            params = fds.readObject(ParameterSet.class);
+            params = ParameterSet.fromFastDeserializer(fds);
             assertEquals(10, params.toArray()[0]);
             assertEquals(10.1, params.toArray()[1]);
         }
@@ -198,7 +196,7 @@ public class TestVoltMessageSerialization extends TestCase {
         paramData = ft2.getParameterDataForFragment(1);
         if (paramData != null) {
             final FastDeserializer fds = new FastDeserializer(paramData);
-            params = fds.readObject(ParameterSet.class);
+            params = ParameterSet.fromFastDeserializer(fds);
             assertEquals(20, params.toArray()[0]);
             assertEquals(20.2, params.toArray()[1]);
         }

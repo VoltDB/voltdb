@@ -306,7 +306,7 @@ public class TestClientInterface {
                                                                          true,
                                                                          new VoltType[0],
                                                                          0),
-                                                            new ParameterSet(),
+                                                            ParameterSet.emptyParameterSet(),
                                                             null,
                                                             null,
                                                             null);

@@ -75,7 +75,7 @@ public class TestReplayTxnState extends TestCase {
     final static FragmentTaskMessage ftmW = new FragmentTaskMessage(0, 2, 1, System.currentTimeMillis(), false, false, false);
     final static FragmentTaskMessage ftmCol = new FragmentTaskMessage(0, 1, 2, System.currentTimeMillis(), false, false, false);
     final static FragmentTaskMessage ftmAgg = new FragmentTaskMessage(0, 1, 2, System.currentTimeMillis(), false, false, false);
-    final static ParameterSet params = new ParameterSet();
+    final static ParameterSet params = ParameterSet.fromArrayNoCopy(new Object[0]);
     static ByteBuffer paramsBuf;
     static FragmentResponseMessage frmR, frmW;
     static InitiateResponseMessage irm;
@@ -84,7 +84,6 @@ public class TestReplayTxnState extends TestCase {
         invocation.setProcName("ryanlikesyankees");
         invocation.setParams(new Object[0]);
         result.addRow(1);
-        params.setParameters(new Object[0]);
         paramsBuf = ByteBuffer.allocate(params.getSerializedSize());
         try { params.flattenToBuffer(paramsBuf); } catch (IOException e) {}
         ftmR.addFragment(0, 0, paramsBuf);

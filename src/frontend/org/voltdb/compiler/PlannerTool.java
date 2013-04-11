@@ -22,6 +22,7 @@ import java.util.List;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
 import org.voltdb.ParameterSet;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
@@ -165,10 +166,11 @@ public class PlannerTool {
                         }
                         if (matched != null) {
                             CorePlan core = matched.core;
-                            ParameterSet params = new ParameterSet();
-                            planner.buildParameterSetFromExtractedLiteralsAndReturnPartitionIndex(
-                                    boundVariants.get(0).core.parameterTypes, params);
-                            Object[] paramArray = params.toArray();
+                            Pair<Integer, Object[]> info =
+                                    planner.buildParameterSetFromExtractedLiteralsAndReturnPartitionIndex(
+                                            boundVariants.get(0).core.parameterTypes);
+                            Object[] paramArray = info.getSecond();
+                            ParameterSet params = ParameterSet.fromArrayNoCopy(paramArray);
                             Object partitionKey = null;
                             if (core.partitioningParamIndex >= 0) {
                                 partitionKey = paramArray[core.partitioningParamIndex];

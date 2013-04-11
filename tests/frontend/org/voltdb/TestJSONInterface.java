@@ -284,68 +284,61 @@ public class TestJSONInterface extends TestCase {
         server.start();
         server.waitForInitialization();
 
-        ParameterSet pset = new ParameterSet();
+        ParameterSet pset;
         String responseJSON;
         Response response;
 
         // Call insert on admin port
-        pset.setParameters(1, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+        pset = ParameterSet.fromArrayNoCopy(1, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
         responseJSON = callProcOverJSON("Insert", pset, null, null, false, true);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         assertTrue(response.status == ClientResponse.SUCCESS);
 
         // Call insert on closed client port and expect failure
-        pset = new ParameterSet();
-        pset.setParameters(2, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+        pset = ParameterSet.fromArrayNoCopy(2, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
         responseJSON = callProcOverJSON("Insert", pset, null, null, false, false);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         assertTrue(response.status == ClientResponse.SERVER_UNAVAILABLE);
 
         // open client port
-        pset = new ParameterSet();
-        pset.setParameters();
+        pset = ParameterSet.emptyParameterSet();
         responseJSON = callProcOverJSON("@Resume", pset, null, null, false, true);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         assertTrue(response.status == ClientResponse.SUCCESS);
 
         // call insert on open client port
-        pset = new ParameterSet();
-        pset.setParameters(2, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+        pset = ParameterSet.fromArrayNoCopy(2, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
         responseJSON = callProcOverJSON("Insert", pset, null, null, false, false);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         assertTrue(response.status == ClientResponse.SUCCESS);
 
         // call insert on admin port again (now that both ports are open)
-        pset = new ParameterSet();
-        pset.setParameters(3, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+        pset = ParameterSet.fromArrayNoCopy(3, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
         responseJSON = callProcOverJSON("Insert", pset, null, null, false, true);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         assertTrue(response.status == ClientResponse.SUCCESS);
 
         // put the system in admin mode
-        pset = new ParameterSet();
-        pset.setParameters();
+        pset = ParameterSet.emptyParameterSet();
         responseJSON = callProcOverJSON("@Pause", pset, null, null, false, true);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         assertTrue(response.status == ClientResponse.SUCCESS);
 
         // Call insert on admin port
-        pset = new ParameterSet();
-        pset.setParameters(4, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+        pset = ParameterSet.fromArrayNoCopy(4, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
         responseJSON = callProcOverJSON("Insert", pset, null, null, false, true);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         assertTrue(response.status == ClientResponse.SUCCESS);
 
         // Call insert on closed client port and expect failure
-        pset = new ParameterSet();
-        pset.setParameters(5, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+        pset = ParameterSet.fromArrayNoCopy(5, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
         responseJSON = callProcOverJSON("Insert", pset, null, null, false, false);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
@@ -392,12 +385,12 @@ public class TestJSONInterface extends TestCase {
         server.start();
         server.waitForInitialization();
 
-        ParameterSet pset = new ParameterSet();
+        ParameterSet pset;
         String responseJSON;
         Response response;
 
         // Call insert
-        pset.setParameters(1, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+        pset = ParameterSet.fromArrayNoCopy(1, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
         responseJSON = callProcOverJSON("Insert", pset, null, null, false);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
@@ -410,8 +403,7 @@ public class TestJSONInterface extends TestCase {
         assertTrue(response.status != ClientResponse.SUCCESS);
 
         // Call proc with complex params
-        pset = new ParameterSet();
-        pset.setParameters(1,
+        pset = ParameterSet.fromArrayNoCopy(1,
                            5,
                            new double[] { 1.5, 6.0, 4 },
                            new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
@@ -439,8 +431,7 @@ public class TestJSONInterface extends TestCase {
         // try to pass a string as a date
         java.sql.Timestamp ts = new java.sql.Timestamp(System.currentTimeMillis());
         ts.setNanos(123456000);
-        pset = new ParameterSet();
-        pset.setParameters(1,
+        pset = ParameterSet.fromArrayNoCopy(1,
                 5,
                 new double[] { 1.5, 6.0, 4 },
                 new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
@@ -457,8 +448,7 @@ public class TestJSONInterface extends TestCase {
         assertEquals(123456, response.results[3].getTimestampAsTimestamp(0).getTime() % 1000000);
 
         // now try a null short value sent as a int  (param expects short)
-        pset = new ParameterSet();
-        pset.setParameters(1,
+        pset = ParameterSet.fromArrayNoCopy(1,
                 VoltType.NULL_SMALLINT,
                 new double[] { 1.5, 6.0, 4 },
                 new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
@@ -472,8 +462,7 @@ public class TestJSONInterface extends TestCase {
         assertFalse(response.status == ClientResponse.SUCCESS);
 
         // now try an out of range long value (param expects short)
-        pset = new ParameterSet();
-        pset.setParameters(1,
+        pset = ParameterSet.fromArrayNoCopy(1,
                 Long.MAX_VALUE - 100,
                 new double[] { 1.5, 6.0, 4 },
                 new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
@@ -487,8 +476,7 @@ public class TestJSONInterface extends TestCase {
         assertFalse(response.status == ClientResponse.SUCCESS);
 
         // now try bigdecimal with small value
-        pset = new ParameterSet();
-        pset.setParameters(1,
+        pset = ParameterSet.fromArrayNoCopy(1,
                 4,
                 new double[] { 1.5, 6.0, 4 },
                 new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
@@ -503,8 +491,7 @@ public class TestJSONInterface extends TestCase {
         assertEquals(ClientResponse.SUCCESS, response.status);
 
         // now try null
-        pset = new ParameterSet();
-        pset.setParameters(1,
+        pset = ParameterSet.fromArrayNoCopy(1,
                 4,
                 new double[] { 1.5, 6.0, 4 },
                 new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
@@ -524,8 +511,7 @@ public class TestJSONInterface extends TestCase {
         assertTrue(responseJSON.startsWith("fooBar("));
 
         // now try adhoc
-        pset = new ParameterSet();
-        pset.setParameters("select * from blah");
+        pset = ParameterSet.fromArrayNoCopy("select * from blah");
         responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
@@ -533,16 +519,14 @@ public class TestJSONInterface extends TestCase {
         assertEquals(ClientResponse.SUCCESS, response.status);
 
         // now try adhoc insert with a huge bigint
-        pset = new ParameterSet();
-        pset.setParameters("insert into blah values (974599638818488300, NULL, NULL, NULL, NULL);");
+        pset = ParameterSet.fromArrayNoCopy("insert into blah values (974599638818488300, NULL, NULL, NULL, NULL);");
         responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
         System.out.println(response.statusString);
         assertEquals(ClientResponse.SUCCESS, response.status);
 
-        pset = new ParameterSet();
-        pset.setParameters("select * from blah where ival = 974599638818488300;");
+        pset = ParameterSet.fromArrayNoCopy("select * from blah where ival = 974599638818488300;");
         responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
@@ -599,7 +583,7 @@ public class TestJSONInterface extends TestCase {
         char[] test1 = {'こ', 'ん', 'に', 'ち', 'は' };
         String test2 = new String(test1);
 
-        ParameterSet pset = new ParameterSet();
+        ParameterSet pset = ParameterSet.emptyParameterSet();
         response = callProcOverJSON("Select", pset, null, null, false);
         System.out.println(response);
         System.out.println(test2);
@@ -667,18 +651,18 @@ public class TestJSONInterface extends TestCase {
         server.start();
         server.waitForInitialization();
 
+        ParameterSet pset;
+
         // test good auths
         for (UserInfo u : ui) {
-            ParameterSet pset = new ParameterSet();
-            pset.setParameters(u.name, u.password, u.name);
+            pset = ParameterSet.fromArrayNoCopy(u.name, u.password, u.name);
             String response = callProcOverJSON("Insert", pset, u.name, u.password, true);
             Response r = responseFromJSON(response);
             assertEquals(ClientResponse.SUCCESS, r.status);
         }
         // test re-using auths
         for (UserInfo u : ui) {
-            ParameterSet pset = new ParameterSet();
-            pset.setParameters(u.name + "-X", u.password + "-X", u.name + "-X");
+            pset = ParameterSet.fromArrayNoCopy(u.name + "-X", u.password + "-X", u.name + "-X");
             String response = callProcOverJSON("Insert", pset, u.name, u.password, false);
             Response r = responseFromJSON(response);
             assertEquals(ClientResponse.SUCCESS, r.status);
@@ -686,8 +670,7 @@ public class TestJSONInterface extends TestCase {
 
         // test bad auth
         UserInfo u = ui[0];
-        ParameterSet pset = new ParameterSet();
-        pset.setParameters(u.name + "-X1", u.password + "-X1", u.name + "-X1");
+        pset = ParameterSet.fromArrayNoCopy(u.name + "-X1", u.password + "-X1", u.name + "-X1");
         String response = callProcOverJSON("Insert", pset, u.name, "ick", true);
         Response r = responseFromJSON(response);
         assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
@@ -696,8 +679,7 @@ public class TestJSONInterface extends TestCase {
         assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
 
         // test malformed auth (too short hash)
-        pset = new ParameterSet();
-        pset.setParameters(u.name + "-X2", u.password + "-X2", u.name + "-X2");
+        pset = ParameterSet.fromArrayNoCopy(u.name + "-X2", u.password + "-X2", u.name + "-X2");
         String paramsInJSON = pset.toJSONString();
         HashMap<String,String> params = new HashMap<String,String>();
         params.put("Procedure", "Insert");
@@ -710,8 +692,7 @@ public class TestJSONInterface extends TestCase {
         assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
 
         // test malformed auth (gibberish password, but good length)
-        pset = new ParameterSet();
-        pset.setParameters(u.name + "-X3", u.password + "-X3", u.name + "-X3");
+        pset = ParameterSet.fromArrayNoCopy(u.name + "-X3", u.password + "-X3", u.name + "-X3");
         paramsInJSON = pset.toJSONString();
         params = new HashMap<String,String>();
         params.put("Procedure", "Insert");
@@ -725,8 +706,7 @@ public class TestJSONInterface extends TestCase {
 
         // test back-to-back rejections, unknown user
         // partial ENG-954 test (make sure the rejection timeout works)
-        pset = new ParameterSet();
-        pset.setParameters(u.name + "-X4", u.password + "-X4", u.name + "-X4");
+        pset = ParameterSet.fromArrayNoCopy(u.name + "-X4", u.password + "-X4", u.name + "-X4");
         response = callProcOverJSON("Insert", pset, "rando", "ick", true);
         r = responseFromJSON(response);
         assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
@@ -749,8 +729,7 @@ public class TestJSONInterface extends TestCase {
         // but the username is not)
         // Wait and clear the authentication failure timeout from above
         Thread.sleep(1100);
-        pset = new ParameterSet();
-        pset.setParameters(u.name + "-X4", u.password + "-X4", u.name + "-X4");
+        pset = ParameterSet.fromArrayNoCopy(u.name + "-X4", u.password + "-X4", u.name + "-X4");
         response = callProcOverJSON("Insert", pset, "rando2", null, true);
         r = responseFromJSON(response);
         assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
@@ -789,8 +768,7 @@ public class TestJSONInterface extends TestCase {
         success = builder2.compile(Configuration.getPathToCatalogForTest("json-update.jar"));
         assertTrue(success);
 
-        pset = new ParameterSet();
-        pset.setParameters(Encoder.hexEncode(CatalogUtil.toBytes(new File(config.m_pathToCatalog))),
+        pset = ParameterSet.fromArrayNoCopy(Encoder.hexEncode(CatalogUtil.toBytes(new File(config.m_pathToCatalog))),
                            new String(CatalogUtil.toBytes(new File(builder2.getPathToDeployment())), "UTF-8"));
         response = callProcOverJSON("@UpdateApplicationCatalog", pset,
                                     ui[0].name, ui[0].password, true);
@@ -799,8 +777,7 @@ public class TestJSONInterface extends TestCase {
 
         // retest the good auths above
         for (UserInfo user : ui) {
-            ParameterSet ps = new ParameterSet();
-            ps.setParameters(user.name + "-X3", user.password + "-X3", user.name + "-X3");
+            ParameterSet ps = ParameterSet.fromArrayNoCopy(user.name + "-X3", user.password + "-X3", user.name + "-X3");
             String respstr = callProcOverJSON("Insert", ps, user.name, user.password, false);
             Response resp = responseFromJSON(respstr);
             assertEquals(ClientResponse.SUCCESS, resp.status);
@@ -848,8 +825,7 @@ public class TestJSONInterface extends TestCase {
         server.waitForInitialization();
 
         // test not enabled
-        ParameterSet pset = new ParameterSet();
-        pset.setParameters("foo", "bar", "foobar");
+        ParameterSet pset = ParameterSet.fromArrayNoCopy("foo", "bar", "foobar");
         try {
             callProcOverJSON("Insert", pset, null, null, false, false, 403); // HTTP_FORBIDDEN
         }
@@ -889,8 +865,7 @@ public class TestJSONInterface extends TestCase {
         server.start();
         server.waitForInitialization();
 
-        ParameterSet pset = new ParameterSet();
-        pset.setParameters(30000);
+        ParameterSet pset = ParameterSet.fromArrayNoCopy(30000);
         String response = callProcOverJSON("DelayProc", pset, null, null, false);
         Response r = responseFromJSON(response);
         assertEquals(ClientResponse.SUCCESS, r.status);

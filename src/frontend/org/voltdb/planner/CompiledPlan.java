@@ -69,7 +69,7 @@ public class CompiledPlan {
     public VoltType[] parameters = null;
 
     /** Parameter values, if the planner pulled constants out of the plan */
-    public ParameterSet extractedParamValues = new ParameterSet();
+    public ParameterSet extractedParamValues = ParameterSet.emptyParameterSet();
 
     /** A list of output column ids, indexes and types */
     public NodeSchema columns = new NodeSchema();

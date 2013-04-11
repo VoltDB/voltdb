@@ -60,7 +60,6 @@ import org.voltdb.exceptions.SerializableException;
 import org.voltdb.executionsitefuzz.ExecutionSiteFuzzChecker;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.SiteFailureFault;
-import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
@@ -658,17 +657,16 @@ public class TestExecutionSite extends TestCase {
 
         /** Helper to turn object list into parameter set buffer */
         private ByteBuffer createParametersBuffer(Object... paramList) {
-            ParameterSet paramSet = new ParameterSet();
-            paramSet.setParameters(paramList);
-            FastSerializer fs = new FastSerializer();
+            ParameterSet paramSet = ParameterSet.fromArrayNoCopy(paramList);
+            ByteBuffer buf = ByteBuffer.allocate(paramSet.getSerializedSize());
             try {
-                fs.writeObject(paramSet);
+                paramSet.flattenToBuffer(buf);
             }
             catch (IOException e) {
                 throw new RuntimeException(e);
             }
-            ByteBuffer paramBuf = fs.getBuffer();
-            return paramBuf;
+            buf.flip();
+            return buf;
         }
 
         @Override

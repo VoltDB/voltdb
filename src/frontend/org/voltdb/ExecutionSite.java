@@ -57,7 +57,6 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
-
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -616,6 +615,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         }
     };
 
+    @Override
     public void tick() {
         /*
          * poke the PartitionDRGateway regularly even if we are not idle. In the
@@ -2623,7 +2623,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             if (paramData != null) {
                 final FastDeserializer fds = new FastDeserializer(paramData);
                 try {
-                    params = fds.readObject(ParameterSet.class);
+                    params = ParameterSet.fromFastDeserializer(fds);
                 }
                 catch (final IOException e) {
                     hostLog.l7dlog( Level.FATAL,
@@ -2632,7 +2632,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 }
             }
             else {
-                params = new ParameterSet();
+                params = ParameterSet.emptyParameterSet();
             }
 
             byte[] fragmentPlan = ftask.getFragmentPlan(frag);

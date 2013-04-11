@@ -147,9 +147,8 @@ public class AdHocPlannedStatement {
         buf.get(sql);
 
         // params
-        ParameterSet parameterSet = new ParameterSet();
         FastDeserializer fds = new FastDeserializer(buf);
-        parameterSet.readExternal(fds);
+        ParameterSet parameterSet = ParameterSet.fromFastDeserializer(fds);
 
         return new AdHocPlannedStatement(sql, core, parameterSet, null, null, null);
     }

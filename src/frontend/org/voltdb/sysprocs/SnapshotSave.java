@@ -44,6 +44,7 @@ import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.utils.VoltTableUtil;
 
 import com.google.common.primitives.Longs;
 
@@ -436,9 +437,7 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[0].outputDepId = DEP_saveTest;
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
-        ParameterSet params = new ParameterSet();
-        params.setParameters(filePath, fileNonce, format.name(), data);
-        pfs[0].parameters = params;
+        pfs[0].parameters = ParameterSet.fromArrayNoCopy(filePath, fileNonce, format.name(), data);
 
         // This fragment aggregates the save-to-disk sanity check results
         pfs[1] = new SynthesizedPlanFragment();
@@ -446,7 +445,7 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[1].outputDepId = DEP_saveTestResults;
         pfs[1].inputDepIds = new int[] { DEP_saveTest };
         pfs[1].multipartition = false;
-        pfs[1].parameters = new ParameterSet();
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
 
         VoltTable[] results;
         results = executeSysProcPlanFragments(pfs, DEP_saveTestResults);
@@ -470,9 +469,8 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[0].outputDepId = DEP_createSnapshotTargets;
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
-        ParameterSet params = new ParameterSet();
-        params.setParameters(filePath, fileNonce, txnId, perPartitionTxnIds, block, format.name(), data);
-        pfs[0].parameters = params;
+        pfs[0].parameters = ParameterSet.fromArrayNoCopy(
+                filePath, fileNonce, txnId, perPartitionTxnIds, block, format.name(), data);
 
         // This fragment aggregates the results of creating those files
         pfs[1] = new SynthesizedPlanFragment();
@@ -480,7 +478,7 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[1].outputDepId = DEP_createSnapshotTargetsResults;
         pfs[1].inputDepIds = new int[] { DEP_createSnapshotTargets };
         pfs[1].multipartition = false;
-        pfs[1].parameters = new ParameterSet();
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
 
         VoltTable[] results;
         results = executeSysProcPlanFragments(pfs, DEP_createSnapshotTargetsResults);
@@ -498,7 +496,7 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[0].outputDepId = DEP_snapshotSaveQuiesce;
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
-        pfs[0].parameters = new ParameterSet();
+        pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         // This fragment aggregates the quiesce results
         pfs[1] = new SynthesizedPlanFragment();
@@ -506,7 +504,7 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[1].outputDepId = DEP_snapshotSaveQuiesceResults;
         pfs[1].inputDepIds = new int[] { DEP_snapshotSaveQuiesce };
         pfs[1].multipartition = false;
-        pfs[1].parameters = new ParameterSet();
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
 
         VoltTable[] results;
         results = executeSysProcPlanFragments(pfs, DEP_snapshotSaveQuiesceResults);

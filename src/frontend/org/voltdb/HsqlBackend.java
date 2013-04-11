@@ -30,6 +30,7 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.List;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.catalog.StmtParameter;
@@ -267,6 +268,13 @@ public class HsqlBackend {
 
         int lastIndex = 0;
         String sql = stmt.getText();
+
+        // if there's no ? in the statmemt, then zero out any auto-parameterization
+        int paramCount = StringUtils.countMatches(sql, "?");
+        if (paramCount == 0) {
+            params = ParameterSet.emptyParameterSet();
+        }
+
         Object[] paramObjs = params.toArray();
         for (int i = 0; i < paramObjs.length; i++) {
             int nextIndex = sql.indexOf('?', lastIndex);

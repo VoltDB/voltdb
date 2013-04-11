@@ -2500,8 +2500,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         spi.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
             @Override
             public ParameterSet call() {
-                ParameterSet paramSet = new ParameterSet();
-                paramSet.setParameters(params);
+                ParameterSet paramSet = ParameterSet.fromArrayWithCopy(params);
                 return paramSet;
             }
         });

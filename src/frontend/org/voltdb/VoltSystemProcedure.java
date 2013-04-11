@@ -233,7 +233,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
             if (pf.parameters != null) {
                 FastSerializer fs = new FastSerializer();
                 try {
-                    fs.writeObject(pf.parameters);
+                    pf.parameters.writeExternal(fs);
                 }
                 catch (IOException e) {
                     e.printStackTrace();
@@ -386,7 +386,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
             if (pf.parameters != null) {
                 FastSerializer fs = new FastSerializer();
                 try {
-                    fs.writeObject(pf.parameters);
+                    pf.parameters.writeExternal(fs);
                 }
                 catch (IOException e) {
                     e.printStackTrace();

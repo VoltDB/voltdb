@@ -1160,9 +1160,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         pfs[0].outputDepId = DEP_restoreDistributeExportAndPartitionSequenceNumbers;
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
-        ParameterSet params = new ParameterSet();
-        params.setParameters(exportSequenceNumberBytes, txnId, perPartitionTxnIds);
-        pfs[0].parameters = params;
+        pfs[0].parameters = ParameterSet.fromArrayNoCopy(exportSequenceNumberBytes, txnId, perPartitionTxnIds);
 
         // This fragment aggregates the save-to-disk sanity check results
         pfs[1] = new SynthesizedPlanFragment();
@@ -1170,7 +1168,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         pfs[1].outputDepId = DEP_restoreDistributeExportAndPartitionSequenceNumbersResults;
         pfs[1].inputDepIds = new int[] { DEP_restoreDistributeExportAndPartitionSequenceNumbers };
         pfs[1].multipartition = false;
-        pfs[1].parameters = new ParameterSet();
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
 
         VoltTable[] results;
         results = executeSysProcPlanFragments(pfs, DEP_restoreDistributeExportAndPartitionSequenceNumbersResults);
@@ -1244,9 +1242,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         pfs[0].outputDepId = DEP_restoreAsyncRunLoop;
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
-        ParameterSet params = new ParameterSet();
-        params.setParameters( coordinatorHSId );
-        pfs[0].parameters = params;
+        pfs[0].parameters = ParameterSet.fromArrayNoCopy(coordinatorHSId);
 
         // This fragment aggregates the save-to-disk sanity check results
         pfs[1] = new SynthesizedPlanFragment();
@@ -1254,7 +1250,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         pfs[1].outputDepId = DEP_restoreAsyncRunLoopResults;
         pfs[1].inputDepIds = new int[] { DEP_restoreAsyncRunLoop };
         pfs[1].multipartition = false;
-        pfs[1].parameters = new ParameterSet();
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
 
         return executeSysProcPlanFragments(pfs, DEP_restoreAsyncRunLoopResults);
     }
@@ -1271,9 +1267,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         pfs[0].outputDepId = DEP_restoreScan;
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
-        ParameterSet params = new ParameterSet();
-        params.setParameters(filePath, fileNonce);
-        pfs[0].parameters = params;
+        pfs[0].parameters = ParameterSet.fromArrayNoCopy(filePath, fileNonce);
 
         // This fragment aggregates the save-to-disk sanity check results
         pfs[1] = new SynthesizedPlanFragment();
@@ -1281,7 +1275,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         pfs[1].outputDepId = DEP_restoreScanResults;
         pfs[1].inputDepIds = new int[] { DEP_restoreScan };
         pfs[1].multipartition = false;
-        pfs[1].parameters = new ParameterSet();
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
 
         VoltTable[] results;
         results = executeSysProcPlanFragments(pfs, DEP_restoreScanResults);
@@ -1305,7 +1299,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         pfs[0].outputDepId = DEP_restoreDigestScan;
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
-        pfs[0].parameters = new ParameterSet();
+        pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         // This fragment aggregates the save-to-disk sanity check results
         pfs[1] = new SynthesizedPlanFragment();
@@ -1313,7 +1307,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         pfs[1].outputDepId = DEP_restoreDigestScanResults;
         pfs[1].inputDepIds = new int[] { DEP_restoreDigestScan };
         pfs[1].multipartition = false;
-        pfs[1].parameters = new ParameterSet();
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
 
         VoltTable[] results;
         results = executeSysProcPlanFragments(pfs, DEP_restoreDigestScanResults);
@@ -1643,9 +1637,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 pfs[0].outputDepId = result_dependency_id;
                 pfs[0].inputDepIds = new int[] {};
                 pfs[0].multipartition = false;
-                ParameterSet params = new ParameterSet();
-                params.setParameters(tableName, result_dependency_id, compressedTable);
-                pfs[0].parameters = params;
+                pfs[0].parameters = ParameterSet.fromArrayNoCopy(tableName, result_dependency_id, compressedTable);
 
                 int final_dependency_id = TableSaveFileState.getNextDependencyId();
                 pfs[1] = new SynthesizedPlanFragment();
@@ -1654,9 +1646,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 pfs[1].outputDepId = final_dependency_id;
                 pfs[1].inputDepIds = new int[] { result_dependency_id };
                 pfs[1].multipartition = false;
-                ParameterSet result_params = new ParameterSet();
-                result_params.setParameters(final_dependency_id);
-                pfs[1].parameters = result_params;
+                pfs[1].parameters = ParameterSet.fromArrayNoCopy(final_dependency_id);
                 TRACE_LOG.trace("Sending replicated table: " + tableName + " to site id:" +
                         siteId);
                 results = executeSysProcPlanFragments(pfs, m_mbox);
@@ -1764,11 +1754,10 @@ public class SnapshotRestore extends VoltSystemProcedure
                     pfs[pfs_index].multipartition = false;
                     pfs[pfs_index].outputDepId = dependencyIds[pfs_index];
                     pfs[pfs_index].inputDepIds = new int [] {};
-                    ParameterSet params = new ParameterSet();
-                    params.setParameters(tableName, partition_id,
+                    pfs[pfs_index].parameters = ParameterSet.fromArrayNoCopy(
+                            tableName, partition_id,
                             dependencyIds[pfs_index],
                             partitioned_tables[partition_id]);
-                    pfs[pfs_index].parameters = params;
                     ++pfs_index;
                 }
                 int result_dependency_id = TableSaveFileState.getNextDependencyId();
@@ -1778,9 +1767,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 pfs[sites_to_partitions.size()].multipartition = false;
                 pfs[sites_to_partitions.size()].outputDepId = result_dependency_id;
                 pfs[sites_to_partitions.size()].inputDepIds = dependencyIds;
-                ParameterSet params = new ParameterSet();
-                params.setParameters(result_dependency_id);
-                pfs[sites_to_partitions.size()].parameters = params;
+                pfs[sites_to_partitions.size()].parameters = ParameterSet.fromArrayNoCopy(result_dependency_id);
                 results = executeSysProcPlanFragments(pfs, m_mbox);
             }
         } catch (Exception e) {

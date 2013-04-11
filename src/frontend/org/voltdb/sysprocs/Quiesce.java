@@ -20,16 +20,16 @@ package org.voltdb.sysprocs;
 import java.util.List;
 import java.util.Map;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
-import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltcore.logging.VoltLogger;
 
 /**
  * Forces a flush of committed Export data to the connector queues.
@@ -98,14 +98,14 @@ public class Quiesce extends VoltSystemProcedure {
             pfs1[0].outputDepId = DEP_SITES;
             pfs1[0].inputDepIds = new int[]{};
             pfs1[0].multipartition = true;
-            pfs1[0].parameters = new ParameterSet();
+            pfs1[0].parameters = ParameterSet.emptyParameterSet();
 
             pfs1[1] = new SynthesizedPlanFragment();
             pfs1[1].fragmentId = SysProcFragmentId.PF_quiesce_processed_sites;
             pfs1[1].outputDepId = DEP_PROCESSED_SITES;
             pfs1[1].inputDepIds = new int[] { DEP_SITES };
             pfs1[1].multipartition = false;
-            pfs1[1].parameters = new ParameterSet();
+            pfs1[1].parameters = ParameterSet.emptyParameterSet();
 
             try {
                 result = executeSysProcPlanFragments(pfs1, DEP_PROCESSED_SITES);
