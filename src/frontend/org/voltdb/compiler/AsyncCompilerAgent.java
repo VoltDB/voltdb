@@ -38,6 +38,7 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 
 public class AsyncCompilerAgent {
 
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
     static final VoltLogger ahpLog = new VoltLogger("ADHOCPLANNERTHREAD");
 
     // if more than this amount of work is queued, reject new work
@@ -109,7 +110,11 @@ public class AsyncCompilerAgent {
                     Object acah = acahClz.newInstance();
                     Method acahPrepareMethod = acahClz.getMethod(
                             "prepareApplicationCatalogDiff", new Class<?>[] { CatalogChangeWork.class });
+                    hostLog.info("Asynchronously preparing to update the application catalog and/or deployment settings.");
                     final AsyncCompilerResult result = (AsyncCompilerResult) acahPrepareMethod.invoke(acah, w);
+                    if (result.errorMsg != null) {
+                        hostLog.info("A request to update the application catalog and/or deployment settings has been rejected. More info returned to client.");
+                    }
                     w.completionHandler.onCompletion(result);
                 }
                 catch (Exception e) {

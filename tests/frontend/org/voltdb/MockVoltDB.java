@@ -374,11 +374,11 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands,
-            byte[] catalogBytes, int expectedCatalogVersion,
+            byte[] catalogBytes, byte[] catalogHash, int expectedCatalogVersion,
             long currentTxnId, long currentTxnTimestamp, long deploymentCRC)
-            {
+    {
         throw new UnsupportedOperationException("unimplemented");
-            }
+    }
 
     @Override
     public BackendTarget getBackendTargetType() {
