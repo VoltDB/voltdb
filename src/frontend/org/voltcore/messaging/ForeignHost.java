@@ -183,39 +183,25 @@ public class ForeignHost {
             return;
         }
 
-        StackTraceElement[] stack = Thread.currentThread().getStackTrace();
-        String stackTrace = "Calling ForeignHost.send()\n";
-        for (StackTraceElement ste : stack) {
-            stackTrace += "    at " + ste.toString() + "\n";
-        }
-        final String trace = stackTrace.intern();
-
-
         m_connection.writeStream().enqueue(
             new DeferredSerialization() {
                 @Override
                 public final ByteBuffer[] serialize() throws IOException{
-                    try {
-                        int len = 4            /* length prefix */
-                                + 8            /* source hsid */
-                                + 4            /* destinationCount */
-                                + 8 * destinations.length  /* destination list */
-                                + message.getSerializedSize();
-                        ByteBuffer buf = ByteBuffer.allocate(len);
-                        buf.putInt(len - 4);
-                        buf.putLong(message.m_sourceHSId);
-                        buf.putInt(destinations.length);
-                        for (int ii = 0; ii < destinations.length; ii++) {
-                            buf.putLong(destinations[ii]);
-                        }
-                        message.flattenToBuffer(buf);
-                        buf.flip();
-                        return new ByteBuffer[] { buf };
+                    int len = 4            /* length prefix */
+                            + 8            /* source hsid */
+                            + 4            /* destinationCount */
+                            + 8 * destinations.length  /* destination list */
+                            + message.getSerializedSize();
+                    ByteBuffer buf = ByteBuffer.allocate(len);
+                    buf.putInt(len - 4);
+                    buf.putLong(message.m_sourceHSId);
+                    buf.putInt(destinations.length);
+                    for (int ii = 0; ii < destinations.length; ii++) {
+                        buf.putLong(destinations[ii]);
                     }
-                    catch (RuntimeException rt) {
-                        hostLog.warn(trace);
-                        throw rt;
-                    }
+                    message.flattenToBuffer(buf);
+                    buf.flip();
+                    return new ByteBuffer[] { buf };
                 }
 
                 @Override
