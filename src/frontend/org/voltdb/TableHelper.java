@@ -130,7 +130,7 @@ public class TableHelper {
 
         public String ddlForView() {
             return String.format("CREATE VIEW %s (col1,col2,col3) AS " +
-            		"SELECT %s, COUNT(*), SUM(%s) FROM %s GROUP BY %s;",
+                    "SELECT %s, COUNT(*), SUM(%s) FROM %s GROUP BY %s;",
                     viewName, groupColName, sumColName, srcTableName, groupColName);
         }
 
