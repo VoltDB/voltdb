@@ -58,14 +58,17 @@
         <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">1</td><td class="nbrtitle">Start the database</td></tr></table>
         <br/>
         Open a Terminal window, and run:<br/>
-        <pre><script>document.write(root.replace('/tools/demo/','/examples/voter/run.sh'));</script></pre>
+        <pre>cd <script>document.write(root.replace('/tools/demo/','/examples/voter'));</script></pre>
+        Then run:
+        <pre>./run.sh</pre>
         This will start the VoltDB database process.
 
         <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">2</td><td class="nbrtitle">Run the voter client</td></tr></table>
         <br/>
         Open another Terminal window, and run:<br/>
-        <pre><script>document.write(root.replace('/tools/demo/','/examples/voter/run.sh client'));</script></pre>
-
+        <pre>cd <script>document.write(root.replace('/tools/demo/','/examples/voter'));</script></pre>
+        Then run:
+        <pre>./run.sh client</pre>
         This will run a benchmark application that connects to the database and generates transactions that simulate a call center capturing text message votes.
 
         <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">3</td><td class="nbrtitle">Monitor Performance</td></tr></table>
@@ -118,13 +121,18 @@
         <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">1</td><td class="nbrtitle">Start the database</td></tr></table>
         <br/>
         Open a Terminal window, and run:<br/>
-        <pre><script>document.write(root.replace('/tools/demo/','/examples/voltkv/run.sh'));</script></pre>
+       <pre>cd <script>document.write(root.replace('/tools/demo/','/examples/voltkv'));</script></pre>
+        Then run:
+        <pre>./run.sh</pre>
+
         This will start the VoltDB database process.
 
         <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">2</td><td class="nbrtitle">Run the voltkv client</td></tr></table>
         <br/>
         Open another Terminal window, and run:<br/>
-        <pre><script>document.write(root.replace('/tools/demo/','/examples/voltkv/run.sh client'));</script></pre>
+        <pre><script>document.write(root.replace('/tools/demo/','/examples/voltkv'));</script></pre>
+        Then run:
+        <pre>./run.sh client</pre>
 
         This will run a benchmark application that connects to the database and generates transactions that simulate a Key/Value Store workload.
 
