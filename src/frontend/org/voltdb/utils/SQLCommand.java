@@ -53,6 +53,7 @@ import jline.console.KeyMap;
 import jline.console.completer.Completer;
 import jline.console.history.FileHistory;
 
+import org.voltdb.RealVoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -1284,7 +1285,7 @@ public class SQLCommand
 
         try {
             // Read the response from VoltDB
-            String a="http://community.voltdb.com/versioncheck?app=sqlcmd&ver=3.2";
+            String a="http://community.voltdb.com/versioncheck?app=sqlcmd&ver=" + org.voltdb.VoltDB.instance().getVersionString();
             url = new URL(a);
             URLConnection conn = url.openConnection();
 
