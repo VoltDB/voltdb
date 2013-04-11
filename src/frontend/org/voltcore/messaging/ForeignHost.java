@@ -25,6 +25,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
 import org.voltcore.network.QueueMonitor;
@@ -32,10 +33,12 @@ import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.VoltDB;
 
 public class ForeignHost {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final RateLimitedLogger rateLimitedLogger = new RateLimitedLogger(10 * 1000, hostLog, Level.WARN);
 
     private Connection m_connection;
     final FHInputHandler m_handler;
@@ -225,6 +228,16 @@ public class ForeignHost {
 
         long current_time = EstTime.currentTimeMillis();
         long current_delta = current_time - m_lastMessageMillis.get();
+        /*
+         * Try and give some warning when a connection is timing out.
+         * Allows you to observe the liveness of the host receiving the heartbeats
+         */
+        if (current_delta > 10 * 1000) {
+            rateLimitedLogger.log(
+                    "Have not received a message from host "
+                        + hostname() + " for " + (current_delta / 1000.0) + " seconds",
+                        current_time);
+        }
         // NodeFailureFault no longer immediately trips FHInputHandler to
         // set m_isUp to false, so use both that and m_closing to
         // avoid repeat reports of a single node failure
