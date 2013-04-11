@@ -760,6 +760,9 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
 
     for (size_t iteration = 0; iteration < NUM_REPETITIONS; iteration++) {
 
+        // The last repetition does the delete after streaming.
+        bool doDelete = (iteration == NUM_REPETITIONS - 1);
+
         tool.iterate();
 
         int totalInserted = 0;              // Total tuple counter.
@@ -797,7 +800,7 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
 
         tool.context("activate");
 
-        bool alreadyActivated = m_table->activateCopyOnWrite(&serializer, 0, strings, npartitions);
+        bool alreadyActivated = m_table->activateCopyOnWrite(&serializer, 0, strings, doDelete);
         if (alreadyActivated) {
             tool.error("COW was previously activated");
         }
@@ -852,8 +855,10 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
             }
 
             // Mutate the table.
-            for (size_t imutation = 0; imutation < NUM_MUTATIONS; imutation++) {
-                doRandomTableMutation(m_table);
+            if (!doDelete) {
+                for (size_t imutation = 0; imutation < NUM_MUTATIONS; imutation++) {
+                    doRandomTableMutation(m_table);
+                }
             }
         }
 
@@ -905,7 +910,14 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
             numTuples++;
             ASSERT_FALSE(tuple.isDirty());
         }
-        ASSERT_EQ(numTuples, tupleCount + (m_tuplesInserted - m_tuplesDeleted));
+
+        // If deleting there should be no tuples remaining in the table.
+        if (doDelete) {
+            ASSERT_EQ(numTuples, 0);
+        }
+        else {
+            ASSERT_EQ(numTuples, tupleCount + (m_tuplesInserted - m_tuplesDeleted));
+        }
         ASSERT_EQ(tool.nerrors, 0);
     }
 }

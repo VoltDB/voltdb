@@ -422,6 +422,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     public boolean activateTableStream(int tableId, TableStreamType streamType) {
         FastSerializer fs = new FastSerializer();
         try {
+            fs.writeByte(0);                // Delete flag
             fs.writeInt(0);                 // Predicate count
         }
         catch (IOException e) {

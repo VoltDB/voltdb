@@ -752,7 +752,7 @@ TableStats* PersistentTable::getTableStats() {
  */
 bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId,
                                           const std::vector<std::string> &predicate_strings,
-                                          int32_t totalPartitions) {
+                                          bool doDelete) {
     if (m_COWContext != NULL) {
         // true => COW already active
         return true;
@@ -774,7 +774,7 @@ bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t p
         assert(serializer != NULL);
         CopyOnWriteContext *newCOW =
             new CopyOnWriteContext(*this, *serializer, partitionId,
-                                   predicate_strings, totalPartitions, activeTupleCount());
+                                   predicate_strings, activeTupleCount(), doDelete);
         m_COWContext.reset(newCOW);
     }
     catch(SerializableEEException &e) {
