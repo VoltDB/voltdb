@@ -29,6 +29,7 @@
 
 #define throwFatalException(...) { char reallysuperbig_nonce_message[8192]; snprintf(reallysuperbig_nonce_message, 8192, __VA_ARGS__); throw voltdb::FatalException( reallysuperbig_nonce_message, __FILE__, __LINE__); }
 #define HACK_HARDCODED_BACKTRACE_PATH "/tmp/voltdb_backtrace.txt"
+
 namespace voltdb {
 class FatalException {
 public:
@@ -120,39 +121,127 @@ private:
     std::string m_whatwhat;
 };
 
-// It's probably going to be easier to just use/remember the values 1, 2, 3, but...
+//
+// This section is for Paul's experimental debuggability features.
+// He has, in a past life, effectively used and shared with other developers hacks like this.
+// John H seems initially skeptical but tolerant about the whole business.
+//
+// The features are accessed primarily through these macros:
+//
+//     DEBUG_ASSERT_OR_THROW_OR_CRASH(CONDITION, STREAMABLES) -- a flexible substitute for assert
+//         That is, instead of
+//
+//             assert( pos < size );
+//
+//         use something more informative like
+//
+//             DEBUG_ASSERT_OR_THROW_OR_CRASH( pos < size,
+//                                             "pos " << pos << " >= size " << size <<
+//                                             " for " this->debugInfo());
+//
+//         which supports the dynamic runtime option of a fatal throw that can, under some conditions,
+//         provide even MORE useful context output as the stack unwinds prior to crashVoltDB.
+//
+//     DEBUG_IGNORE_OR_THROW_OR_CRASH(STREAMABLES) -- a flexible substitite for throwing runtime errors
+//         That is, instead of
+//
+//#ifdef DEBUG
+//             char msg[512];
+//             snprintf(msg, 512, "pos %d <= size %d", pos, size);
+//             throw SomeRuntimeErrorThatCouldMaskASeriousLogicError(msg);
+//#endif
+//
+//         use the more flexible and informative
+//
+//             char msg[512];
+//             snprintf(msg, 512, "pos %d <= size %d", pos, size);
+//             DEBUG_IGNORE_THROW_OR_CRASH(msg << " for " this->debugInfo());
+//             throw SomeRuntimeErrorThatCouldMaskASeriousLogicError(msg);
+//
+//         which also has added runtime options, like the ability to throw a genuinely fatal error.
+//
+// Both of these macros support a dynamic runtime option to crash immediately with a SEGV.
+// It's still early to tell whether that has any advantages over an assert or TRULY fatal throw.
+// Part of the problem is that Paul has not been able to get a usable stack trace on his development
+// machine from EITHER of the two semi-redundant mechanisms supported in the code, including the one
+// in SegVException.cpp.
+
+// It's probably going to be easier (e.g. in gdb) to just use/remember the values 1, 2, 3, but...
 const int VOLTDB_DEBUG_IGNORE_123 = 1;
 const int VOLTDB_DEBUG_ASSERT_123 = 1;
 const int VOLTDB_DEBUG_THROW_123 = 2;
 const int VOLTDB_DEBUG_CRASH_123 = 3;
-// Enable configurable response to unpossibilies, choosing by convention from a menu of:
-// 1 assert/ignore in the caller vs.
-// 2 throw in the caller vs.
+
+/// Utility function to allow different error responses (to unpossibilities)
+/// depending on an integer control variable, choosing by convention from a menu of values:
+// 1 return false to assert/ignore in the caller vs.
+// 2 return true to throw a fatal error in the caller vs.
 // 3 crash here and now
 inline bool debug_false_or_true_or_crash_123(int one_or_two_or_three) {
     // Get a crash (div by 0) for 3, true for 2, false for 1 (and true for anything else).
     return ( 2 / (3 - one_or_two_or_three) ) == 2;
 }
-#ifdef NDEBUG
-#define DEBUG_ASSERT_OR_THROW_OR_CRASH_123(CONDITION, ONE_OR_TWO_OR_THREE, STREAMBLES) {}
-#define DEBUG_IGNORE_OR_THROW_OR_CRASH_123(ONE_OR_TWO_OR_THREE, STREAMABLES) {}
-#else
-#define DEBUG_ASSERT_OR_THROW_OR_CRASH_123(CONDITION, ONE_OR_TWO_OR_THREE, STREAMABLES) {\
-    if ( ! (CONDITION) ) {                                                               \
-        if (debug_false_or_true_or_crash_123(ONE_OR_TWO_OR_THREE)) {                     \
-            throwFatalLogicErrorStreamed(STREAMABLES);                                   \
-        }                                                                                \
-        assert(CONDITION);                                                               \
-    }                                                                                    \
-}
 
-#define DEBUG_IGNORE_OR_THROW_OR_CRASH_123(ONE_OR_TWO_OR_THREE, STREAMABLES) {\
-    if (debug_false_or_true_or_crash_123(ONE_OR_TWO_OR_THREE)) {              \
-        throwFatalLogicErrorStreamed(STREAMABLES);                            \
-    }                                                                         \
-}
+#ifdef DEBUG
 
-#endif
+    /// A macro to conditionally issue error responses, arbitrarily annotated
+    /// -- purposely not a function, to allow file/line annotations and to defer evaluation
+    /// of the annotating expressions.
+    /// STREAMABLES are one or more values that support the "<<" output serialization operator
+    /// separated by "<<".
+    /// STREAMABLES has the syntactic form of a single macro argument (no embedded commas),
+    /// but it is typically not a type-valid expression.
+    /// It needs to be valid only when placed to the right of a left-associating "<<" operator,
+    /// which uses the first expression of STREAMABLES as the rhs of a "<<" operator returning
+    /// a stream which combines with the next "<<" and next expression to return a stream, etc.
+    #define DEBUG_ASSERT_OR_THROW_OR_CRASH_123(CONDITION, ONE_OR_TWO_OR_THREE, STREAMABLES) { \
+        if ( ! (CONDITION) ) {                                                                \
+            if (debug_false_or_true_or_crash_123(ONE_OR_TWO_OR_THREE)) {                      \
+                throwFatalLogicErrorStreamed(STREAMABLES);                                    \
+            } else {                                                                          \
+                std::cout << STREAMABLES;                                                     \
+                assert(CONDITION);                                                            \
+            }                                                                                 \
+        }                                                                                     \
+    }
+
+    /// A macro to issue error responses, arbitrarily annotated
+    /// -- purposely not a function, to allow file/line annotations and to defer evaluation
+    /// of the annotating expressions.
+    #define DEBUG_IGNORE_OR_THROW_OR_CRASH_123(ONE_OR_TWO_OR_THREE, STREAMABLES) { \
+        if (debug_false_or_true_or_crash_123(ONE_OR_TWO_OR_THREE)) {               \
+            throwFatalLogicErrorStreamed(STREAMABLES);                             \
+        }                                                                          \
+    }
+
+#else // non DEBUG
+
+    // None of this debug support is intended to interfere with non-DEBUG production runs.
+    #define DEBUG_ASSERT_OR_THROW_OR_CRASH_123(CONDITION, ONE_OR_TWO_OR_THREE, STREAMABLES) { }
+    #define DEBUG_IGNORE_OR_THROW_OR_CRASH_123(ONE_OR_TWO_OR_THREE, STREAMABLES) { }
+
+#endif // END "ELSE non DEBUG"
+
+// Reset either or both of these control variables from the debugger to dynamically
+// control the error responses that depend on them.
+//TODO: It MIGHT be even better if these could be unified to a single 4-valued variable
+// -- assert|throw|crash|ignore -- but that would mean deciding on a single default behavior
+// for the two legacy use cases -- "assert-like" and "noop-lke" (i.e. fall through to non-fatal throw).
+extern int control_assert_or_throw_fatal_or_crash_123;
+extern int control_ignore_or_throw_fatal_or_crash_123;
+
+// Provide simplified forms that use these centralized global control variables.
+// This still leaves the door open to custom variables for different callers -- not currently used.
+// John H. seems slightly less skeptical and more tolerant of the simplified usage.
+// This may be largely because horrors are easier to ignore when self-contained in one-liners.
+#define DEBUG_ASSERT_OR_THROW_OR_CRASH(CONDITION, STREAMABLES)                     \
+    DEBUG_ASSERT_OR_THROW_OR_CRASH_123(CONDITION,                                  \
+                                       control_assert_or_throw_fatal_or_crash_123, \
+                                       STREAMABLES)
+
+#define DEBUG_IGNORE_OR_THROW_OR_CRASH(STREAMABLES)                                \
+    DEBUG_IGNORE_OR_THROW_OR_CRASH_123(control_ignore_or_throw_fatal_or_crash_123, \
+                                       STREAMABLES)
 
 }
 #endif /* FATALEXCEPTION_HPP_ */

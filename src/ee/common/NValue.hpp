@@ -501,8 +501,6 @@ class NValue {
     static const double s_gtMaxDecimalAsDouble = 1E26;
     static const double s_ltMinDecimalAsDouble = -1E26;
 
-    static int fall_through_or_throw_fatal_or_crash_123;
-
     static ValueType promoteForOp(ValueType vta, ValueType vtb) {
         ValueType rt;
         switch (vta) {
@@ -2883,9 +2881,9 @@ inline NValue NValue::castAs(ValueType type) const {
       case VALUE_TYPE_DECIMAL:
         return castAsDecimal();
       default:
-          DEBUG_IGNORE_OR_THROW_OR_CRASH_123(fall_through_or_throw_fatal_or_crash_123,
-                                             "Fallout from planner error."
-                                             " The invalid target value type for a cast is " << getTypeName(type))
+          DEBUG_IGNORE_OR_THROW_OR_CRASH("Fallout from planner error."
+                                         " The invalid target value type for a cast is " <<
+                                         getTypeName(type))
 
           char message[128];
           snprintf(message, 128, "Type %d not a recognized type for casting",

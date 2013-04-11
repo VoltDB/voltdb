@@ -68,7 +68,7 @@ bool TempTable::insertTuple(TableTuple &source) { insertTempTuple(source); retur
 bool TempTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
                                                TableTuple &sourceTupleWithNewValues,
                                                std::vector<TableIndex*> const &indexesToUpdate,
-                                               bool fallible)
+                                               bool)
 {
     throwFatalException("TempTable does not support update");
     // Some day maybe, if we find a use case:

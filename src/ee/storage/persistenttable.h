@@ -155,6 +155,12 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
     virtual void deleteAllTuples(bool freeAllocatedStrings);
+    // The fallible flag is used to denote a change to a persistent table
+    // which is part of a long transaction that has been vetted and can
+    // never fail (e.g. violate a constraint).
+    // The initial use case is a live catalog update that changes table schema and migrates tuples
+    // and/or adds a materialized view.
+    // Constraint checks are bypassed and the change does not make use of "undo" support.
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     virtual bool deleteTuple(TableTuple &tuple, bool fallible=true);
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
@@ -164,6 +170,13 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     // Note that inside update tuple the order of sourceTuple and
     // targetTuple is swapped when making calls on the indexes. This
     // is just an inconsistency in the argument ordering.
+    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
+    // The fallible flag is used to denote a change to a persistent table
+    // which is part of a long transaction that has been vetted and can
+    // never fail (e.g. violate a constraint).
+    // The initial use case is a live catalog update that changes table schema and migrates tuples
+    // and/or adds a materialized view.
+    // Constraint checks are bypassed and the change does not make use of "undo" support.
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
                                                 TableTuple &sourceTupleWithNewValues,

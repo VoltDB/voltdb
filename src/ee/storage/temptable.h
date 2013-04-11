@@ -99,7 +99,7 @@ class TempTable : public Table {
     virtual void deleteAllTuples(bool freeAllocatedStrings);
     // Deleting a tuple from temp table is not supported. use deleteAllTuples instead
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
-    virtual bool deleteTuple(TableTuple &tuple, bool fallible=true);
+    virtual bool deleteTuple(TableTuple &tuple, bool);
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     // -- Most callers should be using TempTable::insertTempTuple, anyway.
     virtual bool insertTuple(TableTuple &tuple);
@@ -109,7 +109,7 @@ class TempTable : public Table {
     virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
                                                 TableTuple &sourceTupleWithNewValues,
                                                 std::vector<TableIndex*> const &indexesToUpdate,
-                                                bool fallible=true);
+                                                bool);
 
 
     void deleteAllTuplesNonVirtual(bool freeAllocatedStrings);

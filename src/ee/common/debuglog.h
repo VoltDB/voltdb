@@ -185,8 +185,7 @@ inline void outputLogHeader_(const char *file, int line, const char *func, int l
                   << " @ " << __FILE__ << ":" << __LINE__ << std::endl; \
     }
 #else
-    // #define DEBUG_STREAM_HERE(STREAMABLES) { }
-    #define DEBUG_STREAM_HERE(STREAMABLES) { std::cout << "DEBUG_STREAM_HERE: DISABLED EXCEPT I'M TEMPORARILY DEBUGGING THE DEBUG OPTION." << std::endl; }
+    #define DEBUG_STREAM_HERE(STREAMABLES) { }
 #endif
 
 #endif // HSTOREDEBUGLOG_H

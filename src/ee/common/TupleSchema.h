@@ -159,8 +159,6 @@ private:
      * Data storage for column info and for indices of string columns
      */
     char m_data[0];
-
-    static int assert_or_throw_fatal_or_crash;
 };
 
 ///////////////////////////////////
@@ -169,10 +167,9 @@ private:
 
 inline ValueType TupleSchema::columnType(int index) const {
     // In theory, the error response, here can be reset dynamically at a gdb breakpoint.
-    DEBUG_ASSERT_OR_THROW_OR_CRASH_123(index < m_columnCount,
-                                       assert_or_throw_fatal_or_crash,
-                                       "Fallout from planner error. The tuple schema index " << index
-                                       << " exceeds the limit for schema:\n" << debug());
+    DEBUG_ASSERT_OR_THROW_OR_CRASH(index < m_columnCount,
+                                   "Fallout from planner error. The tuple schema index " << index <<
+                                   " exceeds the limit for schema:\n" << debug());
     assert(index > -1);
     const ColumnInfo *columnInfo = getColumnInfo(index);
     return static_cast<ValueType>(columnInfo->type);

@@ -1404,10 +1404,13 @@ TEST CASES
                 <exclude name='org/voltdb/dtxn/Test*.class'/>
                 <exclude name="**/TestCommandLog*.class" />
                 <exclude name="**/TestExport*.class"/>
+                <exclude name="**/TestJoin.class"/>
                 <exclude name="**/TestLogReader.class"/>
                 <exclude name="**/TestMaliciousClientSuite.class" />
-                <exclude name="**/Test*Restore*.class" />
                 <exclude name="**/Test*Rejoin*.class" />
+                <exclude name="**/Test*Replication*.class" />
+                <exclude name="**/Test*Restore*.class" />
+                <exclude name="**/Test*Snapshot*.class" />
             </fileset>
         </tests>
     </run_junit>

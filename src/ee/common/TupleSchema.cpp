@@ -22,11 +22,6 @@
 
 namespace voltdb {
 
-// Change this value dynamically from a debugger to control error responses that use it.
-int TupleSchema::assert_or_throw_fatal_or_crash = /* assert           */ 1; //default
-                                                  // throw fatal      *-/ 2;
-                                                  // SEGV on the spot */ 3;
-
 TupleSchema* TupleSchema::createTupleSchema(const std::vector<ValueType> columnTypes,
                                             const std::vector<int32_t> columnSizes,
                                             const std::vector<bool> allowNull,

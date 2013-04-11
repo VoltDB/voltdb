@@ -59,15 +59,17 @@ class StreamedTable : public Table {
     // ------------------------------------------------------------------
     virtual void deleteAllTuples(bool freeAllocatedStrings);
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
-    virtual bool deleteTuple(TableTuple &tuple, bool fallible=true);
+    // The bool argument is irrelevent to StreamedTable.
+    virtual bool deleteTuple(TableTuple &tuple, bool=true);
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     virtual bool insertTuple(TableTuple &tuple);
     // Updating streamed tuples is not supported
+    // Update is irrelevent to StreamedTable.
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
                                                 TableTuple &sourceTupleWithNewValues,
                                                 std::vector<TableIndex*> const &indexesToUpdate,
-                                                bool fallible=true);
+                                                bool=true);
 
 
     virtual void loadTuplesFrom(SerializeInput &serialize_in, Pool *stringPool = NULL);
