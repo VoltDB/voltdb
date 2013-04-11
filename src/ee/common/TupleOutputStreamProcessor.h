@@ -52,8 +52,7 @@ public:
     void open(PersistentTable &table,
               std::size_t maxTupleLength,
               int32_t partitionId,
-              StreamPredicateList &predicates,
-              int32_t totalPartitions);
+              StreamPredicateList &predicates);
 
     /** Stop serializing. */
     void close();
@@ -75,9 +74,6 @@ private:
 
     /** Table receiving tuples. */
     PersistentTable *m_table;
-
-    /** Total number of partitions (for hashing). */
-    int32_t m_totalPartitions;
 
     /** Predicates for filtering. May remain non-NULL after open() if empty. */
     StreamPredicateList *m_predicates;

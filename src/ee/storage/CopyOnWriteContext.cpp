@@ -60,8 +60,8 @@ CopyOnWriteContext::CopyOnWriteContext(
         TupleSerializer &serializer,
         int32_t partitionId,
         const std::vector<std::string> &predicateStrings,
-        int32_t totalPartitions,
-        int64_t totalTuples) :
+        int64_t totalTuples,
+        bool doDelete) :
              m_table(table),
              m_backedUpTuples(TableFactory::getCopiedTempTable(table.databaseId(),
                                                                "COW of " + table.name(),
@@ -74,13 +74,13 @@ CopyOnWriteContext::CopyOnWriteContext(
              m_tuple(table.schema()),
              m_finishedTableScan(false),
              m_partitionId(partitionId),
-             m_totalPartitions(totalPartitions),
              m_totalTuples(totalTuples),
              m_tuplesRemaining(totalTuples),
              m_blocksCompacted(0),
              m_serializationBatches(0),
              m_inserts(0),
-             m_updates(0)
+             m_updates(0),
+             m_doDelete(doDelete)
 {
     // Parse predicate strings. The factory type determines the kind of
     // predicates that get generated.
@@ -96,10 +96,6 @@ CopyOnWriteContext::CopyOnWriteContext(
  * Return remaining tuple count, 0 if done, or -1 on error.
  */
 int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStreams) {
-    if (!m_finishedTableScan) {
-        checkRemainingTuples("serializeMore(start)");
-    }
-
     // Don't expect to be re-called after streaming all the tuples.
     if (m_tuplesRemaining == 0) {
         throwFatalException("serializeMore() was called again after streaming completed.")
@@ -109,7 +105,7 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
     if (outputStreams.empty()) {
         throwFatalException("serializeMore() expects at least one output stream.");
     }
-    outputStreams.open(m_table, m_maxTupleLength, m_partitionId, m_predicates, m_totalPartitions);
+    outputStreams.open(m_table, m_maxTupleLength, m_partitionId, m_predicates);
 
     //=== Tuple processing loop
 
@@ -121,7 +117,8 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
     while (!yield) {
 
         // Next tuple?
-        if (m_iterator->next(tuple)) {
+        bool hasMore = m_iterator->next(tuple);
+        if (hasMore) {
 
             // -1 is used as a sentinel value to disable counting for tests.
             if (m_tuplesRemaining > 0) {
@@ -138,7 +135,7 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
              * If this is the table scan, check to see if the tuple is pending
              * delete and return the tuple if it is
              */
-            if (!m_finishedTableScan && tuple.isPendingDelete()) {
+            if (!m_finishedTableScan && (m_doDelete || tuple.isPendingDelete())) {
                 assert(!tuple.isPendingDeleteOnUndoRelease());
                 if (m_table.m_schema->getUninlinedObjectColumnCount() != 0)
                 {
@@ -156,7 +153,6 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
              * After scanning the persistent table switch to scanning the temp
              * table with the tuples that were backed up.
              */
-            checkRemainingTuples("serializeMore(start temp)");
             m_finishedTableScan = true;
             m_iterator.reset(m_backedUpTuples.get()->makeIterator());
 
@@ -202,9 +198,11 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
              * is still hanging around. So we need to call it again to return
              * the block here.
              */
-            bool hasMore = m_iterator->next(tuple);
-            if (!hasMore) {
-                assert(false);
+            if (hasMore) {
+                hasMore = m_iterator->next(tuple);
+                if (hasMore) {
+                    assert(false);
+                }
             }
             yield = true;
         }

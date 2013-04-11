@@ -46,8 +46,8 @@ public:
                          TupleSerializer &serializer,
                          int32_t partitionId,
                          const std::vector<std::string> &predicateStrings,
-                         int32_t totalPartitions,
-                         int64_t totalTuples);
+                         int64_t totalTuples,
+                         bool doDelete);
 
     /**
      * Serialize tuples to the provided output until no more tuples can be serialized.
@@ -117,14 +117,14 @@ private:
 
     StreamPredicateList m_predicates;
 
-    int32_t m_totalPartitions;
-
     int64_t m_totalTuples;
     int64_t m_tuplesRemaining;
     int64_t m_blocksCompacted;
     int64_t m_serializationBatches;
     int64_t m_inserts;
     int64_t m_updates;
+
+    bool m_doDelete;
 
     void checkRemainingTuples(const std::string &label);
 
