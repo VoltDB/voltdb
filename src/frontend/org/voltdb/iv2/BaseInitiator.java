@@ -207,6 +207,12 @@ public abstract class BaseInitiator implements Initiator
     }
 
     @Override
+    public int getPartitionId()
+    {
+        return m_partitionId;
+    }
+
+    @Override
     public long getInitiatorHSId()
     {
         return m_initiatorMailbox.getHSId();
