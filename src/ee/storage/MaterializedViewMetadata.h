@@ -46,15 +46,21 @@ public:
      * Called when the source table is inserting a tuple. This will update the materialized view
      * destination table to reflect this change.
      */
-    void processTupleInsert(TableTuple &newTuple);
+    void processTupleInsert(TableTuple &newTuple, bool fallible);
 
     /**
      * Called when the source table is deleting a tuple. This will update the materialized view
      * destination table to reflect this change.
      */
-    void processTupleDelete(TableTuple &oldTuple);
+    void processTupleDelete(TableTuple &oldTuple, bool fallible);
 
+    PersistentTable * targetTable() const { return m_target; }
+
+    void setTargetTable(PersistentTable * target);
 private:
+
+    void freeBackedTuples();
+    void allocateBackedTuples();
 
     /** load a predicate from the catalog structure if it's there */
     void parsePredicate(catalog::MaterializedViewInfo *metadata);

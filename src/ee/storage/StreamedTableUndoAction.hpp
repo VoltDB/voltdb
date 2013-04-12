@@ -19,7 +19,6 @@
 #define STREAMEDTABLEUNDOACTION_HPP
 
 #include "common/UndoAction.h"
-#include "common/Pool.hpp"
 
 namespace voltdb {
 
