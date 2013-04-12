@@ -31,7 +31,6 @@ import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.utils.Encoder;
 
 /**
  * Represents a serializeable bundle of procedure name and parameters. This
@@ -330,32 +329,6 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
             }
         else
             retval += "null";
-        retval += ")";
-        retval += " type=" + String.valueOf(type);
-        retval += " clientHandle=" + String.valueOf(clientHandle);
-        retval += " originalTxnId=" + String.valueOf(originalTxnId);
-        retval += " originalUniqueId=" + String.valueOf(originalUniqueId);
-
-        return retval;
-    }
-
-    public String toStringLite() {
-        String retval = type.name() + " Invocation: " + procName + "(";
-        ParameterSet params = getParams();
-        if (params != null) {
-            int paramCount = params.toArray().length;
-            if (paramCount == 7) {
-                retval += String.format("%d params / UAC hash: %s",
-                        paramCount,
-                        Encoder.hexEncode((byte[]) params.toArray()[1]).substring(0, 10));
-            }
-            else {
-                retval += String.format("%d params", paramCount);
-            }
-        }
-        else {
-            retval += "null";
-        }
         retval += ")";
         retval += " type=" + String.valueOf(type);
         retval += " clientHandle=" + String.valueOf(clientHandle);
