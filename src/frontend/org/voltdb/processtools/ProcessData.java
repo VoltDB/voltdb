@@ -143,7 +143,7 @@ public class ProcessData {
 
     public boolean isAlive() {
         synchronized(m_channel) {
-            return m_ssh_session.isConnected();
+            return (m_ssh_session.isConnected() && m_channel.getExitStatus() == -1);
         }
     }
 }

@@ -240,8 +240,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
         pfs[0].fragmentId = SysProcFragmentId.PF_snapshotDelete;
         pfs[0].outputDepId = DEP_snapshotDelete;
         pfs[0].multipartition = true;
-        ParameterSet params = new ParameterSet();
-        params.setParameters(paths, nonces);
+        ParameterSet params = ParameterSet.fromArrayNoCopy(paths, nonces);
         pfs[0].parameters = params;
 
         pfs[1] = new SynthesizedPlanFragment();
@@ -249,7 +248,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
         pfs[1].outputDepId = DEP_snapshotDeleteResults;
         pfs[1].inputDepIds  = new int[] { DEP_snapshotDelete };
         pfs[1].multipartition = false;
-        pfs[1].parameters = new ParameterSet();
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
 
 
         VoltTable[] results;

@@ -241,10 +241,14 @@ public class SchemaChangeClient {
         }
         catch (NoConnectionsException e) {
             // failure
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             // IOException is not cool man
             logStackTrace(e);
             System.exit(-1);
+        }
+        catch (ProcCallException e) {
+            cr = e.getClientResponse();
         }
 
         if (cr != null) {

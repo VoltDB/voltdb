@@ -87,7 +87,7 @@ public interface SiteProcedureConnection {
             int numFragmentIds,
             long[] planFragmentIds,
             long[] inputDepIds,
-            ParameterSet[] parameterSets,
+            Object[] parameterSets,
             long spHandle,
             long uniqueId,
             boolean readOnly) throws EEException;

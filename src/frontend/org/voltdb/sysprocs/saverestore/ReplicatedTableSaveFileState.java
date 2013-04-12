@@ -157,9 +157,9 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         plan_fragment.outputDepId = result_dependency_id;
         plan_fragment.inputDepIds = new int[] {};
         addPlanDependencyId(result_dependency_id);
-        ParameterSet params = new ParameterSet();
-        params.setParameters(getTableName(), result_dependency_id);
-        plan_fragment.parameters = params;
+        plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
+                getTableName(),
+                result_dependency_id);
         return plan_fragment;
     }
 
@@ -176,10 +176,10 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         plan_fragment.outputDepId = result_dependency_id;
         plan_fragment.inputDepIds = new int[] {};
         addPlanDependencyId(result_dependency_id);
-        ParameterSet params = new ParameterSet();
-        params.setParameters(getTableName(), destinationSiteId,
-                             result_dependency_id);
-        plan_fragment.parameters = params;
+        plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
+                getTableName(),
+                destinationSiteId,
+                result_dependency_id);
         return plan_fragment;
     }
 
@@ -194,9 +194,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         plan_fragment.outputDepId = result_dependency_id;
         plan_fragment.inputDepIds = getPlanDependencyIds();
         setRootDependencyId(result_dependency_id);
-        ParameterSet params = new ParameterSet();
-        params.setParameters(result_dependency_id);
-        plan_fragment.parameters = params;
+        plan_fragment.parameters = ParameterSet.fromArrayNoCopy(result_dependency_id);
         return plan_fragment;
     }
 

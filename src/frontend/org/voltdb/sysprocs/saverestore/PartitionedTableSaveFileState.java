@@ -27,15 +27,15 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
 import org.voltdb.VoltTableRow;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.sysprocs.SysProcFragmentId;
-import org.voltcore.utils.Pair;
 
 
 
@@ -272,12 +272,11 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
         plan_fragment.outputDepId = result_dependency_id;
         plan_fragment.inputDepIds = new int[] {};
         addPlanDependencyId(result_dependency_id);
-        ParameterSet params = new ParameterSet();
-        params.setParameters(getTableName(),
-                             originalHostsArray,
-                             uncoveredPartitionsAtHost,
-                             result_dependency_id);
-        plan_fragment.parameters = params;
+        plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
+                getTableName(),
+                originalHostsArray,
+                uncoveredPartitionsAtHost,
+                result_dependency_id);
         return plan_fragment;
     }
 
@@ -292,9 +291,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
         plan_fragment.outputDepId = result_dependency_id;
         plan_fragment.inputDepIds = getPlanDependencyIds();
         setRootDependencyId(result_dependency_id);
-        ParameterSet params = new ParameterSet();
-        params.setParameters(result_dependency_id);
-        plan_fragment.parameters = params;
+        plan_fragment.parameters = ParameterSet.fromArrayNoCopy(result_dependency_id);
         return plan_fragment;
     }
 

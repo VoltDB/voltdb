@@ -271,7 +271,7 @@ public class HsqlBackend {
         // if there's no ? in the statmemt, then zero out any auto-parameterization
         int paramCount = StringUtils.countMatches(sql, "?");
         if (paramCount == 0) {
-            params = new ParameterSet();
+            params = ParameterSet.emptyParameterSet();
             paramJavaTypes = new byte[0];
         }
 

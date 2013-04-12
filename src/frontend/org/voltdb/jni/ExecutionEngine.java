@@ -30,7 +30,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.ExecutionSite;
 import org.voltdb.FragmentPlanSource;
-import org.voltdb.ParameterSet;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.StatsAgent;
@@ -333,7 +332,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public VoltTable[] executePlanFragments(int numFragmentIds,
                                             long[] planFragmentIds,
                                             long[] inputDepIds,
-                                            ParameterSet[] parameterSets,
+                                            Object[] parameterSets,
                                             long spHandle,
                                             long lastCommittedSpHandle,
                                             long uniqueId,
@@ -357,7 +356,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     protected abstract VoltTable[] coreExecutePlanFragments(int numFragmentIds,
                                                             long[] planFragmentIds,
                                                             long[] inputDepIds,
-                                                            ParameterSet[] parameterSets,
+                                                            Object[] parameterSets,
                                                             long spHandle,
                                                             long lastCommittedSpHandle,
                                                             long uniqueId,
