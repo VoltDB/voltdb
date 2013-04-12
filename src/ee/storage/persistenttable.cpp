@@ -544,6 +544,8 @@ void PersistentTable::deleteTupleForSchemaChange(TableTuple &target) {
  * the COWContext. The COWContext set the tuple to have the
  * correct dirty setting when the tuple was originally inserted.
  * TODO remove duplication with regular delete. Also no view updates.
+ *
+ * NB: This is also used as a generic delete for Elastic rebalance.
  */
 void PersistentTable::deleteTupleForUndo(TableTuple &tupleCopy) {
     TableTuple target = lookupTuple(tupleCopy);

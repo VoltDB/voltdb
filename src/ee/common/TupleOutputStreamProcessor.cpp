@@ -94,11 +94,15 @@ void TupleOutputStreamProcessor::close()
  * Expects buffer space was already checked.
  * Returns true when the caller should yield to allow other work to proceed.
  */
-bool TupleOutputStreamProcessor::writeRow(TupleSerializer &serializer, TableTuple &tuple)
+bool TupleOutputStreamProcessor::writeRow(TupleSerializer &serializer,
+                                          TableTuple &tuple,
+                                          int32_t &numCopiesMade)
 {
     if (m_table == NULL) {
         throwFatalException("TupleOutputStreamProcessor::writeRow() was called before open().");
     }
+
+    numCopiesMade = 0;
 
     // Predicates, if supplied, are one per output stream (previously asserted).
     StreamPredicateList::iterator ipredicate;
@@ -126,6 +130,7 @@ bool TupleOutputStreamProcessor::writeRow(TupleSerializer &serializer, TableTupl
                     "TupleOutputStreamProcessor::writeRow() failed because buffer has no space.");
             }
             iter->writeRow(serializer, tuple);
+            numCopiesMade++;
             // Check if we'll need to yield after handling this row.
             if (!yield) {
                 // Yield when the buffer is not capable of handling another tuple

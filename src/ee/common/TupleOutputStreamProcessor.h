@@ -60,9 +60,10 @@ public:
     /**
      * Write a tuple to the output streams.
      * Expects buffer space was already checked.
+     * numCopiesMade helps deletion logic decide when something is being moved.
      * Returns true when the caller should yield to allow other work to proceed.
      */
-    bool writeRow(TupleSerializer &serializer, TableTuple &tuple);
+    bool writeRow(TupleSerializer &serializer, TableTuple &tuple, int32_t &numCopiesMade);
 
 private:
 

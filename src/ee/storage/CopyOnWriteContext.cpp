@@ -128,24 +128,40 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
             /*
              * Write the tuple to all the output streams.
              * Done if any of the buffers filled up.
+             * The returned copy count helps decide when to delete if m_doDelete is true.
              */
-            yield = outputStreams.writeRow(m_serializer, tuple);
+            int32_t numCopiesMade = 0;
+            yield = outputStreams.writeRow(m_serializer, tuple, numCopiesMade);
 
             /*
-             * If this is the table scan, check to see if the tuple is pending
-             * delete and return the tuple if it is
+             * May want to delete tuple if processing the actual table.
              */
-            if (!m_finishedTableScan && (m_doDelete || tuple.isPendingDelete())) {
-                assert(!tuple.isPendingDeleteOnUndoRelease());
-                if (m_table.m_schema->getUninlinedObjectColumnCount() != 0)
-                {
-                    m_table.decreaseStringMemCount(tuple.getNonInlinedMemorySize());
+            if (!m_finishedTableScan) {
+                /*
+                 * If this is the table scan, check to see if the tuple is pending
+                 * delete and return the tuple if it iscop
+                 */
+                if (tuple.isPendingDelete()) {
+                    assert(!tuple.isPendingDeleteOnUndoRelease());
+                    if (m_table.m_schema->getUninlinedObjectColumnCount() != 0)
+                    {
+                        m_table.decreaseStringMemCount(tuple.getNonInlinedMemorySize());
+                    }
+                    tuple.setPendingDeleteFalse();
+                    tuple.freeObjectColumns();
+                    CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
+                    //Save the extra lookup if possible
+                    m_table.deleteTupleStorage(tuple, iter->m_currentBlock);
                 }
-                tuple.setPendingDeleteFalse();
-                tuple.freeObjectColumns();
-                CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
-                //Save the extra lookup if possible
-                m_table.deleteTupleStorage(tuple, iter->m_currentBlock);
+
+                /*
+                 * Delete a moved tuple?
+                 * This is used for Elastic rebalancing, which is wrapped in a transaction.
+                 * The delete for undo is generic enough to support this operation.
+                 */
+                else if (m_doDelete && numCopiesMade > 0) {
+                    m_table.deleteTupleForUndo(tuple);
+                }
             }
 
         } else if (!m_finishedTableScan) {

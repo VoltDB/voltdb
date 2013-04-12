@@ -768,17 +768,25 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
         int totalInserted = 0;              // Total tuple counter.
         boost::scoped_ptr<char> buffers[npartitions];   // Stream buffers.
         std::vector<std::string> strings(npartitions);  // Range strings.
-        TupleSet before[npartitions];   // Tuple values by partition before streaming.
-        TupleSet after[npartitions];    // Tuple values by partition after streaming.
+        TupleSet expected[npartitions]; // Expected tuple values by partition.
+        TupleSet actual[npartitions];   // Actual tuple values by partition.
+        int totalSkipped = 0;
 
         // Prepare streams by generating ranges and range strings based on
         // the desired number of partitions/predicates.
         // Since integer hashes use a simple modulus we just need to provide
         // the partition number for the range.
         // Also prepare a buffer for each stream.
+        // Skip one partition to make it interesting.
+        int32_t skippedPartition = npartitions / 2;
         for (int32_t i = 0; i < npartitions; i++) {
             buffers[i].reset(new char[BUFFER_SIZE]);
-            strings[i] = tool.generatePredicateString(i);
+            if (i != skippedPartition) {
+                strings[i] = tool.generatePredicateString(i);
+            }
+            else {
+                strings[i] = tool.generatePredicateString(-1);
+            }
         }
 
         tool.context("precalculate");
@@ -790,12 +798,17 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
         while (iterator.next(tuple)) {
             int64_t value = *reinterpret_cast<int64_t*>(tuple.address() + 1);
             int32_t ipart = (int32_t)(ValuePeeker::peekAsRawInt64(tuple.getNValue(partCol)) % npartitions);
-            bool inserted = before[ipart].insert(value).second;
-            if (!inserted) {
-                int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
-                tool.error("Duplicate primary key %d iteration=%lu", primaryKey, iteration);
+            if (ipart != skippedPartition) {
+                bool inserted = expected[ipart].insert(value).second;
+                if (!inserted) {
+                    int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
+                    tool.error("Duplicate primary key %d iteration=%lu", primaryKey, iteration);
+                }
+                ASSERT_TRUE(inserted);
             }
-            ASSERT_TRUE(inserted);
+            else {
+                totalSkipped++;
+            }
         }
 
         tool.context("activate");
@@ -834,7 +847,7 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
                         values[0] = ntohl(*reinterpret_cast<const int32_t*>(buffers[ipart].get()+ibuf));
                         values[1] = ntohl(*reinterpret_cast<const int32_t*>(buffers[ipart].get()+ibuf+4));
                         int64_t value = *reinterpret_cast<int64_t*>(values);
-                        const bool inserted = after[ipart].insert(value).second;
+                        const bool inserted = actual[ipart].insert(value).second;
                         if (!inserted) {
                             tool.valueError(values, "Buffer duplicate: ipart=%lu totalInserted=%d ibuf=%d",
                                             ipart, totalInserted, ibuf);
@@ -865,16 +878,16 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
         // Summarize partitions with incorrect tuple counts.
         for (size_t ipart = 0; ipart < npartitions; ipart++) {
             tool.context("check size: partition=%lu", ipart);
-            if (before[ipart].size() != after[ipart].size()) {
+            if (expected[ipart].size() != actual[ipart].size()) {
                 tool.error("Size mismatch: expected=%lu actual=%lu",
-                           before[ipart].size(), after[ipart].size());
+                           expected[ipart].size(), actual[ipart].size());
             }
         }
 
-        // Summarize partitions where before and after aren't equal.
+        // Summarize partitions where expected and actual aren't equal.
         for (size_t ipart = 0; ipart < npartitions; ipart++) {
             tool.context("check equality: partition=%lu", ipart);
-            if (before[ipart] != after[ipart]) {
+            if (expected[ipart] != actual[ipart]) {
                 tool.error("Not equal");
             }
         }
@@ -882,20 +895,20 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
         // Look for tuples that are missing from partitions.
         for (size_t ipart = 0; ipart < npartitions; ipart++) {
             tool.context("missing: partition=%lu", ipart);
-            tool.diff(before[ipart], after[ipart]);
+            tool.diff(expected[ipart], actual[ipart]);
         }
 
         // Look for extra tuples that don't belong in partitions.
         for (size_t ipart = 0; ipart < npartitions; ipart++) {
             tool.context("extra: partition=%lu", ipart);
-            tool.diff(after[ipart], before[ipart]);
+            tool.diff(actual[ipart], expected[ipart]);
         }
 
         // Check tuple diff for each predicate/partition.
         for (size_t ipart = 0; ipart < npartitions; ipart++) {
             tool.context("check equality: partition=%lu", ipart);
-            ASSERT_EQ(before[ipart].size(), after[ipart].size());
-            ASSERT_TRUE(before[ipart] == after[ipart]);
+            ASSERT_EQ(expected[ipart].size(), actual[ipart].size());
+            ASSERT_TRUE(expected[ipart] == actual[ipart]);
         }
 
         // Check for dirty tuples.
@@ -911,9 +924,9 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
             ASSERT_FALSE(tuple.isDirty());
         }
 
-        // If deleting there should be no tuples remaining in the table.
+        // If deleting check the tuples remaining in the table.
         if (doDelete) {
-            ASSERT_EQ(numTuples, 0);
+            ASSERT_EQ(numTuples, totalSkipped);
         }
         else {
             ASSERT_EQ(numTuples, tupleCount + (m_tuplesInserted - m_tuplesDeleted));
