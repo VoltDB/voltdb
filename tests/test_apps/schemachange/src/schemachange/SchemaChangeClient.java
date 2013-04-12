@@ -394,7 +394,7 @@ public class SchemaChangeClient {
      * Delete some rows rows (triggers compaction).
      * Re-add odd rows until RSS or rowcount target met (makes buffers out of order).
      */
-    private void loadTable(VoltTable t) {
+    private void loadTable(VoltTable t) throws Exception {
         // if #partitions is odd, delete every 2 - if even, delete every 3
         //int n = 3 - (topo.partitions % 2);
 
