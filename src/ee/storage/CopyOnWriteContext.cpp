@@ -160,7 +160,7 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
                  * The delete for undo is generic enough to support this operation.
                  */
                 else if (m_doDelete && numCopiesMade > 0) {
-                    m_table.deleteTupleForUndo(tuple);
+                    m_table.deleteTupleForUndo(tuple, true);
                 }
             }
 

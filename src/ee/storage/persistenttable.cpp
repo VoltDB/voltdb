@@ -546,23 +546,33 @@ void PersistentTable::deleteTupleForSchemaChange(TableTuple &target) {
  * TODO remove duplication with regular delete. Also no view updates.
  *
  * NB: This is also used as a generic delete for Elastic rebalance.
+ *     skipLookup will be true in this case because the passed tuple
+ *     can be used directly.
  */
-void PersistentTable::deleteTupleForUndo(TableTuple &tupleCopy) {
-    TableTuple target = lookupTuple(tupleCopy);
-    if (target.isNullTuple()) {
+void PersistentTable::deleteTupleForUndo(TableTuple &tupleCopy, bool skipLookup) {
+    TableTuple *target = NULL;
+    TableTuple lookedUpTuple;
+    if (skipLookup) {
+        target = &tupleCopy;
+    }
+    else {
+        lookedUpTuple = lookupTuple(tupleCopy);
+        target = &lookedUpTuple;
+    }
+    if (target->isNullTuple()) {
         throwFatalException("Failed to delete tuple from table %s:"
                             " tuple does not exist\n%s\n", m_name.c_str(),
                             tupleCopy.debugNoHeader().c_str());
     }
     else {
         // Make sure that they are not trying to delete the same tuple twice
-        assert(target.isActive());
+        assert(target->isActive());
 
         // Also make sure they are not trying to delete our m_tempTuple
-        assert(&target != &m_tempTuple);
+        assert(target != &m_tempTuple);
 
         // Just like insert, we want to remove this tuple from all of our indexes
-        deleteFromAllIndexes(&target);
+        deleteFromAllIndexes(target);
 
         if (m_schema->getUninlinedObjectColumnCount() != 0)
         {
@@ -570,8 +580,8 @@ void PersistentTable::deleteTupleForUndo(TableTuple &tupleCopy) {
         }
 
         // Delete the strings/objects
-        target.freeObjectColumns();
-        deleteTupleStorage(target);
+        target->freeObjectColumns();
+        deleteTupleStorage(*target);
         m_usedTupleCount--;
     }
 }
