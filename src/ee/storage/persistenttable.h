@@ -179,7 +179,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      * index lookup.
      */
     bool deleteTuple(TableTuple &tuple, bool freeAllocatedStrings);
-    void deleteTupleForUndo(voltdb::TableTuple &tupleCopy);
+    void deleteTupleForUndo(voltdb::TableTuple &tupleCopy, bool skipLookup = false);
     void deleteTupleForSchemaChange(TableTuple &target);
 
     /*
