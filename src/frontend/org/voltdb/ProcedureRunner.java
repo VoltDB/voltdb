@@ -68,7 +68,8 @@ public class ProcedureRunner {
     static class QueuedSQL {
         SQLStmt stmt;
         ParameterSet params;
-        Expectation expectation;
+        Expectation expectation = null;
+        ByteBuffer serialization = null;
     }
     protected final ArrayList<QueuedSQL> m_batch = new ArrayList<QueuedSQL>(100);
     // cached fake SQLStmt array for single statement non-java procs
@@ -414,7 +415,9 @@ public class ProcedureRunner {
             try {
                 ByteBuffer buf = ByteBuffer.allocate(queuedSQL.params.getSerializedSize());
                 queuedSQL.params.flattenToBuffer(buf);
+                buf.flip();
                 m_inputCRC.update(buf.array());
+                queuedSQL.serialization = buf;
             } catch (IOException e) {
                 log.error("Unable to compute CRC of parameters to " +
                         "a SQL statement in procedure: " + m_procedureName, e);
@@ -1111,7 +1114,12 @@ public class ProcedureRunner {
            // Build the set of params for the frags
            FastSerializer fs = new FastSerializer();
            try {
-               queuedSQL.params.writeExternal(fs);
+               if (queuedSQL.serialization != null) {
+                   fs.write(queuedSQL.serialization);
+               }
+               else {
+                   queuedSQL.params.writeExternal(fs);
+               }
            } catch (IOException e) {
                throw new RuntimeException("Error serializing parameters for SQL statement: " +
                                           queuedSQL.stmt.getText() + " with params: " +
@@ -1185,15 +1193,21 @@ public class ProcedureRunner {
 
    // Batch up pre-planned fragments, but handle ad hoc independently.
    private VoltTable[] fastPath(List<QueuedSQL> batch) {
-                   final int batchSize = batch.size();
-                   ParameterSet[] params = new ParameterSet[batchSize];
-                   long[] fragmentIds = new long[batchSize];
+       final int batchSize = batch.size();
+       Object[] params = new Object[batchSize];
+       long[] fragmentIds = new long[batchSize];
 
        int i = 0;
        for (final QueuedSQL qs : batch) {
            assert(qs.stmt.collector == null);
            fragmentIds[i] = qs.stmt.aggregator.id;
-           params[i] = qs.params;
+           // use the pre-serialized params if it exists
+           if (qs.serialization != null) {
+               params[i] = qs.serialization;
+           }
+           else {
+               params[i] = qs.params;
+           }
            i++;
        }
        return m_site.executePlanFragments(

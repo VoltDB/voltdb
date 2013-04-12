@@ -220,7 +220,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int numFragmentIds,
             final long[] planFragmentIds,
             final long[] inputDepIds,
-            final ParameterSet[] parameterSets,
+            final Object[] parameterSets,
             final long spHandle, final long lastCommittedSpHandle,
             long uniqueId, final long undoToken) throws EEException
     {
@@ -238,14 +238,28 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         // serialize the param sets
         fsForParameterSet.clear();
         for (int i = 0; i < batchSize; ++i) {
-            try {
-                parameterSets[i].writeExternal(fsForParameterSet);
+            if (parameterSets[i] instanceof ByteBuffer) {
+                ByteBuffer buf = (ByteBuffer) parameterSets[i];
+                try {
+                    fsForParameterSet.write(buf);
+                } catch (IOException exception) {
+                    throw new RuntimeException("Error serializing parameters for SQL batch element: " +
+                            i + " with plan fragment ID: " + planFragmentIds[i] +
+                            " and with pre-serialized params of length: " +
+                            buf.capacity(), exception);
+                }
             }
-            catch (final IOException exception) {
-                throw new RuntimeException("Error serializing parameters for SQL batch element: " +
-                                           i + " with plan fragment ID: " + planFragmentIds[i] +
-                                           " and with params: " +
-                                           parameterSets[i].toJSONString(), exception);
+            else {
+                ParameterSet pset = (ParameterSet) parameterSets[i];
+                try {
+                    pset.writeExternal(fsForParameterSet);
+                }
+                catch (final IOException exception) {
+                    throw new RuntimeException("Error serializing parameters for SQL batch element: " +
+                                               i + " with plan fragment ID: " + planFragmentIds[i] +
+                                               " and with params: " +
+                                               pset.toJSONString(), exception);
+                }
             }
         }
         // checkMaxFsSize();
