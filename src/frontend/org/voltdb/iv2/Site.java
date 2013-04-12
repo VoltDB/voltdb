@@ -23,6 +23,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.TreeMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -1047,15 +1049,30 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 TheHashinator.getConfigureBytes(m_numberOfPartitions));
     }
 
-    class FragInfo {
-        Sha1Wrapper hash;
-        long fragId;
-        byte[] plan;
+    private static class FragInfo {
+        final Sha1Wrapper hash;
+        final long fragId;
+        final byte[] plan;
         int refCount;
+        long lastUse;
+
+        FragInfo(Sha1Wrapper key, byte[] plan, long nextId)
+        {
+            this.hash = key;
+            this.plan = plan;
+            this.fragId = nextId;
+            this.refCount = 0;
+            this.lastUse = 0;
+        }
+
     }
+
     HashMap<Sha1Wrapper, FragInfo> m_plansByHash = new HashMap<Sha1Wrapper, FragInfo>();
     HashMap<Long, FragInfo> m_plansById = new HashMap<Long, FragInfo>();
+    TreeMap<Long, FragInfo> m_plansLRU = new TreeMap<Long, FragInfo>();
     long m_nextFragId = 5000;
+    /// A ticker that allows the sequencing of all fragment uses, providing a key to the LRU map.
+    long m_nextFragUse = 0;
 
     @Override
     public long getFragmentIdForPlanHash(byte[] planHash) {
@@ -1071,23 +1088,58 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public long loadOrAddRefPlanFragment(byte[] planHash, byte[] plan) {
         Sha1Wrapper key = new Sha1Wrapper(planHash);
-        FragInfo frag = null;
         synchronized (FragInfo.class) {
-            frag = m_plansByHash.get(key);
-            if (frag != null) {
-                frag.refCount++;
-                return frag.fragId;
+            FragInfo frag = m_plansByHash.get(key);
+            if (frag == null) {
+                frag = new FragInfo(key, plan, m_nextFragId++);
+                frag.lastUse = ++m_nextFragUse;
+                m_plansLRU.put(frag.lastUse, frag);
+                m_plansByHash.put(frag.hash, frag);
+                m_plansById.put(frag.fragId, frag);
+
+                if (m_plansLRU.size() > ExecutionEngine.EE_PLAN_CACHE_SIZE) {
+                    dropLRUfragment();
+                }
+            } else {
+                // Prepare to lazily update the re-used frag's position in the LRU map.
+                // A fragment can be referenced numerous times like this before new cache entries force
+                // it to the front of the LRU map. When that happens, it can refresh its position
+                // in the map ONCE based on its LAST use so that some other entry gets de-cached.
+                // This is more efficient than thrashing the map on every fragment use,
+                // especially when fragment re-use dominates new fragments.
+                frag.lastUse = ++m_nextFragUse;
+            }
+            frag.refCount++;
+            return frag.fragId;
+        }
+    }
+
+    void dropLRUfragment()
+    {
+        while (true) {
+            // Remove the earliest entry.
+            Entry<Long, FragInfo> lru = m_plansLRU.pollFirstEntry();
+            FragInfo frag = lru.getValue();
+            // Re-insert it "last" if its ref count says that it is "in use" / "reserved".
+            if (frag.refCount > 0) {
+                frag.lastUse = ++m_nextFragUse;
+            }
+            else if (lru.getKey() != frag.lastUse) {
+                // Don't remove a fragment that was used recently, since is was last (re)inserted.
+                // Instead, re-insert it at its point of last use.
+                // This prevents thrashing of the LRU list for frequently used frags.
+                frag.lastUse = m_nextFragUse++;
             }
             else {
-                frag = new FragInfo();
-                frag.hash = key;
-                frag.plan = plan;
-                frag.refCount = 1;
-                frag.fragId = m_nextFragId++;
-                m_plansByHash.put(key, frag);
-                m_plansById.put(frag.fragId, frag);
-                return frag.fragId;
+                // Found and removed the actually least recently used safe entry from the LRU map.
+                // Remove the entry from all the collections.
+                return;
             }
+            m_plansById.remove(frag.fragId);
+            m_plansByHash.remove(frag.hash);
+            // Try another candidate. They can't ALL be in use.
+            lru = m_plansLRU.pollFirstEntry();
+            assert(lru != null);
         }
     }
 
@@ -1100,10 +1152,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         synchronized (FragInfo.class) {
             frag = m_plansById.get(fragmentId);
             assert(frag != null);
-            if (--frag.refCount == 0) {
-                m_plansById.remove(fragmentId);
-                m_plansByHash.remove(frag.hash);
-            }
+            --frag.refCount;
         }
     }
 
