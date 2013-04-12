@@ -957,7 +957,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public VoltTable[] executePlanFragments(int numFragmentIds,
             long[] planFragmentIds, long[] inputDepIds,
-            ParameterSet[] parameterSets, long spHandle, long uniqueId, boolean readOnly)
+            Object[] parameterSets, long spHandle, long uniqueId, boolean readOnly)
             throws EEException {
         return m_ee.executePlanFragments(
                 numFragmentIds,

@@ -679,16 +679,14 @@ public class SnapshotScan extends VoltSystemProcedure {
         pfs[0].fragmentId = SysProcFragmentId.PF_snapshotScan;
         pfs[0].outputDepId = DEP_snapshotScan;
         pfs[0].multipartition = true;
-        ParameterSet params = new ParameterSet();
-        params.setParameters(path);
-        pfs[0].parameters = params;
+        pfs[0].parameters = ParameterSet.fromArrayNoCopy(path);
 
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_snapshotScanResults;
         pfs[1].outputDepId = DEP_snapshotScanResults;
         pfs[1].inputDepIds  = new int[] { DEP_snapshotScan };
         pfs[1].multipartition = false;
-        pfs[1].parameters = new ParameterSet();
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
 
 
         VoltTable[] results;
@@ -704,16 +702,14 @@ public class SnapshotScan extends VoltSystemProcedure {
         pfs[0].fragmentId = SysProcFragmentId.PF_snapshotDigestScan;
         pfs[0].outputDepId = DEP_snapshotDigestScan;
         pfs[0].multipartition = true;
-        ParameterSet params = new ParameterSet();
-        params.setParameters(path);
-        pfs[0].parameters = params;
+        pfs[0].parameters = ParameterSet.fromArrayNoCopy(path);
 
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_snapshotDigestScanResults;
         pfs[1].outputDepId = DEP_snapshotDigestScanResults;
         pfs[1].inputDepIds  = new int[] { DEP_snapshotDigestScan };
         pfs[1].multipartition = false;
-        pfs[1].parameters = new ParameterSet();
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
 
 
         VoltTable[] results;
@@ -729,16 +725,14 @@ public class SnapshotScan extends VoltSystemProcedure {
         pfs[0].fragmentId = SysProcFragmentId.PF_hostDiskFreeScan;
         pfs[0].outputDepId = DEP_hostDiskFreeScan;
         pfs[0].multipartition = true;
-        ParameterSet params = new ParameterSet();
-        params.setParameters(path);
-        pfs[0].parameters = params;
+        pfs[0].parameters = ParameterSet.fromArrayNoCopy(path);
 
         pfs[1] = new SynthesizedPlanFragment();
         pfs[1].fragmentId = SysProcFragmentId.PF_hostDiskFreeScanResults;
         pfs[1].outputDepId = DEP_hostDiskFreeScanResults;
         pfs[1].inputDepIds  = new int[] { DEP_hostDiskFreeScan };
         pfs[1].multipartition = false;
-        pfs[1].parameters = new ParameterSet();
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
 
 
         VoltTable[] results;

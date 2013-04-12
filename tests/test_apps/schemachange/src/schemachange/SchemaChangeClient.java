@@ -39,11 +39,13 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.utils.MiscUtils;
 
 public class SchemaChangeClient {
 
@@ -88,9 +90,6 @@ public class SchemaChangeClient {
 
         @Option(desc = "Time (secs) to end run if no progress is being made.")
         int noProgressTimeout = 600;
-
-        @Option(desc = "Interval (secs) to check if progress is being made")
-        int checkInterval = 60;
 
         @Override
         public void validate() {
@@ -222,10 +221,14 @@ public class SchemaChangeClient {
         }
         catch (NoConnectionsException e) {
             // failure
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             // IOException is not cool man
             logStackTrace(e);
             System.exit(-1);
+        }
+        catch (ProcCallException e) {
+            cr = e.getClientResponse();
         }
 
         if (cr != null) {
@@ -357,7 +360,7 @@ public class SchemaChangeClient {
     /**
      * Find the largest pkey value in the table.
      */
-    private long maxId(VoltTable t) {
+    public long maxId(VoltTable t) {
         if (t == null) {
             return 0;
         }
@@ -373,7 +376,7 @@ public class SchemaChangeClient {
      */
     private void loadTable(VoltTable t) {
         // if #partitions is odd, delete every 2 - if even, delete every 3
-        int n = 3 - (topo.partitions % 2);
+        //int n = 3 - (topo.partitions % 2);
 
         int redundancy = topo.sites / topo.partitions;
         long realRowCount = (config.targetrowcount * topo.hosts) / redundancy;
@@ -387,11 +390,7 @@ public class SchemaChangeClient {
         TableLoader loader = new TableLoader(this, t, rand);
 
         log.info(_F("loading table"));
-        loader.load(max + 1, realRowCount, 1);
-        log.info(_F("deleting from table"));
-        loader.delete(1, realRowCount, n);
-        log.info(_F("reloading table"));
-        loader.load(1, realRowCount, n);
+        loader.load(max + 1, realRowCount);
     }
 
     /**
@@ -412,6 +411,8 @@ public class SchemaChangeClient {
 
         return t2;
     }
+
+
 
     /**
      * Connect to a single server with retry. Limited exponential backoff. No
@@ -471,8 +472,15 @@ public class SchemaChangeClient {
             if ((currentTime - startTime) < (config.duration * 1000)) {
                 log.warn(_F("Lost connection to %s:%d.", hostname, port));
                 totalConnections.decrementAndGet();
+
+                // reset the connection id so the client will connect to a recovered cluster
+                // this is a bit of a hack
+                if (connectionsLeft == 0) {
+                    ((ClientImpl) client).resetInstanceId();
+                }
+
                 // setup for retry
-                final String server = hostname;
+                final String server = MiscUtils.getHostnameColonPortString(hostname, port);
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
