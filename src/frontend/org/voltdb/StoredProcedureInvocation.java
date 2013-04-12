@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.io.IOException;
+import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -37,7 +38,6 @@ import org.voltdb.messaging.FastSerializer;
  *
  */
 public class StoredProcedureInvocation implements FastSerializable, JSONString {
-    @SuppressWarnings("unused")
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     ProcedureInvocationType type = ProcedureInvocationType.ORIGINAL;
@@ -112,8 +112,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
             @Override
             public ParameterSet call() {
-                ParameterSet params = new ParameterSet();
-                params.setParameters(parameters);
+                ParameterSet params = ParameterSet.fromArrayWithCopy(parameters);
                 return params;
             }
         });
@@ -185,7 +184,15 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         }
         else if (params != null)
         {
-            size += getParams().getSerializedSize();
+            ParameterSet pset = getParams();
+            assert(pset != null);
+            int serializedSize = pset.getSerializedSize();
+            if ((pset.toArray().length > 0) && (serializedSize <= 2)) {
+                throw new IllegalStateException(String.format("Parameter set for invocation " +
+                        "%s doesn't have the proper size (currently = %s)",
+                        getProcName(), serializedSize));
+            }
+            size += pset.getSerializedSize();
         }
 
         return size;
@@ -224,7 +231,14 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
             }
         }
         else if (params != null) {
-            getParams().flattenToBuffer(buf);
+            try {
+                getParams().flattenToBuffer(buf);
+            }
+            catch (BufferOverflowException e) {
+                hostLog.info("SP \"" + procName + "\" has thrown BufferOverflowException");
+                hostLog.info(toString());
+                throw e;
+            }
         }
     }
 
@@ -253,7 +267,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
             @Override
             public ParameterSet call() throws Exception {
                 FastDeserializer fds = new FastDeserializer(duplicate);
-                return fds.readObject(ParameterSet.class);
+                return ParameterSet.fromFastDeserializer(fds);
             }
         });
     }
@@ -282,7 +296,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
             @Override
             public ParameterSet call() throws Exception {
                 FastDeserializer fds = new FastDeserializer(duplicate);
-                return fds.readObject(ParameterSet.class);
+                return ParameterSet.fromFastDeserializer(fds);
             }
         });
     }
@@ -301,7 +315,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         if (serializedParams != null)
             out.write(serializedParams.duplicate());
         else if (params != null) {
-            out.writeObject(getParams());
+            getParams().writeExternal(out);
         }
     }
 
