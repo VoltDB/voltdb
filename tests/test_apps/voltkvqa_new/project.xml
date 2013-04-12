@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<project>
+    <database>
+        <schemas>
+            <schema path='ddl.sql' />
+        </schemas>
+        <procedures>
+            <procedure class='voltkvqa_new.procedures.Initialize' />
+            <procedure class='voltkvqa_new.procedures.Get' />
+            <procedure class='voltkvqa_new.procedures.GetMp' />
+            <procedure class='voltkvqa_new.procedures.Put' />
+            <procedure class='voltkvqa_new.procedures.PutMp' />
+            <procedure class='voltkvqa_new.procedures.Remove' />
+        </procedures>
+    </database>
+</project>
