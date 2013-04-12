@@ -534,7 +534,7 @@ public abstract class CatalogUtil {
         if (deployment == null) {
             return -1;
         }
-        return compileDeploymentAndGetCRC(catalog, deployment, crashOnFailedValidation, false);
+        return compileDeploymentAndGetCRC(catalog, deployment, crashOnFailedValidation);
     }
 
     public static long compileDeploymentStringAndGetCRC(Catalog catalog, String deploymentString, boolean crashOnFailedValidation) {
@@ -542,7 +542,7 @@ public abstract class CatalogUtil {
         if (deployment == null) {
             return -1;
         }
-        return compileDeploymentAndGetCRC(catalog, deployment, crashOnFailedValidation, true);
+        return compileDeploymentAndGetCRC(catalog, deployment, crashOnFailedValidation);
     }
 
     /**
@@ -555,8 +555,8 @@ public abstract class CatalogUtil {
      */
     public static long compileDeploymentAndGetCRC(Catalog catalog,
                                                   DeploymentType deployment,
-                                                  boolean crashOnFailedValidation,
-                                                  boolean printLog) {
+                                                  boolean crashOnFailedValidation)
+    {
 
         if (!validateDeployment(catalog, deployment)) {
             return -1;
@@ -566,7 +566,7 @@ public abstract class CatalogUtil {
         catalog.getClusters().get("cluster").getDeployment().add("deployment");
 
         // set the cluster info
-        setClusterInfo(catalog, deployment, printLog);
+        setClusterInfo(catalog, deployment);
 
         //Set the snapshot schedule
         setSnapshotInfo( catalog, deployment.getSnapshot());
@@ -579,8 +579,7 @@ public abstract class CatalogUtil {
         // because path locations for snapshots and partition detection don't
         // exist in the catalog until after those portions of the deployment
         // file are handled.
-        setPathsInfo(catalog, deployment.getPaths(), crashOnFailedValidation,
-                     printLog);
+        setPathsInfo(catalog, deployment.getPaths(), crashOnFailedValidation);
 
         // set the users info
         setUsersInfo(catalog, deployment.getUsers());
@@ -902,33 +901,13 @@ public abstract class CatalogUtil {
      * @param catalog The catalog to be updated.
      * @param printLog Whether or not to print cluster configuration.
      */
-    private static void setClusterInfo(Catalog catalog, DeploymentType deployment,
-                                       boolean printLog) {
+    private static void setClusterInfo(Catalog catalog, DeploymentType deployment) {
         ClusterType cluster = deployment.getCluster();
         int hostCount = cluster.getHostcount();
         int sitesPerHost = cluster.getSitesperhost();
         int kFactor = cluster.getKfactor();
 
         ClusterConfig config = new ClusterConfig(hostCount, sitesPerHost, kFactor);
-        if (printLog) {
-            hostLog.l7dlog(Level.INFO,
-                           LogKeys.compiler_VoltCompiler_LeaderAndHostCountAndSitesPerHost.name(),
-                           new Object[] { config.getHostCount(),
-                                          VoltDB.instance().getConfig().m_leader,
-                                          config.getSitesPerHost(),
-                                          config.getReplicationFactor() },
-                           null);
-        }
-        int replicas = config.getReplicationFactor() + 1;
-        int partitionCount = config.getSitesPerHost() * config.getHostCount() / replicas;
-        if (printLog) {
-            hostLog.info(String.format("The entire cluster has %d %s of%s %d logical partition%s.",
-                                       replicas,
-                                       replicas > 1 ? "copies" : "copy",
-                                       partitionCount > 1 ? " each of the" : "",
-                                       partitionCount,
-                                       partitionCount > 1 ? "s" : ""));
-        }
 
         if (!config.validate()) {
             hostLog.error(config.getErrorMsg());
@@ -952,15 +931,9 @@ public abstract class CatalogUtil {
                     else {
                         sched.setPrefix(defaultPPDPrefix);
                     }
-                    if (printLog) {
-                        hostLog.info("Detection of network partitions in the cluster is enabled.");
-                    }
                 }
                 else {
                     catCluster.setNetworkpartition(false);
-                    if (printLog) {
-                        hostLog.info("Detection of network partitions in the cluster is not enabled.");
-                    }
                 }
             }
             else {
@@ -970,15 +943,9 @@ public abstract class CatalogUtil {
                     CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
                     SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
                     sched.setPrefix(defaultPPDPrefix);
-                    if (printLog) {
-                        hostLog.info("Detection of network partitions in the cluster is enabled.");
-                    }
                 }
                 else {
                     catCluster.setNetworkpartition(false);
-                    if (printLog) {
-                        hostLog.info("Detection of network partitions in the cluster is not enabled.");
-                    }
                 }
             }
 
@@ -1237,17 +1204,13 @@ public abstract class CatalogUtil {
      * @param paths A reference to the <paths> element of the deployment.xml file.
      * @param printLog Whether or not to print paths info.
      */
-    private static void setPathsInfo(Catalog catalog, PathsType paths, boolean crashOnFailedValidation,
-                                     boolean printLog) {
+    private static void setPathsInfo(Catalog catalog, PathsType paths, boolean crashOnFailedValidation) {
         File voltDbRoot;
         final Cluster cluster = catalog.getClusters().get("cluster");
         // Handles default voltdbroot (and completely missing "paths" element).
         voltDbRoot = getVoltDbRoot(paths);
 
         validateDirectory("volt root", voltDbRoot, crashOnFailedValidation);
-        if (printLog) {
-            hostLog.info("Using \"" + voltDbRoot.getAbsolutePath() + "\" for voltdbroot directory.");
-        }
 
         PathEntry path_entry = null;
         if (paths != null)

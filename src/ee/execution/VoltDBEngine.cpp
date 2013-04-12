@@ -696,13 +696,17 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
 
             if (!hasSameSchema(catalogTable, persistenttable)) {
                 char msg[512];
-                snprintf(msg, sizeof(msg), "Processing schema changes for %s\n",
+                snprintf(msg, sizeof(msg), "Table %s has changed schema and will be rebuilt.",
                          catalogTable->name().c_str());
                 LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
 
                 tcd->processSchemaChanges(*m_database, *catalogTable, m_delegatesByName);
 
-                // don't continue on to modify/add/remove indexes/views, because the
+                snprintf(msg, sizeof(msg), "Table %s was successfully rebuilt with new schema.",
+                         catalogTable->name().c_str());
+                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
+
+                // don't continue on to modify/add/remove indexes, because the
                 // call above should rebuild them all anyway
                 continue;
             }

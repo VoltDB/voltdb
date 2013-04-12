@@ -500,6 +500,8 @@ TableCatalogDelegate::migrateChangedTuples(catalog::Table const &catalogTable,
                                            PersistentTable* existingTable,
                                            PersistentTable* newTable)
 {
+    int64_t existingTupleCount = existingTable->activeTupleCount();
+
     // remove all indexes from the existing table
     vector<TableIndex*> currentIndexes = existingTable->allIndexes();
     for (int i = 0; i < currentIndexes.size(); i++) {
@@ -567,6 +569,8 @@ TableCatalogDelegate::migrateChangedTuples(catalog::Table const &catalogTable,
 
     TableTuple scannedTuple(existingTable->schema());
 
+    int64_t tuplesMigrated = 0;
+
     // going to run until the source table has no allocated blocks
     size_t blocksLeft = existingTable->allocatedBlockCount();
     while (blocksLeft) {
@@ -598,6 +602,9 @@ TableCatalogDelegate::migrateChangedTuples(catalog::Table const &catalogTable,
             // delete from the old table
             existingTable->deleteTupleForSchemaChange(scannedTuple);
 
+            // note one tuple moved
+            ++tuplesMigrated;
+
             // if a block was just deleted, start the iterator again on the next block
             // this avoids using the block iterator over a changing set of blocks
             size_t prevBlocksLeft = blocksLeft;
@@ -613,6 +620,13 @@ TableCatalogDelegate::migrateChangedTuples(catalog::Table const &catalogTable,
     // implies serious problems, we'll not worry our pretty little heads
     for (int i = 0; i < columnCount; i++) {
         defaults[i].free();
+    }
+
+    // check tuple counts are sane
+    assert(newTable->activeTupleCount() == existingTupleCount);
+    // dumb way to structure an assert avoids unused variable warning (lame)
+    if (tuplesMigrated != existingTupleCount) {
+        assert(tuplesMigrated == existingTupleCount);
     }
 }
 
