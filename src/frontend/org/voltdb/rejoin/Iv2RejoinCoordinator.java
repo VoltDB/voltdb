@@ -18,6 +18,7 @@
 package org.voltdb.rejoin;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -75,7 +76,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     private final Map<Long, String> m_nonces = new HashMap<Long, String>();
 
     public Iv2RejoinCoordinator(HostMessenger messenger,
-                                       List<Long> sites,
+                                       Collection<Long> sites,
                                        String voltroot,
                                        boolean liveRejoin) {
         super(messenger);

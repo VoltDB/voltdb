@@ -21,6 +21,7 @@ import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Collection;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.VoltLogger;
@@ -94,6 +95,7 @@ public abstract class TheHashinator {
     abstract protected int pHashinateLong(long value);
     abstract protected int pHashinateBytes(byte[] bytes);
     abstract protected Pair<HashinatorType, byte[]> pGetCurrentConfig();
+    abstract protected Set<Integer> pPredecessors(int partition);
 
     /**
      * Given a long value, pick a partition to store the data. It's only called for legacy
@@ -295,5 +297,9 @@ public abstract class TheHashinator {
 
     public static Pair<HashinatorType, byte[]> getCurrentConfig() {
         return instance.get().getSecond().pGetCurrentConfig();
+    }
+
+    public static Set<Integer> predecessors(int partition) {
+        return instance.get().getSecond().pPredecessors(partition);
     }
 }

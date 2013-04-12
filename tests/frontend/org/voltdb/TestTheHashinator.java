@@ -28,11 +28,14 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Random;
+import java.util.Set;
 import java.util.TreeMap;
 
+import com.google.common.collect.ImmutableSortedMap;
 import junit.framework.TestCase;
 
 import org.apache.cassandra_voltpatches.MurmurHash3;
@@ -602,6 +605,41 @@ public class TestTheHashinator extends TestCase {
         assertEquals(ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION, (int) newPidCounts.get(3));
         assertEquals(ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION, (int) newPidCounts.get(4));
         assertEquals(ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION, (int) newPidCounts.get(5));
+    }
+
+    @Test
+    public void testElasticPredecessors() {
+        if (hashinatorType == HashinatorType.LEGACY) return;
+
+        byte[] config = ElasticHashinator.getConfigureBytes(3,
+                                                            ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+        byte[] newConfig = ElasticHashinator.addPartitions(new ElasticHashinator(config), Arrays.asList(3, 4, 5),
+                                                           ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+        TheHashinator.initialize(HashinatorType.ELASTIC.hashinatorClass, newConfig);
+        Map<Long, Integer> newTokens = deserializeElasticConfig(newConfig);
+        Set<Long> tokensForP4 = new HashSet<Long>();
+        Set<Integer> predecessors = TheHashinator.predecessors(4);
+        // Predecessor set shouldn't contain the partition itself
+        assertFalse(predecessors.contains(4));
+
+        for (Map.Entry<Long, Integer> entry : newTokens.entrySet()) {
+            if (entry.getValue() == 4) {
+                tokensForP4.add(entry.getKey());
+            }
+        }
+        assertEquals(ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION, tokensForP4.size());
+
+        ElasticHashinator hashinator = new ElasticHashinator(TheHashinator.getCurrentConfig().getSecond());
+        for (long token : tokensForP4) {
+            int pid;
+            if (token != Long.MIN_VALUE) {
+                pid = hashinator.partitionForToken(token - 1);
+            } else {
+                pid = hashinator.partitionForToken(Long.MAX_VALUE);
+            }
+            predecessors.remove(pid);
+        }
+        assertEquals(0, predecessors.size());
     }
 }
 
