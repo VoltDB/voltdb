@@ -140,7 +140,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     public VoltDB.Configuration m_config = new VoltDB.Configuration();
     int m_configuredNumberOfPartitions;
-    CatalogContext m_catalogContext;
+    // CatalogContext is immutable, just make sure that accessors see a consistent version
+    volatile CatalogContext m_catalogContext;
     private String m_buildString;
     private static final String m_defaultVersionString = "3.2";
     private String m_versionString = m_defaultVersionString;
@@ -213,7 +214,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // Synchronize initialize and shutdown.
     private final Object m_startAndStopLock = new Object();
 
-    // Synchronize updates of catalog contexts with context accessors.
+    // Synchronize updates of catalog contexts across the multiple sites on this host.
+    // Ensure that the first site to reach catalogUpdate() does all the work and that no
+    // others enter until that's finished.  CatalogContext is immutable and volatile, accessors
+    // should be able to always get a valid context without needing this lock.
     private final Object m_catalogUpdateLock = new Object();
 
     // add a random number to the sampler output to make it likely to be unique for this process.
@@ -1695,9 +1699,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     @Override
     public CatalogContext getCatalogContext() {
-        synchronized(m_catalogUpdateLock) {
-            return m_catalogContext;
-        }
+        return m_catalogContext;
     }
 
     /**
