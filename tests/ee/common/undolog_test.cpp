@@ -72,13 +72,11 @@ public:
             const int64_t undoToken = (INT64_MIN + 1) + (ii * 3);
             undoTokens.push_back(undoToken);
             voltdb::UndoQuantum *quantum = m_undoLog->generateUndoQuantum(undoToken);
-            voltdb::Pool *pool = quantum->getDataPool();
             std::vector<MockUndoActionHistory*> histories;
             for (int qq = 0; qq < numUndoActions; qq++) {
                 MockUndoActionHistory *history = new MockUndoActionHistory();
                 histories.push_back(history);
-                MockUndoAction *undoAction = new (pool->allocate(sizeof(MockUndoAction))) MockUndoAction(history);
-                quantum->registerUndoAction(undoAction);
+                quantum->registerUndoAction(new (*quantum) MockUndoAction(history));
             }
             m_undoActionHistoryByQuantum.push_back(histories);
         }

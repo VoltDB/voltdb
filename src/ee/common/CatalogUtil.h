@@ -33,7 +33,7 @@
  * A table is export only if any connector's table list marks it as
  * such. Search through the connector's table lists accordingly.
  */
-bool isTableExportOnly(catalog::Database& database, int32_t tableIndex) {
+bool isTableExportOnly(catalog::Database const & database, int32_t tableIndex) {
 
     // no export, no export only tables
     if (database.connectors().size() == 0) {
@@ -63,7 +63,7 @@ bool isTableExportOnly(catalog::Database& database, int32_t tableIndex) {
  * a connector's table list and if export is enabled for the
  * database as a whole
  */
-bool isExportEnabledForTable(catalog::Database& database, int32_t tableIndex) {
+bool isExportEnabledForTable(catalog::Database const & database, int32_t tableIndex) {
 
     // export is disabled unless a connector exists
     if (database.connectors().size() == 0) {
