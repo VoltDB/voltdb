@@ -1144,6 +1144,15 @@ NATIVE EE STUFF
     </exec>
 </target>
 
+<target name="eebuild" depends="voltdbipc"
+    description="Build but do not run test cases for C++ JNI library.">
+    <exec dir='.' executable='python' failonerror='true'>
+        <env key="TEST_DIR" value="${build.testobjects.dir}" />
+        <env key="EETESTSUITE" value="${eetestsuite}"/>
+        <arg line="build.py ${build} build" />
+    </exec>
+</target>
+
 <target name='voltdbipc' depends="ee"
     description="Build the IPC client.">
     <exec dir='.' executable='python' failonerror='true'>
@@ -1395,10 +1404,13 @@ TEST CASES
                 <exclude name='org/voltdb/dtxn/Test*.class'/>
                 <exclude name="**/TestCommandLog*.class" />
                 <exclude name="**/TestExport*.class"/>
+                <exclude name="**/TestJoin.class"/>
                 <exclude name="**/TestLogReader.class"/>
                 <exclude name="**/TestMaliciousClientSuite.class" />
-                <exclude name="**/Test*Restore*.class" />
                 <exclude name="**/Test*Rejoin*.class" />
+                <exclude name="**/Test*Replication*.class" />
+                <exclude name="**/Test*Restore*.class" />
+                <exclude name="**/Test*Snapshot*.class" />
             </fileset>
         </tests>
     </run_junit>

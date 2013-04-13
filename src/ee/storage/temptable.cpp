@@ -43,14 +43,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <vector>
-
 #include "temptable.h"
-#include "tableiterator.h"
-#include "common/tabletuple.h"
-#include "common/serializeio.h"
 #include "common/debuglog.h"
-#include "storage/TableStats.h"
 
 #define TABLE_BLOCKSIZE 131072
 
@@ -69,26 +63,26 @@ TempTable::~TempTable() {}
 // OPERATIONS
 // ------------------------------------------------------------------
 void TempTable::deleteAllTuples(bool freeAllocatedStrings) { deleteAllTuplesNonVirtual(freeAllocatedStrings); }
-bool TempTable::insertTuple(TableTuple &source) {
-    insertTupleNonVirtual(source);
-    return true;
-}
+bool TempTable::insertTuple(TableTuple &source) { insertTempTuple(source); return true; }
 
 bool TempTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
                                                TableTuple &sourceTupleWithNewValues,
-                                               std::vector<TableIndex*> &indexesToUpdate) {
-    updateTupleNonVirtual(targetTupleToUpdate, sourceTupleWithNewValues);
-    return true;
+                                               std::vector<TableIndex*> const &indexesToUpdate,
+                                               bool)
+{
+    throwFatalException("TempTable does not support update");
+    // Some day maybe, if we find a use case:
+    // Copy the source tuple into the target
+    // targetTupleToUpdate.copy(sourceTupleWithNewValues);
 }
 
-bool TempTable::deleteTuple(TableTuple &target, bool deleteAllocatedStrings) {
-    VOLT_ERROR("TempTable does not support deleting individual tuples");
-    return false;
+bool TempTable::deleteTuple(TableTuple &, bool)
+{
+    throwFatalException("TempTable does not support deleting individual tuples");
 }
 
-std::string TempTable::tableType() const {
-    return "TempTable";
-}
+std::string TempTable::tableType() const { return "TempTable"; }
 
 voltdb::TableStats* TempTable::getTableStats() { return NULL; }
+
 }
