@@ -95,12 +95,6 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
          */
         if (!m_finishedTableScan && tuple.isPendingDelete()) {
             assert(!tuple.isPendingDeleteOnUndoRelease());
-            if (m_table->m_schema->getUninlinedObjectColumnCount() != 0)
-            {
-                m_table->decreaseStringMemCount(tuple.getNonInlinedMemorySize());
-            }
-            tuple.setPendingDeleteFalse();
-            tuple.freeObjectColumns();
             CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
             //Save the extra lookup if possible
             m_table->deleteTupleStorage(tuple, iter->m_currentBlock);
