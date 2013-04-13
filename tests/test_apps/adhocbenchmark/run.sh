@@ -86,13 +86,15 @@ function _benchmark() {
         ${APPNAME}.Benchmark \
         --displayinterval=5 \
         --servers=localhost \
-        --configfile=config.xml \
+        --configfile=cachefriendlyconfig.xml \
         --warmup=5 \
-        --duration=20 \
-#--querytracefile=$1.queries.log.txt \
-        --test=$1
-    echo Sample queries:
-    head -6 $1.queries.out
+        --duration=60 \
+        --test=$1 \
+        --querythrottle=30
+                           ## \
+##        --querytracefile=$1.queries.out
+#    echo Sample queries:
+#    head -6 $1.queries.out
 }
 
 function benchmark-joins() {
