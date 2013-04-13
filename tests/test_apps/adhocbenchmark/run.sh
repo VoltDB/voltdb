@@ -86,7 +86,7 @@ function _benchmark() {
         ${APPNAME}.Benchmark \
         --displayinterval=5 \
         --servers=localhost \
-        --configfile=config.xml \
+        --configfile=cachefriendlyconfig.xml \
         --warmup=5 \
         --duration=60 \
         --test=$1 \

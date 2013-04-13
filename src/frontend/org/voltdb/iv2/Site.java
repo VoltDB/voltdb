@@ -1049,11 +1049,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 TheHashinator.getConfigureBytes(m_numberOfPartitions));
     }
 
+    /// A plan fragment entry in the cache.
     private static class FragInfo {
         final Sha1Wrapper hash;
         final long fragId;
         final byte[] plan;
         int refCount;
+        /// The ticker value current when this fragment was last (dis)used.
+        /// A new FragInfo or any other not in the LRU map because it is being referenced has value 0.
+        /// A non-zero value is either the fragment's current key in the LRU map OR its intended/future
+        /// key, if it has been lazily updated after the fragment was reused.
         long lastUse;
 
         FragInfo(Sha1Wrapper key, byte[] plan, long nextId)
@@ -1070,9 +1075,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     HashMap<Sha1Wrapper, FragInfo> m_plansByHash = new HashMap<Sha1Wrapper, FragInfo>();
     HashMap<Long, FragInfo> m_plansById = new HashMap<Long, FragInfo>();
     TreeMap<Long, FragInfo> m_plansLRU = new TreeMap<Long, FragInfo>();
+    /// A ticker that provides temporary ids for all cached fragments, for communicating with the EE.
     long m_nextFragId = 5000;
     /// A ticker that allows the sequencing of all fragment uses, providing a key to the LRU map.
-    long m_nextFragUse = 0;
+    long m_nextFragUse = 1;
 
     @Override
     public long getFragmentIdForPlanHash(byte[] planHash) {
@@ -1092,55 +1098,74 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             FragInfo frag = m_plansByHash.get(key);
             if (frag == null) {
                 frag = new FragInfo(key, plan, m_nextFragId++);
-                frag.lastUse = ++m_nextFragUse;
-                m_plansLRU.put(frag.lastUse, frag);
                 m_plansByHash.put(frag.hash, frag);
                 m_plansById.put(frag.fragId, frag);
-
-                if (m_plansLRU.size() > ExecutionEngine.EE_PLAN_CACHE_SIZE) {
-                    dropLRUfragment();
+                if (m_plansById.size() > ExecutionEngine.EE_PLAN_CACHE_SIZE) {
+                    evictLRUfragment();
                 }
-            } else {
-                // Prepare to lazily update the re-used frag's position in the LRU map.
-                // A fragment can be referenced numerous times like this before new cache entries force
-                // it to the front of the LRU map. When that happens, it can refresh its position
-                // in the map ONCE based on its LAST use so that some other entry gets de-cached.
-                // This is more efficient than thrashing the map on every fragment use,
-                // especially when fragment re-use dominates new fragments.
-                frag.lastUse = ++m_nextFragUse;
             }
+            // The fragment MAY be in the LRU map.
+            // An incremented refCount is a lazy way to keep it safe from eviction
+            // without having to update the map.
+            // This optimizes for popular fragments in a small or stable cache that may be reused
+            // many times before the eviction process needs to take any notice.
             frag.refCount++;
             return frag.fragId;
         }
     }
 
-    void dropLRUfragment()
+    /// Evict the least recently used fragment (if any are currently unused).
+    /// Along the way, update any obsolete entries that were left
+    /// by the laziness of the fragment state changes (fragment reuse).
+    /// In the rare case of a cache bloated beyond its usual limit,
+    /// keep evicting as needed and as entries are available until the bloat is gone.
+    void evictLRUfragment()
     {
-        while (true) {
+        while ( ! m_plansLRU.isEmpty()) {
             // Remove the earliest entry.
             Entry<Long, FragInfo> lru = m_plansLRU.pollFirstEntry();
             FragInfo frag = lru.getValue();
-            // Re-insert it "last" if its ref count says that it is "in use" / "reserved".
             if (frag.refCount > 0) {
-                frag.lastUse = ++m_nextFragUse;
+                // The fragment is being re-used, it is no longer an eviction candidate.
+                // It is only in the map due to the laziness in loadOrAddRefPlanFragment.
+                // It will be re-considered (at a later key) once it is no longer referenced.
+                // Resetting its lastUse to 0, here, restores it to a state identical to that
+                // of a new fragment.
+                // It eventually causes decrefPlanFragmentById to put it back in the map
+                // at its then up-to-date key.
+                // This makes it safe to keep out of the LRU map for now.
+                // See the comment in decrefPlanFragmentById and the one in the next code block.
+                frag.lastUse = 0;
             }
             else if (lru.getKey() != frag.lastUse) {
-                // Don't remove a fragment that was used recently, since is was last (re)inserted.
-                // Instead, re-insert it at its point of last use.
-                // This prevents thrashing of the LRU list for frequently used frags.
-                frag.lastUse = m_nextFragUse++;
+                // The fragment is not in use but has been re-used more recently than the key reflects.
+                // This is a result of the laziness in decrefPlanFragmentById.
+                // Correct the entry's key in the LRU map to reflect its last use.
+                // This may STILL be the least recently used entry.
+                // If so, it will be picked off in a later iteration of this loop;
+                // its key will now match its lastUse value.
+                m_plansLRU.put(frag.lastUse, frag);
             }
             else {
-                // Found and removed the actually least recently used safe entry from the LRU map.
-                // Remove the entry from all the collections.
+                // Found and removed the actual up-to-date least recently used entry from the LRU map.
+                // Remove the entry from the other collections.
+                m_plansById.remove(frag.fragId);
+                m_plansByHash.remove(frag.hash);
+                // Normally, one eviction for each new fragment is enough to restore order.
+                // BUT, if a prior call ever failed to find an unused fragment in the cache,
+                // the cache may have grown beyond its normal size. In that rare case,
+                // one eviction is not enough to reduce the cache to the desired size,
+                // so take another bite at the apple.
+                // Otherwise, trading exactly one evicted fragment for each new fragment
+                // would never reduce the cache.
+                if (m_plansById.size() > ExecutionEngine.EE_PLAN_CACHE_SIZE) {
+                     continue;
+                }
                 return;
             }
-            m_plansById.remove(frag.fragId);
-            m_plansByHash.remove(frag.hash);
-            // Try another candidate. They can't ALL be in use.
-            lru = m_plansLRU.pollFirstEntry();
-            assert(lru != null);
         }
+        // Strange. All FragInfo entries appear to be in use. There's nothing to evict.
+        // Let the cache bloat a little and try again later after the next new fragment.
     }
 
     @Override
@@ -1152,7 +1177,23 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         synchronized (FragInfo.class) {
             frag = m_plansById.get(fragmentId);
             assert(frag != null);
-            --frag.refCount;
+            if (--frag.refCount == 0) {
+                // The disused fragment belongs in the LRU map at the end -- at the current "ticker".
+                // If its lastUse value is 0 like a new entry's, it is not currently in the map.
+                // Put into the map in its proper position.
+                // If it is already in the LRU map (at a "too early" entry), just set its lastUse value
+                // as a cheap way to notify evictLRUfragment that it is not ready for eviction but
+                // should instead be re-ordered further forward in the map.
+                // This re-ordering only needs to happen when the eviction process considers the entry.
+                // For a popular fragment in a small or stable cache, that may be after MANY
+                // re-uses like this.
+                // This prevents thrashing of the LRU map, repositioning recent entries.
+                boolean notInLRUmap = (frag.lastUse == 0); // check this BEFORE updating lastUse
+                frag.lastUse = ++m_nextFragUse;
+                if (notInLRUmap) {
+                    m_plansLRU.put(frag.lastUse, frag);
+                }
+            }
         }
     }
 
