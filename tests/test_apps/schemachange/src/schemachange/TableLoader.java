@@ -135,13 +135,13 @@ class TableLoader {
         return Math.min(low, max);
     }
 
-    void load(long startPkey, long stopPkey) throws Exception {
+    void load(long startPkey, long stopPkey) {
         while (!loadChunk(startPkey, stopPkey)) {
             startPkey = safeStartPkey(startPkey, stopPkey);
         }
     }
 
-    private boolean loadChunk(long startPkey, long stopPkey) throws Exception {
+    private boolean loadChunk(long startPkey, long stopPkey) {
         assert(startPkey >= 0);
         assert(stopPkey >= 0);
 
@@ -170,7 +170,7 @@ class TableLoader {
             }
             catch (Exception e) {
                 log.info("loadChunk exiting (failed) due to thrown exception: " + e.getMessage());
-                throw e; // fail the test
+                return false;
             }
         }
 
