@@ -391,4 +391,58 @@ public abstract class ExpressionUtil {
         return ExpressionUtil.combine(newList);
     }
 
+    /**
+     *  A condition is null-rejected for a given table in the following cases:
+     *      If it is of the form A IS NOT NULL, where A is an attribute of any of the inner tables
+     *      If it is a predicate containing a reference to an inner table that evaluates to UNKNOWN
+     *          when one of its arguments is NULL
+     *      If it is a conjunction containing a null-rejected condition as a conjunct
+     *      If it is a disjunction of null-rejected conditions
+     *
+     * @param expr
+     * @param tableName
+     * @return
+     */
+    public static boolean isNullRejectingExpression(AbstractExpression expr, String tableName) {
+        if (expr.getExpressionType() == ExpressionType.CONJUNCTION_AND) {
+            assert(expr.m_left != null && expr.m_right != null);
+            return isNullRejectingExpression(expr.m_left, tableName) || isNullRejectingExpression(expr.m_right, tableName);
+        } else if (expr.getExpressionType() == ExpressionType.CONJUNCTION_OR) {
+            assert(expr.m_left != null && expr.m_right != null);
+            return isNullRejectingExpression(expr.m_left, tableName) && isNullRejectingExpression(expr.m_right, tableName);
+        } else if (expr.getExpressionType() == ExpressionType.OPERATOR_NOT) {
+            assert(expr.m_left != null);
+            if (expr.m_left.getExpressionType() == ExpressionType.OPERATOR_IS_NULL) {
+                return ExpressionUtil.containsMatchingTVE(expr, tableName);
+            } else {
+                return isNullRejectingExpression(expr.m_left, tableName);
+            }
+        } else if (expr.getExpressionType() == ExpressionType.FUNCTION) {
+            FunctionExpression fe = (FunctionExpression) expr;
+            for (AbstractExpression arg : fe.m_args) {
+                if (ExpressionUtil.containsMatchingTVE(arg, tableName)) {
+                    return true;
+                }
+            }
+            return false;
+        } else if (expr.getExpressionType() == ExpressionType.OPERATOR_IS_NULL) {
+            // IS NOT NULL is NULL rejecting
+            return false;
+        } else {
+            // @TODO ENG_3038 Is it safe to assume for the rest of the expressions that if
+            // it contains a TVE with the matching table name then it is NULL rejection expression?
+            return ExpressionUtil.containsMatchingTVE(expr, tableName);
+        }
+    }
+
+    private static boolean containsMatchingTVE(AbstractExpression expr, String tableName) {
+        assert(expr != null);
+        List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(expr);
+        for (TupleValueExpression tve : tves) {
+            if (tve.m_tableName == tableName) {
+                return true;
+            }
+        }
+        return false;
+    }
 }

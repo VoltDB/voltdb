@@ -255,12 +255,100 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     }
 
     /**
-     * Outerjoin simplification.
+     * Outer join simplification using null rejection.
+     * http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.43.2531
+     * Outerjoin Simplification and Reordering for Query Optimization
+     * by Cesar A. Galindo-Legaria , Arnon Rosenthal
+     * Algorithm:
+     * Traverse the join tree top-down:
+     *  For each join node n1 do:
+     *    For each expression expr (join and where) at the node n1
+     *      For each join node n2 descended from n1 do:
+     *          If expr rejects nulls introduced by n2 inner table,
+     *          then convert n2 to an inner join. If n2 is a full join then need repeat this step
+     *          for n2 inner and outer tables
      */
     private JoinTree simplifyOuterJoin(JoinTree joinTree) {
-        // Placeholder to apply null-rejection simplification
+        assert(joinTree.m_root != null);
+        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+        // For the top level node only WHERE expressions need to be evaluated for NULL-rejection
+        if (joinTree.m_root.m_leftNode != null && joinTree.m_root.m_leftNode.m_whereExpr != null) {
+            exprs.add(joinTree.m_root.m_leftNode.m_whereExpr);
+        }
+        if (joinTree.m_root.m_rightNode != null && joinTree.m_root.m_rightNode.m_whereExpr != null) {
+            exprs.add(joinTree.m_root.m_rightNode.m_whereExpr);
+        }
+        simplifyOuterJoinRecurcively(joinTree.m_root, exprs);
+        joinTree.m_hasOuterJoin = joinTree.m_root.hasOuterJoin();
         return joinTree;
     }
+
+    private JoinNode simplifyOuterJoinRecurcively(JoinNode joinNode, List<AbstractExpression> exprs) {
+        assert (joinNode != null);
+        if (joinNode.m_table != null) {
+            // End of the recursion. Nothing to simplify
+            return joinNode;
+        }
+        assert(joinNode.m_leftNode != null && joinNode.m_rightNode != null);
+        assert(joinNode.m_leftNode.m_joinType == JoinType.INNER || joinNode.m_rightNode.m_joinType == JoinType.INNER);
+        JoinNode innerNode = null;
+        if (joinNode.m_rightNode.m_joinType == JoinType.LEFT || joinNode.m_leftNode.m_joinType == JoinType.RIGHT) {
+            innerNode = joinNode.m_rightNode;
+        } else if (joinNode.m_rightNode.m_joinType == JoinType.RIGHT || joinNode.m_leftNode.m_joinType == JoinType.LEFT) {
+            innerNode = joinNode.m_leftNode;
+        } else {
+            // Full joins are not supported
+            assert(false);
+        }
+        if (innerNode != null) {
+            for (AbstractExpression expr : exprs) {
+                if (innerNode.m_table != null) {
+                    if (ExpressionUtil.isNullRejectingExpression(expr, innerNode.m_table.getTypeName())) {
+                        // We are done at this level
+                        joinNode.m_leftNode.m_joinType = JoinType.INNER;
+                        joinNode.m_rightNode.m_joinType = JoinType.INNER;
+                        break;
+                    }
+                } else {
+                    // This is a join node itself. Get all the tables underneath this node and
+                    // see if the expression is NULL-rejecting for any of them
+                    List<Table> tables = innerNode.generateTableJoinOrder();
+                    boolean rejectNull = false;
+                    for (Table table : tables) {
+                        if (ExpressionUtil.isNullRejectingExpression(expr, table.getTypeName())) {
+                            // We are done at this level
+                            joinNode.m_leftNode.m_joinType = JoinType.INNER;
+                            joinNode.m_rightNode.m_joinType = JoinType.INNER;
+                            rejectNull = true;
+                            break;
+                        }
+                    }
+                    if (rejectNull) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Now add this node expression to the list and descend
+        if (joinNode.m_leftNode.m_joinExpr != null) {
+            exprs.add(joinNode.m_leftNode.m_joinExpr);
+        }
+        if (joinNode.m_leftNode.m_whereExpr != null) {
+            exprs.add(joinNode.m_leftNode.m_whereExpr);
+        }
+        if (joinNode.m_rightNode.m_joinExpr != null) {
+            exprs.add(joinNode.m_rightNode.m_joinExpr);
+        }
+        if (joinNode.m_rightNode.m_whereExpr != null) {
+            exprs.add(joinNode.m_rightNode.m_whereExpr);
+        }
+        simplifyOuterJoinRecurcively(joinNode.m_leftNode, exprs);
+        simplifyOuterJoinRecurcively(joinNode.m_rightNode, exprs);
+        return joinNode;
+
+    }
+
     /**
      * Pull a join order out of the join orders deque, compute all possible plans
      * for that join order, then append them to the computed plans deque.
@@ -586,6 +674,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             nljNode.addAndLinkChild(nljAccessPlan);
 
             nljNode.addAndLinkChild(subPlan);
+
             // now generate the output schema for this join
             nljNode.generateOutputSchema(m_db);
 

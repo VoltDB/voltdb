@@ -178,6 +178,19 @@ public class JoinTree {
             nodes.add(node);
         }
 
+        /**
+         * Returns true if one of the tree nodes has outer join
+         */
+        boolean hasOuterJoin() {
+            if (m_table != null) {
+                return false;
+            }
+            assert(m_leftNode != null && m_rightNode != null);
+            return m_leftNode.m_joinType != JoinType.INNER ||
+                    m_rightNode.m_joinType != JoinType.INNER ||
+                    m_leftNode.hasOuterJoin() || m_rightNode.hasOuterJoin();
+        }
+
     }
 
     // The tree root
