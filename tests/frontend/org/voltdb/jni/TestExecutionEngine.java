@@ -173,8 +173,8 @@ public class TestExecutionEngine extends TestCase {
 
         loadTestTables( sourceEngine, m_catalog);
 
-        sourceEngine.activateTableStream( WAREHOUSE_TABLEID, TableStreamType.RECOVERY );
-        sourceEngine.activateTableStream( STOCK_TABLEID, TableStreamType.RECOVERY );
+        sourceEngine.activateTableStream( WAREHOUSE_TABLEID, TableStreamType.RECOVERY, new byte[] {0, 0, 0, 0});
+        sourceEngine.activateTableStream( STOCK_TABLEID, TableStreamType.RECOVERY, new byte[] {0, 0, 0, 0});
 
         BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
         try {

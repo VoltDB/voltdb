@@ -313,7 +313,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Interface frontend invokes to communicate to CPP execution engine.
      */
 
-    abstract public boolean activateTableStream(final int tableId, TableStreamType type);
+    abstract public boolean activateTableStream(final int tableId, TableStreamType type, byte[] data);
 
     /**
      * Serialize more tuples from the specified table that already has a stream enabled

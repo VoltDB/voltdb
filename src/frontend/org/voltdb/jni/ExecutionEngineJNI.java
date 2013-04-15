@@ -419,16 +419,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateTableStream(int tableId, TableStreamType streamType) {
-        FastSerializer fs = new FastSerializer();
-        try {
-            fs.writeByte(0);                // Delete flag
-            fs.writeInt(0);                 // Predicate count
-        }
-        catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        return nativeActivateTableStream(pointer, tableId, streamType.ordinal(), fs.getBytes());
+    public boolean activateTableStream(int tableId, TableStreamType streamType, byte[] data) {
+        return nativeActivateTableStream(pointer, tableId, streamType.ordinal(), data);
     }
 
     @Override

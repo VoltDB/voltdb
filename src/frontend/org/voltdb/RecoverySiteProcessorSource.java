@@ -437,7 +437,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
         }
         m_onCompletion = onCompletion;
         RecoveryTable table = m_tablesToStream.peek();
-        if (!m_engine.activateTableStream(table.m_tableId, TableStreamType.RECOVERY )) {
+        if (!m_engine.activateTableStream(table.m_tableId, TableStreamType.RECOVERY, new byte[] {0, 0, 0, 0})) {
             VoltDB.crashLocalVoltDB("Attempted to activate recovery stream for table "
                     + table.m_name + " and failed", false, null);
         }
@@ -618,7 +618,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                     m_tablesToStream.poll();
                     RecoveryTable nextTable = m_tablesToStream.peek();
                     if (nextTable != null) {
-                        if (!m_engine.activateTableStream(nextTable.m_tableId, TableStreamType.RECOVERY )) {
+                        if (!m_engine.activateTableStream(nextTable.m_tableId, TableStreamType.RECOVERY, new byte[] {0, 0, 0, 0})) {
                             VoltDB.crashLocalVoltDB("Attempted to activate recovery stream for table "
                                     + nextTable.m_name + " and failed", false, null);
                         }

@@ -170,7 +170,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateTableStream(int tableId, TableStreamType type) {
+    public boolean activateTableStream(int tableId, TableStreamType type, byte[] data) {
         return false;
     }
 
