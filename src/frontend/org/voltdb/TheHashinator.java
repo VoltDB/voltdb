@@ -270,14 +270,13 @@ public abstract class TheHashinator {
     /**
      * Add new partitions to create a new hashinator configuration.
      */
-    public static byte[] addPartitions(Collection<Integer> newPartitions) {
+    public static byte[] addPartitions(Map<Long, Integer> tokensToPartitions) {
         HashinatorType type = getConfiguredHashinatorType();
         switch (type) {
-            case LEGACY:
-                throw new RuntimeException("Legacy hashinator doesn't support adding partitions");
-            case ELASTIC:
-                return ElasticHashinator.addPartitions(instance.get().getSecond(), newPartitions,
-                                                       ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+        case LEGACY:
+            throw new RuntimeException("Legacy hashinator doesn't support adding partitions");
+        case ELASTIC:
+            return ElasticHashinator.addPartitions(instance.get().getSecond(), tokensToPartitions);
         }
         throw new RuntimeException("Should not reach here");
     }
