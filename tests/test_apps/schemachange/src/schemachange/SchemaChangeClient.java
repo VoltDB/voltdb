@@ -487,9 +487,6 @@ public class SchemaChangeClient {
     private class StatusListener extends ClientStatusListenerExt {
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
-            // if the benchmark is still active
-            long currentTime = System.currentTimeMillis();
-            if ((currentTime - startTime) < (config.duration * 1000)) {
                 log.warn(_F("Lost connection to %s:%d.", hostname, port));
                 totalConnections.decrementAndGet();
 
@@ -507,7 +504,6 @@ public class SchemaChangeClient {
                         connectToOneServerWithRetry(server);
                     }
                 }).start();
-            }
         }
     }
 
@@ -540,6 +536,21 @@ public class SchemaChangeClient {
     }
 
     private void runTestWorkload() throws Exception {
+
+        startTime = System.currentTimeMillis();
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                if (config.duration == 0)
+                    return;
+                try { Thread.sleep(config.duration * 1000); }
+                catch (Exception e) { }
+                log.info("Duration limit reached, terminating run");
+                System.exit(0);
+            }
+        }).start();
+
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
         //clientConfig.setProcedureCallTimeout(30 * 60 * 1000); // 30 min
         client = ClientFactory.createClient(clientConfig);
@@ -557,9 +568,7 @@ public class SchemaChangeClient {
             v = schema.getSecond();
         }
 
-        startTime = System.currentTimeMillis();
-
-        while (config.duration == 0 || (System.currentTimeMillis() - startTime < (config.duration * 1000))) {
+        while (true) {
 
             // make sure the table is full and mess around with it
             loadTable(t);
@@ -615,8 +624,6 @@ public class SchemaChangeClient {
                 }
             }
         }
-
-        client.close();
     }
 
     public static void main(String[] args) throws Exception {
