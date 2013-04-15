@@ -38,7 +38,8 @@ import com.google.common.collect.ImmutableSortedMap;
  * to pick what partition to route a particular value.
  */
 public class ElasticHashinator extends TheHashinator {
-    public static int DEFAULT_TOKENS_PER_PARTITION = 8;
+    public static int DEFAULT_TOKENS_PER_PARTITION =
+        Integer.parseInt(System.getProperty("ELASTIC_TOKENS_PER_PARTITION", "8"));
 
     /**
      * Tokens on the ring. A value hashes to a token if the token is the first value <=
