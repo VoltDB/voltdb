@@ -423,8 +423,8 @@ public class TestCatalogUtil extends TestCase {
             "<jsonapi enabled='true'/>" +
             "</httpd>" +
             "<users> " +
-            "<user name=\"joe\" password=\"1w28252425271v2e231t25\" onus=\"true\" roles=\"louno\"/>" +
-            "<user name=\"jane\" password=\"1u2e232223211x28251z23221t\" onus=\"true\" roles=\"launo\"/>" +
+            "<user name=\"joe\" password=\"1E4E888AC66F8DD41E00C5A7AC36A32A9950D271\" plaintext=\"false\" roles=\"louno\"/>" +
+            "<user name=\"jane\" password=\"AAF4C61DDCC5E8A2DABEDE0F3B482CD9AEA9434D\" plaintext=\"false\" roles=\"launo\"/>" +
             "</users>" +
             "</deployment>";
 
@@ -433,11 +433,7 @@ public class TestCatalogUtil extends TestCase {
 
         final File tmpRole = VoltProjectBuilder.writeStringToTempFile(depRole);
 
-        long rc = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpRole.getPath(), true);
-        if (!MiscUtils.isPro()) {
-            if (rc != -1) fail("community editition should have failed catalog validation");
-            return;
-        }
+        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpRole.getPath(), true);
 
         Database db = catalog.getClusters().get("cluster")
                 .getDatabases().get("database");

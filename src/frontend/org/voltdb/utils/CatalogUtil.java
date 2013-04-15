@@ -105,6 +105,8 @@ import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.xml.sax.SAXException;
 
+import com.google.common.base.Charsets;
+
 /**
  *
  */
@@ -873,8 +875,6 @@ public abstract class CatalogUtil {
             return true;
         }
 
-        boolean isPro = VoltDB.instance().getConfig().m_isEnterprise;
-
         Cluster cluster = catalog.getClusters().get("cluster");
         Database database = cluster.getDatabases().get("database");
         Set<String> validGroups = new HashSet<String>();
@@ -883,10 +883,6 @@ public abstract class CatalogUtil {
         }
 
         for (UsersType.User user : deployment.getUsers().getUser()) {
-            if (!isPro && !user.isPlaintext()) {
-                hostLog.error("Masked passwords are a VoltDB Enterprise edition only feature");
-                return false;
-            }
             if (user.getGroups() == null && user.getRoles() == null)
                 continue;
 
@@ -1337,14 +1333,16 @@ public abstract class CatalogUtil {
 
         SecureRandom sr = new SecureRandom();
         for (UsersType.User user : users.getUser()) {
-            String password = user.getPassword();
-            if (!user.isPlaintext()) {
-                password = TextScramblerUtil.unscramble(password);
+
+            String sha1hex = user.getPassword();
+            if (user.isPlaintext()) {
+                sha1hex = extractPassword(user.getPassword());
             }
             org.voltdb.catalog.User catUser = db.getUsers().add(user.getName());
+
             String hashedPW =
                     BCrypt.hashpw(
-                            extractPassword(password),
+                            sha1hex,
                             BCrypt.gensalt(BCrypt.GENSALT_DEFAULT_LOG2_ROUNDS,sr));
             catUser.setShadowpassword(hashedPW);
 
@@ -1420,7 +1418,7 @@ public abstract class CatalogUtil {
             hostLog.l7dlog(Level.FATAL, LogKeys.compiler_VoltCompiler_NoSuchAlgorithm.name(), e);
             System.exit(-1);
         }
-        final byte passwordHash[] = md.digest(password.getBytes());
+        final byte passwordHash[] = md.digest(password.getBytes(Charsets.UTF_8));
         return Encoder.hexEncode(passwordHash);
     }
 

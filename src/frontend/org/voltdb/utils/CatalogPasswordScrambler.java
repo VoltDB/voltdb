@@ -17,8 +17,6 @@
 
 package org.voltdb.utils;
 
-import static org.voltdb.utils.TextScramblerUtil.scramble;
-
 import java.io.File;
 import java.io.IOException;
 
@@ -82,7 +80,7 @@ public class CatalogPasswordScrambler {
                     user.getPassword() != null &&
                     !user.getPassword().trim().isEmpty()
             ) {
-                user.setPassword(scramble(user.getPassword()));
+                user.setPassword(Digester.sha1AsHex(user.getPassword()));
                 user.setPlaintext(false);
             }
         }
