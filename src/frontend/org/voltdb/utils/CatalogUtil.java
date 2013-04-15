@@ -698,6 +698,7 @@ public abstract class CatalogUtil {
                 sb.append(u.getName()).append(",");
                 sb.append(Arrays.toString(mergeUserRoles(u).toArray()));
                 sb.append(",").append(u.getPassword()).append(",");
+                sb.append(u.isOnus()).append(",");
             }
         }
         sb.append("\n");
@@ -872,6 +873,8 @@ public abstract class CatalogUtil {
             return true;
         }
 
+        boolean isPro = VoltDB.instance().getConfig().m_isEnterprise;
+
         Cluster cluster = catalog.getClusters().get("cluster");
         Database database = cluster.getDatabases().get("database");
         Set<String> validGroups = new HashSet<String>();
@@ -880,6 +883,10 @@ public abstract class CatalogUtil {
         }
 
         for (UsersType.User user : deployment.getUsers().getUser()) {
+            if (!isPro && user.isOnus()) {
+                hostLog.error("Masked passwords are a VoltDB Enterprise edition only feature");
+                return false;
+            }
             if (user.getGroups() == null && user.getRoles() == null)
                 continue;
 
@@ -1330,10 +1337,14 @@ public abstract class CatalogUtil {
 
         SecureRandom sr = new SecureRandom();
         for (UsersType.User user : users.getUser()) {
+            String password = user.getPassword();
+            if (user.isOnus()) {
+                password = TextScramblerUtil.unscramble(password);
+            }
             org.voltdb.catalog.User catUser = db.getUsers().add(user.getName());
             String hashedPW =
                     BCrypt.hashpw(
-                            extractPassword(user.getPassword()),
+                            extractPassword(password),
                             BCrypt.gensalt(BCrypt.GENSALT_DEFAULT_LOG2_ROUNDS,sr));
             catUser.setShadowpassword(hashedPW);
 

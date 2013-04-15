@@ -10,7 +10,7 @@
 
     If you modify this schema, the jaxb bindings must be regenerated.
     It is normally handled by the ant build.
-    
+
     It's also easy to do manually:
 
     cd src/frontend
@@ -273,6 +273,7 @@
           <xs:attribute name="groups" type="xs:string"/>
           <xs:attribute name="roles" type="xs:string"/>
           <xs:attribute name="password" type="xs:string" use="required"/>
+          <xs:attribute name="onus" type="xs:boolean" default="false"/>
         </xs:complexType>
       </xs:element>
     </xs:sequence>
