@@ -105,6 +105,8 @@ import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.xml.sax.SAXException;
 
+import com.google.common.base.Charsets;
+
 /**
  *
  */
@@ -698,6 +700,7 @@ public abstract class CatalogUtil {
                 sb.append(u.getName()).append(",");
                 sb.append(Arrays.toString(mergeUserRoles(u).toArray()));
                 sb.append(",").append(u.getPassword()).append(",");
+                sb.append(u.isPlaintext()).append(",");
             }
         }
         sb.append("\n");
@@ -1330,10 +1333,16 @@ public abstract class CatalogUtil {
 
         SecureRandom sr = new SecureRandom();
         for (UsersType.User user : users.getUser()) {
+
+            String sha1hex = user.getPassword();
+            if (user.isPlaintext()) {
+                sha1hex = extractPassword(user.getPassword());
+            }
             org.voltdb.catalog.User catUser = db.getUsers().add(user.getName());
+
             String hashedPW =
                     BCrypt.hashpw(
-                            extractPassword(user.getPassword()),
+                            sha1hex,
                             BCrypt.gensalt(BCrypt.GENSALT_DEFAULT_LOG2_ROUNDS,sr));
             catUser.setShadowpassword(hashedPW);
 
@@ -1409,7 +1418,7 @@ public abstract class CatalogUtil {
             hostLog.l7dlog(Level.FATAL, LogKeys.compiler_VoltCompiler_NoSuchAlgorithm.name(), e);
             System.exit(-1);
         }
-        final byte passwordHash[] = md.digest(password.getBytes());
+        final byte passwordHash[] = md.digest(password.getBytes(Charsets.UTF_8));
         return Encoder.hexEncode(passwordHash);
     }
 
