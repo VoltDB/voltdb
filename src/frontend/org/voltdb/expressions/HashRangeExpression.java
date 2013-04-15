@@ -19,10 +19,12 @@ package org.voltdb.expressions;
 
 import java.util.Map;
 
+import com.google.common.collect.ImmutableSortedMap;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.types.ExpressionType;
@@ -41,7 +43,7 @@ public class HashRangeExpression extends AbstractValueExpression {
         RANGE_END
     }
 
-    protected Map<Long, Long> m_ranges;
+    protected ImmutableSortedMap<Long, Long> m_ranges;
     protected int m_hashColumn = Integer.MIN_VALUE;
 
     public HashRangeExpression() {
@@ -51,7 +53,7 @@ public class HashRangeExpression extends AbstractValueExpression {
     }
 
     @Override
-    public Object clone() throws CloneNotSupportedException {
+    public Object clone() {
         HashRangeExpression clone = (HashRangeExpression)super.clone();
         clone.m_ranges = m_ranges;
         clone.m_hashColumn = m_hashColumn;
@@ -98,7 +100,7 @@ public class HashRangeExpression extends AbstractValueExpression {
      * @param ranges the column_alias to set
      */
     public void setRanges(Map<Long, Long> ranges) {
-        m_ranges = ImmutableMap.copyOf(ranges);
+        m_ranges = ImmutableSortedMap.copyOf(ranges);
     }
 
     @Override
@@ -149,7 +151,7 @@ public class HashRangeExpression extends AbstractValueExpression {
         for (Map.Entry<Long, Long> e : m_ranges.entrySet()) {
             stringer.object();
             stringer.key(Members.RANGE_START.name()).value(e.getKey());
-            stringer.key(Members.RANGE_END.name()).value(e.getKey());
+            stringer.key(Members.RANGE_END.name()).value(e.getValue());
             stringer.endObject();
         }
         stringer.endArray();
@@ -159,7 +161,7 @@ public class HashRangeExpression extends AbstractValueExpression {
     protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {
         m_hashColumn = obj.getInt(Members.HASH_COLUMN.name());
         JSONArray array = obj.getJSONArray(Members.RANGES.name());
-        ImmutableMap.Builder<Long, Long> b = ImmutableMap.builder();
+        ImmutableSortedMap.Builder<Long, Long> b = ImmutableSortedMap.naturalOrder();
         for (int ii = 0; ii < array.length(); ii++) {
             JSONObject range = array.getJSONObject(ii);
             b.put(range.getLong(Members.RANGE_START.name()), range.getLong(Members.RANGE_END.name()));
