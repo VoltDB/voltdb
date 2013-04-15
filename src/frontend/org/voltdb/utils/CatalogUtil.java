@@ -698,7 +698,7 @@ public abstract class CatalogUtil {
                 sb.append(u.getName()).append(",");
                 sb.append(Arrays.toString(mergeUserRoles(u).toArray()));
                 sb.append(",").append(u.getPassword()).append(",");
-                sb.append(u.isOnus()).append(",");
+                sb.append(u.isPlaintext()).append(",");
             }
         }
         sb.append("\n");
@@ -883,7 +883,7 @@ public abstract class CatalogUtil {
         }
 
         for (UsersType.User user : deployment.getUsers().getUser()) {
-            if (!isPro && user.isOnus()) {
+            if (!isPro && !user.isPlaintext()) {
                 hostLog.error("Masked passwords are a VoltDB Enterprise edition only feature");
                 return false;
             }
@@ -1338,7 +1338,7 @@ public abstract class CatalogUtil {
         SecureRandom sr = new SecureRandom();
         for (UsersType.User user : users.getUser()) {
             String password = user.getPassword();
-            if (user.isOnus()) {
+            if (!user.isPlaintext()) {
                 password = TextScramblerUtil.unscramble(password);
             }
             org.voltdb.catalog.User catUser = db.getUsers().add(user.getName());

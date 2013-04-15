@@ -273,7 +273,7 @@
           <xs:attribute name="groups" type="xs:string"/>
           <xs:attribute name="roles" type="xs:string"/>
           <xs:attribute name="password" type="xs:string" use="required"/>
-          <xs:attribute name="onus" type="xs:boolean" default="false"/>
+          <xs:attribute name="plaintext" type="xs:boolean" default="true"/>
         </xs:complexType>
       </xs:element>
     </xs:sequence>

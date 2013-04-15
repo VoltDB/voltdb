@@ -78,12 +78,12 @@ public class CatalogPasswordScrambler {
         if (users == null) return;
 
         for (UsersType.User user: users.getUser()) {
-            if (    !user.isOnus() &&
+            if (    user.isPlaintext() &&
                     user.getPassword() != null &&
                     !user.getPassword().trim().isEmpty()
             ) {
                 user.setPassword(scramble(user.getPassword()));
-                user.setOnus(true);
+                user.setPlaintext(false);
             }
         }
     }
