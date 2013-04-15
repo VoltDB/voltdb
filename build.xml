@@ -69,12 +69,14 @@
 <property name='src.hsqldb.dir'              location='src/hsqldb19b3' />
 <property name='src.test.dir'                location='tests/frontend' />
 <property name='src.hsqldb.test.dir'         location='tests/hsqldb' />
+<property name='src.ee.test.dir'             location='tests/ee' />
 <property name='src.studio.dir'              location='src/frontend/org/voltdb/studio' />
 <property name='build.testoutput.dir'        location='${build.dir}/testoutput' />
 <property name='build.testobjects.dir'       location='${build.dir}/testobjects' />
 <property name='lib.dir'                     location='lib' />
 <property name='vendor.lib.dir'              location='third_party/java/jars' />
 <property name='vendor.src.dir'              location='third_party/java/src'  />
+<property name='vendor.cpp.dir'              location='third_party/cpp' />
 <property name='src.ee.parent.dir'           location='src/ee' />
 <property name='src.ee.dir'                  location='src/ee' />
 <property name='src.catalog.dir'             location='src/catgen' />
@@ -92,6 +94,14 @@
 <condition property="os.mac">
     <os family="mac"/>
 </condition>
+
+<!--set if makefile up to date. Eliminates timeconsuming build.py in ee -->
+<uptodate property="makefile.uptodate">
+  <srcfiles dir='${src.ee.dir}' includes='**/*' />
+  <srcfiles dir='${vendor.cpp.dir}'  includes='**/*' />
+  <srcfiles dir='${src.ee.test.dir}'  includes='**/*' />
+  <mapper type="merge" to="${build.dir}/makefile"/>
+</uptodate>
 
 <!-- emma build instrumentation location -->
 <property name='build.instr.dir'             location='${build.dir}/instr' />
@@ -772,7 +782,7 @@ CLEANING
         <arg line="-c 'rm -f host*-*-*.txt'"/>
     </exec>
 </target>
-                        
+
 <target name='cleantmp' description="Remove all data files Volt generated in /tmp.">
   <exec dir='.' executable='/bin/sh' failonerror='false'>
     <arg line="-c 'rm -rf /tmp/myApp*.tmp *.vpt *.digest'"/>
@@ -1161,6 +1171,7 @@ NATIVE EE STUFF
 </target>
 
 <target name='ee' depends="catalog, jnicompile, buildinfo"
+    unless="makefile.uptodate"
     description="Build C++ JNI library and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
         <arg line="build.py ${build}" />
