@@ -66,7 +66,13 @@ public class LegacyHashinator extends TheHashinator {
     }
 
     @Override
-    protected Set<Integer> pPredecessors(int partition)
+    protected Map<Long, Integer> pPredecessors(int partition)
+    {
+        throw new RuntimeException("Legacy hashinator doesn't support predecessors");
+    }
+
+    @Override
+    protected Pair<Long, Integer> pPredecessor(int partition, long token)
     {
         throw new RuntimeException("Legacy hashinator doesn't support predecessors");
     }

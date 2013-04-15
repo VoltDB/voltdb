@@ -238,13 +238,13 @@ public class ElasticHashinator extends TheHashinator {
      * Find the predecessors of the given partition on the ring. This method runs in linear time,
      * use with caution when the set of partitions is large.
      * @param partition
-     * @return The IDs of the partitions that are the predecessors of the given partition.
+     * @return The map of tokens to partitions that are the predecessors of the given partition.
      * If the given partition doesn't exist or it's the only partition on the ring, the
-     * set is empty.
+     * map will be empty.
      */
     @Override
-    protected Set<Integer> pPredecessors(int partition) {
-        Set<Integer> predecessors = new HashSet<Integer>();
+    protected Map<Long, Integer> pPredecessors(int partition) {
+        Map<Long, Integer> predecessors = new TreeMap<Long, Integer>();
         UnmodifiableIterator<Map.Entry<Long,Integer>> iter = tokens.entrySet().iterator();
         Set<Long> pTokens = new HashSet<Long>();
         while (iter.hasNext()) {
@@ -266,7 +266,7 @@ public class ElasticHashinator extends TheHashinator {
             }
 
             if (predecessor != null && predecessor.getValue() != partition) {
-                predecessors.add(predecessor.getValue());
+                predecessors.put(predecessor.getKey(), predecessor.getValue());
             }
         }
 
@@ -274,11 +274,40 @@ public class ElasticHashinator extends TheHashinator {
     }
 
     /**
+     * Find the predecessor of the given token on the ring.
+     * @param partition    The partition that maps to the given token
+     * @param token        The token on the ring
+     * @return The predecessor of the given token. Null if the given partition doesn't
+     * exist or it is the only token on the ring.
+     */
+    @Override
+    protected Pair<Long, Integer> pPredecessor(int partition, long token) {
+        Integer partForToken = tokens.get(token);
+        if (partForToken != null && partForToken == partition) {
+            Map.Entry<Long, Integer> predecessor = tokens.headMap(token).lastEntry();
+
+            if (predecessor == null) {
+                predecessor = tokens.lastEntry();
+            }
+
+            if (predecessor.getKey() != token) {
+                return Pair.of(predecessor.getKey(), predecessor.getValue());
+            } else {
+                // given token is the only one on the ring
+                return null;
+            }
+        } else {
+            // given token doesn't map to partition
+            return null;
+        }
+    }
+
+    /**
      * This runs in linear time with respect to the number of tokens on the ring.
      */
     @Override
     protected Map<Long, Long> pGetRanges(int partition) {
-        Map<Long, Long> ranges = new HashMap<Long, Long>();
+        Map<Long, Long> ranges = new TreeMap<Long, Long>();
         Long first = null; // start of the very first token on the ring
         Long start = null; // start of a range
         UnmodifiableIterator<Map.Entry<Long,Integer>> iter = tokens.entrySet().iterator();

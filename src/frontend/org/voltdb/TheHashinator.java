@@ -20,7 +20,6 @@ package org.voltdb;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.Collection;
 import java.util.Set;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -72,7 +71,7 @@ public abstract class TheHashinator {
      * Helper method to do the reflection boilerplate to call the constructor
      * of the selected hashinator and convert the exceptions to runtime excetions.
      */
-    private static TheHashinator
+    public static TheHashinator
         constructHashinator(
                 Class<? extends TheHashinator> hashinatorImplementation,
                 byte config[]) {
@@ -96,7 +95,8 @@ public abstract class TheHashinator {
     abstract protected int pHashinateLong(long value);
     abstract protected int pHashinateBytes(byte[] bytes);
     abstract protected Pair<HashinatorType, byte[]> pGetCurrentConfig();
-    abstract protected Set<Integer> pPredecessors(int partition);
+    abstract protected Map<Long, Integer> pPredecessors(int partition);
+    abstract protected Pair<Long, Integer> pPredecessor(int partition, long token);
     abstract protected Map<Long, Long> pGetRanges(int partition);
 
     /**
@@ -300,8 +300,12 @@ public abstract class TheHashinator {
         return instance.get().getSecond().pGetCurrentConfig();
     }
 
-    public static Set<Integer> predecessors(int partition) {
+    public static Map<Long, Integer> predecessors(int partition) {
         return instance.get().getSecond().pPredecessors(partition);
+    }
+
+    public static Pair<Long, Integer> predecessor(int partition, long token) {
+        return instance.get().getSecond().pPredecessor(partition, token);
     }
 
     /**
