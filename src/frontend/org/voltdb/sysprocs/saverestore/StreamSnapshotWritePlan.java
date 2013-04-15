@@ -86,8 +86,10 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             new StreamSnapshotRequestConfig(jsData, context.getDatabase(), localHSIds);
 
         List<Integer> localPartitions = tracker.getPartitionsForHost(context.getHostId());
-        Map<Long, Integer> tokensToAdd = createTokensToAdd(config.partitionsToAdd);
-        createUpdateHashinatorTasksForSites(localPartitions, tokensToAdd, txnId);
+        if (!config.partitionsToAdd.isEmpty()) {
+            Map<Long, Integer> tokensToAdd = createTokensToAdd(config.partitionsToAdd);
+            createUpdateHashinatorTasksForSites(localPartitions, tokensToAdd, txnId);
+        }
 
         final AtomicInteger numTables = new AtomicInteger(config.tables.size());
         final SnapshotRegistry.Snapshot snapshotRecord =
