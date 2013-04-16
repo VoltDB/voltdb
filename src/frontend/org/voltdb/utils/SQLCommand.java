@@ -1271,12 +1271,15 @@ public class SQLCommand
     // errors.
     private static void openURLAsync()
     {
-        new Thread(new Runnable() {
+        Thread t = new Thread(new Runnable() {
             @Override
             public void run() {
                  openURL();
             }
-        }).start();
+        });
+        // Set the daemon flag so that this won't hang the process if it runs into difficulty
+        t.setDaemon(true);
+        t.start();
     }
 
     private static void openURL()
