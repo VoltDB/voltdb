@@ -279,6 +279,10 @@ public class SchemaChangeClient {
         if (versionObserved == schemaVersionNo) {
             // make sure the system didn't say it worked
             assert(success == false);
+            if (success == true) {
+                log.info(_F("Catalog update was reported to be successful but is not observable."));
+                System.exit(-1);     // fail test
+            }
 
             // signal to the caller this didn't work
             return null;
@@ -474,7 +478,7 @@ public class SchemaChangeClient {
                     Thread.sleep(sleep);
                 } catch (Exception interruted) {
                 }
-                if (sleep < 8000)
+                if (sleep < 4000)
                     sleep += sleep;
             }
         }
@@ -498,12 +502,16 @@ public class SchemaChangeClient {
 
                 // setup for retry
                 final String server = MiscUtils.getHostnameColonPortString(hostname, port);
-                new Thread(new Runnable() {
+                class ReconnectThread extends Thread {
                     @Override
                     public void run() {
                         connectToOneServerWithRetry(server);
                     }
-                }).start();
+                };
+
+                ReconnectThread th = new ReconnectThread();
+                th.setDaemon(true);
+                th.start();
         }
     }
 
@@ -539,7 +547,7 @@ public class SchemaChangeClient {
 
         startTime = System.currentTimeMillis();
 
-        new Thread(new Runnable() {
+        class watchDog extends Thread {
             @Override
             public void run() {
                 if (config.duration == 0)
@@ -549,7 +557,10 @@ public class SchemaChangeClient {
                 log.info("Duration limit reached, terminating run");
                 System.exit(0);
             }
-        }).start();
+        };
+        watchDog th = new watchDog();
+        th.setDaemon(true);
+        th.start();
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
         //clientConfig.setProcedureCallTimeout(30 * 60 * 1000); // 30 min
@@ -597,6 +608,10 @@ public class SchemaChangeClient {
                 boolean isNewTable = (j == 0) && (rand.nextInt(5) == 0);
                 while (newT == null) {
                     Pair<VoltTable, TableHelper.ViewRep> schema = catalogChange(t, isNewTable, v);
+                    if (schema == null) {
+                            log.info(_F("Retrying an unsuccessful catalog update."));
+                            continue;   // try again
+                    }
                     newT = schema.getFirst();
                     newV = schema.getSecond();
                 }
