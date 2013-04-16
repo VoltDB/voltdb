@@ -1277,6 +1277,7 @@ public class SQLCommand
                  openURL();
             }
         });
+
         // Set the daemon flag so that this won't hang the process if it runs into difficulty
         t.setDaemon(true);
         t.start();
