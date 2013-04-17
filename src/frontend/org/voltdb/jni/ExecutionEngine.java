@@ -60,7 +60,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public static final int ERRORCODE_NEED_PLAN = 110;
 
     /** For now sync this value with the value in the EE C++ code to get good stats. */
-    public static final int EE_PLAN_CACHE_SIZE = 10000;
+    public static final int EE_PLAN_CACHE_SIZE = 1000;
 
     /** Partition ID */
     protected final int m_partitionId;

@@ -117,18 +117,25 @@ public class SchemaChangeClient {
                 cr = client.callProcedure(procName, params);
             }
             catch (ProcCallException e) {
+                log.debug("callROProcedureWithRetry operation exception:", e);
                 cr = e.getClientResponse();
             }
             catch (NoConnectionsException e) {
+                log.debug("callROProcedureWithRetry operation exception:", e);
                 // wait a bit to retry
                 try { Thread.sleep(1000); } catch (InterruptedException e1) {}
-            } catch (IOException e) {
+            }
+            catch (IOException e) {
+                log.debug("callROProcedureWithRetry operation exception:", e);
                 // IOException is not cool man
                 logStackTrace(e);
                 System.exit(-1);
             }
 
             if (cr != null) {
+                if (cr.getStatus() != ClientResponse.SUCCESS) {
+                    log.debug("callROProcedureWithRetry operation failed: " + ((ClientResponseImpl)cr).toJSONString());
+                }
                 switch (cr.getStatus()) {
                 case ClientResponse.SUCCESS:
                     // hooray!
@@ -159,7 +166,7 @@ public class SchemaChangeClient {
             now = System.currentTimeMillis();
         }
 
-        assert(false);
+        log.error(_F("Error no progress timeout reached, terminating"));
         System.exit(-1);
         return null;
     }
@@ -279,6 +286,10 @@ public class SchemaChangeClient {
         if (versionObserved == schemaVersionNo) {
             // make sure the system didn't say it worked
             assert(success == false);
+            if (success == true) {
+                log.info(_F("Catalog update was reported to be successful but is not observable."));
+                System.exit(-1);     // fail test
+            }
 
             // signal to the caller this didn't work
             return null;
@@ -474,7 +485,7 @@ public class SchemaChangeClient {
                     Thread.sleep(sleep);
                 } catch (Exception interruted) {
                 }
-                if (sleep < 8000)
+                if (sleep < 4000)
                     sleep += sleep;
             }
         }
@@ -487,9 +498,6 @@ public class SchemaChangeClient {
     private class StatusListener extends ClientStatusListenerExt {
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
-            // if the benchmark is still active
-            long currentTime = System.currentTimeMillis();
-            if ((currentTime - startTime) < (config.duration * 1000)) {
                 log.warn(_F("Lost connection to %s:%d.", hostname, port));
                 totalConnections.decrementAndGet();
 
@@ -501,13 +509,16 @@ public class SchemaChangeClient {
 
                 // setup for retry
                 final String server = MiscUtils.getHostnameColonPortString(hostname, port);
-                new Thread(new Runnable() {
+                class ReconnectThread extends Thread {
                     @Override
                     public void run() {
                         connectToOneServerWithRetry(server);
                     }
-                }).start();
-            }
+                };
+
+                ReconnectThread th = new ReconnectThread();
+                th.setDaemon(true);
+                th.start();
         }
     }
 
@@ -540,8 +551,27 @@ public class SchemaChangeClient {
     }
 
     private void runTestWorkload() throws Exception {
+
+        startTime = System.currentTimeMillis();
+
+        class watchDog extends Thread {
+            @Override
+            public void run() {
+                if (config.duration == 0)
+                    return;
+                try { Thread.sleep(config.duration * 1000); }
+                catch (Exception e) { }
+                log.info("Duration limit reached, terminating run");
+                System.exit(0);
+            }
+        };
+        watchDog th = new watchDog();
+        th.setDaemon(true);
+        th.start();
+
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
         //clientConfig.setProcedureCallTimeout(30 * 60 * 1000); // 30 min
+        clientConfig.setMaxOutstandingTxns(512);
         client = ClientFactory.createClient(clientConfig);
         connect(config.servers);
 
@@ -557,9 +587,7 @@ public class SchemaChangeClient {
             v = schema.getSecond();
         }
 
-        startTime = System.currentTimeMillis();
-
-        while (config.duration == 0 || (System.currentTimeMillis() - startTime < (config.duration * 1000))) {
+        while (true) {
 
             // make sure the table is full and mess around with it
             loadTable(t);
@@ -588,6 +616,10 @@ public class SchemaChangeClient {
                 boolean isNewTable = (j == 0) && (rand.nextInt(5) == 0);
                 while (newT == null) {
                     Pair<VoltTable, TableHelper.ViewRep> schema = catalogChange(t, isNewTable, v);
+                    if (schema == null) {
+                            log.info(_F("Retrying an unsuccessful catalog update."));
+                            continue;   // try again
+                    }
                     newT = schema.getFirst();
                     newV = schema.getSecond();
                 }
@@ -615,8 +647,6 @@ public class SchemaChangeClient {
                 }
             }
         }
-
-        client.close();
     }
 
     public static void main(String[] args) throws Exception {
