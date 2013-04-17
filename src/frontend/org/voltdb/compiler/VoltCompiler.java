@@ -1536,22 +1536,43 @@ public class VoltCompiler {
 
             outputStream.println();
 
-            // memoize non-det procs for a warning at the end of the compile
+            // Accumulate a summary of the summary for a briefer report
             ArrayList<Procedure> nonDetProcs = new ArrayList<Procedure>();
+            int countSinglePartition = 0;
+            int countMultiPartition = 0;
+            int countDefaultProcs = 0;
+            int countTableScans = 0;
 
             for (Procedure p : database.getProcedures()) {
                 if (p.getSystemproc()) {
                     continue;
                 }
+
+                // Aggregate statistics about MP/SP/SEQ
+                if (!p.getDefaultproc()) {
+                    if (p.getSinglepartition()) {
+                        countSinglePartition++;
+                    }
+                    else {
+                        countMultiPartition++;
+                    }
+                }
+                else {
+                    countDefaultProcs++;
+                }
+                if (p.getHasseqscans()) {
+                    countTableScans++;
+                }
+
                 outputStream.printf("[%s][%s]%s %s\n",
                                       p.getSinglepartition() ? "SP" : "MP",
-                                      p.getReadonly() ? "RO" : "RW",
-                                      p.getHasseqscans() ? "[Seq]" : "",
+                                      p.getReadonly() ? "READ" : "WRITE",
+                                      p.getHasseqscans() ? "[TABLE SCAN]" : "",
                                       p.getTypeName());
                 for (Statement s : p.getStatements()) {
                     String seqScanTag = "";
                     if (s.getSeqscancount() > 0) {
-                        seqScanTag = "[Seq] ";
+                        seqScanTag = "[TABLE SCAN] ";
                     }
                     String determinismTag = "";
 
@@ -1559,11 +1580,11 @@ public class VoltCompiler {
                     // output determinism warnings
                     if (p.getHasjava() && (!p.getReadonly())) {
                         if (s.getIscontentdeterministic() == false) {
-                            determinismTag = "[NDC] ";
+                            determinismTag = "[NON-DETERMINISTIC CONTENT] ";
                             nonDetProcs.add(p);
                         }
                         else if (s.getIsorderdeterministic() == false) {
-                            determinismTag = "[NDO] ";
+                            determinismTag = "[NON-DETERMINISTIC ORDER] ";
                             nonDetProcs.add(p);
                         }
                     }
@@ -1583,10 +1604,34 @@ public class VoltCompiler {
             outputStream.println("------------------------------------------");
 
             //
-            // post-compile determinism warning
+            // post-compile summary and legend.
             //
+            if (countSinglePartition > 0) {
+                outputStream.printf("[SP] Catalog contains %d single partition procedures.\n",
+                        countSinglePartition, countSinglePartition);
+            }
+            if (countMultiPartition > 0) {
+                outputStream.printf("[MP] Catalog contains %d multi-partition procedures.\n",
+                        countMultiPartition, countMultiPartition);
+            }
+            if (countTableScans > 0) {
+                outputStream.printf("[TABLE SCAN] Catalog contains %d procedures that use a table scan.\n",
+                        countTableScans, countTableScans);
+            }
+            outputStream.printf("Catalog contains %d built-in CRUD procedures.\n",
+                    countDefaultProcs);
+            outputStream.println("------------------------------------------");
+            if (countSinglePartition == 0 && countMultiPartition > 0) {
+                outputStream.printf(
+                        "\nALL MULTI-PARTITION WARNING:\n\n" +
+                        "All of the user procedures are multi-partition. This often\n" +
+                        "indicates that the application is not utilizing VoltDB partitioning\n" +
+                        "for best performance.\n"+
+                        "\nPlease see %s\nfor information on VoltDB partitioning.\n\n",
+                        "http://voltdb.com/docs/UsingVoltDB/ChapAppDesign.php");
+                outputStream.println("------------------------------------------");
+            }
             if (!nonDetProcs.isEmpty()) {
-
                 outputStream.println(
                         "\nNON-DETERMINISM WARNING:\n\n" +
                         "The procedures listed below contain non-deterministic queries.\n");
@@ -1603,11 +1648,8 @@ public class VoltCompiler {
                         "SQL statements (marked as \"[NDO] or [NDC]\").  Add a unique\n" +
                         "index to the schema or an explicit ORDER BY clause to the\n" +
                         "query to make these queries deterministic.\n");
-
                 outputStream.println("------------------------------------------");
             }
-
-
         }
         if (feedbackStream != null) {
             for (Feedback fb : m_warnings) {
