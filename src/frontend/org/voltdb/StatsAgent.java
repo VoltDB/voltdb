@@ -333,11 +333,7 @@ public class StatsAgent {
     }
 
     private void handleJSONMessage(JSONObject obj) throws Exception {
-        String selectorString = obj.getString("selector");
-        SysProcSelector selector = SysProcSelector.valueOf(selectorString);
-        if (selector == SysProcSelector.DRNODE) {
-            collectDRStats(obj);
-        }
+        collectDistributedStats(obj);
     }
 
     private void collectTopoStats(PendingStatsRequest psr)
@@ -358,19 +354,21 @@ public class StatsAgent {
         }
     }
 
-    private void collectDRStats(JSONObject obj) throws Exception {
-        List<Long> catalogIds = Arrays.asList(new Long[] { 0L });
-        Long now = System.currentTimeMillis();
+    private void collectDistributedStats(JSONObject obj) throws Exception
+    {
         long requestId = obj.getLong("requestId");
         long returnAddress = obj.getLong("returnAddress");
 
-        VoltTable partitionStats = getStats(SysProcSelector.DRPARTITION, catalogIds, false, now);
-        VoltTable nodeStats = getStats(SysProcSelector.DRNODE, catalogIds, false, now);
+        VoltTable[] stats = null;
+        // dispatch to collection
+        String selectorString = obj.getString("selector");
+        SysProcSelector selector = SysProcSelector.valueOf(selectorString);
+        if (selector == SysProcSelector.DRNODE) {
+            stats = collectDRStats();
+        }
 
-        /*
-         * Send a response with no data since the stats is not supported
-         */
-        if (partitionStats == null || nodeStats == null) {
+        // Send a response with no data since the stats is not supported
+        if (stats == null) {
             ByteBuffer responseBuffer = ByteBuffer.allocate(8);
             responseBuffer.putLong(requestId);
             byte responseBytes[] = CompressionService.compressBytes(responseBuffer.array());
@@ -379,24 +377,44 @@ public class StatsAgent {
             return;
         }
 
-        ByteBuffer partitionStatsBuffer = partitionStats.getBuffer();
-        partitionStatsBuffer.position(0);
-
-        ByteBuffer nodeStatsBuffer = nodeStats.getBuffer();
-        nodeStatsBuffer.position(0);
+        ByteBuffer[] bufs = new ByteBuffer[stats.length];
+        int statbytes = 0;
+        for (int i = 0; i < stats.length; i++) {
+            bufs[i] = stats[i].getBuffer();
+            bufs[i].position(0);
+            statbytes += bufs[i].remaining();
+        }
 
         ByteBuffer responseBuffer = ByteBuffer.allocate(
                 16 //requestId + a length prefix for each stats table
-                + partitionStatsBuffer.remaining() + nodeStatsBuffer.remaining());
+                + statbytes);
         responseBuffer.putLong(requestId);
-        responseBuffer.putInt(partitionStatsBuffer.remaining());
-        responseBuffer.put(partitionStatsBuffer);
-        responseBuffer.putInt(nodeStatsBuffer.remaining());
-        responseBuffer.put(nodeStatsBuffer);
+        for (int i = 0; i < bufs.length; i++) {
+            responseBuffer.putInt(bufs[i].remaining());
+            responseBuffer.put(bufs[i]);
+        }
         byte responseBytes[] = CompressionService.compressBytes(responseBuffer.array());
 
         BinaryPayloadMessage bpm = new BinaryPayloadMessage( new byte[] {STATS_PAYLOAD}, responseBytes);
         m_mailbox.send(returnAddress, bpm);
+
+    }
+
+    // This could probably eventually move to the stats source
+    private VoltTable[] collectDRStats()
+    {
+        List<Long> catalogIds = Arrays.asList(new Long[] { 0L });
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable partitionStats = getStats(SysProcSelector.DRPARTITION, catalogIds, false, now);
+        VoltTable nodeStats = getStats(SysProcSelector.DRNODE, catalogIds, false, now);
+        if (partitionStats != null && nodeStats != null) {
+            stats = new VoltTable[2];
+            stats[0] = partitionStats;
+            stats[1] = nodeStats;
+        }
+        return stats;
     }
 
     public synchronized void registerStatsSource(SysProcSelector selector, long catalogId, StatsSource source) {
