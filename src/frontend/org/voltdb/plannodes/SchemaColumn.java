@@ -60,14 +60,7 @@ public class SchemaColumn
         m_tableName = tableName;
         m_columnName = columnName;
         m_columnAlias = columnAlias;
-        try
-        {
-            m_expression = (AbstractExpression) expression.clone();
-        }
-        catch (CloneNotSupportedException e)
-        {
-            throw new RuntimeException(e.getMessage());
-        }
+        m_expression = (AbstractExpression) expression.clone();
     }
 
     /**
@@ -89,14 +82,7 @@ public class SchemaColumn
         TupleValueExpression new_exp = null;
         if (m_expression instanceof TupleValueExpression)
         {
-            try
-            {
-                new_exp = (TupleValueExpression) m_expression.clone();
-            }
-            catch (CloneNotSupportedException e)
-            {
-                throw new RuntimeException(e.getMessage());
-            }
+            new_exp = (TupleValueExpression) m_expression.clone();
         }
         else
         {

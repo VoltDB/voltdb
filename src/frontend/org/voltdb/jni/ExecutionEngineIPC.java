@@ -44,6 +44,7 @@ import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 
 import com.google.common.base.Charsets;
+import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 
 /* Serializes data over a connection that presumably is being read
  * by a voltdb execution engine. The serialization is currently a
@@ -1051,13 +1052,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateTableStream(int tableId, TableStreamType streamType) {
+    public boolean activateTableStream(int tableId, TableStreamType streamType, SnapshotPredicates predicates) {
         m_data.clear();
         m_data.putInt(Commands.ActivateTableStream.m_id);
         m_data.putInt(tableId);
         m_data.putInt(streamType.ordinal());
-        m_data.put((byte)0);        // Delete flag
-        m_data.putInt(0);           // Predicate count
+        m_data.put(predicates.toBytes()); // predicates
 
         try {
             m_data.flip();

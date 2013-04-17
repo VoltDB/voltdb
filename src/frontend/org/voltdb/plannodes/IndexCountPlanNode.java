@@ -142,16 +142,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             // PlanNodes all need private deep copies of expressions
             // so that the resolveColumnIndexes results
             // don't get bashed by other nodes or subsequent planner runs
-            try
-            {
-                endKeys.add((AbstractExpression)ae.getRight().clone());
-            }
-            catch (CloneNotSupportedException e)
-            {
-                // This shouldn't ever happen
-                e.printStackTrace();
-                throw new RuntimeException(e.toString());
-            }
+            endKeys.add((AbstractExpression)ae.getRight().clone());
         }
 
         // Avoid the cases that would cause undercounts for prefix matches.

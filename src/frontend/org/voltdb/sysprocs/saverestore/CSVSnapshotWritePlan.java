@@ -149,6 +149,8 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
                             table.getRelativeIndex(),
                             sdt,
                             filters.toArray(new SnapshotDataFilter[filters.size()]),
+                            null,
+                            false,
                             table.getIsreplicated(),
                             table.getTypeName());
 

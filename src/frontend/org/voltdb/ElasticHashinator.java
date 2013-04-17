@@ -38,7 +38,8 @@ import com.google.common.collect.ImmutableSortedMap;
  * to pick what partition to route a particular value.
  */
 public class ElasticHashinator extends TheHashinator {
-    public static int DEFAULT_TOKENS_PER_PARTITION = 8;
+    public static int DEFAULT_TOKENS_PER_PARTITION =
+        Integer.parseInt(System.getProperty("ELASTIC_TOKENS_PER_PARTITION", "8"));
 
     /**
      * Tokens on the ring. A value hashes to a token if the token is the first value <=
@@ -117,6 +118,39 @@ public class ElasticHashinator extends TheHashinator {
                     newConfig.put(candidateToken, pid);
                     break;
                 }
+            }
+        }
+
+        return new ElasticHashinator(newConfig).toBytes();
+    }
+
+    /**
+     * Given an existing elastic hashinator, add a set of new partitions to the existing hash ring
+     * with calculated ranges.
+     * @param oldHashinator An elastic hashinator
+     * @param partitionsAndRanges A set of new partitions and their associated ranges
+     * @return The config bytes of the new hash ring
+     */
+    public static byte[] addPartitions(TheHashinator oldHashinator,
+                                       Map<Long, Integer> tokensToPartitions) {
+        Preconditions.checkArgument(oldHashinator instanceof ElasticHashinator);
+        ElasticHashinator oldElasticHashinator = (ElasticHashinator) oldHashinator;
+        Map<Long, Integer> newConfig = new HashMap<Long, Integer>(oldElasticHashinator.tokens);
+        Set<Integer> existingPartitions = new HashSet<Integer>(oldElasticHashinator.tokens.values());
+
+        for (Map.Entry<Long, Integer> entry : tokensToPartitions.entrySet()) {
+            long token = entry.getKey();
+            int pid = entry.getValue();
+
+            if (existingPartitions.contains(pid)) {
+                throw new RuntimeException("Partition " + pid + " already exists in the " +
+                                               "hashinator");
+            }
+
+            Integer oldPartition = newConfig.put(token, pid);
+            if (oldPartition != null) {
+                throw new RuntimeException("Token " + token + " used to map to partition " +
+                                               oldPartition + " but now maps to " + pid);
             }
         }
 
@@ -204,13 +238,13 @@ public class ElasticHashinator extends TheHashinator {
      * Find the predecessors of the given partition on the ring. This method runs in linear time,
      * use with caution when the set of partitions is large.
      * @param partition
-     * @return The IDs of the partitions that are the predecessors of the given partition.
+     * @return The map of tokens to partitions that are the predecessors of the given partition.
      * If the given partition doesn't exist or it's the only partition on the ring, the
-     * set is empty.
+     * map will be empty.
      */
     @Override
-    protected Set<Integer> pPredecessors(int partition) {
-        Set<Integer> predecessors = new HashSet<Integer>();
+    protected Map<Long, Integer> pPredecessors(int partition) {
+        Map<Long, Integer> predecessors = new TreeMap<Long, Integer>();
         UnmodifiableIterator<Map.Entry<Long,Integer>> iter = tokens.entrySet().iterator();
         Set<Long> pTokens = new HashSet<Long>();
         while (iter.hasNext()) {
@@ -232,10 +266,90 @@ public class ElasticHashinator extends TheHashinator {
             }
 
             if (predecessor != null && predecessor.getValue() != partition) {
-                predecessors.add(predecessor.getValue());
+                predecessors.put(predecessor.getKey(), predecessor.getValue());
             }
         }
 
         return predecessors;
+    }
+
+    /**
+     * Find the predecessor of the given token on the ring.
+     * @param partition    The partition that maps to the given token
+     * @param token        The token on the ring
+     * @return The predecessor of the given token.
+     */
+    @Override
+    protected Pair<Long, Integer> pPredecessor(int partition, long token) {
+        Integer partForToken = tokens.get(token);
+        if (partForToken != null && partForToken == partition) {
+            Map.Entry<Long, Integer> predecessor = tokens.headMap(token).lastEntry();
+
+            if (predecessor == null) {
+                predecessor = tokens.lastEntry();
+            }
+
+            if (predecessor.getKey() != token) {
+                return Pair.of(predecessor.getKey(), predecessor.getValue());
+            } else {
+                // given token is the only one on the ring, umpossible
+                throw new RuntimeException("There is only one token on the hash ring");
+            }
+        } else {
+            // given token doesn't map to partition
+            throw new IllegalArgumentException("The given token " + token +
+                                                   " does not map to partition " + partition);
+        }
+    }
+
+    /**
+     * This runs in linear time with respect to the number of tokens on the ring.
+     */
+    @Override
+    protected Map<Long, Long> pGetRanges(int partition) {
+        Map<Long, Long> ranges = new TreeMap<Long, Long>();
+        Long first = null; // start of the very first token on the ring
+        Long start = null; // start of a range
+        UnmodifiableIterator<Map.Entry<Long,Integer>> iter = tokens.entrySet().iterator();
+
+        // Iterate through the token map to find the ranges assigned to
+        // the given partition
+        while (iter.hasNext()) {
+            Map.Entry<Long, Integer> next = iter.next();
+            long token = next.getKey();
+            int pid = next.getValue();
+
+            if (first == null) {
+                first = token;
+            }
+
+            if (pid == partition) {
+                // if start is null, there's no open range, start one.
+                // else there is already an open range, leave it open.
+                if (start == null) {
+                    start = token;
+                }
+            } else {
+                // hit a token that belongs to a different partition.
+                // if start is not null, there's an open range, now is
+                // the time to close it.
+                // else there is no open range, keep on going.
+                if (start != null) {
+                    ranges.put(start, token);
+                    start = null;
+                }
+            }
+        }
+
+        // if there is an open range when we get here, it means that
+        // the last token on the ring belongs to the partition, and
+        // it wraps around the origin of the ring, so close the range
+        // with the the very first token on the ring.
+        if (start != null) {
+            assert first != null;
+            ranges.put(start, first);
+        }
+
+        return ranges;
     }
 }

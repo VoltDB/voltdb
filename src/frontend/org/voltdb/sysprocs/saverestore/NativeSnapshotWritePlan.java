@@ -127,6 +127,8 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                             table.getRelativeIndex(),
                             sdt,
                             new SnapshotDataFilter[0],
+                            null,
+                            false,
                             table.getIsreplicated(),
                             table.getTypeName());
 

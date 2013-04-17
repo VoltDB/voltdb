@@ -205,7 +205,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
              */
             tableBlock = null;
             ListIterator<StreamSnapshotSink> sinkIter = m_dataSinks.listIterator();
-            while (tableBlock == null && sinkIter.hasNext()) {
+            while (sinkIter.hasNext()) {
                 StreamSnapshotSink sink = sinkIter.next();
                 if (sink.isEOF()) {
                     // No more data from this data sink, close and remove it from the list
@@ -218,6 +218,11 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
                     }
                 } else {
                     tableBlock = sink.poll();
+                }
+
+                if (tableBlock != null) {
+                    // Got a block, restore it in the outer loop
+                    break;
                 }
             }
         }

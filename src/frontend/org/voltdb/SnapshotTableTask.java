@@ -17,6 +17,8 @@
 
 package org.voltdb;
 
+import org.voltdb.expressions.AbstractExpression;
+
 /**
  * A class identifying a table that should be snapshotted as well as the destination
  * for the resulting tuple blocks
@@ -26,6 +28,8 @@ public class SnapshotTableTask
     final int m_tableId;
     final SnapshotDataTarget m_target;
     final SnapshotDataFilter m_filters[];
+    final AbstractExpression m_predicate;
+    final boolean m_deleteTuples;
     final boolean m_isReplicated;
     final String m_name;
     final boolean m_isDevNull;
@@ -34,12 +38,16 @@ public class SnapshotTableTask
             final int tableId,
             final SnapshotDataTarget target,
             final SnapshotDataFilter filters[],
+            final AbstractExpression predicate,
+            final boolean deleteTuples,
             boolean isReplicated,
             final String tableName)
     {
         m_tableId = tableId;
         m_target = target;
         m_filters = filters;
+        m_predicate = predicate;
+        m_deleteTuples = deleteTuples;
         m_isReplicated = isReplicated;
         m_name = tableName;
         m_isDevNull = m_target instanceof DevNullSnapshotTarget;
