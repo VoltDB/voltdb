@@ -117,18 +117,25 @@ public class SchemaChangeClient {
                 cr = client.callProcedure(procName, params);
             }
             catch (ProcCallException e) {
+                log.debug("callROProcedureWithRetry operation exception:", e);
                 cr = e.getClientResponse();
             }
             catch (NoConnectionsException e) {
+                log.debug("callROProcedureWithRetry operation exception:", e);
                 // wait a bit to retry
                 try { Thread.sleep(1000); } catch (InterruptedException e1) {}
-            } catch (IOException e) {
+            }
+            catch (IOException e) {
+                log.debug("callROProcedureWithRetry operation exception:", e);
                 // IOException is not cool man
                 logStackTrace(e);
                 System.exit(-1);
             }
 
             if (cr != null) {
+                if (cr.getStatus() != ClientResponse.SUCCESS) {
+                    log.debug("callROProcedureWithRetry operation failed: " + ((ClientResponseImpl)cr).toJSONString());
+                }
                 switch (cr.getStatus()) {
                 case ClientResponse.SUCCESS:
                     // hooray!
@@ -159,7 +166,7 @@ public class SchemaChangeClient {
             now = System.currentTimeMillis();
         }
 
-        assert(false);
+        log.error(_F("Error no progress timeout reached, terminating"));
         System.exit(-1);
         return null;
     }
@@ -564,6 +571,7 @@ public class SchemaChangeClient {
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
         //clientConfig.setProcedureCallTimeout(30 * 60 * 1000); // 30 min
+        clientConfig.setMaxOutstandingTxns(512);
         client = ClientFactory.createClient(clientConfig);
         connect(config.servers);
 

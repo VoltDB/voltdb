@@ -28,6 +28,7 @@ import java.util.Random;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
@@ -52,6 +53,7 @@ class TableLoader {
     final AtomicBoolean hadError = new AtomicBoolean(false);
     final SortedSet<Long> outstandingPkeys = Collections.synchronizedSortedSet(new TreeSet<Long>());
     long lastSentPkey = 0;
+    final AtomicInteger success_count = new AtomicInteger(0);
 
     private static String _F(String str, Object... parameters) {
         return String.format(str, parameters);
@@ -82,11 +84,15 @@ class TableLoader {
 
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
+            if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                log.debug("TableLoader::clientCallback operation failed: " + ((ClientResponseImpl)clientResponse).toJSONString());
+            }
             switch (clientResponse.getStatus()) {
             case ClientResponse.SUCCESS:
                 // hooray!
                 boolean success = outstandingPkeys.remove(pkey);
                 assert(success);
+                success_count.incrementAndGet();
                 break;
             case ClientResponse.CONNECTION_LOST:
             case ClientResponse.CONNECTION_TIMEOUT:
@@ -172,6 +178,10 @@ class TableLoader {
                 log.info("loadChunk exiting (failed) due to thrown exception: " + e.getMessage());
                 return false;
             }
+            // periodically print a progress confirmation
+            int sc = success_count.get();
+            if (sc > 0 && sc % 100 == 0)
+                log.info(_F("loadChunk progress report: ops count: %d last key: %d", sc, key));
         }
 
         try {
