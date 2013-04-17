@@ -277,8 +277,7 @@ public class ElasticHashinator extends TheHashinator {
      * Find the predecessor of the given token on the ring.
      * @param partition    The partition that maps to the given token
      * @param token        The token on the ring
-     * @return The predecessor of the given token. Null if the given partition doesn't
-     * exist or it is the only token on the ring.
+     * @return The predecessor of the given token.
      */
     @Override
     protected Pair<Long, Integer> pPredecessor(int partition, long token) {
@@ -293,12 +292,13 @@ public class ElasticHashinator extends TheHashinator {
             if (predecessor.getKey() != token) {
                 return Pair.of(predecessor.getKey(), predecessor.getValue());
             } else {
-                // given token is the only one on the ring
-                return null;
+                // given token is the only one on the ring, umpossible
+                throw new RuntimeException("There is only one token on the hash ring");
             }
         } else {
             // given token doesn't map to partition
-            return null;
+            throw new IllegalArgumentException("The given token " + token +
+                                                   " does not map to partition " + partition);
         }
     }
 
