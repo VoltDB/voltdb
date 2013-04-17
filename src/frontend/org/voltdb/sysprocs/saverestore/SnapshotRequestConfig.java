@@ -17,7 +17,6 @@
 
 package org.voltdb.sysprocs.saverestore;
 
-import com.google.common.collect.ImmutableList;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -34,7 +33,7 @@ import java.util.Set;
 public class SnapshotRequestConfig {
     protected static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
 
-    public final List<Table> tables;
+    public final Table[] tables;
 
     /**
      * @param tables    If tables is null, all tables will be snapshotted.
@@ -46,17 +45,17 @@ public class SnapshotRequestConfig {
         if (tables == null) {
             this.tables = null;
         } else {
-            this.tables = ImmutableList.copyOf(tables);
+            this.tables = tables.toArray(new Table[0]);
         }
     }
 
     public SnapshotRequestConfig(JSONObject jsData, Database catalogDatabase)
     {
-        tables = ImmutableList.copyOf(getTablesToInclude(jsData, catalogDatabase));
+        tables = getTablesToInclude(jsData, catalogDatabase);
     }
 
-    private static List<Table> getTablesToInclude(JSONObject jsData,
-                                                  Database catalogDatabase)
+    private static Table[] getTablesToInclude(JSONObject jsData,
+                                              Database catalogDatabase)
     {
         final List<Table> tables = SnapshotUtil.getTablesToSave(catalogDatabase);
         final Set<Integer> tableIdsToInclude = new HashSet<Integer>();
@@ -78,7 +77,7 @@ public class SnapshotRequestConfig {
             // It doesn't make any sense to take a snapshot that doesn't include any table,
             // it must be that the request doesn't specify a table filter,
             // so default to all tables.
-            return tables;
+            return tables.toArray(new Table[0]);
         }
 
         ListIterator<Table> iter = tables.listIterator();
@@ -90,7 +89,7 @@ public class SnapshotRequestConfig {
             }
         }
 
-        return tables;
+        return tables.toArray(new Table[0]);
     }
 
     public void toJSONString(JSONStringer stringer) throws JSONException

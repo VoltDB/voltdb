@@ -91,7 +91,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             createUpdateHashinatorTasksForSites(localPartitions, tokensToAdd, txnId);
         }
 
-        final AtomicInteger numTables = new AtomicInteger(config.tables.size());
+        final AtomicInteger numTables = new AtomicInteger(config.tables.length);
         final SnapshotRegistry.Snapshot snapshotRecord =
             SnapshotRegistry.startSnapshot(
                     txnId,
@@ -99,7 +99,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                     file_path,
                     file_nonce,
                     SnapshotFormat.STREAM,
-                    config.tables.toArray(new Table[0]));
+                    config.tables);
 
         // table schemas for all the tables we'll snapshot on this partition
         Map<Integer, byte[]> schemas = new HashMap<Integer, byte[]>();
