@@ -42,6 +42,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTableUtil;
 
@@ -313,7 +314,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Interface frontend invokes to communicate to CPP execution engine.
      */
 
-    abstract public boolean activateTableStream(final int tableId, TableStreamType type);
+    abstract public boolean activateTableStream(final int tableId, TableStreamType type, SnapshotPredicates predicates);
 
     /**
      * Serialize more tuples from the specified table that already has a stream enabled

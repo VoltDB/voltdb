@@ -35,17 +35,18 @@ import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
 
-import com.google.common.collect.ImmutableSortedMap;
-import junit.framework.TestCase;
-
 import org.apache.cassandra_voltpatches.MurmurHash3;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
+import org.voltcore.utils.Pair;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineJNI;
+
+import static org.junit.Assert.*;
 
 /**
  * This test verifies that the Java Hashinator behaves
@@ -53,10 +54,10 @@ import org.voltdb.jni.ExecutionEngineJNI;
  *
  */
 @RunWith(Parameterized.class)
-public class TestTheHashinator extends TestCase {
+public class TestTheHashinator {
     Random r = new Random();
 
-    @Override
+    @Before
     public void setUp() {
         EELibraryLoader.loadExecutionEngineLibrary(true);
         VoltDB.instance().readBuildInfo("Test");
@@ -618,11 +619,15 @@ public class TestTheHashinator extends TestCase {
         TheHashinator.initialize(HashinatorType.ELASTIC.hashinatorClass, newConfig);
         Map<Long, Integer> newTokens = deserializeElasticConfig(newConfig);
         Set<Long> tokensForP4 = new HashSet<Long>();
-        Set<Integer> predecessors = TheHashinator.predecessors(4);
+        Map<Long, Integer> tokensToPredecessors = TheHashinator.predecessors(4);
+        Set<Integer> predecessors = new HashSet<Integer>(tokensToPredecessors.values());
         // Predecessor set shouldn't contain the partition itself
         assertFalse(predecessors.contains(4));
 
         for (Map.Entry<Long, Integer> entry : newTokens.entrySet()) {
+            if (tokensToPredecessors.containsKey(entry.getKey())) {
+                assertEquals(entry.getValue(), tokensToPredecessors.get(entry.getKey()));
+            }
             if (entry.getValue() == 4) {
                 tokensForP4.add(entry.getKey());
             }
@@ -640,6 +645,119 @@ public class TestTheHashinator extends TestCase {
             predecessors.remove(pid);
         }
         assertEquals(0, predecessors.size());
+    }
+
+    @Test
+    public void testElasticPredecessor() {
+        if (hashinatorType == HashinatorType.LEGACY) return;
+
+        byte[] config = ElasticHashinator.getConfigureBytes(3,
+                                                            ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+        byte[] newConfig = ElasticHashinator.addPartitions(new ElasticHashinator(config), Arrays.asList(3, 4, 5),
+                                                           ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+        TheHashinator.initialize(HashinatorType.ELASTIC.hashinatorClass, newConfig);
+        Map<Long, Integer> predecessors = TheHashinator.predecessors(4);
+
+        // pick the first predecessor
+        Map.Entry<Long, Integer> predecessor = predecessors.entrySet().iterator().next();
+        // if token and partition doesn't match, it should return null
+        assertNull(TheHashinator.predecessor(predecessor.getValue(), predecessor.getKey() - 1));
+        Pair<Long, Integer> prevPredecessor = TheHashinator.predecessor(predecessor.getValue(), predecessor.getKey());
+        assertNotNull(prevPredecessor);
+
+        ElasticHashinator hashinator = new ElasticHashinator(TheHashinator.getCurrentConfig().getSecond());
+        assertEquals(prevPredecessor.getSecond().intValue(), hashinator.partitionForToken(prevPredecessor.getFirst()));
+        // check if predecessor's token - 1 belongs to the previous predecessor
+        if (predecessor.getKey() != Long.MIN_VALUE) {
+            assertEquals(prevPredecessor.getSecond().intValue(), hashinator.partitionForToken(predecessor.getKey() - 1));
+        } else {
+            assertEquals(prevPredecessor.getSecond().intValue(), hashinator.partitionForToken(Long.MAX_VALUE));
+        }
+    }
+
+    @Test
+    public void testElasticAddPartitionDeterminism() {
+        if (hashinatorType == HashinatorType.LEGACY) return;
+
+        ElasticHashinator hashinator = new ElasticHashinator(ElasticHashinator.getConfigureBytes(3,
+                ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION));
+
+        // Add 3 partitions in a batch to the original hashinator
+        byte[] batchAddConfig = ElasticHashinator.addPartitions(hashinator, Arrays.asList(3, 4, 5),
+                                                                ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+        Map<Long, Integer> batchAddTokens = deserializeElasticConfig(batchAddConfig);
+
+        // Add the same 3 partitions one at a time to the original hashinator
+        byte[] add3Config = ElasticHashinator.addPartitions(hashinator, Arrays.asList(3),
+                                                            ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+        ElasticHashinator add3Hashinator = new ElasticHashinator(add3Config);
+        byte[] add4Config = ElasticHashinator.addPartitions(add3Hashinator, Arrays.asList(4),
+                                                            ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+        ElasticHashinator add4Hashinator = new ElasticHashinator(add4Config);
+        byte[] seqAddConfig = ElasticHashinator.addPartitions(add4Hashinator, Arrays.asList(5),
+                                                              ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+        Map<Long, Integer> seqAddTokens = deserializeElasticConfig(seqAddConfig);
+
+        // The two approaches should produce the same hash ring
+        assertFalse(seqAddTokens.isEmpty());
+        assertTrue(seqAddTokens.values().contains(3));
+        assertTrue(seqAddTokens.values().contains(4));
+        assertTrue(seqAddTokens.values().contains(5));
+        assertEquals(batchAddTokens, seqAddTokens);
+    }
+
+    @Test
+    public void testElasticGetRanges() {
+        if (hashinatorType == HashinatorType.LEGACY) return;
+
+        ElasticHashinator hashinator = new ElasticHashinator(ElasticHashinator.getConfigureBytes(24,
+                ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION));
+        Map<Long, Long> range1 = hashinator.pGetRanges(15);
+        assertFalse(range1.isEmpty());
+
+        // make sure that the returned map is sorted
+        long previous = Long.MIN_VALUE;
+        for (long k : range1.keySet()) {
+            assertTrue(k >= previous);
+            previous = k;
+        }
+
+        // make sure that every range hashes to partition 15
+        for (Map.Entry<Long, Long> entry : range1.entrySet()) {
+            long start = entry.getKey();
+            long end = entry.getValue();
+            assertEquals(15, hashinator.partitionForToken(start));
+            if (end != Long.MIN_VALUE) {
+                assertEquals(15, hashinator.partitionForToken(end - 1));
+            } else {
+                assertEquals(15, hashinator.partitionForToken(Long.MAX_VALUE));
+            }
+            assertNotSame(15, hashinator.partitionForToken(end));
+        }
+
+        // make sure that every token for partition 15 appears in the range map
+        byte[] config = hashinator.pGetCurrentConfig().getSecond();
+        Map<Long, Integer> tokens = deserializeElasticConfig(config);
+        for (Map.Entry<Long, Integer> entry : tokens.entrySet()) {
+            long token = entry.getKey();
+            int partition = entry.getValue();
+
+            if (partition == 15) {
+                boolean foundRange = false;
+                for (Map.Entry<Long, Long> rangeEntry : range1.entrySet()) {
+                    long start = rangeEntry.getKey();
+                    long end = rangeEntry.getValue();
+                    if (start <= token && token < end) {
+                        foundRange = true;
+                        break;
+                    }
+                }
+                assertTrue(foundRange);
+            }
+        }
+
+        // non-existing partition should have an empty range
+        assertTrue(hashinator.pGetRanges(32).isEmpty());
     }
 }
 

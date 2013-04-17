@@ -20,6 +20,7 @@ package org.voltdb;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
@@ -51,6 +52,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.iv2.SiteTaskerQueue;
 import org.voltdb.iv2.SnapshotTask;
 import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.utils.CatalogUtil;
 
 import com.google.common.util.concurrent.Callables;
@@ -398,12 +400,21 @@ public class SnapshotSiteProcessor {
                 }
             }
             SNAP_LOG.debug("Examining SnapshotTableTask: " + task);
+
+            SnapshotPredicates predicates;
+            if (task.m_predicate == null) {
+                predicates = new SnapshotPredicates();
+            } else {
+                predicates = new SnapshotPredicates(Arrays.asList(task.m_predicate),
+                                                    task.m_deleteTuples);
+            }
+
             /*
              * Why do the extra work for a /dev/null target
              * Check if it is dev null and don't activate COW
              */
             if (!task.m_isDevNull) {
-                if (!ee.activateTableStream(task.m_tableId, TableStreamType.SNAPSHOT )) {
+                if (!ee.activateTableStream(task.m_tableId, TableStreamType.SNAPSHOT, predicates)) {
                     SNAP_LOG.error("Attempted to activate copy on write mode for table "
                             + task.m_name + " and failed");
                     SNAP_LOG.error(task);

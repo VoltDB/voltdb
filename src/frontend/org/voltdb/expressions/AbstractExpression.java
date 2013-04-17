@@ -117,8 +117,14 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     @Override
-    public Object clone() throws CloneNotSupportedException {
-        AbstractExpression clone = (AbstractExpression)super.clone();
+    public Object clone() {
+        AbstractExpression clone = null;
+        try {
+            clone = (AbstractExpression)super.clone();
+        } catch (CloneNotSupportedException e) {
+            // umpossible
+            return null;
+        }
         clone.m_id = m_id;
         clone.m_isJoiningClause = m_isJoiningClause;
         clone.m_type = m_type;

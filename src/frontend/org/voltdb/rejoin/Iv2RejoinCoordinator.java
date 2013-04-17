@@ -41,6 +41,7 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
+import org.voltdb.sysprocs.saverestore.StreamSnapshotRequestConfig;
 
 /**
  * Thread Safety: this is a reentrant class. All mutable datastructures
@@ -128,7 +129,9 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
 
     private String makeSnapshotRequest(Map<Long, Long> sourceToDests)
     {
-        return makeSnapshotRequest(sourceToDests, null, null);
+        StreamSnapshotRequestConfig config =
+            new StreamSnapshotRequestConfig(null, sourceToDests, null);
+        return makeSnapshotRequest(config);
     }
 
     @Override
