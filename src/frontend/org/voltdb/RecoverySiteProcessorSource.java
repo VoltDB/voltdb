@@ -49,6 +49,7 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.rejoin.RejoinDataAckMessage;
 import org.voltdb.rejoin.RejoinDataMessage;
+import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 
@@ -437,7 +438,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
         }
         m_onCompletion = onCompletion;
         RecoveryTable table = m_tablesToStream.peek();
-        if (!m_engine.activateTableStream(table.m_tableId, TableStreamType.RECOVERY, new byte[] {0, 0, 0, 0})) {
+        if (!m_engine.activateTableStream(table.m_tableId, TableStreamType.RECOVERY, new SnapshotPredicates())) {
             VoltDB.crashLocalVoltDB("Attempted to activate recovery stream for table "
                     + table.m_name + " and failed", false, null);
         }
@@ -618,7 +619,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                     m_tablesToStream.poll();
                     RecoveryTable nextTable = m_tablesToStream.peek();
                     if (nextTable != null) {
-                        if (!m_engine.activateTableStream(nextTable.m_tableId, TableStreamType.RECOVERY, new byte[] {0, 0, 0, 0})) {
+                        if (!m_engine.activateTableStream(nextTable.m_tableId, TableStreamType.RECOVERY, new SnapshotPredicates())) {
                             VoltDB.crashLocalVoltDB("Attempted to activate recovery stream for table "
                                     + nextTable.m_name + " and failed", false, null);
                         }

@@ -49,6 +49,7 @@ import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 
 /**
  * Tests native execution engine JNI interface.
@@ -173,8 +174,8 @@ public class TestExecutionEngine extends TestCase {
 
         loadTestTables( sourceEngine, m_catalog);
 
-        sourceEngine.activateTableStream( WAREHOUSE_TABLEID, TableStreamType.RECOVERY, new byte[] {0, 0, 0, 0});
-        sourceEngine.activateTableStream( STOCK_TABLEID, TableStreamType.RECOVERY, new byte[] {0, 0, 0, 0});
+        sourceEngine.activateTableStream( WAREHOUSE_TABLEID, TableStreamType.RECOVERY, new SnapshotPredicates());
+        sourceEngine.activateTableStream( STOCK_TABLEID, TableStreamType.RECOVERY, new SnapshotPredicates());
 
         BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
         try {

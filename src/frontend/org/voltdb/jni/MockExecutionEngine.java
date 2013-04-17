@@ -31,6 +31,7 @@ import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.export.ExportProtoMessage;
+import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 
 public class MockExecutionEngine extends ExecutionEngine {
 
@@ -170,7 +171,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateTableStream(int tableId, TableStreamType type, byte[] data) {
+    public boolean activateTableStream(int tableId, TableStreamType type, SnapshotPredicates predicates) {
         return false;
     }
 

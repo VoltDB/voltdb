@@ -18,9 +18,9 @@
 package org.voltdb;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
@@ -38,7 +38,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google.common.base.Charsets;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -50,10 +49,10 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
-import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.iv2.SiteTaskerQueue;
 import org.voltdb.iv2.SnapshotTask;
 import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.utils.CatalogUtil;
 
 import com.google.common.util.concurrent.Callables;
@@ -402,22 +401,12 @@ public class SnapshotSiteProcessor {
             }
             SNAP_LOG.debug("Examining SnapshotTableTask: " + task);
 
-            // get predicate bytes
-            AbstractExpression predicate = task.m_predicate;
-            ByteBuffer buf;
-            if (predicate != null) {
-                byte[] predicateBytes = predicate.toJSONString().getBytes(Charsets.UTF_8);
-                // 1 byte delete flag, 4 bytes for count, 4 bytes for string len
-                buf = ByteBuffer.allocate(predicateBytes.length + 9);
-                buf.put(task.m_deleteTuples ? 1 : (byte) 0);
-                buf.putInt(1); // TODO: Only support 1 target for now
-                buf.putInt(predicateBytes.length);
-                buf.put(predicateBytes);
+            SnapshotPredicates predicates;
+            if (task.m_predicate == null) {
+                predicates = new SnapshotPredicates();
             } else {
-                // no predicate
-                buf = ByteBuffer.allocate(5);
-                buf.put((byte) 0);
-                buf.putInt(0);
+                predicates = new SnapshotPredicates(Arrays.asList(task.m_predicate),
+                                                    task.m_deleteTuples);
             }
 
             /*
@@ -425,7 +414,7 @@ public class SnapshotSiteProcessor {
              * Check if it is dev null and don't activate COW
              */
             if (!task.m_isDevNull) {
-                if (!ee.activateTableStream(task.m_tableId, TableStreamType.SNAPSHOT, buf.array())) {
+                if (!ee.activateTableStream(task.m_tableId, TableStreamType.SNAPSHOT, predicates)) {
                     SNAP_LOG.error("Attempted to activate copy on write mode for table "
                             + task.m_name + " and failed");
                     SNAP_LOG.error(task);

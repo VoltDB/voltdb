@@ -36,6 +36,7 @@ import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FastSerializer.BufferGrowCallback;
+import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 
 /**
  * Wrapper for native Execution Engine library.
@@ -419,8 +420,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateTableStream(int tableId, TableStreamType streamType, byte[] data) {
-        return nativeActivateTableStream(pointer, tableId, streamType.ordinal(), data);
+    public boolean activateTableStream(int tableId, TableStreamType streamType, SnapshotPredicates predicates) {
+        return nativeActivateTableStream(pointer, tableId, streamType.ordinal(), predicates.toBytes());
     }
 
     @Override
