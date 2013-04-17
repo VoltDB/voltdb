@@ -32,7 +32,6 @@
 #include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
 #include "common/tabletuple.h"
-#include "common/DummyUndoQuantum.hpp"
 #include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tablefactory.h"
@@ -45,8 +44,7 @@ using namespace std;
 class TableAndIndexTest : public Test {
     public:
         TableAndIndexTest() {
-            dummyUndo = new DummyUndoQuantum();
-            engine = new ExecutorContext(0, 0, dummyUndo, NULL, NULL, false, "", 0);
+            engine = new ExecutorContext(0, 0, NULL, NULL, NULL, false, "", 0);
             mem = 0;
 
             vector<voltdb::ValueType> districtColumnTypes;
@@ -235,7 +233,6 @@ class TableAndIndexTest : public Test {
 
         ~TableAndIndexTest() {
             delete engine;
-            delete dummyUndo;
             delete districtTable;
             delete districtTempTable;
             delete warehouseTable;
@@ -247,7 +244,6 @@ class TableAndIndexTest : public Test {
     protected:
         int mem;
         TempTableLimits limits;
-        UndoQuantum *dummyUndo;
         ExecutorContext *engine;
 
         TupleSchema      *districtTupleSchema;

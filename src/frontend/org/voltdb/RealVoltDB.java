@@ -42,8 +42,10 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
@@ -98,6 +100,7 @@ import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.rejoin.Iv2RejoinCoordinator;
 import org.voltdb.rejoin.JoinCoordinator;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.Encoder;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
@@ -118,7 +121,6 @@ import com.google.common.util.concurrent.SettableFuture;
  */
 public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 {
-    private static final VoltLogger log = new VoltLogger(VoltDB.class.getName());
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
@@ -138,7 +140,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     public VoltDB.Configuration m_config = new VoltDB.Configuration();
     int m_configuredNumberOfPartitions;
-    CatalogContext m_catalogContext;
+    // CatalogContext is immutable, just make sure that accessors see a consistent version
+    volatile CatalogContext m_catalogContext;
     private String m_buildString;
     private static final String m_defaultVersionString = "3.2";
     private String m_versionString = m_defaultVersionString;
@@ -211,7 +214,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // Synchronize initialize and shutdown.
     private final Object m_startAndStopLock = new Object();
 
-    // Synchronize updates of catalog contexts with context accessors.
+    // Synchronize updates of catalog contexts across the multiple sites on this host.
+    // Ensure that the first site to reach catalogUpdate() does all the work and that no
+    // others enter until that's finished.  CatalogContext is immutable and volatile, accessors
+    // should be able to always get a valid context without needing this lock.
     private final Object m_catalogUpdateLock = new Object();
 
     // add a random number to the sampler output to make it likely to be unique for this process.
@@ -900,6 +906,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             if (hbt != null) {
                 m_config.m_deadHostTimeoutMS = hbt.getTimeout() * 1000;
                 m_messenger.setDeadHostTimeout(m_config.m_deadHostTimeoutMS);
+            } else {
+                hostLog.info("Dead host timeout set to " + m_config.m_deadHostTimeoutMS + " milliseconds");
             }
 
 
@@ -930,8 +938,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
             }
 
-            long depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_deployment,
-                    true, true);
+            long depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_deployment, true);
             assert(depCRC != -1);
 
             m_catalogContext = new CatalogContext(
@@ -1145,7 +1152,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         javamaxheapmem /= (1024 * 1024);
         hostLog.info(String.format("Maximum usable Java heap set to %d mb.", javamaxheapmem));
 
-        m_catalogContext.logDebuggingInfoFromCatalog();
+        SortedMap<String, String> dbgMap = m_catalogContext.getDebuggingInfoFromCatalog();
+        for (String line : dbgMap.values()) {
+            hostLog.info(line);
+        }
 
         // print out a bunch of useful system info
         PlatformProperties pp = PlatformProperties.getPlatformProperties();
@@ -1267,7 +1277,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
             }
             catch (Exception ignored2) {
-                log.l7dlog( Level.ERROR, LogKeys.org_voltdb_VoltDB_FailedToRetrieveBuildString.name(), null);
+                hostLog.l7dlog( Level.ERROR, LogKeys.org_voltdb_VoltDB_FailedToRetrieveBuildString.name(), null);
             }
         }
         return new String[] { versionString, buildString };
@@ -1433,7 +1443,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     try {
                         m_nodeDRGateway.shutdown();
                     } catch (InterruptedException e) {
-                        log.warn("Interrupted shutting down invocation buffer server", e);
+                        hostLog.warn("Interrupted shutting down invocation buffer server", e);
                     }
                 }
 
@@ -1527,6 +1537,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(
             String diffCommands,
             byte[] newCatalogBytes,
+            byte[] catalogBytesHash,
             int expectedCatalogVersion,
             long currentTxnId,
             long currentTxnUniqueId,
@@ -1558,6 +1569,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalogVersion);
             }
 
+            hostLog.info(String.format("Globally updating the current application catalog (new hash %s).",
+                    Encoder.hexEncode(catalogBytesHash).substring(0, 10)));
+
+            // get old debugging info
+            SortedMap<String, String> oldDbgMap = m_catalogContext.getDebuggingInfoFromCatalog();
+
             // 0. A new catalog! Update the global context and the context tracker
             m_catalogContext =
                 m_catalogContext.update(
@@ -1572,7 +1589,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     new ContextTracker(
                             m_catalogContext,
                             csp));
-            m_catalogContext.logDebuggingInfoFromCatalog();
+
+            // log the stuff that's changed in this new catalog update
+            SortedMap<String, String> newDbgMap = m_catalogContext.getDebuggingInfoFromCatalog();
+            for (Entry<String, String> e : newDbgMap.entrySet()) {
+                // skip log lines that are unchanged
+                if (oldDbgMap.containsKey(e.getKey()) && oldDbgMap.get(e.getKey()).equals(e.getValue())) {
+                    continue;
+                }
+                hostLog.info(e.getValue());
+            }
 
             //Construct the list of partitions and sites because it simply doesn't exist anymore
             SiteTracker siteTracker = VoltDB.instance().getSiteTrackerForSnapshot();
@@ -1586,6 +1612,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // 1. update the export manager.
             ExportManager.instance().updateCatalog(m_catalogContext, partitions);
+
+            // 1.5 update the dead host timeout
+            if (m_catalogContext.cluster.getHeartbeattimeout() * 1000 != m_config.m_deadHostTimeoutMS) {
+                m_config.m_deadHostTimeoutMS = m_catalogContext.cluster.getHeartbeattimeout() * 1000;
+                m_messenger.setDeadHostTimeout(m_config.m_deadHostTimeoutMS);
+            }
 
             // 2. update client interface (asynchronously)
             //    CI in turn updates the planner thread.
@@ -1666,9 +1698,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     @Override
     public CatalogContext getCatalogContext() {
-        synchronized(m_catalogUpdateLock) {
-            return m_catalogContext;
-        }
+        return m_catalogContext;
     }
 
     /**

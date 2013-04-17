@@ -87,26 +87,23 @@ bool StreamedTable::insertTuple(TableTuple &source)
                                       source,
                                       TupleStreamWrapper::INSERT);
         m_tupleCount++;
-        m_usedTupleCount++;
-
         UndoQuantum *uq = m_executorContext->getCurrentUndoQuantum();
-        Pool *pool = uq->getDataPool();
-        StreamedTableUndoAction *ua =
-          new (pool->allocate(sizeof(StreamedTableUndoAction)))
-          StreamedTableUndoAction(this, mark);
-        uq->registerUndoAction(ua);
+        if (!uq) {
+            // With no active UndoLog, there is no undo support.
+            return true;
+        }
+        uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark));
     }
     return true;
 }
 
-bool StreamedTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
-                                                   TableTuple &sourceTupleWithNewValues,
-                                                   std::vector<TableIndex*> &indexesToUpdate)
+bool StreamedTable::updateTupleWithSpecificIndexes(TableTuple &, TableTuple &, std::vector<TableIndex*> const&, bool)
 {
     throwFatalException("May not update a streamed table.");
+    return true;
 }
 
-bool StreamedTable::deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings)
+bool StreamedTable::deleteTuple(TableTuple &tuple, bool fallible)
 {
     size_t mark = 0;
     if (m_wrapper) {
@@ -118,14 +115,14 @@ bool StreamedTable::deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings)
                                       tuple,
                                       TupleStreamWrapper::DELETE);
         m_tupleCount++;
-        m_usedTupleCount++;
-
+        // Infallible delete (schema change with tuple migration & views) is not supported for export tables
+        assert(fallible);
         UndoQuantum *uq = m_executorContext->getCurrentUndoQuantum();
-        Pool *pool = uq->getDataPool();
-        StreamedTableUndoAction *ua =
-          new (pool->allocate(sizeof(StreamedTableUndoAction)))
-          StreamedTableUndoAction(this, mark);
-        uq->registerUndoAction(ua);
+        if (!uq) {
+            // With no active UndoLog, there is no undo support.
+            return true;
+        }
+        uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark));
     }
     return true;
 }

@@ -46,14 +46,11 @@
 #ifndef HSTORETABLEUTIL_H
 #define HSTORETABLEUTIL_H
 
-#include <string>
-#include "common/common.h"
-#include "common/tabletuple.h"
-#include "storage/table.h"
+#include "storage/persistenttable.h"
 
 namespace tableutil {
 
-bool getRandomTuple(const voltdb::Table* table, voltdb::TableTuple &out);
+bool getRandomTuple(const voltdb::PersistentTable* table, voltdb::TableTuple &out);
 bool setRandomTupleValues(voltdb::Table* table, voltdb::TableTuple *tuple);
 bool addRandomTuples(voltdb::Table* table, int num_of_tuples);
 

@@ -710,7 +710,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int numFragmentIds,
             final long[] planFragmentIds,
             long[] inputDepIdsIn,
-            final ParameterSet[] parameterSets,
+            final Object[] parameterSets,
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
@@ -720,7 +720,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         final FastSerializer fser = new FastSerializer();
         try {
             for (int i = 0; i < numFragmentIds; ++i) {
-                parameterSets[i].writeExternal(fser);
+                // pset can be ByteBuffer or ParameterSet instance
+                if (parameterSets[i] instanceof ByteBuffer) {
+                    fser.write((ByteBuffer) parameterSets[i]);
+                }
+                else {
+                    ((ParameterSet) parameterSets[i]).writeExternal(fser);
+                }
             }
         } catch (final IOException exception) {
             throw new RuntimeException(exception);
@@ -764,7 +770,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int numFragmentIds,
             final long[] planFragmentIds,
             final long[] inputDepIds,
-            final ParameterSet[] parameterSets,
+            final Object[] parameterSets,
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
@@ -1269,8 +1275,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     @Override
     public int hashinate(Object value, HashinatorType type, byte config[])
     {
-        ParameterSet parameterSet = new ParameterSet();
-        parameterSet.setParameters(value);
+        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(value);
 
         final FastSerializer fser = new FastSerializer();
         try {

@@ -22,6 +22,7 @@
 #include "common/TupleOutputStream.h"
 #include "common/FatalException.hpp"
 #include "common/StreamPredicateList.h"
+#include "logging/LogManager.h"
 #include <algorithm>
 #include <cassert>
 #include <iostream>
@@ -143,12 +144,6 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
                  */
                 if (tuple.isPendingDelete()) {
                     assert(!tuple.isPendingDeleteOnUndoRelease());
-                    if (m_table.m_schema->getUninlinedObjectColumnCount() != 0)
-                    {
-                        m_table.decreaseStringMemCount(tuple.getNonInlinedMemorySize());
-                    }
-                    tuple.setPendingDeleteFalse();
-                    tuple.freeObjectColumns();
                     CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
                     //Save the extra lookup if possible
                     m_table.deleteTupleStorage(tuple, iter->m_currentBlock);
@@ -160,7 +155,7 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
                  * The delete for undo is generic enough to support this operation.
                  */
                 else if (m_doDelete && numCopiesMade > 0) {
-                    m_table.deleteTupleForUndo(tuple, true);
+                    m_table.deleteTupleForUndo(tuple.address(), true);
                 }
             }
 
@@ -178,6 +173,7 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
              * persistent table.
              */
             if (m_tuplesRemaining > 0) {
+#ifdef DEBUG
                 throwFatalException("serializeMore(): tuple count > 0 after streaming:\n"
                                     "Table name: %s\n"
                                     "Table type: %s\n"
@@ -197,6 +193,30 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
                                     (intmax_t)m_inserts,
                                     (intmax_t)m_updates,
                                     m_table.partitionColumn());
+#else
+                char message[1024 * 16];
+                snprintf(message, 1024 * 16,
+                        "serializeMore(): tuple count > 0 after streaming:\n"
+                        "Table name: %s\n"
+                        "Table type: %s\n"
+                        "Original tuple count: %jd\n"
+                        "Active tuple count: %jd\n"
+                        "Remaining tuple count: %jd\n"
+                        "Compacted block count: %jd\n"
+                        "Dirty insert count: %jd\n"
+                        "Dirty update count: %jd\n"
+                        "Partition column: %d\n",
+                        m_table.name().c_str(),
+                        m_table.tableType().c_str(),
+                        (intmax_t)m_totalTuples,
+                        (intmax_t)m_table.activeTupleCount(),
+                        (intmax_t)m_tuplesRemaining,
+                        (intmax_t)m_blocksCompacted,
+                        (intmax_t)m_inserts,
+                        (intmax_t)m_updates,
+                        m_table.partitionColumn());
+             LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, message);
+#endif
             }
             // -1 is used for tests when we don't bother counting. Need to force it to 0 here.
             if (m_tuplesRemaining < 0)  {

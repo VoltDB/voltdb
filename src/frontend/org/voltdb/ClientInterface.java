@@ -2111,7 +2111,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             // create the execution site task
                             StoredProcedureInvocation task = new StoredProcedureInvocation();
                             task.procName = "@UpdateApplicationCatalog";
-                            task.setParams(changeResult.encodedDiffCommands, changeResult.catalogBytes,
+                            task.setParams(changeResult.encodedDiffCommands, changeResult.catalogHash, changeResult.catalogBytes,
                                            changeResult.expectedCatalogVersion, changeResult.deploymentString,
                                            changeResult.deploymentCRC, changeResult.requiresSnapshotIsolation ? 1 : 0);
                             task.clientHandle = changeResult.clientHandle;
@@ -2343,8 +2343,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         spi.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
             @Override
             public ParameterSet call() {
-                ParameterSet paramSet = new ParameterSet();
-                paramSet.setParameters(params);
+                ParameterSet paramSet = ParameterSet.fromArrayWithCopy(params);
                 return paramSet;
             }
         });

@@ -20,6 +20,7 @@ package org.voltdb.planner;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltcore.utils.Pair;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Cluster;
@@ -196,9 +197,11 @@ public class QueryPlanner {
                 CompiledPlan plan = compileFromXML(m_paramzInfo.parameterizedXmlSQL,
                                                    m_paramzInfo.paramLiteralValues);
 
-                plan.partitioningKeyIndex =
-                        buildParameterSetFromExtractedLiteralsAndReturnPartitionIndex(
-                                plan.parameters, plan.extractedParamValues);
+                Pair<Integer, Object[]> info = buildParameterSetFromExtractedLiteralsAndReturnPartitionIndex(
+                        plan.parameters);
+                plan.partitioningKeyIndex = info.getFirst();
+                plan.extractedParamValues = ParameterSet.fromArrayNoCopy(info.getSecond());
+
                 // set the partition key value for SP plans
                 if (plan.partitioningKeyIndex >= 0) {
                     plan.setPartitioningKey(plan.extractedParamValues.toArray()[plan.partitioningKeyIndex]);
@@ -235,8 +238,8 @@ public class QueryPlanner {
      * it in the cache, then you can convert the parameters ParameterizationInfo
      * pulled out into the right types for the plan.
      */
-    public int buildParameterSetFromExtractedLiteralsAndReturnPartitionIndex(
-            VoltType[] paramTypes, ParameterSet psetToBuild) throws Exception
+    public Pair<Integer, Object[]> buildParameterSetFromExtractedLiteralsAndReturnPartitionIndex(
+            VoltType[] paramTypes) throws Exception
     {
         assert(m_paramzInfo.paramLiteralValues.length == paramTypes.length);
         Object[] params = new Object[m_paramzInfo.paramLiteralValues.length];
@@ -261,9 +264,7 @@ public class QueryPlanner {
             }
         }
 
-        psetToBuild.setParameters(params);
-
-        return partitionIndex;
+        return new Pair<Integer, Object[]>(partitionIndex, params, false);
     }
 
     /**

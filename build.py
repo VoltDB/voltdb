@@ -196,6 +196,7 @@ CTX.INPUT['structures'] = """
 CTX.INPUT['common'] = """
  CompactingStringPool.cpp
  CompactingStringStorage.cpp
+ FatalException.cpp
  ThreadLocalPool.cpp
  SegvException.cpp
  SerializableEEException.cpp
@@ -294,9 +295,6 @@ CTX.INPUT['storage'] = """
  MaterializedViewMetadata.cpp
  persistenttable.cpp
  PersistentTableStats.cpp
- PersistentTableUndoDeleteAction.cpp
- PersistentTableUndoInsertAction.cpp
- PersistentTableUndoUpdateAction.cpp
  StreamedTableStats.cpp
  streamedtable.cpp
  table.cpp

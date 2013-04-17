@@ -229,7 +229,7 @@ public:
         m_tuplesInsertedInLastUndo = 0;
     }
 
-void doRandomTableMutation(Table *table) {
+    void doRandomTableMutation(PersistentTable *table) {
         int rand = ::rand();
         int op = rand % 3;
         switch (op) {

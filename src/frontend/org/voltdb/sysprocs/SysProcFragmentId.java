@@ -82,8 +82,7 @@ public class SysProcFragmentId
      */
     public static final long PF_snapshotSaveQuiesceResults = 45;
 
-    public static boolean isSnapshotSaveFragment(byte[] planHash)
-    {
+    public static boolean isSnapshotSaveFragment(byte[] planHash) {
         long fragId = VoltSystemProcedure.hashToFragId(planHash);
 
         return (fragId == PF_saveTest || fragId == PF_createSnapshotTargets ||
@@ -158,6 +157,12 @@ public class SysProcFragmentId
     // @Update application catalog
     public static final long PF_updateCatalog = 210;
     public static final long PF_updateCatalogAggregate = 211;
+
+    public static boolean isCatalogUpdateFragment(byte[] planHash) {
+        long fragId = VoltSystemProcedure.hashToFragId(planHash);
+
+        return (fragId == PF_updateCatalog || fragId == PF_updateCatalogAggregate);
+    }
 
     // @Update topology
     public static final long PF_updateTopology = 230;

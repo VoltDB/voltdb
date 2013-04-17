@@ -211,6 +211,9 @@ class NValue {
     /* Release memory associated to object type NValues */
     void free() const;
 
+    /* Release memory associated to object type tuple columns */
+    static void freeObjectsFromTupleStorage(std::vector<char*> const &oldObjects);
+
     /* Set value to the correct SQL NULL representation. */
     void setNull();
 
@@ -2104,6 +2107,17 @@ inline void NValue::free() const {
     }
 }
 
+inline void NValue::freeObjectsFromTupleStorage(std::vector<char*> const &oldObjects)
+{
+
+    for (std::vector<char*>::const_iterator it = oldObjects.begin(); it != oldObjects.end(); ++it) {
+        StringRef* sref = reinterpret_cast<StringRef*>(*it);
+        if (sref != NULL) {
+            StringRef::destroy(sref);
+        }
+    }
+}
+
 /**
  * Get the amount of storage necessary to store a value of the specified type
  * in a tuple
@@ -2873,6 +2887,10 @@ inline NValue NValue::castAs(ValueType type) const {
       case VALUE_TYPE_DECIMAL:
         return castAsDecimal();
       default:
+          DEBUG_IGNORE_OR_THROW_OR_CRASH("Fallout from planner error."
+                                         " The invalid target value type for a cast is " <<
+                                         getTypeName(type))
+
           char message[128];
           snprintf(message, 128, "Type %d not a recognized type for casting",
                   (int) type);

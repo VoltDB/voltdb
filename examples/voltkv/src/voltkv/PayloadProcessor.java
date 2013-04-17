@@ -129,6 +129,21 @@ public class PayloadProcessor
             return new Pair(key, rawValue, null);
     }
 
+    public String [] generateAdjecentKeys( int count)
+    {
+        if (count < 0) return new String [0];
+
+        String [] keys = new String[count];
+
+        int start = this.Rand.nextInt(this.PoolSize);
+
+        for (int i = 0; i < count; ++i) {
+            int keyNo = (start + i) % this.PoolSize;
+            keys[i] =  String.format(this.KeyFormat, keyNo);
+        }
+        return keys;
+    }
+
     synchronized public String generateRandomKeyForRetrieval()
     {
         return String.format(this.KeyFormat, this.Rand.nextInt(this.PoolSize));
