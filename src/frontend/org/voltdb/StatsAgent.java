@@ -71,24 +71,30 @@ public class StatsAgent {
 
     private HostMessenger m_messenger;
 
+    // Things that would be nice in the future:
+    // 1. Instead of the tables to be aggregates identified by index in the
+    // returned response, they should be named so it's safe if they return in
+    // any order.
+    // 2. Instead of guessing the number of returned tables, it would be nice
+    // if the selector mapped to something that specified the number of
+    // results, the call to get the stats, etc.
+    //
     private static class PendingStatsRequest {
         private final String selector;
         private final Connection c;
         private final long clientData;
         private int expectedStatsResponses = 0;
-        private final VoltTable aggregateTables[];
+        private VoltTable[] aggregateTables = null;
         private final long startTime;
         public PendingStatsRequest(
                 String selector,
                 Connection c,
                 long clientData,
-                VoltTable aggregateTables[],
                 long startTime) {
             this.startTime = startTime;
             this.selector = selector;
             this.c = c;
             this.clientData = clientData;
-            this.aggregateTables = aggregateTables;
         }
     }
 
@@ -152,22 +158,34 @@ public class StatsAgent {
             return;
         }
 
-        if (buf.hasRemaining()) {
-            for (int ii = 0; ii < request.aggregateTables.length; ii++) {
+        // The first message we receive will create the correct number of tables.  Nobody else better
+        // disagree or there will be trouble here in River City.  Nobody else better add non-table
+        // stuff after the responses to the returned messages or said trouble will also occur.  Ick, fragile.
+        if (request.aggregateTables == null) {
+            List<VoltTable> tables = new ArrayList<VoltTable>();
+            while (buf.hasRemaining()) {
                 final int tableLength = buf.getInt();
                 int oldLimit = buf.limit();
                 buf.limit(buf.position() + tableLength);
                 ByteBuffer tableBuf = buf.slice();
                 buf.position(buf.limit()).limit(oldLimit);
-                //Lazy init the aggregate table using the first result
-                if (request.aggregateTables[ii] == null) {
-                    ByteBuffer copy = ByteBuffer.allocate(tableBuf.capacity() * 2);
-                    copy.put(tableBuf);
-                    copy.limit(copy.position());
-                    copy.position(0);
-                    VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer( copy, false);
-                    request.aggregateTables[ii] = vt;
-                } else {
+                ByteBuffer copy = ByteBuffer.allocate(tableBuf.capacity() * 2);
+                copy.put(tableBuf);
+                copy.limit(copy.position());
+                copy.position(0);
+                VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer( copy, false);
+                tables.add(vt);
+            }
+            request.aggregateTables = tables.toArray(new VoltTable[tables.size()]);
+        }
+        else {
+            for (int ii = 0; ii < request.aggregateTables.length; ii++) {
+                if (buf.hasRemaining()) {
+                    final int tableLength = buf.getInt();
+                    int oldLimit = buf.limit();
+                    buf.limit(buf.position() + tableLength);
+                    ByteBuffer tableBuf = buf.slice();
+                    buf.position(buf.limit()).limit(oldLimit);
                     VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer( tableBuf, true);
                     while (vt.advanceRow()) {
                         request.aggregateTables[ii].add(vt);
@@ -248,7 +266,6 @@ public class StatsAgent {
                 selector,
                 c,
                 clientHandle,
-                new VoltTable[2],
                 System.currentTimeMillis());
             collectTopoStats(psr);
             return;
@@ -259,7 +276,6 @@ public class StatsAgent {
                     selector,
                     c,
                     clientHandle,
-                    new VoltTable[2],
                     System.currentTimeMillis());
         final long requestId = m_nextRequestId++;
         m_pendingRequests.put(requestId, psr);
@@ -312,15 +328,12 @@ public class StatsAgent {
          * It is possible not to receive a table response if a feature is not enabled
          */
         VoltTable responseTables[] = request.aggregateTables;
-        for (int ii = 0; ii < responseTables.length; ii++) {
-            if (responseTables[ii] == null) {
-                responseTables = new VoltTable[0];
-                statusCode = ClientResponse.GRACEFUL_FAILURE;
-                statusString =
-                    "Requested statistic \"" + request.selector +
-                    "\" is not supported in the current configuration";
-                break;
-            }
+        if (responseTables == null || responseTables.length == 0) {
+            responseTables = new VoltTable[0];
+            statusCode = ClientResponse.GRACEFUL_FAILURE;
+            statusString =
+                "Requested statistic \"" + request.selector +
+                "\" is not supported in the current configuration";
         }
 
         ClientResponseImpl response =
@@ -339,6 +352,7 @@ public class StatsAgent {
     private void collectTopoStats(PendingStatsRequest psr)
     {
         List<Long> catalogIds = Arrays.asList(new Long[] { 0L });
+        psr.aggregateTables = new VoltTable[2];
         psr.aggregateTables[0] = getStats(SysProcSelector.TOPO, catalogIds, false, psr.startTime);
         VoltTable vt =
                 new VoltTable(
