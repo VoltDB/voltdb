@@ -457,7 +457,6 @@ public class CommandLine extends VoltDB.Configuration
         cmdline.add("-XX:+UseTLAB");
         cmdline.add("-XX:CMSInitiatingOccupancyFraction=75");
         cmdline.add("-XX:+UseCMSInitiatingOccupancyOnly");
-        cmdline.add("-XX:+UseLargePages");
         if (conditionalCardMark) {
             cmdline.add("-XX:+UseCondCardMark");
         }
