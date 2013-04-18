@@ -36,6 +36,7 @@
 #include "storage/tableutil.h"
 #include "indexes/tableindex.h"
 #include "storage/tableiterator.h"
+#include "storage/TableStreamer.h"
 #include "storage/CopyOnWriteIterator.h"
 #include "stx/btree_set.h"
 #include "common/DefaultTupleSerializer.h"
@@ -64,9 +65,9 @@ static int32_t m_primaryKeyIndex = 0;
 
 // Extra small quantities for quick debugging runs.
 const size_t TUPLE_COUNT = 10;
-const size_t BUFFER_SIZE = 1024;
+const size_t BUFFER_SIZE = 100;
 const size_t NUM_REPETITIONS = 2;
-const size_t NUM_MUTATIONS = 5;
+const size_t NUM_MUTATIONS = 1;
 
 #elif defined(MEMCHECK)
 
@@ -392,7 +393,6 @@ TEST_F(CopyOnWriteTest, BigTest) {
     initTable(true);
     int tupleCount = TUPLE_COUNT;
     addRandomUniqueTuples( m_table, tupleCount);
-    DefaultTupleSerializer serializer;
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         stx::btree_set<int64_t> originalTuples;
         voltdb::TableIterator& iterator = m_table->iterator();
@@ -408,7 +408,8 @@ TEST_F(CopyOnWriteTest, BigTest) {
             ASSERT_TRUE(inserted);
         }
 
-        m_table->activateCopyOnWrite(&serializer, 0);
+        boost::shared_ptr<TableStreamer> tableStream = TableStreamer::fromData(TABLE_STREAM_SNAPSHOT, 0, false);
+        m_table->activateStream(tableStream);
 
         stx::btree_set<int64_t> COWTuples;
         char serializationBuffer[BUFFER_SIZE];
@@ -416,7 +417,8 @@ TEST_F(CopyOnWriteTest, BigTest) {
         while (true) {
             TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
             TupleOutputStream &outputStream = outputStreams.at(0);
-            m_table->serializeMore(outputStreams);
+            std::vector<int> positions;
+            m_table->streamMore(outputStreams, positions);
             const int serialized = static_cast<int>(outputStream.position());
             if (serialized == 0) {
                 break;
@@ -450,7 +452,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
     addRandomUniqueTuples( m_table, tupleCount);
     m_engine->setUndoToken(0);
     m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0);
-    DefaultTupleSerializer serializer;
+    boost::shared_ptr<TableStreamer> tableStream = TableStreamer::fromData(TABLE_STREAM_SNAPSHOT, 0, false);
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         stx::btree_set<int64_t> originalTuples;
         voltdb::TableIterator& iterator = m_table->iterator();
@@ -466,7 +468,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
             ASSERT_TRUE(inserted);
         }
 
-        m_table->activateCopyOnWrite(&serializer, 0);
+        m_table->activateStream(tableStream);
 
         stx::btree_set<int64_t> COWTuples;
         char serializationBuffer[BUFFER_SIZE];
@@ -474,7 +476,8 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
         while (true) {
             TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
             TupleOutputStream &outputStream = outputStreams.at(0);
-            m_table->serializeMore(outputStreams);
+            std::vector<int> positions;
+            m_table->streamMore(outputStreams, positions);
             const int serialized = static_cast<int>(outputStream.position());
             if (serialized == 0) {
                 break;
@@ -509,7 +512,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
     addRandomUniqueTuples( m_table, tupleCount);
     m_engine->setUndoToken(0);
     m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0);
-    DefaultTupleSerializer serializer;
+    boost::shared_ptr<TableStreamer> tableStream = TableStreamer::fromData(TABLE_STREAM_SNAPSHOT, 0, false);
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         stx::btree_set<int64_t> originalTuples;
         voltdb::TableIterator& iterator = m_table->iterator();
@@ -525,7 +528,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
             ASSERT_TRUE(inserted);
         }
 
-        m_table->activateCopyOnWrite(&serializer, 0);
+        m_table->activateStream(tableStream);
 
         stx::btree_set<int64_t> COWTuples;
         char serializationBuffer[BUFFER_SIZE];
@@ -533,7 +536,8 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
         while (true) {
             TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
             TupleOutputStream &outputStream = outputStreams.at(0);
-            m_table->serializeMore(outputStreams);
+            std::vector<int> positions;
+            m_table->streamMore(outputStreams, positions);
             const int serialized = static_cast<int>(outputStream.position());
             if (serialized == 0) {
                 break;
@@ -813,7 +817,10 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
 
         tool.context("activate");
 
-        bool alreadyActivated = m_table->activateCopyOnWrite(&serializer, 0, strings, doDelete);
+        boost::shared_ptr<TableStreamer> tableStream =
+                TableStreamer::fromData(TABLE_STREAM_SNAPSHOT, 0, doDelete, strings);
+
+        bool alreadyActivated = m_table->activateStream(tableStream);
         if (alreadyActivated) {
             tool.error("COW was previously activated");
         }
@@ -828,7 +835,8 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
                 outputStreams.add((void*)buffers[i].get(), BUFFER_SIZE);
             }
 
-            remaining = m_table->serializeMore(outputStreams);
+            std::vector<int> positions;
+            remaining = m_table->streamMore(outputStreams, positions);
 
             // Per-predicate iterators.
             TupleOutputStreamProcessor::iterator outputStream = outputStreams.begin();
@@ -954,11 +962,13 @@ TEST_F(CopyOnWriteTest, BufferBoundaryCondition) {
     addRandomUniqueTuples(m_table, tupleCount);
     size_t origPendingCount = m_table->getBlocksNotPendingSnapshotCount();
     // This should succeed in one call to serializeMore().
-    DefaultTupleSerializer serializer;
     char serializationBuffer[bufferSize];
-    m_table->activateCopyOnWrite(&serializer, 0);
+    boost::shared_ptr<TableStreamer> tableStream =
+            TableStreamer::fromData(TABLE_STREAM_SNAPSHOT, 0, false);
+    m_table->activateStream(tableStream);
     TupleOutputStreamProcessor outputStreams(serializationBuffer, bufferSize);
-    int64_t remaining = m_table->serializeMore(outputStreams);
+    std::vector<int> positions;
+    int64_t remaining = m_table->streamMore(outputStreams, positions);
     ASSERT_EQ(0, remaining);
     // Expect the same pending count, because it should get reset when
     // serialization finishes cleanly.

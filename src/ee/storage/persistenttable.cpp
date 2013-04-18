@@ -88,7 +88,6 @@ PersistentTable::PersistentTable(int partitionColumn) :
     m_allowNulls(),
     m_partitionColumn(partitionColumn),
     stats_(this),
-    m_COWContext(NULL),
     m_failedCompactionCount(0)
 {
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
@@ -247,9 +246,7 @@ bool PersistentTable::insertTuple(TableTuple &source, bool createUndoQuantum) {
      * is on have it decide. COW should always set the dirty to false unless the
      * tuple is in a to be scanned area.
      */
-    if (m_COWContext.get() != NULL) {
-        m_COWContext->markTupleDirty(m_tmpTarget1, true);
-    } else {
+    if (m_tableStream == NULL || !m_tableStream->notifyTupleInsert(m_tmpTarget1)) {
         m_tmpTarget1.setDirtyFalse();
     }
     m_tmpTarget1.isDirty();
@@ -355,8 +352,8 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         new (pool->allocate(sizeof(PersistentTableUndoUpdateAction)))
              PersistentTableUndoUpdateAction(targetTupleToUpdate, this, pool);
 
-    if (m_COWContext.get() != NULL) {
-        m_COWContext->markTupleDirty(targetTupleToUpdate, false);
+    if (m_tableStream.get() != NULL) {
+        m_tableStream->notifyTupleUpdate(targetTupleToUpdate);
     }
 
     /**
@@ -759,16 +756,21 @@ TableStats* PersistentTable::getTableStats() {
     return &stats_;
 }
 
-/**
- * Switch the table to copy on write mode. Returns true if the table was already in copy on write mode.
- */
-bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId,
-                                          const std::vector<std::string> &predicate_strings,
-                                          bool doDelete) {
-    if (m_COWContext != NULL) {
-        // true => COW already active
+/** Prepare table for streaming. */
+bool PersistentTable::activateStream(boost::shared_ptr<TableStreamer> tableStream) {
+    // Check that there was no stream before and that there is one now.
+    assert(m_tableStream.get() == NULL);
+    assert(tableStream.get() != NULL);
+    if (tableStream.get() == NULL) {
+        throwFatalException("PersistentTable::activateStream: expect non-null table stream.");
+    }
+    m_tableStream = tableStream;
+
+    if (m_tableStream->isAlreadyActive()) {
+        // true => COW or recovery context is already active.
         return true;
     }
+
     if (m_tupleCount == 0) {
         return false;
     }
@@ -781,63 +783,28 @@ bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t p
         assert(m_blocksNotPendingSnapshotLoad[ii]->empty());
     }
 
-    try {
-        // Constructor can throw exception when it parses the predicates.
-        assert(serializer != NULL);
-        CopyOnWriteContext *newCOW =
-            new CopyOnWriteContext(*this, *serializer, partitionId,
-                                   predicate_strings, activeTupleCount(), doDelete);
-        m_COWContext.reset(newCOW);
+    if (m_tableStream->activateStream(*this)) {
+        return false;
     }
-    catch(SerializableEEException &e) {
-        VOLT_ERROR("SerializableEEException: %s", e.message().c_str());
-        return true;
-    }
-    return false;
+
+    return true;
 }
 
 /**
  * Attempt to serialize more tuples from the table to the provided output streams.
  * Return remaining tuple count, 0 if done, or -1 on error.
  */
-int64_t PersistentTable::serializeMore(TupleOutputStreamProcessor &outputStreams) {
-    if (m_COWContext == NULL) {
+int64_t PersistentTable::streamMore(TupleOutputStreamProcessor &outputStreams,
+                                    std::vector<int> &retPositions) {
+    if (m_tableStream.get() == NULL) {
         return -1;
     }
-
-    int64_t remaining = m_COWContext->serializeMore(outputStreams);
+    int64_t remaining = m_tableStream->streamMore(outputStreams, retPositions);
     if (remaining <= 0) {
-        m_COWContext.reset(NULL);
+        // clang needs the cast for some reason.
+        m_tableStream.reset((TableStreamer*)NULL);
     }
-
     return remaining;
-}
-
-/**
- * Create a recovery stream for this table. Returns true if the table already has an active recovery stream
- */
-bool PersistentTable::activateRecoveryStream(int32_t tableId) {
-    if (m_recoveryContext != NULL) {
-        return true;
-    }
-    m_recoveryContext.reset(new RecoveryContext( this, tableId ));
-    return false;
-}
-
-/**
- * Serialize the next message in the stream of recovery messages. Returns true if there are
- * more messages and false otherwise.
- */
-bool PersistentTable::nextRecoveryMessage(ReferenceSerializeOutput *out) {
-    if (m_recoveryContext == NULL) {
-        return false;
-    }
-
-    const bool hasMore = m_recoveryContext->nextMessage(out);
-    if (!hasMore) {
-        m_recoveryContext.reset(NULL);
-    }
-    return hasMore;
 }
 
 /**
@@ -889,9 +856,9 @@ void PersistentTable::notifyBlockWasCompactedAway(TBPtr block) {
     if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
         assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
     } else {
-        assert(m_COWContext != NULL);
+        assert(m_tableStream != NULL);
         assert(m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end());
-        m_COWContext->notifyBlockWasCompactedAway(block);
+        m_tableStream->notifyBlockWasCompactedAway(block);
     }
 
 }
@@ -1037,8 +1004,7 @@ void PersistentTable::doIdleCompaction() {
 }
 
 void PersistentTable::doForcedCompaction() {
-    if (m_recoveryContext != NULL)
-    {
+    if (m_tableStream.get() != NULL && m_tableStream->isRecoveryActive()) {
         LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO,
             "Deferring compaction until recovery is complete.");
         return;

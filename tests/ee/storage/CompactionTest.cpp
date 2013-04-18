@@ -391,8 +391,8 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
 
     stx::btree_set<int32_t> COWTuples;
     int totalInsertedCOWTuples = 0;
-    DefaultTupleSerializer serializer;
-    m_table->activateCopyOnWrite(&serializer, 0);
+    boost::shared_ptr<TableStreamer> tableStream = TableStreamer::fromData(TABLE_STREAM_SNAPSHOT, 0, false);
+    m_table->activateStream(tableStream);
     for (int qq = 0; qq < 3; qq++) {
 #ifdef MEMCHECK
         int serializationBufferSize = 22700;
@@ -403,7 +403,8 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
         while (true) {
             TupleOutputStreamProcessor outs( serializationBuffer, serializationBufferSize);
             TupleOutputStream &out = outs.at(0);
-            m_table->serializeMore(outs);
+            std::vector<int> positions;
+            m_table->streamMore(outs, positions);
             const int serialized = static_cast<int>(out.position());
             if (out.position() == 0) {
                 break;
@@ -526,10 +527,10 @@ TEST_F(CompactionTest, TestENG897) {
 
     size_t blocksNotPendingSnapshot = m_table->getBlocksNotPendingSnapshotCount();
     ASSERT_EQ(5, blocksNotPendingSnapshot);
-    DefaultTupleSerializer serializer;
 
-    m_table->activateCopyOnWrite(&serializer, 0);
-    for (int ii = 0; ii < 16130; ii++) {
+    boost::shared_ptr<TableStreamer> tableStream = TableStreamer::fromData(TABLE_STREAM_SNAPSHOT, 0, false);
+    m_table->activateStream(tableStream);
+for (int ii = 0; ii < 16130; ii++) {
         if (ii % 2 == 0) {
             continue;
         }
@@ -545,7 +546,8 @@ TEST_F(CompactionTest, TestENG897) {
     while (true) {
         TupleOutputStreamProcessor outs( serializationBuffer, 2097152);
         TupleOutputStream &out = outs.at(0);
-        m_table->serializeMore(outs);
+        std::vector<int> positions;
+        m_table->streamMore(outs, positions);
         if (out.position() == 0) {
             break;
         }
@@ -567,7 +569,7 @@ TEST_F(CompactionTest, TestENG897) {
 
     //std::cout << "Before idle compaction" << std::endl;
     //m_table->printBucketInfo();
-    m_table->activateCopyOnWrite(&serializer, 0);
+    m_table->activateStream(tableStream);
     //std::cout << "Activated COW" << std::endl;
     //m_table->printBucketInfo();
     m_table->doIdleCompaction();
