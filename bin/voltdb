@@ -183,13 +183,13 @@ fi
 
 # run it
 export CMDVAL="$JAVA -server -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp "
-export CMDVAL=$CMDVAL"-XX:+UseConcMarkSweepGC -XX:+CMSParallelRemarkEnabled"
+export CMDVAL=$CMDVAL"-XX:+UseConcMarkSweepGC -XX:+CMSParallelRemarkEnabled "
 # note: bash evals '1.7.x' as > '1.7' so this is really a >= 1.7 jvm check
 if [ "$JVM_VERSION" \> "1.7" ] ; then
-    export CMDVAL=$CMDVAL"-XX:+UseCondCardMark"
+    export CMDVAL=$CMDVAL"-XX:+UseCondCardMark "
 fi
-export CMDVAL=$CMDVAL"-XX:+UseTLAB -XX:CMSInitiatingOccupancyFraction=75 -XX:+UseCMSInitiatingOccupancyOnly"
-export CMDVAL=$CMDVAL"-XX:+UseLargePages -XX:+UseParNewGC"
+export CMDVAL=$CMDVAL"-XX:+UseTLAB -XX:CMSInitiatingOccupancyFraction=75 -XX:+UseCMSInitiatingOccupancyOnly "
+export CMDVAL=$CMDVAL"-XX:+UseLargePages -XX:+UseParNewGC "
 export CMDVAL=$CMDVAL"$JAVA_HEAP_MAX $VOLTDB_OPTS "
 export CMDVAL=$CMDVAL"-Dlog4j.configuration=file://${LOG4J_CONFIG_PATH} "
 export CMDVAL=$CMDVAL"-Djava.library.path=${JAVA_LIBRARY_PATH} -classpath $CLASSPATH "
