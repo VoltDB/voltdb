@@ -288,10 +288,16 @@ public class StatsAgent {
         STATS_COLLECTION_TIMEOUT,
         TimeUnit.MILLISECONDS);
 
+        // DR has external/internal deltas, fix them here
+        String realSelector = selector;
+        if (selector.equalsIgnoreCase("DR")) {
+            realSelector = "DRNODE";
+        }
+
         JSONObject obj = new JSONObject();
         obj.put("requestId", requestId);
         obj.put("returnAddress", m_mailbox.getHSId());
-        obj.put("selector", "DRNODE");
+        obj.put("selector", realSelector);
         byte payloadBytes[] = CompressionService.compressBytes(obj.toString(4).getBytes("UTF-8"));
         for (int hostId : m_messenger.getLiveHostIds()) {
             long agentHsId = CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.STATS_SITE_ID);
@@ -380,6 +386,9 @@ public class StatsAgent {
         if (selector == SysProcSelector.DRNODE) {
             stats = collectDRStats();
         }
+        else if (selector == SysProcSelector.SNAPSHOTSTATUS) {
+            stats = collectSnapshotStatusStats();
+        }
 
         // Send a response with no data since the stats is not supported
         if (stats == null) {
@@ -400,7 +409,8 @@ public class StatsAgent {
         }
 
         ByteBuffer responseBuffer = ByteBuffer.allocate(
-                16 //requestId + a length prefix for each stats table
+                8 + // requestId
+                4 * stats.length + // length prefix for each stats table
                 + statbytes);
         responseBuffer.putLong(requestId);
         for (int i = 0; i < bufs.length; i++) {
@@ -427,6 +437,20 @@ public class StatsAgent {
             stats = new VoltTable[2];
             stats[0] = partitionStats;
             stats[1] = nodeStats;
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectSnapshotStatusStats()
+    {
+        List<Long> catalogIds = Arrays.asList(new Long[] { 0L });
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable ssStats = getStats(SysProcSelector.SNAPSHOTSTATUS, catalogIds, false, now);
+        if (ssStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = ssStats;
         }
         return stats;
     }

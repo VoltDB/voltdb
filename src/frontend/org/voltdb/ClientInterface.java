@@ -1656,7 +1656,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // dispatch selectors that do not us the @Statistics system procedure
         if ((params.toArray().length != 0)) {
             String selector = (String)params.toArray()[0];
-            if (selector.equals("DR") || selector.equals("TOPO")) {
+            if (selector.equals("DR") || selector.equals("TOPO") || selector.equals("SNAPSHOTSTATUS")) {
                try {
                    VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, selector);
                    return null;

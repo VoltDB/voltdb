@@ -129,6 +129,23 @@ public class TestStatsAgent {
                 { "44", 44 }
         });
         m_secondAgent.registerStatsSource(SysProcSelector.DRNODE, 0, nodeSource);
+
+        List<VoltTable.ColumnInfo> snapshotStatusColumns = Arrays.asList(new VoltTable.ColumnInfo[] {
+            new VoltTable.ColumnInfo("c1", VoltType.STRING),
+            new VoltTable.ColumnInfo("c2", VoltType.STRING)
+        });
+        MockStatsSource.columns = snapshotStatusColumns;
+        MockStatsSource snapshotSource = new MockStatsSource(new Object[][] {
+            {"RYANLOVES", "THEYANKEES"},
+            {"NOREALLY", "ASKHIM"}
+        });
+        m_mvoltdb.getStatsAgent().registerStatsSource(SysProcSelector.SNAPSHOTSTATUS, 0, snapshotSource);
+        MockStatsSource.columns = snapshotStatusColumns;
+        snapshotSource = new MockStatsSource(new Object[][] {
+            {"ISWEAR", "ITSTRUE"},
+            {"HONEST", "NOFOOLIN"}
+        });
+        m_secondAgent.registerStatsSource(SysProcSelector.SNAPSHOTSTATUS, 0, snapshotSource);
     }
 
     @Test
@@ -142,6 +159,17 @@ public class TestStatsAgent {
         System.out.println(results[0]);
         System.out.println(results[1]);
         verifyResults(response);
+    }
+
+    @Test
+    public void testCollectSnapshotStatusStats() throws Exception {
+        createAndRegisterStats();
+        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "SNAPSHOTSTATUS");
+        ClientResponseImpl response = responses.take();
+
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        VoltTable results[] = response.getResults();
+        System.out.println(results[0]);
     }
 
     @Test
