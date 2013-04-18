@@ -660,8 +660,11 @@ public class TestTheHashinator {
 
         // pick the first predecessor
         Map.Entry<Long, Integer> predecessor = predecessors.entrySet().iterator().next();
-        // if token and partition doesn't match, it should return null
-        assertNull(TheHashinator.predecessor(predecessor.getValue(), predecessor.getKey() - 1));
+        // if token and partition doesn't match, it should throw
+        try {
+            TheHashinator.predecessor(predecessor.getValue(), predecessor.getKey() - 1);
+            fail();
+        } catch (Exception e) {}
         Pair<Long, Integer> prevPredecessor = TheHashinator.predecessor(predecessor.getValue(), predecessor.getKey());
         assertNotNull(prevPredecessor);
 
