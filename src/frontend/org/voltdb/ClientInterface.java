@@ -1814,6 +1814,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return dispatchStatistics(sysProc, buf, task, handler, ccxn);
             } else if (task.procName.equals("@Promote")) {
                 return dispatchPromote(sysProc, buf, task, handler, ccxn);
+            } else if (task.procName.equals("@SnapshotStatus")) {
+                // SnapshotStatus is really through @Statistics now, but preserve the
+                // legacy calling mechanism
+                Object[] params = new Object[1];
+                params[0] = "SNAPSHOTSTATUS";
+                task.setParams(params);
+                return dispatchStatistics(SystemProcedureCatalog.listing.get("@Statistics"),
+                        buf, task, handler, ccxn);
             }
 
             // If you're going to copy and paste something, CnP the pattern
