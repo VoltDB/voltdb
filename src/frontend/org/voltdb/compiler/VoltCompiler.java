@@ -1625,24 +1625,25 @@ public class VoltCompiler {
                         countMultiPartition);
             }
             if (!tableScans.isEmpty()) {
-                outputStream.printf("[TABLE SCAN] Catalog contains %d procedures that use a table scan:\n",
+                outputStream.printf("[TABLE SCAN] Catalog contains %d procedures that use a table scan:\n\n",
                         tableScans.size());
                 for (Procedure p : tableScans) {
                     outputStream.println("\t\t" + p.getClassname());
                 }
                 outputStream.printf(
-                        "\tTable scans do not use indexes and may become slower as tables grow.\n\n");
+                        "\n\tTable scans do not use indexes and may become slower as tables grow.\n\n");
             }
             if (!nonDetProcs.isEmpty()) {
                 outputStream.println(
                         "[NDO][NDC] NON-DETERMINISTIC CONTENT OR ORDER WARNING:\n" +
-                        "\tThe procedures listed below contain non-deterministic queries.");
+                        "\tThe procedures listed below contain non-deterministic queries.\n");
 
                 for (Procedure p : nonDetProcs) {
                     outputStream.println("\t\t" + p.getClassname());
                 }
 
                 outputStream.printf(
+                        "\n" +
                         "\tUsing the output of these queries as input to subsequent\n" +
                         "\twrite queries can result in differences between replicated\n" +
                         "\tpartitions at runtime, forcing VoltDB to shutdown the cluster.\n" +
