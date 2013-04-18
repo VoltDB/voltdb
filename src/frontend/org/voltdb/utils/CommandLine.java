@@ -277,6 +277,12 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
+    boolean conditionalCardMark = false;
+    public CommandLine conditionalCardMark(boolean conditionalCardMark) {
+        this.conditionalCardMark = conditionalCardMark;
+        return this;
+    }
+
     String voltFilePrefix = "";
     public CommandLine voltFilePrefix(String voltFilePrefix) {
         this.voltFilePrefix = voltFilePrefix;
@@ -433,7 +439,6 @@ public class CommandLine extends VoltDB.Configuration
     public List<String> createCommandLine() {
         List<String> cmdline = new ArrayList<String>(50);
         cmdline.add(javaExecutable);
-        cmdline.add("-XX:-ReduceInitialCardMarks");
         cmdline.add("-XX:+HeapDumpOnOutOfMemoryError");
         cmdline.add("-Djava.library.path=" + java_library_path);
         if (rmi_host_name != null)
@@ -446,6 +451,16 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("-Xloggc:"+ volt_root + "/" + VEM_GC_ROLLOVER_FILE_NAME+" -verbose:gc -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCTimeStamps -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles="+VEM_GC_ROLLOVER_FILE_COUNT+" -XX:GCLogFileSize="+VEM_GC_ROLLOVER_FILE_SIZE);
         }
         cmdline.add(maxHeap);
+        cmdline.add("-XX:+UseParNewGC");
+        cmdline.add("-XX:+UseConcMarkSweepGC");
+        cmdline.add("-XX:+CMSParallelRemarkEnabled");
+        cmdline.add("-XX:+UseTLAB");
+        cmdline.add("-XX:CMSInitiatingOccupancyFraction=75");
+        cmdline.add("-XX:+UseCMSInitiatingOccupancyOnly");
+        cmdline.add("-XX:+UseLargePages");
+        if (conditionalCardMark) {
+            cmdline.add("-XX:+UseCondCardMark");
+        }
         cmdline.add("-classpath"); cmdline.add(classPath);
 
         if (includeTestOpts)
