@@ -63,6 +63,6 @@ AS
 -- stored procedures
 CREATE PROCEDURE FROM CLASS voter.procedures.Initialize;
 CREATE PROCEDURE FROM CLASS voter.procedures.Results;
-CREATE PROCEDURE FROM CLASS voter.procedures.Vote;
+-- CREATE PROCEDURE FROM CLASS voter.procedures.Vote;
 CREATE PROCEDURE FROM CLASS voter.procedures.ContestantWinningStates;
 CREATE PROCEDURE FROM CLASS voter.procedures.GetStateHeatmap;

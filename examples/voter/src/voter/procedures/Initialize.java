@@ -38,6 +38,7 @@ public class Initialize extends VoltProcedure
 {
     // Check if the database has already been initialized
     public final SQLStmt checkStmt = new SQLStmt("SELECT COUNT(*) FROM contestants;");
+    public final SQLStmt stupid = new SQLStmt("select * from votes limit 1;");
 
     // Inserts an area code/state mapping
     public final SQLStmt insertACSStmt = new SQLStmt("INSERT INTO area_code_state VALUES (?,?);");
