@@ -20,11 +20,10 @@
 
 #include <string>
 #include <vector>
-#include <boost/shared_ptr.hpp>
 #include <boost/scoped_ptr.hpp>
 #include "common/ids.h"
 #include "common/types.h"
-#include "common/DefaultTupleSerializer.h"
+#include "common/TupleSerializer.h"
 #include "storage/TupleBlock.h"
 
 namespace voltdb
@@ -41,28 +40,28 @@ class TableStreamer
 public:
 
     /**
-     * Factory method to create a TableStreamer from data received in a message.
+     * Constructor with data from serialized message.
      */
-    static boost::shared_ptr<TableStreamer> fromMessage(TableStreamType type,
-                                                        int32_t partitionId,
-                                                        ReferenceSerializeInput &serializeIn);
+    TableStreamer(TupleSerializer &tupleSerializer,
+                  TableStreamType streamType,
+                  int32_t partitionId,
+                  ReferenceSerializeInput &serializeIn);
 
     /**
-     * Factory method to create a TableStreamer directly from generated data
-     * with predicates for tests.
+     * Constructor with predicates to be copied.
      */
-    static boost::shared_ptr<TableStreamer> fromData(TableStreamType streamType,
-                                                     int32_t partitionId,
-                                                     bool doDelete,
-                                                     std::vector<std::string> &predicateStrings);
+    TableStreamer(TupleSerializer &tupleSerializer,
+                  TableStreamType streamType,
+                  int32_t partitionId,
+                  const std::vector<std::string> &predicateStrings,
+                  bool doDelete);
 
     /**
-     * Factory method to create a TableStreamer directly from generated data
-     * without predicates for tests.
+     * Constructor without predicates or delete flag.
      */
-    static boost::shared_ptr<TableStreamer> fromData(TableStreamType streamType,
-                                                     int32_t partitionId,
-                                                     bool doDelete);
+    TableStreamer(TupleSerializer &tupleSerializer,
+                  TableStreamType streamType,
+                  int32_t partitionId);
 
     /**
      * Destructor.
@@ -109,6 +108,13 @@ public:
     }
 
     /**
+     * Return the stream type, snapshot, recovery, etc..
+     */
+    TableStreamType getStreamType() const {
+        return m_streamType;
+    }
+
+    /**
      * Return true if recovery is in progress.
      */
     bool isRecoveryActive() const {
@@ -122,10 +128,8 @@ public:
 
 private:
 
-    /**
-     * Use a factory method for construction.
-     */
-    TableStreamer(TableStreamType streamType, int32_t partitionId, bool doDelete);
+    /// Tuple serializer.
+    TupleSerializer &m_tupleSerializer;
 
     /// The type of scan.
     const TableStreamType m_streamType;
@@ -133,20 +137,17 @@ private:
     /// Current partition ID.
     int32_t m_partitionId;
 
-    /// True if rows should be deleted after streaming.
-    const bool m_doDelete;
-
     /// Predicate strings.
     std::vector<std::string> m_predicateStrings;
+
+    /// True if rows should be deleted after streaming.
+    bool m_doDelete;
 
     /// Context to keep track of snapshot scans.
     boost::scoped_ptr<CopyOnWriteContext> m_COWContext;
 
     /// Context to keep track of recovery scans.
     boost::scoped_ptr<RecoveryContext> m_recoveryContext;
-
-    /// Tuple serializer.
-    DefaultTupleSerializer m_tupleSerializer;
 };
 
 } // namespace voltdb

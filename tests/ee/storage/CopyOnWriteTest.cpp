@@ -36,7 +36,6 @@
 #include "storage/tableutil.h"
 #include "indexes/tableindex.h"
 #include "storage/tableiterator.h"
-#include "storage/TableStreamer.h"
 #include "storage/CopyOnWriteIterator.h"
 #include "stx/btree_set.h"
 #include "common/DefaultTupleSerializer.h"
@@ -65,9 +64,9 @@ static int32_t m_primaryKeyIndex = 0;
 
 // Extra small quantities for quick debugging runs.
 const size_t TUPLE_COUNT = 10;
-const size_t BUFFER_SIZE = 100;
+const size_t BUFFER_SIZE = 1024;
 const size_t NUM_REPETITIONS = 2;
-const size_t NUM_MUTATIONS = 1;
+const size_t NUM_MUTATIONS = 5;
 
 #elif defined(MEMCHECK)
 
@@ -179,7 +178,7 @@ public:
         std::vector<voltdb::TableIndexScheme> indexes;
 
         m_table = dynamic_cast<voltdb::PersistentTable*>(
-            voltdb::TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_columnNames, 0));
+                                                         voltdb::TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_columnNames, 0));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);
@@ -206,23 +205,23 @@ public:
         int op = rand % 2;
         switch (op) {
 
-        /*
-         * Undo the last quantum
-         */
-        case 0: {
-            m_engine->undoUndoToken(m_undoToken);
-            m_tuplesDeleted -= m_tuplesDeletedInLastUndo;
-            m_tuplesInserted -= m_tuplesInsertedInLastUndo;
-            break;
-        }
+                /*
+                 * Undo the last quantum
+                 */
+            case 0: {
+                m_engine->undoUndoToken(m_undoToken);
+                m_tuplesDeleted -= m_tuplesDeletedInLastUndo;
+                m_tuplesInserted -= m_tuplesInsertedInLastUndo;
+                break;
+            }
 
-        /*
-         * Release the last quantum
-         */
-        case 1: {
-            m_engine->releaseUndoToken(m_undoToken);
-            break;
-        }
+                /*
+                 * Release the last quantum
+                 */
+            case 1: {
+                m_engine->releaseUndoToken(m_undoToken);
+                break;
+            }
         }
         m_engine->setUndoToken(++m_undoToken);
         m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0);
@@ -230,51 +229,51 @@ public:
         m_tuplesInsertedInLastUndo = 0;
     }
 
-void doRandomTableMutation(Table *table) {
+    void doRandomTableMutation(PersistentTable *table) {
         int rand = ::rand();
         int op = rand % 3;
         switch (op) {
 
-        /*
-         * Delete a tuple
-         */
-        case 0: {
-            TableTuple tuple(table->schema());
-            if (tableutil::getRandomTuple(table, tuple)) {
-                table->deleteTuple(tuple, true);
-                m_tuplesDeleted++;
-                m_tuplesDeletedInLastUndo++;
+                /*
+                 * Delete a tuple
+                 */
+            case 0: {
+                TableTuple tuple(table->schema());
+                if (tableutil::getRandomTuple(table, tuple)) {
+                    table->deleteTuple(tuple, true);
+                    m_tuplesDeleted++;
+                    m_tuplesDeletedInLastUndo++;
+                }
+                break;
             }
-            break;
-        }
 
-        /*
-         * Insert a tuple
-         */
-        case 1: {
-            addRandomUniqueTuples(table, 1);
-            m_tuplesInserted++;
-            m_tuplesInsertedInLastUndo++;
-            break;
-        }
-
-        /*
-         * Update a random tuple
-         */
-        case 2: {
-            voltdb::TableTuple tuple(table->schema());
-            voltdb::TableTuple tempTuple = table->tempTuple();
-            if (tableutil::getRandomTuple(table, tuple)) {
-                tempTuple.copy(tuple);
-                tempTuple.setNValue(1, ValueFactory::getIntegerValue(::rand()));
-                table->updateTuple(tuple, tempTuple);
-                m_tuplesUpdated++;
+                /*
+                 * Insert a tuple
+                 */
+            case 1: {
+                addRandomUniqueTuples(table, 1);
+                m_tuplesInserted++;
+                m_tuplesInsertedInLastUndo++;
+                break;
             }
-            break;
-        }
-        default:
-            assert(false);
-            break;
+
+                /*
+                 * Update a random tuple
+                 */
+            case 2: {
+                voltdb::TableTuple tuple(table->schema());
+                voltdb::TableTuple tempTuple = table->tempTuple();
+                if (tableutil::getRandomTuple(table, tuple)) {
+                    tempTuple.copy(tuple);
+                    tempTuple.setNValue(1, ValueFactory::getIntegerValue(::rand()));
+                    table->updateTuple(tuple, tempTuple);
+                    m_tuplesUpdated++;
+                }
+                break;
+            }
+            default:
+                assert(false);
+                break;
         }
     }
 
@@ -301,7 +300,7 @@ void doRandomTableMutation(Table *table) {
         while (iterator.next(tuple)) {
             if (tuple.isDirty()) {
                 printf("Found tuple %d is active and dirty at end of COW\n",
-                        ValuePeeker::peekAsInteger(tuple.getNValue(0)));
+                       ValuePeeker::peekAsInteger(tuple.getNValue(0)));
             }
             numTuples++;
             if (tuple.isDirty()) {
@@ -393,23 +392,23 @@ TEST_F(CopyOnWriteTest, BigTest) {
     initTable(true);
     int tupleCount = TUPLE_COUNT;
     addRandomUniqueTuples( m_table, tupleCount);
+    DefaultTupleSerializer serializer;
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         stx::btree_set<int64_t> originalTuples;
         voltdb::TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
             const std::pair<stx::btree_set<int64_t>::iterator, bool> p =
-                    originalTuples.insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
+            originalTuples.insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
             const bool inserted = p.second;
             if (!inserted) {
-                    int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
-                    printf("Failed to insert %d\n", primaryKey);
+                int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
+                printf("Failed to insert %d\n", primaryKey);
             }
             ASSERT_TRUE(inserted);
         }
 
-        boost::shared_ptr<TableStreamer> tableStream = TableStreamer::fromData(TABLE_STREAM_SNAPSHOT, 0, false);
-        m_table->activateStream(tableStream);
+        m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0);
 
         stx::btree_set<int64_t> COWTuples;
         char serializationBuffer[BUFFER_SIZE];
@@ -417,8 +416,8 @@ TEST_F(CopyOnWriteTest, BigTest) {
         while (true) {
             TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
             TupleOutputStream &outputStream = outputStreams.at(0);
-            std::vector<int> positions;
-            m_table->streamMore(outputStreams, positions);
+            std::vector<int> retPositions;
+            m_table->streamMore(outputStreams, retPositions);
             const int serialized = static_cast<int>(outputStream.position());
             if (serialized == 0) {
                 break;
@@ -429,7 +428,7 @@ TEST_F(CopyOnWriteTest, BigTest) {
                 values[0] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
                 values[1] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii + 4]));
                 const bool inserted =
-                        COWTuples.insert(*reinterpret_cast<int64_t*>(values)).second;
+                COWTuples.insert(*reinterpret_cast<int64_t*>(values)).second;
                 if (!inserted) {
                     printf("Failed in iteration %d, total inserted %d, with values %d and %d\n", qq, totalInserted, values[0], values[1]);
                 }
@@ -452,23 +451,23 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
     addRandomUniqueTuples( m_table, tupleCount);
     m_engine->setUndoToken(0);
     m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0);
-    boost::shared_ptr<TableStreamer> tableStream = TableStreamer::fromData(TABLE_STREAM_SNAPSHOT, 0, false);
+    DefaultTupleSerializer serializer;
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         stx::btree_set<int64_t> originalTuples;
         voltdb::TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
             const std::pair<stx::btree_set<int64_t>::iterator, bool> p =
-                    originalTuples.insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
+            originalTuples.insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
             const bool inserted = p.second;
             if (!inserted) {
-                    int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
-                    printf("Failed to insert %d\n", primaryKey);
+                int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
+                printf("Failed to insert %d\n", primaryKey);
             }
             ASSERT_TRUE(inserted);
         }
 
-        m_table->activateStream(tableStream);
+        m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0);
 
         stx::btree_set<int64_t> COWTuples;
         char serializationBuffer[BUFFER_SIZE];
@@ -476,8 +475,8 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
         while (true) {
             TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
             TupleOutputStream &outputStream = outputStreams.at(0);
-            std::vector<int> positions;
-            m_table->streamMore(outputStreams, positions);
+            std::vector<int> retPositions;
+            m_table->streamMore(outputStreams, retPositions);
             const int serialized = static_cast<int>(outputStream.position());
             if (serialized == 0) {
                 break;
@@ -488,7 +487,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
                 values[0] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
                 values[1] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii + 4]));
                 const bool inserted =
-                        COWTuples.insert(*reinterpret_cast<int64_t*>(values)).second;
+                COWTuples.insert(*reinterpret_cast<int64_t*>(values)).second;
                 if (!inserted) {
                     printf("Failed in iteration %d with values %d and %d\n", totalInserted, values[0], values[1]);
                 }
@@ -512,23 +511,23 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
     addRandomUniqueTuples( m_table, tupleCount);
     m_engine->setUndoToken(0);
     m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0);
-    boost::shared_ptr<TableStreamer> tableStream = TableStreamer::fromData(TABLE_STREAM_SNAPSHOT, 0, false);
+    DefaultTupleSerializer serializer;
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         stx::btree_set<int64_t> originalTuples;
         voltdb::TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
             const std::pair<stx::btree_set<int64_t>::iterator, bool> p =
-                    originalTuples.insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
+            originalTuples.insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
             const bool inserted = p.second;
             if (!inserted) {
-                    int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
-                    printf("Failed to insert %d\n", primaryKey);
+                int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
+                printf("Failed to insert %d\n", primaryKey);
             }
             ASSERT_TRUE(inserted);
         }
 
-        m_table->activateStream(tableStream);
+        m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0);
 
         stx::btree_set<int64_t> COWTuples;
         char serializationBuffer[BUFFER_SIZE];
@@ -536,8 +535,8 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
         while (true) {
             TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
             TupleOutputStream &outputStream = outputStreams.at(0);
-            std::vector<int> positions;
-            m_table->streamMore(outputStreams, positions);
+            std::vector<int> retPositions;
+            m_table->streamMore(outputStreams, retPositions);
             const int serialized = static_cast<int>(outputStream.position());
             if (serialized == 0) {
                 break;
@@ -548,7 +547,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
                 values[0] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
                 values[1] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii + 4]));
                 const bool inserted =
-                        COWTuples.insert(*reinterpret_cast<int64_t*>(values)).second;
+                COWTuples.insert(*reinterpret_cast<int64_t*>(values)).second;
                 if (!inserted) {
                     printf("Failed in iteration %d with values %d and %d\n", totalInserted, values[0], values[1]);
                 }
@@ -576,11 +575,11 @@ typedef stx::btree_set<int64_t> TupleSet;
 class MultiStreamTestTool {
 public:
     MultiStreamTestTool(PersistentTable& table, size_t nparts) :
-        table(table),
-        nparts(nparts),
-        iteration(-1),
-        nerrors(0),
-        showTuples(TUPLE_COUNT <= MAX_DETAIL_COUNT)
+    table(table),
+    nparts(nparts),
+    iteration(-1),
+    nerrors(0),
+    showTuples(TUPLE_COUNT <= MAX_DETAIL_COUNT)
     {
         strcpy(stage, "Initialize");
         TableTuple tuple(table.schema());
@@ -718,18 +717,18 @@ public:
         std::string colname = table.columnName(colidx);
         json_spirit::Object jsonTuple = expr_value_tuple("INTEGER", tblname, colidx, colname);
         json_spirit::Object json =
-            expr_binary_op("COMPARE_EQUAL", "INTEGER",
-                expr_binary_op("OPERATOR_MINUS", "INTEGER",
-                    jsonTuple,
-                    expr_binary_op("OPERATOR_MULTIPLY", "INTEGER",
-                        expr_binary_op("OPERATOR_DIVIDE", "INTEGER",
-                                       jsonTuple,
-                                       expr_value("INTEGER", (int)nparts)),
-                        expr_value("INTEGER", (int)nparts)
-                    )
-                ),
-                expr_value("INTEGER", (int)ipart)
-            );
+        expr_binary_op("COMPARE_EQUAL", "INTEGER",
+                       expr_binary_op("OPERATOR_MINUS", "INTEGER",
+                                      jsonTuple,
+                                      expr_binary_op("OPERATOR_MULTIPLY", "INTEGER",
+                                                     expr_binary_op("OPERATOR_DIVIDE", "INTEGER",
+                                                                    jsonTuple,
+                                                                    expr_value("INTEGER", (int)nparts)),
+                                                     expr_value("INTEGER", (int)nparts)
+                                                     )
+                                      ),
+                       expr_value("INTEGER", (int)ipart)
+                       );
 
         std::ostringstream os;
         json_spirit::write(json, os);
@@ -817,10 +816,7 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
 
         tool.context("activate");
 
-        boost::shared_ptr<TableStreamer> tableStream =
-                TableStreamer::fromData(TABLE_STREAM_SNAPSHOT, 0, doDelete, strings);
-
-        bool alreadyActivated = m_table->activateStream(tableStream);
+        bool alreadyActivated = m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0, strings, doDelete);
         if (alreadyActivated) {
             tool.error("COW was previously activated");
         }
@@ -835,8 +831,8 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
                 outputStreams.add((void*)buffers[i].get(), BUFFER_SIZE);
             }
 
-            std::vector<int> positions;
-            remaining = m_table->streamMore(outputStreams, positions);
+            std::vector<int> retPositions;
+            remaining = m_table->streamMore(outputStreams, retPositions);
 
             // Per-predicate iterators.
             TupleOutputStreamProcessor::iterator outputStream = outputStreams.begin();
@@ -962,13 +958,12 @@ TEST_F(CopyOnWriteTest, BufferBoundaryCondition) {
     addRandomUniqueTuples(m_table, tupleCount);
     size_t origPendingCount = m_table->getBlocksNotPendingSnapshotCount();
     // This should succeed in one call to serializeMore().
+    DefaultTupleSerializer serializer;
     char serializationBuffer[bufferSize];
-    boost::shared_ptr<TableStreamer> tableStream =
-            TableStreamer::fromData(TABLE_STREAM_SNAPSHOT, 0, false);
-    m_table->activateStream(tableStream);
+    m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0);
     TupleOutputStreamProcessor outputStreams(serializationBuffer, bufferSize);
-    std::vector<int> positions;
-    int64_t remaining = m_table->streamMore(outputStreams, positions);
+    std::vector<int> retPositions;
+    int64_t remaining = m_table->streamMore(outputStreams, retPositions);
     ASSERT_EQ(0, remaining);
     // Expect the same pending count, because it should get reset when
     // serialization finishes cleanly.

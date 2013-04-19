@@ -63,7 +63,9 @@ public:
      * numCopiesMade helps deletion logic decide when something is being moved.
      * Returns true when the caller should yield to allow other work to proceed.
      */
-    bool writeRow(TupleSerializer &serializer, TableTuple &tuple, int32_t &numCopiesMade);
+    bool writeRow(TupleSerializer &tupleSerializer,
+                  TableTuple &tuple,
+                  int32_t &numCopiesMade);
 
 private:
 

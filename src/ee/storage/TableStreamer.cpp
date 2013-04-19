@@ -30,87 +30,62 @@ namespace voltdb
 typedef std::pair<CatalogId, Table*> TIDPair;
 
 /**
- * Use a factory method for construction.
+ * Constructor with data from serialized message.
  */
-TableStreamer::TableStreamer(TableStreamType streamType, int32_t partitionId, bool doDelete) :
+TableStreamer::TableStreamer(TupleSerializer &tupleSerializer,
+                             TableStreamType streamType,
+                             int32_t partitionId,
+                             ReferenceSerializeInput &serializeIn) :
+    m_tupleSerializer(tupleSerializer),
     m_streamType(streamType),
     m_partitionId(partitionId),
+    m_doDelete(false)
+{
+    // Grab the predicates and delete flag for snapshots.
+    if (streamType == TABLE_STREAM_SNAPSHOT) {
+        m_doDelete = (serializeIn.readByte() != 0);
+        int npreds = serializeIn.readInt();
+        if (npreds > 0) {
+            m_predicateStrings.reserve(npreds);
+            for (int ipred = 0; ipred < npreds; ipred++) {
+                std::string spred = serializeIn.readTextString();
+                m_predicateStrings.push_back(spred);
+            }
+        }
+    }
+}
+
+/**
+ * Constructor with predicates to be copied.
+ */
+TableStreamer::TableStreamer(TupleSerializer &tupleSerializer,
+                             TableStreamType streamType,
+                             int32_t partitionId,
+                             const std::vector<std::string> &predicateStrings,
+                             bool doDelete) :
+    m_tupleSerializer(tupleSerializer),
+    m_streamType(streamType),
+    m_partitionId(partitionId),
+    m_predicateStrings(predicateStrings),
     m_doDelete(doDelete)
-{}
+{
+}
+
+/**
+ * Constructor without predicates or delete flag.
+ */
+TableStreamer::TableStreamer(TupleSerializer &tupleSerializer,
+                             TableStreamType streamType,
+                             int32_t partitionId) :
+    m_tupleSerializer(tupleSerializer),
+    m_streamType(streamType),
+    m_partitionId(partitionId),
+    m_doDelete(false)
+{
+}
 
 TableStreamer::~TableStreamer()
 {}
-
-boost::shared_ptr<TableStreamer> TableStreamer::fromMessage(
-    TableStreamType streamType,
-    int32_t partitionId,
-    ReferenceSerializeInput &serializeIn)
-{
-    // Defaults to a NULL pointer for unknown types.
-    boost::shared_ptr<TableStreamer> tableStream;
-
-    switch (streamType) {
-
-        case TABLE_STREAM_SNAPSHOT: {
-            bool doDelete = (serializeIn.readByte() != 0);
-            tableStream.reset(new TableStreamer(streamType, partitionId, doDelete));
-            int npreds = serializeIn.readInt();
-            if (npreds > 0) {
-                tableStream->m_predicateStrings.reserve(npreds);
-                for (int ipred = 0; ipred < npreds; ipred++) {
-                    std::string spred = serializeIn.readTextString();
-                    tableStream->m_predicateStrings.push_back(spred);
-                }
-            }
-            break;
-        }
-
-        case TABLE_STREAM_RECOVERY:
-            tableStream.reset(new TableStreamer(streamType, partitionId, false));
-            break;
-    }
-
-    return tableStream;
-}
-
-boost::shared_ptr<TableStreamer> TableStreamer::fromData(
-     TableStreamType streamType,
-     int32_t partitionId,
-     bool doDelete,
-     std::vector<std::string> &predicateStrings)
-{
-    // Defaults to a NULL pointer for unknown types.
-    boost::shared_ptr<TableStreamer> tableStream;
-
-    switch (streamType) {
-
-        case TABLE_STREAM_SNAPSHOT: {
-            tableStream.reset(new TableStreamer(streamType, partitionId, doDelete));
-            if (!predicateStrings.empty()) {
-                tableStream->m_predicateStrings.reserve(predicateStrings.size());
-                for (std::vector<std::string>::const_iterator ipred = predicateStrings.begin();
-                     ipred != predicateStrings.end(); ++ipred) {
-                    tableStream->m_predicateStrings.push_back(*ipred);
-                }
-            }
-            break;
-        }
-
-        case TABLE_STREAM_RECOVERY:
-            tableStream.reset(new TableStreamer(streamType, partitionId, false));
-            break;
-    }
-
-    return tableStream;
-}
-
-boost::shared_ptr<TableStreamer> TableStreamer::fromData(TableStreamType streamType,
-                                                         int32_t partitionId,
-                                                         bool doDelete)
-{
-    std::vector<std::string> predicateStrings;
-    return fromData(streamType, partitionId, doDelete, predicateStrings);
-}
 
 bool TableStreamer::isAlreadyActive() const
 {
@@ -126,9 +101,11 @@ bool TableStreamer::isAlreadyActive() const
 bool TableStreamer::activateStream(PersistentTable &table)
 {
     CatalogId tableId = table.databaseId();
+    VOLT_ERROR("TableStreamer::activateStream: addr=0x%lx table=%d", (long)this, tableId);
 
     switch (m_streamType) {
         case TABLE_STREAM_SNAPSHOT: {
+            VOLT_ERROR("TableStreamer::activateStream[snapshot]: table=%d context=0x%lx", tableId, (long)m_COWContext.get());
             if (m_COWContext.get() != NULL) {
                 // true => COW already active
                 return true;
@@ -149,6 +126,7 @@ bool TableStreamer::activateStream(PersistentTable &table)
         }
 
         case TABLE_STREAM_RECOVERY:
+            VOLT_ERROR("TableStreamer::activateStream[recovery]: table=%d", tableId);
             if (m_recoveryContext.get() != NULL) {
                 // Recovery context already active.
                 return true;
@@ -157,53 +135,60 @@ bool TableStreamer::activateStream(PersistentTable &table)
             break;
 
         default:
+            VOLT_ERROR("TableStreamer::activateStream[???]: table=%d", tableId);
             assert(false);
     }
 
+    VOLT_ERROR("TableStreamer::activateStream[true]: table=%d context=0x%lx", tableId, (long)m_COWContext.get());
     return true;
 }
 
 int64_t TableStreamer::streamMore(TupleOutputStreamProcessor &outputStreams,
                                   std::vector<int> &retPositions)
 {
+    VOLT_ERROR("TableStreamer::streamMore: addr=0x%lx context=0x%lx", (long)this, (long)m_COWContext.get());
     int64_t remaining = -2;
     switch (m_streamType) {
         case TABLE_STREAM_SNAPSHOT: {
             if (m_COWContext.get() == NULL) {
-                throwFatalException("TableStreamer::continueStreaming: Expect non-null COW context.");
+                remaining = -1;
             }
-            remaining = m_COWContext->serializeMore(outputStreams);
-            // If more was streamed copy current positions for return.
-            // Can this copy be avoided?
-            for (size_t i = 0; i < outputStreams.size(); i++) {
-                retPositions.push_back((int)outputStreams.at(i).position());
-            }
-            if (remaining <= 0) {
-                m_COWContext.reset(NULL);
+            else {
+                remaining = m_COWContext->serializeMore(outputStreams);
+                // If more was streamed copy current positions for return.
+                // Can this copy be avoided?
+                for (size_t i = 0; i < outputStreams.size(); i++) {
+                    retPositions.push_back((int)outputStreams.at(i).position());
+                }
+                if (remaining <= 0) {
+                    m_COWContext.reset(NULL);
+                }
             }
             break;
         }
 
         case TABLE_STREAM_RECOVERY: {
             if (m_recoveryContext.get() == NULL) {
-                throwFatalException("TableStreamer::continueStreaming: Expect non-null recovery context.");
+                remaining = -1;
             }
-            if (outputStreams.size() != 1) {
-                throwFatalException("TableStreamer::continueStreaming: Expect 1 output stream "
-                                    "for recovery, received %ld", outputStreams.size());
-            }
-            /*
-             * Table ids don't change during recovery because
-             * catalog changes are not allowed.
-             */
-            bool hasMore = m_recoveryContext->nextMessage(&outputStreams[0]);
-            // Non-zero if some tuples remain, we're just not sure how many.
-            remaining = (hasMore ? 1 : 0);
-            for (size_t i = 0; i < outputStreams.size(); i++) {
-                retPositions.push_back((int)outputStreams.at(i).position());
-            }
-            if (!hasMore) {
-                m_recoveryContext.reset(NULL);
+            else {
+                if (outputStreams.size() != 1) {
+                    throwFatalException("TableStreamer::continueStreaming: Expect 1 output stream "
+                                        "for recovery, received %ld", outputStreams.size());
+                }
+                /*
+                 * Table ids don't change during recovery because
+                 * catalog changes are not allowed.
+                 */
+                bool hasMore = m_recoveryContext->nextMessage(&outputStreams[0]);
+                // Non-zero if some tuples remain, we're just not sure how many.
+                remaining = (hasMore ? 1 : 0);
+                for (size_t i = 0; i < outputStreams.size(); i++) {
+                    retPositions.push_back((int)outputStreams.at(i).position());
+                }
+                if (!hasMore) {
+                    m_recoveryContext.reset(NULL);
+                }
             }
             break;
         }

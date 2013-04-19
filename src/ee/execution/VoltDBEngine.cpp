@@ -1339,6 +1339,7 @@ bool VoltDBEngine::activateTableStream(
         TableStreamType streamType,
         ReferenceSerializeInput &serializeIn) {
 
+    VOLT_ERROR("ACTIVATE: start table=%d streamType=%d", tableId, streamType);
     // Look up the table.
     map<CatalogId, Table*>::iterator it = m_tables.find(tableId);
     if (it == m_tables.end()) {
@@ -1352,33 +1353,22 @@ bool VoltDBEngine::activateTableStream(
         return false;
     }
 
-    // Expect m_tableStream to be null. Only make it fatal in debug builds.
-    if (m_tableStream.get() != NULL) {
-        VOLT_ERROR("VoltDBEngine::activateTableStream: Expect null table stream.");
-        assert(m_tableStream.get() != NULL);
-    }
-    else {
-        // Prepare a TableStreamer.
-        m_tableStream = TableStreamer::fromMessage(streamType, m_partitionId, serializeIn);
-        if (m_tableStream == NULL) {
-            return false;
-        }
-    }
-
     // Crank up the necessary persistent table streaming mechanism(s).
-    if (table->activateStream(m_tableStream)) {
+    if (table->activateStreamForEngine(m_tupleSerializer, streamType, m_partitionId, serializeIn)) {
         return false;
     }
 
     // keep track of snapshotting tables. a table already in cow mode
     // can not be re-activated for cow mode.
-    if (m_tableStream->isCopyOnWriteActive()) {
+    if (streamType == TABLE_STREAM_SNAPSHOT) {
         if (m_snapshottingTables.find(tableId) != m_snapshottingTables.end()) {
             assert(false);
+            VOLT_ERROR("ACTIVATE: ERROR table=%d", tableId);
             return false;
         }
 
         table->incrementRefcount();
+        VOLT_ERROR("ACTIVATE: add table=%d", tableId);
         m_snapshottingTables[tableId] = table;
     }
 
@@ -1428,6 +1418,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
         e.serialize(getExceptionOutputSerializer());
         remaining = -2; // error
     }
+
     return remaining;
 }
 
@@ -1447,11 +1438,6 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
         ReferenceSerializeInput &serializeIn,
         std::vector<int> &retPositions)
 {
-    if (m_tableStream.get() == NULL) {
-        VOLT_ERROR("VoltDBEngine::tableStreamSerializeMore: Expect non-null table stream.");
-        return -1;
-    }
-
     // Deserialize the output buffer ptr/offset/length values into a COWStreamProcessor.
     int nBuffers = serializeIn.readInt();
     if (nBuffers <= 0) {
@@ -1469,34 +1455,47 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
     retPositions.reserve(nBuffers);
 
     // Find the table based on what kind of stream we have.
+    // If a completed table is polled, return remaining==-1. The
+    // Java engine will always poll a fully serialized table one more
+    // time (it doesn't see the hasMore return code).
+    int64_t remaining = -1;
     PersistentTable *table = NULL;
-    if (m_tableStream->isCopyOnWriteActive()) {
-        map<int32_t, Table*>::iterator pos = m_snapshottingTables.find(tableId);
-        if (pos != m_snapshottingTables.end()) {
-            table = dynamic_cast<PersistentTable*>(pos->second);
+    switch (streamType) {
+        case TABLE_STREAM_SNAPSHOT: {
+            map<int32_t, Table*>::iterator pos = m_snapshottingTables.find(tableId);
+            if (pos != m_snapshottingTables.end()) {
+                table = dynamic_cast<PersistentTable*>(pos->second);
+            }
+            break;
         }
-    }
-    else if (m_tableStream->isRecoveryActive()) {
-        map<int32_t, Table*>::iterator pos = m_tables.find(tableId);
-        if (pos != m_tables.end()) {
-            table = dynamic_cast<PersistentTable*>(pos->second);
+
+        case TABLE_STREAM_RECOVERY: {
+            map<int32_t, Table*>::iterator pos = m_tables.find(tableId);
+            if (pos != m_tables.end()) {
+                table = dynamic_cast<PersistentTable*>(pos->second);
+            }
+            break;
         }
+
+        default:
+            // Failure.
+            return -2;
     }
 
+    VOLT_ERROR("SERIALIZE: table=%d(0x%lx) streamType=%d", tableId, (long)table, streamType);
     // Perform the streaming.
-    int64_t remaining = -2;
-    if (table == NULL) {
-        // If a completed table is polled, return remaining==-1. The
-        // Java engine will always poll a fully serialized table one more
-        // time (it doesn't see the hasMore return code).
-        remaining = -1;
-    }
-    else {
+    if (table != NULL) {
+
         remaining = table->streamMore(outputStreams, retPositions);
-        if (remaining <= 0 && m_tableStream->isCopyOnWriteActive()) {
+        VOLT_ERROR("SERIALIZE: table=%d remaining=%lld", table->databaseId(), remaining);
+
+        // Clear it from the snapshot table as appropriate.
+        if (remaining <= 0 && streamType == TABLE_STREAM_SNAPSHOT) {
+            VOLT_ERROR("SERIALIZE: erase table=%d", table->databaseId());
             m_snapshottingTables.erase(tableId);
             table->decrementRefcount();
         }
+
         // If more was streamed copy current positions for return.
         // Can this copy be avoided?
         for (size_t i = 0; i < nBuffers; i++) {
@@ -1504,6 +1503,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
         }
     }
 
+    VOLT_ERROR("SERIALIZE: table=%d remaining=%lld", tableId, remaining);
     return remaining;
 }
 

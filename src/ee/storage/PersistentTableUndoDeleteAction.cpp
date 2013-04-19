@@ -45,8 +45,8 @@ void PersistentTableUndoDeleteAction::release() {
      * Persistent tables are responsible for managing the life of
      * strings stored in the table.
      */
-    if (m_table->m_tableStream.get() != NULL && m_table->m_tableStream->isCopyOnWriteActive()) {
-        if (m_table->m_tableStream->canSafelyFreeTuple(tuple)) {
+    if (m_table->isCopyOnWriteActive()) {
+        if (m_table->canSafelyFreeTuple(tuple)) {
             //Safe to free the tuple and do memory accounting
             if (m_table->m_schema->getUninlinedObjectColumnCount() != 0)
             {

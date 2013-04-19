@@ -204,15 +204,31 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     /** Add a view to this table */
     void addMaterializedView(MaterializedViewMetadata *view);
 
-    /** Prepare table for streaming */
-    bool activateStream(boost::shared_ptr<TableStreamer> tableStream);
+    /** Prepare table for streaming from serialized data. */
+    bool activateStreamForEngine(TupleSerializer &tupleSerializer,
+                                 TableStreamType streamType,
+                                 int32_t partitionId,
+                                 ReferenceSerializeInput &serializeIn);
+
+    /** Prepare table for streaming from pre-parsed data (predicates are copied). */
+    bool activateStreamForTest(TupleSerializer &tupleSerializer,
+                               TableStreamType streamType,
+                               int32_t partitionId,
+                               const std::vector<std::string> &predicate_strings,
+                               bool doDelete);
+
+    /** Prepare table for streaming from pre-parsed data (no predicates). */
+    bool activateStreamForTest(TupleSerializer &tupleSerializer,
+                               TableStreamType streamType,
+                               int32_t partitionId);
 
     /**
      * Attempt to stream more tuples from the table to the provided
      * output stream.
      * Return remaining tuple count, 0 if done, or -1 on error.
      */
-    int64_t streamMore(TupleOutputStreamProcessor &outputStreams, std::vector<int> &retPositions);
+    int64_t streamMore(TupleOutputStreamProcessor &outputStreams,
+                       std::vector<int> &retPositions);
 
     /**
      * Process the updates from a recovery message
@@ -245,7 +261,21 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
         return m_data.size();
     }
 
+    bool isCopyOnWriteActive() const {
+        return m_tableStreamer.get() != NULL && m_tableStreamer->isCopyOnWriteActive();
+    }
+
+    bool isRecoveryActive() const {
+        return m_tableStreamer.get() != NULL && m_tableStreamer->isRecoveryActive();
+    }
+
+    bool canSafelyFreeTuple(TableTuple &tuple) const {
+        return m_tableStreamer.get() != NULL && m_tableStreamer->canSafelyFreeTuple(tuple);
+    }
+
   private:
+
+    bool activateStream();
 
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
         if (nextBlock != NULL) {
@@ -335,7 +365,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     stx::btree_set<TBPtr > m_blocksWithSpace;
 
     // Provides access to all table streaming apparatuses, including COW and recovery.
-    boost::shared_ptr<TableStreamer> m_tableStream;
+    boost::shared_ptr<TableStreamer> m_tableStreamer;
 
   private:
     // pointers to chunks of data. Specific to table impl. Don't leak this type.

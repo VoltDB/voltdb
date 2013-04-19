@@ -246,7 +246,7 @@ bool PersistentTable::insertTuple(TableTuple &source, bool createUndoQuantum) {
      * is on have it decide. COW should always set the dirty to false unless the
      * tuple is in a to be scanned area.
      */
-    if (m_tableStream == NULL || !m_tableStream->notifyTupleInsert(m_tmpTarget1)) {
+    if (m_tableStreamer == NULL || !m_tableStreamer->notifyTupleInsert(m_tmpTarget1)) {
         m_tmpTarget1.setDirtyFalse();
     }
     m_tmpTarget1.isDirty();
@@ -352,8 +352,8 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         new (pool->allocate(sizeof(PersistentTableUndoUpdateAction)))
              PersistentTableUndoUpdateAction(targetTupleToUpdate, this, pool);
 
-    if (m_tableStream.get() != NULL) {
-        m_tableStream->notifyTupleUpdate(targetTupleToUpdate);
+    if (m_tableStreamer.get() != NULL) {
+        m_tableStreamer->notifyTupleUpdate(targetTupleToUpdate);
     }
 
     /**
@@ -756,17 +756,61 @@ TableStats* PersistentTable::getTableStats() {
     return &stats_;
 }
 
-/** Prepare table for streaming. */
-bool PersistentTable::activateStream(boost::shared_ptr<TableStreamer> tableStream) {
-    // Check that there was no stream before and that there is one now.
-    assert(m_tableStream.get() == NULL);
-    assert(tableStream.get() != NULL);
-    if (tableStream.get() == NULL) {
-        throwFatalException("PersistentTable::activateStream: expect non-null table stream.");
-    }
-    m_tableStream = tableStream;
+/** Prepare table for streaming from serialized data. */
+bool PersistentTable::activateStreamForEngine(
+    TupleSerializer &tupleSerializer,
+    TableStreamType streamType,
+    int32_t partitionId,
+    ReferenceSerializeInput &serializeIn) {
 
-    if (m_tableStream->isAlreadyActive()) {
+    VOLT_ERROR("PersistentTable::activateStreamForEngine: table=%d tableStreamer=0x%lx", databaseId(), (long)m_tableStreamer.get());
+    // Expect m_tableStreamer to be null. Only make it fatal in debug builds.
+    if (m_tableStreamer.get() != NULL) {
+        assert(m_tableStreamer.get() != NULL);
+    }
+    else {
+        // Prepare a TableStreamer.
+        m_tableStreamer.reset(
+            new TableStreamer(tupleSerializer, streamType, partitionId, serializeIn));
+    }
+
+    return activateStream();
+}
+
+/** Prepare table for streaming from pre-parsed data (predicates are copied). */
+bool PersistentTable::activateStreamForTest(
+     TupleSerializer &tupleSerializer,
+     TableStreamType streamType,
+     int32_t partitionId,
+     const std::vector<std::string> &predicateStrings,
+     bool doDelete) {
+
+    // Expect m_tableStreamer to be null. Only make it fatal in debug builds.
+    if (m_tableStreamer.get() != NULL) {
+        assert(m_tableStreamer.get() != NULL);
+    }
+    else {
+        // Prepare a TableStreamer.
+        m_tableStreamer.reset(
+            new TableStreamer(tupleSerializer, streamType, partitionId, predicateStrings, doDelete));
+    }
+
+    return activateStream();
+}
+
+/** Prepare table for streaming from pre-parsed data (no predicates). */
+bool PersistentTable::activateStreamForTest(TupleSerializer &tupleSerializer,
+                           TableStreamType streamType,
+                           int32_t partitionId) {
+    std::vector<std::string> predicateStrings;
+    return activateStreamForTest(tupleSerializer, streamType, partitionId, predicateStrings, false);
+}
+
+/** Prepare table for streaming. */
+bool PersistentTable::activateStream() {
+
+    VOLT_ERROR("PersistentTable::activateStream[1]: table=%d active=%d count=%d", databaseId(), (int)m_tableStreamer->isAlreadyActive(), m_tupleCount);
+    if (m_tableStreamer->isAlreadyActive()) {
         // true => COW or recovery context is already active.
         return true;
     }
@@ -775,15 +819,17 @@ bool PersistentTable::activateStream(boost::shared_ptr<TableStreamer> tableStrea
         return false;
     }
 
-    //All blocks are now pending snapshot
-    m_blocksPendingSnapshot.swap(m_blocksNotPendingSnapshot);
-    m_blocksPendingSnapshotLoad.swap(m_blocksNotPendingSnapshotLoad);
-    assert(m_blocksNotPendingSnapshot.empty());
-    for (int ii = 0; ii < m_blocksNotPendingSnapshotLoad.size(); ii++) {
-        assert(m_blocksNotPendingSnapshotLoad[ii]->empty());
+    if (m_tableStreamer->getStreamType() == TABLE_STREAM_SNAPSHOT) {
+        //All blocks are now pending snapshot
+        m_blocksPendingSnapshot.swap(m_blocksNotPendingSnapshot);
+        m_blocksPendingSnapshotLoad.swap(m_blocksNotPendingSnapshotLoad);
+        assert(m_blocksNotPendingSnapshot.empty());
+        for (int ii = 0; ii < m_blocksNotPendingSnapshotLoad.size(); ii++) {
+            assert(m_blocksNotPendingSnapshotLoad[ii]->empty());
+        }
     }
 
-    if (m_tableStream->activateStream(*this)) {
+    if (m_tableStreamer->activateStream(*this)) {
         return false;
     }
 
@@ -796,13 +842,13 @@ bool PersistentTable::activateStream(boost::shared_ptr<TableStreamer> tableStrea
  */
 int64_t PersistentTable::streamMore(TupleOutputStreamProcessor &outputStreams,
                                     std::vector<int> &retPositions) {
-    if (m_tableStream.get() == NULL) {
+    if (m_tableStreamer.get() == NULL) {
         return -1;
     }
-    int64_t remaining = m_tableStream->streamMore(outputStreams, retPositions);
+    int64_t remaining = m_tableStreamer->streamMore(outputStreams, retPositions);
     if (remaining <= 0) {
         // clang needs the cast for some reason.
-        m_tableStream.reset((TableStreamer*)NULL);
+        m_tableStreamer.reset((TableStreamer*)NULL);
     }
     return remaining;
 }
@@ -856,9 +902,9 @@ void PersistentTable::notifyBlockWasCompactedAway(TBPtr block) {
     if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
         assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
     } else {
-        assert(m_tableStream != NULL);
+        assert(m_tableStreamer.get() != NULL);
         assert(m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end());
-        m_tableStream->notifyBlockWasCompactedAway(block);
+        m_tableStreamer->notifyBlockWasCompactedAway(block);
     }
 
 }
@@ -1004,7 +1050,7 @@ void PersistentTable::doIdleCompaction() {
 }
 
 void PersistentTable::doForcedCompaction() {
-    if (m_tableStream.get() != NULL && m_tableStream->isRecoveryActive()) {
+    if (m_tableStreamer.get() != NULL && m_tableStreamer->isRecoveryActive()) {
         LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO,
             "Deferring compaction until recovery is complete.");
         return;
