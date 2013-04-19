@@ -406,8 +406,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     Constructor<?> constructor = elasticJoinCoordClass.getConstructor(HostMessenger.class);
                     m_joinCoordinator = (JoinCoordinator) constructor.newInstance(m_messenger);
                     m_messenger.registerMailbox(m_joinCoordinator);
+                    m_joinCoordinator.initialize(m_deployment.getCluster().getKfactor());
                 } catch (Exception e) {
-                    VoltDB.crashLocalVoltDB("Failed to instantiate joiner", true, e);
+                    VoltDB.crashLocalVoltDB("Failed to instantiate join coordinator", true, e);
                 }
             }
 
