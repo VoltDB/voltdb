@@ -50,6 +50,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.zk.ZKUtil;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
@@ -121,13 +122,16 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     private String m_prefixAndSeparator;
     private Future<?> m_snapshotTask;
 
+    private SnapshotSchedule m_lastKnownSchedule = null;
+
     private final HashMap<Long, ProcedureCallback> m_procedureCallbacks = new HashMap<Long, ProcedureCallback>();
 
     private final SimpleDateFormat m_dateFormat = new SimpleDateFormat("'_'yyyy.MM.dd.HH.mm.ss");
 
     // true if this SnapshotDaemon is the one responsible for generating
     // snapshots
-    private boolean m_isActive = false;
+    private boolean m_isAutoSnapshotLeader = false;
+    private Future<?> m_autoSnapshotTask = null;
     private long m_nextSnapshotTime;
 
     /**
@@ -241,6 +245,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         @Override
                         public void run() {
                             try {
+                                m_isAutoSnapshotLeader = true;
+                                if (m_lastKnownSchedule != null) {
+                                    makeActivePrivate(m_lastKnownSchedule);
+                                }
                                 electedTruncationLeader();
                             } catch (Exception e) {
                                 VoltDB.crashLocalVoltDB("Exception in snapshot daemon electing master via ZK", true, e);
@@ -431,6 +439,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 if (stat == null) {
                     try {
                         m_zk.create(VoltZK.snapshot_truncation_master, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+                        m_isAutoSnapshotLeader = true;
+                        if (m_lastKnownSchedule != null) {
+                            makeActivePrivate(m_lastKnownSchedule);
+                        }
                         electedTruncationLeader();
                         return;
                     } catch (NodeExistsException e) {
@@ -460,8 +472,12 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 }
             }
         }, 0, 1, TimeUnit.HOURS);
-        truncationRequestExistenceCheck();
-        userSnapshotRequestExistenceCheck(false);
+        try {
+            truncationRequestExistenceCheck();
+            userSnapshotRequestExistenceCheck(false);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Error while accepting snapshot daemon leadership", true, e);
+        }
     }
 
     /*
@@ -470,6 +486,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      */
     private void processTruncationRequestEvent(final WatchedEvent event) {
         if (event.getType() == EventType.NodeCreated) {
+            loggingLog.info("Scheduling truncation request processing 10 seconds from now");
             /*
              * Do it 10 seconds later because these requests tend to come in bunches
              * and we want one truncation snapshot to do truncation for all nodes
@@ -478,10 +495,25 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             m_es.schedule(new Runnable() {
                 @Override
                 public void run() {
-                    processSnapshotTruncationRequestCreated(event);
+                    try {
+                        processSnapshotTruncationRequestCreated(event);
+                    } catch (Exception e) {
+                        VoltDB.crashLocalVoltDB("Error processing snapshot truncation request creation", true, e);
+                    }
                 }
             }, m_truncationGatheringPeriod, TimeUnit.SECONDS);
             return;
+        } else {
+            /*
+             * We are very careful to cancel the watch if we find that a truncation requests exists. We are
+             * the only thread and daemon that should delete the node or change the data and the watch
+             * isn't set when that happens because it is part of processing the request and the watch should
+             * either be canceled or have already fired.
+             */
+            VoltDB.crashLocalVoltDB(
+                    "Trunction request watcher fired with event type other then created: " + event.getType(),
+                    true,
+                    null);
         }
     }
 
@@ -544,7 +576,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             /*
              * Should never happen, so fail fast
              */
-            VoltDB.crashLocalVoltDB("", false, e);
+            VoltDB.crashLocalVoltDB("", true, e);
         }
 
         long handle = m_nextCallbackHandle++;
@@ -565,7 +597,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     m_es.schedule(new Runnable() {
                         @Override
                         public void run() {
-                            processTruncationRequestEvent(event);
+                            try {
+                                processTruncationRequestEvent(event);
+                            } catch (Exception e) {
+                                VoltDB.crashLocalVoltDB("Error processing snapshot truncation request event", true, e);
+                            }
                         }
                     }, 5, TimeUnit.MINUTES);
                     return;
@@ -596,6 +632,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 }
 
                 if (success) {
+                    loggingLog.info("Snapshot initiation for log truncation was successful");
                     /*
                      * Race to create the completion node before deleting
                      * the request node so that we can guarantee that the
@@ -643,7 +680,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     m_es.schedule(new Runnable() {
                         @Override
                         public void run() {
-                            processTruncationRequestEvent(event);
+                            try {
+                                processTruncationRequestEvent(event);
+                            } catch (Exception e) {
+                                VoltDB.crashLocalVoltDB("Exception processing truncation request event", true, e);
+                            }
                         }
                     }, 1, TimeUnit.MINUTES);
                 }
@@ -651,32 +692,36 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
         });
         try {
+            loggingLog.info("Initiating @SnapshotSave for log truncation");
             m_initiator.initiateSnapshotDaemonWork("@SnapshotSave", handle, new Object[] { jsObj.toString(4) });
         } catch (JSONException e) {
             /*
              * Should never happen, so fail fast
              */
-            VoltDB.crashLocalVoltDB("", false, e);
+            VoltDB.crashLocalVoltDB("", true, e);
         }
         return;
     }
 
+    private TruncationRequestExistenceWatcher m_currentTruncationWatcher = new TruncationRequestExistenceWatcher();
     /*
      * Watcher that handles changes to the ZK node for
      * internal truncation snapshot requests
      */
-    private final Watcher m_truncationRequestExistenceWatcher = new Watcher() {
+    private class TruncationRequestExistenceWatcher extends ZKUtil.CancellableWatcher {
+
+        public TruncationRequestExistenceWatcher() {
+            super(m_es);
+        }
 
         @Override
-        public void process(final WatchedEvent event) {
+        public void pProcess(final WatchedEvent event) {
             if (event.getState() == KeeperState.Disconnected) return;
-
-            m_es.execute(new Runnable() {
-                @Override
-                public void run() {
-                    processTruncationRequestEvent(event);
-                }
-            });
+            try {
+                processTruncationRequestEvent(event);
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Error procesing truncation request event", true, e);
+            }
         }
     };
 
@@ -696,7 +741,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     try {
                         processUserSnapshotRequestEvent(event);
                     } catch (Exception e) {
-                        VoltDB.crashLocalVoltDB("Error processing user snapshot request event", false, e);
+                        VoltDB.crashLocalVoltDB("Error processing user snapshot request event", true, e);
                     }
                 }
             });
@@ -723,43 +768,51 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             m_procedureCallbacks.put(handle, new ProcedureCallback() {
 
                 @Override
-                public void clientCallback(ClientResponse clientResponse)
-                        throws Exception {
-                    /*
-                     * If there is an error then we are done.
-                     */
-                    if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                        ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
-                        ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
-                        m_zk.create(
-                                VoltZK.user_snapshot_response + requestId,
-                                rimpl.flattenToBuffer(buf).array(),
-                                Ids.OPEN_ACL_UNSAFE,
-                                CreateMode.PERSISTENT);
-                        //Reset the watch
-                        userSnapshotRequestExistenceCheck(true);
-                        return;
-                    }
+                public void clientCallback(ClientResponse clientResponse) {
+                    try {
+                        /*
+                         * If there is an error then we are done.
+                         */
+                        if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                            ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
+                            ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
+                            m_zk.create(
+                                    VoltZK.user_snapshot_response + requestId,
+                                    rimpl.flattenToBuffer(buf).array(),
+                                    Ids.OPEN_ACL_UNSAFE,
+                                    CreateMode.PERSISTENT);
+                            //Reset the watch
+                            userSnapshotRequestExistenceCheck(true);
+                            return;
+                        }
 
-                    /*
-                     * Now analyze the response. If a snapshot was in progress
-                     * we have to reattempt it later, and send a response to the client
-                     * saying it was queued. Otherwise, forward the response
-                     * failure/success to the client.
-                     */
-                    if (isSnapshotInProgressResponse(clientResponse)) {
-                        scheduleSnapshotForLater( jsObj.toString(4), requestId, true);
-                    } else {
-                        ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
-                        ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
-                        m_zk.create(
-                                VoltZK.user_snapshot_response + requestId,
-                                rimpl.flattenToBuffer(buf).array(),
-                                Ids.OPEN_ACL_UNSAFE,
-                                CreateMode.PERSISTENT);
-                        //Reset the watch
-                        userSnapshotRequestExistenceCheck(true);
-                        return;
+                        /*
+                         * Now analyze the response. If a snapshot was in progress
+                         * we have to reattempt it later, and send a response to the client
+                         * saying it was queued. Otherwise, forward the response
+                         * failure/success to the client.
+                         */
+                        if (isSnapshotInProgressResponse(clientResponse)) {
+                            scheduleSnapshotForLater( jsObj.toString(4), requestId, true);
+                        } else {
+                            ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
+                            ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
+                            m_zk.create(
+                                    VoltZK.user_snapshot_response + requestId,
+                                    rimpl.flattenToBuffer(buf).array(),
+                                    Ids.OPEN_ACL_UNSAFE,
+                                    CreateMode.PERSISTENT);
+                            //Reset the watch
+                            userSnapshotRequestExistenceCheck(true);
+                            return;
+                        }
+                    } catch (Exception e) {
+                        SNAP_LOG.error("Error processing user snapshot request", e);
+                        try {
+                            userSnapshotRequestExistenceCheck(true);
+                        } catch (Exception e2) {
+                            VoltDB.crashLocalVoltDB("Error resetting watch for user snapshots", true, e2);
+                        }
                     }
                 }
             });
@@ -825,90 +878,99 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     final long handle = m_nextCallbackHandle++;
                     m_procedureCallbacks.put(handle, new ProcedureCallback() {
                         @Override
-                        public void clientCallback(ClientResponse clientResponse)
-                                throws Exception {
-                            /*
-                             * If there is an error then we are done
-                             * attempting this user snapshot. The params must be bad
-                             * or things are broken.
-                             */
-                            if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                                SNAP_LOG.error(clientResponse.getStatusString());
-                                //Reset the watch, in case this is recoverable
-                                userSnapshotRequestExistenceCheck(true);
-                                return;
-                            }
-
-                            VoltTable results[] = clientResponse.getResults();
-                            //Do this check to avoid an NPE
-                            if (results == null || results.length == 0 || results[0].getRowCount() < 1) {
-                                SNAP_LOG.error("Queued user snapshot request reattempt received an unexpected response" +
-                                        " and will not be reattempted");
+                        public void clientCallback(ClientResponse clientResponse) {
+                            try {
                                 /*
-                                 * Don't think this should happen, reset the watch to allow later requests
+                                 * If there is an error then we are done
+                                 * attempting this user snapshot. The params must be bad
+                                 * or things are broken.
                                  */
-                                userSnapshotRequestExistenceCheck(true);
-                                return;
-                            }
+                                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                                    SNAP_LOG.error(clientResponse.getStatusString());
+                                    //Reset the watch, in case this is recoverable
+                                    userSnapshotRequestExistenceCheck(true);
+                                    return;
+                                }
 
-                            VoltTable result = results[0];
-                            boolean snapshotInProgress = false;
-                            boolean haveFailure = false;
-                            while (result.advanceRow()) {
-                                if (result.getString("RESULT").equals("FAILURE")) {
-                                    if (result.getString("ERR_MSG").equals("SNAPSHOT IN PROGRESS")) {
-                                        snapshotInProgress = true;
-                                    } else {
-                                        haveFailure = true;
+                                VoltTable results[] = clientResponse.getResults();
+                                //Do this check to avoid an NPE
+                                if (results == null || results.length == 0 || results[0].getRowCount() < 1) {
+                                    SNAP_LOG.error("Queued user snapshot request reattempt received an unexpected response" +
+                                            " and will not be reattempted");
+                                    /*
+                                     * Don't think this should happen, reset the watch to allow later requests
+                                     */
+                                    userSnapshotRequestExistenceCheck(true);
+                                    return;
+                                }
+
+                                VoltTable result = results[0];
+                                boolean snapshotInProgress = false;
+                                boolean haveFailure = false;
+                                while (result.advanceRow()) {
+                                    if (result.getString("RESULT").equals("FAILURE")) {
+                                        if (result.getString("ERR_MSG").equals("SNAPSHOT IN PROGRESS")) {
+                                            snapshotInProgress = true;
+                                        } else {
+                                            haveFailure = true;
+                                        }
                                     }
                                 }
-                            }
 
-                            /*
-                             * If a snapshot was in progress, reattempt later, otherwise,
-                             * if there was a failure, abort the attempt and log.
-                             */
-                            if (snapshotInProgress) {
-                                SNAP_LOG.info("Queued user snapshot was reattempted, but a snapshot was " +
-                                        " still in progress. It will be reattempted.");
-                                //Turtles all the way down
-                                scheduleSnapshotForLater(
-                                        requestObj,
-                                        null,//null because it shouldn't be used, request already responded to
-                                        false);
-                            } else if (haveFailure) {
-                                SNAP_LOG.info("Queued user snapshot was attempted, but there was a failure.");
-                                if (requestId != null) {
-                                    ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
-                                    ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
-                                    m_zk.create(
-                                            VoltZK.user_snapshot_response + requestId,
-                                            rimpl.flattenToBuffer(buf).array(),
-                                            Ids.OPEN_ACL_UNSAFE,
-                                            CreateMode.PERSISTENT);
+                                /*
+                                 * If a snapshot was in progress, reattempt later, otherwise,
+                                 * if there was a failure, abort the attempt and log.
+                                 */
+                                if (snapshotInProgress) {
+                                    SNAP_LOG.info("Queued user snapshot was reattempted, but a snapshot was " +
+                                            " still in progress. It will be reattempted.");
+                                    //Turtles all the way down
+                                    scheduleSnapshotForLater(
+                                            requestObj,
+                                            null,//null because it shouldn't be used, request already responded to
+                                            false);
+                                } else if (haveFailure) {
+                                    SNAP_LOG.info("Queued user snapshot was attempted, but there was a failure.");
+                                    if (requestId != null) {
+                                        ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
+                                        ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
+                                        m_zk.create(
+                                                VoltZK.user_snapshot_response + requestId,
+                                                rimpl.flattenToBuffer(buf).array(),
+                                                Ids.OPEN_ACL_UNSAFE,
+                                                CreateMode.PERSISTENT);
+                                    }
+                                    //Reset the watch, in case this is recoverable
+                                    userSnapshotRequestExistenceCheck(true);
+                                    //Log the details of the failure, after resetting the watch in case of some odd NPE
+                                    result.resetRowPosition();
+                                    SNAP_LOG.info(result);
+                                } else {
+                                    if (requestId != null) {
+                                        SNAP_LOG.debug("Queued user snapshot was successfully requested, saving to path " +
+                                                VoltZK.user_snapshot_response + requestId);
+                                        /*
+                                         * Snapshot was started no problem, reset the watch for new requests
+                                         */
+                                        ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
+                                        ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
+                                        m_zk.create(
+                                                VoltZK.user_snapshot_response + requestId,
+                                                rimpl.flattenToBuffer(buf).array(),
+                                                Ids.OPEN_ACL_UNSAFE,
+                                                CreateMode.PERSISTENT);
+                                    }
+                                    userSnapshotRequestExistenceCheck(true);
+                                    return;
                                 }
-                                //Reset the watch, in case this is recoverable
-                                userSnapshotRequestExistenceCheck(true);
-                                //Log the details of the failure, after resetting the watch in case of some odd NPE
-                                result.resetRowPosition();
-                                SNAP_LOG.info(result);
-                            } else {
-                                if (requestId != null) {
-                                    SNAP_LOG.debug("Queued user snapshot was successfully requested, saving to path " +
-                                            VoltZK.user_snapshot_response + requestId);
-                                    /*
-                                     * Snapshot was started no problem, reset the watch for new requests
-                                     */
-                                    ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
-                                    ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
-                                    m_zk.create(
-                                            VoltZK.user_snapshot_response + requestId,
-                                            rimpl.flattenToBuffer(buf).array(),
-                                            Ids.OPEN_ACL_UNSAFE,
-                                            CreateMode.PERSISTENT);
+                            } catch (Exception e) {
+                                SNAP_LOG.error("Error processing procedure callback for user snapshot", e);
+                                try {
+                                    userSnapshotRequestExistenceCheck(true);
+                                } catch (Exception e1) {
+                                    VoltDB.crashLocalVoltDB(
+                                            "Error resetting watch for user snapshot requests", true, e1);
                                 }
-                                userSnapshotRequestExistenceCheck(true);
-                                return;
                             }
                         }
                     });
@@ -916,6 +978,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     m_initiator.initiateSnapshotDaemonWork("@SnapshotSave", handle,
                             new Object[] { requestObj });
                 } catch (Exception e) {
+                    try {
+                        userSnapshotRequestExistenceCheck(true);
+                    } catch (Exception e1) {
+                        VoltDB.crashLocalVoltDB("Error checking for existence of user snapshots", true, e1);
+                    }
                 }
             }
         };
@@ -961,7 +1028,12 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * for a truncation snapshot
      */
     void truncationRequestExistenceCheck() throws KeeperException, InterruptedException {
-        if (m_zk.exists(VoltZK.request_truncation_snapshot, m_truncationRequestExistenceWatcher) != null) {
+        loggingLog.info("Checking for existence of snapshot truncation request");
+        m_currentTruncationWatcher.cancel();
+        m_currentTruncationWatcher = new TruncationRequestExistenceWatcher();
+        if (m_zk.exists(VoltZK.request_truncation_snapshot, m_currentTruncationWatcher) != null) {
+            loggingLog.info("A truncation request node already existed, processing truncation request event");
+            m_currentTruncationWatcher.cancel();
             processTruncationRequestEvent(new WatchedEvent(
                     EventType.NodeCreated,
                     KeeperState.SyncConnected,
@@ -988,7 +1060,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     /**
      * Make this SnapshotDaemon responsible for generating snapshots
      */
-    public ListenableFuture<Void> makeActive(final SnapshotSchedule schedule)
+    public ListenableFuture<Void> mayGoActiveOrInactive(final SnapshotSchedule schedule)
     {
         return m_es.submit(new Callable<Void>() {
             @Override
@@ -1000,49 +1072,63 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     }
 
     private void makeActivePrivate(final SnapshotSchedule schedule) {
-        m_isActive = true;
-        m_frequency = schedule.getFrequencyvalue();
-        m_retain = schedule.getRetain();
-        m_path = schedule.getPath();
-        m_prefix = schedule.getPrefix();
-        m_prefixAndSeparator = m_prefix + "_";
-        final String frequencyUnitString = schedule.getFrequencyunit().toLowerCase();
-        assert(frequencyUnitString.length() == 1);
-        final char frequencyUnit = frequencyUnitString.charAt(0);
+        m_lastKnownSchedule = schedule;
+        if (schedule.getEnabled()) {
+            m_frequency = schedule.getFrequencyvalue();
+            m_retain = schedule.getRetain();
+            m_path = schedule.getPath();
+            m_prefix = schedule.getPrefix();
+            m_prefixAndSeparator = m_prefix + "_";
+            final String frequencyUnitString = schedule.getFrequencyunit().toLowerCase();
+            assert(frequencyUnitString.length() == 1);
+            final char frequencyUnit = frequencyUnitString.charAt(0);
 
-        switch (frequencyUnit) {
-        case 's':
-            m_frequencyUnit = TimeUnit.SECONDS;
-            break;
-        case 'm':
-            m_frequencyUnit = TimeUnit.MINUTES;
-            break;
-        case 'h':
-            m_frequencyUnit = TimeUnit.HOURS;
-            break;
-            default:
-                throw new RuntimeException("Frequency unit " + frequencyUnitString + "" +
-                        " in snapshot schedule is not one of d,m,h");
+            switch (frequencyUnit) {
+            case 's':
+                m_frequencyUnit = TimeUnit.SECONDS;
+                break;
+            case 'm':
+                m_frequencyUnit = TimeUnit.MINUTES;
+                break;
+            case 'h':
+                m_frequencyUnit = TimeUnit.HOURS;
+                break;
+                default:
+                    throw new RuntimeException("Frequency unit " + frequencyUnitString + "" +
+                            " in snapshot schedule is not one of d,m,h");
+            }
+            m_frequencyInMillis = TimeUnit.MILLISECONDS.convert( m_frequency, m_frequencyUnit);
+            m_nextSnapshotTime = System.currentTimeMillis() + m_frequencyInMillis;
         }
-        m_frequencyInMillis = TimeUnit.MILLISECONDS.convert( m_frequency, m_frequencyUnit);
-        m_nextSnapshotTime = System.currentTimeMillis() + m_frequencyInMillis;
-        m_es.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    doPeriodicWork(System.currentTimeMillis());
-                } catch (Exception e) {
 
+        if (m_isAutoSnapshotLeader) {
+            if (schedule.getEnabled()) {
+                if (m_autoSnapshotTask == null) {
+                    m_autoSnapshotTask = m_es.scheduleAtFixedRate(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                doPeriodicWork(System.currentTimeMillis());
+                            } catch (Exception e) {
+                                SNAP_LOG.warn("Error doing periodic snapshot management work", e);
+                            }
+                        }
+                    }, 0, m_periodicWorkInterval, TimeUnit.MILLISECONDS);
+                }
+            } else {
+                if (m_autoSnapshotTask != null) {
+                    m_autoSnapshotTask.cancel(false);
+                    m_autoSnapshotTask = null;
                 }
             }
-        }, 0, m_periodicWorkInterval, TimeUnit.MILLISECONDS);
+        }
     }
 
     public void makeInactive() {
         m_es.execute(new Runnable() {
             @Override
             public void run() {
-                m_isActive = false;
+
                 m_snapshots.clear();
             }
         });
@@ -1079,7 +1165,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * @return null if there is no work to do or a sysproc with parameters if there is work
      */
     private void doPeriodicWork(final long now) {
-        if (!m_isActive)
+        if (m_lastKnownSchedule == null)
         {
             setState(State.STARTUP);
             return;
@@ -1205,7 +1291,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     m_procedureCallbacks.remove(handle).clientCallback(resp);
                 } catch (Exception e) {
                     SNAP_LOG.warn("Error when SnapshotDaemon invoked callback for a procedure invocation", e);
-                    throw e;
+                    /*
+                     * Don't think it is productive to propagate any exceptions here, Ideally
+                     * they should be handled by the procedure callbacks
+                     */
                 }
                 return null;
             }
@@ -1434,7 +1523,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         m_es.submit(new Runnable() {
             @Override
             public void run() {
-                submitUserSnapshotRequest(invocation, c);
+                try {
+                    submitUserSnapshotRequest(invocation, c);
+                } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Exception submitting user snapshot request", true, e);
+                }
             }
         });
     }

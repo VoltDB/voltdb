@@ -23,22 +23,35 @@ package org.voltdb;
  */
 public class SQLStmtAdHocHelper {
     /**
-     * Factory method to construct a SQLStmt instance with a compiled plan attached.
+     * Factory method to construct a SQLStmt instance from a plan outside the catalog.
      *
      * @param sqlText Valid VoltDB compliant SQL
-     * @param aggregatorFragment Compiled aggregator fragment
-     * @param collectorFragment Compiled collector fragment
-     * @param isReplicatedTableDML Flag set to true if replicated
-     *
+     * @param aggFragId Site-local id of the aggregator fragment
+     * @param aggPlanHash 20 byte sha1 hash of the aggregator fragment plan
+     * @param isAggTransactional Does the aggregator fragment read/write tables?
+     * @param collectorFragId Site-local id of the collector fragment
+     * @param collectorPlanHash 20 byte sha1 hash of the collector fragment plan
+     * @param isCollectorTransactional Does the collector fragment read/write tables?
+     * @param isReplicatedTableDML Flag set to true if replicated DML
+     * @param isReadOnly Is SQL read only?
+     * @param params Description of parameters expected by the statement
+     * @param site SPC used for cleanup of plans
      * @return SQLStmt object with plan added
      */
     public static SQLStmt createWithPlan(byte[] sqlText,
-                                         byte[] aggregatorFragment,
-                                         byte[] collectorFragment,
+                                         long aggFragId,
+                                         byte[] aggPlanHash,
+                                         boolean isAggTransactional,
+                                         long collectorFragId,
+                                         byte[] collectorPlanHash,
+                                         boolean isCollectorTransactional,
                                          boolean isReplicatedTableDML,
                                          boolean isReadOnly,
-                                         VoltType[] params) {
-        return SQLStmt.createWithPlan(sqlText, aggregatorFragment, collectorFragment,
-                isReplicatedTableDML, isReadOnly, params);
+                                         VoltType[] params,
+                                         SiteProcedureConnection site) {
+        return SQLStmt.createWithPlan(sqlText,
+                aggFragId, aggPlanHash, isAggTransactional,
+                collectorFragId, collectorPlanHash, isCollectorTransactional,
+                isReplicatedTableDML, isReadOnly, params, site);
     }
 }

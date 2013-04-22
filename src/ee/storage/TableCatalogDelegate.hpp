@@ -19,7 +19,7 @@
 #define TABLECATALOGDELEGATE_HPP
 
 #include "common/CatalogDelegate.hpp"
-#include "indexes/tableindex.h"
+//#include "indexes/tableindex.h"
 #include "catalog/table.h"
 #include "catalog/index.h"
 
@@ -29,9 +29,20 @@ class Database;
 
 namespace voltdb {
 class Table;
+class PersistentTable;
 class ExecutorContext;
 class TupleSchema;
-class TableIndexScheme;
+struct TableIndexScheme;
+
+// There might be a better place for this, but current callers happen to have this header in common.
+template<typename K, typename V> V findInMapOrNull(const K& key, std::map<K, V> const &the_map)
+{
+    typename std::map<K, V>::const_iterator lookup = the_map.find(key);
+    if (lookup != the_map.end()) {
+        return lookup->second;
+    }
+    return (V)NULL;
+}
 
 /*
  * Implementation of CatalogDelgate for Table
@@ -48,13 +59,21 @@ class TableCatalogDelegate : public CatalogDelegate {
 
 
     // table specific
-    int init(catalog::Database &catalogDatabase,
-             catalog::Table &catalogTable);
+    int init(catalog::Database const &catalogDatabase,
+             catalog::Table const &catalogTable);
 
-    static TupleSchema *createTupleSchema(catalog::Table &catalogTable);
+    void processSchemaChanges(catalog::Database const &catalogDatabase,
+                             catalog::Table const &catalogTable,
+                             std::map<std::string, CatalogDelegate*> const &tablesByName);
 
-    static bool getIndexScheme(catalog::Table &catalogTable,
-                               catalog::Index &catalogIndex,
+    static void migrateChangedTuples(catalog::Table const &catalogTable,
+                                     voltdb::PersistentTable* existingTable,
+                                     voltdb::PersistentTable* newTable);
+
+    static TupleSchema *createTupleSchema(catalog::Table const &catalogTable);
+
+    static bool getIndexScheme(catalog::Table const &catalogTable,
+                               catalog::Index const &catalogIndex,
                                const TupleSchema *schema,
                                TableIndexScheme *scheme);
 
@@ -79,6 +98,9 @@ class TableCatalogDelegate : public CatalogDelegate {
     }
 
   private:
+    static Table *constructTableFromCatalog(catalog::Database const &catalogDatabase,
+                                            catalog::Table const &catalogTable);
+
     voltdb::Table *m_table;
     bool m_exportEnabled;
     std::string m_signature;

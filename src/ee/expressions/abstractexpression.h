@@ -49,10 +49,10 @@
 #include "boost/shared_ptr.hpp"
 #include "common/types.h"
 #include "common/valuevector.h"
+#include "common/PlannerDomValue.h"
 
 #include <string>
 #include <vector>
-#include "json_spirit/json_spirit.h"
 
 namespace voltdb {
 
@@ -74,7 +74,7 @@ class AbstractExpression {
     /** destroy this node and all children */
     virtual ~AbstractExpression();
 
-    virtual NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const = 0;
+    virtual NValue eval(const TableTuple *tuple1 = NULL, const TableTuple *tuple2 = NULL) const = 0;
 
     /** set parameter values for this node and its descendents */
     virtual void substitute(const NValueArray &params);
@@ -94,7 +94,7 @@ class AbstractExpression {
 
     /** create an expression tree. call this once with the input
         stream positioned at the root expression node */
-    static AbstractExpression* buildExpressionTree(json_spirit::Object &obj);
+    static AbstractExpression* buildExpressionTree(PlannerDomValue obj);
 
     /** accessors */
     ExpressionType getExpressionType() const {
@@ -140,7 +140,7 @@ class AbstractExpression {
                        AbstractExpression *right);
 
   private:
-    static AbstractExpression* buildExpressionTree_recurse(json_spirit::Object &obj);
+    static AbstractExpression* buildExpressionTree_recurse(PlannerDomValue obj);
     bool initParamShortCircuits();
 
   protected:

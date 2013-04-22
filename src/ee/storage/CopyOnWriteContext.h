@@ -104,6 +104,7 @@ private:
     const int32_t m_partitionId;
 
     int32_t m_tuplesSerialized;
+    int32_t m_expectedTupleCount;
 };
 
 }

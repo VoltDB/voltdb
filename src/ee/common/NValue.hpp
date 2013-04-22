@@ -210,6 +210,9 @@ class NValue {
     /* Release memory associated to object type NValues */
     void free() const;
 
+    /* Release memory associated to object type tuple columns */
+    static void freeObjectsFromTupleStorage(std::vector<char*> const &oldObjects);
+
     /* Set value to the correct SQL NULL representation. */
     void setNull();
 
@@ -284,6 +287,9 @@ class NValue {
 
     /* Serialize this NValue to an Export stream */
     void serializeToExport(ExportSerializeOutput&) const;
+
+    // See comment with inlined body, below.
+    void allocatePersistentObjectFromInlineValue();
 
     /* Check if the value represents SQL NULL */
     bool isNull() const;
@@ -892,6 +898,43 @@ class NValue {
             return getTimestamp();
         default:
             throwCastSQLException(type, VALUE_TYPE_BIGINT);
+            return 0; // NOT REACHED
+        }
+    }
+
+    int32_t castAsIntegerAndGetValue() const {
+        const ValueType type = getValueType();
+        if (isNull()) {
+            return INT32_NULL;
+        }
+
+        switch (type) {
+        case VALUE_TYPE_NULL:
+            return INT32_NULL;
+        case VALUE_TYPE_TINYINT:
+            return static_cast<int32_t>(getTinyInt());
+        case VALUE_TYPE_SMALLINT:
+            return static_cast<int32_t>(getSmallInt());
+        case VALUE_TYPE_INTEGER:
+            return getInteger();
+        case VALUE_TYPE_BIGINT:
+        {
+            const int64_t value = getBigInt();
+            if (value > (int64_t)INT32_MAX || value < (int64_t)VOLT_INT32_MIN) {
+                throwCastSQLValueOutOfRangeException<int64_t>(value, VALUE_TYPE_BIGINT, VALUE_TYPE_INTEGER);
+            }
+            return static_cast<int32_t>(value);
+        }
+        case VALUE_TYPE_DOUBLE:
+        {
+            const double value = getDouble();
+            if (value > (double)INT32_MAX || value < (double)VOLT_INT32_MIN) {
+                throwCastSQLValueOutOfRangeException(value, VALUE_TYPE_DOUBLE, VALUE_TYPE_INTEGER);
+            }
+            return static_cast<int32_t>(value);
+        }
+        default:
+            throwCastSQLException(type, VALUE_TYPE_INTEGER);
             return 0; // NOT REACHED
         }
     }
@@ -2058,6 +2101,17 @@ inline void NValue::free() const {
     }
 }
 
+inline void NValue::freeObjectsFromTupleStorage(std::vector<char*> const &oldObjects)
+{
+
+    for (std::vector<char*>::const_iterator it = oldObjects.begin(); it != oldObjects.end(); ++it) {
+        StringRef* sref = reinterpret_cast<StringRef*>(*it);
+        if (sref != NULL) {
+            StringRef::destroy(sref);
+        }
+    }
+}
+
 /**
  * Get the amount of storage necessary to store a value of the specified type
  * in a tuple
@@ -2628,6 +2682,52 @@ inline void NValue::serializeToExport(ExportSerializeOutput &io) const
                                   "Invalid type in serializeToExport");
 }
 
+/** Reformat an object-typed value from its inlined form to its allocated out-of-line form,
+ *  for use with a widened tuple column. **/
+inline void NValue::allocatePersistentObjectFromInlineValue()
+{
+    if (m_valueType == VALUE_TYPE_NULL || m_valueType == VALUE_TYPE_INVALID) {
+        return;
+    }
+
+    assert(m_valueType == VALUE_TYPE_VARCHAR || m_valueType == VALUE_TYPE_VARBINARY);
+    assert(m_sourceInlined);
+
+    // Not sure why there need to be two ways to signify NULL,
+    // maybe it simplifies value transfer from inline tuple storage
+    // to be able to use the second object-length-based form,
+    // but since this is how isNull works, do likewise.
+    if (*reinterpret_cast<void* const*>(m_data) == NULL ||
+        *reinterpret_cast<const int32_t*>(&m_data[8]) == OBJECTLENGTH_NULL) {
+        // Standardize on the more direct NULL representation.
+        // The object-length-based form of NULL appears to only be expected for inlined values.
+        *reinterpret_cast<void**>(m_data) = NULL;
+        // serializeToTupleStorage fusses about this inline flag being set, even for NULLs
+        setSourceInlined(false);
+        return;
+    }
+
+    // A future version/variant of this function may take an optional Pool argument,
+    // so that it could be used for temp values/tables.
+    // The default persistent string pool specified by NULL works fine here and now.
+    Pool* stringPool = NULL;
+
+    // When an object is inlined, m_data is a direct pointer into a tuple's inline storage area.
+    char* source = *reinterpret_cast<char**>(m_data);
+
+    // When it isn't inlined, m_data must contain a pointer to a StringRef object
+    // that contains that same data in that same format.
+
+    int32_t length = getObjectLength();
+    // inlined objects always have a minimal (1-byte) length field.
+    StringRef* sref = StringRef::create(length + SHORT_OBJECT_LENGTHLENGTH, stringPool);
+    char* storage = sref->get();
+    // Copy length and value into the allocated out-of-line storage
+    ::memcpy(storage, source, length + SHORT_OBJECT_LENGTHLENGTH);
+    setObjectValue(sref);
+    setSourceInlined(false);
+}
+
 inline bool NValue::isNull() const {
     switch (getValueType()) {
       case VALUE_TYPE_NULL:
@@ -2781,6 +2881,10 @@ inline NValue NValue::castAs(ValueType type) const {
       case VALUE_TYPE_DECIMAL:
         return castAsDecimal();
       default:
+          DEBUG_IGNORE_OR_THROW_OR_CRASH("Fallout from planner error."
+                                         " The invalid target value type for a cast is " <<
+                                         getTypeName(type))
+
           char message[128];
           snprintf(message, 128, "Type %d not a recognized type for casting",
                   (int) type);

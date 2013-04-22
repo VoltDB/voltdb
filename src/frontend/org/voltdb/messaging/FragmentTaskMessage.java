@@ -19,6 +19,8 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,6 +31,7 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
+import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
 /**
@@ -45,8 +48,21 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     public static final byte SYS_PROC_PER_PARTITION = 1;
     public static final byte SYS_PROC_PER_SITE = 2;
 
+    public static final byte[] EMPTY_HASH;
+    static {
+        MessageDigest md = null;
+        try {
+            md = MessageDigest.getInstance("SHA-1");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+            System.exit(-1); // this means the jvm is broke
+        }
+        md.update("".getBytes(VoltDB.UTF8ENCODING));
+        EMPTY_HASH = md.digest();
+    }
+
     private static class FragmentData {
-        long m_fragmentId = 0;
+        byte[] m_planHash = null;
         ByteBuffer m_parameterSet = null;
         Integer m_outputDepId = null;
         ArrayList<Integer> m_inputDepIds = null;
@@ -59,12 +75,12 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         @Override
         public String toString() {
             StringBuilder sb = new StringBuilder();
-            sb.append(String.format("FRAGMENT ID: %d\n", m_fragmentId));
+            sb.append(String.format("FRAGMENT PLAN HASH: %s\n", Encoder.hexEncode(m_planHash)));
             if (m_parameterSet != null) {
                 FastDeserializer fds = new FastDeserializer(m_parameterSet.asReadOnlyBuffer());
                 ParameterSet pset = null;
                 try {
-                    pset = fds.readObject(ParameterSet.class);
+                    pset = ParameterSet.fromFastDeserializer(fds);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -164,9 +180,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
      * @param outputDepId
      * @param parameterSet
      */
-    public void addFragment(long fragmentId, int outputDepId, ByteBuffer parameterSet) {
+    public void addFragment(byte[] planHash, int outputDepId, ByteBuffer parameterSet) {
         FragmentData item = new FragmentData();
-        item.m_fragmentId = fragmentId;
+        item.m_planHash = planHash;
         item.m_outputDepId = outputDepId;
         item.m_parameterSet = parameterSet;
         m_items.add(item);
@@ -180,8 +196,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
      * @param parameterSet
      * @param fragmentPlan
      */
-    public void addCustomFragment(int outputDepId, ByteBuffer parameterSet, byte[] fragmentPlan) {
+    public void addCustomFragment(byte[] planHash, int outputDepId, ByteBuffer parameterSet, byte[] fragmentPlan) {
         FragmentData item = new FragmentData();
+        item.m_planHash = planHash;
         item.m_outputDepId = outputDepId;
         item.m_parameterSet = parameterSet;
         item.m_fragmentPlan = fragmentPlan;
@@ -208,14 +225,14 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                                                             long txnId,
                                                             long uniqueId,
                                                             boolean isReadOnly,
-                                                            long fragmentId,
+                                                            byte[] planHash,
                                                             int outputDepId,
                                                             ByteBuffer parameterSet,
                                                             boolean isFinal,
                                                             boolean isForReplay) {
         FragmentTaskMessage ret = new FragmentTaskMessage(initiatorHSId, coordinatorHSId,
                                                           txnId, uniqueId, isReadOnly, isFinal, isForReplay);
-        ret.addFragment(fragmentId, outputDepId, parameterSet);
+        ret.addFragment(planHash, outputDepId, parameterSet);
         return ret;
     }
 
@@ -297,7 +314,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     // fragment with the provided outputDepId
     public void setEmptyForRestart(int outputDepId) {
         m_emptyForRestart = true;
-        addFragment(Long.MIN_VALUE, outputDepId, ByteBuffer.allocate(0));
+        addFragment(EMPTY_HASH, outputDepId, ByteBuffer.allocate(0));
     }
 
     public boolean isEmptyForRestart() {
@@ -323,11 +340,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         return m_initiateTask;
     }
 
-    public long getFragmentId(int index) {
+    public byte[] getPlanHash(int index) {
         assert(index >= 0 && index < m_items.size());
         FragmentData item = m_items.get(index);
         assert(item != null);
-        return item.m_fragmentId;
+        return item.m_planHash;
     }
 
     public int getOutputDepId(int index) {
@@ -350,7 +367,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         if (paramData != null) {
             final FastDeserializer fds = new FastDeserializer(paramData);
             try {
-                params = fds.readObject(ParameterSet.class);
+                params = ParameterSet.fromFastDeserializer(fds);
             }
             catch (final IOException e) {
                 hostLog.l7dlog(Level.FATAL,
@@ -359,7 +376,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             }
         }
         else {
-            params = new ParameterSet();
+            params = ParameterSet.emptyParameterSet();
         }
         return params;
     }
@@ -415,8 +432,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // Fixed header
         msgsize += 2 + 2 + 1 + 1 + 1 + 1 + 1;
 
-        // Fragment ID block
-        msgsize += 8 * m_items.size();
+        // Fragment ID block (20 bytes per sha1-hash)
+        msgsize += 20 * m_items.size();
 
         //nested initiate task message length prefix
         msgsize += 4;
@@ -507,9 +524,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         buf.put(nOutputDepIds > 0 ? (byte) 1 : (byte) 0);
         buf.put(nInputDepIds  > 0 ? (byte) 1 : (byte) 0);
 
-        // Fragment ID block
+        // Plan Hash block
         for (FragmentData item : m_items) {
-            buf.putLong(item.m_fragmentId);
+            buf.put(item.m_planHash);
         }
 
         // Parameter set block
@@ -592,7 +609,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // Fragment ID block (creates the FragmentData objects)
         for (int i = 0; i < fragCount; i++) {
             FragmentData item = new FragmentData();
-            item.m_fragmentId = buf.getLong();
+            item.m_planHash = new byte[20]; // sha1 is 20b
+            buf.get(item.m_planHash);
             m_items.add(item);
         }
 

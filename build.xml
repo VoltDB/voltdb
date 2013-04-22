@@ -86,6 +86,7 @@
 <property name='deployment.parsergen.pkg'    value='org.voltdb.compiler.deploymentfile' />
 <property name='deployment.parsergen.xsd'    value='org/voltdb/compiler/DeploymentFileSchema.xsd' />
 <property name='debian.package.dir'          value='obj/debian' />
+<property name='rpm.package.dir'             value='obj/rpms' />
 
 <!-- os.mac is set when build is running on Mac OSX -->
 <condition property="os.mac">
@@ -192,6 +193,24 @@ PRIMARY ENTRY POINTS
         <arg value="licensecheck" />
         <arg value="junit_quick" />
         <arg value="distcheck" />
+        <arg value="-Dbuild=${build}" />
+        <arg value="-DtimeoutLength=${timeoutLength}" />
+        <arg value="-DVOLT_REGRESSIONS=${VOLT_REGRESSIONS}" />
+        <arg value="-DVOLT_ENABLEIV2=${VOLT_ENABLEIV2}" />
+    </exec>
+</target>
+<target name='check_sql'
+    depends="licensecheck, compile, voltdbipc"
+    description="Run Java and C++ JNI testcases stressing sql functionality over process architecture." >
+    <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
+        <isset property="timeoutLength"/>
+    </condition>
+
+    <exec executable="/usr/bin/ant" failonerror="true" timeout="9000000">
+        <arg value="eecheck" />
+        <arg value="junit_sql" />
+        <arg value="distcheck" />
+        <arg value="pythonfser" />
         <arg value="-Dbuild=${build}" />
         <arg value="-DtimeoutLength=${timeoutLength}" />
         <arg value="-DVOLT_REGRESSIONS=${VOLT_REGRESSIONS}" />
@@ -714,7 +733,7 @@ CLEANING
 
 <target name='clean'
 	description="Remove all compiled and generated files."
-	depends="cleantmp, clean_project_gen, clean_deployment_gen, clean_debian_package, clean_bindoc, clean_other_gen">
+	depends="cleantmp, clean_project_gen, clean_deployment_gen, clean_debian_package, clean_rpm_package, clean_bindoc, clean_other_gen">
   <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='examples/voltcache' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
@@ -743,9 +762,17 @@ CLEANING
   <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf doc/javadoc/procedure-api/* doc/javadoc/java-client-api/*'"/>
   </exec>
-
 </target>
 
+<target name='cleanugh' description="Remove stack traces and crash dumps dropped by tests">
+    <exec dir='.' executable='/bin/sh'>
+        <arg line="-c 'rm -f voltdb_crash*.txt'"/>
+    </exec>
+    <exec dir='.' executable='/bin/sh'>
+        <arg line="-c 'rm -f host*-*-*.txt'"/>
+    </exec>
+</target>
+                        
 <target name='cleantmp' description="Remove all data files Volt generated in /tmp.">
   <exec dir='.' executable='/bin/sh' failonerror='false'>
     <arg line="-c 'rm -rf /tmp/myApp*.tmp *.vpt *.digest'"/>
@@ -854,6 +881,7 @@ JAR BUILDING
             <include name="org/voltdb/**" />
             <include name="org/json_voltpatches/**" />
             <include name="org/apache/hadoop_voltpatches/**" />
+            <include name="org/apache/cassandra_voltpatches/MurmurHash3.class"/>
             <include name="vanilla/**" />
             <include name="jsr166y/**" />
         </fileset>
@@ -1116,6 +1144,15 @@ NATIVE EE STUFF
     </exec>
 </target>
 
+<target name="eebuild" depends="voltdbipc"
+    description="Build but do not run test cases for C++ JNI library.">
+    <exec dir='.' executable='python' failonerror='true'>
+        <env key="TEST_DIR" value="${build.testobjects.dir}" />
+        <env key="EETESTSUITE" value="${eetestsuite}"/>
+        <arg line="build.py ${build} build" />
+    </exec>
+</target>
+
 <target name='voltdbipc' depends="ee"
     description="Build the IPC client.">
     <exec dir='.' executable='python' failonerror='true'>
@@ -1265,6 +1302,9 @@ TEST CASES
             <env key="TEST_DIR" value="${build.testobjects.dir}" />
             <env key="VOLT_REGRESSIONS" value="${regressions}" />
             <env key="VOLT_ENABLEIV2" value="${enableiv2}" />
+            <!-- Leave breadcrumbs so we can figure out deep in the bowels of VoltDB if
+                 this is a test -->
+            <env key="VOLT_JUSTATEST" value="YESYESYES" />
             <!-- Following two env vars are used by Java code
                  when running ant check -Dbuild=memcheck
                  The voltdbipc client is used in concert with valgrind
@@ -1315,8 +1355,7 @@ TEST CASES
     </sequential>
 </target>
 
-<target
-    name="junit"
+<target name="junit"
     description="Execute JUnit test suites.">
     <run_junit>
         <tests>
@@ -1330,7 +1369,6 @@ TEST CASES
                 <include name='org/voltdb/network/**/*Test.class'/>
                 <include name='org/voltdb/utils/**/*Test.class'/>
                 <exclude name="**/*$*.class"/>
-                <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
                 <exclude name="**/TestExportBase.class"/>
                 <!-- Excluded pro tests -->
@@ -1338,20 +1376,41 @@ TEST CASES
                 <exclude name="**/TestCommandLogReinitiator.class"/>
                 <exclude name="**/TestCommandLog.class"/>
                 <exclude name="**/TestLogReader.class"/>
-                <exclude name="**/TestTaskLog.class"/>
-                <exclude name="**/TestResponseSampler.class" />  <!-- fails legacy -->
                 <exclude name="**/TestRestoreWithReplay.class" />
                 <exclude name="**/TestPauselessRejoinFuzz.class" /> <!-- fails legacy -->
-                <exclude name="**/TestSecondaryRejoin.class" />
-                <exclude name="**/TestSnapshotSaveTruncation.class" />
                 <!-- Exclude community tests -->
+                <!-- Recorded as ENG-4423 -->
                 <exclude name="**/TestIV2BlacklistSaveRestoreSysprocSuite.class" />
                 <exclude name="**/TestRejoinFuzz.class" />
                 <exclude name="**/TestRejoinFuzz2.class" />
-                <exclude name="**/TestNonDetermisticSeppuku.class" />
-                <exclude name="**/TestExecutionSite.class" />
                 <exclude name="**/TestMaliciousClientSuite.class" /> <!-- fails legacy -->
-                <exclude name="**/TestSneakyExecutionOrderSuite.class" />
+            </fileset>
+        </tests>
+    </run_junit>
+</target>
+
+<target name='junit_sql'
+    description="Execute JUnit test suites.">
+    <run_junit>
+        <tests>
+            <fileset dir='${build.test.dir}'>
+                <!-- Standard junit fileset -->
+                <include name='org/hsqldb_voltpatches/**/Test*.class'/>
+                <include name='org/voltdb/**/Test*.class'/>
+                <include name='org/voltdb/utils/**/*Test.class'/>
+                <!-- Exclude many tests not directly related to sql functionality -->
+                <exclude name="**/*$*.class"/>
+                <exclude name="org/voltdb/quarantine/**/*.class"/>
+                <exclude name='org/voltdb/dtxn/Test*.class'/>
+                <exclude name="**/TestCommandLog*.class" />
+                <exclude name="**/TestExport*.class"/>
+                <exclude name="**/TestJoin.class"/>
+                <exclude name="**/TestLogReader.class"/>
+                <exclude name="**/TestMaliciousClientSuite.class" />
+                <exclude name="**/Test*Rejoin*.class" />
+                <exclude name="**/Test*Replication*.class" />
+                <exclude name="**/Test*Restore*.class" />
+                <exclude name="**/Test*Snapshot*.class" />
             </fileset>
         </tests>
     </run_junit>
@@ -1415,7 +1474,6 @@ TEST CASES
                 <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
                 <exclude name="**/TestExportBase.class"/>
-                <exclude name="**/TestResponseSampler.class" />  <!-- regressed during 3.0 bugfix? -->
                 <exclude name="**/TestPauselessRejoinFuzz.class" /> <!-- regressed during 3.0 bugfix? -->
             </fileset>
         </tests>
@@ -1708,7 +1766,7 @@ TEST CASES
         <arg line="-c 'rm -rf ${sqlcov.dir}'"/>
     </exec>
     <mkdir dir="${sqlcov.dir}" />
-    <condition property="enableiv2" value="${enableiv2}" else="false">
+    <condition property="enableiv2" value="${enableiv2}" else="true">
         <isset property="enableiv2"/>
     </condition>
     <condition property="" value="${env.VOLTBUILD}" else='release'>
@@ -2109,6 +2167,31 @@ DEBIAN PACKAGE CREATION
         description="Forceably remove all Debian/Ubuntu package build artifacts as root.">
     <exec dir="." executable="sudo" failonerror="false">
         <arg line="/bin/sh -c 'rm -rfv ${debian.package.dir}'" />
+    </exec>
+</target>
+
+<!--
+***********************
+RPM PACKAGE CREATION
+***********************
+-->
+
+<target name="rpm_package"
+        depends="buildinfo"
+        description="Create RPM package">
+    <exec executable="python" failonerror="true">
+        <arg value="${base.dir}/tools/voltdb-install.py" />
+        <arg value="-R" />
+        <arg value="${raw.dist.dir}/voltdb-${dist.version}.tar.gz" />
+    </exec>
+</target>
+
+<!-- This cleaning target is safe. It doesn't run as root. -->
+<target name="clean_rpm_package"
+	    depends=""
+        description="Remove all RPM build artifacts.">
+    <exec dir='.' executable='/bin/sh' failonerror='false'>
+        <arg line="-c 'rm -rfv ${rpm.package.dir}'" />
     </exec>
 </target>
 

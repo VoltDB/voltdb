@@ -36,11 +36,13 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
+import org.voltdb.LegacyHashinator;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.RecoverySiteProcessorDestination;
 import org.voltdb.RecoverySiteProcessorSource;
 import org.voltdb.SysProcSelector;
 import org.voltdb.TableStreamType;
+import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -144,10 +146,21 @@ public class TestExecutionEngine extends TestCase {
 
         // Each EE needs its own thread for correct initialization.
         final AtomicReference<ExecutionEngine> destinationEngine = new AtomicReference<ExecutionEngine>();
+        final byte configBytes[] = LegacyHashinator.getConfigureBytes(1);
         Thread destEEThread = new Thread() {
             @Override
             public void run() {
-                destinationEngine.set(new ExecutionEngineJNI(CLUSTER_ID, NODE_ID, 0, 0, "", 100, 1));
+                destinationEngine.set(
+                        new ExecutionEngineJNI(
+                                CLUSTER_ID,
+                                NODE_ID,
+                                0,
+                                0,
+                                "",
+                                100,
+                                HashinatorType.LEGACY,
+                                configBytes,
+                                null));
             }
         };
         destEEThread.start();
@@ -265,13 +278,22 @@ public class TestExecutionEngine extends TestCase {
         final MockMailbox destinationDataMailbox = new MockMailbox();
         destinationDataMailbox.setHSId(destinationDataId);
         MockMailbox.registerMailbox(destinationDataId, destinationDataMailbox);
+        final byte configBytes[] = LegacyHashinator.getConfigureBytes(1);
 
         Thread destinationThread = new Thread("Destination thread") {
             @Override
             public void run() {
                 final ExecutionEngine destinationEngine =
-                    new ExecutionEngineJNI(CLUSTER_ID, NODE_ID, (int)destinationId,
-                                           (int)destinationId, "", 100, 1);
+                    new ExecutionEngineJNI(
+                            CLUSTER_ID,
+                            NODE_ID,
+                            (int)destinationId,
+                            (int)destinationId,
+                            "",
+                            100,
+                            HashinatorType.LEGACY,
+                            configBytes,
+                            null);
                 destinationReference.set(destinationEngine);
                 destinationEngine.loadCatalog( 0, serializedCatalog);
                 RecoverySiteProcessorDestination destinationProcess =
@@ -303,9 +325,16 @@ public class TestExecutionEngine extends TestCase {
             @Override
             public void run() {
                 final ExecutionEngine sourceEngine =
-                        new ExecutionEngineJNI(CLUSTER_ID, NODE_ID,
-                                               (int)sourceId, (int)sourceId,
-                                               "", 100, 1);
+                        new ExecutionEngineJNI(
+                                CLUSTER_ID,
+                                NODE_ID,
+                                (int)sourceId,
+                                (int)sourceId,
+                                "",
+                                100,
+                                HashinatorType.LEGACY,
+                                configBytes,
+                                null);
                 sourceReference.set(sourceEngine);
                 sourceEngine.loadCatalog( 0, serializedCatalog);
 
@@ -387,7 +416,17 @@ public class TestExecutionEngine extends TestCase {
     protected void setUp() throws Exception {
         super.setUp();
         VoltDB.instance().readBuildInfo("Test");
-        sourceEngine = new ExecutionEngineJNI(CLUSTER_ID, NODE_ID, 0, 0, "", 100, 1);
+        sourceEngine =
+                new ExecutionEngineJNI(
+                        CLUSTER_ID,
+                        NODE_ID,
+                        0,
+                        0,
+                        "",
+                        100,
+                        HashinatorType.LEGACY,
+                        LegacyHashinator.getConfigureBytes(1),
+                        null);
         m_project = new TPCCProjectBuilder();
         m_catalog = m_project.createTPCCSchemaCatalog();
     }

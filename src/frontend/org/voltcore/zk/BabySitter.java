@@ -19,20 +19,18 @@ package org.voltcore.zk;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.zookeeper_voltpatches.data.Stat;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-
+import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 
@@ -155,7 +153,7 @@ public class BabySitter
         List<String> zkchildren = m_zk.getChildren(m_dir, m_watcher, stat);
         ArrayList<String> tmp = new ArrayList<String>(zkchildren.size());
         tmp.addAll(zkchildren);
-        ZKUtil.sortSequentialNodes(tmp);
+        Collections.sort(tmp);
         m_children = Collections.unmodifiableList(tmp);
         return m_children;
     }

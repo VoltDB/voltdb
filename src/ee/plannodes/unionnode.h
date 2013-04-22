@@ -70,7 +70,7 @@ class UnionPlanNode : public AbstractPlanNode {
         std::string debugInfo(const std::string &spacer) const;
 
     protected:
-        void loadFromJSONObject(json_spirit::Object &obj);
+        void loadFromJSONObject(PlannerDomValue obj);
 
     private:
        UnionType m_unionType;

@@ -30,16 +30,16 @@ import org.voltdb.rejoin.TaskLog;
 
 public class CompleteTransactionTask extends TransactionTask
 {
-    final private CompleteTransactionMessage m_msg;
+    final private CompleteTransactionMessage m_completeMsg;
     final private PartitionDRGateway m_drGateway;
 
-    public CompleteTransactionTask(TransactionState txn,
+    public CompleteTransactionTask(TransactionState txnState,
                                    TransactionTaskQueue queue,
                                    CompleteTransactionMessage msg,
                                    PartitionDRGateway drGateway)
     {
-        super(txn, queue);
-        m_msg = msg;
+        super(txnState, queue);
+        m_completeMsg = msg;
         m_drGateway = drGateway;
     }
 
@@ -47,16 +47,18 @@ public class CompleteTransactionTask extends TransactionTask
     public void run(SiteProcedureConnection siteConnection)
     {
         hostLog.debug("STARTING: " + this);
-        if (!m_txn.isReadOnly()) {
+        if (!m_txnState.isReadOnly()) {
             // the truncation point token SHOULD be part of m_txn. However, the
             // legacy interaces don't work this way and IV2 hasn't changed this
             // ownership yet. But truncateUndoLog is written assuming the right
             // eventual encapsulation.
-            siteConnection.truncateUndoLog(m_msg.isRollback(), m_txn.getBeginUndoToken(), m_txn.txnId, m_txn.spHandle);
+            siteConnection.truncateUndoLog(m_completeMsg.isRollback(),
+                    m_txnState.getBeginUndoToken(),
+                    m_txnState.txnId,
+                    m_txnState.spHandle);
         }
-        if (!m_msg.isRestart()) {
-            m_txn.setDone();
-            m_queue.flush();
+        if (!m_completeMsg.isRestart()) {
+            doCommonSPICompleteActions();
 
             // Log invocation to DR
             logToDR();
@@ -68,7 +70,7 @@ public class CompleteTransactionTask extends TransactionTask
             // first FragmentTask will set it correctly.  Otherwise, don't set the Done state or
             // flush the queue; we want the TransactionTaskQueue to stay blocked on this TXN ID
             // for the restarted fragments.
-            m_txn.setBeginUndoToken(Site.kInvalidUndoToken);
+            m_txnState.setBeginUndoToken(Site.kInvalidUndoToken);
             hostLog.debug("RESTART: " + this);
         }
     }
@@ -77,51 +79,60 @@ public class CompleteTransactionTask extends TransactionTask
     public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
     throws IOException
     {
-        if (!m_msg.isRestart()) {
+        if (!m_completeMsg.isRestart()) {
             // future: offer to siteConnection.IBS for replay.
-            m_txn.setDone();
-            m_queue.flush();
+            doCommonSPICompleteActions();
         }
         // We need to log the restarting message to the task log so we'll replay the whole
         // stream faithfully
-        taskLog.logTask(m_msg);
+        taskLog.logTask(m_completeMsg);
     }
 
     @Override
     public long getSpHandle()
     {
-        return m_msg.getSpHandle();
+        return m_completeMsg.getSpHandle();
     }
 
     @Override
     public void runFromTaskLog(SiteProcedureConnection siteConnection)
     {
-        if (!m_txn.isReadOnly()) {
+        if (!m_txnState.isReadOnly()) {
             // the truncation point token SHOULD be part of m_txn. However, the
             // legacy interaces don't work this way and IV2 hasn't changed this
             // ownership yet. But truncateUndoLog is written assuming the right
             // eventual encapsulation.
-            siteConnection.truncateUndoLog(m_msg.isRollback(), m_txn.getBeginUndoToken(), m_txn.txnId, m_txn.spHandle);
+            siteConnection.truncateUndoLog(m_completeMsg.isRollback(),
+                    m_txnState.getBeginUndoToken(),
+                    m_txnState.txnId,
+                    m_txnState.spHandle);
         }
-        if (!m_msg.isRestart()) {
-            m_txn.setDone();
+        if (!m_completeMsg.isRestart()) {
+            // this call does the right thing with a null TransactionTaskQueue
+            doCommonSPICompleteActions();
             logToDR();
         }
         else {
-            m_txn.setBeginUndoToken(Site.kInvalidUndoToken);
+            m_txnState.setBeginUndoToken(Site.kInvalidUndoToken);
         }
     }
 
     private void logToDR()
     {
         // Log invocation to DR
-        if (m_drGateway != null && !m_txn.isForReplay() && !m_txn.isReadOnly() && !m_msg.isRollback()) {
-            FragmentTaskMessage fragment = (FragmentTaskMessage) m_txn.getNotice();
+        if (m_drGateway != null && !m_txnState.isForReplay() && !m_txnState.isReadOnly() &&
+            !m_completeMsg.isRollback())
+        {
+            FragmentTaskMessage fragment = (FragmentTaskMessage) m_txnState.getNotice();
             Iv2InitiateTaskMessage initiateTask = fragment.getInitiateTask();
             assert(initiateTask != null);
             StoredProcedureInvocation invocation = initiateTask.getStoredProcedureInvocation().getShallowCopy();
-            m_drGateway.onSuccessfulMPCall(m_txn.spHandle, m_txn.txnId, m_txn.uniqueId, m_msg.getHash(),
-                    invocation, m_txn.getResults());
+            m_drGateway.onSuccessfulMPCall(m_txnState.spHandle,
+                    m_txnState.txnId,
+                    m_txnState.uniqueId,
+                    m_completeMsg.getHash(),
+                    invocation,
+                    m_txnState.getResults());
         }
     }
 
@@ -132,8 +143,8 @@ public class CompleteTransactionTask extends TransactionTask
         sb.append("CompleteTransactionTask:");
         sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
         sb.append("  SP HANDLE: ").append(TxnEgo.txnIdToString(getSpHandle()));
-        sb.append("  UNDO TOKEN: ").append(m_txn.getBeginUndoToken());
-        sb.append("  MSG: ").append(m_msg.toString());
+        sb.append("  UNDO TOKEN: ").append(m_txnState.getBeginUndoToken());
+        sb.append("  MSG: ").append(m_completeMsg.toString());
         return sb.toString();
     }
 }

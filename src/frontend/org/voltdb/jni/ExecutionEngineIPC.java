@@ -29,11 +29,12 @@ import java.util.logging.Logger;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.BackendTarget;
+import org.voltdb.FragmentPlanSource;
 import org.voltdb.ParameterSet;
-import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SysProcSelector;
 import org.voltdb.TableStreamType;
+import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
@@ -41,6 +42,8 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
+
+import com.google.common.base.Charsets;
 
 /* Serializes data over a connection that presumably is being read
  * by a voltdb execution engine. The serialization is currently a
@@ -117,7 +120,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         Hashinate(23),
         GetPoolAllocations(24),
         GetUSOs(25),
-        LoadFragment(26);
+        updateHashinator(27);
         Commands(final int id) {
             m_id = id;
         }
@@ -183,7 +186,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             // order. this hurts .. but I'm not sure of a better way.
             m_dataNetwork.clear();
             final int amt = m_data.remaining();
-            m_dataNetwork.putInt(amt + 4);
+            m_dataNetwork.putInt(4 + amt);
+            if (m_dataNetwork.capacity() < (4 + amt)) {
+                throw new IOException("Catalog data size (" + (4 + amt) +
+                                      ") exceeds ExecutionEngineIPC's hard-coded data buffer capacity (" +
+                                      m_dataNetwork.capacity() + ")");
+            }
             m_dataNetwork.limit(4 + amt);
             m_dataNetwork.rewind();
             while (m_dataNetwork.hasRemaining()) {
@@ -494,8 +502,10 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int tempTableMemory,
             final BackendTarget target,
             final int port,
-            final int totalPartitions) {
-        super(siteId, partitionId);
+            final HashinatorType type,
+            final byte config[],
+            FragmentPlanSource planSource) {
+        super(siteId, partitionId, planSource);
 
         // m_counter = 0;
         m_clusterIndex = clusterIndex;
@@ -507,12 +517,21 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_connection = new Connection(target, port);
 
         // voltdbipc assumes host byte order everywhere
-        m_dataNetworkOrigin = org.voltcore.utils.DBBPool.allocateDirect(1024 * 1024 * 10);
+        // Arbitrarily set to 20MB when 10MB crashed for an arbitrarily scaled unit test.
+        m_dataNetworkOrigin = org.voltcore.utils.DBBPool.allocateDirect(1024 * 1024 * 20);
         m_dataNetwork = m_dataNetworkOrigin.b;
         m_dataNetwork.position(4);
         m_data = m_dataNetwork.slice();
 
-        initialize(m_clusterIndex, m_siteId, m_partitionId, m_hostId, m_hostname, 1024 * 1024 * tempTableMemory, totalPartitions);
+        initialize(
+                m_clusterIndex,
+                m_siteId,
+                m_partitionId,
+                m_hostId,
+                m_hostname,
+                1024 * 1024 * tempTableMemory,
+                type,
+                config);
     }
 
     /** Utility method to generate an EEXception that can be overriden by derived classes**/
@@ -545,7 +564,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int hostId,
             final String hostname,
             final long tempTableMemory,
-            final int totalPartitions)
+            final HashinatorType hashinatorType,
+            final byte hashinatorConfig[])
     {
         synchronized(printLockObject) {
             System.out.println("Initializing an IPC EE " + this + " for hostId " + hostId + " siteId " + siteId + " from thread " + Thread.currentThread().getId());
@@ -559,13 +579,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putInt(hostId);
         m_data.putLong(EELoggers.getLogLevels());
         m_data.putLong(tempTableMemory);
-        m_data.putInt(totalPartitions);
-        m_data.putShort((short)hostname.length());
-        try {
-            m_data.put(hostname.getBytes("UTF-8"));
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
+        m_data.putInt(hashinatorType.typeId());
+        m_data.putInt(hashinatorConfig.length);
+        m_data.putInt((short)hostname.length());
+        m_data.put(hashinatorConfig);
+        m_data.put(hostname.getBytes(Charsets.UTF_8));
         try {
             m_data.flip();
             m_connection.write();
@@ -679,7 +697,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int numFragmentIds,
             final long[] planFragmentIds,
             long[] inputDepIdsIn,
-            final ParameterSet[] parameterSets,
+            final Object[] parameterSets,
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
@@ -689,7 +707,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         final FastSerializer fser = new FastSerializer();
         try {
             for (int i = 0; i < numFragmentIds; ++i) {
-                parameterSets[i].writeExternal(fser);
+                // pset can be ByteBuffer or ParameterSet instance
+                if (parameterSets[i] instanceof ByteBuffer) {
+                    fser.write((ByteBuffer) parameterSets[i]);
+                }
+                else {
+                    ((ParameterSet) parameterSets[i]).writeExternal(fser);
+                }
             }
         } catch (final IOException exception) {
             throw new RuntimeException(exception);
@@ -729,61 +753,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public long loadPlanFragment(byte[] plan) throws EEException
-    {
-        m_data.clear();
-        m_data.putInt(Commands.LoadFragment.m_id);
-        m_data.putInt(plan.length);
-        m_data.put(plan);
-
-        try {
-            m_data.flip();
-            m_connection.write();
-        } catch (final Exception e) {
-            System.out.println("Exception: " + e.getMessage());
-            throw new RuntimeException(e);
-        }
-
-        int result = ExecutionEngine.ERRORCODE_ERROR;
-        long planFragId = 0;
-        long cacheSize = 0;
-        PlannerStatsCollector.CacheUse cacheUse = PlannerStatsCollector.CacheUse.FAIL;
-
-        // Start collecting statistics
-        startStatsCollection();
-
-        try {
-            try {
-                result = m_connection.readStatusByte();
-                planFragId = m_connection.readLong();
-                cacheSize = m_connection.readLong();
-                if (m_connection.readLong() != 0) {
-                    cacheUse = PlannerStatsCollector.CacheUse.HIT1;
-                }
-                else {
-                    cacheUse = PlannerStatsCollector.CacheUse.MISS;
-                }
-            } catch (final IOException e) {
-                System.out.println("Exception: " + e.getMessage());
-                throw new RuntimeException(e);
-            }
-            if (result != ExecutionEngine.ERRORCODE_SUCCESS) {
-                throw new EEException(ExecutionEngine.ERRORCODE_ERROR);
-            }
-        }
-        finally {
-            // Stop collecting statistics.
-            endStatsCollection(cacheSize, cacheUse);
-        }
-        return planFragId;
-    }
-
-    @Override
-    public VoltTable[] executePlanFragments(
+    protected VoltTable[] coreExecutePlanFragments(
             final int numFragmentIds,
             final long[] planFragmentIds,
             final long[] inputDepIds,
-            final ParameterSet[] parameterSets,
+            final Object[] parameterSets,
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
@@ -792,26 +766,41 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 numFragmentIds, planFragmentIds, inputDepIds, parameterSets,
                 spHandle, lastCommittedSpHandle, uniqueId, undoToken);
         int result = ExecutionEngine.ERRORCODE_ERROR;
-        try {
-            result = m_connection.readStatusByte();
-        } catch (final IOException e) {
-            System.out.println("Exception: " + e.getMessage());
-            throw new RuntimeException(e);
-        }
-        if (result == ExecutionEngine.ERRORCODE_SUCCESS) {
-            final VoltTable resultTables[] = new VoltTable[numFragmentIds];
-            for (int ii = 0; ii < numFragmentIds; ii++) {
-                resultTables[ii] = PrivateVoltTableFactory.createUninitializedVoltTable();
-            }
+
+        while (true) {
             try {
-                m_connection.readResultTables(resultTables);
+                result = m_connection.readStatusByte();
+
+                if (result == ExecutionEngine.ERRORCODE_NEED_PLAN) {
+                    long fragmentId = m_connection.readLong();
+                    byte[] plan = planForFragmentId(fragmentId);
+                    m_data.clear();
+                    m_data.put(plan);
+                    m_data.flip();
+                    m_connection.write();
+                }
+                else if (result == ExecutionEngine.ERRORCODE_SUCCESS) {
+                    final VoltTable resultTables[] = new VoltTable[numFragmentIds];
+                    for (int ii = 0; ii < numFragmentIds; ii++) {
+                        resultTables[ii] = PrivateVoltTableFactory.createUninitializedVoltTable();
+                    }
+                    try {
+                        m_connection.readResultTables(resultTables);
+                    } catch (final IOException e) {
+                        throw new EEException(
+                                ExecutionEngine.ERRORCODE_WRONG_SERIALIZED_BYTES);
+                    }
+                    return resultTables;
+                }
+                else {
+                    // failure
+                    return null;
+                }
             } catch (final IOException e) {
-                throw new EEException(
-                        ExecutionEngine.ERRORCODE_WRONG_SERIALIZED_BYTES);
+                System.out.println("Exception: " + e.getMessage());
+                throw new RuntimeException(e);
             }
-            return resultTables;
         }
-        return null;
     }
 
     @Override
@@ -1243,10 +1232,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public int hashinate(Object value, int partitionCount)
+    public int hashinate(Object value, HashinatorType type, byte config[])
     {
-        ParameterSet parameterSet = new ParameterSet();
-        parameterSet.setParameters(value);
+        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(value);
 
         final FastSerializer fser = new FastSerializer();
         try {
@@ -1257,7 +1245,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
         m_data.clear();
         m_data.putInt(Commands.Hashinate.m_id);
-        m_data.putInt(partitionCount);
+        m_data.putInt(type.typeId());
+        m_data.putInt(config.length);
+        m_data.put(config);
         m_data.put(fser.getBuffer());
         try {
             m_data.flip();
@@ -1273,6 +1263,23 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
             part.flip();
             return part.getInt();
+        } catch (final Exception e) {
+            System.out.println("Exception: " + e.getMessage());
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void updateHashinator(HashinatorType type, byte[] config)
+    {
+        m_data.clear();
+        m_data.putInt(Commands.updateHashinator.m_id);
+        m_data.putInt(type.typeId());
+        m_data.putInt(config.length);
+        m_data.put(config);
+        try {
+            m_data.flip();
+            m_connection.write();
         } catch (final Exception e) {
             System.out.println("Exception: " + e.getMessage());
             throw new RuntimeException(e);

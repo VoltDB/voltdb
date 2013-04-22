@@ -17,13 +17,17 @@
 
 package org.voltdb.jni;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Random;
 
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.FragmentPlanSource;
 import org.voltdb.ParameterSet;
 import org.voltdb.SysProcSelector;
 import org.voltdb.TableStreamType;
+import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
@@ -32,8 +36,8 @@ import org.voltdb.export.ExportProtoMessage;
 
 public class MockExecutionEngine extends ExecutionEngine {
 
-    public MockExecutionEngine() {
-        super();
+    public MockExecutionEngine(FragmentPlanSource planSource) {
+        super(planSource);
     }
 
     @Override
@@ -44,16 +48,11 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public long loadPlanFragment(byte[] plan) throws EEException {
-        return -1;
-    }
-
-    @Override
-    public VoltTable[] executePlanFragments(
+    protected VoltTable[] coreExecutePlanFragments(
             final int numFragmentIds,
             final long[] planFragmentIds,
             final long[] inputDepIds,
-            final ParameterSet[] parameterSets,
+            final Object[] parameterSets,
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
@@ -78,7 +77,16 @@ public class MockExecutionEngine extends ExecutionEngine {
 
         ArrayList<Object> params = new ArrayList<Object>();
 
-        for (Object param : parameterSets[0].toArray())
+        // de-serialize all parameter sets
+        if (parameterSets[0] instanceof ByteBuffer) {
+            try {
+                parameterSets[0] = ParameterSet.fromByteBuffer((ByteBuffer) parameterSets[0]);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        for (Object param : ((ParameterSet) parameterSets[0]).toArray())
         {
             params.add(param);
         }
@@ -203,8 +211,14 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public int hashinate(Object value, int partitionCount) {
+    public int hashinate(Object value, HashinatorType type, byte config[]) {
         return 0;
+    }
+
+    @Override
+    public void updateHashinator(HashinatorType type, byte[] config)
+    {
+
     }
 
     @Override

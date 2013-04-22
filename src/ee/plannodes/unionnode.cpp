@@ -65,18 +65,9 @@ std::string UnionPlanNode::debugInfo(const std::string &spacer) const {
     return string(buffer.str());
 }
 
-void UnionPlanNode::loadFromJSONObject(json_spirit::Object& obj)
+void UnionPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
-    json_spirit::Value unionTypeValue =
-        json_spirit::find_value(obj, "UNION_TYPE");
-    if (unionTypeValue == json_spirit::Value::null)
-    {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "UnionPlanNode::loadFromJSONObject:"
-                                      " Couldn't find UNION_TYPE value");
-    }
-
-    string unionTypeStr = unionTypeValue.get_str();
+    string unionTypeStr = obj.valueForKey("UNION_TYPE").asStr();
     if (unionTypeStr == "UNION") {
         m_unionType = UNION_TYPE_UNION;
     } else if (unionTypeStr == "UNION_ALL") {
@@ -95,7 +86,7 @@ void UnionPlanNode::loadFromJSONObject(json_spirit::Object& obj)
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "UnionPlanNode::loadFromJSONObject:"
                                       " Unsupported UNION_TYPE value " +
-                                      unionTypeValue.get_str());
+                                      unionTypeStr);
     }
 }
 

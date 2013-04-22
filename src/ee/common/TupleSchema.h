@@ -22,6 +22,7 @@
 #include <cstring>
 #include <stdint.h>
 #include <string>
+#include "common/FatalException.hpp"
 #include "common/types.h"
 #include <iostream>
 #include <vector>
@@ -165,7 +166,10 @@ private:
 ///////////////////////////////////
 
 inline ValueType TupleSchema::columnType(int index) const {
-    assert(index < m_columnCount);
+    // In theory, the error response, here can be reset dynamically at a gdb breakpoint.
+    DEBUG_ASSERT_OR_THROW_OR_CRASH(index < m_columnCount,
+                                   "Fallout from planner error. The tuple schema index " << index <<
+                                   " exceeds the limit for schema:\n" << debug());
     assert(index > -1);
     const ColumnInfo *columnInfo = getColumnInfo(index);
     return static_cast<ValueType>(columnInfo->type);

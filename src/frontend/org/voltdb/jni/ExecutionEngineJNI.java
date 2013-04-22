@@ -23,11 +23,12 @@ import java.nio.ByteBuffer;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.FragmentPlanSource;
 import org.voltdb.ParameterSet;
-import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SysProcSelector;
 import org.voltdb.TableStreamType;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
@@ -92,10 +93,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int hostId,
             final String hostname,
             final int tempTableMemory,
-            final int totalPartitions)
+            final TheHashinator.HashinatorType hashinatorType,
+            final byte hashinatorConfig[],
+            final FragmentPlanSource planSource)
     {
         // base class loads the volt shared library.
-        super(siteId, partitionId);
+        super(siteId, partitionId, planSource);
 
         //exceptionBuffer.order(ByteOrder.nativeOrder());
         LOG.trace("Creating Execution Engine on clusterIndex=" + clusterIndex
@@ -117,7 +120,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     hostId,
                     getStringBytes(hostname),
                     tempTableMemory * 1024 * 1024,
-                    totalPartitions);
+                    hashinatorType.typeId(), hashinatorConfig);
         checkErrorCode(errorCode);
         fsForParameterSet = new FastSerializer(true, new BufferGrowCallback() {
             @Override
@@ -182,12 +185,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     @Override
     public void loadCatalog(long timestamp, final String serializedCatalog) throws EEException {
-        //C++ JSON deserializer is not thread safe, must synchronize
         LOG.trace("Loading Application Catalog...");
         int errorCode = 0;
-        synchronized (ExecutionEngineJNI.class) {
-            errorCode = nativeLoadCatalog(pointer, timestamp, getStringBytes(serializedCatalog));
-        }
+        errorCode = nativeLoadCatalog(pointer, timestamp, getStringBytes(serializedCatalog));
         checkErrorCode(errorCode);
         //LOG.info("Loaded Catalog.");
     }
@@ -198,58 +198,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     @Override
     public void updateCatalog(long timestamp, final String catalogDiffs) throws EEException {
-        //C++ JSON deserializer is not thread safe, must synchronize
         LOG.trace("Loading Application Catalog...");
         int errorCode = 0;
-        synchronized (ExecutionEngineJNI.class) {
-            errorCode = nativeUpdateCatalog(pointer, timestamp, getStringBytes(catalogDiffs));
-        }
+        errorCode = nativeUpdateCatalog(pointer, timestamp, getStringBytes(catalogDiffs));
         checkErrorCode(errorCode);
-    }
-
-    @Override
-    public long loadPlanFragment(byte[] plan) throws EEException
-    {
-        deserializer.clear();
-
-        long cacheSize = 0;
-        CacheUse cacheUse = CacheUse.FAIL;
-
-        // Start collecting statistics
-        startStatsCollection();
-
-        //C++ JSON deserializer is not thread safe, must synchronize
-        int errorCode = 0;
-        synchronized (ExecutionEngineJNI.class) {
-            errorCode = nativeLoadPlanFragment(pointer, plan);
-        }
-        try {
-            checkErrorCode(errorCode);
-            FastDeserializer fds = fallbackBuffer == null ? deserializer : new FastDeserializer(fallbackBuffer);
-            try {
-                final long fragId = fds.readLong();
-                final boolean wasHit = fds.readBoolean();
-                cacheSize = fds.readLong();
-                if (fragId == 0) {
-                    throw new EEException(ERRORCODE_ERROR);
-                }
-                if (wasHit) {
-                    cacheUse = CacheUse.HIT1;
-                }
-                else {
-                    cacheUse = CacheUse.MISS;
-                }
-                return fragId;
-            } catch (final IOException ex) {
-                LOG.error("Failed to deserialze loadPlanFragment results" + ex);
-                throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
-            }
-        } finally {
-            // Stop collecting statistics.
-            endStatsCollection(cacheSize, cacheUse);
-
-            fallbackBuffer = null;
-        }
     }
 
     private static byte[] getStringBytes(String string) {
@@ -264,11 +216,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * @param undoToken Token identifying undo quantum for generated undo info
      */
     @Override
-    public VoltTable[] executePlanFragments(
+    protected VoltTable[] coreExecutePlanFragments(
             final int numFragmentIds,
             final long[] planFragmentIds,
             final long[] inputDepIds,
-            final ParameterSet[] parameterSets,
+            final Object[] parameterSets,
             final long spHandle, final long lastCommittedSpHandle,
             long uniqueId, final long undoToken) throws EEException
     {
@@ -286,14 +238,28 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         // serialize the param sets
         fsForParameterSet.clear();
         for (int i = 0; i < batchSize; ++i) {
-            try {
-                parameterSets[i].writeExternal(fsForParameterSet);
+            if (parameterSets[i] instanceof ByteBuffer) {
+                ByteBuffer buf = (ByteBuffer) parameterSets[i];
+                try {
+                    fsForParameterSet.write(buf);
+                } catch (IOException exception) {
+                    throw new RuntimeException("Error serializing parameters for SQL batch element: " +
+                            i + " with plan fragment ID: " + planFragmentIds[i] +
+                            " and with pre-serialized params of length: " +
+                            buf.capacity(), exception);
+                }
             }
-            catch (final IOException exception) {
-                throw new RuntimeException("Error serializing parameters for SQL batch element: " +
-                                           i + " with plan fragment ID: " + planFragmentIds[i] +
-                                           " and with params: " +
-                                           parameterSets[i].toJSONString(), exception);
+            else {
+                ParameterSet pset = (ParameterSet) parameterSets[i];
+                try {
+                    pset.writeExternal(fsForParameterSet);
+                }
+                catch (final IOException exception) {
+                    throw new RuntimeException("Error serializing parameters for SQL batch element: " +
+                                               i + " with plan fragment ID: " + planFragmentIds[i] +
+                                               " and with params: " +
+                                               pset.toJSONString(), exception);
+                }
             }
         }
         // checkMaxFsSize();
@@ -511,10 +477,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public int hashinate(Object value, int partitionCount)
+    public int hashinate(Object value, TheHashinator.HashinatorType hashinatorType, byte hashinatorConfig[])
     {
-        ParameterSet parameterSet = new ParameterSet();
-        parameterSet.setParameters(value);
+        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(value, hashinatorType.typeId(), hashinatorConfig);
 
         // serialize the param set
         fsForParameterSet.clear();
@@ -524,7 +489,23 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             throw new RuntimeException(exception); // can't happen
         }
 
-        return nativeHashinate(pointer, partitionCount);
+        return nativeHashinate(pointer);
+    }
+
+    @Override
+    public void updateHashinator(TheHashinator.HashinatorType type, byte[] config)
+    {
+        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(type.typeId(), config);
+
+        // serialize the param set
+        fsForParameterSet.clear();
+        try {
+            parameterSet.writeExternal(fsForParameterSet);
+        } catch (final IOException exception) {
+            throw new RuntimeException(exception); // can't happen
+        }
+
+        nativeUpdateHashinator(pointer);
     }
 
     @Override

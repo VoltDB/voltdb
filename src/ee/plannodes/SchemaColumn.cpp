@@ -17,60 +17,49 @@
 
 #include "SchemaColumn.h"
 
-using namespace json_spirit;
 using namespace std;
 using namespace voltdb;
 
-SchemaColumn::SchemaColumn(Object& colObject) : m_colObject(colObject)
+SchemaColumn::SchemaColumn(PlannerDomValue colObject)
 {
     bool contains_table_name = false;
     bool contains_column_name = false;
     bool contains_column_alias = false;
     bool contains_type = false;
     bool contains_size = false;
-    for (int attr = 0; attr < m_colObject.size(); attr++)
-    {
-        if (m_colObject[attr].name_ == "TABLE_NAME")
-        {
-            contains_table_name = true;
-            m_tableName = m_colObject[attr].value_.get_str();
-        }
-        else if (m_colObject[attr].name_ == "COLUMN_NAME")
-        {
-            contains_column_name = true;
-            m_columnName = m_colObject[attr].value_.get_str();
-        }
-        else if (m_colObject[attr].name_ == "COLUMN_ALIAS")
-        {
-            contains_column_alias = true;
-            m_columnAlias = m_colObject[attr].value_.get_str();
-        }
-        else if (m_colObject[attr].name_ == "TYPE")
-        {
-            contains_type = true;
-            string m_colObjectTypeString =
-                m_colObject[attr].value_.get_str();
-            m_type = stringToValue(m_colObjectTypeString);
-        }
-        else if (m_colObject[attr].name_ == "SIZE")
-        {
-            contains_size = true;
-            m_size = m_colObject[attr].value_.get_int();
-        }
+
+    if (colObject.hasKey("TABLE_NAME")) {
+        contains_table_name = true;
+        m_tableName = colObject.valueForKey("TABLE_NAME").asStr();
+    }
+
+    if (colObject.hasKey("COLUMN_NAME")) {
+        contains_column_name = true;
+        m_columnName = colObject.valueForKey("COLUMN_NAME").asStr();
+    }
+
+    if (colObject.hasKey("COLUMN_ALIAS")) {
+        contains_column_alias = true;
+        m_columnAlias = colObject.valueForKey("COLUMN_ALIAS").asStr();
+    }
+
+    if (colObject.hasKey("TYPE")) {
+        contains_type = true;
+        string colObjectTypeString = colObject.valueForKey("TYPE").asStr();
+        m_type = stringToValue(colObjectTypeString);
+    }
+
+    if (colObject.hasKey("SIZE")) {
+        contains_size = true;
+        m_size = colObject.valueForKey("SIZE").asInt();
     }
 
     m_expression = NULL;
     // lazy vector search
 
-    Value columnExpressionValue = find_value(m_colObject, "EXPRESSION");
-    if (columnExpressionValue == Value::null)
-    {
-        throw runtime_error("SchemaColumn::constructor: "
-                            "Can't find EXPRESSION value");
-    }
+    PlannerDomValue columnExpressionValue = colObject.valueForKey("EXPRESSION");
 
-    Object columnExpressionObject = columnExpressionValue.get_obj();
-    m_expression = AbstractExpression::buildExpressionTree(columnExpressionObject);
+    m_expression = AbstractExpression::buildExpressionTree(columnExpressionValue);
 
     if(!(contains_table_name && contains_column_name &&
          contains_column_alias && contains_type && contains_size)) {

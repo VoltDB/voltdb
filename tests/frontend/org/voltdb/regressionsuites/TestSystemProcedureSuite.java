@@ -31,6 +31,7 @@ import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.SysProcSelector;
+import org.voltdb.UpdateCatalogAcceptancePolicy;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -111,6 +112,25 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         }
         catch (ProcCallException pce) {
             assertEquals(ClientResponse.GRACEFUL_FAILURE, pce.getClientResponse().getStatus());
+        }
+    }
+
+    public void testCommunityUpdateCatalogError() throws Exception {
+        // test is meaningless for enterprise because it has the @UAC proc
+        if (VoltDB.instance().getConfig().m_isEnterprise) {
+            return;
+        }
+
+        Client client = getClient();
+        try {
+            client.callProcedure("@UpdateApplicationCatalog", "AABBCC", new byte[] { 'a', 'a' });
+            fail();
+        }
+        catch (ProcCallException pce) {
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, pce.getClientResponse().getStatus());
+            String msg = pce.getClientResponse().getStatusString();
+            assertTrue(UpdateCatalogAcceptancePolicy.COMMUNITY_MISSING_UAC_ERROR_MSG.equals(msg));
+            System.out.println(pce.getClientResponse().getStatusString());
         }
     }
 
@@ -304,8 +324,9 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         if (VoltDB.checkTestEnvForIv2()) {
             results = client.callProcedure("@Statistics", "TOPO", 0).getResults();
             // one aggregate table returned
-            assertEquals(1, results.length);
+            assertEquals(2, results.length);
             System.out.println("Test TOPO table: " + results[0].toString());
+            System.out.println("Test TOPO table: " + results[1].toString());
             VoltTable topo = results[0];
             // Make sure we can find the MPI, at least
             boolean found = false;

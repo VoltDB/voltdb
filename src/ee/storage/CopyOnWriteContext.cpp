@@ -20,6 +20,7 @@
 #include "storage/CopyOnWriteIterator.h"
 #include "storage/tableiterator.h"
 #include "common/FatalException.hpp"
+#include "logging/LogManager.h"
 #include <algorithm>
 #include <cassert>
 
@@ -34,7 +35,8 @@ CopyOnWriteContext::CopyOnWriteContext(PersistentTable *table, TupleSerializer *
              m_iterator(new CopyOnWriteIterator(table, m_blocks.begin(), m_blocks.end())),
              m_maxTupleLength(serializer->getMaxSerializedTupleSize(table->schema())),
              m_tuple(table->schema()), m_finishedTableScan(false), m_partitionId(partitionId),
-             m_tuplesSerialized(0) {}
+             m_tuplesSerialized(0),
+             m_expectedTupleCount(static_cast<int32_t>(table->activeTupleCount())) {}
 
 bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
     out->writeInt(m_partitionId);
@@ -61,6 +63,18 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
         if (!hadMore) {
             if (m_finishedTableScan) {
                 out->writeIntAt( rowCountPosition, rowsSerialized);
+                if (m_tuplesSerialized != m_expectedTupleCount) {
+#ifndef DEBUG
+                    char message[1024 * 16];
+                    snprintf(message, 1024 * 16, "Expected %d rows but only found %d rows while serializing snapshot",
+                            m_expectedTupleCount, m_tuplesSerialized);
+                    LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, message);
+#else
+                    throwFatalException("Expected %d rows but only found %d rows while serializing snapshot",
+                            m_expectedTupleCount, m_tuplesSerialized);
+#endif
+
+                }
                 return false;
             } else {
                 m_finishedTableScan = true;
@@ -81,12 +95,6 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
          */
         if (!m_finishedTableScan && tuple.isPendingDelete()) {
             assert(!tuple.isPendingDeleteOnUndoRelease());
-            if (m_table->m_schema->getUninlinedObjectColumnCount() != 0)
-            {
-                m_table->decreaseStringMemCount(tuple.getNonInlinedMemorySize());
-            }
-            tuple.setPendingDeleteFalse();
-            tuple.freeObjectColumns();
             CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
             //Save the extra lookup if possible
             m_table->deleteTupleStorage(tuple, iter->m_currentBlock);

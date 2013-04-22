@@ -37,8 +37,7 @@ public class Iv2TransactionCreator implements TransactionCreator
             String connectionHostname, boolean adminConnection,
             StoredProcedureInvocation invocation, boolean isReadOnly,
             boolean isSinglePartition, boolean isEverySite, int[] partitions,
-            int numPartitions, Object clientData, int messageSize, long now,
-            boolean allowMismatchedResults)
+            Object clientData, int messageSize, long now)
     {
         return m_ci.createTransaction(connectionId,
                 connectionHostname,
@@ -48,11 +47,9 @@ public class Iv2TransactionCreator implements TransactionCreator
                 isSinglePartition,
                 isEverySite,
                 partitions,
-                numPartitions,
                 clientData,
                 messageSize,
-                now,
-                allowMismatchedResults);
+                now);
     }
 
     @Override
@@ -61,8 +58,7 @@ public class Iv2TransactionCreator implements TransactionCreator
             long uniqueId,
             StoredProcedureInvocation invocation, boolean isReadOnly,
             boolean isSinglePartition, boolean isEverySite, int[] partitions,
-            int numPartitions, Object clientData, int messageSize, long now,
-            boolean allowMismatchedResults)
+            Object clientData, int messageSize, long now)
     {
         return m_ci.createTransaction(connectionId,
                 connectionHostname,
@@ -74,11 +70,9 @@ public class Iv2TransactionCreator implements TransactionCreator
                 isSinglePartition,
                 isEverySite,
                 partitions,
-                numPartitions,
                 clientData,
                 messageSize,
                 now,
-                allowMismatchedResults,
                 true);
     }
 

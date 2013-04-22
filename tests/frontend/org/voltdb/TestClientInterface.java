@@ -29,12 +29,9 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyBoolean;
 import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.anyLong;
-import static org.mockito.Matchers.anyObject;
-import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -47,7 +44,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.List;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -57,6 +53,8 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.network.Connection;
@@ -73,10 +71,9 @@ import org.voltdb.compiler.AdHocPlannerWork;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.dtxn.MailboxPublisher;
-import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.messaging.FastSerializer;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.planner.CorePlan;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -86,9 +83,9 @@ public class TestClientInterface {
     private VoltDBInterface m_volt;
     private StatsAgent m_statsAgent;
     private HostMessenger m_messenger;
-    private TransactionInitiator m_initiator;
     private ClientInputHandler m_handler;
     private Cartographer m_cartographer;
+    private Connection m_cxn;
     private ZooKeeper m_zk;
 
     // real context
@@ -113,10 +110,11 @@ public class TestClientInterface {
         m_volt = mock(VoltDBInterface.class);
         m_statsAgent = mock(StatsAgent.class);
         m_messenger = mock(HostMessenger.class);
-        m_initiator = mock(TransactionInitiator.class);
         m_handler = mock(ClientInputHandler.class);
         m_cartographer = mock(Cartographer.class);
         m_zk = mock(ZooKeeper.class);
+        m_cxn = mock(Connection.class);
+
 
         /*
          * Setup the mock objects so that they return expected objects in CI
@@ -130,10 +128,16 @@ public class TestClientInterface {
         doReturn(m_zk).when(m_messenger).getZK();
         doReturn(mock(Configuration.class)).when(m_volt).getConfig();
         doReturn(32L).when(m_messenger).getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
-        doReturn(mock(MailboxPublisher.class)).when(m_volt).getMailboxPublisher();
+        doAnswer(new Answer<Object>() {
+            @Override
+            public Object answer(InvocationOnMock invocation) {
+                return null;
+            }
+        }).when(m_cxn).queueTask(any(Runnable.class));
         m_ci = spy(new ClientInterface(VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT,
-                                       m_context, m_messenger, ReplicationRole.NONE, m_initiator,
+                                       m_context, m_messenger, ReplicationRole.NONE,
                                        m_cartographer, m_allPartitions));
+        m_ci.bindAdapter(m_cxn);
 
         //m_mb = m_ci.m_mailbox;
     }
@@ -163,13 +167,12 @@ public class TestClientInterface {
         CatalogUtil.compileDeploymentAndGetCRC(catalog, deploymentPath, true);
 
         m_context = new CatalogContext(0, 0, catalog, bytes, 0, 0, 0);
-        TheHashinator.initialize(3);
+        TheHashinator.initialize(LegacyHashinator.class, LegacyHashinator.getConfigureBytes(3));
     }
 
     @After
     public void tearDown() {
         reset(m_messenger);
-        reset(m_initiator);
         reset(m_handler);
     }
 
@@ -216,46 +219,34 @@ public class TestClientInterface {
     private StoredProcedureInvocation readAndCheck(ByteBuffer msg, String procName, Object partitionParam,
                                                    boolean isAdmin, boolean isReadonly, boolean isSinglePart,
                                                    boolean isEverySite) throws IOException {
-        when(m_initiator.createTransaction(anyLong(), anyString(), anyBoolean(),
-                                           any(StoredProcedureInvocation.class),
-                                           anyBoolean(), anyBoolean(), anyBoolean(),
-                                           any(int[].class), anyInt(), anyObject(),
-                                           anyInt(), anyLong(), anyBoolean())).thenReturn(true);
-
-        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
 
-        ArgumentCaptor<Boolean> boolCaptor = ArgumentCaptor.forClass(Boolean.class);
-        ArgumentCaptor<StoredProcedureInvocation> invocationCaptor =
-                ArgumentCaptor.forClass(StoredProcedureInvocation.class);
-        ArgumentCaptor<int[]> partitionCaptor = ArgumentCaptor.forClass(int[].class);
-        verify(m_initiator).createTransaction(anyLong(), anyString(), boolCaptor.capture(),
-                                              invocationCaptor.capture(),
-                                              boolCaptor.capture(), boolCaptor.capture(),
-                                              boolCaptor.capture(),
-                                              partitionCaptor.capture(),
-                                              anyInt(), anyObject(), anyInt(), anyLong(),
-                                              boolCaptor.capture());
-        List<Boolean> boolValues = boolCaptor.getAllValues();
-        assertEquals(isAdmin, boolValues.get(0)); // is admin
-        assertEquals(isReadonly, boolValues.get(1)); // readonly
-        assertEquals(isSinglePart, boolValues.get(2)); // single-part
-        assertEquals(isEverySite, boolValues.get(3)); // every site
-        assertEquals(procName, invocationCaptor.getValue().getProcName());
+        ArgumentCaptor<Long> destinationCaptor =
+                ArgumentCaptor.forClass(Long.class);
+        ArgumentCaptor<Iv2InitiateTaskMessage> messageCaptor =
+                ArgumentCaptor.forClass(Iv2InitiateTaskMessage.class);
+        verify(m_messenger).send(destinationCaptor.capture(), messageCaptor.capture());
+
+        Iv2InitiateTaskMessage message = messageCaptor.getValue();
+        //assertEquals(isAdmin, message.); // is admin
+        assertEquals(isReadonly, message.isReadOnly()); // readonly
+        assertEquals(isSinglePart, message.isSinglePartition()); // single-part
+        //assertEquals(isEverySite, message.g); // every site
+        assertEquals(procName, message.getStoredProcedureName());
         if (isSinglePart) {
             int expected = TheHashinator.hashToPartition(partitionParam);
-            assertEquals(1, partitionCaptor.getValue().length);
-            assertEquals(expected, partitionCaptor.getValue()[0]);
+            assertEquals(new Long(m_cartographer.getHSIdForMaster(expected)), destinationCaptor.getValue());
         } else {
-            assertEquals(m_allPartitions, partitionCaptor.getValue());
+            assertEquals(new Long(m_cartographer.getHSIdForMultiPartitionInitiator()), destinationCaptor.getValue());
         }
-        return invocationCaptor.getValue();
+        return message.getStoredProcedureInvocation();
     }
 
     @Test
     public void testExplain() throws IOException {
         ByteBuffer msg = createMsg("@Explain", "select * from a");
-        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
         ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
         verify(m_messenger).send(eq(32L), captor.capture());
@@ -267,7 +258,7 @@ public class TestClientInterface {
     @Test
     public void testAdHoc() throws IOException {
         ByteBuffer msg = createMsg("@AdHoc", "select * from a");
-        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
         ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
         verify(m_messenger).send(eq(32L), captor.capture());
@@ -277,7 +268,7 @@ public class TestClientInterface {
         // single-part adhoc
         reset(m_messenger);
         msg = createMsg("@AdHoc", "select * from a where i = 3", 3);
-        resp = m_ci.handleRead(msg, m_handler, null);
+        resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
         verify(m_messenger).send(eq(32L), captor.capture());
         assertTrue(captor.getValue().payload instanceof AdHocPlannerWork);
@@ -290,48 +281,40 @@ public class TestClientInterface {
      */
     @Test
     public void testFinishedAdHocPlanning() throws Exception {
-        when(m_initiator.createTransaction(anyLong(), anyString(), anyBoolean(),
-                                           any(StoredProcedureInvocation.class),
-                                           anyBoolean(), anyBoolean(), anyBoolean(),
-                                           any(int[].class), anyInt(), anyObject(),
-                                           anyInt(), anyLong(), anyBoolean())).thenReturn(true);
-
         // Need a batch and a statement
         AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
                 "select * from a", null, 0, 0, "localhost", false, ProcedureInvocationType.ORIGINAL, 0, 0, null);
         AdHocPlannedStatement s = new AdHocPlannedStatement("select * from a".getBytes(VoltDB.UTF8ENCODING),
                                                             new CorePlan(new byte[0],
                                                                          new byte[0],
+                                                                         new byte[20],
+                                                                         new byte[20],
                                                                          false,
                                                                          false,
                                                                          true,
                                                                          new VoltType[0],
                                                                          0),
-                                                            new ParameterSet(),
+                                                            ParameterSet.emptyParameterSet(),
                                                             null,
                                                             null,
                                                             null);
         plannedStmtBatch.addStatement(s);
         m_ci.processFinishedCompilerWork(plannedStmtBatch).run();
 
-        ArgumentCaptor<Boolean> boolCaptor = ArgumentCaptor.forClass(Boolean.class);
-        ArgumentCaptor<StoredProcedureInvocation> invocationCaptor =
-                ArgumentCaptor.forClass(StoredProcedureInvocation.class);
-        verify(m_initiator).createTransaction(anyLong(), anyString(), boolCaptor.capture(),
-                                              invocationCaptor.capture(),
-                                              boolCaptor.capture(), boolCaptor.capture(),
-                                              boolCaptor.capture(),
-                                              any(int[].class), anyInt(),
-                                              anyObject(), anyInt(), anyLong(),
-                                              boolCaptor.capture());
-        List<Boolean> boolValues = boolCaptor.getAllValues();
-        assertFalse(boolValues.get(0)); // is admin
-        assertTrue(boolValues.get(1));  // readonly
-        assertFalse(boolValues.get(2)); // single-part
-        assertFalse(boolValues.get(3)); // every site
-        assertEquals("@AdHoc_RO_MP", invocationCaptor.getValue().getProcName());
+        ArgumentCaptor<Long> destinationCaptor =
+                ArgumentCaptor.forClass(Long.class);
+        ArgumentCaptor<Iv2InitiateTaskMessage> messageCaptor =
+                ArgumentCaptor.forClass(Iv2InitiateTaskMessage.class);
+        verify(m_messenger).send(destinationCaptor.capture(), messageCaptor.capture());
+        Iv2InitiateTaskMessage message = messageCaptor.getValue();
 
-        byte[] serializedData = (byte[]) invocationCaptor.getValue().getParameterAtIndex(0);
+        //assertFalse(boolValues.get(0)); // is admin
+        assertTrue(message.isReadOnly());  // readonly
+        assertFalse(message.isSinglePartition()); // single-part
+        //assertFalse(boolValues.get(3)); // every site
+        assertEquals("@AdHoc_RO_MP", message.getStoredProcedureName());
+
+        byte[] serializedData = (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(0);
         AdHocPlannedStatement[] statements = AdHocPlannedStmtBatch.planArrayFromBuffer(ByteBuffer.wrap(serializedData));
         assertEquals(1, statements.length);
         String sql = new String(statements[0].sql, VoltDB.UTF8ENCODING);
@@ -340,20 +323,23 @@ public class TestClientInterface {
 
     @Test
     public void testUpdateCatalog() throws IOException {
-        String catalogHex = Encoder.hexEncode("blah");
-        ByteBuffer msg = createMsg("@UpdateApplicationCatalog", catalogHex, "blah");
-        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
-        assertNull(resp);
-        ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
-        verify(m_messenger).send(eq(32L), // A fixed number set in setUpOnce()
-                                 captor.capture());
-        assertTrue(captor.getValue().payload instanceof CatalogChangeWork);
+        // only makes sense in pro (sysproc suite has a complementary test for community)
+        if (VoltDB.instance().getConfig().m_isEnterprise) {
+            String catalogHex = Encoder.hexEncode("blah");
+            ByteBuffer msg = createMsg("@UpdateApplicationCatalog", catalogHex, "blah");
+            ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
+            assertNull(resp);
+            ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
+            verify(m_messenger).send(eq(32L), // A fixed number set in setUpOnce()
+                                     captor.capture());
+            assertTrue(captor.getValue().payload instanceof CatalogChangeWork);
+        }
     }
 
     @Test
     public void testNegativeUpdateCatalog() throws IOException {
         ByteBuffer msg = createMsg("@UpdateApplicationCatalog", new Integer(1), new Long(0));
-        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         // expect an error response from handleRead.
         assertNotNull(resp);
         assertTrue(resp.getStatus() != 0);
@@ -366,12 +352,6 @@ public class TestClientInterface {
      */
     @Test
     public void testFinishedCatalogDiffing() {
-        when(m_initiator.createTransaction(anyLong(), anyString(), anyBoolean(),
-                                           any(StoredProcedureInvocation.class),
-                                           anyBoolean(), anyBoolean(), anyBoolean(),
-                                           any(int[].class), anyInt(), anyObject(),
-                                           anyInt(), anyLong(), anyBoolean())).thenReturn(true);
-
         CatalogChangeResult catalogResult = new CatalogChangeResult();
         catalogResult.clientData = null;
         catalogResult.clientHandle = 0;
@@ -379,6 +359,7 @@ public class TestClientInterface {
         catalogResult.adminConnection = false;
         catalogResult.hostname = "localhost";
         // catalog change specific boiler plate
+        catalogResult.catalogHash = "blah".getBytes();
         catalogResult.catalogBytes = "blah".getBytes();
         catalogResult.deploymentString = "blah";
         catalogResult.deploymentCRC = 1234l;
@@ -389,30 +370,25 @@ public class TestClientInterface {
         catalogResult.originalUniqueId = 87654321l;
         m_ci.processFinishedCompilerWork(catalogResult).run();
 
-        ArgumentCaptor<Boolean> boolCaptor = ArgumentCaptor.forClass(Boolean.class);
-        ArgumentCaptor<StoredProcedureInvocation> invocationCaptor =
-                ArgumentCaptor.forClass(StoredProcedureInvocation.class);
-        verify(m_initiator).createTransaction(anyLong(), anyString(), boolCaptor.capture(),
-                                              invocationCaptor.capture(),
-                                              boolCaptor.capture(), boolCaptor.capture(),
-                                              boolCaptor.capture(),
-                                              any(int[].class),
-                                              anyInt(), anyObject(), anyInt(), anyLong(),
-                                              boolCaptor.capture());
-        List<Boolean> boolValues = boolCaptor.getAllValues();
-        assertFalse(boolValues.get(0)); // is admin
-        assertFalse(boolValues.get(1)); // readonly
-        assertFalse(boolValues.get(2)); // single-part
-        assertFalse(boolValues.get(3)); // every site
-        assertEquals("@UpdateApplicationCatalog", invocationCaptor.getValue().getProcName());
-        assertEquals("diff", invocationCaptor.getValue().getParameterAtIndex(0));
-        assertTrue(Arrays.equals("blah".getBytes(), (byte[]) invocationCaptor.getValue().getParameterAtIndex(1)));
-        assertEquals(3, invocationCaptor.getValue().getParameterAtIndex(2));
-        assertEquals("blah", invocationCaptor.getValue().getParameterAtIndex(3));
-        assertEquals(1234l, invocationCaptor.getValue().getParameterAtIndex(4));
-        assertEquals(ProcedureInvocationType.REPLICATED, invocationCaptor.getValue().getType());
-        assertEquals(12345678l, invocationCaptor.getValue().getOriginalTxnId());
-        assertEquals(87654321l, invocationCaptor.getValue().getOriginalUniqueId());
+        ArgumentCaptor<Long> destinationCaptor =
+                ArgumentCaptor.forClass(Long.class);
+        ArgumentCaptor<Iv2InitiateTaskMessage> messageCaptor =
+                ArgumentCaptor.forClass(Iv2InitiateTaskMessage.class);
+        verify(m_messenger).send(destinationCaptor.capture(), messageCaptor.capture());
+        Iv2InitiateTaskMessage message = messageCaptor.getValue();
+        //assertFalse(boolValues.get(0)); // is admin
+        assertFalse(message.isReadOnly()); // readonly
+        assertFalse(message.isSinglePartition()); // single-part
+        //assertFalse(boolValues.get(3)); // every site
+        assertEquals("@UpdateApplicationCatalog", message.getStoredProcedureName());
+        assertEquals("diff", message.getStoredProcedureInvocation().getParameterAtIndex(0));
+        assertTrue(Arrays.equals("blah".getBytes(), (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(2)));
+        assertEquals(3, message.getStoredProcedureInvocation().getParameterAtIndex(3));
+        assertEquals("blah", message.getStoredProcedureInvocation().getParameterAtIndex(4));
+        assertEquals(1234l, message.getStoredProcedureInvocation().getParameterAtIndex(5));
+        assertEquals(ProcedureInvocationType.REPLICATED, message.getStoredProcedureInvocation().getType());
+        assertEquals(12345678l, message.getStoredProcedureInvocation().getOriginalTxnId());
+        assertEquals(87654321l, message.getStoredProcedureInvocation().getOriginalUniqueId());
     }
 
     @Test
@@ -438,7 +414,7 @@ public class TestClientInterface {
     @Test
     public void testDRStats() throws Exception {
         ByteBuffer msg = createMsg("@Statistics", "DR", 0);
-        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
         verify(m_statsAgent).collectStats(any(Connection.class), anyInt(), captor.capture());
@@ -466,7 +442,7 @@ public class TestClientInterface {
         // pause the node
         when(m_volt.getMode()).thenReturn(OperationMode.PAUSED);
         ByteBuffer msg = createMsg("hello", 1);
-        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNotNull(resp);
         assertEquals(ClientResponse.SERVER_UNAVAILABLE, resp.getStatus());
         when(m_volt.getMode()).thenReturn(OperationMode.RUNNING);
@@ -475,7 +451,7 @@ public class TestClientInterface {
     @Test
     public void testInvalidProcedure() throws IOException {
         ByteBuffer msg = createMsg("hellooooo", 1);
-        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNotNull(resp);
         assertEquals(ClientResponse.UNEXPECTED_FAILURE, resp.getStatus());
     }
@@ -483,12 +459,12 @@ public class TestClientInterface {
     @Test
     public void testAdminProcsOnNonAdminPort() throws IOException {
         ByteBuffer msg = createMsg("@Pause");
-        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNotNull(resp);
         assertEquals(ClientResponse.UNEXPECTED_FAILURE, resp.getStatus());
 
         msg = createMsg("@Resume");
-        resp = m_ci.handleRead(msg, m_handler, null);
+        resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNotNull(resp);
         assertEquals(ClientResponse.UNEXPECTED_FAILURE, resp.getStatus());
     }
@@ -497,7 +473,7 @@ public class TestClientInterface {
     public void testRejectDupInvocation() throws IOException {
         // by default, the mock initiator returns false for createTransaction()
         ByteBuffer msg = createMsg(12345l, "hello", 1);
-        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNotNull(resp);
         assertEquals(ClientResponse.UNEXPECTED_FAILURE, resp.getStatus());
     }
@@ -506,7 +482,7 @@ public class TestClientInterface {
     public void testPolicyRejection() throws IOException {
         // incorrect parameters to @AdHoc proc
         ByteBuffer msg = createMsg("@AdHoc", 1, 3, 3);
-        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNotNull(resp);
         assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
     }
@@ -514,7 +490,7 @@ public class TestClientInterface {
     @Test
     public void testPromoteWithoutCommandLogging() throws Exception {
         final ByteBuffer msg = createMsg("@Promote");
-        m_ci.handleRead(msg, m_handler, null);
+        m_ci.handleRead(msg, m_handler, m_cxn);
         // Verify that the truncation request node was not created.
         verify(m_zk, never()).create(eq(VoltZK.request_truncation_snapshot), any(byte[].class),
                                      eq(Ids.OPEN_ACL_UNSAFE), eq(CreateMode.PERSISTENT));
@@ -527,7 +503,7 @@ public class TestClientInterface {
         logConfig.setEnabled(true);
         try {
             final ByteBuffer msg = createMsg("@Promote");
-            m_ci.handleRead(msg, m_handler, null);
+            m_ci.handleRead(msg, m_handler, m_cxn);
             // Verify that the truncation request node was created.
             verify(m_zk, never()).create(eq(VoltZK.request_truncation_snapshot), any(byte[].class),
                                 eq(Ids.OPEN_ACL_UNSAFE), eq(CreateMode.PERSISTENT));

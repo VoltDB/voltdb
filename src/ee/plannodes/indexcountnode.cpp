@@ -108,66 +108,33 @@ std::string IndexCountPlanNode::debugInfo(const std::string &spacer) const {
     return (buffer.str());
 }
 
-void IndexCountPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
+void IndexCountPlanNode::loadFromJSONObject(PlannerDomValue obj) {
     AbstractScanPlanNode::loadFromJSONObject(obj);
-    json_spirit::Value keyIterateValue = json_spirit::find_value( obj, "KEY_ITERATE");
-    if (keyIterateValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "IndexCountPlanNode::loadFromJSONObject:"
-                                      " Can't find KEY_ITERATE value");
-    }
-    key_iterate = keyIterateValue.get_bool();
 
-    json_spirit::Value endTypeValue = json_spirit::find_value( obj, "END_TYPE");
-    if (endTypeValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                "IndexCountPlanNode::loadFromJSONObject:"
-                " Can't find END_TYPE");
-    }
-    std::string endTypeString = endTypeValue.get_str();
+    key_iterate = obj.valueForKey("KEY_ITERATE").asBool();
+
+    std::string endTypeString = obj.valueForKey("END_TYPE").asStr();
     end_type = stringToIndexLookup(endTypeString);
 
-    json_spirit::Value lookupTypeValue = json_spirit::find_value( obj, "LOOKUP_TYPE");
-    if (lookupTypeValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "IndexCountPlanNode::loadFromJSONObject:"
-                                      " Can't find LOOKUP_TYPE");
-    }
-    std::string lookupTypeString = lookupTypeValue.get_str();
+    std::string lookupTypeString = obj.valueForKey("LOOKUP_TYPE").asStr();
     lookup_type = stringToIndexLookup(lookupTypeString);
 
-    json_spirit::Value targetIndexNameValue = json_spirit::find_value( obj, "TARGET_INDEX_NAME");
-    if (targetIndexNameValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "IndexCountPlanNode::loadFromJSONObject:"
-                                      " Can't find TARGET_INDEX_NAME");
-    }
-    target_index_name = targetIndexNameValue.get_str();
+    target_index_name = obj.valueForKey("TARGET_INDEX_NAME").asStr();
 
-    json_spirit::Value endKeyExpressionsValue = json_spirit::find_value( obj, "ENDKEY_EXPRESSIONS");
-    if (endKeyExpressionsValue == json_spirit::Value::null) {
-        endkey_expressions.clear();
-    } else {
-        json_spirit::Array endKeyExpressionsArray = endKeyExpressionsValue.get_array();
-        for (int ii = 0; ii < endKeyExpressionsArray.size(); ii++) {
-            json_spirit::Object endKeyExpressionObject = endKeyExpressionsArray[ii].get_obj();
-            AbstractExpression *expr = AbstractExpression::buildExpressionTree(endKeyExpressionObject);
+    if (obj.hasNonNullKey("ENDKEY_EXPRESSIONS")) {
+        PlannerDomValue endKeyExprArray = obj.valueForKey("ENDKEY_EXPRESSIONS");
+        for (int i = 0; i < endKeyExprArray.arrayLen(); i++) {
+            AbstractExpression *expr = AbstractExpression::buildExpressionTree(endKeyExprArray.valueAtIndex(i));
             endkey_expressions.push_back(expr);
         }
     }
-
-
-    json_spirit::Value searchKeyExpressionsValue = json_spirit::find_value( obj, "SEARCHKEY_EXPRESSIONS");
-    if (searchKeyExpressionsValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "IndexCountPlanNode::loadFromJSONObject:"
-                                      " Can't find SEARCHKEY_EXPRESSIONS");
+    else {
+        endkey_expressions.clear();
     }
-    json_spirit::Array searchKeyExpressionsArray = searchKeyExpressionsValue.get_array();
 
-    for (int ii = 0; ii < searchKeyExpressionsArray.size(); ii++) {
-        json_spirit::Object searchKeyExpressionObject = searchKeyExpressionsArray[ii].get_obj();
-        AbstractExpression *expr = AbstractExpression::buildExpressionTree(searchKeyExpressionObject);
+    PlannerDomValue searchKeyExprArray = obj.valueForKey("SEARCHKEY_EXPRESSIONS");
+    for (int i = 0; i < searchKeyExprArray.arrayLen(); i++) {
+        AbstractExpression *expr = AbstractExpression::buildExpressionTree(searchKeyExprArray.valueAtIndex(i));
         searchkey_expressions.push_back(expr);
     }
 }

@@ -709,7 +709,7 @@ public class TestIndexesSuite extends RegressionSuite {
 
         boolean success;
 
-        // CONFIG #2: HSQL
+        // CONFIG #1: HSQL
         config = new LocalCluster("testindexes-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         success = config.compile(project);
         assertTrue(success);

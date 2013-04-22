@@ -23,7 +23,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
-import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.licensetool.LicenseApi;
@@ -69,7 +68,6 @@ public interface VoltDBInterface
 
     public VoltDB.Configuration getConfig();
     public CatalogContext getCatalogContext();
-    public SiteTracker getSiteTracker();
     public String getBuildString();
     public String getVersionString();
     public HostMessenger getHostMessenger();
@@ -80,7 +78,6 @@ public interface VoltDBInterface
     public FaultDistributorInterface getFaultDistributor();
     public BackendTarget getBackendTargetType();
     public String getLocalMetadata();
-    public MailboxPublisher getMailboxPublisher();
     public SiteTracker getSiteTrackerForSnapshot();
 
     /**
@@ -101,8 +98,9 @@ public interface VoltDBInterface
      * @param currentTxnId  The transaction ID at which this method is called
      * @param deploymentCRC The CRC of the deployment file
      */
-    public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands, byte[] newCatalogBytes,
-           int expectedCatalogVersion, long currentTxnId, long currentTxnTimestamp, long deploymentCRC);
+    public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands,
+            byte[] newCatalogBytes, byte[] catalogBytesHash, int expectedCatalogVersion,
+            long currentTxnId, long currentTxnTimestamp, long deploymentCRC);
 
    /**
      * Tells if the VoltDB is running. m_isRunning needs to be set to true

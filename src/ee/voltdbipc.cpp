@@ -32,6 +32,8 @@
 #include "common/SegvException.hpp"
 #include "common/RecoveryProtoMessage.h"
 #include "common/TheHashinator.h"
+#include "common/LegacyHashinator.h"
+#include "common/ElasticHashinator.h"
 #include "execution/IPCTopend.h"
 #include "execution/VoltDBEngine.h"
 #include "common/ThreadLocalPool.h"
@@ -160,7 +162,8 @@ typedef struct {
 
 typedef struct {
     struct ipc_command cmd;
-    int32_t partitionCount;
+    int32_t hashinatorType;
+    int32_t configLength;
     char data[0];
 }__attribute__((packed)) hashinate_msg;
 
@@ -318,8 +321,8 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
           threadLocalPoolAllocations();
           result = kErrorCode_None;
           break;
-      case 26:
-          loadFragment(cmd);
+      case 27:
+          updateHashinator(cmd);
           result = kErrorCode_None;
           break;
       default:
@@ -363,7 +366,7 @@ int8_t VoltDBIPC::loadCatalog(struct ipc_command *cmd) {
     // rather than in hard-to-maintain "execute method" boilerplate code like this.
     } catch (const FatalException& e) {
         crashVoltDB(e);
-    } catch (SerializableEEException &e) {} //TODO: We don't really want to quietly SQUASH non-fatal exceptions.
+    } catch (const SerializableEEException &e) {} //TODO: We don't really want to quietly SQUASH non-fatal exceptions.
 
     return kErrorCode_Error;
 }
@@ -384,7 +387,7 @@ int8_t VoltDBIPC::updateCatalog(struct ipc_command *cmd) {
         if (m_engine->updateCatalog(ntohll(uc->timestamp), std::string(uc->data)) == true) {
             return kErrorCode_Success;
         }
-    } catch (FatalException e) {
+    } catch (const FatalException &e) {
         crashVoltDB(e);
     }
     return kErrorCode_Error;
@@ -406,9 +409,10 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         int hostId;
         int64_t logLevels;
         int64_t tempTableMemory;
-        int32_t totalPartitions;
-        int16_t hostnameLength;
-        char hostname[0];
+        int32_t hashinatorType;
+        int32_t hashinatorConfigLength;
+        int32_t hostnameLength;
+        char data[0];
     }__attribute__((packed));
     struct initialize * cs = (struct initialize*) cmd;
 
@@ -418,11 +422,13 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     cs->siteId = ntohll(cs->siteId);
     cs->partitionId = ntohl(cs->partitionId);
     cs->hostId = ntohl(cs->hostId);
-    cs->hostnameLength = ntohs(cs->hostnameLength);
     cs->logLevels = ntohll(cs->logLevels);
     cs->tempTableMemory = ntohll(cs->tempTableMemory);
-    cs->totalPartitions = ntohl(cs->totalPartitions);
-    std::string hostname(cs->hostname, cs->hostnameLength);
+    cs->hashinatorType = ntohl(cs->hashinatorType);
+    cs->hashinatorConfigLength = ntohl(cs->hashinatorConfigLength);
+    cs->hostnameLength = ntohl(cs->hostnameLength);
+
+    std::string hostname(cs->data + cs->hashinatorConfigLength, cs->hostnameLength);
     try {
         m_engine = new VoltDBEngine(new voltdb::IPCTopend(this), new voltdb::StdoutLogProxy());
         m_engine->getLogManager()->setLogLevels(cs->logLevels);
@@ -435,10 +441,11 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
                                  cs->hostId,
                                  hostname,
                                  cs->tempTableMemory,
-                                 cs->totalPartitions) == true) {
+                                 (HashinatorType)cs->hashinatorType,
+                                 (char*)cs->data) == true) {
             return kErrorCode_Success;
         }
-    } catch (FatalException e) {
+    } catch (const FatalException &e) {
         crashVoltDB(e);
     }
     return kErrorCode_Error;
@@ -472,7 +479,7 @@ int8_t VoltDBIPC::releaseUndoToken(struct ipc_command *cmd) {
 
     try {
         m_engine->releaseUndoToken(ntohll(cs->token));
-    } catch (FatalException e) {
+    } catch (const FatalException &e) {
         crashVoltDB(e);
     }
 
@@ -489,7 +496,7 @@ int8_t VoltDBIPC::undoUndoToken(struct ipc_command *cmd) {
 
     try {
         m_engine->undoUndoToken(ntohll(cs->token));
-    } catch (FatalException e) {
+    } catch (const FatalException &e) {
         crashVoltDB(e);
     }
 
@@ -513,7 +520,7 @@ int8_t VoltDBIPC::tick(struct ipc_command *cmd) {
     try {
         // no return code. can't fail!
         m_engine->tick(ntohll(cs->time), ntohll(cs->lastSpHandle));
-    } catch (FatalException e) {
+    } catch (const FatalException &e) {
         crashVoltDB(e);
     }
 
@@ -530,7 +537,7 @@ int8_t VoltDBIPC::quiesce(struct ipc_command *cmd) {
 
     try {
         m_engine->quiesce(ntohll(cs->lastSpHandle));
-    } catch (FatalException e) {
+    } catch (const FatalException &e) {
         crashVoltDB(e);
     }
 
@@ -585,9 +592,8 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
             }
         }
         pool->purge();
-        m_engine->resizePlanCache(); // shrink cache if need be
     }
-    catch (FatalException e) {
+    catch (const FatalException &e) {
         crashVoltDB(e);
     }
 
@@ -617,47 +623,6 @@ void VoltDBIPC::sendException(int8_t errorCode) {
     writeOrDie(m_fd, (const unsigned char*)exceptionData, expectedSize);
 }
 
-/**
- * Ensure a plan fragment is loaded.
- * Return error code, fragmentid for plan, and cache stats
- */
-void VoltDBIPC::loadFragment(struct ipc_command *cmd) {
-    int errors = 0;
-
-    loadfrag *load = (loadfrag*)cmd;
-
-    int32_t planFragLength = ntohl(load->planFragLength);
-
-    int64_t fragId;
-    bool wasHit;
-    int64_t cacheSize;
-
-    try {
-        // execute
-        if (m_engine->loadFragment(load->data, planFragLength, fragId, wasHit, cacheSize)) {
-            ++errors;
-        }
-    } catch (FatalException e) {
-        crashVoltDB(e);
-    }
-
-    // make network suitable
-    fragId = htonll(fragId);
-    int64_t wasHitLong = htonll((wasHit ? 1L : 0L));
-    cacheSize = htonll(cacheSize);
-
-    // write the results array back across the wire
-    const int8_t successResult = kErrorCode_Success;
-    if (errors == 0) {
-        writeOrDie(m_fd, (const unsigned char*)&successResult, sizeof(int8_t));
-        writeOrDie(m_fd, (const unsigned char*)&fragId, sizeof(int64_t));
-        writeOrDie(m_fd, (const unsigned char*)&wasHitLong, sizeof(int64_t));
-        writeOrDie(m_fd, (const unsigned char*)&cacheSize, sizeof(int64_t));
-    } else {
-        sendException(kErrorCode_Error);
-    }
-}
-
 int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
     load_table_cmd *loadTableCommand = (load_table_cmd*) cmd;
 
@@ -682,7 +647,7 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
         } else {
             return kErrorCode_Error;
         }
-    } catch (FatalException e) {
+    } catch (const FatalException &e) {
         crashVoltDB(e);
     }
     return kErrorCode_Error;
@@ -692,7 +657,7 @@ int8_t VoltDBIPC::setLogLevels(struct ipc_command *cmd) {
     int64_t logLevels = *((int64_t*)&cmd->data[0]);
     try {
         m_engine->getLogManager()->setLogLevels(logLevels);
-    } catch (FatalException e) {
+    } catch (const FatalException &e) {
         crashVoltDB(e);
     }
     return kErrorCode_Success;
@@ -776,6 +741,54 @@ char *VoltDBIPC::retrieveDependency(int32_t dependencyId, size_t *dependencySz) 
         exit(-1);
     }
     return dependencyData;
+}
+
+std::string VoltDBIPC::planForFragmentId(int64_t fragmentId) {
+    char message[sizeof(int8_t) + sizeof(int64_t)];
+
+    message[0] = static_cast<int8_t>(kErrorCode_needPlan);
+    *reinterpret_cast<int64_t*>(&message[1]) = htonll(fragmentId);
+    writeOrDie(m_fd, (unsigned char*)message, sizeof(int8_t) + sizeof(int64_t));
+
+    int32_t length;
+    ssize_t bytes = read(m_fd, &length, sizeof(int32_t));
+    if (bytes != sizeof(int32_t)) {
+        printf("Error - blocking read failed. %jd read %jd attempted",
+               (intmax_t)bytes, (intmax_t)sizeof(int32_t));
+        fflush(stdout);
+        assert(false);
+        exit(-1);
+    }
+    length = static_cast<int32_t>(ntohl(length) - sizeof(int32_t));
+    assert(length > 0);
+
+    boost::scoped_array<char> planBytes(new char[length + 1]);
+    bytes = 0;
+    while (bytes != length) {
+        ssize_t oldBytes = bytes;
+        bytes += read(m_fd, planBytes.get() + bytes, length - bytes);
+        if (oldBytes == bytes) {
+            break;
+        }
+        if (oldBytes > bytes) {
+            bytes++;
+            break;
+        }
+    }
+
+    if (bytes != length) {
+        printf("Error - blocking read failed. %jd read %jd attempted",
+               (intmax_t)bytes, (intmax_t)length);
+        fflush(stdout);
+        assert(false);
+        exit(-1);
+    }
+
+    // null terminate
+    planBytes[length] = '\0';
+
+    // need to return a string
+    return std::string(planBytes.get());
 }
 
 void VoltDBIPC::crashVoltDB(voltdb::FatalException e) {
@@ -877,7 +890,7 @@ void VoltDBIPC::getStats(struct ipc_command *cmd) {
         } else {
             sendException(kErrorCode_Error);
         }
-    } catch (FatalException e) {
+    } catch (const FatalException &e) {
         crashVoltDB(e);
     }
 }
@@ -994,8 +1007,24 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
     hashinate_msg* hash = (hashinate_msg*)cmd;
     NValueArray& params = m_engine->getParameterContainer();
 
-    int32_t partCount = ntohl(hash->partitionCount);
-    void* offset = hash->data;
+    HashinatorType hashinatorType = static_cast<HashinatorType>(ntohl(hash->hashinatorType));
+    int32_t configLength = ntohl(hash->configLength);
+    boost::scoped_ptr<TheHashinator> hashinator;
+    switch (hashinatorType) {
+    case HASHINATOR_LEGACY:
+        hashinator.reset(LegacyHashinator::newInstance(hash->data));
+        break;
+    case HASHINATOR_ELASTIC:
+        hashinator.reset(ElasticHashinator::newInstance(hash->data));
+        break;
+    default:
+        try {
+            throwFatalException("Unrecognized hashinator type %d", hashinatorType);
+        } catch (const FatalException &e) {
+            crashVoltDB(e);
+        }
+    }
+    void* offset = hash->data + configLength;
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(hash));
     ReferenceSerializeInput serialize_in(offset, sz);
 
@@ -1006,9 +1035,9 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
         Pool *pool = m_engine->getStringPool();
         deserializeParameterSetCommon(cnt, serialize_in, params, pool);
         retval =
-            voltdb::TheHashinator::hashinate(params[0], partCount);
+            hashinator->hashinate(params[0]);
         pool->purge();
-    } catch (FatalException e) {
+    } catch (const FatalException &e) {
         crashVoltDB(e);
     }
 
@@ -1016,6 +1045,17 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
     response[0] = kErrorCode_Success;
     *reinterpret_cast<int32_t*>(&response[1]) = htonl(retval);
     writeOrDie(m_fd, (unsigned char*)response, 5);
+}
+
+void VoltDBIPC::updateHashinator(struct ipc_command *cmd) {
+    hashinate_msg* hash = (hashinate_msg*)cmd;
+
+    HashinatorType hashinatorType = static_cast<HashinatorType>(ntohl(hash->hashinatorType));
+    try {
+        m_engine->updateHashinator(hashinatorType, hash->data);
+    } catch (const FatalException &e) {
+        crashVoltDB(e);
+    }
 }
 
 void VoltDBIPC::signalHandler(int signum, siginfo_t *info, void *context) {

@@ -62,7 +62,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.SyncCallback;
-import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -453,9 +452,9 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
     }
 
-    /*
-     * Test that a replicated table can be distributed correctly
-     */
+    //
+    // Test that a replicated table can be distributed correctly
+    //
     public void testDistributeReplicatedTable()
     throws Exception
     {
@@ -546,18 +545,18 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                                   num_partitioned_items_per_chunk,
                                   num_partitioned_chunks);
 
-        /*
-         * Take a snapshot that will block snapshots in the system
-         */
+        //
+        // Take a snapshot that will block snapshots in the system
+        //
         DefaultSnapshotDataTarget.m_simulateBlockedWrite = new CountDownLatch(1);
         client.callProcedure("@SnapshotSave", TMPDIR,
                                        TESTNONCE, (byte)0);
 
         org.voltdb.SnapshotDaemon.m_userSnapshotRetryInterval = 1;
 
-        /*
-         * Make sure we can queue a snapshot
-         */
+        //
+        // Make sure we can queue a snapshot
+        //
         ClientResponse r =
             client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE + "2",  (byte)0);
         VoltTable result = r.getResults()[0];
@@ -568,10 +567,10 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         //Let it reattempt and fail a few times
         Thread.sleep(2000);
 
-        /*
-         * Make sure that attempting to queue a second snapshot save request results
-         * in a snapshot in progress message
-         */
+        //
+        // Make sure that attempting to queue a second snapshot save request results
+        // in a snapshot in progress message
+        //
         r =
             client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE + "2",  (byte)0);
         result = r.getResults()[0];
@@ -579,9 +578,9 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         assertTrue(
                 result.getString("ERR_MSG").startsWith("SNAPSHOT IN PROGRESS"));
 
-        /*
-         * Now make sure it is reattempted and works
-         */
+        //
+        // Now make sure it is reattempted and works
+        //
         DefaultSnapshotDataTarget.m_simulateBlockedWrite.countDown();
         DefaultSnapshotDataTarget.m_simulateBlockedWrite = null;
 
@@ -593,10 +592,10 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
         assertTrue(hadSuccess);
 
-        /*
-         * Make sure errors are properly forwarded, this is one code path to handle errors,
-         * there is another for errors that don't occur right off the bat
-         */
+        //
+        // Make sure errors are properly forwarded, this is one code path to handle errors,
+        // there is another for errors that don't occur right off the bat
+        //
         r =
             client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE + "2",  (byte)1);
         result = r.getResults()[0];
@@ -604,10 +603,10 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         assertTrue(result.getString("ERR_MSG").startsWith("SAVE FILE ALREADY EXISTS"));
     }
 
-    /*
-     * Test specific case where a user snapshot is queued
-     * and then fails while queued. It shouldn't block future snapshots
-     */
+    //
+    // Test specific case where a user snapshot is queued
+    // and then fails while queued. It shouldn't block future snapshots
+    //
     public void testQueueFailedUserSnapshot() throws Exception
     {
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
@@ -631,18 +630,18 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                                   num_partitioned_items_per_chunk,
                                   num_partitioned_chunks);
 
-        /*
-         * Take a snapshot that will block snapshots in the system
-         */
+        //
+        // Take a snapshot that will block snapshots in the system
+        //
         DefaultSnapshotDataTarget.m_simulateBlockedWrite = new CountDownLatch(1);
         client.callProcedure("@SnapshotSave", TMPDIR,
                                        TESTNONCE, (byte)0);
 
         org.voltdb.SnapshotDaemon.m_userSnapshotRetryInterval = 1;
 
-        /*
-         * Make sure we can queue a snapshot
-         */
+        //
+        // Make sure we can queue a snapshot
+        //
         ClientResponse r =
             client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, (byte)0);
         VoltTable result = r.getResults()[0];
@@ -653,20 +652,20 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         //Let it reattempt a few times
         Thread.sleep(2000);
 
-        /*
-         * Now make sure it is reattempted, it will fail,
-         * because it has the name of an existing snapshot.
-         * No way to tell other then that new snapshots continue to work
-         */
+        //
+        // Now make sure it is reattempted, it will fail,
+        // because it has the name of an existing snapshot.
+        // No way to tell other then that new snapshots continue to work
+        //
         DefaultSnapshotDataTarget.m_simulateBlockedWrite.countDown();
         DefaultSnapshotDataTarget.m_simulateBlockedWrite = null;
 
         Thread.sleep(2000);
 
-        /*
-         * Make sure errors are properly forwarded, this is one code path to handle errors,
-         * there is another for errors that don't occur right off the bat
-         */
+        //
+        // Make sure errors are properly forwarded, this is one code path to handle errors,
+        // there is another for errors that don't occur right off the bat
+        //
         r =
             client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE + "2",  (byte)1);
         result = r.getResults()[0];
@@ -986,10 +985,11 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 TMPDIR + File.separator + TESTNONCE + "-REPLICATED_TESTER" + ".csv");
         validateTextFile(expectedText, true, fis);
     }
-    /*
-     * Also does some basic smoke tests
-     * of @SnapshotStatus, @SnapshotScan and @SnapshotDelete
-     */
+
+    //
+    // Also does some basic smoke tests
+    // of @SnapshotStatus, @SnapshotScan and @SnapshotDelete
+    //
     public void testSnapshotSave() throws Exception
     {
         if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
@@ -1016,9 +1016,9 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         validateSnapshot(true);
 
-        /*
-         * Check that snapshot status returns a reasonable result
-         */
+        //
+        // Check that snapshot status returns a reasonable result
+        //
         checkSnapshotStatus(client, TMPDIR, TESTNONCE, null, "SUCCESS", 8);
 
         VoltTable scanResults[] = client.callProcedure("@SnapshotScan", new Object[] { null }).getResults();
@@ -1041,10 +1041,10 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         assertEquals( 9, scanResults[0].getColumnCount());
         assertTrue(scanResults[0].getRowCount() >= 1);
         assertTrue(scanResults[0].advanceRow());
-        /*
-         * We can't assert that all snapshot files are generated by this test.
-         * There might be leftover snapshot files from other runs.
-         */
+        //
+        // We can't assert that all snapshot files are generated by this test.
+        // There might be leftover snapshot files from other runs.
+        //
         int count = 0;
         String completeStatus = null;
         do {
@@ -1097,11 +1097,10 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         Cluster cluster = VoltDB.instance().getCatalogContext().cluster;
         Database database = cluster.getDatabases().get("database");
         CatalogMap<Table> tables = database.getTables();
-        SiteTracker st = VoltDB.instance().getSiteTracker();
-        int num_hosts = st.m_numberOfHosts;
+        int num_hosts = 1;
         int replicated = 0;
         int total_tables = 0;
-        int expected_entries = st.m_numberOfExecutionSites;
+        int expected_entries = 3;
 
         for (Table table : tables)
         {
@@ -1284,16 +1283,16 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         client.callProcedure("@SnapshotSave", TMPDIR,
                                        TESTNONCE, (byte)0);
 
-        /*
-         * Increased timeout from .7 to 1.2 seconds for the mini. It might not
-         * finished the non-blocking snapshot in time.  Later increased to 2.0
-         * to get memcheck to stop timing out ENG-1800
-         */
+        //
+        // Increased timeout from .7 to 1.2 seconds for the mini. It might not
+        // finished the non-blocking snapshot in time.  Later increased to 2.0
+        // to get memcheck to stop timing out ENG-1800
+        //
         Thread.sleep(2000);
 
-        /*
-         * Check that snapshot status returns a reasonable result
-         */
+        //
+        // Check that snapshot status returns a reasonable result
+        //
         checkSnapshotStatus(client, TMPDIR, TESTNONCE, null, "SUCCESS", 8);
 
         validateSnapshot(true);
@@ -1687,7 +1686,15 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
             client = getClient();
 
-            results = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults();
+            results = null;
+            try {
+                client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE);
+                fail(); // expect fail
+            }
+            catch (ProcCallException e) {
+                assertEquals(ClientResponse.OPERATIONAL_FAILURE, e.getClientResponse().getStatus());
+                results = e.getClientResponse().getResults();
+            }
             assertNotNull(results);
             assertNotNull(results[0]);
             boolean haveFailure = false;
@@ -1742,7 +1749,15 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
             client = getClient();
 
-            VoltTable results[] = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults();
+            VoltTable results[] = null;
+            try {
+                client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults();
+                fail(); // expect fail
+            }
+            catch (ProcCallException e) {
+                assertEquals(ClientResponse.OPERATIONAL_FAILURE, e.getClientResponse().getStatus());
+                results = e.getClientResponse().getResults();
+            }
             assertNotNull(results);
             assertNotNull(results[0]);
             boolean haveFailure = false;
@@ -1796,7 +1811,14 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         m_config.startUp();
         client = getClient();
 
-        VoltTable resultTable = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults()[0];
+        VoltTable resultTable = null;
+        try {
+            client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE);
+        }
+        catch (ProcCallException e) {
+            resultTable = e.getClientResponse().getResults()[0];
+            assertEquals(ClientResponse.OPERATIONAL_FAILURE, e.getClientResponse().getStatus());
+        }
         assertTrue(resultTable.advanceRow());
         assertTrue(resultTable.getString("ERR_MSG").equals("Save data contains no information for table PARTITION_TESTER"));
     }
@@ -2084,11 +2106,11 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         {
             results = client.callProcedure("@SnapshotRestore", TMPDIR,
                                            TESTNONCE).getResults();
+            fail(); // expect failure
         }
-        catch (Exception ex)
-        {
-            ex.printStackTrace();
-            fail("Unexpected exception from SnapshotRestore");
+        catch (ProcCallException ex) {
+            assertEquals(ClientResponse.OPERATIONAL_FAILURE, ex.getClientResponse().getStatus());
+            results = ex.getClientResponse().getResults();
         }
 
         boolean type_failure = false;

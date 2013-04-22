@@ -150,6 +150,7 @@ public class MiscUtils {
         File licenseFile = new File(pathToLicense);
         if (licenseFile.exists() == false) {
             hostLog.fatal("Unable to open license file: " + pathToLicense);
+            hostLog.fatal("Please contact sales@voltdb.com to request a license.");
             return null;
         }
 
@@ -190,6 +191,7 @@ public class MiscUtils {
         if (now.after(licenseApi.expires())) {
             if (licenseApi.isTrial()) {
                 hostLog.fatal("VoltDB trial license expired on " + expiresStr + ".");
+                hostLog.fatal("Please contact sales@voltdb.com to request a new license.");
                 return false;
             }
             else {
@@ -607,16 +609,24 @@ public class MiscUtils {
     }
 
     /**
-     * Get the resident set size, in mb for the voltdb server on the other end of the client
+     * Get the resident set size, in mb, for the voltdb server on the other end of the client.
+     * If the client is connected to multiple servers, return the max individual rss across
+     * the cluster.
      */
     public static long getMBRss(Client client) {
         assert(client != null);
+        long rssMax = 0;
         try {
             ClientResponse r = client.callProcedure("@Statistics", "MEMORY", 0);
             VoltTable stats = r.getResults()[0];
-            stats.advanceRow();
-            long rss = stats.getLong("RSS") / 1024;
-            return rss;
+            stats.resetRowPosition();
+            while (stats.advanceRow()) {
+                long rss = stats.getLong("RSS") / 1024;
+                if (rss > rssMax) {
+                    rssMax = rss;
+                }
+            }
+            return rssMax;
         }
         catch (Exception e) {
             e.printStackTrace();

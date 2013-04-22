@@ -30,6 +30,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doReturn;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -174,7 +175,8 @@ public class TestMpPromoteAlgo extends TestCase
     @Test
     public void testRepairSurvivors() throws InterruptedException, ExecutionException
     {
-        InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
+        InitiatorMailbox mailbox = mock(MpInitiatorMailbox.class);
+        doReturn(4L).when(mailbox).getHSId();
         ArrayList<Long> masters = new ArrayList<Long>();
         masters.add(1L);
         masters.add(2L);
@@ -197,6 +199,10 @@ public class TestMpPromoteAlgo extends TestCase
         algo.deliver(makeRealFragResponse(requestId, 3L, 1, 3, txnEgo(1000L)));
         algo.deliver(makeRealCompleteResponse(requestId, 3L, 2, 3, txnEgo(1000L)));
 
+        // deliver the same complete from the MPI's repair log
+        algo.deliver(makeRealAckResponse(requestId, 4L, 0, 2, txnEgo(1000L)));
+        algo.deliver(makeRealCompleteResponse(requestId, 4L, 1, 2, txnEgo(1000L)));
+
         // Verify that we send a complete to every site.
         List<Long> needsRepair = new ArrayList<Long>();
         needsRepair.add(1L);
@@ -210,7 +216,8 @@ public class TestMpPromoteAlgo extends TestCase
     @Test
     public void testSlowDieOff() throws InterruptedException, ExecutionException
     {
-        InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
+        InitiatorMailbox mailbox = mock(MpInitiatorMailbox.class);
+        doReturn(4L).when(mailbox).getHSId();
         InOrder inOrder = inOrder(mailbox);
         ArrayList<Long> masters = new ArrayList<Long>();
         masters.add(1L);
@@ -255,6 +262,11 @@ public class TestMpPromoteAlgo extends TestCase
         // 3 loses complete
         algo.deliver(makeRealFragResponse(requestId,     3L, 3, 4, txnEgo(1001L)));
 
+        // MPI
+        // Deliver the last complete
+        algo.deliver(makeRealAckResponse(requestId, 4L, 0, 2, txnEgo(1002L)));
+        algo.deliver(makeRealCompleteResponse(requestId, 4L, 1, 2, txnEgo(1002L)));
+
         // We should send to all hosts in all cases for all non-truncated MP txns now
         List<Long> needsRepair = new ArrayList<Long>();
         needsRepair.add(1L);
@@ -270,7 +282,8 @@ public class TestMpPromoteAlgo extends TestCase
     @Test
     public void testSaneWithNoMP() throws InterruptedException, ExecutionException
     {
-        InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
+        InitiatorMailbox mailbox = mock(MpInitiatorMailbox.class);
+        doReturn(4L).when(mailbox).getHSId();
         ArrayList<Long> masters = new ArrayList<Long>();
         masters.add(1L);
         masters.add(2L);
@@ -290,9 +303,49 @@ public class TestMpPromoteAlgo extends TestCase
         // has only the normal ack. Never saw an MP transaction.
         algo.deliver(makeRealAckResponse(requestId, 3L, 0, 1, Long.MAX_VALUE));
 
+        // has only the normal ack. Never saw an MP transaction.
+        algo.deliver(makeRealAckResponse(requestId, 4L, 0, 1, Long.MAX_VALUE));
+
         // verify that the discovered txn id is 0 (the correct starting txnid).
         Pair<Boolean, Long> real_result = result.get();
         assertEquals(TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId(), (long)real_result.getSecond());
+    }
+
+    // Verify that if the MPI is the only person with a complete, that we
+    // complete the transaction to the new replicas
+    @Test
+    public void testRepairSurvivorsFromJustMPI() throws InterruptedException, ExecutionException
+    {
+        InitiatorMailbox mailbox = mock(MpInitiatorMailbox.class);
+        doReturn(4L).when(mailbox).getHSId();
+        ArrayList<Long> masters = new ArrayList<Long>();
+        // This should only possible with one master, but we'll make sure multiple work
+        masters.add(1L);
+        masters.add(2L);
+
+        MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox, "Test");
+        long requestId = algo.getRequestId();
+        Future<Pair<Boolean, Long>> result = algo.start();
+        verify(mailbox, times(1)).send(any(long[].class), any(Iv2RepairLogRequestMessage.class));
+
+        // has a frag for txn 1000. MP handle is 1000L
+        algo.deliver(makeRealAckResponse(requestId, 1L, 0, 2, txnEgo(1000L)));
+        algo.deliver(makeRealFragResponse(requestId, 1L, 1, 2, txnEgo(1000L)));
+
+        // has only the normal ack. Never saw an MP transaction.
+        algo.deliver(makeRealAckResponse(requestId, 2L, 0, 1, Long.MAX_VALUE));
+
+        // deliver the same complete from the MPI's repair log
+        algo.deliver(makeRealAckResponse(requestId, 4L, 0, 2, txnEgo(1000L)));
+        algo.deliver(makeRealCompleteResponse(requestId, 4L, 1, 2, txnEgo(1000L)));
+
+        // Verify that we send a complete to every site.
+        List<Long> needsRepair = new ArrayList<Long>();
+        needsRepair.add(1L);
+        needsRepair.add(2L);
+        verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
+        Pair<Boolean, Long> real_result = result.get();
+        assertEquals(txnEgo(1000L), (long)real_result.getSecond());
     }
 }
 

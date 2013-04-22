@@ -17,6 +17,8 @@
 
 #ifndef IPCTOPEND_H_
 #define IPCTOPEND_H_
+
+#include <string>
 #include "common/Topend.h"
 #include "common/Pool.hpp"
 #include "common/FatalException.hpp"
@@ -29,6 +31,7 @@ class IPCTopend : public Topend {
 public:
     IPCTopend( VoltDBIPC *vdbipc);
     int loadNextDependency(int32_t dependencyId, Pool *stringPool, Table* destination);
+    std::string planForFragmentId(int64_t fragmentId);
     void crashVoltDB(FatalException e);
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
     void pushExportBuffer(

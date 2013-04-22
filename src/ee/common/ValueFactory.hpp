@@ -127,6 +127,48 @@ public:
     static inline NValue castAsString(NValue value) {
         return value.castAsString();
     }
+
+    static NValue nvalueFromSQLDefaultType(const ValueType type, std::string &value) {
+        switch (type) {
+            case VALUE_TYPE_NULL:
+            {
+                return getNullValue();
+            }
+            case VALUE_TYPE_TINYINT:
+            case VALUE_TYPE_SMALLINT:
+            case VALUE_TYPE_INTEGER:
+            case VALUE_TYPE_BIGINT:
+            case VALUE_TYPE_TIMESTAMP:
+            {
+                NValue retval(VALUE_TYPE_BIGINT);
+                int64_t ival = atol(value.c_str());
+                retval = getBigIntValue(ival);
+                return retval.castAs(type);
+            }
+            case VALUE_TYPE_DECIMAL:
+            {
+                return getDecimalValueFromString(value);
+            }
+            case VALUE_TYPE_DOUBLE:
+            {
+                double dval = atof(value.c_str());
+                return getDoubleValue(dval);
+            }
+            case VALUE_TYPE_VARCHAR:
+            {
+                return getStringValue(value.c_str());
+            }
+            case VALUE_TYPE_VARBINARY:
+            {
+                return getBinaryValue(value);
+            }
+            default:
+            {
+                // skip to throw
+            }
+        }
+        throwDynamicSQLException("Default value parsing error.");
+    }
 };
 }
 #endif /* VALUEFACTORY_HPP_ */

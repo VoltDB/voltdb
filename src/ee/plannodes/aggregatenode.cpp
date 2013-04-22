@@ -51,21 +51,8 @@
 #include <sstream>
 #include <stdexcept>
 
-using namespace json_spirit;
 using namespace std;
 using namespace voltdb;
-
-AggregatePlanNode::AggregatePlanNode(CatalogId id)
-  : AbstractPlanNode(id)
-{
-    // Do nothing
-}
-
-AggregatePlanNode::AggregatePlanNode(PlanNodeType type)
-  : AbstractPlanNode(), m_type(type)
-{
-    // Do nothing
-}
 
 AggregatePlanNode::~AggregatePlanNode()
 {
@@ -84,36 +71,6 @@ AggregatePlanNode::~AggregatePlanNode()
     }
 }
 
-PlanNodeType
-AggregatePlanNode::getPlanNodeType() const
-{
-    return m_type;
-}
-
-vector<ExpressionType>
-AggregatePlanNode::getAggregates()
-{
-    return m_aggregates;
-}
-
-const vector<ExpressionType>
-AggregatePlanNode::getAggregates() const
-{
-    return m_aggregates;
-}
-
-const vector<bool>&
-AggregatePlanNode::getDistinctAggregates() const
-{
-    return m_distinctAggregates;
-}
-
-const vector<AbstractExpression*>&
-AggregatePlanNode::getGroupByExpressions() const
-{
-    return m_groupByExpressions;
-}
-
 string AggregatePlanNode::debugInfo(const string &spacer) const {
     ostringstream buffer;
     buffer << spacer << "\nAggregates["
@@ -128,7 +85,10 @@ string AggregatePlanNode::debugInfo(const string &spacer) const {
         buffer << spacer << "outcol="
                << m_aggregateOutputColumns[ctr] << "\n";
         buffer << spacer << "expr="
-               << m_aggregateInputExpressions[ctr]->debug(spacer) << "\n";
+               << (m_aggregateInputExpressions[ctr] ?
+                   m_aggregateInputExpressions[ctr]->debug(spacer) :
+                   "null")
+               << "\n";
     }
     buffer << spacer << "}";
 
@@ -146,73 +106,62 @@ string AggregatePlanNode::debugInfo(const string &spacer) const {
 }
 
 void
-AggregatePlanNode::loadFromJSONObject(Object &obj)
+AggregatePlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
-    Value aggregateColumnsValue = find_value(obj, "AGGREGATE_COLUMNS");
-    if (aggregateColumnsValue == Value::null)
-    {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AggregatePlanNode::loadFromJSONObject:"
-                                      " Can't find AGGREGATE_COLUMNS value");
-    }
-    Array aggregateColumnsArray = aggregateColumnsValue.get_array();
-    for (int ii = 0; ii < aggregateColumnsArray.size(); ii++)
-    {
-        Value aggregateColumnValue = aggregateColumnsArray[ii];
-        Object aggregateColumn = aggregateColumnValue.get_obj();
+    PlannerDomValue aggregateColumnsArray = obj.valueForKey("AGGREGATE_COLUMNS");
+    for (int i = 0; i < aggregateColumnsArray.arrayLen(); i++) {
+        PlannerDomValue aggregateColumnValue = aggregateColumnsArray.valueAtIndex(i);
         bool containsType = false;
         bool containsDistinct = false;
         bool containsOutputColumn = false;
         bool containsExpression = false;
-        for (int zz = 0; zz < aggregateColumn.size(); zz++)
-        {
-            if (aggregateColumn[zz].name_ == "AGGREGATE_TYPE")
-            {
-                containsType = true;
-                string aggregateColumnTypeString =
-                    aggregateColumn[zz].value_.get_str();
-                m_aggregates.
-                    push_back(stringToExpression(aggregateColumnTypeString));
-            }
-            else if (aggregateColumn[zz].name_ == "AGGREGATE_DISTINCT")
-            {
-                containsDistinct = true;
-                bool distinct = false;
-                if (aggregateColumn[zz].value_.get_int() == 1)
-                {
-                    distinct = true;
-                }
-                m_distinctAggregates.push_back(distinct);
-            }
-            else if (aggregateColumn[zz].name_ == "AGGREGATE_OUTPUT_COLUMN")
-            {
-                containsOutputColumn = true;
-                m_aggregateOutputColumns.
-                    push_back(aggregateColumn[zz].value_.get_int());
-            }
-            else if (aggregateColumn[zz].name_ == "AGGREGATE_EXPRESSION")
-            {
-                containsExpression = true;
-                m_aggregateInputExpressions.
-                    push_back(AbstractExpression::buildExpressionTree(aggregateColumn[zz].value_.get_obj()));
-            }
+        if (aggregateColumnValue.hasNonNullKey("AGGREGATE_TYPE")) {
+            containsType = true;
+            string aggregateColumnTypeString = aggregateColumnValue.valueForKey("AGGREGATE_TYPE").asStr();
+            m_aggregates.push_back(stringToExpression(aggregateColumnTypeString));
         }
-        if(!(containsType && containsDistinct && containsOutputColumn && containsExpression)) {
+        if (aggregateColumnValue.hasNonNullKey("AGGREGATE_DISTINCT")) {
+            containsDistinct = true;
+            bool distinct = aggregateColumnValue.valueForKey("AGGREGATE_DISTINCT").asInt() == 1;
+            m_distinctAggregates.push_back(distinct);
+        }
+        if (aggregateColumnValue.hasNonNullKey("AGGREGATE_OUTPUT_COLUMN")) {
+            containsOutputColumn = true;
+            int column = aggregateColumnValue.valueForKey("AGGREGATE_OUTPUT_COLUMN").asInt();
+            m_aggregateOutputColumns.push_back(column);
+        }
+        if (aggregateColumnValue.hasNonNullKey("AGGREGATE_EXPRESSION")) {
+            containsExpression = true;
+            PlannerDomValue exprDom = aggregateColumnValue.valueForKey("AGGREGATE_EXPRESSION");
+            m_aggregateInputExpressions.push_back(AbstractExpression::buildExpressionTree(exprDom));
+        }
+
+        if(!(containsType && containsDistinct && containsOutputColumn)) {
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "AggregatePlanNode::loadFromJSONObject:"
-                                      " Missing type,distinct, outputcolumn or expression.");
+                                      " Missing type, distinct, or outputcolumn.");
+        }
+        if ( ! containsExpression) {
+            m_aggregateInputExpressions.push_back(NULL);
         }
     }
 
-    Value groupByExpressionsValue = find_value(obj, "GROUPBY_EXPRESSIONS");
-    if (!(groupByExpressionsValue == Value::null))
-    {
-        Array groupByExpressionsArray = groupByExpressionsValue.get_array();
-        for (int ii = 0; ii < groupByExpressionsArray.size(); ii++)
-        {
-            Value groupByExpressionValue = groupByExpressionsArray[ii];
-            m_groupByExpressions.push_back(AbstractExpression::buildExpressionTree(groupByExpressionValue.get_obj()));
+    if (obj.hasNonNullKey("GROUPBY_EXPRESSIONS")) {
+        PlannerDomValue groupByExpressionsArray = obj.valueForKey("GROUPBY_EXPRESSIONS");
+        for (int i = 0; i < groupByExpressionsArray.arrayLen(); i++) {
+            m_groupByExpressions.push_back(AbstractExpression::buildExpressionTree(groupByExpressionsArray.valueAtIndex(i)));
         }
+    }
+}
+
+void AggregatePlanNode::collectOutputExpressions(std::vector<AbstractExpression*>& outputColumnExpressions) const
+{
+    const std::vector<SchemaColumn*>& outputSchema = getOutputSchema();
+    size_t size = outputSchema.size();
+    outputColumnExpressions.resize(size);
+    for (int ii = 0; ii < size; ii++) {
+        SchemaColumn* outputColumn = outputSchema[ii];
+        outputColumnExpressions[ii] = outputColumn->getExpression();
     }
 }
 

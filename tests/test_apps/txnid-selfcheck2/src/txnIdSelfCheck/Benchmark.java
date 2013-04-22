@@ -152,6 +152,9 @@ public class Benchmark {
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
+        @Option(desc = "Allow experimental in-procedure adhoc statments.")
+        boolean allowinprocadhoc = false;
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -463,7 +466,8 @@ public class Benchmark {
                 (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize);
         replicatedLoader.start();
 
-        ReadThread readThread = new ReadThread(client, config.threads, config.threadoffset);
+        ReadThread readThread = new ReadThread(client, config.threads, config.threadoffset,
+                config.allowinprocadhoc);
         readThread.start();
 
         AdHocMayhemThread adHocMayhemThread = new AdHocMayhemThread(client);
@@ -473,7 +477,8 @@ public class Benchmark {
 
         List<ClientThread> clientThreads = new ArrayList<ClientThread>();
         for (byte cid = (byte) config.threadoffset; cid < config.threadoffset + config.threads; cid++) {
-            ClientThread clientThread = new ClientThread(cid, txnCount, client, processor, permits);
+            ClientThread clientThread = new ClientThread(cid, txnCount, client, processor, permits,
+                    config.allowinprocadhoc);
             clientThread.start();
             clientThreads.add(clientThread);
         }

@@ -59,7 +59,6 @@
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
 #include "execution/VoltDBEngine.h"
-#include "executors/executors.h"
 #include "plannodes/nodes.h"
 #include "plannodes/abstractplannode.h"
 #include "indexes/tableindex.h"
@@ -147,7 +146,9 @@ class ExecutionEngineTest : public Test {
              * Initialize the engine
              */
             engine = new VoltDBEngine();
-            ASSERT_TRUE(engine->initialize(this->cluster_id, this->site_id, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY, 3));
+            int partitionCount = 3;
+            ASSERT_TRUE(engine->initialize(this->cluster_id, this->site_id, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY,
+                                           HASHINATOR_LEGACY, (char*)&partitionCount));
             ASSERT_TRUE(engine->loadCatalog( -2, catalog_string));
 
             /*

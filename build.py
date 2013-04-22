@@ -196,6 +196,7 @@ CTX.INPUT['structures'] = """
 CTX.INPUT['common'] = """
  CompactingStringPool.cpp
  CompactingStringStorage.cpp
+ FatalException.cpp
  ThreadLocalPool.cpp
  SegvException.cpp
  SerializableEEException.cpp
@@ -221,6 +222,7 @@ CTX.INPUT['execution'] = """
 
 CTX.INPUT['executors'] = """
  abstractexecutor.cpp
+ aggregateexecutor.cpp
  deleteexecutor.cpp
  distinctexecutor.cpp
  executorutil.cpp
@@ -290,9 +292,6 @@ CTX.INPUT['storage'] = """
  MaterializedViewMetadata.cpp
  persistenttable.cpp
  PersistentTableStats.cpp
- PersistentTableUndoDeleteAction.cpp
- PersistentTableUndoInsertAction.cpp
- PersistentTableUndoUpdateAction.cpp
  StreamedTableStats.cpp
  streamedtable.cpp
  table.cpp
@@ -322,6 +321,7 @@ CTX.INPUT['logging'] = """
 CTX.THIRD_PARTY_INPUT['json_spirit'] = """
  json_spirit_reader.cpp
  json_spirit_value.cpp
+ json_spirit_writer.cpp
 """
 
 CTX.THIRD_PARTY_INPUT['jsoncpp'] = """
@@ -331,6 +331,10 @@ CTX.THIRD_PARTY_INPUT['jsoncpp'] = """
 CTX.THIRD_PARTY_INPUT['crc'] = """
  crc32c.cc
  crc32ctables.cc 
+"""
+
+CTX.THIRD_PARTY_INPUT['murmur3'] = """
+ MurmurHash3.cpp
 """
 
 ###############################################################################
@@ -366,6 +370,7 @@ if whichtests in ("${eetestsuite}", "common"):
      nvalue_test
      pool_test
      tabletuple_test
+     elastic_hashinator_test
     """
 
 if whichtests in ("${eetestsuite}", "execution"):

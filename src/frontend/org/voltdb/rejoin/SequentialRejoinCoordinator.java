@@ -29,6 +29,8 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
+import org.voltdb.catalog.Database;
+import org.voltdb.iv2.Cartographer;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.utils.VoltFile;
@@ -104,7 +106,7 @@ public class SequentialRejoinCoordinator extends RejoinCoordinator {
     }
 
     @Override
-    public void startRejoin() {
+    public boolean startJoin(Database catalog, Cartographer cartographer) {
         long firstSite;
         synchronized (m_lock) {
             firstSite = m_pendingSites.poll();
@@ -113,6 +115,7 @@ public class SequentialRejoinCoordinator extends RejoinCoordinator {
         String HSIdString = CoreUtils.hsIdToString(firstSite);
         rejoinLog.info("Initiating snapshot stream to first site: " + HSIdString);
         initiateRejoinOnSite(firstSite);
+        return true;
     }
 
     private void onSnapshotStreamFinished(long HSId) {

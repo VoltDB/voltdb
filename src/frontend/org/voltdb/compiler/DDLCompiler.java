@@ -1453,10 +1453,10 @@ public class DDLCompiler {
             }
 
             ParsedSelectStmt.ParsedColInfo countCol = stmt.displayColumns.get(stmt.groupByColumns.size());
-            assert(countCol.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT);
+            assert(countCol.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR);
             assert(countCol.expression.getLeft() == null);
             processMaterializedViewColumn(matviewinfo, srcTable, destTable, destColumnArray.get(stmt.groupByColumns.size()),
-                    ExpressionType.AGGREGATE_COUNT, null);
+                    ExpressionType.AGGREGATE_COUNT_STAR, null);
 
             // create an index and constraint for the table
             Index pkIndex = destTable.getIndexes().add("MATVIEW_PK_INDEX");
@@ -1542,9 +1542,7 @@ public class DDLCompiler {
         }
 
         AbstractExpression coli = stmt.displayColumns.get(i).expression;
-        if ((coli.getExpressionType() != ExpressionType.AGGREGATE_COUNT) ||
-                (coli.getLeft() != null) ||
-                (coli.getRight() != null)) {
+        if (coli.getExpressionType() != ExpressionType.AGGREGATE_COUNT_STAR) {
             msg += "is missing count(*) as the column after the group by columns, a materialized view requirement.";
             throw m_compiler.new VoltCompilerException(msg);
         }

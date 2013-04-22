@@ -64,7 +64,8 @@ public:
         m_tuplesInsertedInLastUndo = 0;
         m_tuplesDeletedInLastUndo = 0;
         m_engine = new voltdb::VoltDBEngine();
-        m_engine->initialize(1,1, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY, 1);
+        int partitionCount = 1;
+        m_engine->initialize(1,1, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY, HASHINATOR_LEGACY, (char*)&partitionCount);
 
         m_columnNames.push_back("1");
         m_columnNames.push_back("2");
@@ -185,7 +186,7 @@ public:
         m_tuplesInsertedInLastUndo = 0;
     }
 
-    void doRandomTableMutation(Table *table) {
+    void doRandomTableMutation(PersistentTable *table) {
         int rand = ::rand();
         int op = rand % 3;
         switch (op) {

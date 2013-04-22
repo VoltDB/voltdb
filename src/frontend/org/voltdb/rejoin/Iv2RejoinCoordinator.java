@@ -24,30 +24,24 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicLong;
-
-import org.json_voltpatches.JSONStringer;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 
-import org.voltdb.client.ClientResponse;
+import org.voltdb.catalog.Database;
 
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.SnapshotFormat;
 
+import org.voltdb.iv2.Cartographer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
 import org.voltdb.VoltDB;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.utils.VoltFile;
-
-import org.voltdb.VoltTable;
 
 /**
  * Thread Safety: this is a reentrant class. All mutable datastructures
@@ -119,7 +113,7 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
     private void initiateRejoinOnSites(List<Long> HSIds) {
         // We're going to share this snapshot across the provided HSIDs.
         // Steal just the first one to disabiguate it.
-        String nonce = makeSnapshotNonce(HSIds.get(0));
+        String nonce = makeSnapshotNonce("Rejoin", HSIds.get(0));
         // Must not hold m_lock across the send() call to manage lock
         // acquisition ordering with other in-process mailboxes.
         synchronized(m_lock) {
@@ -140,33 +134,13 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
         }
     }
 
-    private String makeSnapshotNonce(long HSId)
-    {
-        return "Rejoin_" + HSId + "_" + System.currentTimeMillis();
-    }
-
     private String makeSnapshotRequest(Map<Long, Long> sourceToDests)
     {
-        try {
-            JSONStringer jsStringer = new JSONStringer();
-            jsStringer.object();
-            jsStringer.key("streamPairs");
-            jsStringer.object();
-            for (Entry<Long, Long> entry : sourceToDests.entrySet()) {
-                jsStringer.key(Long.toString(entry.getKey())).value(Long.toString(entry.getValue()));
-            }
-            jsStringer.endObject();
-            jsStringer.endObject();
-            return jsStringer.toString();
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Failed to serialize to JSON", true, e);
-        }
-        // unreachable;
-        return null;
+        return makeSnapshotRequest(sourceToDests, null);
     }
 
     @Override
-    public void startRejoin() {
+    public boolean startJoin(Database catalog, Cartographer cartographer) {
         m_startTime = System.currentTimeMillis();
         if (m_liveRejoin) {
             long firstSite;
@@ -188,6 +162,8 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
             REJOINLOG.info("Initiating snapshot stream to sites: " + CoreUtils.hsIdCollectionToString(firstSites));
             initiateRejoinOnSites(firstSites);
         }
+
+        return true;
     }
 
     private void onSnapshotStreamFinished(long HSId) {
@@ -242,40 +218,6 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
             VoltDB.instance().onExecutionSiteRejoinCompletion(0l);
         }
     }
-
-    /*
-     * m_handler is called when a SnapshotUtil.requestSnapshot response occurs.
-     * This callback runs on the snapshot daemon thread.
-     */
-    SnapshotResponseHandler m_handler = new SnapshotResponseHandler() {
-        @Override
-        public void handleResponse(ClientResponse resp)
-        {
-            if (resp == null) {
-                VoltDB.crashLocalVoltDB("Failed to initiate rejoin snapshot",
-                        false, null);
-            } else if (resp.getStatus() != ClientResponseImpl.SUCCESS) {
-                VoltDB.crashLocalVoltDB("Failed to initiate rejoin snapshot: "
-                        + resp.getStatusString(), false, null);
-            }
-
-            VoltTable[] results = resp.getResults();
-            if (SnapshotUtil.didSnapshotRequestSucceed(results)) {
-                String appStatus = resp.getAppStatusString();
-                if (appStatus == null) {
-                    VoltDB.crashLocalVoltDB("Rejoin snapshot request failed: "
-                            + resp.getStatusString(), false, null);
-                }
-                else {
-                    // success is buried down here...
-                    return;
-                }
-            } else {
-                VoltDB.crashLocalVoltDB("Snapshot request for rejoin failed",
-                        false, null);
-            }
-        }
-    };
 
     private void onSiteInitialized(long HSId, long masterHSId, long dataSinkHSId)
     {

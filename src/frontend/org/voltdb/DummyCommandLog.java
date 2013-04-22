@@ -19,9 +19,7 @@ package org.voltdb;
 
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Semaphore;
 
-import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class DummyCommandLog implements CommandLog {
@@ -34,24 +32,7 @@ public class DummyCommandLog implements CommandLog {
     }
 
     @Override
-    public void log(InitiateTaskMessage message) {}
-
-    @Override
     public void shutdown() throws InterruptedException {}
-
-    @Override
-    public Semaphore logFault(Set<Long> failedInitiators,
-                              Set<Long> faultedTxns) {
-        return new Semaphore(1);
-    }
-
-    @Override
-    public void logHeartbeat(final long txnId) {}
-
-    @Override
-    public long getFaultSequenceNumber() {
-        return 0;
-    }
 
     @Override
     public void initForRejoin(CatalogContext context, long txnId, Map<Integer, Long> perPartitionTxnId, boolean isRejoin, String affinity) {}

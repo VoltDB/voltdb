@@ -368,8 +368,8 @@ public class CSVLoader {
             // trim white space in this line.
             slot[i] = slot[i].trim();
             // treat NULL, \N and "\N" as actual null value
-            if ((slot[i]).equals("NULL") || slot[i].equals("\\N")
-                    || !config.strictquotes && slot[i].equals("\"\\N\""))
+            if ((slot[i]).equals("NULL") || slot[i].equals(VoltTable.CSV_NULL)
+                    || !config.strictquotes && slot[i].equals(VoltTable.QUOTED_CSV_NULL))
                 slot[i] = null;
             else if (slot[i].equals("")) {
                 if (config.blank.equalsIgnoreCase("null") ) slot[i] = null;

@@ -117,7 +117,6 @@ function sync-benchmark() {
         --threads=40
 }
 
-# JDBC benchmark sample
 # Use this target for argument help
 function jdbc-benchmark-help() {
     srccompile

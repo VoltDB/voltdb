@@ -51,7 +51,7 @@
 #include <map>
 #include <list>
 
-#include "json_spirit/json_spirit.h"
+#include "common/PlannerDomValue.h"
 #include "common/common.h"
 #include "common/serializeio.h"
 #include "catalog/catalog.h"
@@ -76,7 +76,7 @@ class PlanNodeFragment {
     static PlanNodeFragment * createFromCatalog(const std::string);
 
     // construct a new fragment from a serialized json object
-    static PlanNodeFragment* fromJSONObject(json_spirit::Object &obj);
+    static PlanNodeFragment* fromJSONObject(PlannerDomValue obj);
 
     // construct a new fragment from a root node (used by testcode)
     PlanNodeFragment(AbstractPlanNode *root_node);
@@ -105,7 +105,7 @@ class PlanNodeFragment {
   private:
 
     // reads execute list from plannodelist json objects
-    void loadFromJSONObject(json_spirit::Object &obj);
+    void loadFromJSONObject(PlannerDomValue obj);
 
     // serialized java type: org.voltdb.plannodes.PlanNode[List|Tree]
     std::string m_serializedType;

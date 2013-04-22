@@ -23,6 +23,8 @@
 
 package txnIdSelfCheck;
 
+import java.io.InterruptedIOException;
+
 import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -50,15 +52,15 @@ public class ClientThread extends Thread {
          * Use modulo so the same CID will run the same code
          * across client process lifetimes.
          */
-        static Type typeFromId(int id) {
+        static Type typeFromId(int id, boolean allowInProcAdhoc) {
             if (id % 10 == 0) return PARTITIONED_MP;               // 20%
             if (id % 10 == 1) return PARTITIONED_MP;
             if (id % 10 == 2) return REPLICATED;                   // 20%
             if (id % 10 == 3) return REPLICATED;
             if (id % 10 == 4) return HYBRID;                       // 20%
             if (id % 10 == 5) return HYBRID;
-            if ((id % 10 == 6) && (id % 20 != 6)) return ADHOC_MP; // 5%
-            return PARTITIONED_SP;                                 // 35%
+            if (allowInProcAdhoc && (id % 10 == 6) && (id % 20 != 6)) return ADHOC_MP; // 5% or 0%
+            return PARTITIONED_SP;                                 // 35% or 40%
         }
     }
 
@@ -72,10 +74,13 @@ public class ClientThread extends Thread {
     final Random m_random = new Random();
     final Semaphore m_permits;
 
-    ClientThread(byte cid, AtomicLong txnsRun, Client client, TxnId2PayloadProcessor processor, Semaphore permits) throws Exception {
+    ClientThread(byte cid, AtomicLong txnsRun, Client client, TxnId2PayloadProcessor processor, Semaphore permits,
+            boolean allowInProcAdhoc)
+        throws Exception
+    {
         setName("ClientThread(CID=" + String.valueOf(cid) + ")");
 
-        m_type = Type.typeFromId(cid);
+        m_type = Type.typeFromId(cid, allowInProcAdhoc);
         m_cid = cid;
         m_client = client;
         m_processor = processor;
@@ -107,21 +112,26 @@ public class ClientThread extends Thread {
 
         try {
             String procName = null;
+            int expectedTables = 3;
             switch (m_type) {
             case PARTITIONED_SP:
                 procName = "UpdatePartitionedSP";
                 break;
             case PARTITIONED_MP:
                 procName = "UpdatePartitionedMP";
+                expectedTables = 4;
                 break;
             case REPLICATED:
                 procName = "UpdateReplicatedMP";
+                expectedTables = 4;
                 break;
             case HYBRID:
                 procName = "UpdateBothMP";
+                expectedTables = 4;
                 break;
             case ADHOC_MP:
                 procName = "UpdateReplicatedMPInProcAdHoc";
+                expectedTables = 4;
                 break;
             }
 
@@ -154,10 +164,10 @@ public class ClientThread extends Thread {
 
             m_txnsRun.incrementAndGet();
 
-            if (results.length != 3) {
+            if (results.length != expectedTables) {
                 log.error(String.format(
-                        "Client cid %d procedure %s returned %d results instead of 3",
-                        m_cid, procName, results.length));
+                        "Client cid %d procedure %s returned %d results instead of %d",
+                        m_cid, procName, results.length, expectedTables));
                 log.error(((ClientResponseImpl) response).toJSONString());
                 Benchmark.printJStack();
                 System.exit(-1);
@@ -182,6 +192,7 @@ public class ClientThread extends Thread {
 
     void shutdown() {
         m_shouldContinue.set(false);
+        this.interrupt();
     }
 
     void handleException(ClientResponseImpl cri, Exception e) {
@@ -242,6 +253,12 @@ public class ClientThread extends Thread {
             catch (UserProcCallException e) {
                 ClientResponseImpl cri = e.cri;
                 handleException(cri, e);
+            }
+            catch (InterruptedException e) {
+                // just need to fall through and get out
+            }
+            catch (InterruptedIOException e) {
+                // just need to fall through and get out
             }
             catch (Exception e) {
                 log.error("ClientThread had a non proc-call exception", e);

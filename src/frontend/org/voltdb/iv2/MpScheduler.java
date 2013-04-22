@@ -273,7 +273,7 @@ public class MpScheduler extends Scheduler
         final MpProcedureTask task =
             new MpProcedureTask(m_mailbox, procedureName,
                     m_pendingTasks, mp, m_iv2Masters, m_buddyHSId, false);
-        m_outstandingTxns.put(task.m_txn.txnId, task.m_txn);
+        m_outstandingTxns.put(task.m_txnState.txnId, task.m_txnState);
         m_pendingTasks.offer(task);
     }
 
@@ -313,7 +313,7 @@ public class MpScheduler extends Scheduler
         final MpProcedureTask task =
             new MpProcedureTask(m_mailbox, procedureName,
                     m_pendingTasks, mp, m_iv2Masters, m_buddyHSId, true);
-        m_outstandingTxns.put(task.m_txn.txnId, task.m_txn);
+        m_outstandingTxns.put(task.m_txnState.txnId, task.m_txnState);
         m_pendingTasks.offer(task);
     }
 
@@ -352,6 +352,16 @@ public class MpScheduler extends Scheduler
             m_outstandingTxns.remove(message.getTxnId());
             // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
             m_mailbox.send(message.getInitiatorHSId(), message);
+            // We actually completed this MP transaction.  Create a fake CompleteTransactionMessage
+            // to send to our local repair log so that the fate of this transaction is never forgotten
+            // even if all the masters somehow die before forwarding Complete on to their replicas.
+            CompleteTransactionMessage ctm = new CompleteTransactionMessage(m_mailbox.getHSId(),
+                    message.m_sourceHSId, message.getTxnId(), message.isReadOnly(), 0,
+                    !message.shouldCommit(), false, false, false);
+            ctm.setTruncationHandle(m_repairLogTruncationHandle);
+            // dump it in the repair log
+            // hacky castage
+            ((MpInitiatorMailbox)m_mailbox).deliverToRepairLog(ctm);
         }
     }
 

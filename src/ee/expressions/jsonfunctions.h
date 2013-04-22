@@ -62,7 +62,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_FIELD>(const std::vector<NValue>
 
     if( ! reader.parse(doc, root)) {
         char msg[1024];
-        // get formattedErrorMessafe returns concise message about location
+        // getFormatedErrorMessages returns concise message about location
         // of the error rather than the malformed document itself
         snprintf(msg, sizeof(msg), "Invalid JSON %s", reader.getFormatedErrorMessages().c_str());
         throw SQLException(SQLException::
@@ -95,6 +95,110 @@ template<> inline NValue NValue::call<FUNC_VOLT_FIELD>(const std::vector<NValue>
     std::string serializedValue(writer.write(fieldValue));
     // writer always appends a trailing new line \n
     return getTempStringValue(serializedValue.c_str(), serializedValue.length() -1);
+}
+
+/** implement the 2-argument SQL ARRAY_ELEMENT function */
+template<> inline NValue NValue::call<FUNC_VOLT_ARRAY_ELEMENT>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 2);
+
+    const NValue& docNVal = arguments[0];
+    if (docNVal.isNull()) {
+        return getNullStringValue();
+    }
+    if (docNVal.getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException (docNVal.getValueType(), VALUE_TYPE_VARCHAR);
+    }
+
+    const NValue& indexNVal = arguments[1];
+    if (indexNVal.isNull()) {
+        return getNullStringValue();
+    }
+    int32_t lenDoc = docNVal.getObjectLength();
+    char *docChars = reinterpret_cast<char*>(docNVal.getObjectValue());
+    const std::string doc(docChars, lenDoc);
+
+    int32_t index = indexNVal.castAsIntegerAndGetValue();
+
+    Json::Value root;
+    Json::Reader reader;
+
+    if( ! reader.parse(doc, root)) {
+        char msg[1024];
+        // getFormatedErrorMessages returns concise message about location
+        // of the error rather than the malformed document itself
+        snprintf(msg, sizeof(msg), "Invalid JSON %s", reader.getFormatedErrorMessages().c_str());
+        throw SQLException(SQLException::
+                           data_exception_invalid_parameter,
+                           msg);
+    }
+
+    // only array type contains elements. objects, primitives do not
+    if( ! root.isArray()) {
+        return getNullStringValue();
+    }
+
+    // Sure, root[-1].isNull() would return true just like we want it to
+    // -- but only in production with asserts turned off.
+    // Turn on asserts for debugging and you'll want this guard up front.
+    // Forcing the null return for a negative index seems more consistent than crashing in debug mode
+    // or even throwing an SQL error in any mode. It's the same handling that a too large index gets.
+    if (index < 0) {
+        return getNullStringValue();
+    }
+
+    Json::Value fieldValue = root[index];
+
+    if (fieldValue.isNull()) {
+        return getNullStringValue();
+    }
+
+    if (fieldValue.isConvertibleTo(Json::stringValue)) {
+        std::string stringValue(fieldValue.asString());
+        return getTempStringValue(stringValue.c_str(), stringValue.length());
+    }
+
+    Json::FastWriter writer;
+    std::string serializedValue(writer.write(fieldValue));
+    // writer always appends a trailing new line \n
+    return getTempStringValue(serializedValue.c_str(), serializedValue.length() -1);
+}
+
+/** implement the 1-argument SQL ARRAY_LENGTH function */
+template<> inline NValue NValue::callUnary<FUNC_VOLT_ARRAY_LENGTH>() const {
+
+    if (isNull()) {
+        return getNullValue(VALUE_TYPE_INTEGER);
+    }
+    if (getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException (getValueType(), VALUE_TYPE_VARCHAR);
+    }
+
+    int32_t lenDoc = getObjectLength();
+    char *docChars = reinterpret_cast<char*>(getObjectValue());
+    const std::string doc(docChars, lenDoc);
+
+    Json::Value root;
+    Json::Reader reader;
+
+    if( ! reader.parse(doc, root)) {
+        char msg[1024];
+        // getFormatedErrorMessages returns concise message about location
+        // of the error rather than the malformed document itself
+        snprintf(msg, sizeof(msg), "Invalid JSON %s", reader.getFormatedErrorMessages().c_str());
+        throw SQLException(SQLException::
+                           data_exception_invalid_parameter,
+                           msg);
+    }
+
+    // only array type contains indexed elements. objects, primitives do not
+    if( ! root.isArray()) {
+        return getNullValue(VALUE_TYPE_INTEGER);
+    }
+
+    NValue result(VALUE_TYPE_INTEGER);
+    int32_t size = static_cast<int32_t>(root.size());
+    result.getInteger() = size;
+    return result;
 }
 
 }

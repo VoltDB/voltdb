@@ -252,6 +252,7 @@ class PathArgument(StringArgument):
         self.absolute = utility.kwargs_get_boolean(kwargs, 'absolute', default = False)
         self.exists   = utility.kwargs_get_boolean(kwargs, 'exists', default = False)
         requirements = []
+        help2 = ''
         if self.absolute:
             requirements.append('absolute path')
         if self.exists:

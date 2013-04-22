@@ -70,11 +70,12 @@ public class SpInitiator extends BaseInitiator implements Promotable
     };
 
     public SpInitiator(HostMessenger messenger, Integer partition, StatsAgent agent,
-            SnapshotCompletionMonitor snapMonitor, boolean forRejoin)
+            SnapshotCompletionMonitor snapMonitor,
+            VoltDB.START_ACTION startAction)
     {
         super(VoltZK.iv2masters, messenger, partition,
                 new SpScheduler(partition, new SiteTaskerQueue(), snapMonitor),
-                "SP", agent, forRejoin);
+                "SP", agent, startAction);
         m_leaderCache = new LeaderCache(messenger.getZK(), VoltZK.iv2appointees, m_leadersChangeHandler);
         m_tickProducer = new TickProducer(m_scheduler.m_tasks);
     }
@@ -172,7 +173,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
                             + "trying. Retrying.");
                 }
             }
-            super.acceptPromotion();
             // Tag along and become the export master too
             ExportManager.instance().acceptMastership(m_partitionId);
         } catch (Exception e) {

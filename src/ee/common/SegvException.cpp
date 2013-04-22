@@ -17,26 +17,12 @@
 
 #include "SegvException.hpp"
 
-// #include "common/debuglog.h"
-// #include "common/serializeio.h"
-// #include "common/Pool.hpp"
-// #include "common/FatalException.hpp"
-// #include "common/RecoveryProtoMessage.h"
-// #include "execution/IPCTopend.h"
-// #include "execution/VoltDBEngine.h"
-
-// #include <cassert>
-// #include <cstdlib>
-// #include <iostream>
-#include <string>
+#include <cstdlib>
+#include <cstring> // for strcmp
+#include <cxxabi.h>
 #include <dlfcn.h>
+#include <string>
 
-// #include <arpa/inet.h>
-// #include <unistd.h>
-// #include <sys/types.h>
-// #include <sys/socket.h>
-// #include <netinet/in.h>
-// #include <netinet/tcp.h>
 
 using namespace std;
 using namespace voltdb;

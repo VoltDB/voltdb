@@ -23,12 +23,11 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -268,22 +267,6 @@ public class ZKUtil {
         }
         return lastCallback;
     }
-    /**
-     * Sorts the sequential nodes based on their sequence numbers.
-     * @param nodes
-     */
-    public static void sortSequentialNodes(List<String> nodes) {
-        Collections.sort(nodes, new Comparator<String>() {
-            @Override
-            public int compare(String o1, String o2) {
-                int len1 = o1.length();
-                int len2 = o2.length();
-                int seq1 = Integer.parseInt(o1.substring(len1 - 10, len1));
-                int seq2 = Integer.parseInt(o2.substring(len2 - 10, len2));
-                return Integer.signum(seq1 - seq2);
-            }
-        });
-    }
 
     public static class StatCallback implements org.apache.zookeeper_voltpatches.AsyncCallback.StatCallback {
         private final CountDownLatch done = new CountDownLatch(1);
@@ -483,4 +466,33 @@ public class ZKUtil {
         }
     }
 
+    /*
+     * A watcher that can be cancelled. Requires a single threaded executor service
+     * to serialize the cancellation with the watch firing.
+     */
+    public static abstract class CancellableWatcher implements Watcher {
+        volatile boolean canceled = false;
+        final ExecutorService es;
+
+        public CancellableWatcher(ExecutorService es) {
+            this.es = es;
+        }
+
+        public void cancel() {
+            canceled = true;
+        }
+
+        @Override
+        public void process(final WatchedEvent event) {
+           es.execute(new Runnable() {
+               @Override
+               public void run() {
+                   if (canceled) return;
+                   pProcess(event);
+               }
+           });
+        }
+
+        abstract protected void pProcess(final WatchedEvent event);
+    }
 }
