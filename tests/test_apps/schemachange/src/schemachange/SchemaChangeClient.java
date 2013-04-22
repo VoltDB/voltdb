@@ -601,7 +601,10 @@ public class SchemaChangeClient {
                 long max = maxId(t);
                 long sampleOffset = -1;
                 if (max > 0) {
-                    sampleOffset = Math.min((long) (max * .75), max - 100);
+                    if (max <= 100)
+                        sampleOffset = 0;
+                    else
+                        sampleOffset = Math.min((long) (max * .75), max - 100);
                     assert(max >= 0);
                     preT = sample(sampleOffset, t);
                     assert(preT.getRowCount() > 0);
