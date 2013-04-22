@@ -417,7 +417,10 @@ TEST_F(CopyOnWriteTest, BigTest) {
             TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
             TupleOutputStream &outputStream = outputStreams.at(0);
             std::vector<int> retPositions;
-            m_table->streamMore(outputStreams, retPositions);
+            int64_t remaining = m_table->streamMore(outputStreams, retPositions);
+            if (remaining >= 0) {
+                ASSERT_EQ(outputStreams.size(), retPositions.size());
+            }
             const int serialized = static_cast<int>(outputStream.position());
             if (serialized == 0) {
                 break;
@@ -476,7 +479,10 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
             TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
             TupleOutputStream &outputStream = outputStreams.at(0);
             std::vector<int> retPositions;
-            m_table->streamMore(outputStreams, retPositions);
+            int64_t remaining = m_table->streamMore(outputStreams, retPositions);
+            if (remaining >= 0) {
+                ASSERT_EQ(outputStreams.size(), retPositions.size());
+            }
             const int serialized = static_cast<int>(outputStream.position());
             if (serialized == 0) {
                 break;
@@ -536,7 +542,10 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
             TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
             TupleOutputStream &outputStream = outputStreams.at(0);
             std::vector<int> retPositions;
-            m_table->streamMore(outputStreams, retPositions);
+            int64_t remaining = m_table->streamMore(outputStreams, retPositions);
+            if (remaining >= 0) {
+                ASSERT_EQ(outputStreams.size(), retPositions.size());
+            }
             const int serialized = static_cast<int>(outputStream.position());
             if (serialized == 0) {
                 break;
@@ -832,7 +841,10 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
             }
 
             std::vector<int> retPositions;
-            remaining = m_table->streamMore(outputStreams, retPositions);
+            int64_t remaining = m_table->streamMore(outputStreams, retPositions);
+            if (remaining >= 0) {
+                ASSERT_EQ(outputStreams.size(), retPositions.size());
+            }
 
             // Per-predicate iterators.
             TupleOutputStreamProcessor::iterator outputStream = outputStreams.begin();
@@ -964,6 +976,9 @@ TEST_F(CopyOnWriteTest, BufferBoundaryCondition) {
     TupleOutputStreamProcessor outputStreams(serializationBuffer, bufferSize);
     std::vector<int> retPositions;
     int64_t remaining = m_table->streamMore(outputStreams, retPositions);
+    if (remaining >= 0) {
+        ASSERT_EQ(outputStreams.size(), retPositions.size());
+    }
     ASSERT_EQ(0, remaining);
     // Expect the same pending count, because it should get reset when
     // serialization finishes cleanly.

@@ -101,11 +101,9 @@ bool TableStreamer::isAlreadyActive() const
 bool TableStreamer::activateStream(PersistentTable &table)
 {
     CatalogId tableId = table.databaseId();
-    VOLT_ERROR("TableStreamer::activateStream: addr=0x%lx table=%d", (long)this, tableId);
 
     switch (m_streamType) {
         case TABLE_STREAM_SNAPSHOT: {
-            VOLT_ERROR("TableStreamer::activateStream[snapshot]: table=%d context=0x%lx", tableId, (long)m_COWContext.get());
             if (m_COWContext.get() != NULL) {
                 // true => COW already active
                 return true;
@@ -119,14 +117,12 @@ bool TableStreamer::activateStream(PersistentTable &table)
                 m_COWContext.reset(newCOW);
             }
             catch(SerializableEEException &e) {
-                VOLT_ERROR("SerializableEEException: %s", e.message().c_str());
                 return false;
             }
             break;
         }
 
         case TABLE_STREAM_RECOVERY:
-            VOLT_ERROR("TableStreamer::activateStream[recovery]: table=%d", tableId);
             if (m_recoveryContext.get() != NULL) {
                 // Recovery context already active.
                 return true;
@@ -135,18 +131,15 @@ bool TableStreamer::activateStream(PersistentTable &table)
             break;
 
         default:
-            VOLT_ERROR("TableStreamer::activateStream[???]: table=%d", tableId);
             assert(false);
     }
 
-    VOLT_ERROR("TableStreamer::activateStream[true]: table=%d context=0x%lx", tableId, (long)m_COWContext.get());
     return true;
 }
 
 int64_t TableStreamer::streamMore(TupleOutputStreamProcessor &outputStreams,
                                   std::vector<int> &retPositions)
 {
-    VOLT_ERROR("TableStreamer::streamMore: addr=0x%lx context=0x%lx", (long)this, (long)m_COWContext.get());
     int64_t remaining = -2;
     switch (m_streamType) {
         case TABLE_STREAM_SNAPSHOT: {

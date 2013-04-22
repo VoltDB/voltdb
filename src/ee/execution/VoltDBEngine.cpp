@@ -1339,7 +1339,6 @@ bool VoltDBEngine::activateTableStream(
         TableStreamType streamType,
         ReferenceSerializeInput &serializeIn) {
 
-    VOLT_ERROR("ACTIVATE: start table=%d streamType=%d", tableId, streamType);
     // Look up the table.
     map<CatalogId, Table*>::iterator it = m_tables.find(tableId);
     if (it == m_tables.end()) {
@@ -1363,12 +1362,10 @@ bool VoltDBEngine::activateTableStream(
     if (streamType == TABLE_STREAM_SNAPSHOT) {
         if (m_snapshottingTables.find(tableId) != m_snapshottingTables.end()) {
             assert(false);
-            VOLT_ERROR("ACTIVATE: ERROR table=%d", tableId);
             return false;
         }
 
         table->incrementRefcount();
-        VOLT_ERROR("ACTIVATE: add table=%d", tableId);
         m_snapshottingTables[tableId] = table;
     }
 
@@ -1482,28 +1479,17 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
             return -2;
     }
 
-    VOLT_ERROR("SERIALIZE: table=%d(0x%lx) streamType=%d", tableId, (long)table, streamType);
     // Perform the streaming.
     if (table != NULL) {
-
         remaining = table->streamMore(outputStreams, retPositions);
-        VOLT_ERROR("SERIALIZE: table=%d remaining=%jd", table->databaseId(), (intmax_t)remaining);
 
         // Clear it from the snapshot table as appropriate.
         if (remaining <= 0 && streamType == TABLE_STREAM_SNAPSHOT) {
-            VOLT_ERROR("SERIALIZE: erase table=%d", table->databaseId());
             m_snapshottingTables.erase(tableId);
             table->decrementRefcount();
         }
-
-        // If more was streamed copy current positions for return.
-        // Can this copy be avoided?
-        for (size_t i = 0; i < nBuffers; i++) {
-            retPositions.push_back((int)outputStreams.at(i).position());
-        }
     }
 
-    VOLT_ERROR("SERIALIZE: table=%d remaining=%jd", tableId, (intmax_t)remaining);
     return remaining;
 }
 

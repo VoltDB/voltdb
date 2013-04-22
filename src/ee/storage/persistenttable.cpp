@@ -763,7 +763,6 @@ bool PersistentTable::activateStreamForEngine(
     int32_t partitionId,
     ReferenceSerializeInput &serializeIn) {
 
-    VOLT_ERROR("PersistentTable::activateStreamForEngine: table=%d tableStreamer=0x%lx", databaseId(), (long)m_tableStreamer.get());
     // Expect m_tableStreamer to be null. Only make it fatal in debug builds.
     if (m_tableStreamer.get() != NULL) {
         assert(m_tableStreamer.get() != NULL);
@@ -809,7 +808,6 @@ bool PersistentTable::activateStreamForTest(TupleSerializer &tupleSerializer,
 /** Prepare table for streaming. */
 bool PersistentTable::activateStream() {
 
-    VOLT_ERROR("PersistentTable::activateStream[1]: table=%d active=%d count=%d", databaseId(), (int)m_tableStreamer->isAlreadyActive(), m_tupleCount);
     if (m_tableStreamer->isAlreadyActive()) {
         // true => COW or recovery context is already active.
         return true;
