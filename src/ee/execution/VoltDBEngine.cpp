@@ -1487,7 +1487,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
     if (table != NULL) {
 
         remaining = table->streamMore(outputStreams, retPositions);
-        VOLT_ERROR("SERIALIZE: table=%d remaining=%lld", table->databaseId(), remaining);
+        VOLT_ERROR("SERIALIZE: table=%d remaining=%jd", table->databaseId(), (intmax_t)remaining);
 
         // Clear it from the snapshot table as appropriate.
         if (remaining <= 0 && streamType == TABLE_STREAM_SNAPSHOT) {
@@ -1503,7 +1503,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
         }
     }
 
-    VOLT_ERROR("SERIALIZE: table=%d remaining=%lld", tableId, remaining);
+    VOLT_ERROR("SERIALIZE: table=%d remaining=%jd", tableId, (intmax_t)remaining);
     return remaining;
 }
 
