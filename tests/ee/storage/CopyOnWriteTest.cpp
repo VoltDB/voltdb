@@ -841,7 +841,7 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
             }
 
             std::vector<int> retPositions;
-            int64_t remaining = m_table->streamMore(outputStreams, retPositions);
+            remaining = m_table->streamMore(outputStreams, retPositions);
             if (remaining >= 0) {
                 ASSERT_EQ(outputStreams.size(), retPositions.size());
             }
