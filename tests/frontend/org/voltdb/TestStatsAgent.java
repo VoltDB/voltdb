@@ -33,6 +33,7 @@ import java.util.Set;
 import org.junit.After;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -137,6 +138,19 @@ public class TestStatsAgent {
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         VoltTable results[] = response.getResults();
         System.out.println(results[0]);
+        while (results[0].advanceRow()) {
+            String c1 = results[0].getString("c1");
+            String c2 = results[0].getString("c2");
+            if (c1.equalsIgnoreCase("RYANLOVES")) {
+                assertEquals("THEYANKEES", c2);
+            }
+            else if (c1.equalsIgnoreCase("NOREALLY")) {
+                assertEquals("ASKHIM", c2);
+            }
+            else {
+                fail("Unexpected row in results: c1: " + c1 + ", c2: " + c2);
+            }
+        }
     }
 
     @Test
