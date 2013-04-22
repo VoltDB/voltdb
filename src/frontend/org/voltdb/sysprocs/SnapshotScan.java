@@ -49,7 +49,7 @@ import org.voltdb.utils.VoltTableUtil;
 
 @ProcInfo(singlePartition = false)
 public class SnapshotScan extends VoltSystemProcedure {
-    private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotStatus.class.getName());
+    private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotDelete.class.getName());
 
     private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
 

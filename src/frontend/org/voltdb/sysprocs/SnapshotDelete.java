@@ -40,7 +40,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
 
     private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
 
-    private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotStatus.class.getName());
+    private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotDelete.class.getName());
 
     private static final int DEP_snapshotDelete = (int)
         SysProcFragmentId.PF_snapshotDelete | DtxnConstants.MULTIPARTITION_DEPENDENCY;
