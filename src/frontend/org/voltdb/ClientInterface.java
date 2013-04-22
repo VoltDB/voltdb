@@ -1656,7 +1656,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // dispatch selectors that do not us the @Statistics system procedure
         if ((params.toArray().length != 0)) {
             String selector = (String)params.toArray()[0];
-            if (selector.equals("DR") || selector.equals("TOPO")) {
+            if (selector.equals("DR") || selector.equals("TOPO") || selector.equals("SNAPSHOTSTATUS")) {
                try {
                    VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, selector);
                    return null;
@@ -1814,6 +1814,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return dispatchStatistics(sysProc, buf, task, handler, ccxn);
             } else if (task.procName.equals("@Promote")) {
                 return dispatchPromote(sysProc, buf, task, handler, ccxn);
+            } else if (task.procName.equals("@SnapshotStatus")) {
+                // SnapshotStatus is really through @Statistics now, but preserve the
+                // legacy calling mechanism
+                Object[] params = new Object[1];
+                params[0] = "SNAPSHOTSTATUS";
+                task.setParams(params);
+                return dispatchStatistics(SystemProcedureCatalog.listing.get("@Statistics"),
+                        buf, task, handler, ccxn);
             }
 
             // If you're going to copy and paste something, CnP the pattern
