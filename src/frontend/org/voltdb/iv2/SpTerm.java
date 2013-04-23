@@ -25,7 +25,6 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.BabySitter.Callback;
 import org.voltcore.zk.LeaderElector;
@@ -82,10 +81,9 @@ public class SpTerm implements Term
     public void start()
     {
         try {
-            Pair<BabySitter, List<String>> pair = BabySitter.blockingFactory(m_zk,
+            m_babySitter = BabySitter.nonblockingFactory(m_zk,
                     LeaderElector.electionDirForPartition(m_partitionId),
                     m_replicasChangeHandler);
-            m_babySitter = pair.getFirst();
         }
         catch (ExecutionException ee) {
             VoltDB.crashLocalVoltDB("Unable to create babysitter starting term.", true, ee);

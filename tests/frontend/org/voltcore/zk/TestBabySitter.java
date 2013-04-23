@@ -69,11 +69,9 @@ public class TestBabySitter extends ZKTestBase {
         ZooKeeper zk = getClient(0);
         zk.create("/babysitterroot", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         zk.create("/babysitterroot/c1", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
-        Pair<BabySitter, List<String>> pair = BabySitter.blockingFactory(zk, "/babysitterroot", cb);
-        BabySitter bs = pair.getFirst();
+        BabySitter bs = BabySitter.nonblockingFactory(zk, "/babysitterroot", cb);
         sem.acquire();
         assertTrue(bs.lastSeenChildren().size() == 1);
-        assertTrue(pair.getSecond().size() == 1);
 
         zk.create("/babysitterroot/c2", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
         sem.acquire();

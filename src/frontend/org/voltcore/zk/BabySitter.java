@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -32,7 +31,6 @@ import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
 
 /**
  * BabySitter watches a zookeeper node and alerts on appearances
@@ -93,28 +91,27 @@ public class BabySitter
     }
 
     /**
-     * Create a new BabySitter and block on reading the initial children list.
+     * Create a new BabySitter and queue a task to read the initial children list.
      */
-    public static Pair<BabySitter, List<String>> blockingFactory(ZooKeeper zk, String dir, Callback cb)
+    public static BabySitter nonblockingFactory(ZooKeeper zk, String dir, Callback cb)
         throws InterruptedException, ExecutionException
     {
         ExecutorService es = CoreUtils.getCachedSingleThreadExecutor("Babysitter-" + dir, 15000);
-        return blockingFactory(zk, dir, cb, es);
+        return nonblockingFactory(zk, dir, cb, es);
     }
 
     /**
-     * Create a new BabySitter and block on reading the initial children list.
+     * Create a new BabySitter and queue a task to get the initial children list.
      * Use the provided ExecutorService to queue events to, rather than
      * creating a private ExecutorService.
      */
-    public static Pair<BabySitter, List<String>> blockingFactory(ZooKeeper zk, String dir, Callback cb,
-            ExecutorService es)
+    public static BabySitter nonblockingFactory(ZooKeeper zk, String dir, Callback cb,
+                                                ExecutorService es)
         throws InterruptedException, ExecutionException
     {
         BabySitter bs = new BabySitter(zk, dir, cb, es);
-        Future<List<String>> task = bs.m_es.submit(bs.m_eventHandler);
-        List<String> initialChildren = task.get();
-        return new Pair<BabySitter, List<String>>(bs, initialChildren);
+        bs.m_es.submit(bs.m_eventHandler);
+        return bs;
     }
 
     // eventHandler fetches the new children and resets the watch.
