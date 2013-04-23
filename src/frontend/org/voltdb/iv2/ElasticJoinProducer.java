@@ -33,9 +33,11 @@ import org.voltdb.rejoin.TaskLog;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -293,6 +295,10 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         } else if (!m_firstFragResponseSent) {
             // Received first fragment but haven't notified the coordinator
             sendFirstFragResponse();
+            // TODO: hack to make producer finish early because data transfer is not supported for k-safe join yet
+            HashMap<String, Map<Integer, Pair<Long, Long>>> export = new HashMap<String, Map<Integer, Pair<Long, Long>>>();
+            setJoinComplete(siteConnection, export);
+            return;
         } else if (!m_replicatedStreamFinished) {
             if (m_replicatedCompletionMonitor.isDone()) {
                 notifyReplicatedSnapshotFinished();
