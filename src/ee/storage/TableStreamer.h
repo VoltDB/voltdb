@@ -76,7 +76,7 @@ public:
     /**
      * Activate streaming.
      */
-    bool activateStream(PersistentTable &table);
+    bool activateStream(PersistentTable &table, CatalogId tableId);
 
     /**
      * Continue streaming.

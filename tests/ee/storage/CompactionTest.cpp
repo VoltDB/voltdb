@@ -110,6 +110,8 @@ public:
         m_primaryKeyIndexColumns.push_back(0);
 
         m_undoToken = 0;
+
+        m_tableId = 0;
     }
 
     ~CompactionTest() {
@@ -152,7 +154,7 @@ public:
 
 
         m_table = dynamic_cast<voltdb::PersistentTable*>(
-                                                         voltdb::TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_columnNames, 0));
+                voltdb::TableFactory::getPersistentTable(m_tableId, "Foo", m_tableSchema, m_columnNames, 0));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);
@@ -271,6 +273,8 @@ public:
     int32_t m_tuplesDeletedInLastUndo;
 
     int64_t m_undoToken;
+
+    CatalogId m_tableId;
 };
 
 TEST_F(CompactionTest, BasicCompaction) {
@@ -393,7 +397,7 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
     stx::btree_set<int32_t> COWTuples;
     int totalInsertedCOWTuples = 0;
     DefaultTupleSerializer serializer;
-    m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0);
+    m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId);
     for (int qq = 0; qq < 3; qq++) {
 #ifdef MEMCHECK
         int serializationBufferSize = 22700;
@@ -530,7 +534,7 @@ TEST_F(CompactionTest, TestENG897) {
     ASSERT_EQ(5, blocksNotPendingSnapshot);
     DefaultTupleSerializer serializer;
 
-    m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0);
+    m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId);
     for (int ii = 0; ii < 16130; ii++) {
         if (ii % 2 == 0) {
             continue;
@@ -570,7 +574,7 @@ TEST_F(CompactionTest, TestENG897) {
 
     //std::cout << "Before idle compaction" << std::endl;
     //m_table->printBucketInfo();
-    m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0);
+    m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId);
     //std::cout << "Activated COW" << std::endl;
     //m_table->printBucketInfo();
     m_table->doIdleCompaction();

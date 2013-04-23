@@ -98,10 +98,8 @@ bool TableStreamer::isAlreadyActive() const
     return false;
 }
 
-bool TableStreamer::activateStream(PersistentTable &table)
+bool TableStreamer::activateStream(PersistentTable &table, CatalogId tableId)
 {
-    CatalogId tableId = table.databaseId();
-
     switch (m_streamType) {
         case TABLE_STREAM_SNAPSHOT: {
             if (m_COWContext.get() != NULL) {

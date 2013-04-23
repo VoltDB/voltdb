@@ -1353,7 +1353,7 @@ bool VoltDBEngine::activateTableStream(
     }
 
     // Crank up the necessary persistent table streaming mechanism(s).
-    if (table->activateStreamForEngine(m_tupleSerializer, streamType, m_partitionId, serializeIn)) {
+    if (table->activateStreamForEngine(m_tupleSerializer, streamType, m_partitionId, tableId, serializeIn)) {
         return false;
     }
 
@@ -1467,9 +1467,9 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
         }
 
         case TABLE_STREAM_RECOVERY: {
-            map<int32_t, Table*>::iterator pos = m_tables.find(tableId);
-            if (pos != m_tables.end()) {
-                table = dynamic_cast<PersistentTable*>(pos->second);
+            Table* found = getTable(tableId);
+            if (found) {
+                table = dynamic_cast<PersistentTable*>(found);
             }
             break;
         }

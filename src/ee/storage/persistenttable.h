@@ -208,19 +208,22 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     bool activateStreamForEngine(TupleSerializer &tupleSerializer,
                                  TableStreamType streamType,
                                  int32_t partitionId,
+                                 CatalogId tableId,
                                  ReferenceSerializeInput &serializeIn);
 
     /** Prepare table for streaming from pre-parsed data (predicates are copied). */
     bool activateStreamForTest(TupleSerializer &tupleSerializer,
                                TableStreamType streamType,
                                int32_t partitionId,
+                               CatalogId tableId,
                                const std::vector<std::string> &predicate_strings,
                                bool doDelete);
 
     /** Prepare table for streaming from pre-parsed data (no predicates). */
     bool activateStreamForTest(TupleSerializer &tupleSerializer,
                                TableStreamType streamType,
-                               int32_t partitionId);
+                               int32_t partitionId,
+                               CatalogId tableId);
 
     /**
      * Attempt to stream more tuples from the table to the provided
@@ -275,7 +278,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
 
   private:
 
-    bool activateStream();
+    bool activateStream(CatalogId tableId);
 
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
         if (nextBlock != NULL) {

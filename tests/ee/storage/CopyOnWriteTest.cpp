@@ -25,6 +25,7 @@
 #include "common/TupleSchema.h"
 #include "common/types.h"
 #include "common/NValue.hpp"
+#include "common/RecoveryProtoMessage.h"
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
 #include "common/TupleOutputStream.h"
@@ -157,6 +158,8 @@ public:
         m_primaryKeyIndexColumns.push_back(0);
 
         m_undoToken = 0;
+
+        m_tableId = 0;
     }
 
     ~CopyOnWriteTest() {
@@ -178,7 +181,7 @@ public:
         std::vector<voltdb::TableIndexScheme> indexes;
 
         m_table = dynamic_cast<voltdb::PersistentTable*>(
-                                                         voltdb::TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_columnNames, 0));
+                voltdb::TableFactory::getPersistentTable(m_tableId, "Foo", m_tableSchema, m_columnNames, 0));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);
@@ -335,6 +338,8 @@ public:
     int64_t m_undoToken;
 
     int32_t m_tupleWidth;
+
+    CatalogId m_tableId;
 };
 
 TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
@@ -408,7 +413,7 @@ TEST_F(CopyOnWriteTest, BigTest) {
             ASSERT_TRUE(inserted);
         }
 
-        m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0);
+        m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId);
 
         stx::btree_set<int64_t> COWTuples;
         char serializationBuffer[BUFFER_SIZE];
@@ -470,7 +475,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
             ASSERT_TRUE(inserted);
         }
 
-        m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0);
+        m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId);
 
         stx::btree_set<int64_t> COWTuples;
         char serializationBuffer[BUFFER_SIZE];
@@ -533,7 +538,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
             ASSERT_TRUE(inserted);
         }
 
-        m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0);
+        m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId);
 
         stx::btree_set<int64_t> COWTuples;
         char serializationBuffer[BUFFER_SIZE];
@@ -825,7 +830,7 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
 
         tool.context("activate");
 
-        bool alreadyActivated = m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0, strings, doDelete);
+        bool alreadyActivated = m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, strings, doDelete);
         if (alreadyActivated) {
             tool.error("COW was previously activated");
         }
@@ -972,7 +977,7 @@ TEST_F(CopyOnWriteTest, BufferBoundaryCondition) {
     // This should succeed in one call to serializeMore().
     DefaultTupleSerializer serializer;
     char serializationBuffer[bufferSize];
-    m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0);
+    m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId);
     TupleOutputStreamProcessor outputStreams(serializationBuffer, bufferSize);
     std::vector<int> retPositions;
     int64_t remaining = m_table->streamMore(outputStreams, retPositions);

@@ -761,6 +761,7 @@ bool PersistentTable::activateStreamForEngine(
     TupleSerializer &tupleSerializer,
     TableStreamType streamType,
     int32_t partitionId,
+    CatalogId tableId,
     ReferenceSerializeInput &serializeIn) {
 
     // Expect m_tableStreamer to be null. Only make it fatal in debug builds.
@@ -773,16 +774,17 @@ bool PersistentTable::activateStreamForEngine(
             new TableStreamer(tupleSerializer, streamType, partitionId, serializeIn));
     }
 
-    return activateStream();
+    return activateStream(tableId);
 }
 
 /** Prepare table for streaming from pre-parsed data (predicates are copied). */
 bool PersistentTable::activateStreamForTest(
-     TupleSerializer &tupleSerializer,
-     TableStreamType streamType,
-     int32_t partitionId,
-     const std::vector<std::string> &predicateStrings,
-     bool doDelete) {
+    TupleSerializer &tupleSerializer,
+    TableStreamType streamType,
+    int32_t partitionId,
+    CatalogId tableId,
+    const std::vector<std::string> &predicateStrings,
+    bool doDelete) {
 
     // Expect m_tableStreamer to be null. Only make it fatal in debug builds.
     if (m_tableStreamer.get() != NULL) {
@@ -794,19 +796,20 @@ bool PersistentTable::activateStreamForTest(
             new TableStreamer(tupleSerializer, streamType, partitionId, predicateStrings, doDelete));
     }
 
-    return activateStream();
+    return activateStream(tableId);
 }
 
 /** Prepare table for streaming from pre-parsed data (no predicates). */
 bool PersistentTable::activateStreamForTest(TupleSerializer &tupleSerializer,
                            TableStreamType streamType,
-                           int32_t partitionId) {
+                           int32_t partitionId,
+                           CatalogId tableId) {
     std::vector<std::string> predicateStrings;
-    return activateStreamForTest(tupleSerializer, streamType, partitionId, predicateStrings, false);
+    return activateStreamForTest(tupleSerializer, streamType, partitionId, tableId, predicateStrings, false);
 }
 
 /** Prepare table for streaming. */
-bool PersistentTable::activateStream() {
+bool PersistentTable::activateStream(CatalogId tableId) {
 
     if (m_tableStreamer->isAlreadyActive()) {
         // true => COW or recovery context is already active.
@@ -827,7 +830,7 @@ bool PersistentTable::activateStream() {
         }
     }
 
-    if (m_tableStreamer->activateStream(*this)) {
+    if (m_tableStreamer->activateStream(*this, tableId)) {
         return false;
     }
 
