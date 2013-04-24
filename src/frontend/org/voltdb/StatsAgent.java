@@ -54,7 +54,7 @@ public class StatsAgent {
     private static final int MAX_IN_FLIGHT_REQUESTS = 5;
     static int STATS_COLLECTION_TIMEOUT = 60 * 1000;
 
-    // The id that responds to global requests (catalog id == -1).
+    // The local site id that responds to global requests (site id == -1).
     // Start at -1 until a winner is chosen.
     // Updated in synchronized getStats() method.
     private static Long m_idForGlobalStats = null;
@@ -206,8 +206,9 @@ public class StatsAgent {
      * to avoid hoarding references to the catalog.
      */
     public synchronized void notifyOfCatalogUpdate() {
-        final HashMap<Long, ArrayList<StatsSource>> catalogIdToStatsSources = registeredStatsSources.get(SysProcSelector.PROCEDURE);
-        catalogIdToStatsSources.clear();
+        final HashMap<Long, ArrayList<StatsSource>> siteIdToStatsSources =
+            registeredStatsSources.get(SysProcSelector.PROCEDURE);
+        siteIdToStatsSources.clear();
     }
 
     public void collectStats(final Connection c, final long clientHandle, final String selector) throws Exception {
@@ -357,9 +358,9 @@ public class StatsAgent {
 
     private void collectTopoStats(PendingStatsRequest psr)
     {
-        List<Long> catalogIds = Arrays.asList(new Long[] { 0L });
+        List<Long> siteIds = Arrays.asList(new Long[] { 0L });
         psr.aggregateTables = new VoltTable[2];
-        psr.aggregateTables[0] = getStats(SysProcSelector.TOPO, catalogIds, false, psr.startTime);
+        psr.aggregateTables[0] = getStats(SysProcSelector.TOPO, siteIds, false, psr.startTime);
         VoltTable vt =
                 new VoltTable(
                 new VoltTable.ColumnInfo("HASHTYPE", VoltType.STRING),
@@ -427,12 +428,12 @@ public class StatsAgent {
     // This could probably eventually move to the stats source
     private VoltTable[] collectDRStats()
     {
-        List<Long> catalogIds = Arrays.asList(new Long[] { 0L });
+        List<Long> siteIds = Arrays.asList(new Long[] { 0L });
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable partitionStats = getStats(SysProcSelector.DRPARTITION, catalogIds, false, now);
-        VoltTable nodeStats = getStats(SysProcSelector.DRNODE, catalogIds, false, now);
+        VoltTable partitionStats = getStats(SysProcSelector.DRPARTITION, siteIds, false, now);
+        VoltTable nodeStats = getStats(SysProcSelector.DRNODE, siteIds, false, now);
         if (partitionStats != null && nodeStats != null) {
             stats = new VoltTable[2];
             stats[0] = partitionStats;
@@ -443,11 +444,11 @@ public class StatsAgent {
 
     private VoltTable[] collectSnapshotStatusStats()
     {
-        List<Long> catalogIds = Arrays.asList(new Long[] { 0L });
+        List<Long> siteIds = Arrays.asList(new Long[] { 0L });
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable ssStats = getStats(SysProcSelector.SNAPSHOTSTATUS, catalogIds, false, now);
+        VoltTable ssStats = getStats(SysProcSelector.SNAPSHOTSTATUS, siteIds, false, now);
         if (ssStats != null) {
             stats = new VoltTable[1];
             stats[0] = ssStats;
@@ -455,15 +456,15 @@ public class StatsAgent {
         return stats;
     }
 
-    public synchronized void registerStatsSource(SysProcSelector selector, long catalogId, StatsSource source) {
+    public synchronized void registerStatsSource(SysProcSelector selector, long siteId, StatsSource source) {
         assert selector != null;
         assert source != null;
-        final HashMap<Long, ArrayList<StatsSource>> catalogIdToStatsSources = registeredStatsSources.get(selector);
-        assert catalogIdToStatsSources != null;
-        ArrayList<StatsSource> statsSources = catalogIdToStatsSources.get(catalogId);
+        final HashMap<Long, ArrayList<StatsSource>> siteIdToStatsSources = registeredStatsSources.get(selector);
+        assert siteIdToStatsSources != null;
+        ArrayList<StatsSource> statsSources = siteIdToStatsSources.get(siteId);
         if (statsSources == null) {
             statsSources = new ArrayList<StatsSource>();
-            catalogIdToStatsSources.put(catalogId, statsSources);
+            siteIdToStatsSources.put(siteId, statsSources);
         }
         statsSources.add(source);
     }
@@ -471,17 +472,17 @@ public class StatsAgent {
     /**
      * Get statistics.
      * @param selector    @Statistics selector keyword
-     * @param catalogIds  statistics catalog ids
+     * @param siteIds     site IDs of the sites from which to pull stats
      * @param interval    true if processing a reporting interval
      * @param now         current timestamp
      * @return  statistics VoltTable results
      */
     public synchronized VoltTable getStats(
             final SysProcSelector selector,
-            final List<Long> catalogIds,
+            final List<Long> siteIds,
             final boolean interval,
             final Long now) {
-        return getStatsInternal(selector, catalogIds, interval, now, null);
+        return getStatsInternal(selector, siteIds, interval, now, null);
     }
 
     /**
@@ -490,7 +491,7 @@ public class StatsAgent {
      * @param selector  statistics selector keyword
      * @param interval  true if processing a reporting interval
      * @param now       current timestamp
-     * @param siteId    siteId for catalog
+     * @param siteId    siteId of the calling site
      * @return  statistics VoltTable results
      */
     public synchronized VoltTable getSiteAndHostStats(
@@ -506,17 +507,17 @@ public class StatsAgent {
         // First get the site-specific statistics.
         VoltTable results;
         {
-            ArrayList<Long> catalogIds = new ArrayList<Long>();
-            catalogIds.add(siteId);
-            results = getStatsInternal(selector, catalogIds, interval, now, null);
+            ArrayList<Long> siteIds = new ArrayList<Long>();
+            siteIds.add(siteId);
+            results = getStatsInternal(selector, siteIds, interval, now, null);
         }
 
         // Then append global results if it's the chosen site.
         if (siteId == m_idForGlobalStats) {
-            // -1 is always the global catalog id.
-            ArrayList<Long> catalogIds = new ArrayList<Long>();
-            catalogIds.add(-1L);
-            results = getStatsInternal(selector, catalogIds, interval, now, results);
+            // -1 is always the global site id.
+            ArrayList<Long> siteIds = new ArrayList<Long>();
+            siteIds.add(-1L);
+            results = getStatsInternal(selector, siteIds, interval, now, results);
         }
 
         return results;
@@ -533,17 +534,17 @@ public class StatsAgent {
      */
     private synchronized VoltTable getStatsInternal(
             final SysProcSelector selector,
-            final List<Long> catalogIds,
+            final List<Long> siteIds,
             final boolean interval,
             final Long now,
             VoltTable prevResults) {
         assert selector != null;
-        assert catalogIds != null;
-        assert catalogIds.size() > 0;
-        final HashMap<Long, ArrayList<StatsSource>> catalogIdToStatsSources = registeredStatsSources.get(selector);
-        assert catalogIdToStatsSources != null;
+        assert siteIds != null;
+        assert siteIds.size() > 0;
+        final HashMap<Long, ArrayList<StatsSource>> siteIdToStatsSources = registeredStatsSources.get(selector);
+        assert siteIdToStatsSources != null;
 
-        ArrayList<StatsSource> statsSources = catalogIdToStatsSources.get(catalogIds.get(0));
+        ArrayList<StatsSource> statsSources = siteIdToStatsSources.get(siteIds.get(0));
         //Let these two be null since they are for pro features
         if (selector == SysProcSelector.DRNODE || selector == SysProcSelector.DRPARTITION) {
             if (statsSources == null || statsSources.isEmpty()) {
@@ -574,8 +575,8 @@ public class StatsAgent {
          // Append to previous results if provided.
         final VoltTable resultTable = prevResults != null ? prevResults : new VoltTable(columns);
 
-        for (Long catalogId : catalogIds) {
-            statsSources = catalogIdToStatsSources.get(catalogId);
+        for (Long siteId : siteIds) {
+            statsSources = siteIdToStatsSources.get(siteId);
             assert statsSources != null;
             for (final StatsSource ss : statsSources) {
                 assert ss != null;

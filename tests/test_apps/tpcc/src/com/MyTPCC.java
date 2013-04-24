@@ -472,13 +472,15 @@ public class MyTPCC
         public void clientCallback(ClientResponse clientResponse)
         {
             // TODO: Necessary?
+            /*
             boolean abortExpected = false;
             if (m_procedureName != null && (m_procedureName.equals(Constants.ORDER_STATUS_BY_NAME)
                 || m_procedureName.equals(Constants.ORDER_STATUS_BY_ID)))
                 abortExpected = true;
-            boolean status = clientResponse.getStatus() == ClientResponse.SUCCESS && abortExpected;
+            boolean status = (clientResponse.getStatus() == ClientResponse.SUCCESS || abortExpected;
             assert status;
-            if (m_transactionType != null)
+            */
+            if (m_transactionType != null && clientResponse.getStatus() == ClientResponse.SUCCESS)
             {
                 procCounts[m_transactionType.ordinal()].incrementAndGet();
 
