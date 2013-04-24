@@ -47,7 +47,11 @@ for(item in Hudson.instance.items)
       if (branch)
             branch.setDefaultValue(str_branch)
 */
-      project.scm = new hudson.plugins.cloneworkspace.CloneWorkspaceSCM("kit-"+workspace_name+"-build", "any")
+
+      // if the job has a cloned workspace, replace it with the new kitbuild workspace
+      if (project.scm instanceof hudson.plugins.cloneworkspace.CloneWorkspaceSCM) {
+              project.scm = new hudson.plugins.cloneworkspace.CloneWorkspaceSCM("kit-"+workspace_name+"-build", "any")
+      }
 
     // update recipient list
     project.publishersList.each() { p ->
