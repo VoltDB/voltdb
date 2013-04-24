@@ -42,6 +42,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKUtil;
@@ -272,7 +273,7 @@ public class LeaderAppointer implements Promotable
                         for (String child : children) {
                             int pid = LeaderElector.getPartitionFromElectionDir(child);
                             if (!m_partitionWatchers.containsKey(pid) && pid != MpInitiator.MP_INIT_PID) {
-                                watchPartition(pid, m_es);
+                                watchPartition(pid, m_es, false);
                             }
                         }
                         tmLog.info("Done " + m_partitionWatchers.keySet());
@@ -346,7 +347,7 @@ public class LeaderAppointer implements Promotable
                 final int initialPartitionCount = getInitialPartitionCount();
                 for (int i = 0; i < initialPartitionCount; i++) {
                     addPartitionZKNode(m_zk, i);
-                    watchPartition(i, m_es);
+                    watchPartition(i, m_es, true);
                 }
             } catch (IllegalAccessException e) {
                 // This should never happen
@@ -370,9 +371,9 @@ public class LeaderAppointer implements Promotable
                 int partId = master.getKey();
                 String dir = LeaderElector.electionDirForPartition(partId);
                 m_callbacks.put(partId, new PartitionCallback(partId, master.getValue()));
-                BabySitter sitterstuff =
-                    BabySitter.nonblockingFactory(m_zk, dir, m_callbacks.get(partId), m_es);
-                m_partitionWatchers.put(partId, sitterstuff);
+                Pair<BabySitter, List<String>> sitterstuff =
+                    BabySitter.blockingFactory(m_zk, dir, m_callbacks.get(partId), m_es);
+                m_partitionWatchers.put(partId, sitterstuff.getFirst());
             }
             // just go ahead and promote our MPI
             m_MPI.acceptPromotion();
@@ -408,18 +409,25 @@ public class LeaderAppointer implements Promotable
      *
      * @param pid The partition ID
      * @param es The executor service to use to construct the baby sitter
+     * @param shouldBlock Whether or not to wait for the initial read of children
      * @throws KeeperException
      * @throws InterruptedException
      * @throws ExecutionException
      */
-    void watchPartition(int pid, ExecutorService es) throws InterruptedException,
-            ExecutionException
+    void watchPartition(int pid, ExecutorService es, boolean shouldBlock)
+        throws InterruptedException, ExecutionException
     {
-        tmLog.info("Start watching partition " + pid);
         String dir = LeaderElector.electionDirForPartition(pid);
         m_callbacks.put(pid, new PartitionCallback(pid));
-        BabySitter sitterstuff = BabySitter.nonblockingFactory(m_zk, dir, m_callbacks.get(pid), es);
-        m_partitionWatchers.put(pid, sitterstuff);
+        BabySitter babySitter;
+
+        if (shouldBlock) {
+            babySitter = BabySitter.blockingFactory(m_zk, dir, m_callbacks.get(pid), es).getFirst();
+        } else {
+            babySitter = BabySitter.nonblockingFactory(m_zk, dir, m_callbacks.get(pid), es);
+        }
+
+        m_partitionWatchers.put(pid, babySitter);
     }
 
     private long assignLeader(int partitionId, List<Long> children)
