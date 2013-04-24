@@ -1,10 +1,8 @@
 /*
-
 A jenkins groovy script written as a first exercise with
 jenkins and goovy that clones all the system-test jobs 
 to new jobs which build a different branch and set the
 email notification to a different set or recipients
-
 */
 
 import hudson.model.*
@@ -13,11 +11,10 @@ import hudson.tasks.Mailer
 
 def str_search = "system-test-nextrelease"
 def str_oldbranch = "master"
-def str_branch = "foobar"
+def str_branch = "release-3.2.0.1"
 def workspace_name = str_search.replace("nextrelease", str_branch)
-
-//def view = Hudson.instance.getView(str_view)
-//for(item in view.getItems())
+//whitespace separated list of email addresses
+def recipientlist = "qa@voltdb.com"
 
 /*
 import hudson.plugins.build_timeout
@@ -54,9 +51,7 @@ for(item in Hudson.instance.items)
 
     // update recipient list
     project.publishersList.each() { p ->
-        //println(p)
         if (p instanceof Mailer) {
-          //whitespace separated list of email addresses
           p.recipients = recipientlist
         }
     }
