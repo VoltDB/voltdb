@@ -33,8 +33,9 @@ public class CatalogDiffEngine {
     // collection of reasons why a diff is not supported
     private final StringBuilder m_errors;
 
-    // original tables/indexes kept to check whether a new unique index is possible
+    // original and new indexes kept to check whether a new/modified unique index is possible
     private final Map<String, CatalogMap<Index>> m_originalIndexesByTable = new HashMap<String, CatalogMap<Index>>();
+    private final Map<String, CatalogMap<Index>> m_newIndexesByTable = new HashMap<String, CatalogMap<Index>>();
 
     /**
      * Instantiate a new diff. The resulting object can return the text
@@ -48,12 +49,17 @@ public class CatalogDiffEngine {
         m_errors = new StringBuilder();
         m_supported = true;
 
-        // store the original tables so some extra checking can be done with
-        // constraints and unique indexes
+        // store the complete set of old and new indexes so some extra checking can be done with
+        // constraints and new/updated unique indexes
         CatalogMap<Table> tables = prev.getClusters().get("cluster").getDatabases().get("database").getTables();
         assert(tables != null);
         for (Table t : tables) {
             m_originalIndexesByTable.put(t.getTypeName(), t.getIndexes());
+        }
+        tables = next.getClusters().get("cluster").getDatabases().get("database").getTables();
+        assert(tables != null);
+        for (Table t : tables) {
+            m_newIndexesByTable.put(t.getTypeName(), t.getIndexes());
         }
 
         diffRecursively(prev, next);
@@ -216,8 +222,27 @@ public class CatalogDiffEngine {
             // refs are safe to add drop if the thing they reference is
             if (suspect instanceof ConstraintRef)
                 return true;
-            if (suspect instanceof ColumnRef)
+
+            if (suspect instanceof ColumnRef) {
+                if (suspect.getParent() instanceof Index) {
+                    Index parent = (Index) suspect.getParent();
+
+                    if (parent.getUnique() && (changeType == ChangeType.DELETION)) {
+                        CatalogMap<Index> newIndexes= m_newIndexesByTable.get(parent.getParent().getTypeName());
+                        Index newIndex = newIndexes.get(parent.getTypeName());
+
+                        if (!checkNewUniqueIndex(newIndex)) {
+                            m_errors.append("May not dynamically remove columns from a unique index: " +
+                                    parent.getTypeName() + "\n");
+                            m_supported = false;
+                            return false;
+                        }
+                    }
+                }
+
+                // ColumnRef is not part of an index, index is not unique OR unique index is safe to create
                 return true;
+            }
 
         } while ((suspect = suspect.m_parent) != null);
 
