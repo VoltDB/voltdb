@@ -417,7 +417,7 @@ public class TestClientInterface {
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(m_statsAgent).collectStats(any(Connection.class), anyInt(), captor.capture());
+        verify(m_statsAgent).collectStats(any(Connection.class), anyInt(), captor.capture(), any(Boolean.class));
         assertEquals("DR", captor.getValue());
     }
 

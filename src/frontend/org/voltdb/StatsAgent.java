@@ -211,12 +211,14 @@ public class StatsAgent {
         siteIdToStatsSources.clear();
     }
 
-    public void collectStats(final Connection c, final long clientHandle, final String selector) throws Exception {
+    public void collectStats(final Connection c, final long clientHandle, final String selector,
+            final boolean interval) throws Exception
+    {
         m_es.submit(new Runnable() {
             @Override
             public void run() {
                 try {
-                    collectStatsImpl(c, clientHandle, selector);
+                    collectStatsImpl(c, clientHandle, selector, interval);
                 } catch (Throwable e) {
                     hostLog.warn("Exception while attempting to collect stats", e);
                 }
@@ -224,7 +226,9 @@ public class StatsAgent {
         });
     }
 
-    private void collectStatsImpl(Connection c, long clientHandle, String selector) throws Exception {
+    private void collectStatsImpl(Connection c, long clientHandle, String selector, boolean interval)
+        throws Exception
+    {
         if (m_pendingRequests.size() > MAX_IN_FLIGHT_REQUESTS) {
             /*
              * Defensively check for an expired request not caught
@@ -299,6 +303,7 @@ public class StatsAgent {
         obj.put("requestId", requestId);
         obj.put("returnAddress", m_mailbox.getHSId());
         obj.put("selector", realSelector);
+        obj.put("interval", interval);
         byte payloadBytes[] = CompressionService.compressBytes(obj.toString(4).getBytes("UTF-8"));
         for (int hostId : m_messenger.getLiveHostIds()) {
             long agentHsId = CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.STATS_SITE_ID);
