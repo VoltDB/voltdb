@@ -478,7 +478,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         std::map<std::string, CatalogDelegate*> m_delegatesByName;
 
         // map catalog table id to table pointers
-        std::map<int32_t, Table*> m_tables;
+        std::map<CatalogId, Table*> m_tables;
 
         // map catalog table name to table pointers
         std::map<std::string, Table*> m_tablesByName;
