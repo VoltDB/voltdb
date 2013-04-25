@@ -28,6 +28,7 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
@@ -580,8 +581,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, boolean.class);
                     m_nodeDRGateway = (NodeDRGateway) ndrgwConstructor.newInstance(drOverflowDir,
                                                                                    m_replicationActive);
+                } catch (InvocationTargetException e) {
+                    VoltDB.crashLocalVoltDB("Unable to load DR system", true, e.getTargetException());
                 } catch (Exception e) {
-                    VoltDB.crashLocalVoltDB(e.getMessage(), false, null);
+                    VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
                 }
             }
 
