@@ -43,9 +43,9 @@ def get_branch_list(merged):
 
     return branches
 
-def make_delete_branches_script(branches, do_it):
+def make_delete_branches_script(branches, dry_run):
     other_args = ''
-    if not do_it:
+    if dry_run:
         other_args = ' --dry-run'
 
     for b in branches:
@@ -73,16 +73,23 @@ def get_jira_info(b):
 
     return comment
 
-def make_archive_branches_script(branches):
+def make_archive_branches_script(branches, dry_run):
+    other_args = ''
+    if dry_run:
+        other_args = ' --dry-run'
     for b in branches:
         comment = get_jira_info(b)
         shortname = b.split('origin/')[1]
         print
+        print comment
         print 'git tag -m "archiving branch %s" archive/%s %s' % (shortname, shortname, b)
-        print 'git push origin --delete %s %s' % (shortname, comment)
+        print 'git push origin --delete %s %s' % (other_args, shortname)
+        print 'git push --tags' + other_args
 
 def weed_out_newer_branches(branches,maxage):
     old_branches = []
+    print "####List of branches newer than %d days####" % maxage
+
     for b in branches:
         cmd = 'git show -s --pretty=format:"%%ci" %s' % b
         (ret,stdout,stderr) = run_cmd(cmd)
@@ -109,7 +116,7 @@ if __name__ == "__main__":
                       default = True)
     parser.add_option('--older', dest = 'olderthan', action = 'store',
                       help = "age of unmerged branches to list",
-                      default = 21);
+                      type="int", default = 21);
 
 
     (options,args) = parser.parse_args()
@@ -123,10 +130,9 @@ if __name__ == "__main__":
 
     branch_list = get_branch_list(options.merged)
 
+    old_branches = weed_out_newer_branches(branch_list, options.olderthan )
     if options.merged:
-        make_delete_branches_script(branch_list, True)
+        make_delete_branches_script(old_branches, dry_run=False)
     else:
-        old_branches = weed_out_newer_branches(branch_list, options.olderthan)
-        make_archive_branches_script(old_branches)
-        print ('\n#----------------\n#Don\'t forget to git push --tags\n#----------------')
+        make_archive_branches_script(old_branches, dry_run=False)
 
