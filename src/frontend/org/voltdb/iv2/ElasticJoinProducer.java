@@ -50,6 +50,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     // true if the site has notified the coordinator about the receipt of the first fragment
     // message
     private boolean m_firstFragResponseSent = false;
+    private volatile boolean m_shouldWaitForSnapshotCompletion = true;
 
     // replicated table snapshot completion monitor
     private final SettableFuture<SnapshotCompletionEvent> m_replicatedCompletionMonitor =
@@ -82,6 +83,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
     private void doInitiation(RejoinMessage message)
     {
         m_coordinatorHsId = message.m_sourceHSId;
+        m_shouldWaitForSnapshotCompletion = message.shouldWaitForSnapshotCompletion();
         String snapshotNonce = message.getSnapshotNonce();
         SnapshotCompletionAction interest =
                 new SnapshotCompletionAction(snapshotNonce, m_replicatedCompletionMonitor);
@@ -295,10 +297,15 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         } else if (!m_firstFragResponseSent) {
             // Received first fragment but haven't notified the coordinator
             sendFirstFragResponse();
-            // TODO: hack to make producer finish early because data transfer is not supported for k-safe join yet
-            HashMap<String, Map<Integer, Pair<Long, Long>>> export = new HashMap<String, Map<Integer, Pair<Long, Long>>>();
-            setJoinComplete(siteConnection, export);
-            return;
+
+            if (!m_shouldWaitForSnapshotCompletion) {
+                // TODO: hack to make producer finish early because data transfer
+                // is not supported for k-safe join yet
+                HashMap<String, Map<Integer, Pair<Long, Long>>> export =
+                    new HashMap<String, Map<Integer, Pair<Long, Long>>>();
+                setJoinComplete(siteConnection, export);
+                return;
+            }
         } else if (!m_replicatedStreamFinished) {
             if (m_replicatedCompletionMonitor.isDone()) {
                 notifyReplicatedSnapshotFinished();
