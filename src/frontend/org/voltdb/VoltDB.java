@@ -20,6 +20,7 @@ package org.voltdb;
 import java.io.File;
 import java.io.PrintStream;
 import java.io.PrintWriter;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
@@ -713,6 +714,14 @@ public class VoltDB {
      * Exit the process with an error message, optionally with a stack trace.
      */
     public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
+        /*
+         * InvocationTargetException suppresses information about the cause, so unwrap until
+         * we get to the root cause
+         */
+        while (thrown instanceof InvocationTargetException) {
+            thrown = ((InvocationTargetException)thrown).getCause();
+        }
+
         // for test code
         wasCrashCalled = true;
         crashMessage = errMsg;
