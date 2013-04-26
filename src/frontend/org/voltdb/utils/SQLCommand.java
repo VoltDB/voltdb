@@ -863,14 +863,6 @@ public class SQLCommand
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
         Procedures.put("@SnapshotStatus",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
-        Procedures.put("@AdHoc_RO_MP",
-                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
-        Procedures.put("@AdHoc_RO_SP",
-                ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "bigint")).build());
-        Procedures.put("@AdHoc_RW_MP",
-                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
-        Procedures.put("@AdHoc_RW_SP",
-                ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "bigint")).build());
         Procedures.put("@Explain",
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@ExplainProc",
