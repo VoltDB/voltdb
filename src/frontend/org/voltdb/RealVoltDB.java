@@ -690,8 +690,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
             }
 
-            if (!m_joining && (m_cartographer.getPartitions().size() - 1) !=
-                    m_configuredNumberOfPartitions) {
+            if (!m_joining && (m_cartographer.getPartitionCount()) != m_configuredNumberOfPartitions) {
                 for (Map.Entry<Integer, ImmutableList<Long>> entry :
                     getSiteTrackerForSnapshot().m_partitionsToSitesImmutable.entrySet()) {
                     hostLog.info(entry.getKey() + " -- "
@@ -699,7 +698,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
                 VoltDB.crashGlobalVoltDB("Mismatch between configured number of partitions (" +
                         m_configuredNumberOfPartitions + ") and actual (" +
-                        (m_cartographer.getPartitions().size() - 1) + ")",
+                        m_cartographer.getPartitionCount() + ")",
                         true, null);
             }
 
