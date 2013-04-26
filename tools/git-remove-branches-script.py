@@ -80,11 +80,14 @@ def make_archive_branches_script(branches, dry_run):
     for b in branches:
         comment = get_jira_info(b)
         shortname = b.split('origin/')[1]
+        tagname = "archive/" + shortname
         print
         print comment
-        print 'git tag -m "archiving branch %s" archive/%s %s' % (shortname, shortname, b)
+        print 'git tag -m "archiving branch %s" %s %s' % \
+            (shortname, tagname, b)
+        print 'git push origin %s' % (tagname)
         print 'git push origin --delete %s %s' % (other_args, shortname)
-        print 'git push --tags' + other_args
+
 
 def weed_out_newer_branches(branches,maxage):
     old_branches = []
@@ -101,6 +104,7 @@ def weed_out_newer_branches(branches,maxage):
             else:
                 print ("#  %-25s last checkin %-2d days ago - %s" %
                        (b, (date.today()-d).days, d))
+    print "####"
     return old_branches
 
 if __name__ == "__main__":
