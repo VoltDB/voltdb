@@ -270,6 +270,27 @@ public class TestCatalogDiffs extends TestCase {
         assertFalse(diff.supported());
     }
 
+    public void testAdminStartupChange() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("A", "C1");
+        builder.compile(testDir + File.separator + "adminstartup1.jar",
+                1, 1, 0, 1000, true);
+        Catalog catOriginal = catalogForJar(testDir + File.separator + "adminstartup1.jar");
+
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addPartitionInfo("A", "C1");
+        builder.compile(testDir + File.separator + "adminstartup2.jar",
+                1, 1, 0, 1000, false); // changing adminstartup to false is the test
+        builder.compile(testDir + File.separator + "adminstartup2.jar");
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "adminstartup2.jar");
+
+        verifyDiff(catOriginal, catUpdated);
+    }
+
     public void testDiffOfIdenticalCatalogs() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
