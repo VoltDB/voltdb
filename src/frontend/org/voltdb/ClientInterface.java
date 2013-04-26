@@ -1660,7 +1660,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (params.toArray().length == 2) {
                 interval = ((Number)(params.toArray()[1])).longValue() == 1L;
             }
-            if (selector.equals("DR") || selector.equals("TOPO") || selector.equals("SNAPSHOTSTATUS")) {
+            if (selector.equals("DR") || selector.equals("TOPO") || selector.equals("SNAPSHOTSTATUS") ||
+                selector.equals("MEMORY"))
+            {
                try {
                    VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, selector, interval);
                    return null;

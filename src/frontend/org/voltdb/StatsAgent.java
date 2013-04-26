@@ -388,12 +388,16 @@ public class StatsAgent {
         VoltTable[] stats = null;
         // dispatch to collection
         String selectorString = obj.getString("selector");
+        boolean interval = obj.getBoolean("interval");
         SysProcSelector selector = SysProcSelector.valueOf(selectorString);
         if (selector == SysProcSelector.DRNODE) {
             stats = collectDRStats();
         }
         else if (selector == SysProcSelector.SNAPSHOTSTATUS) {
             stats = collectSnapshotStatusStats();
+        }
+        else if (selector == SysProcSelector.MEMORY) {
+            stats = collectMemoryStats(interval);
         }
 
         // Send a response with no data since the stats is not supported
@@ -457,6 +461,20 @@ public class StatsAgent {
         if (ssStats != null) {
             stats = new VoltTable[1];
             stats[0] = ssStats;
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectMemoryStats(boolean interval)
+    {
+        List<Long> siteIds = Arrays.asList(new Long[] { 0L });
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable mStats = getStats(SysProcSelector.MEMORY, siteIds, interval, now);
+        if (mStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = mStats;
         }
         return stats;
     }
