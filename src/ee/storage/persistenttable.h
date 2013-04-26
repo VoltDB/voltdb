@@ -56,13 +56,14 @@
 #include "storage/table.h"
 #include "storage/TupleStreamWrapper.h"
 #include "storage/TableStats.h"
-#include "storage/TableStreamer.h"
 #include "storage/PersistentTableStats.h"
+#include "storage/ElasticStreamer.h"
 #include "storage/RecoveryContext.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
 
 class CopyOnWriteTest_CopyOnWriteIterator;
+class CopyOnWriteTest_ElasticScannerTest;
 class CompactionTest_BasicCompaction;
 class CompactionTest_CompactionWithCopyOnWrite;
 
@@ -83,6 +84,10 @@ class MaterializedViewMetadata;
 class RecoveryProtoMsg;
 class TupleOutputStreamProcessor;
 class ReferenceSerializeInput;
+
+namespace elastic {
+    class Scanner;
+}
 
 /**
  * Represents a non-temporary table which permanently resides in
@@ -113,6 +118,7 @@ class ReferenceSerializeInput;
 class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     friend class CopyOnWriteContext;
     friend class CopyOnWriteIterator;
+    friend class elastic::Scanner;
     friend class TableFactory;
     friend class TableTuple;
     friend class TableIterator;
@@ -121,6 +127,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     friend class PersistentTableUndoInsertAction;
     friend class PersistentTableUndoUpdateAction;
     friend class ::CopyOnWriteTest_CopyOnWriteIterator;
+    friend class ::CopyOnWriteTest_ElasticScannerTest;
     friend class ::CompactionTest_BasicCompaction;
     friend class ::CompactionTest_CompactionWithCopyOnWrite;
 
@@ -378,8 +385,8 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     // that have never been allocated
     stx::btree_set<TBPtr > m_blocksWithSpace;
 
-    // Provides access to all table streaming apparatuses, including COW and recovery.
-    boost::shared_ptr<TableStreamer> m_tableStreamer;
+    // Provides access to all table streaming apparati, including COW and recovery.
+    boost::shared_ptr<elastic::Streamer> m_tableStreamer;
 
   private:
     // pointers to chunks of data. Specific to table impl. Don't leak this type.

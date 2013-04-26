@@ -38,6 +38,7 @@
 #include "indexes/tableindex.h"
 #include "storage/tableiterator.h"
 #include "storage/CopyOnWriteIterator.h"
+#include "storage/ElasticScanner.h"
 #include "stx/btree_set.h"
 #include "common/DefaultTupleSerializer.h"
 #include <vector>
@@ -89,6 +90,11 @@ const size_t NUM_MUTATIONS = 10;
 
 // Maximum quantity for detailed error display.
 const size_t MAX_DETAIL_COUNT = 50;
+
+// Handy types and values.
+typedef int64_t T_Value;
+typedef stx::btree_set<T_Value> T_ValueSet;
+typedef std::pair<int32_t, int32_t> HashRange;
 
 /**
  * The strategy of this test is to create a table with 5 blocks of tuples with the first column (primary key)
@@ -189,16 +195,20 @@ public:
         m_table->setPrimaryKeyIndex(pkeyIndex);
     }
 
-    void addRandomUniqueTuples(Table *table, int numTuples) {
+    void addRandomUniqueTuples(Table *table, int numTuples, T_ValueSet *set = NULL) {
         TableTuple tuple = table->tempTuple();
         ::memset(tuple.address() + 1, 0, tuple.tupleLength() - 1);
         for (int ii = 0; ii < numTuples; ii++) {
+            int value = rand();
             tuple.setNValue(0, ValueFactory::getIntegerValue(m_primaryKeyIndex++));
-            tuple.setNValue(1, ValueFactory::getIntegerValue(rand()));
+            tuple.setNValue(1, ValueFactory::getIntegerValue(value));
             bool success = table->insertTuple(tuple);
             if (!success) {
                 std::cout << "Failed to add random unique tuple" << std::endl;
                 return;
+            }
+            if (set != NULL) {
+                set->insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
             }
         }
     }
@@ -232,55 +242,78 @@ public:
         m_tuplesInsertedInLastUndo = 0;
     }
 
+    void doRandomDelete(PersistentTable *table, T_ValueSet *set = NULL) {
+        TableTuple tuple(table->schema());
+        if (tableutil::getRandomTuple(table, tuple)) {
+            if (set != NULL) {
+                set->insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
+            }
+            table->deleteTuple(tuple, true);
+            m_tuplesDeleted++;
+            m_tuplesDeletedInLastUndo++;
+        }
+    }
+
+    void doRandomInsert(PersistentTable *table, T_ValueSet *set = NULL) {
+        addRandomUniqueTuples(table, 1, set);
+        m_tuplesInserted++;
+        m_tuplesInsertedInLastUndo++;
+    }
+
+    void doRandomUpdate(PersistentTable *table, T_ValueSet *setFrom = NULL, T_ValueSet *setTo = NULL) {
+        voltdb::TableTuple tuple(table->schema());
+        voltdb::TableTuple tempTuple = table->tempTuple();
+        if (tableutil::getRandomTuple(table, tuple)) {
+            tempTuple.copy(tuple);
+            int value = ::rand();
+            tempTuple.setNValue(1, ValueFactory::getIntegerValue(value));
+            if (setFrom != NULL) {
+                setFrom->insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
+            }
+            if (setTo != NULL) {
+                setTo->insert(*reinterpret_cast<int64_t*>(tempTuple.address() + 1));
+            }
+            table->updateTuple(tuple, tempTuple);
+            m_tuplesUpdated++;
+        }
+    }
+
     void doRandomTableMutation(PersistentTable *table) {
         int rand = ::rand();
         int op = rand % 3;
         switch (op) {
 
-                /*
-                 * Delete a tuple
-                 */
+            /*
+             * Delete a tuple
+             */
             case 0: {
-                TableTuple tuple(table->schema());
-                if (tableutil::getRandomTuple(table, tuple)) {
-                    table->deleteTuple(tuple, true);
-                    m_tuplesDeleted++;
-                    m_tuplesDeletedInLastUndo++;
-                }
+                doRandomDelete(table);
                 break;
             }
 
-                /*
-                 * Insert a tuple
-                 */
+            /*
+             * Insert a tuple
+             */
             case 1: {
-                addRandomUniqueTuples(table, 1);
-                m_tuplesInserted++;
-                m_tuplesInsertedInLastUndo++;
+                doRandomInsert(table);
                 break;
             }
 
-                /*
-                 * Update a random tuple
-                 */
+            /*
+             * Update a random tuple
+             */
             case 2: {
-                voltdb::TableTuple tuple(table->schema());
-                voltdb::TableTuple tempTuple = table->tempTuple();
-                if (tableutil::getRandomTuple(table, tuple)) {
-                    tempTuple.copy(tuple);
-                    tempTuple.setNValue(1, ValueFactory::getIntegerValue(::rand()));
-                    table->updateTuple(tuple, tempTuple);
-                    m_tuplesUpdated++;
-                }
+                doRandomUpdate(table);
                 break;
             }
+
             default:
                 assert(false);
                 break;
         }
     }
 
-    void checkTuples(size_t tupleCount, stx::btree_set<int64_t>& originalTuples, stx::btree_set<int64_t>& COWTuples) {
+    void checkTuples(size_t tupleCount, T_ValueSet& originalTuples, T_ValueSet& COWTuples) {
         std::vector<int64_t> diff;
         std::insert_iterator<std::vector<int64_t> > ii( diff, diff.begin());
         std::set_difference(originalTuples.begin(), originalTuples.end(), COWTuples.begin(), COWTuples.end(), ii);
@@ -319,6 +352,21 @@ public:
         ASSERT_TRUE(originalTuples == COWTuples);
     }
 
+    void getTableValueSet(T_ValueSet &set) {
+        voltdb::TableIterator& iterator = m_table->iterator();
+        TableTuple tuple(m_table->schema());
+        while (iterator.next(tuple)) {
+            const std::pair<T_ValueSet::iterator, bool> p =
+                    set.insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
+            const bool inserted = p.second;
+            if (!inserted) {
+                int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
+                printf("Failed to insert %d\n", primaryKey);
+            }
+            ASSERT_TRUE(inserted);
+        }
+    }
+
     voltdb::VoltDBEngine *m_engine;
     voltdb::TupleSchema *m_tableSchema;
     voltdb::PersistentTable *m_table;
@@ -328,7 +376,7 @@ public:
     std::vector<bool> m_tableSchemaAllowNull;
     std::vector<int> m_primaryKeyIndexColumns;
 
-    int32_t m_tuplesInserted ;
+    int32_t m_tuplesInserted;
     int32_t m_tuplesUpdated;
     int32_t m_tuplesDeleted;
 
@@ -399,19 +447,8 @@ TEST_F(CopyOnWriteTest, BigTest) {
     addRandomUniqueTuples( m_table, tupleCount);
     DefaultTupleSerializer serializer;
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
-        stx::btree_set<int64_t> originalTuples;
-        voltdb::TableIterator& iterator = m_table->iterator();
-        TableTuple tuple(m_table->schema());
-        while (iterator.next(tuple)) {
-            const std::pair<stx::btree_set<int64_t>::iterator, bool> p =
-            originalTuples.insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
-            const bool inserted = p.second;
-            if (!inserted) {
-                int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
-                printf("Failed to insert %d\n", primaryKey);
-            }
-            ASSERT_TRUE(inserted);
-        }
+        T_ValueSet originalTuples;
+        getTableValueSet(originalTuples);
 
         char config[5];
         ::memset(config, 0, 5);
@@ -419,7 +456,7 @@ TEST_F(CopyOnWriteTest, BigTest) {
 
         m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
 
-        stx::btree_set<int64_t> COWTuples;
+        T_ValueSet COWTuples;
         char serializationBuffer[BUFFER_SIZE];
         int totalInserted = 0;
         while (true) {
@@ -465,11 +502,11 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
     m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0);
     DefaultTupleSerializer serializer;
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
-        stx::btree_set<int64_t> originalTuples;
+        T_ValueSet originalTuples;
         voltdb::TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
-            const std::pair<stx::btree_set<int64_t>::iterator, bool> p =
+            const std::pair<T_ValueSet::iterator, bool> p =
             originalTuples.insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
             const bool inserted = p.second;
             if (!inserted) {
@@ -484,7 +521,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
         ReferenceSerializeInput input(config, 5);
         m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
 
-        stx::btree_set<int64_t> COWTuples;
+        T_ValueSet COWTuples;
         char serializationBuffer[BUFFER_SIZE];
         int totalInserted = 0;
         while (true) {
@@ -531,11 +568,11 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
     m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0);
     DefaultTupleSerializer serializer;
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
-        stx::btree_set<int64_t> originalTuples;
+        T_ValueSet originalTuples;
         voltdb::TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
-            const std::pair<stx::btree_set<int64_t>::iterator, bool> p =
+            const std::pair<T_ValueSet::iterator, bool> p =
             originalTuples.insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
             const bool inserted = p.second;
             if (!inserted) {
@@ -550,7 +587,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
         ReferenceSerializeInput input(config, 5);
         m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
 
-        stx::btree_set<int64_t> COWTuples;
+        T_ValueSet COWTuples;
         char serializationBuffer[BUFFER_SIZE];
         int totalInserted = 0;
         while (true) {
@@ -590,10 +627,6 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
         checkTuples(0, originalTuples, COWTuples);
     }
 }
-
-// Handy types and values.
-typedef std::pair<int32_t, int32_t> HashRange;
-typedef stx::btree_set<int64_t> TupleSet;
 
 /** Tool object holds test state and conveniently displays errors. */
 class MultiStreamTestTool {
@@ -670,7 +703,7 @@ public:
         va_end(args);
     }
 
-    void diff(TupleSet set1, TupleSet set2) {
+    void diff(T_ValueSet set1, T_ValueSet set2) {
         std::vector<int64_t> diff;
         std::insert_iterator<std::vector<int64_t> > idiff( diff, diff.begin());
         std::set_difference(set1.begin(), set1.end(), set2.begin(), set2.end(), idiff);
@@ -795,8 +828,8 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
         int totalInserted = 0;              // Total tuple counter.
         boost::scoped_ptr<char> buffers[npartitions];   // Stream buffers.
         std::vector<std::string> strings(npartitions);  // Range strings.
-        TupleSet expected[npartitions]; // Expected tuple values by partition.
-        TupleSet actual[npartitions];   // Actual tuple values by partition.
+        T_ValueSet expected[npartitions]; // Expected tuple values by partition.
+        T_ValueSet actual[npartitions];   // Actual tuple values by partition.
         int totalSkipped = 0;
 
         // Prepare streams by generating ranges and range strings based on
@@ -1011,6 +1044,146 @@ TEST_F(CopyOnWriteTest, BufferBoundaryCondition) {
     // serialization finishes cleanly.
     size_t curPendingCount = m_table->getBlocksNotPendingSnapshotCount();
     ASSERT_EQ(origPendingCount, curPendingCount);
+}
+
+static void dumpValueSet(const std::string &tag, const T_ValueSet &set) {
+    std:: cout << "::: " << tag << " :::" << std::endl;
+    if (set.size() > 20) {
+        std::cout << "  (" << set.size() << " items)" << std::endl;
+    }
+    else {
+        for (T_ValueSet::const_iterator i = set.begin(); i != set.end(); ++i) {
+            std::cout << *i << std::endl;
+        }
+    }
+}
+
+// Test the elastic::Scanner.
+TEST_F(CopyOnWriteTest, ElasticScannerTest) {
+
+    initTable(true);
+
+#ifdef EXTRA_SMALL
+    const size_t NUM_INITIAL = 10;
+    const size_t NUM_CYCLES = 10;
+#else
+    const size_t NUM_INITIAL = 10000;
+    const size_t NUM_CYCLES = 10000;
+#endif
+    const size_t FREQ_INSERT = 1;       // Keep a steady flow of inserts
+    const size_t FREQ_DELETE = 3;
+    const size_t FREQ_UPDATE = 5;
+    const size_t FREQ_COMPACTION = 100;
+
+    TableTuple tuple(m_table->schema());
+
+    for (size_t irep = 0; irep < NUM_REPETITIONS; irep++) {
+
+        // Value sets used for checking results.
+        T_ValueSet initial;
+        T_ValueSet inserts;
+        T_ValueSet updateSources;
+        T_ValueSet updateTargets;
+        T_ValueSet deletes;
+        T_ValueSet returns;
+
+        // Each repetition starts fresh.
+        m_table->deleteAllTuples(true);
+
+        // Populate the table with initial tuples.
+        addRandomUniqueTuples(m_table, NUM_INITIAL);
+        getTableValueSet(initial);
+
+        boost::shared_ptr<elastic::Scanner> scanner =
+                elastic::ScannerFactory::makeScanner(*m_table);
+
+        // Mutate/scan loop.
+        for (size_t icycle = 0; icycle < NUM_CYCLES; icycle++) {
+
+            if (icycle % FREQ_INSERT == 0) {
+                doRandomInsert(m_table, &inserts);
+            }
+
+            if (icycle % FREQ_DELETE == 0) {
+                doRandomDelete(m_table, &deletes);
+            }
+
+            if (icycle % FREQ_UPDATE == 0) {
+                doRandomUpdate(m_table, &updateSources, &updateTargets);
+            }
+
+            if (icycle % FREQ_COMPACTION == 0) {
+                m_table->doForcedCompaction();
+            }
+
+            bool found = scanner->next(tuple);
+            ASSERT_TRUE(found);
+            T_Value value = *reinterpret_cast<T_Value*>(tuple.address() + 1);
+            returns.insert(value);
+        }
+
+        // Scan the remaining tuples that weren't encountered in the mutate/scan loop.
+        while (scanner->next(tuple)) {
+            T_Value value = *reinterpret_cast<T_Value*>(tuple.address() + 1);
+            returns.insert(value);
+        }
+
+        //=== Checks
+
+        // Updates, inserts and deletes to tuples in blocks that were already
+        // scanned are invisible, unless compaction moves their blocks around.
+        // The checks have to be a little loose since we don't keep track of
+        // which updates or deletes should be visible or not.
+
+        // 1) Should be able to account for all scan returns in the initial,
+        //    inserts or updateTargets sets.
+        T_ValueSet missing;
+        for (T_ValueSet::const_iterator iter = returns.begin(); iter != returns.end(); ++iter) {
+            T_Value value = *iter;
+            if(initial.find(value) == initial.end() &&
+               inserts.find(value) == inserts.end() &&
+               updateTargets.find(value) == updateTargets.end()) {
+                missing.insert(value);
+            }
+        }
+        if (!missing.empty()) {
+            std::cerr << std::endl << "ERROR: "
+                      << missing.size() << " scan tuple(s) received that can not be found"
+                      << " in the initial, inserts or update targets sets."
+                      << std::endl;
+            dumpValueSet("unexpected returned tuple values", missing);
+            dumpValueSet("initial tuple values", initial);
+            dumpValueSet("inserted tuple values", inserts);
+            dumpValueSet("updated tuple target values", updateTargets);
+            ASSERT_TRUE(missing.empty());
+        }
+
+        // 2) Should be able to account for all initial values in the returns,
+        //    deletes or update sources sets.
+        for (T_ValueSet::const_iterator iter = initial.begin(); iter != initial.end(); ++iter) {
+            T_Value value = *iter;
+            if(returns.find(value) == returns.end() &&
+               deletes.find(value) == deletes.end() &&
+               updateSources.find(value) == updateSources.end()) {
+                missing.insert(value);
+            }
+        }
+        if (!missing.empty()) {
+            /*
+             * All initial tuples should have been returned by the scan, unless they
+             * were deleted or updated (to have a different value).
+             */
+            std::cerr << std::endl << "ERROR: "
+                      << missing.size() << " initial tuple(s) can not be found"
+                      << " in the scanned, deleted or updated sets."
+                      << std::endl;
+            dumpValueSet("missing initial tuple values", missing);
+            dumpValueSet("returned tuple values", returns);
+            dumpValueSet("deleted tuple values", deletes);
+            dumpValueSet("updated tuple source values", updateSources);
+            ASSERT_TRUE(missing.empty());
+        }
+    }
 }
 
 int main() {

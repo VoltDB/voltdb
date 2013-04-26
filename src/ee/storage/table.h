@@ -354,6 +354,19 @@ class Table {
         return false;
     }
 
+    /**
+     * These metrics are needed by some iterators.
+     */
+    uint32_t getTupleLength() const {
+        return m_tupleLength;
+    }
+    int getTableAllocationSize() const {
+        return m_tableAllocationSize;
+    }
+    uint32_t getTuplesPerBlock() const {
+        return m_tuplesPerBlock;
+    }
+
 protected:
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom
