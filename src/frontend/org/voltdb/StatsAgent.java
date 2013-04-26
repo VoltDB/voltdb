@@ -402,6 +402,9 @@ public class StatsAgent {
         else if (selector == SysProcSelector.IOSTATS) {
             stats = collectIOStats(interval);
         }
+        else if (selector == SysProcSelector.PARTITIONCOUNT) {
+            stats = collectPartitionCount(interval);
+        }
 
         // Send a response with no data since the stats is not supported
         if (stats == null) {
@@ -492,6 +495,20 @@ public class StatsAgent {
         if (iStats != null) {
             stats = new VoltTable[1];
             stats[0] = iStats;
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectPartitionCount(boolean interval)
+    {
+        List<Long> siteIds = Arrays.asList(new Long[] { 0L });
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable pcStats = getStats(SysProcSelector.PARTITIONCOUNT, siteIds, interval, now);
+        if (pcStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = pcStats;
         }
         return stats;
     }
