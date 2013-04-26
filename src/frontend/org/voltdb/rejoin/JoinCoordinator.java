@@ -30,11 +30,11 @@ import org.voltdb.catalog.Database;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.messaging.LocalMailbox;
+import org.voltdb.sysprocs.saverestore.SnapshotRequestConfig;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.VoltFile;
 
 import java.io.File;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -85,7 +85,7 @@ public abstract class JoinCoordinator extends LocalMailbox {
     }
 
     public void setClientInterface(ClientInterface ci) {}
-    public void setSites(List<Long> sites) {}
+    public void setPartitionsToHSIds(Map<Integer, Long> partsToHSIds) {}
     public List<Integer> getPartitionsToAdd() {
         throw new UnsupportedOperationException("getPartitionsToAdd is only supported for " +
                 "elastic join");
@@ -125,39 +125,12 @@ public abstract class JoinCoordinator extends LocalMailbox {
         return type + "_" + HSId + "_" + System.currentTimeMillis();
     }
 
-    protected String makeSnapshotRequest(Map<Long, Long> sourceToDests,
-                                         Collection<Integer> tableIds,
-                                         Map<String, JSONObject> postSnapshotTasks)
+    protected String makeSnapshotRequest(SnapshotRequestConfig config)
     {
         try {
             JSONStringer jsStringer = new JSONStringer();
             jsStringer.object();
-
-            jsStringer.key("streamPairs");
-            jsStringer.object();
-            for (Map.Entry<Long, Long> entry : sourceToDests.entrySet()) {
-                jsStringer.key(Long.toString(entry.getKey())).value(Long.toString(entry.getValue()));
-            }
-            jsStringer.endObject();
-
-            jsStringer.key("tableIds");
-            jsStringer.array();
-            if (tableIds != null) {
-                for (int id : tableIds) {
-                    jsStringer.value(id);
-                }
-            }
-            jsStringer.endArray();
-
-            if (postSnapshotTasks != null) {
-                jsStringer.key("postSnapshotTasks");
-                jsStringer.object();
-                for (Map.Entry<String, JSONObject> e : postSnapshotTasks.entrySet()) {
-                    jsStringer.key(e.getKey()).value(e.getValue());
-                }
-                jsStringer.endObject();
-            }
-
+            config.toJSONString(jsStringer);
             jsStringer.endObject();
             return jsStringer.toString();
         } catch (Exception e) {

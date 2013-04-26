@@ -1693,7 +1693,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // dispatch selectors that do not us the @Statistics system procedure
         if ((params.toArray().length != 0)) {
             String selector = (String)params.toArray()[0];
-            if (selector.equals("DR") || selector.equals("TOPO")) {
+            if (selector.equals("DR") || selector.equals("TOPO") || selector.equals("SNAPSHOTSTATUS")) {
                try {
                    VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, selector);
                    return null;
@@ -1855,6 +1855,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return dispatchStatistics(catProc, buf, task, handler, ccxn);
             } else if (task.procName.equals("@Promote")) {
                 return dispatchPromote(catProc, buf, task, handler, ccxn);
+            } else if (task.procName.equals("@SnapshotStatus")) {
+                // SnapshotStatus is really through @Statistics now, but preserve the
+                // legacy calling mechanism
+                Object[] params = new Object[1];
+                params[0] = "SNAPSHOTSTATUS";
+                task.setParams(params);
+                return dispatchStatistics(SystemProcedureCatalog.listing.get("@Statistics").asCatalogProcedure(),
+                        buf, task, handler, ccxn);
             }
 
             // If you're going to copy and paste something, CnP the pattern
@@ -2111,7 +2119,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             // create the execution site task
                             StoredProcedureInvocation task = new StoredProcedureInvocation();
                             task.procName = "@UpdateApplicationCatalog";
-                            task.setParams(changeResult.encodedDiffCommands, changeResult.catalogBytes,
+                            task.setParams(changeResult.encodedDiffCommands, changeResult.catalogHash, changeResult.catalogBytes,
                                            changeResult.expectedCatalogVersion, changeResult.deploymentString,
                                            changeResult.deploymentCRC, changeResult.requiresSnapshotIsolation ? 1 : 0);
                             task.clientHandle = changeResult.clientHandle;
@@ -2343,8 +2351,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         spi.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
             @Override
             public ParameterSet call() {
-                ParameterSet paramSet = new ParameterSet();
-                paramSet.setParameters(params);
+                ParameterSet paramSet = ParameterSet.fromArrayWithCopy(params);
                 return paramSet;
             }
         });

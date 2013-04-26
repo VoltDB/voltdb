@@ -17,15 +17,15 @@
 
 #ifndef UNDOLOG_H_
 #define UNDOLOG_H_
-#include "common/Pool.hpp"
-#include "common/UndoQuantum.h"
-#include "boost/pool/object_pool.hpp"
 
 #include <vector>
 #include <deque>
 #include <stdint.h>
 #include <iostream>
 #include <cassert>
+
+#include "common/Pool.hpp"
+#include "common/UndoQuantum.h"
 
 namespace voltdb
 {
@@ -61,9 +61,7 @@ namespace voltdb
                 m_undoDataPools.pop_back();
             }
             assert(pool);
-            UndoQuantum *undoQuantum =
-                new (pool->allocate(sizeof(UndoQuantum)))
-                UndoQuantum(nextUndoToken, pool);
+            UndoQuantum *undoQuantum = new (*pool) UndoQuantum(nextUndoToken, pool);
             m_undoQuantums.push_back(undoQuantum);
             return undoQuantum;
         }
@@ -107,8 +105,8 @@ namespace voltdb
                 }
 
                 m_undoQuantums.pop_back();
-                Pool *pool = undoQuantum->getDataPool();
-                undoQuantum->undo();
+                // Destroy the quantum, but retain its pool for reuse.
+                Pool *pool = undoQuantum->undo();
                 pool->purge();
                 m_undoDataPools.push_back(pool);
 
@@ -137,8 +135,8 @@ namespace voltdb
                 }
 
                 m_undoQuantums.pop_front();
-                Pool *pool = undoQuantum->getDataPool();
-                undoQuantum->release();
+                // Destroy the quantum, but retain its pool for reuse.
+                Pool *pool = undoQuantum->release();
                 pool->purge();
                 m_undoDataPools.push_back(pool);
                 if(undoQuantumToken == undoToken) {

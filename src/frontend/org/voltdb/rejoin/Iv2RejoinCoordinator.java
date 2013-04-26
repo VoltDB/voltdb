@@ -18,6 +18,7 @@
 package org.voltdb.rejoin;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -40,6 +41,7 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
+import org.voltdb.sysprocs.saverestore.StreamSnapshotRequestConfig;
 
 /**
  * Thread Safety: this is a reentrant class. All mutable datastructures
@@ -75,7 +77,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     private final Map<Long, String> m_nonces = new HashMap<Long, String>();
 
     public Iv2RejoinCoordinator(HostMessenger messenger,
-                                       List<Long> sites,
+                                       Collection<Long> sites,
                                        String voltroot,
                                        boolean liveRejoin) {
         super(messenger);
@@ -127,7 +129,9 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
 
     private String makeSnapshotRequest(Map<Long, Long> sourceToDests)
     {
-        return makeSnapshotRequest(sourceToDests, null, null);
+        StreamSnapshotRequestConfig config =
+            new StreamSnapshotRequestConfig(null, sourceToDests, null);
+        return makeSnapshotRequest(config);
     }
 
     @Override

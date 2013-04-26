@@ -19,9 +19,6 @@
 #define PERSISTENTTABLEUNDOINSERTACTION_H_
 
 #include "common/UndoAction.h"
-#include "common/TupleSchema.h"
-#include "common/Pool.hpp"
-#include "common/tabletuple.h"
 #include "storage/persistenttable.h"
 
 namespace voltdb {
@@ -29,30 +26,25 @@ namespace voltdb {
 
 class PersistentTableUndoInsertAction: public voltdb::UndoAction {
 public:
-    inline PersistentTableUndoInsertAction(voltdb::TableTuple insertedTuple,
-                                           voltdb::PersistentTable *table,
-                                           voltdb::Pool *pool)
+    inline PersistentTableUndoInsertAction(char* insertedTuple,
+                                           voltdb::PersistentTable *table)
         : m_tuple(insertedTuple), m_table(table)
-    {
-        void *tupleData = pool->allocate(m_tuple.tupleLength());
-        m_tuple.move(tupleData);
-        ::memcpy(tupleData, insertedTuple.address(), m_tuple.tupleLength());
-    }
+    { }
 
-    virtual ~PersistentTableUndoInsertAction();
+    virtual ~PersistentTableUndoInsertAction() { }
 
     /*
      * Undo whatever this undo action was created to undo
      */
-    void undo();
+    virtual void undo() { m_table->deleteTupleForUndo(m_tuple); }
 
     /*
      * Release any resources held by the undo action. It will not need
      * to be undone in the future.
      */
-    void release();
+    void release() { }
 private:
-    voltdb::TableTuple m_tuple;
+    char* m_tuple;
     PersistentTable *m_table;
 };
 

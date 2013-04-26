@@ -22,9 +22,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 import java.util.Collection;
-import java.util.HashSet;
-import java.util.ListIterator;
 import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -33,22 +33,22 @@ import java.util.Map;
 
 import java.util.Map.Entry;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Longs;
-import org.json_voltpatches.JSONArray;
-import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 
-import org.voltdb.SiteProcedureConnection;
+import org.voltdb.PostSnapshotTask;
 import org.voltdb.TheHashinator;
 import org.voltdb.catalog.Table;
 
 import org.voltdb.dtxn.SiteTracker;
 
-import org.voltdb.iv2.SiteTasker;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.HashRangeExpression;
 import org.voltdb.rejoin.StreamSnapshotDataTarget;
 
 import org.voltdb.SnapshotDataFilter;
@@ -57,7 +57,6 @@ import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
 
-import org.voltdb.rejoin.TaskLog;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.SystemProcedureExecutionContext;
 
@@ -80,16 +79,19 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             SiteTracker tracker, long timestamp) throws IOException
     {
-        // not empty if targeting only one site (used for rejoin)
-        // set later from the "data" JSON string
-        Map<Long, Long> streamPairs;
-
         assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty());
 
-        createPostSnapshotTasks(tracker.getPartitionsForHost(context.getHostId()), jsData);
-        final List<Table> tables = getTablesToInclude(jsData, context);
+        final List<Long> localHSIds = Longs.asList(tracker.getLocalSites());
+        final StreamSnapshotRequestConfig config =
+            new StreamSnapshotRequestConfig(jsData, context.getDatabase(), localHSIds);
 
-        final AtomicInteger numTables = new AtomicInteger(tables.size());
+        List<Integer> localPartitions = tracker.getPartitionsForHost(context.getHostId());
+        if (!config.partitionsToAdd.isEmpty()) {
+            Map<Long, Integer> tokensToAdd = createTokensToAdd(config.partitionsToAdd);
+            createUpdateHashinatorTasksForSites(localPartitions, tokensToAdd, txnId);
+        }
+
+        final AtomicInteger numTables = new AtomicInteger(config.tables.length);
         final SnapshotRegistry.Snapshot snapshotRecord =
             SnapshotRegistry.startSnapshot(
                     txnId,
@@ -97,29 +99,20 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                     file_path,
                     file_nonce,
                     SnapshotFormat.STREAM,
-                    tables.toArray(new Table[0]));
+                    config.tables);
 
         // table schemas for all the tables we'll snapshot on this partition
         Map<Integer, byte[]> schemas = new HashMap<Integer, byte[]>();
-        for (final Table table : tables) {
+        for (final Table table : config.tables) {
             VoltTable schemaTable = CatalogUtil.getVoltTable(table);
             schemas.put(table.getRelativeIndex(), schemaTable.getSchemaBytes());
         }
 
-        try {
-            streamPairs = getStreamPairs(jsData, tracker);
-        }
-        catch (JSONException e) {
-            // Can't proceed without valid JSON, Ned
-            SnapshotRegistry.discardSnapshot(snapshotRecord);
-            return true;
-        }
-
         Map<Long, SnapshotDataTarget> sdts = new HashMap<Long, SnapshotDataTarget>();
-        if (streamPairs.size() > 0) {
+        if (config.streamPairs.size() > 0) {
             SNAP_LOG.debug("Sites to stream from: " +
-                    CoreUtils.hsIdCollectionToString(streamPairs.keySet()));
-            for (Entry<Long, Long> entry : streamPairs.entrySet()) {
+                    CoreUtils.hsIdCollectionToString(config.streamPairs.keySet()));
+            for (Entry<Long, Long> entry : config.streamPairs.entrySet()) {
                 sdts.put(entry.getKey(), new StreamSnapshotDataTarget(entry.getValue(), schemas));
             }
         }
@@ -137,17 +130,25 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                 new ArrayList<SnapshotTableTask>();
             SnapshotDataTarget sdt = entry.getValue();
             m_targets.add(sdt);
-            for (final Table table : tables)
+            for (final Table table : config.tables)
             {
                 final Runnable onClose = new TargetStatsClosure(sdt, table.getTypeName(),
                         numTables, snapshotRecord);
                 sdt.setOnCloseHandler(onClose);
+                AbstractExpression predicate = null;
+                boolean deleteTuples = false;
+                if (!table.getIsreplicated()) {
+                    predicate = createPredicateForTable(table, config);
+                    deleteTuples = true;
+                }
 
                 final SnapshotTableTask task =
                     new SnapshotTableTask(
                             table.getRelativeIndex(),
                             sdt,
                             new SnapshotDataFilter[0], // This task no longer needs partition filtering
+                            predicate,
+                            deleteTuples,
                             table.getIsreplicated(),
                             table.getTypeName());
 
@@ -174,137 +175,95 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         return false;
     }
 
-    private List<Table> getTablesToInclude(JSONObject jsData,
-                                           SystemProcedureExecutionContext context)
+    private static AbstractExpression createPredicateForTable(Table table,
+                                                              StreamSnapshotRequestConfig config)
     {
-        final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
-        final Set<Integer> tableIdsToInclude = new HashSet<Integer>();
+        HashRangeExpression predicate = null;
 
-        if (jsData != null) {
-            JSONArray tableIds = jsData.optJSONArray("tableIds");
-            if (tableIds != null) {
-                for (int i = 0; i < tableIds.length(); i++) {
-                    try {
-                        tableIdsToInclude.add(tableIds.getInt(i));
-                    } catch (JSONException e) {
-                        SNAP_LOG.warn("Unable to parse tables to include for stream snapshot", e);
-                    }
+        if (!config.partitionsToAdd.isEmpty()) {
+            Map<Long, Long> ranges = new TreeMap<Long, Long>();
+            for (Entry<Integer, SortedMap<Long, Long>> entry : config.partitionsToAdd.entrySet()) {
+                int partition = entry.getKey();
+                SortedMap<Long, Long> pRanges = entry.getValue();
+                if (SNAP_LOG.isTraceEnabled()) {
+                    SNAP_LOG.trace("Partition " + partition + " has ranges " + pRanges);
                 }
+                ranges.putAll(pRanges);
+            }
+            predicate = new HashRangeExpression();
+            predicate.setRanges(ranges);
+            predicate.setHashColumnIndex(table.getPartitioncolumn().getIndex());
+        }
+
+        return predicate;
+    }
+
+    private static Map<Long, Integer> createTokensToAdd(Map<Integer, SortedMap<Long, Long>> newPartitions)
+    {
+        ImmutableMap.Builder<Long, Integer> tokenBuilder = ImmutableMap.builder();
+        for (Entry<Integer, SortedMap<Long, Long>> entry : newPartitions.entrySet()) {
+            int partition = entry.getKey();
+            SortedMap<Long, Long> ranges = entry.getValue();
+            for (long token : ranges.keySet()) {
+                tokenBuilder.put(token, partition);
             }
         }
+        return tokenBuilder.build();
+    }
 
-        if (tableIdsToInclude.isEmpty()) {
-            // It doesn't make any sense to take a snapshot that doesn't include any table,
-            // it must be that the request doesn't specify a table filter,
-            // so default to all tables.
-            return tables;
-        }
-
-        ListIterator<Table> iter = tables.listIterator();
+    private static void createUpdateHashinatorTasksForSites(Collection<Integer> localPartitions,
+                                                            Map<Long, Integer> tokensToPartitions,
+                                                            long txnId)
+    {
+        byte[] configBytes = TheHashinator.addPartitions(tokensToPartitions);
+        PostSnapshotTask task = new UpdateHashinator(ImmutableSet.copyOf(tokensToPartitions.values()),
+                                                     txnId, configBytes);
+        assert !localPartitions.isEmpty();
+        Iterator<Integer> iter = localPartitions.iterator();
         while (iter.hasNext()) {
-            Table table = iter.next();
-            if (!tableIdsToInclude.contains(table.getRelativeIndex())) {
-                // If the table index is not in the list to include, remove it
-                iter.remove();
-            }
-        }
-
-        return tables;
-    }
-
-    private Map<Long, Long> getStreamPairs(JSONObject jsData, SiteTracker tracker) throws JSONException
-    {
-        Map<Long, Long> streamPairs = new HashMap<Long, Long>();
-
-        if (jsData != null) {
-            List<Long> localHSIds = Longs.asList(tracker.getLocalSites());
-            JSONObject sp = jsData.getJSONObject("streamPairs");
-            @SuppressWarnings("unchecked")
-            Iterator<String> it = sp.keys();
-            while (it.hasNext()) {
-                String key = it.next();
-                long sourceHSId = Long.valueOf(key);
-                // See whether this source HSID is a local site, if so, we need
-                // the partition ID
-                if (localHSIds.contains(sourceHSId)) {
-                    Long destHSId = Long.valueOf(sp.getString(key));
-                    streamPairs.put(sourceHSId, destHSId);
-                }
-            }
-        }
-
-        return streamPairs;
-    }
-
-    private static void createPostSnapshotTasks(Collection<Integer> partitions,
-                                                JSONObject jsData)
-    {
-        if (jsData != null) {
-            try {
-                JSONObject cts = jsData.optJSONObject("postSnapshotTasks");
-                if (cts != null) {
-                    Iterator keys = cts.keys();
-                    while (keys.hasNext()) {
-                        String key = (String) keys.next();
-                        if (key.equalsIgnoreCase("updateHashinator")) {
-                            createUpdateHashinatorTasksForSites(partitions, cts.getJSONObject(key));
-                        }
-                    }
-                }
-            } catch (JSONException e) {
-                SNAP_LOG.warn("Failed to parse completion task information", e);
-            }
-        }
-    }
-
-    private static void createUpdateHashinatorTasksForSites(Collection<Integer> partitions,
-                                                            JSONObject jsData) throws JSONException
-    {
-        // Get the set of new partitions to add
-        JSONArray newPartitionsArray = jsData.getJSONArray("config");
-        Set<Integer> newPartitions = new HashSet<Integer>();
-        for (int i = 0; i < newPartitionsArray.length(); i++) {
-            newPartitions.add(newPartitionsArray.getInt(i));
-        }
-
-        SiteTasker task = new UpdateEEHashinator(ImmutableSet.copyOf(newPartitions));
-        for (int partition : partitions) {
+            int partition = iter.next();
             SnapshotSiteProcessor.m_siteTasksPostSnapshotting.put(partition, task);
         }
     }
 
     /**
-     * A post-snapshot site task that updates the hashinator in Java and EE.
+     * A post-snapshot site task that updates the hashinator in both Java and EE,
+     * runs on all sites. Only one site will succeed in updating the Java hashinator.
      */
-    private static class UpdateEEHashinator extends SiteTasker {
+    private static class UpdateHashinator implements PostSnapshotTask {
         private final Set<Integer> m_newPartitions;
+        // txnId of the snapshot MP txn, used for hashinator update
+        private final long m_txnId;
+        // This site should update the Java hashinator if this is not null
+        private final byte[] m_javaHashinatorConfig;
 
-        public UpdateEEHashinator(Set<Integer> newPartitions)
+        public UpdateHashinator(Set<Integer> newPartitions,
+                                long txnId,
+                                byte[] javaHashinatorConfig)
         {
             m_newPartitions = newPartitions;
+            m_txnId = txnId;
+            m_javaHashinatorConfig = javaHashinatorConfig;
         }
 
         @Override
-        public void run(SiteProcedureConnection siteConnection)
+        public void run(SystemProcedureExecutionContext context)
         {
-            // TODO: This is not thread-safe, sites will race to update it. Once we support
-            // adding multiple partitions, this must check if the new partitions are already
-            // before changing the Java hashinator.
-            TheHashinator.HashinatorType type = TheHashinator.getConfiguredHashinatorType();
-            byte[] configBytes = TheHashinator.addPartitions(m_newPartitions);
-            TheHashinator.initialize(TheHashinator.getConfiguredHashinatorType().hashinatorClass, configBytes);
+            SNAP_LOG.debug("P" + context.getPartitionId() +
+                               " updating Java hashinator with new partitions: " +
+                               m_newPartitions);
+            // Update the Java hashinator, sites will race to do this, only one will succeed
+            TheHashinator.updateHashinator(TheHashinator.getConfiguredHashinatorType().hashinatorClass,
+                                           m_txnId,
+                                           m_javaHashinatorConfig);
+
             if (SNAP_LOG.isDebugEnabled()) {
-                SNAP_LOG.debug("P" + siteConnection.getCorrespondingPartitionId() +
+                SNAP_LOG.debug("P" + context.getPartitionId() +
                                " updated the hashinator with new partitions: " + m_newPartitions);
             }
-            siteConnection.updateHashinator(Pair.of(type, configBytes));
-        }
-
-        @Override
-        public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
-                throws IOException
-        {
-            throw new RuntimeException("Update EE hashinator task attempted on partial rejoin state.");
+            // Update EE hashinator
+            Pair<TheHashinator.HashinatorType, byte[]> currentConfig = TheHashinator.getCurrentConfig();
+            context.updateHashinator(currentConfig);
         }
     }
 }

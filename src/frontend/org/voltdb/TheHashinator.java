@@ -20,7 +20,8 @@ package org.voltdb;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.Collection;
+import java.util.Set;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.VoltLogger;
@@ -70,7 +71,7 @@ public abstract class TheHashinator {
      * Helper method to do the reflection boilerplate to call the constructor
      * of the selected hashinator and convert the exceptions to runtime excetions.
      */
-    private static TheHashinator
+    public static TheHashinator
         constructHashinator(
                 Class<? extends TheHashinator> hashinatorImplementation,
                 byte config[]) {
@@ -94,6 +95,9 @@ public abstract class TheHashinator {
     abstract protected int pHashinateLong(long value);
     abstract protected int pHashinateBytes(byte[] bytes);
     abstract protected Pair<HashinatorType, byte[]> pGetCurrentConfig();
+    abstract protected Map<Long, Integer> pPredecessors(int partition);
+    abstract protected Pair<Long, Integer> pPredecessor(int partition, long token);
+    abstract protected Map<Long, Long> pGetRanges(int partition);
 
     /**
      * Given a long value, pick a partition to store the data. It's only called for legacy
@@ -266,14 +270,13 @@ public abstract class TheHashinator {
     /**
      * Add new partitions to create a new hashinator configuration.
      */
-    public static byte[] addPartitions(Collection<Integer> newPartitions) {
+    public static byte[] addPartitions(Map<Long, Integer> tokensToPartitions) {
         HashinatorType type = getConfiguredHashinatorType();
         switch (type) {
-            case LEGACY:
-                throw new RuntimeException("Legacy hashinator doesn't support adding partitions");
-            case ELASTIC:
-                return ElasticHashinator.addPartitions(instance.get().getSecond(), newPartitions,
-                        ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+        case LEGACY:
+            throw new RuntimeException("Legacy hashinator doesn't support adding partitions");
+        case ELASTIC:
+            return ElasticHashinator.addPartitions(instance.get().getSecond(), tokensToPartitions);
         }
         throw new RuntimeException("Should not reach here");
     }
@@ -295,5 +298,24 @@ public abstract class TheHashinator {
 
     public static Pair<HashinatorType, byte[]> getCurrentConfig() {
         return instance.get().getSecond().pGetCurrentConfig();
+    }
+
+    public static Map<Long, Integer> predecessors(int partition) {
+        return instance.get().getSecond().pPredecessors(partition);
+    }
+
+    public static Pair<Long, Integer> predecessor(int partition, long token) {
+        return instance.get().getSecond().pPredecessor(partition, token);
+    }
+
+    /**
+     * Get the ranges the given partition is assigned to.
+     * @param partition
+     * @return A map of ranges, the key is the start of a range, the value is
+     * the corresponding end. Ranges returned in the map are [start, end).
+     * The ranges may or may not be contiguous.
+     */
+    public static Map<Long, Long> getRanges(int partition) {
+        return instance.get().getSecond().pGetRanges(partition);
     }
 }

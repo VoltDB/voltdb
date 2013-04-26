@@ -30,7 +30,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.ExecutionSite;
 import org.voltdb.FragmentPlanSource;
-import org.voltdb.ParameterSet;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.StatsAgent;
@@ -42,6 +41,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTableUtil;
 
@@ -62,7 +62,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public static final int ERRORCODE_NEED_PLAN = 110;
 
     /** For now sync this value with the value in the EE C++ code to get good stats. */
-    public static final int EE_PLAN_CACHE_SIZE = 10000;
+    public static final int EE_PLAN_CACHE_SIZE = 1000;
 
     /** Partition ID */
     protected final int m_partitionId;
@@ -313,7 +313,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Interface frontend invokes to communicate to CPP execution engine.
      */
 
-    abstract public boolean activateTableStream(final int tableId, TableStreamType type);
+    abstract public boolean activateTableStream(final int tableId, TableStreamType type, SnapshotPredicates predicates);
 
     /**
      * Serialize more tuples from the specified table that already has a stream enabled
@@ -339,7 +339,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public VoltTable[] executePlanFragments(int numFragmentIds,
                                             long[] planFragmentIds,
                                             long[] inputDepIds,
-                                            ParameterSet[] parameterSets,
+                                            Object[] parameterSets,
                                             long spHandle,
                                             long lastCommittedSpHandle,
                                             long uniqueId,
@@ -363,7 +363,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     protected abstract VoltTable[] coreExecutePlanFragments(int numFragmentIds,
                                                             long[] planFragmentIds,
                                                             long[] inputDepIds,
-                                                            ParameterSet[] parameterSets,
+                                                            Object[] parameterSets,
                                                             long spHandle,
                                                             long lastCommittedSpHandle,
                                                             long uniqueId,

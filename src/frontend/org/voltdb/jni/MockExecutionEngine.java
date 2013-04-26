@@ -17,6 +17,8 @@
 
 package org.voltdb.jni;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Random;
 
@@ -31,6 +33,7 @@ import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.export.ExportProtoMessage;
+import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 
 public class MockExecutionEngine extends ExecutionEngine {
 
@@ -50,7 +53,7 @@ public class MockExecutionEngine extends ExecutionEngine {
             final int numFragmentIds,
             final long[] planFragmentIds,
             final long[] inputDepIds,
-            final ParameterSet[] parameterSets,
+            final Object[] parameterSets,
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
@@ -75,7 +78,16 @@ public class MockExecutionEngine extends ExecutionEngine {
 
         ArrayList<Object> params = new ArrayList<Object>();
 
-        for (Object param : parameterSets[0].toArray())
+        // de-serialize all parameter sets
+        if (parameterSets[0] instanceof ByteBuffer) {
+            try {
+                parameterSets[0] = ParameterSet.fromByteBuffer((ByteBuffer) parameterSets[0]);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        for (Object param : ((ParameterSet) parameterSets[0]).toArray())
         {
             params.add(param);
         }
@@ -170,7 +182,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateTableStream(int tableId, TableStreamType type) {
+    public boolean activateTableStream(int tableId, TableStreamType type, SnapshotPredicates predicates) {
         return false;
     }
 

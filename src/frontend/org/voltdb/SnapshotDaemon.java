@@ -50,6 +50,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.zk.ZKUtil;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
@@ -503,12 +504,16 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             }, m_truncationGatheringPeriod, TimeUnit.SECONDS);
             return;
         } else {
-            loggingLog.info("Truncation request event was not type created: " + event.getType());
-            try {
-                truncationRequestExistenceCheck();
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Error resetting truncation request existence check", true, e);
-            }
+            /*
+             * We are very careful to cancel the watch if we find that a truncation requests exists. We are
+             * the only thread and daemon that should delete the node or change the data and the watch
+             * isn't set when that happens because it is part of processing the request and the watch should
+             * either be canceled or have already fired.
+             */
+            VoltDB.crashLocalVoltDB(
+                    "Trunction request watcher fired with event type other then created: " + event.getType(),
+                    true,
+                    null);
         }
     }
 
@@ -698,26 +703,25 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         return;
     }
 
+    private TruncationRequestExistenceWatcher m_currentTruncationWatcher = new TruncationRequestExistenceWatcher();
     /*
      * Watcher that handles changes to the ZK node for
      * internal truncation snapshot requests
      */
-    private final Watcher m_truncationRequestExistenceWatcher = new Watcher() {
+    private class TruncationRequestExistenceWatcher extends ZKUtil.CancellableWatcher {
+
+        public TruncationRequestExistenceWatcher() {
+            super(m_es);
+        }
 
         @Override
-        public void process(final WatchedEvent event) {
+        public void pProcess(final WatchedEvent event) {
             if (event.getState() == KeeperState.Disconnected) return;
-
-            m_es.execute(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        processTruncationRequestEvent(event);
-                    } catch (Exception e) {
-                        VoltDB.crashLocalVoltDB("Error procesing truncation request event", true, e);
-                    }
-                }
-            });
+            try {
+                processTruncationRequestEvent(event);
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Error procesing truncation request event", true, e);
+            }
         }
     };
 
@@ -1025,8 +1029,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      */
     void truncationRequestExistenceCheck() throws KeeperException, InterruptedException {
         loggingLog.info("Checking for existence of snapshot truncation request");
-        if (m_zk.exists(VoltZK.request_truncation_snapshot, m_truncationRequestExistenceWatcher) != null) {
+        m_currentTruncationWatcher.cancel();
+        m_currentTruncationWatcher = new TruncationRequestExistenceWatcher();
+        if (m_zk.exists(VoltZK.request_truncation_snapshot, m_currentTruncationWatcher) != null) {
             loggingLog.info("A truncation request node already existed, processing truncation request event");
+            m_currentTruncationWatcher.cancel();
             processTruncationRequestEvent(new WatchedEvent(
                     EventType.NodeCreated,
                     KeeperState.SyncConnected,

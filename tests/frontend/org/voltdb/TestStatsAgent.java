@@ -33,20 +33,17 @@ import java.util.Set;
 import org.junit.After;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import org.junit.Before;
 import org.junit.Test;
 
-import org.voltcore.messaging.HostMessenger;
 import org.voltcore.network.*;
-import org.voltcore.utils.CoreUtils;
-import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.client.ClientResponse;
 
 public class TestStatsAgent {
 
     private MockVoltDB m_mvoltdb;
 
-    private StatsAgent m_secondAgent;
     private final LinkedBlockingQueue<ClientResponseImpl> responses = new LinkedBlockingQueue<ClientResponseImpl>();
 
     private final Connection m_mockConnection = new MockConnection() {
@@ -73,15 +70,7 @@ public class TestStatsAgent {
     @Before
     public void setUp() throws Exception {
         m_mvoltdb = new MockVoltDB();
-        m_mvoltdb.addSite( CoreUtils.getHSIdFromHostAndSite( 0, 1), MailboxType.Initiator);
-        m_mvoltdb.addSite( CoreUtils.getHSIdFromHostAndSite( 1, 2), MailboxType.Initiator);
         VoltDB.replaceVoltDBInstanceForTest(m_mvoltdb);
-        m_secondAgent = new StatsAgent();
-        long secondAgentHSId = VoltDB.instance().getHostMessenger().getHSIdForLocalSite(42);
-        VoltDB.instance().getHostMessenger().generateMailboxId(
-                VoltDB.instance().getHostMessenger().getHSIdForLocalSite(42));
-        m_secondAgent.getMailbox(VoltDB.instance().getHostMessenger(), secondAgentHSId);
-        m_mvoltdb.addSite(secondAgentHSId, MailboxType.StatsAgent);
     }
 
     @After
@@ -90,7 +79,6 @@ public class TestStatsAgent {
         StatsAgent.STATS_COLLECTION_TIMEOUT = 60 * 1000;
         m_mvoltdb.shutdown(null);
         VoltDB.replaceVoltDBInstanceForTest(null);
-        m_secondAgent.shutdown();
     }
 
     private void createAndRegisterStats() throws Exception {
@@ -116,19 +104,16 @@ public class TestStatsAgent {
         });
         m_mvoltdb.getStatsAgent().registerStatsSource(SysProcSelector.DRNODE, 0, nodeSource);
 
-        MockStatsSource.columns = partitionColumns;
-        partitionSource = new MockStatsSource(new Object[][] {
-                { 44, "44" },
-                { 45, "45" }
+        List<VoltTable.ColumnInfo> snapshotStatusColumns = Arrays.asList(new VoltTable.ColumnInfo[] {
+            new VoltTable.ColumnInfo("c1", VoltType.STRING),
+            new VoltTable.ColumnInfo("c2", VoltType.STRING)
         });
-        m_secondAgent.registerStatsSource(SysProcSelector.DRPARTITION, 0, partitionSource);
-
-        MockStatsSource.columns = nodeColumns;
-        nodeSource = new MockStatsSource(new Object[][] {
-                { "45", 44 },
-                { "44", 44 }
+        MockStatsSource.columns = snapshotStatusColumns;
+        MockStatsSource snapshotSource = new MockStatsSource(new Object[][] {
+            {"RYANLOVES", "THEYANKEES"},
+            {"NOREALLY", "ASKHIM"}
         });
-        m_secondAgent.registerStatsSource(SysProcSelector.DRNODE, 0, nodeSource);
+        m_mvoltdb.getStatsAgent().registerStatsSource(SysProcSelector.SNAPSHOTSTATUS, 0, snapshotSource);
     }
 
     @Test
@@ -142,6 +127,30 @@ public class TestStatsAgent {
         System.out.println(results[0]);
         System.out.println(results[1]);
         verifyResults(response);
+    }
+
+    @Test
+    public void testCollectSnapshotStatusStats() throws Exception {
+        createAndRegisterStats();
+        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "SNAPSHOTSTATUS");
+        ClientResponseImpl response = responses.take();
+
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        VoltTable results[] = response.getResults();
+        System.out.println(results[0]);
+        while (results[0].advanceRow()) {
+            String c1 = results[0].getString("c1");
+            String c2 = results[0].getString("c2");
+            if (c1.equalsIgnoreCase("RYANLOVES")) {
+                assertEquals("THEYANKEES", c2);
+            }
+            else if (c1.equalsIgnoreCase("NOREALLY")) {
+                assertEquals("ASKHIM", c2);
+            }
+            else {
+                fail("Unexpected row in results: c1: " + c1 + ", c2: " + c2);
+            }
+        }
     }
 
     @Test

@@ -44,6 +44,7 @@ import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 
 import com.google.common.base.Charsets;
+import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 
 /* Serializes data over a connection that presumably is being read
  * by a voltdb execution engine. The serialization is currently a
@@ -709,7 +710,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int numFragmentIds,
             final long[] planFragmentIds,
             long[] inputDepIdsIn,
-            final ParameterSet[] parameterSets,
+            final Object[] parameterSets,
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
@@ -719,7 +720,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         final FastSerializer fser = new FastSerializer();
         try {
             for (int i = 0; i < numFragmentIds; ++i) {
-                parameterSets[i].writeExternal(fser);
+                // pset can be ByteBuffer or ParameterSet instance
+                if (parameterSets[i] instanceof ByteBuffer) {
+                    fser.write((ByteBuffer) parameterSets[i]);
+                }
+                else {
+                    ((ParameterSet) parameterSets[i]).writeExternal(fser);
+                }
             }
         } catch (final IOException exception) {
             throw new RuntimeException(exception);
@@ -763,7 +770,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int numFragmentIds,
             final long[] planFragmentIds,
             final long[] inputDepIds,
-            final ParameterSet[] parameterSets,
+            final Object[] parameterSets,
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
@@ -1051,13 +1058,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateTableStream(int tableId, TableStreamType streamType) {
+    public boolean activateTableStream(int tableId, TableStreamType streamType, SnapshotPredicates predicates) {
         m_data.clear();
         m_data.putInt(Commands.ActivateTableStream.m_id);
         m_data.putInt(tableId);
         m_data.putInt(streamType.ordinal());
-        m_data.put((byte)0);        // Delete flag
-        m_data.putInt(0);           // Predicate count
+        m_data.put(predicates.toBytes()); // predicates
 
         try {
             m_data.flip();
@@ -1269,8 +1275,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     @Override
     public int hashinate(Object value, HashinatorType type, byte config[])
     {
-        ParameterSet parameterSet = new ParameterSet();
-        parameterSet.setParameters(value);
+        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(value);
 
         final FastSerializer fser = new FastSerializer();
         try {

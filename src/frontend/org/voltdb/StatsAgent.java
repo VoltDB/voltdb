@@ -54,7 +54,7 @@ public class StatsAgent {
     private static final int MAX_IN_FLIGHT_REQUESTS = 5;
     static int STATS_COLLECTION_TIMEOUT = 60 * 1000;
 
-    // The id that responds to global requests (catalog id == -1).
+    // The local site id that responds to global requests (site id == -1).
     // Start at -1 until a winner is chosen.
     // Updated in synchronized getStats() method.
     private static Long m_idForGlobalStats = null;
@@ -71,24 +71,30 @@ public class StatsAgent {
 
     private HostMessenger m_messenger;
 
+    // Things that would be nice in the future:
+    // 1. Instead of the tables to be aggregates identified by index in the
+    // returned response, they should be named so it's safe if they return in
+    // any order.
+    // 2. Instead of guessing the number of returned tables, it would be nice
+    // if the selector mapped to something that specified the number of
+    // results, the call to get the stats, etc.
+    //
     private static class PendingStatsRequest {
         private final String selector;
         private final Connection c;
         private final long clientData;
         private int expectedStatsResponses = 0;
-        private final VoltTable aggregateTables[];
+        private VoltTable[] aggregateTables = null;
         private final long startTime;
         public PendingStatsRequest(
                 String selector,
                 Connection c,
                 long clientData,
-                VoltTable aggregateTables[],
                 long startTime) {
             this.startTime = startTime;
             this.selector = selector;
             this.c = c;
             this.clientData = clientData;
-            this.aggregateTables = aggregateTables;
         }
     }
 
@@ -152,22 +158,34 @@ public class StatsAgent {
             return;
         }
 
-        if (buf.hasRemaining()) {
-            for (int ii = 0; ii < request.aggregateTables.length; ii++) {
+        // The first message we receive will create the correct number of tables.  Nobody else better
+        // disagree or there will be trouble here in River City.  Nobody else better add non-table
+        // stuff after the responses to the returned messages or said trouble will also occur.  Ick, fragile.
+        if (request.aggregateTables == null) {
+            List<VoltTable> tables = new ArrayList<VoltTable>();
+            while (buf.hasRemaining()) {
                 final int tableLength = buf.getInt();
                 int oldLimit = buf.limit();
                 buf.limit(buf.position() + tableLength);
                 ByteBuffer tableBuf = buf.slice();
                 buf.position(buf.limit()).limit(oldLimit);
-                //Lazy init the aggregate table using the first result
-                if (request.aggregateTables[ii] == null) {
-                    ByteBuffer copy = ByteBuffer.allocate(tableBuf.capacity() * 2);
-                    copy.put(tableBuf);
-                    copy.limit(copy.position());
-                    copy.position(0);
-                    VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer( copy, false);
-                    request.aggregateTables[ii] = vt;
-                } else {
+                ByteBuffer copy = ByteBuffer.allocate(tableBuf.capacity() * 2);
+                copy.put(tableBuf);
+                copy.limit(copy.position());
+                copy.position(0);
+                VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer( copy, false);
+                tables.add(vt);
+            }
+            request.aggregateTables = tables.toArray(new VoltTable[tables.size()]);
+        }
+        else {
+            for (int ii = 0; ii < request.aggregateTables.length; ii++) {
+                if (buf.hasRemaining()) {
+                    final int tableLength = buf.getInt();
+                    int oldLimit = buf.limit();
+                    buf.limit(buf.position() + tableLength);
+                    ByteBuffer tableBuf = buf.slice();
+                    buf.position(buf.limit()).limit(oldLimit);
                     VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer( tableBuf, true);
                     while (vt.advanceRow()) {
                         request.aggregateTables[ii].add(vt);
@@ -188,8 +206,9 @@ public class StatsAgent {
      * to avoid hoarding references to the catalog.
      */
     public synchronized void notifyOfCatalogUpdate() {
-        final HashMap<Long, ArrayList<StatsSource>> catalogIdToStatsSources = registeredStatsSources.get(SysProcSelector.PROCEDURE);
-        catalogIdToStatsSources.clear();
+        final HashMap<Long, ArrayList<StatsSource>> siteIdToStatsSources =
+            registeredStatsSources.get(SysProcSelector.PROCEDURE);
+        siteIdToStatsSources.clear();
     }
 
     public void collectStats(final Connection c, final long clientHandle, final String selector) throws Exception {
@@ -248,7 +267,6 @@ public class StatsAgent {
                 selector,
                 c,
                 clientHandle,
-                new VoltTable[2],
                 System.currentTimeMillis());
             collectTopoStats(psr);
             return;
@@ -259,7 +277,6 @@ public class StatsAgent {
                     selector,
                     c,
                     clientHandle,
-                    new VoltTable[2],
                     System.currentTimeMillis());
         final long requestId = m_nextRequestId++;
         m_pendingRequests.put(requestId, psr);
@@ -272,10 +289,16 @@ public class StatsAgent {
         STATS_COLLECTION_TIMEOUT,
         TimeUnit.MILLISECONDS);
 
+        // DR has external/internal deltas, fix them here
+        String realSelector = selector;
+        if (selector.equalsIgnoreCase("DR")) {
+            realSelector = "DRNODE";
+        }
+
         JSONObject obj = new JSONObject();
         obj.put("requestId", requestId);
         obj.put("returnAddress", m_mailbox.getHSId());
-        obj.put("selector", "DRNODE");
+        obj.put("selector", realSelector);
         byte payloadBytes[] = CompressionService.compressBytes(obj.toString(4).getBytes("UTF-8"));
         for (int hostId : m_messenger.getLiveHostIds()) {
             long agentHsId = CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.STATS_SITE_ID);
@@ -312,15 +335,12 @@ public class StatsAgent {
          * It is possible not to receive a table response if a feature is not enabled
          */
         VoltTable responseTables[] = request.aggregateTables;
-        for (int ii = 0; ii < responseTables.length; ii++) {
-            if (responseTables[ii] == null) {
-                responseTables = new VoltTable[0];
-                statusCode = ClientResponse.GRACEFUL_FAILURE;
-                statusString =
-                    "Requested statistic \"" + request.selector +
-                    "\" is not supported in the current configuration";
-                break;
-            }
+        if (responseTables == null || responseTables.length == 0) {
+            responseTables = new VoltTable[0];
+            statusCode = ClientResponse.GRACEFUL_FAILURE;
+            statusString =
+                "Requested statistic \"" + request.selector +
+                "\" is not supported in the current configuration";
         }
 
         ClientResponseImpl response =
@@ -333,17 +353,14 @@ public class StatsAgent {
     }
 
     private void handleJSONMessage(JSONObject obj) throws Exception {
-        String selectorString = obj.getString("selector");
-        SysProcSelector selector = SysProcSelector.valueOf(selectorString);
-        if (selector == SysProcSelector.DRNODE) {
-            collectDRStats(obj);
-        }
+        collectDistributedStats(obj);
     }
 
     private void collectTopoStats(PendingStatsRequest psr)
     {
-        List<Long> catalogIds = Arrays.asList(new Long[] { 0L });
-        psr.aggregateTables[0] = getStats(SysProcSelector.TOPO, catalogIds, false, psr.startTime);
+        List<Long> siteIds = Arrays.asList(new Long[] { 0L });
+        psr.aggregateTables = new VoltTable[2];
+        psr.aggregateTables[0] = getStats(SysProcSelector.TOPO, siteIds, false, psr.startTime);
         VoltTable vt =
                 new VoltTable(
                 new VoltTable.ColumnInfo("HASHTYPE", VoltType.STRING),
@@ -358,19 +375,24 @@ public class StatsAgent {
         }
     }
 
-    private void collectDRStats(JSONObject obj) throws Exception {
-        List<Long> catalogIds = Arrays.asList(new Long[] { 0L });
-        Long now = System.currentTimeMillis();
+    private void collectDistributedStats(JSONObject obj) throws Exception
+    {
         long requestId = obj.getLong("requestId");
         long returnAddress = obj.getLong("returnAddress");
 
-        VoltTable partitionStats = getStats(SysProcSelector.DRPARTITION, catalogIds, false, now);
-        VoltTable nodeStats = getStats(SysProcSelector.DRNODE, catalogIds, false, now);
+        VoltTable[] stats = null;
+        // dispatch to collection
+        String selectorString = obj.getString("selector");
+        SysProcSelector selector = SysProcSelector.valueOf(selectorString);
+        if (selector == SysProcSelector.DRNODE) {
+            stats = collectDRStats();
+        }
+        else if (selector == SysProcSelector.SNAPSHOTSTATUS) {
+            stats = collectSnapshotStatusStats();
+        }
 
-        /*
-         * Send a response with no data since the stats is not supported
-         */
-        if (partitionStats == null || nodeStats == null) {
+        // Send a response with no data since the stats is not supported
+        if (stats == null) {
             ByteBuffer responseBuffer = ByteBuffer.allocate(8);
             responseBuffer.putLong(requestId);
             byte responseBytes[] = CompressionService.compressBytes(responseBuffer.array());
@@ -379,35 +401,70 @@ public class StatsAgent {
             return;
         }
 
-        ByteBuffer partitionStatsBuffer = partitionStats.getBuffer();
-        partitionStatsBuffer.position(0);
-
-        ByteBuffer nodeStatsBuffer = nodeStats.getBuffer();
-        nodeStatsBuffer.position(0);
+        ByteBuffer[] bufs = new ByteBuffer[stats.length];
+        int statbytes = 0;
+        for (int i = 0; i < stats.length; i++) {
+            bufs[i] = stats[i].getBuffer();
+            bufs[i].position(0);
+            statbytes += bufs[i].remaining();
+        }
 
         ByteBuffer responseBuffer = ByteBuffer.allocate(
-                16 //requestId + a length prefix for each stats table
-                + partitionStatsBuffer.remaining() + nodeStatsBuffer.remaining());
+                8 + // requestId
+                4 * stats.length + // length prefix for each stats table
+                + statbytes);
         responseBuffer.putLong(requestId);
-        responseBuffer.putInt(partitionStatsBuffer.remaining());
-        responseBuffer.put(partitionStatsBuffer);
-        responseBuffer.putInt(nodeStatsBuffer.remaining());
-        responseBuffer.put(nodeStatsBuffer);
+        for (int i = 0; i < bufs.length; i++) {
+            responseBuffer.putInt(bufs[i].remaining());
+            responseBuffer.put(bufs[i]);
+        }
         byte responseBytes[] = CompressionService.compressBytes(responseBuffer.array());
 
         BinaryPayloadMessage bpm = new BinaryPayloadMessage( new byte[] {STATS_PAYLOAD}, responseBytes);
         m_mailbox.send(returnAddress, bpm);
+
     }
 
-    public synchronized void registerStatsSource(SysProcSelector selector, long catalogId, StatsSource source) {
+    // This could probably eventually move to the stats source
+    private VoltTable[] collectDRStats()
+    {
+        List<Long> siteIds = Arrays.asList(new Long[] { 0L });
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable partitionStats = getStats(SysProcSelector.DRPARTITION, siteIds, false, now);
+        VoltTable nodeStats = getStats(SysProcSelector.DRNODE, siteIds, false, now);
+        if (partitionStats != null && nodeStats != null) {
+            stats = new VoltTable[2];
+            stats[0] = partitionStats;
+            stats[1] = nodeStats;
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectSnapshotStatusStats()
+    {
+        List<Long> siteIds = Arrays.asList(new Long[] { 0L });
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable ssStats = getStats(SysProcSelector.SNAPSHOTSTATUS, siteIds, false, now);
+        if (ssStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = ssStats;
+        }
+        return stats;
+    }
+
+    public synchronized void registerStatsSource(SysProcSelector selector, long siteId, StatsSource source) {
         assert selector != null;
         assert source != null;
-        final HashMap<Long, ArrayList<StatsSource>> catalogIdToStatsSources = registeredStatsSources.get(selector);
-        assert catalogIdToStatsSources != null;
-        ArrayList<StatsSource> statsSources = catalogIdToStatsSources.get(catalogId);
+        final HashMap<Long, ArrayList<StatsSource>> siteIdToStatsSources = registeredStatsSources.get(selector);
+        assert siteIdToStatsSources != null;
+        ArrayList<StatsSource> statsSources = siteIdToStatsSources.get(siteId);
         if (statsSources == null) {
             statsSources = new ArrayList<StatsSource>();
-            catalogIdToStatsSources.put(catalogId, statsSources);
+            siteIdToStatsSources.put(siteId, statsSources);
         }
         statsSources.add(source);
     }
@@ -415,17 +472,17 @@ public class StatsAgent {
     /**
      * Get statistics.
      * @param selector    @Statistics selector keyword
-     * @param catalogIds  statistics catalog ids
+     * @param siteIds     site IDs of the sites from which to pull stats
      * @param interval    true if processing a reporting interval
      * @param now         current timestamp
      * @return  statistics VoltTable results
      */
     public synchronized VoltTable getStats(
             final SysProcSelector selector,
-            final List<Long> catalogIds,
+            final List<Long> siteIds,
             final boolean interval,
             final Long now) {
-        return getStatsInternal(selector, catalogIds, interval, now, null);
+        return getStatsInternal(selector, siteIds, interval, now, null);
     }
 
     /**
@@ -434,7 +491,7 @@ public class StatsAgent {
      * @param selector  statistics selector keyword
      * @param interval  true if processing a reporting interval
      * @param now       current timestamp
-     * @param siteId    siteId for catalog
+     * @param siteId    siteId of the calling site
      * @return  statistics VoltTable results
      */
     public synchronized VoltTable getSiteAndHostStats(
@@ -450,17 +507,17 @@ public class StatsAgent {
         // First get the site-specific statistics.
         VoltTable results;
         {
-            ArrayList<Long> catalogIds = new ArrayList<Long>();
-            catalogIds.add(siteId);
-            results = getStatsInternal(selector, catalogIds, interval, now, null);
+            ArrayList<Long> siteIds = new ArrayList<Long>();
+            siteIds.add(siteId);
+            results = getStatsInternal(selector, siteIds, interval, now, null);
         }
 
         // Then append global results if it's the chosen site.
         if (siteId == m_idForGlobalStats) {
-            // -1 is always the global catalog id.
-            ArrayList<Long> catalogIds = new ArrayList<Long>();
-            catalogIds.add(-1L);
-            results = getStatsInternal(selector, catalogIds, interval, now, results);
+            // -1 is always the global site id.
+            ArrayList<Long> siteIds = new ArrayList<Long>();
+            siteIds.add(-1L);
+            results = getStatsInternal(selector, siteIds, interval, now, results);
         }
 
         return results;
@@ -477,17 +534,17 @@ public class StatsAgent {
      */
     private synchronized VoltTable getStatsInternal(
             final SysProcSelector selector,
-            final List<Long> catalogIds,
+            final List<Long> siteIds,
             final boolean interval,
             final Long now,
             VoltTable prevResults) {
         assert selector != null;
-        assert catalogIds != null;
-        assert catalogIds.size() > 0;
-        final HashMap<Long, ArrayList<StatsSource>> catalogIdToStatsSources = registeredStatsSources.get(selector);
-        assert catalogIdToStatsSources != null;
+        assert siteIds != null;
+        assert siteIds.size() > 0;
+        final HashMap<Long, ArrayList<StatsSource>> siteIdToStatsSources = registeredStatsSources.get(selector);
+        assert siteIdToStatsSources != null;
 
-        ArrayList<StatsSource> statsSources = catalogIdToStatsSources.get(catalogIds.get(0));
+        ArrayList<StatsSource> statsSources = siteIdToStatsSources.get(siteIds.get(0));
         //Let these two be null since they are for pro features
         if (selector == SysProcSelector.DRNODE || selector == SysProcSelector.DRPARTITION) {
             if (statsSources == null || statsSources.isEmpty()) {
@@ -518,8 +575,8 @@ public class StatsAgent {
          // Append to previous results if provided.
         final VoltTable resultTable = prevResults != null ? prevResults : new VoltTable(columns);
 
-        for (Long catalogId : catalogIds) {
-            statsSources = catalogIdToStatsSources.get(catalogId);
+        for (Long siteId : siteIds) {
+            statsSources = siteIdToStatsSources.get(siteId);
             assert statsSources != null;
             for (final StatsSource ss : statsSources) {
                 assert ss != null;

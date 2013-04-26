@@ -66,7 +66,6 @@
 #include "common/valuevector.h"
 #include "common/Pool.hpp"
 #include "common/UndoLog.h"
-#include "common/DummyUndoQuantum.hpp"
 #include "common/SerializableEEException.h"
 #include "common/Topend.h"
 #include "common/DefaultTupleSerializer.h"
@@ -104,6 +103,7 @@ class AbstractExecutor;
 class AbstractPlanNode;
 class SerializeInput;
 class SerializeOutput;
+class PersistentTable;
 class Table;
 class CatalogDelegate;
 class PlanNodeFragment;
@@ -121,6 +121,9 @@ const size_t PLAN_CACHE_SIZE = 1024 * 10;
 // TODO(evanj): Used by JNI so must be exported. Remove when we only one .so
 class __attribute__((visibility("default"))) VoltDBEngine {
     public:
+
+        typedef std::pair<std::string, CatalogDelegate*> LabeledCDPair;
+
         /** Constructor for test code: this does not enable JNI callbacks. */
         VoltDBEngine() :
           m_currentUndoQuantum(NULL),
@@ -131,9 +134,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
           m_isELEnabled(false),
           m_numResultDependencies(0),
           m_logManager(new StdoutLogProxy()), m_templateSingleLongTable(NULL), m_topend(NULL)
-
         {
-            m_currentUndoQuantum = new DummyUndoQuantum();
         }
 
         VoltDBEngine(Topend *topend, LogProxy *logProxy);
@@ -186,8 +187,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         bool loadCatalog(const int64_t timestamp, const std::string &catalogPayload);
         bool updateCatalog(const int64_t timestamp, const std::string &catalogPayload);
         bool processCatalogAdditions(bool addAll, int64_t timestamp);
-        bool processCatalogDeletes(int64_t timestamp);
-        bool rebuildTableCollections();
 
 
         /**
@@ -305,33 +304,22 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         inline void setUndoToken(int64_t nextUndoToken) {
             if (nextUndoToken == INT64_MAX) { return; }
-            if (m_currentUndoQuantum != NULL && m_currentUndoQuantum->isDummy()) {
-                //std::cout << "Deleting dummy undo quantum " << std::endl;
-                delete m_currentUndoQuantum;
-                m_currentUndoQuantum = NULL;
-            }
             if (m_currentUndoQuantum != NULL) {
-                assert(nextUndoToken >= m_currentUndoQuantum->getUndoToken());
                 if (m_currentUndoQuantum->getUndoToken() == nextUndoToken) {
                     return;
                 }
+                assert(nextUndoToken > m_currentUndoQuantum->getUndoToken());
             }
             setCurrentUndoQuantum(m_undoLog.generateUndoQuantum(nextUndoToken));
         }
 
         inline void releaseUndoToken(int64_t undoToken) {
-            if (m_currentUndoQuantum != NULL && m_currentUndoQuantum->isDummy()) {
-                return;
-            }
             if (m_currentUndoQuantum != NULL && m_currentUndoQuantum->getUndoToken() == undoToken) {
                 m_currentUndoQuantum = NULL;
             }
             m_undoLog.release(undoToken);
         }
         inline void undoUndoToken(int64_t undoToken) {
-            if (m_currentUndoQuantum != NULL && m_currentUndoQuantum->isDummy()) {
-                return;
-            }
             m_undoLog.undo(undoToken);
             m_currentUndoQuantum = NULL;
         }
@@ -417,7 +405,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                           AbstractPlanNode* node,
                           TempTableLimits* limits);
         bool initCluster();
-        bool initMaterializedViews(bool addAll);
+        void processCatalogDeletes(int64_t timestamp);
+        void rebuildTableCollections();
+        void initMaterializedViews(bool addAll);
         bool updateCatalogDatabaseReference();
 
         bool hasSameSchema(catalog::Table *t1, voltdb::Table *t2);
@@ -485,6 +475,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * Catalog delegates hashed by path.
          */
         std::map<std::string, CatalogDelegate*> m_catalogDelegates;
+        std::map<std::string, CatalogDelegate*> m_delegatesByName;
 
         // map catalog table id to table pointers
         std::map<CatalogId, Table*> m_tables;
@@ -502,7 +493,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * to try to map this tableId back to catalog::Table via
          * the catalog, at least w/o comparing table names.
          */
-        std::map<CatalogId, Table*> m_snapshottingTables;
+        std::map<int32_t, PersistentTable*> m_snapshottingTables;
 
         /*
          * Map of table signatures to exporting tables.

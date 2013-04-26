@@ -86,6 +86,7 @@ PARTITION TABLE bigp ON COLUMN p;
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReplicatedUpdateBaseProc;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonBaseProc;
 
 -- real procedures
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.SetupAdHocTables;
@@ -105,3 +106,6 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.Summarize;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGPTableInsert;
 PARTITION PROCEDURE BIGPTableInsert ON TABLE bigp COLUMN p;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGRTableInsert;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonSP;
+PARTITION PROCEDURE PoisonSP ON TABLE partitioned COLUMN cid;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonMP;

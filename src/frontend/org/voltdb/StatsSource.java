@@ -40,14 +40,17 @@ public abstract class StatsSource {
     private final ArrayList<ColumnInfo> columns = new ArrayList<ColumnInfo>();
 
     /**
-     * Map from the name of a column to its index in the a result row. In order to decouple the contributions of each class
-     * in the inheritance hierarchy from the integer index in the result row this map is used for lookups instead of hard coding an index.
+     * Map from the name of a column to its index in the a result row. In
+     * order to decouple the contributions of each class in the inheritance
+     * hierarchy from the integer index in the result row this map is used for
+     * lookups instead of hard coding an index.
      */
     protected final HashMap<String, Integer> columnNameToIndex = new HashMap<String, Integer>();
 
     /**
-     * Initialize this source of statistical information with the specified name. Populate the column schema by calling populateColumnSchema
-     * on the derived class and use it to populate the columnNameToIndex map.
+     * Initialize this source of statistical information with the specified
+     * name. Populate the column schema by calling populateColumnSchema on the
+     * derived class and use it to populate the columnNameToIndex map.
      * @param name
      * @param isEE If this source represents statistics from EE
      */
@@ -73,8 +76,10 @@ public abstract class StatsSource {
     }
 
     /**
-     * Called from the constructor to generate the column schema at run time. Derived classes need to override this method in order
-     * to specify the columns they will be adding. The first line must always be a call the superclasses version of populateColumnSchema
+     * Called from the constructor to generate the column schema at run time.
+     * Derived classes need to override this method in order to specify the
+     * columns they will be adding. The first line must always be a call the
+     * superclasses version of populateColumnSchema
      * in order to ensure the columns are add to the list in the right order.
      * @param columns Output list for the column schema.
      */
@@ -94,8 +99,10 @@ public abstract class StatsSource {
     }
 
     /**
-     * Get the latest stat values as an array of arrays of objects suitable for insertion into an VoltTable
-     * @param interval Whether to get stats since the beginning or since the last time stats were retrieved
+     * Get the latest stat values as an array of arrays of objects suitable for
+     * insertion into an VoltTable
+     * @param interval Whether to get stats since the beginning or since the
+     * last time stats were retrieved
      * @return Array of Arrays of objects containing the latest values
      */
     public Object[][] getStatsRows(boolean interval, final Long now) {
@@ -149,9 +156,10 @@ public abstract class StatsSource {
     private Long now = System.currentTimeMillis();
 
     /**
-     * Update the parameter array with the latest values. This is similar
-     * to populateColumnSchema in that it must be overriden by
-     * derived classes and the derived class implementation must call the super classes implementation.
+     * Update the parameter array with the latest values. This is similar to
+     * populateColumnSchema in that it must be overriden by derived classes and
+     * the derived class implementation must call the super classes
+     * implementation.
      * @param rowKey Key identifying the specific row to be populated
      * @param rowValues Output parameter. Array of values to be updated.
      */
@@ -162,10 +170,10 @@ public abstract class StatsSource {
     }
 
     /**
-     * Retrieve an iterator that iterates over the keys identifying all unique stats rows
-     * available for retrieval from the stats source
-     * @param interval Whether return stats that are recorded from the beginning or since
-     *  the last time they were iterated
+     * Retrieve an iterator that iterates over the keys identifying all unique
+     * stats rows available for retrieval from the stats source
+     * @param interval Whether return stats that are recorded from the
+     * beginning or since the last time they were iterated
      * @return Iterator of Objects representing keys that identify unique stats rows
      */
     abstract protected Iterator<Object> getStatsRowKeyIterator(boolean interval);

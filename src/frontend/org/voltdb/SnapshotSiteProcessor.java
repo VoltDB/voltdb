@@ -20,6 +20,7 @@ package org.voltdb;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
@@ -48,10 +49,10 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
-import org.voltdb.iv2.SiteTasker;
 import org.voltdb.iv2.SiteTaskerQueue;
 import org.voltdb.iv2.SnapshotTask;
 import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.utils.CatalogUtil;
 
 import com.google.common.util.concurrent.Callables;
@@ -131,8 +132,8 @@ public class SnapshotSiteProcessor {
      * Random tasks performed on each site after the snapshot tasks are finished but
      * before the snapshot transaction is finished.
      */
-    public static final Map<Integer, SiteTasker> m_siteTasksPostSnapshotting =
-            Collections.synchronizedMap(new HashMap<Integer, SiteTasker>());
+    public static final Map<Integer, PostSnapshotTask> m_siteTasksPostSnapshotting =
+            Collections.synchronizedMap(new HashMap<Integer, PostSnapshotTask>());
 
 
     /** Number of snapshot buffers to keep */
@@ -399,12 +400,21 @@ public class SnapshotSiteProcessor {
                 }
             }
             SNAP_LOG.debug("Examining SnapshotTableTask: " + task);
+
+            SnapshotPredicates predicates;
+            if (task.m_predicate == null) {
+                predicates = new SnapshotPredicates();
+            } else {
+                predicates = new SnapshotPredicates(Arrays.asList(task.m_predicate),
+                                                    task.m_deleteTuples);
+            }
+
             /*
              * Why do the extra work for a /dev/null target
              * Check if it is dev null and don't activate COW
              */
             if (!task.m_isDevNull) {
-                if (!ee.activateTableStream(task.m_tableId, TableStreamType.SNAPSHOT )) {
+                if (!ee.activateTableStream(task.m_tableId, TableStreamType.SNAPSHOT, predicates)) {
                     SNAP_LOG.error("Attempted to activate copy on write mode for table "
                             + task.m_name + " and failed");
                     SNAP_LOG.error(task);
@@ -440,7 +450,8 @@ public class SnapshotSiteProcessor {
             m_quietUntil = System.currentTimeMillis() + (5 * m_snapshotPriority) + ((long)(m_random.nextDouble() * 15));
         }
     }
-    public Future<?> doSnapshotWork(int partitionId, ExecutionEngine ee, boolean ignoreQuietPeriod) {
+    public Future<?> doSnapshotWork(SystemProcedureExecutionContext context,
+                                    ExecutionEngine ee, boolean ignoreQuietPeriod) {
         ListenableFuture<?> retval = null;
 
         /*
@@ -555,12 +566,8 @@ public class SnapshotSiteProcessor {
          */
         if (m_snapshotTableTasks.isEmpty()) {
             SNAP_LOG.debug("Finished with tasks");
-            // Offer the post-snapshot task if there is one to the site tasker queue
-            SiteTasker postSnapshotTask = m_siteTasksPostSnapshotting.remove(partitionId);
-            if (postSnapshotTask != null) {
-                m_siteTaskerQueue.offer(postSnapshotTask);
-            }
-
+            // In case this is a non-blocking snapshot, do the post-snapshot tasks here.
+            runPostSnapshotTasks(context);
             final ArrayList<SnapshotDataTarget> snapshotTargets = m_snapshotTargets;
             m_snapshotTargets = null;
             m_snapshotTableTasks = null;
@@ -655,6 +662,14 @@ public class SnapshotSiteProcessor {
         return retval;
     }
 
+    public static void runPostSnapshotTasks(SystemProcedureExecutionContext context)
+    {
+        SNAP_LOG.debug("Running post-snapshot tasks");
+        PostSnapshotTask postSnapshotTask = m_siteTasksPostSnapshotting.remove(context.getPartitionId());
+        if (postSnapshotTask != null) {
+            postSnapshotTask.run(context);
+        }
+    }
 
     private static void logSnapshotCompleteToZK(
             long txnId,
@@ -802,10 +817,12 @@ public class SnapshotSiteProcessor {
      * Do snapshot work exclusively until there is no more. Also blocks
      * until the fsync() and close() of snapshot data targets has completed.
      */
-    public HashSet<Exception> completeSnapshotWork(int partitionId, ExecutionEngine ee) throws InterruptedException {
+    public HashSet<Exception> completeSnapshotWork(SystemProcedureExecutionContext context,
+                                                   ExecutionEngine ee)
+        throws InterruptedException {
         HashSet<Exception> retval = new HashSet<Exception>();
         while (m_snapshotTableTasks != null) {
-            Future<?> result = doSnapshotWork(partitionId, ee, true);
+            Future<?> result = doSnapshotWork(context, ee, true);
             if (result != null) {
                 try {
                     result.get();

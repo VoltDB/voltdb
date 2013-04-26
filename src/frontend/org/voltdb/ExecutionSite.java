@@ -18,7 +18,6 @@
 package org.voltdb;
 
 import java.io.File;
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
@@ -47,7 +46,6 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.FailureSiteUpdateMessage;
 import org.voltcore.messaging.HeartbeatMessage;
-import org.voltcore.messaging.HeartbeatResponseMessage;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.RecoveryMessage;
@@ -58,7 +56,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
-import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
@@ -66,7 +63,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
@@ -82,7 +78,6 @@ import org.voltdb.jni.MockExecutionEngine;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
-import org.voltdb.messaging.FragmentTaskLogMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
@@ -626,7 +621,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         }
 
         // do other periodic work
-        m_snapshotter.doSnapshotWork(getCorrespondingPartitionId(), ee, false);
+        m_snapshotter.doSnapshotWork(m_systemProcedureContext, ee, false);
 
         /*
          * grab the table statistics from ee and put it into the statistics
@@ -778,6 +773,12 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation)
         {
             return ExecutionSite.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation);
+        }
+
+        @Override
+        public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config)
+        {
+            //To change body of implemented methods use File | Settings | File Templates.
         }
     }
 
@@ -965,7 +966,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                     if (message == null) {
                         //Will return null if there is no work, safe to block on the mailbox if there is no work
                         boolean hadWork =
-                            (m_snapshotter.doSnapshotWork(getCorrespondingPartitionId(),
+                            (m_snapshotter.doSnapshotWork(m_systemProcedureContext,
                                     ee,
                                     EstTime.currentTimeMillis() - lastCommittedTxnTime > 5) != null);
 
@@ -994,7 +995,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                         handleMailboxMessage(message);
                     } else {
                         //idle, do snapshot work
-                        m_snapshotter.doSnapshotWork(getCorrespondingPartitionId(), ee, EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
+                        m_snapshotter.doSnapshotWork(m_systemProcedureContext, ee, EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
                         // do some rejoin work
                         doRejoinWork();
                     }
@@ -1462,14 +1463,14 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                                 exportm.m_m.getPartitionId(),
                                 exportm.m_m.getSignature());
         } else if (message instanceof PotentialSnapshotWorkMessage) {
-            m_snapshotter.doSnapshotWork(getCorrespondingPartitionId(), ee, false);
+            m_snapshotter.doSnapshotWork(m_systemProcedureContext, ee, false);
         }
         else if (message instanceof ExecutionSiteLocalSnapshotMessage) {
             hostLog.info("Executing local snapshot. Completing any on-going snapshots.");
 
             // first finish any on-going snapshot
             try {
-                HashSet<Exception> completeSnapshotWork = m_snapshotter.completeSnapshotWork(getCorrespondingPartitionId(), ee);
+                HashSet<Exception> completeSnapshotWork = m_snapshotter.completeSnapshotWork(m_systemProcedureContext, ee);
                 if (completeSnapshotWork != null && !completeSnapshotWork.isEmpty()) {
                     for (Exception e : completeSnapshotWork) {
                         hostLog.error("Error completing in progress snapshot.", e);
@@ -1961,7 +1962,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
      */
     @Override
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException {
-        return m_snapshotter.completeSnapshotWork(getCorrespondingPartitionId(), ee);
+        return m_snapshotter.completeSnapshotWork(m_systemProcedureContext, ee);
     }
 
 
@@ -2026,7 +2027,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             int numFragmentIds,
             long[] planFragmentIds,
             long[] inputDepIds,
-            ParameterSet[] parameterSets,
+            Object[] parameterSets,
             long txnId,//txnid is both sphandle and uniqueid pre-iv2
             long txnIdAsUniqueId,
             boolean readOnly) throws EEException
@@ -2319,12 +2320,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     @Override
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds) {
         //A noop pre-IV2
-    }
-
-    @Override
-    public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config)
-    {
-        // A noop pre-IV2
     }
 
     @Override

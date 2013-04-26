@@ -117,25 +117,6 @@ function sync-benchmark() {
         --threads=40
 }
 
-function oneshot-benchmark() {
-    srccompile
-    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        voltkv.OneShotBenchmark \
-        --displayinterval=5 \
-        --duration=60 \
-        --servers=localhost \
-        --poolsize=100000 \
-        --preload=true \
-        --getputratio=0.00 \
-        --keysize=32 \
-        --minvaluesize=8 \
-        --maxvaluesize=8 \
-        --usecompression=false \
-        --threads=40 \
-        --mpthreads=2
-}
-
-# JDBC benchmark sample
 # Use this target for argument help
 function jdbc-benchmark-help() {
     srccompile

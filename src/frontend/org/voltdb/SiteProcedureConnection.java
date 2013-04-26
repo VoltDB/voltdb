@@ -87,7 +87,7 @@ public interface SiteProcedureConnection {
             int numFragmentIds,
             long[] planFragmentIds,
             long[] inputDepIds,
-            ParameterSet[] parameterSets,
+            Object[] parameterSets,
             long spHandle,
             long uniqueId,
             boolean readOnly) throws EEException;
@@ -154,11 +154,6 @@ public interface SiteProcedureConnection {
     // Snapshot services provided by the site
     public Future<?> doSnapshotWork(boolean ignoreQuietPeriod);
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds);
-
-    /**
-     * Update the EE hashinator with the given configuration.
-     */
-    public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config);
 
     /**
      * Get the site-local fragment id for a given plan identified by 20-byte sha-1 hash

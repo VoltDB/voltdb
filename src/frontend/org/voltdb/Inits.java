@@ -23,6 +23,8 @@ import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -291,12 +293,23 @@ public class Inits {
                                 org.voltdb.TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0);
                     }
 
+                    // get a hash of the catalog - should never actually throw
+                    MessageDigest md = null;
+                    try {
+                        md = MessageDigest.getInstance("SHA-1");
+                    } catch (NoSuchAlgorithmException e) {
+                        VoltDB.crashLocalVoltDB("Bad JVM has no SHA-1 hash.", true, e);
+                    }
+                    md.update(catalogBytes);
+                    byte[] catalogHash = md.digest();
+                    assert(catalogHash.length == 20); // sha-1 length
 
                     // publish the catalog bytes to ZK
                     CatalogUtil.uploadCatalogToZK(
                             m_rvdb.getHostMessenger().getZK(),
                             0, catalogTxnId,
                             catalogUniqueId,
+                            catalogHash,
                             catalogBytes);
                 }
                 catch (IOException e) {
@@ -334,7 +347,7 @@ public class Inits {
             try {
                 m_rvdb.m_serializedCatalog = CatalogUtil.loadCatalogFromJar(catalogStuff.bytes, hostLog);
             } catch (IOException e) {
-                VoltDB.crashLocalVoltDB("Unable to load catalog: " + e.getMessage(), false, null);
+                VoltDB.crashLocalVoltDB("Unable to load catalog", true, e);
             }
 
             if ((m_rvdb.m_serializedCatalog == null) || (m_rvdb.m_serializedCatalog.length() == 0))
@@ -346,8 +359,7 @@ public class Inits {
 
             // note if this fails it will print an error first
             try {
-                m_rvdb.m_depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_deployment,
-                                                                         true, false);
+                m_rvdb.m_depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_deployment, true);
                 if (m_rvdb.m_depCRC < 0)
                     System.exit(-1);
             } catch (Exception e) {

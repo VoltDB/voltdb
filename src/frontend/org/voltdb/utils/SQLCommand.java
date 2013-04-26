@@ -27,8 +27,12 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.math.BigDecimal;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLConnection;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -49,6 +53,7 @@ import jline.console.KeyMap;
 import jline.console.completer.Completer;
 import jline.console.history.FileHistory;
 
+import org.voltdb.RealVoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -814,7 +819,7 @@ public class SQLCommand
 
     // VoltDB connection support
     private static Client VoltDB;
-    private static final List<String> StatisticsComponents = Arrays.asList("INDEX","INITIATOR","IOSTATS","MANAGEMENT","MEMORY","PROCEDURE","TABLE","PARTITIONCOUNT","STARVATION","LIVECLIENTS", "DR", "TOPO", "PLANNER");
+    private static final List<String> StatisticsComponents = Arrays.asList("INDEX","INITIATOR","IOSTATS","MANAGEMENT","MEMORY","PROCEDURE","TABLE","PARTITIONCOUNT","STARVATION","LIVECLIENTS", "DR", "TOPO", "PLANNER", "SNAPSHOTSTATUS");
     private static final List<String> SysInfoSelectors = Arrays.asList("OVERVIEW","DEPLOYMENT");
     private static final List<String> MetaDataSelectors =
         Arrays.asList("TABLES", "COLUMNS", "INDEXINFO", "PRIMARYKEYS",
@@ -1138,6 +1143,9 @@ public class SQLCommand
             // Split server list
             String[] servers = serverList.split(",");
 
+            // Phone home to see if there is a newer version of VoltDB
+            openURLAsync();
+
             // Load system procedures
             loadSystemProcedures();
 
@@ -1256,4 +1264,47 @@ public class SQLCommand
         }
     }
 
+    // The following two methods implement a "phone home" version check for VoltDB.
+    // Asynchronously ping VoltDB to see what the current released version is.
+    // If it is newer than the one running here, then notify the user in some manner TBD.
+    // Note that this processing should not impact utility use in any way.  Ignore all
+    // errors.
+    private static void openURLAsync()
+    {
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                 openURL();
+            }
+        });
+
+        // Set the daemon flag so that this won't hang the process if it runs into difficulty
+        t.setDaemon(true);
+        t.start();
+    }
+
+    private static void openURL()
+    {
+        URL url;
+
+        try {
+            // Read the response from VoltDB
+            String a="http://community.voltdb.com/versioncheck?app=sqlcmd&ver=" + org.voltdb.VoltDB.instance().getVersionString();
+            url = new URL(a);
+            URLConnection conn = url.openConnection();
+
+            // open the stream and put it into BufferedReader
+            BufferedReader br = new BufferedReader(
+                               new InputStreamReader(conn.getInputStream()));
+
+            String inputLine;
+            while ((inputLine = br.readLine()) != null) {
+                // At this time do nothing, just drain the stream.
+                // In the future we'll notify the user that a new version of VoltDB is available.
+            }
+            br.close();
+        } catch (Throwable e) {
+            // ignore any error
+        }
+    }
 }
