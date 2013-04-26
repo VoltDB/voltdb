@@ -20,11 +20,13 @@
 
 #include <string>
 #include <vector>
+#include <list>
 #include <boost/scoped_ptr.hpp>
 #include "common/ids.h"
 #include "common/types.h"
 #include "common/TupleSerializer.h"
 #include "storage/TupleBlock.h"
+#include "storage/ElasticScanner.h"
 
 namespace voltdb
 {
@@ -35,38 +37,41 @@ class ReferenceSerializeInput;
 class PersistentTable;
 class TupleOutputStreamProcessor;
 
-class TableStreamer
+namespace elastic
+{
+
+class Streamer
 {
 public:
 
     /**
      * Constructor with data from serialized message.
      */
-    TableStreamer(TupleSerializer &tupleSerializer,
-                  TableStreamType streamType,
-                  int32_t partitionId,
-                  ReferenceSerializeInput &serializeIn);
+    Streamer(TupleSerializer &tupleSerializer,
+             TableStreamType streamType,
+             int32_t partitionId,
+             ReferenceSerializeInput &serializeIn);
 
     /**
      * Constructor with predicates to be copied.
      */
-    TableStreamer(TupleSerializer &tupleSerializer,
-                  TableStreamType streamType,
-                  int32_t partitionId,
-                  const std::vector<std::string> &predicateStrings,
-                  bool doDelete);
+    Streamer(TupleSerializer &tupleSerializer,
+             TableStreamType streamType,
+             int32_t partitionId,
+             const std::vector<std::string> &predicateStrings,
+             bool doDelete);
 
     /**
      * Constructor without predicates or delete flag.
      */
-    TableStreamer(TupleSerializer &tupleSerializer,
-                  TableStreamType streamType,
-                  int32_t partitionId);
+    Streamer(TupleSerializer &tupleSerializer,
+             TableStreamType streamType,
+             int32_t partitionId);
 
     /**
      * Destructor.
      */
-    virtual ~TableStreamer();
+    virtual ~Streamer();
 
     /**
      * Return true if the stream has already been activated.
@@ -126,6 +131,16 @@ public:
      */
     bool canSafelyFreeTuple(TableTuple &tuple) const;
 
+    /**
+     * Create new elastic row scanner.
+     */
+    boost::shared_ptr<Scanner> makeScanner(PersistentTable &table);
+
+    /**
+     * Delete scanner produced by makeScanner().
+     */
+    void deleteScanner(Scanner *scanner);
+
 private:
 
     /// Tuple serializer.
@@ -148,8 +163,13 @@ private:
 
     /// Context to keep track of recovery scans.
     boost::scoped_ptr<RecoveryContext> m_recoveryContext;
+
+    /// List of active scanners to keep updated.
+    std::list<boost::shared_ptr<Scanner> > m_scanners;
 };
 
+
+} // namespace elastic
 } // namespace voltdb
 
 #endif // TABLE_STREAM_H

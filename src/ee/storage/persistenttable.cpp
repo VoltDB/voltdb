@@ -906,7 +906,7 @@ bool PersistentTable::activateStreamForEngine(
     else {
         // Prepare a TableStreamer.
         m_tableStreamer.reset(
-            new TableStreamer(tupleSerializer, streamType, partitionId, serializeIn));
+              new elastic::Streamer(tupleSerializer, streamType, partitionId, serializeIn));
     }
 
     return activateStream(tableId);
@@ -928,7 +928,7 @@ bool PersistentTable::activateStreamForTest(
     else {
         // Prepare a TableStreamer.
         m_tableStreamer.reset(
-            new TableStreamer(tupleSerializer, streamType, partitionId, predicateStrings, doDelete));
+            new elastic::Streamer(tupleSerializer, streamType, partitionId, predicateStrings, doDelete));
     }
 
     return activateStream(tableId);
@@ -984,7 +984,7 @@ int64_t PersistentTable::streamMore(TupleOutputStreamProcessor &outputStreams,
     int64_t remaining = m_tableStreamer->streamMore(outputStreams, retPositions);
     if (remaining <= 0) {
         // clang needs the cast for some reason.
-        m_tableStreamer.reset((TableStreamer*)NULL);
+        m_tableStreamer.reset((elastic::Streamer*)NULL);
     }
     return remaining;
 }

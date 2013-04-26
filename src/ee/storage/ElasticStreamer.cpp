@@ -20,11 +20,13 @@
 #include "common/serializeio.h"
 #include "storage/persistenttable.h"
 #include "storage/CopyOnWriteContext.h"
-#include "TableStreamer.h"
+#include "storage/ElasticStreamer.h"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
 
 namespace voltdb
+{
+namespace elastic
 {
 
 typedef std::pair<CatalogId, Table*> TIDPair;
@@ -32,10 +34,10 @@ typedef std::pair<CatalogId, Table*> TIDPair;
 /**
  * Constructor with data from serialized message.
  */
-TableStreamer::TableStreamer(TupleSerializer &tupleSerializer,
-                             TableStreamType streamType,
-                             int32_t partitionId,
-                             ReferenceSerializeInput &serializeIn) :
+Streamer::Streamer(TupleSerializer &tupleSerializer,
+                   TableStreamType streamType,
+                   int32_t partitionId,
+                   ReferenceSerializeInput &serializeIn) :
     m_tupleSerializer(tupleSerializer),
     m_streamType(streamType),
     m_partitionId(partitionId),
@@ -58,11 +60,11 @@ TableStreamer::TableStreamer(TupleSerializer &tupleSerializer,
 /**
  * Constructor with predicates to be copied.
  */
-TableStreamer::TableStreamer(TupleSerializer &tupleSerializer,
-                             TableStreamType streamType,
-                             int32_t partitionId,
-                             const std::vector<std::string> &predicateStrings,
-                             bool doDelete) :
+Streamer::Streamer(TupleSerializer &tupleSerializer,
+                   TableStreamType streamType,
+                   int32_t partitionId,
+                   const std::vector<std::string> &predicateStrings,
+                   bool doDelete) :
     m_tupleSerializer(tupleSerializer),
     m_streamType(streamType),
     m_partitionId(partitionId),
@@ -74,9 +76,9 @@ TableStreamer::TableStreamer(TupleSerializer &tupleSerializer,
 /**
  * Constructor without predicates or delete flag.
  */
-TableStreamer::TableStreamer(TupleSerializer &tupleSerializer,
-                             TableStreamType streamType,
-                             int32_t partitionId) :
+Streamer::Streamer(TupleSerializer &tupleSerializer,
+                   TableStreamType streamType,
+                   int32_t partitionId) :
     m_tupleSerializer(tupleSerializer),
     m_streamType(streamType),
     m_partitionId(partitionId),
@@ -84,10 +86,10 @@ TableStreamer::TableStreamer(TupleSerializer &tupleSerializer,
 {
 }
 
-TableStreamer::~TableStreamer()
+Streamer::~Streamer()
 {}
 
-bool TableStreamer::isAlreadyActive() const
+bool Streamer::isAlreadyActive() const
 {
     switch (m_streamType) {
         case TABLE_STREAM_SNAPSHOT:
@@ -98,7 +100,7 @@ bool TableStreamer::isAlreadyActive() const
     return false;
 }
 
-bool TableStreamer::activateStream(PersistentTable &table, CatalogId tableId)
+bool Streamer::activateStream(PersistentTable &table, CatalogId tableId)
 {
     switch (m_streamType) {
         case TABLE_STREAM_SNAPSHOT: {
@@ -135,7 +137,7 @@ bool TableStreamer::activateStream(PersistentTable &table, CatalogId tableId)
     return true;
 }
 
-int64_t TableStreamer::streamMore(TupleOutputStreamProcessor &outputStreams,
+int64_t Streamer::streamMore(TupleOutputStreamProcessor &outputStreams,
                                   std::vector<int> &retPositions)
 {
     int64_t remaining = -2;
@@ -164,7 +166,7 @@ int64_t TableStreamer::streamMore(TupleOutputStreamProcessor &outputStreams,
             }
             else {
                 if (outputStreams.size() != 1) {
-                    throwFatalException("TableStreamer::continueStreaming: Expect 1 output stream "
+                    throwFatalException("Streamer::continueStreaming: Expect 1 output stream "
                                         "for recovery, received %ld", outputStreams.size());
                 }
                 /*
@@ -195,7 +197,10 @@ int64_t TableStreamer::streamMore(TupleOutputStreamProcessor &outputStreams,
 /**
  * Block compaction hook.
  */
-void TableStreamer::notifyBlockWasCompactedAway(TBPtr block) {
+void Streamer::notifyBlockWasCompactedAway(TBPtr block) {
+    BOOST_FOREACH(boost::shared_ptr<Scanner> scanner, m_scanners) {
+        scanner->notifyBlockWasCompactedAway(block);
+    }
     if (m_COWContext.get() != NULL) {
         m_COWContext->notifyBlockWasCompactedAway(block);
     }
@@ -205,7 +210,10 @@ void TableStreamer::notifyBlockWasCompactedAway(TBPtr block) {
  * Tuple insert hook.
  * Return true if it was handled by the COW context.
  */
-bool TableStreamer::notifyTupleInsert(TableTuple &tuple) {
+bool Streamer::notifyTupleInsert(TableTuple &tuple) {
+    BOOST_FOREACH(boost::shared_ptr<Scanner> scanner, m_scanners) {
+        scanner->notifyTupleInsert(tuple);
+    }
     if (m_COWContext.get() != NULL) {
         m_COWContext->markTupleDirty(tuple, true);
         return true;
@@ -219,7 +227,10 @@ bool TableStreamer::notifyTupleInsert(TableTuple &tuple) {
  * Tuple update hook.
  * Return true if it was handled by the COW context.
  */
-bool TableStreamer::notifyTupleUpdate(TableTuple &tuple) {
+bool Streamer::notifyTupleUpdate(TableTuple &tuple) {
+    BOOST_FOREACH(boost::shared_ptr<Scanner> scanner, m_scanners) {
+        scanner->notifyTupleUpdate(tuple);
+    }
     if (m_COWContext.get() != NULL) {
         m_COWContext->markTupleDirty(tuple, false);
         return true;
@@ -232,8 +243,45 @@ bool TableStreamer::notifyTupleUpdate(TableTuple &tuple) {
 /**
  * Return true if a tuple can be freed safely.
  */
-bool TableStreamer::canSafelyFreeTuple(TableTuple &tuple) const {
+bool Streamer::canSafelyFreeTuple(TableTuple &tuple) const {
     return (m_COWContext == NULL || m_COWContext->canSafelyFreeTuple(tuple));
 }
 
+/**
+ * Create a new elastic row scanner.
+ */
+boost::shared_ptr<Scanner> Streamer::makeScanner(PersistentTable &table) {
+    return ScannerFactory::makeScanner(table);
+}
+
+/**
+ * Predicate class used by deleteScanner() to find the scanner to remove.
+ */
+class ScannerMatcher {
+  public:
+    ScannerMatcher(Scanner *scanner) :
+        m_scanner(scanner), m_found(0)
+    {}
+    bool operator()(boost::shared_ptr<Scanner> scanner) {
+        bool found = (m_scanner == scanner.get());
+        m_found++;
+        return found;
+    }
+    Scanner *m_scanner;
+    uint32_t m_found;
+};
+
+/**
+ * Delete scanner produced by makeScanner().
+ */
+void Streamer::deleteScanner(Scanner *scanner) {
+    ScannerMatcher predicate(scanner);
+    m_scanners.remove_if(predicate);
+    if (predicate.m_found == 0) {
+        // It's a potential leak, not a show-stopper.
+        VOLT_WARN("Streamer::deleteScanner: Could not find registered scanner for removal.");
+    }
+}
+
+} // namespace elastic
 } // namespace voltdb

@@ -292,6 +292,8 @@ CTX.INPUT['storage'] = """
  CopyOnWriteContext.cpp
  CopyOnWriteIterator.cpp
  ConstraintFailureException.cpp
+ ElasticStreamer.cpp
+ ElasticScanner.cpp
  MaterializedViewMetadata.cpp
  persistenttable.cpp
  PersistentTableStats.cpp
@@ -301,7 +303,6 @@ CTX.INPUT['storage'] = """
  TableCatalogDelegate.cpp
  tablefactory.cpp
  TableStats.cpp
- TableStreamer.cpp
  tableutil.cpp
  temptable.cpp
  TempTableLimits.cpp

@@ -56,8 +56,8 @@
 #include "storage/table.h"
 #include "storage/TupleStreamWrapper.h"
 #include "storage/TableStats.h"
-#include "storage/TableStreamer.h"
 #include "storage/PersistentTableStats.h"
+#include "storage/ElasticStreamer.h"
 #include "storage/RecoveryContext.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
@@ -83,6 +83,10 @@ class MaterializedViewMetadata;
 class RecoveryProtoMsg;
 class TupleOutputStreamProcessor;
 class ReferenceSerializeInput;
+
+namespace elastic {
+    class Scanner;
+}
 
 /**
  * Represents a non-temporary table which permanently resides in
@@ -113,6 +117,7 @@ class ReferenceSerializeInput;
 class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     friend class CopyOnWriteContext;
     friend class CopyOnWriteIterator;
+    friend class elastic::Scanner;
     friend class TableFactory;
     friend class TableTuple;
     friend class TableIterator;
@@ -392,7 +397,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     stx::btree_set<TBPtr > m_blocksWithSpace;
 
     // Provides access to all table streaming apparatuses, including COW and recovery.
-    boost::shared_ptr<TableStreamer> m_tableStreamer;
+    boost::shared_ptr<elastic::Streamer> m_tableStreamer;
 
   private:
     // pointers to chunks of data. Specific to table impl. Don't leak this type.

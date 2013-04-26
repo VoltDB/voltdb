@@ -38,6 +38,7 @@
 #include "indexes/tableindex.h"
 #include "storage/tableiterator.h"
 #include "storage/CopyOnWriteIterator.h"
+#include "storage/ElasticScanner.h"
 #include "stx/btree_set.h"
 #include "common/DefaultTupleSerializer.h"
 #include <vector>
@@ -989,6 +990,68 @@ TEST_F(CopyOnWriteTest, BufferBoundaryCondition) {
     // serialization finishes cleanly.
     size_t curPendingCount = m_table->getBlocksNotPendingSnapshotCount();
     ASSERT_EQ(origPendingCount, curPendingCount);
+}
+
+// This is a clone of BigTest that hasn't been re-worked to exercise elastic::Scanner.
+TEST_F(CopyOnWriteTest, ElasticScannerTest) {
+    initTable(true);
+    int tupleCount = TUPLE_COUNT;
+    addRandomUniqueTuples( m_table, tupleCount);
+    DefaultTupleSerializer serializer;
+    for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
+        stx::btree_set<int64_t> originalTuples;
+        voltdb::TableIterator& iterator = m_table->iterator();
+        TableTuple tuple(m_table->schema());
+        boost::shared_ptr<elastic::Scanner> scanner = elastic::ScannerFactory::makeScanner(*m_table);
+        while (iterator.next(tuple)) {
+            const std::pair<stx::btree_set<int64_t>::iterator, bool> p =
+            originalTuples.insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
+            const bool inserted = p.second;
+            if (!inserted) {
+                int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
+                printf("Failed to insert %d\n", primaryKey);
+            }
+            ASSERT_TRUE(inserted);
+        }
+
+        m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId);
+
+        stx::btree_set<int64_t> COWTuples;
+        char serializationBuffer[BUFFER_SIZE];
+        int totalInserted = 0;
+        while (true) {
+            TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
+            TupleOutputStream &outputStream = outputStreams.at(0);
+            std::vector<int> retPositions;
+            int64_t remaining = m_table->streamMore(outputStreams, retPositions);
+            if (remaining >= 0) {
+                ASSERT_EQ(outputStreams.size(), retPositions.size());
+            }
+            const int serialized = static_cast<int>(outputStream.position());
+            if (serialized == 0) {
+                break;
+            }
+            int ii = 12;//skip partition id and row count and first tuple length
+            while (ii < (serialized - 4)) {
+                int values[2];
+                values[0] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
+                values[1] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii + 4]));
+                const bool inserted =
+                COWTuples.insert(*reinterpret_cast<int64_t*>(values)).second;
+                if (!inserted) {
+                    printf("Failed in iteration %d, total inserted %d, with values %d and %d\n", qq, totalInserted, values[0], values[1]);
+                }
+                ASSERT_TRUE(inserted);
+                totalInserted++;
+                ii += static_cast<int>(m_tupleWidth + sizeof(int32_t));
+            }
+            for (int jj = 0; jj < NUM_MUTATIONS; jj++) {
+                doRandomTableMutation(m_table);
+            }
+        }
+
+        checkTuples(tupleCount + (m_tuplesInserted - m_tuplesDeleted), originalTuples, COWTuples);
+    }
 }
 
 int main() {
