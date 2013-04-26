@@ -42,6 +42,8 @@ package AdHocRejoinConsistency;
 
 import java.io.IOException;
 import java.io.File;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.Stack;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -50,9 +52,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.Random;
 import java.lang.Thread;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
-//import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltProcedure.VoltAbortException;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltTypeException;
@@ -68,7 +71,6 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.dtxn.RPQInterface;
 
 import sun.misc.Signal;
 import sun.misc.SignalHandler;
@@ -94,7 +96,7 @@ public class AsyncBenchmark {
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE = "----------" + "----------"
             + "----------" + "----------" + "----------" + "----------"
-            + "----------" + "----------" + "\n";
+            + "----------" + "----------";
     // Test Case
     Tests testCase = null;
     // validated command line configuration
@@ -120,11 +122,22 @@ public class AsyncBenchmark {
     final AtomicLong failedAsync = new AtomicLong(0);
     final AtomicLong totalAsync = new AtomicLong(0);
 
-    final
-
     Random rand = new Random();
+    
+    static VoltLogger log = new VoltLogger("HOST");
 
     int nPartitions = 0;
+
+    private static String _F(String str, Object... parameters) {
+        return String.format(str, parameters);
+    }
+
+    static void logStackTrace(Throwable t) {
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw, true);
+        t.printStackTrace(pw);
+        log.error(sw.toString());
+    }
 
     /**
      * Uses included {@link CLIConfig} class to declaratively state command line
@@ -187,8 +200,8 @@ public class AsyncBenchmark {
                 int connectionsLeft, DisconnectCause cause) {
             // if the benchmark is still active
             if ((System.currentTimeMillis() - benchmarkStartTS) < (config.duration * 1000)) {
-                System.err.printf("Connection to %s:%d was lost.\n", hostname,
-                        port);
+                log.error(_F("Connection to %s:%d was lost.\n", hostname,
+                        port));
             }
         }
     }
@@ -203,17 +216,10 @@ public class AsyncBenchmark {
     public AsyncBenchmark(VoterConfig config) {
         this.config = config;
 
-        vemTestHome = System.getenv("VEMTEST_HOME");
-        System.err.printf("VEMTEST_HOME: %s\n", vemTestHome);
-        if (vemTestHome == "" || vemTestHome == null) {
-            System.err.println("ERROR VEMTEST_HOME is not set");
-            System.exit(1);
-        }
-
         try { testCase = Tests.valueOf(config.testcase); }
         catch (Exception e) {
             if (! config.testcase.equalsIgnoreCase("ALL")) {
-                System.err.printf("ERROR Unknown testcase: %s\n", config.testcase);
+                log.error(_F("ERROR Unknown testcase: %s\n", config.testcase));
                 System.exit(1);
                 //throw new RuntimeException(e);
             }
@@ -228,20 +234,22 @@ public class AsyncBenchmark {
         } else {
             clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
         }
+        // XXX/PSR for adhoc, otherwise graceful error on reaching backpressure
+        clientConfig.setMaxOutstandingTxns(200);
         client = ClientFactory.createClient(clientConfig);
 
         periodicStatsContext = client.createStatsContext();
         fullStatsContext = client.createStatsContext();
 
-        System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Command Line Configuration");
-        System.out.println(HORIZONTAL_RULE);
-        System.out.println(config.getConfigDumpString());
+        log.info(HORIZONTAL_RULE);
+        log.info(" Command Line Configuration");
+        log.info(HORIZONTAL_RULE);
+        log.info(config.getConfigDumpString());
 
         Signal.handle(new Signal("TERM"), new SignalHandler() {
             public void handle(Signal sig) {
 
-                System.err.println("Received SIGTERM signal. Will teardown.");
+                log.error("Received SIGTERM signal. Will teardown.");
                 // stop run, it will clean up
                 runBenchmark = false;
                 timer.cancel();
@@ -251,7 +259,7 @@ public class AsyncBenchmark {
         Signal.handle(new Signal("INT"), new SignalHandler() {
             public void handle(Signal sig) {
 
-                System.err.println("Received SIGINT signal. Will teardown.");
+                log.error("Received SIGINT signal. Will teardown.");
                 // stop run, it will clean up
                 runBenchmark = false;
                 timer.cancel();
@@ -275,18 +283,15 @@ public class AsyncBenchmark {
                 client.createConnection(server);
                 break;
             } catch (Exception e) {
-                System.err.printf(
-                        "Connection failed - retrying in %d second(s).\n",
-                        sleep / 1000);
-                try {
-                    Thread.sleep(sleep);
-                } catch (Exception interruted) {
-                }
+                log.error(_F("Connection failed - retrying in %d second(s).\n",
+                        sleep / 1000));
+                try { Thread.sleep(sleep); }
+                catch (Exception interruted) { }
                 if (sleep < 8000)
                     sleep += sleep;
             }
         }
-        System.out.printf("Connected to VoltDB node at: %s.\n", server);
+        log.info(_F("Connected to VoltDB node at: %s.\n", server));
     }
 
     /**
@@ -300,7 +305,7 @@ public class AsyncBenchmark {
      *             if anything bad happens with the threads.
      */
     void connect(String servers) throws InterruptedException {
-        System.out.println("Connecting to VoltDB...");
+        log.info("Connecting to VoltDB...");
 
         String[] serverArray = servers.split(",");
         final CountDownLatch connections = new CountDownLatch(
@@ -346,13 +351,15 @@ public class AsyncBenchmark {
         long time = Math
                 .round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
 
-        System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60,
-                time % 60);
-        System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
-        System.out.printf("Aborts/Failures %d/%d, ",
-                stats.getInvocationAborts(), stats.getInvocationErrors());
-        System.out.printf("Avg/95%% Latency %.2f/%dms\n",
-                stats.getAverageLatency(), stats.kPercentileLatency(0.95));
+        log.info(_F("%02d:%02d:%02d Throughput %d/s, Aborts/Failures %d/%d, Avg/95%% Latency %.2f/%dms",
+                time / 3600,
+                (time / 60) % 60,
+                time % 60,
+                stats.getTxnThroughput(),
+                stats.getInvocationAborts(),
+                stats.getInvocationErrors(),
+                stats.getAverageLatency(),
+                stats.kPercentileLatency(0.95)));
     }
 
     /**
@@ -366,9 +373,9 @@ public class AsyncBenchmark {
         ClientStats stats = fullStatsContext.fetch().getStats();
 
         // 3. Performance statistics
-        System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Client Workload Statistics");
-        System.out.println(HORIZONTAL_RULE);
+        log.info(HORIZONTAL_RULE);
+        log.info(" Client Workload Statistics");
+        log.info(HORIZONTAL_RULE);
 
         System.out.printf("Async total: %d successful: %d\n", totalAsync.get(),
                 successfulAsync.get());
@@ -385,9 +392,9 @@ public class AsyncBenchmark {
         System.out.printf("99th percentile latency:       %,9d ms\n",
                 stats.kPercentileLatency(.99));
 
-        System.out.print("\n" + HORIZONTAL_RULE);
-        System.out.println(" System Server Statistics");
-        System.out.println(HORIZONTAL_RULE);
+        log.info(HORIZONTAL_RULE);
+        log.info(" System Server Statistics");
+        log.info(HORIZONTAL_RULE);
 
         if (config.autotune) {
             System.out.printf("Targeted Internal Avg Latency: %,9d ms\n",
@@ -409,8 +416,8 @@ public class AsyncBenchmark {
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
             if (response.getStatus() != ClientResponse.SUCCESS) {
-                System.err.printf("Database operation failed with %s\n",
-                        response.getStatusString());
+                log.error(_F("Database operation failed with %s\n",
+                        ((ClientResponseImpl)response).toJSONString()));
                 //System.exit(1);
             } else {
                 successfulAsync.getAndIncrement();
@@ -429,9 +436,9 @@ public class AsyncBenchmark {
 
         benchmarkThread = Thread.currentThread();
 
-        System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Setup & Initialization");
-        System.out.println(HORIZONTAL_RULE);
+        log.info(HORIZONTAL_RULE);
+        log.info(" Setup & Initialization");
+        log.info(HORIZONTAL_RULE);
 
         // connect to one or more servers, loop until success
         // first server in the list is a blessed node, we only connect to it
@@ -446,17 +453,17 @@ public class AsyncBenchmark {
         while (tpc[0].advanceRow()) {
             nPartitions = (int) tpc[0].getLong(0);
         }
-        System.out.printf("partition count: %d\n", nPartitions);
+        log.info(_F("partition count: %d\n", nPartitions));
         if (nPartitions < 2) {
-            System.err.printf("Less than 2 partitions\n", nPartitions);
+            log.error(_F("Less than 2 partitions\n", nPartitions));
             System.exit(1);
         }
 
         client.callProcedure("Initialize", nPartitions);
 
-        System.out.print(HORIZONTAL_RULE);
-        System.out.println("Starting Benchmark");
-        System.out.println(HORIZONTAL_RULE);
+        log.info(HORIZONTAL_RULE);
+        log.info("Starting Benchmark");
+        log.info(HORIZONTAL_RULE);
 
         // print periodic statistics to the console
         benchmarkStartTS = System.currentTimeMillis();
@@ -464,7 +471,7 @@ public class AsyncBenchmark {
 
         // Run the benchmark loop for the requested duration
         // The throughput may be throttled depending on client configuration
-        System.out.println("\nRunning benchmark...");
+        log.info("\nRunning benchmark...");
         final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
         //String qOps[] = {"*","/"};
         String qOps[] = {"+","+"};
@@ -546,7 +553,7 @@ public class AsyncBenchmark {
                         lastCatalog = 0;
                     }
                     catch (Exception e) {
-                        e.printStackTrace();
+                        logStackTrace(e);
                         throw new RuntimeException();
                     }
                     // running ALL, we don't wait, otherwise go slow.
@@ -555,7 +562,7 @@ public class AsyncBenchmark {
                     }
                     // now, flip to the other catalog
                     // this runs as a synchronous tx (for now)
-                    System.err.printf("updateapplicationcatalog %d...\n", lastCatalog);
+                    log.info(_F("updateapplicationcatalog %d...\n", lastCatalog));
                     // create catalog
                     String catPath = "/home/prosegay/branches/ENG-3884/voltdb/tests/test_apps/adhoc-rejoin-consistency";
                     File catalog_files[] = { new File(catPath + "/AdHocRejoinConsistency.jar"),
@@ -565,7 +572,7 @@ public class AsyncBenchmark {
                     lastCatalog = (lastCatalog+1) % 2;
                     response = client.updateApplicationCatalog(catalog_files[ lastCatalog ], file2);
                     if (response.getStatus() != ClientResponse.SUCCESS) {
-                        System.err.printf("UAC operation failed with %s\n", response.getStatusString());
+                        log.error(_F("UAC operation failed with %s\n", response.getStatusString()));
                         throw new RuntimeException();
                     } else {
                         successfulAsync.getAndIncrement();
@@ -575,13 +582,13 @@ public class AsyncBenchmark {
                             switch (lastCatalog) {
                             case 0:
                                 if (response.getStatus() == ClientResponse.SUCCESS) {
-                                    System.err.printf("unexpected result for catalog 0\n");
+                                    log.error("unexpected result for catalog 0\n");
                                     throw new RuntimeException();
                                 }
                                 break;
                             case 1:
                                 if (response.getStatus() != ClientResponse.SUCCESS) {
-                                    System.err.printf("unexpected result for catalog 1\n");
+                                    log.error("unexpected result for catalog 1\n");
                                     throw new RuntimeException();
                                 }
                                 break;
@@ -591,9 +598,9 @@ public class AsyncBenchmark {
                         }
                         catch (ProcCallException e) {
                             if (lastCatalog != 0) {
-                                e.printStackTrace();
-                                System.err.printf("unexpected result for catalog 1 in proccallexception %d\n%s\n", lastCatalog,
-                                        e.getMessage());
+                                logStackTrace(e);
+                                log.error(_F("unexpected result for catalog 1 in proccallexception %d\n%s\n", lastCatalog,
+                                        e.getMessage()));
                                 throw new RuntimeException();
                             }
                         }
@@ -616,8 +623,7 @@ public class AsyncBenchmark {
                     client.callProcedure(new SequenceCallback(), "MPUpdateRep");
                     break;
 
-                case LOADSINGLEPARTITIONTABLEPTN: // this case is failing
-                    break;
+                case LOADSINGLEPARTITIONTABLEPTN: // this case is failing ENG-4097
                 case LOADMULTIPARTITIONTABLEREP:
                     // LoadSinglePartitionTable LoadMultiPartitionTable ENG-3885 part 1 of 2
                     // voltLoadTable is not client exposed
@@ -628,22 +634,22 @@ public class AsyncBenchmark {
                     try {
                         response = client.callProcedure("getRowFromPtn", p);
                         if (response.getStatus() != ClientResponse.SUCCESS) {
-                            System.err.printf("FATAL Unexpectd result getting source row %s\n",
-                                    response.getStatusString());
+                            log.error(_F("FATAL Unexpectd result getting source row %s\n",
+                                    response.getStatusString()));
                             throw new RuntimeException();
                         }
                     }
                     catch (ProcCallException e) {
                         //e.printStackTrace();
-                        System.err.printf("unexpected exception getting source row\n %s\n", e.getMessage());
+                        log.error(_F("unexpected exception getting source row\n %s\n", e.getMessage()));
                     }
                     VoltTable vt[] = response.getResults();
                     if ( vt.length == 0 ) {
-                        System.err.printf("FATAL VoltTable[] object has no elememts\n");
+                        log.error(_F("FATAL VoltTable[] object has no elememts\n"));
                         throw new RuntimeException();
                     }
                     if ( vt[0].getRowCount() != 1 ) {
-                        System.err.printf("FATAL VoltTable object has wrong number of rows %d\n", vt[0].getRowCount());
+                        log.error(_F("FATAL VoltTable object has wrong number of rows %d\n", vt[0].getRowCount()));
                         throw new RuntimeException();
                     }
                     VoltTable vt0 = vt[0];
@@ -661,7 +667,7 @@ public class AsyncBenchmark {
                         }
                     }
                     catch (VoltAbortException e) {
-                        System.err.printf("FATAL Load single/multi table failed with an exception\n%s\n", e.getMessage());
+                        log.error(_F("FATAL Load single/multi table failed with an exception\n%s\n", e.getMessage()));
                         throw new RuntimeException();
                     }
                     break;
@@ -670,22 +676,22 @@ public class AsyncBenchmark {
                 }
             }
             catch (NoConnectionsException e) {
-                e.printStackTrace();
+                logStackTrace(e);
                 throw new RuntimeException(e);
             }
             catch (InterruptedException e) {
-                e.printStackTrace();
-                System.err.printf("Caught InterrruptedException: %s\ntoString: %s\n", e.getMessage(), e.toString());
+                logStackTrace(e);
+                log.error(_F("Caught InterrruptedException: %s\ntoString: %s\n", e.getMessage(), e.toString()));
                 //throw new RuntimeException(e);
             }
             catch (IOException e) {
-                e.printStackTrace();
-                System.err.printf("Caught IOException: %s\ntoString: %s\n", e.getMessage(), e.toString());
+                logStackTrace(e);
+                log.error(_F("Caught IOException: %s\ntoString: %s\n", e.getMessage(), e.toString()));
                 //throw new RuntimeException(e);
             }
             catch (Exception e) {
-                e.printStackTrace();
-                System.err.printf("Caught Exception: %s\ntoString: %s\n", e.getMessage(), e.toString());
+                logStackTrace(e);
+                log.error(_F("Caught Exception: %s\ntoString: %s\n", e.getMessage(), e.toString()));
                 throw new RuntimeException(e);
             }
             Thread.yield();
@@ -695,7 +701,7 @@ public class AsyncBenchmark {
         timer.cancel();
         try {
             // block until all outstanding txns return
-            System.err.println("draining connection...");
+            log.info("draining connection...");
             client.drain();
         }
 
@@ -725,7 +731,7 @@ public class AsyncBenchmark {
         AsyncBenchmark benchmark = new AsyncBenchmark(config);
         try { benchmark.runBenchmark(); }
         catch (Exception e) {
-            e.printStackTrace();
+            logStackTrace(e);
             try { benchmark.timer.cancel(); }
             catch (Exception f) { }
             finally {

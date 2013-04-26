@@ -2,12 +2,11 @@
 
 APPNAME="AdHocRejoinConsistency"
 
-if false; then
 # find voltdb binaries in either installation or distribution directory.
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
     VOLTDB_BIN=$(dirname "$(which voltdb)")
 else
-    VOLTDB_BIN="$(pwd)/../../bin"
+    VOLTDB_BIN="$(pwd)/../../../bin"
 fi
 # installation layout has all libraries in $VOLTDB_ROOT/lib/voltdb
 if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
@@ -16,26 +15,22 @@ if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
     VOLTDB_VOLTDB="$VOLTDB_LIB"
 # distribution layout has libraries in separate lib and voltdb directories
 else
-    VOLTDB_LIB="`pwd`/../../lib"
-    VOLTDB_VOLTDB="`pwd`/../../voltdb"
+    VOLTDB_LIB="`pwd`/../../../lib"
+    VOLTDB_VOLTDB="`pwd`/../../../voltdb"
 fi
-fi
-echo $VOLTDIST
-: ${VOLTDB_HOME:=$VOLTDIST}
 
-VOLTDB_BASE=$VOLTDB_HOME
-VOLTDB_LIB=$VOLTDB_HOME/lib
-VOLTDB_BIN=$VOLTDB_HOME/bin
-VOLTDB_VOLTDB=$VOLTDB_HOME/voltdb
-
-CLASSPATH=$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
+CLASSPATH=$({ \
+    \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/*.jar; \
+    \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
+} 2> /dev/null | paste -sd ':' - )
 VOLTDB="$VOLTDB_BIN/voltdb"
 VOLTCOMPILER="$VOLTDB_BIN/voltcompiler"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
-#LICENSE="$VOLTDB_VOLTDB/license.xml"
-LICENSE=$VOLTDB_HOME/voltdb/license.xml
-HOST=volt3e
-SERVERS=volt3e,volt3f
+LICENSE="$VOLTDB_VOLTDB/license.xml"
+HOST="localhost"
+HOST="volt10a"
+SERVERS="volt10a,volt10b"
 
 # remove build artifacts
 function clean() {
@@ -45,7 +40,7 @@ function clean() {
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -target 1.6 -source 1.6 -classpath $CLASSPATH -d obj \
+    javac -classpath $CLASSPATH -d obj \
         src/*.java \
         src/procedures/*.java
     # stop if compilation fails
@@ -58,16 +53,14 @@ function catalog() {
     $VOLTCOMPILER obj project.xml $APPNAME.jar
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
-    $VOLTCOMPILER obj project2.xml $APPNAME.jar
+    $VOLTCOMPILER obj project2.xml ${APPNAME}2.jar
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
-    echo "pwd: $PWD"
 }
 
 # run the voltdb server locally
 function server() {
     # if a catalog doesn't exist, build one
-    catalog #XXX/PSR
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
 LOG4J_CONFIG_PATH=$PWD/log4j.xml
@@ -109,7 +102,7 @@ function async-benchmark-help() {
 }
 
 function async-benchmark() {
-    #srccompile
+    srccompile
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         AdHocRejoinConsistency.AsyncBenchmark \
         --displayinterval=5 \
@@ -118,7 +111,8 @@ function async-benchmark() {
         --ratelimit=${RATE:-100000} \
         --autotune=false \
         --latencytarget=1 \
-        --testcase=UPDATEAPPLICATIONCATALOG
+        --testcase=ADHOCSINGLEPARTPTN
+        #--testcase=UPDATEAPPLICATIONCATALOG
         #--testcase=LOADSINGLEPARTITIONTABLEPTN   # this case fails
         #--testcase=ALL
         #--testcase=LOADMULTIPARTITIONTABLEREP
@@ -128,7 +122,6 @@ function async-benchmark() {
         #--testcase=ADHOCMULTIPARTREP
         #--testcase=ADHOCSINGLEPARTREP
         #--testcase=ADHOCMULTIPARTPTN
-        #--testcase=ADHOCSINGLEPARTPTN
 }
 
 function verify() {
