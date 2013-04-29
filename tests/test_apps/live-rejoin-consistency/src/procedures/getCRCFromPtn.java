@@ -25,7 +25,7 @@
 // Returns the heat map data (winning contestant by state) for display on nthe Live Statistics dashboard.
 //
 
-package AdHocRejoinConsistency.procedures;
+package LiveRejoinConsistency.procedures;
 
 import java.util.zip.CRC32;
 

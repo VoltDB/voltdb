@@ -25,7 +25,7 @@
 // Initializes the database, pushing the list of contestants and documenting domain data (Area codes and States).
 //
 
-package AdHocRejoinConsistency.procedures;
+package LiveRejoinConsistency.procedures;
 
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;

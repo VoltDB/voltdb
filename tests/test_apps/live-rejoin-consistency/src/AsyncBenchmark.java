@@ -20,25 +20,35 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
 /*
- * This samples uses the native asynchronous request processing protocol
- * to post requests to the VoltDB server, thus leveraging to the maximum
- * VoltDB's ability to run requests in parallel on multiple database
- * partitions, and multiple servers.
+ * This is a test applicaiton which is intended to check that that the
+ * master/replica consistency is maintained if operations are killed
+ * due to a node failure and the node subsequently rejoined.
  *
- * While asynchronous processing is (marginally) more convoluted to work
- * with and not adapted to all workloads, it is the preferred interaction
- * model to VoltDB as it guarantees blazing performance.
+ * These are the operations that are tested
  *
- * Because there is a risk of 'firehosing' a database cluster (if the
- * cluster is too slow (slow or too few CPUs), this sample performs
- * auto-tuning to target a specific latency (5ms by default).
- * This tuning process, as demonstrated here, is important and should be
- * part of your pre-launch evaluation so you can adequately provision your
- * VoltDB cluster with the number of servers required for your needs.
+ *      ADHOC SINGLE PART operations on PaTitioNed data (ADHOCSINGLEPARTPTN)
+ *      ADHOC MULTI PART operations on PaTitioNed data (ADHOCMULTIPARTPTN)
+ *      ADHOC SINGLE PART operations on REPlicated data (ADHOCSINGLEPARTREP)
+ *      ADHOC MULTI PART operations on REPlicated data (ADHOCMULTIPARTREP)
+ *      UPDATE APPLICATION CATALOG (UPDATEAPPLICATIONCATALOG)
+ *      WRite SINGLE PART STORED PROCedure on PaTitioNed data (WRSINGLEPARTSTOREDPROCPTN)
+ *      WRite MULTI PART STORED PROCedure on PaTitioNed data (WRMULTIPARTSTOREDPROCPTN)
+ *      WRite MULTI PART STORED PROC REPlicated date (WRMULTIPARTSTOREDPROCREP)
+ *      LOAD SINGLE PARTITION TABLE PaTitioNed data (LOADSINGLEPARTITIONTABLEPTN)
+ *      LOAD MULTI PARTITION TABLE REPlicated data (LOADSINGLEPARTITIONTABLEPTN)
+ *
+ *      * The test runs in a blessed node configuration, 2NK1
+ *      * One node remains up the other is killed during the operation
+ *        and rejoined to the cluster.
+ *      * Once the node has been killed, the client is terminated (via SIGTERM)
+ *      * Once the rejoin has completed, a second client is run which checks
+ *      * the master/replica consistencly. The check client relies on short-circuit
+ *        read behavior in voltdb which permits the reading of local data.
  */
 
-package AdHocRejoinConsistency;
+package LiveRejoinConsistency;
 
 import java.io.IOException;
 import java.io.File;
@@ -100,7 +110,7 @@ public class AsyncBenchmark {
     // Test Case
     Tests testCase = null;
     // validated command line configuration
-    final VoterConfig config;
+    final AppConfig config;
     // Reference to the database connection we will use
     final Client client;
     // Timer for periodic stats printing
@@ -143,7 +153,7 @@ public class AsyncBenchmark {
      * Uses included {@link CLIConfig} class to declaratively state command line
      * options with defaults and validation.
      */
-    static class VoterConfig extends CLIConfig {
+    static class AppConfig extends CLIConfig {
         @Option(desc = "Interval for performance feedback, in seconds.")
         long displayinterval = 5;
 
@@ -213,7 +223,7 @@ public class AsyncBenchmark {
      * @param config
      *            Parsed & validated CLI options.
      */
-    public AsyncBenchmark(VoterConfig config) {
+    public AsyncBenchmark(AppConfig config) {
         this.config = config;
 
         try { testCase = Tests.valueOf(config.testcase); }
@@ -234,7 +244,7 @@ public class AsyncBenchmark {
         } else {
             clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
         }
-        // XXX/PSR for adhoc, otherwise graceful error on reaching backpressure
+        // for adhoc limit number of outstanding tx
         clientConfig.setMaxOutstandingTxns(200);
         client = ClientFactory.createClient(clientConfig);
 
@@ -564,9 +574,9 @@ public class AsyncBenchmark {
                     // this runs as a synchronous tx (for now)
                     log.info(_F("updateapplicationcatalog %d...\n", lastCatalog));
                     // create catalog
-                    String catPath = "/home/prosegay/branches/ENG-3884/voltdb/tests/test_apps/adhoc-rejoin-consistency";
-                    File catalog_files[] = { new File(catPath + "/AdHocRejoinConsistency.jar"),
-                            new File(catPath + "/AdHocRejoinConsistency2.jar") };
+                    String catPath = "/home/prosegay/branches/ENG-3884/voltdb/tests/test_apps/live-rejoin-consistency";
+                    File catalog_files[] = { new File(catPath + "/LiveRejoinConsistency.jar"),
+                            new File(catPath + "/LiveRejoinConsistency2.jar") };
                     File file2 = new File(catPath + "/deployment.xml");
                     // Flip the catalog
                     lastCatalog = (lastCatalog+1) % 2;
@@ -721,12 +731,12 @@ public class AsyncBenchmark {
      *            Command line arguments.
      * @throws Exception
      *             if anything goes wrong.
-     * @see {@link VoterConfig}
+     * @see {@link AppConfig}
      */
     public static void main(String[] args) throws Exception {
         // create a configuration from the arguments
 
-        VoterConfig config = new VoterConfig();
+        AppConfig config = new AppConfig();
         config.parse(AsyncBenchmark.class.getName(), args);
         AsyncBenchmark benchmark = new AsyncBenchmark(config);
         try { benchmark.runBenchmark(); }

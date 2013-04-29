@@ -21,24 +21,11 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 /*
- * This samples uses the native asynchronous request processing protocol
- * to post requests to the VoltDB server, thus leveraging to the maximum
- * VoltDB's ability to run requests in parallel on multiple database
- * partitions, and multiple servers.
- *
- * While asynchronous processing is (marginally) more convoluted to work
- * with and not adapted to all workloads, it is the preferred interaction
- * model to VoltDB as it guarantees blazing performance.
- *
- * Because there is a risk of 'firehosing' a database cluster (if the
- * cluster is too slow (slow or too few CPUs), this sample performs
- * auto-tuning to target a specific latency (5ms by default).
- * This tuning process, as demonstrated here, is important and should be
- * part of your pre-launch evaluation so you can adequately provision your
- * VoltDB cluster with the number of servers required for your needs.
+ * This is the "checking" part of the master/replica consistency test app
+ * it relies on a "short circuit" behavior in to obtain the node local data
  */
 
-package AdHocRejoinConsistency;
+package LiveRejoinConsistency;
 
 import java.io.IOException;
 
@@ -54,7 +41,7 @@ import org.voltdb.client.ProcCallException;
 public class CheckReplicaConsistency {
 
     // validated command line configuration
-    final VoterConfig config;
+    final AppConfig config;
     // Reference to the database connection we will use
     final Client client;
 
@@ -64,7 +51,7 @@ public class CheckReplicaConsistency {
      * Uses included {@link CLIConfig} class to declaratively state command line
      * options with defaults and validation.
      */
-    static class VoterConfig extends CLIConfig {
+    static class AppConfig extends CLIConfig {
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
 
@@ -85,7 +72,7 @@ public class CheckReplicaConsistency {
      * @param config
      *            Parsed & validated CLI options.
      */
-    public CheckReplicaConsistency(VoterConfig config) {
+    public CheckReplicaConsistency(AppConfig config) {
         this.config = config;
         client = null;
     }
@@ -105,26 +92,6 @@ public class CheckReplicaConsistency {
             System.err.printf("SP failed %s\n", r_sp.getStatusString());
             throw new RuntimeException();
         }
-
-        /* XXX no point in doing this, adhocs won't read local data, at least not presently
-        ClientResponse r_ah = null;
-
-        r_ah = client.callProcedure(
-                "@AdHoc",
-                "SELECT c.counter from JOINER j, COUNTERS c where j.id = c.id and j.id="
-                        + Integer.toString(pid) + " order by 1;");
-
-        if (r_ah.getStatus() != ClientResponse.SUCCESS) {
-            System.err.printf("Adhoc failed %s\n", r_ah.getStatusString());
-            throw new RuntimeException();
-        }
-
-        if (r_sp.getResults()[0].fetchRow(0).getLong(0) != r_ah.getResults()[0]
-                .fetchRow(0).getLong(0)) {
-            System.err.printf("Answers from same node don't match\n");
-            throw new RuntimeException();
-        }
-         */
 
         System.err.printf("checkAndReturnCounter %s %d %d\n", server, pid,
                 r_sp.getResults()[0].fetchRow(0).getLong(0));
@@ -288,11 +255,11 @@ public class CheckReplicaConsistency {
      *            Command line arguments.
      * @throws Exception
      *             if anything goes wrong.
-     * @see {@link VoterConfig}
+     * @see {@link AppConfig}
      */
     public static void main(String[] args) throws Exception {
         // create a configuration from the arguments
-        VoterConfig config = new VoterConfig();
+        AppConfig config = new AppConfig();
         config.parse(CheckReplicaConsistency.class.getName(), args);
         CheckReplicaConsistency benchmark = new CheckReplicaConsistency(config);
         System.out.println("Checking replicated tables...");

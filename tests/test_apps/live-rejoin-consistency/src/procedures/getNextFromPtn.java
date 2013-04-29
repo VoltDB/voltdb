@@ -21,38 +21,55 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+
 //
-// Returns the heat map data (winning contestant by state) for display on nthe Live Statistics dashboard.
+// Accepts a vote, enforcing business logic: make sure the vote is for a valid
+// contestant and that the voter (phone number of the caller) is not above the
+// number of allowed votes.
 //
 
-package AdHocRejoinConsistency.procedures;
-
-import java.util.ArrayList;
+package LiveRejoinConsistency.procedures;
 
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
+import org.voltdb.VoltTableRow;
 
 @ProcInfo (
-        partitionInfo = "joiner.id:0",
+        partitionInfo = "counters_ptn.id:0",
         singlePartition = true
         )
-public class getRowFromRep extends VoltProcedure {
+public class getNextFromPtn extends VoltProcedure {
 
     // potential return codes
-    public static final long ERR_INVALID_COUNTER = 1;
+    public static final long ERR_INVALID_COUNTER = 0;
 
     // get Counter
     public final SQLStmt getCounterStmt = new SQLStmt(
-            "SELECT j.id as id, c.counter as counter FROM joiner j, counters_rep c WHERE j.id = c.id and j.id = ? order by 1;");
+            "SELECT counter FROM counters_ptn WHERE id = ? order by id;");
+    // update Counter
+    public final SQLStmt updateCounterStmt = new SQLStmt(
+            "UPDATE counters_ptn SET counter = ? WHERE id = ? and counter = ?;");
 
-    public VoltTable[] run(int id) {
+    public long run(int id, long inc) {
 
-        voltQueueSQL(getCounterStmt, id);
-        VoltTable[] result = voltExecuteSQL();
+        voltQueueSQL(getCounterStmt, EXPECT_ZERO_OR_ONE_ROW, id);
+        VoltTable validation[] = voltExecuteSQL();
 
-        return result;
+        if (validation[0].getRowCount() != 1) {
+            return ERR_INVALID_COUNTER;
+        }
+
+        VoltTableRow row = validation[0].fetchRow(0);
+
+        // what happens when this overflows?
+        long count = row.getLong(0)+inc;
+
+        voltQueueSQL(updateCounterStmt, EXPECT_ONE_ROW, count, id, row.getLong(0));
+        VoltTable result[] = voltExecuteSQL(true);
+
+        // return the updated value
+        return count;
     }
 }

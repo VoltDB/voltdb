@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-APPNAME="AdHocRejoinConsistency"
+APPNAME="LiveRejoinConsistency"
 
 # find voltdb binaries in either installation or distribution directory.
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
@@ -29,8 +29,7 @@ VOLTCOMPILER="$VOLTDB_BIN/voltcompiler"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
-HOST="volt10a"
-SERVERS="volt10a,volt10b"
+SERVERS="localhost"
 
 # remove build artifacts
 function clean() {
@@ -69,26 +68,6 @@ export LOG4J_CONFIG_PATH
         license $LICENSE host $HOST
 }
 
-# run the voltdb server locally
-function rejoin() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-LOG4J_CONFIG_PATH=$PWD/log4j.xml
-export LOG4J_CONFIG_PATH
-REJOINHOST=$HOST
-    $VOLTDB deployment deployment.xml \
-        license $LICENSE live rejoin host $REJOINHOST
-}
-
-function serverlegacy() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
-    $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE host $HOST
-}
-
 # run the client that drives the example
 function client() {
     async-benchmark
@@ -104,7 +83,7 @@ function async-benchmark-help() {
 function async-benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        AdHocRejoinConsistency.AsyncBenchmark \
+        LiveRejoinConsistency.AsyncBenchmark \
         --displayinterval=5 \
         --duration=${DURATION:-300} \
         --servers=$SERVERS \
@@ -127,7 +106,7 @@ function async-benchmark() {
 function verify() {
     #srccompile
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        AdHocRejoinConsistency.CheckReplicaConsistency \
+        LiveRejoinConsistency.CheckReplicaConsistency \
         --servers=${SERVERS}
 }
 

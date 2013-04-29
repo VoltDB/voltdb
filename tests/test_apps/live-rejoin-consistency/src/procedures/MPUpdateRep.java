@@ -22,47 +22,41 @@
  */
 
 //
-// Returns the heat map data (winning contestant by state) for display on nthe Live Statistics dashboard.
+// Initializes the database, pushing the list of contestants and documenting domain data (Area codes and States).
 //
 
-package AdHocRejoinConsistency.procedures;
-
-import java.util.zip.CRC32;
+package LiveRejoinConsistency.procedures;
 
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
+import java.util.Random;
 
 @ProcInfo (
-        partitionInfo = "joiner.id:0",
-        singlePartition = true
+        singlePartition = false
         )
+public class MPUpdateRep extends VoltProcedure
+{
 
-public class getCRCFromRep extends VoltProcedure {
+    public final SQLStmt sql3 = new SQLStmt("UPDATE counters_rep set counter=counter*2;");
+    public final SQLStmt sql4 = new SQLStmt("UPDATE counters_rep set counter=counter/2;");
 
-    // get Counter
-    public final SQLStmt Stmt = new SQLStmt(
-            "SELECT j.id as id, c.counter as counter FROM joiner j, like_counters_rep c WHERE j.id=c.id and c.id = ? order by 1;");
+    Random rand = new Random();
 
-    public long run(int id) {
+    public long run() {
 
-        CRC32 crc = new CRC32();
-
-        voltQueueSQL(Stmt, id);
-        VoltTable[] result = voltExecuteSQL(true);
-
-        while (result[0].advanceRow()) {
-            long counter = result[0].getLong("counter");
-
-            byte [] b = new byte[8];
-            for(int i= 0; i < 8; i++) {
-                b[7 - i] = (byte)(counter >>> (i * 8));
-            }
-
-            crc.update(b);
+        switch(rand.nextInt(2)) {
+        case 0:
+            voltQueueSQL(sql3);
+            break;
+        case 1:
+            voltQueueSQL(sql4);
+            break;
         }
-        return crc.getValue();
+        VoltTable result[] = voltExecuteSQL(true);
+
+        return 0;
     }
 }
