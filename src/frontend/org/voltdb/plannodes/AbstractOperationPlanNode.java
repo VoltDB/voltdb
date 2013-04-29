@@ -103,7 +103,11 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
         if (m_outputSchema == null)
         {
             m_outputSchema = new NodeSchema();
-            m_hasSignificantOutputSchema = true;
+            // The EE knows to assume the correct output schema for these "DML" nodes.
+            // TODO: It'd probably be ok just to leave m_outputSchema null, here, but
+            // maybe the "completed plan" processing for DML statements would need to be a
+            // made aware of this.
+            m_hasSignificantOutputSchema = false;
             // This TVE is magic and repeats unfortunately like this
             // throughout the planner.  Consolidate at some point --izzy
             TupleValueExpression tve = new TupleValueExpression();

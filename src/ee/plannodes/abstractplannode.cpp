@@ -317,6 +317,20 @@ AbstractPlanNode::generateTupleSchema(bool allowNulls) const
     return schema;
 }
 
+
+TupleSchema*
+AbstractPlanNode::generateDMLCountTupleSchema()
+{
+    // Assuming the expected output schema here saves the expense of hard-coding it into each DML plan.
+    vector<voltdb::ValueType> columnTypes(1, VALUE_TYPE_BIGINT);
+    vector<int32_t> columnSizes(1, sizeof(int64_t));
+    vector<bool> columnAllowNull(1, false);
+    TupleSchema* schema = TupleSchema::createTupleSchema(columnTypes, columnSizes, columnAllowNull, true);
+    return schema;
+}
+
+
+
 // ----------------------------------------------------
 //  Serialization Functions
 // ----------------------------------------------------
@@ -380,7 +394,8 @@ AbstractPlanNode::fromJSONObject(PlannerDomValue obj) {
     }
 
     // Otherwise, the node is relying on a child's output schema, possibly several levels down,
-    // OR it is just an inline node (e.g. a LIMIT) whose output schema is not of any interest.
+    // OR it is just an inline node (e.g. a LIMIT) or a DML node,
+    // whose output schema is known from its context or is otherwise not of any interest.
     else {
         node->m_validOutputColumnCount = SCHEMA_UNDEFINED_SO_GET_FROM_CHILD;
     }

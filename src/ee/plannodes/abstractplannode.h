@@ -139,9 +139,16 @@ public:
      * from the plan
      *
      * @param allowNulls whether or not the generated schema should
-     * permit null values in the output columns
+     * permit null values in the output columns.
+     *TODO: -- This is always passed true, so deprecate it?
      */
-    TupleSchema* generateTupleSchema(bool allowNulls) const;
+    TupleSchema* generateTupleSchema(bool allowNulls=true) const;
+
+    /**
+     * Convenience method:
+     * Generate a TupleSchema based on the expected format for DML results.
+     */
+    static TupleSchema* generateDMLCountTupleSchema();
 
     // ------------------------------------------------------------------
     // UTILITY METHODS

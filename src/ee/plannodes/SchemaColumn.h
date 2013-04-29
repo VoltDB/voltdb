@@ -41,11 +41,7 @@ public:
     SchemaColumn(PlannerDomValue colObject);
     ~SchemaColumn();
 
-    std::string getTableName() const;
     std::string getColumnName() const;
-    std::string getColumnAlias() const;
-    ValueType getType() const;
-    int32_t getSize() const;
 
     // SchemaColumn retains responsibility for the deletion of
     // the expression
