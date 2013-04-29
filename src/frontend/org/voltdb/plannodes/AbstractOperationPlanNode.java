@@ -103,6 +103,7 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
         if (m_outputSchema == null)
         {
             m_outputSchema = new NodeSchema();
+            m_hasSignificantOutputSchema = true;
             // This TVE is magic and repeats unfortunately like this
             // throughout the planner.  Consolidate at some point --izzy
             TupleValueExpression tve = new TupleValueExpression();

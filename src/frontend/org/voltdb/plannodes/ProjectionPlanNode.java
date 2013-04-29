@@ -65,6 +65,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
     public void setOutputSchema(NodeSchema schema)
     {
         m_outputSchema = schema.clone();
+        m_hasSignificantOutputSchema = true;
     }
 
     @Override
@@ -139,6 +140,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
             }
         }
         m_outputSchema = new_schema;
+        m_hasSignificantOutputSchema = true;
 
         return;
     }
