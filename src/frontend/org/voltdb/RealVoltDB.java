@@ -2277,6 +2277,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     for (ExecutionSite es : getLocalSites().values()) {
                         es.notifySitesAdded(m_siteTracker);
                     }
+
+                    Set<Long> newInitiators = new HashSet<Long>();
+                    for (Long added : deltaAdded) {
+                        newInitiators.add((long)CoreUtils.getHostIdFromHSId(added));
+                    }
+                    getCommandLog().initiatorsAdded(newInitiators);
                 }
             }
         }

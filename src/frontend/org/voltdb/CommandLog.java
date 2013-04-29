@@ -84,4 +84,6 @@ public interface CommandLog {
     public interface DurabilityListener {
         public void onDurability(ArrayDeque<Object> durableThings);
     }
+
+    public abstract void initiatorsAdded(Set<Long> newInitiators);
 }

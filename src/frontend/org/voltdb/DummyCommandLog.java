@@ -71,4 +71,7 @@ public class DummyCommandLog implements CommandLog {
 
     @Override
     public void logIv2MPFault(long txnId) {}
+
+    @Override
+    public void initiatorsAdded(Set<Long> newInitiators) {}
 }
