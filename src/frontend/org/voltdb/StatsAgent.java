@@ -257,16 +257,6 @@ public class StatsAgent {
         }
 
         if (selector.equals("TOPO")) {
-            if (!VoltDB.instance().isIV2Enabled()) {
-                final ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
-                                             new VoltTable[0], "IV2 is not enabled", clientHandle);
-                ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-                buf.putInt(buf.capacity() - 4);
-                errorResponse.flattenToBuffer(buf).flip();
-                c.writeStream().enqueue(buf);
-                return;
-            }
             PendingStatsRequest psr = new PendingStatsRequest(
                 selector,
                 c,
