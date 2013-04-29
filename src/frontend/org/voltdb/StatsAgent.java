@@ -18,7 +18,6 @@ package org.voltdb;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -359,9 +358,8 @@ public class StatsAgent {
 
     private void collectTopoStats(PendingStatsRequest psr)
     {
-        List<Long> siteIds = Arrays.asList(new Long[] { 0L });
         psr.aggregateTables = new VoltTable[2];
-        psr.aggregateTables[0] = getStats(SysProcSelector.TOPO, siteIds, false, psr.startTime);
+        psr.aggregateTables[0] = getStatsAggregate(SysProcSelector.TOPO, false, psr.startTime);
         VoltTable vt =
                 new VoltTable(
                 new VoltTable.ColumnInfo("HASHTYPE", VoltType.STRING),
@@ -378,9 +376,8 @@ public class StatsAgent {
 
     private void collectPartitionCount(PendingStatsRequest psr)
     {
-        List<Long> siteIds = Arrays.asList(new Long[] { 0L });
         psr.aggregateTables = new VoltTable[1];
-        psr.aggregateTables[0] = getStats(SysProcSelector.PARTITIONCOUNT, siteIds, false, psr.startTime);
+        psr.aggregateTables[0] = getStatsAggregate(SysProcSelector.PARTITIONCOUNT, false, psr.startTime);
 
         try {
             sendStatsResponse(psr);
@@ -452,12 +449,11 @@ public class StatsAgent {
     // This could probably eventually move to the stats source
     private VoltTable[] collectDRStats()
     {
-        List<Long> siteIds = Arrays.asList(new Long[] { 0L });
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable partitionStats = getStats(SysProcSelector.DRPARTITION, siteIds, false, now);
-        VoltTable nodeStats = getStats(SysProcSelector.DRNODE, siteIds, false, now);
+        VoltTable partitionStats = getStatsAggregate(SysProcSelector.DRPARTITION, false, now);
+        VoltTable nodeStats = getStatsAggregate(SysProcSelector.DRNODE, false, now);
         if (partitionStats != null && nodeStats != null) {
             stats = new VoltTable[2];
             stats[0] = partitionStats;
@@ -468,11 +464,10 @@ public class StatsAgent {
 
     private VoltTable[] collectSnapshotStatusStats()
     {
-        List<Long> siteIds = Arrays.asList(new Long[] { 0L });
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable ssStats = getStats(SysProcSelector.SNAPSHOTSTATUS, siteIds, false, now);
+        VoltTable ssStats = getStatsAggregate(SysProcSelector.SNAPSHOTSTATUS, false, now);
         if (ssStats != null) {
             stats = new VoltTable[1];
             stats[0] = ssStats;
@@ -482,11 +477,10 @@ public class StatsAgent {
 
     private VoltTable[] collectMemoryStats(boolean interval)
     {
-        List<Long> siteIds = Arrays.asList(new Long[] { 0L });
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable mStats = getStats(SysProcSelector.MEMORY, siteIds, interval, now);
+        VoltTable mStats = getStatsAggregate(SysProcSelector.MEMORY, interval, now);
         if (mStats != null) {
             stats = new VoltTable[1];
             stats[0] = mStats;
@@ -496,11 +490,10 @@ public class StatsAgent {
 
     private VoltTable[] collectIOStats(boolean interval)
     {
-        List<Long> siteIds = Arrays.asList(new Long[] { 0L });
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable iStats = getStats(SysProcSelector.IOSTATS, siteIds, interval, now);
+        VoltTable iStats = getStatsAggregate(SysProcSelector.IOSTATS, interval, now);
         if (iStats != null) {
             stats = new VoltTable[1];
             stats[0] = iStats;
@@ -510,11 +503,10 @@ public class StatsAgent {
 
     private VoltTable[] collectInitiatorStats(boolean interval)
     {
-        List<Long> siteIds = Arrays.asList(new Long[] { 0L });
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable iStats = getStats(SysProcSelector.INITIATOR, siteIds, interval, now);
+        VoltTable iStats = getStatsAggregate(SysProcSelector.INITIATOR, interval, now);
         if (iStats != null) {
             stats = new VoltTable[1];
             stats[0] = iStats;
@@ -549,6 +541,20 @@ public class StatsAgent {
             final boolean interval,
             final Long now) {
         return getStatsInternal(selector, siteIds, interval, now, null);
+    }
+
+    /**
+     * Get aggregate statistics.
+     * @param selector    @Statistics selector keyword
+     * @param interval    true if processing a reporting interval
+     * @param now         current timestamp
+     * @return  statistics VoltTable results
+     */
+    public synchronized VoltTable getStatsAggregate(
+            final SysProcSelector selector,
+            final boolean interval,
+            final Long now) {
+        return getStatsAggregateInternal(selector, interval, now, null);
     }
 
     /**
@@ -587,6 +593,75 @@ public class StatsAgent {
         }
 
         return results;
+    }
+
+    private synchronized VoltTable getStatsAggregateInternal(
+            final SysProcSelector selector,
+            final boolean interval,
+            final Long now,
+            VoltTable prevResults)
+    {
+        assert selector != null;
+        final HashMap<Long, ArrayList<StatsSource>> siteIdToStatsSources = registeredStatsSources.get(selector);
+        assert siteIdToStatsSources != null;
+
+        ArrayList<StatsSource> sSources = siteIdToStatsSources.values().iterator().next();
+        //Let these two be null since they are for pro features
+        if (selector == SysProcSelector.DRNODE || selector == SysProcSelector.DRPARTITION) {
+            if (sSources == null || sSources.isEmpty()) {
+                return null;
+            }
+        } else {
+            assert sSources != null && !sSources.isEmpty();
+        }
+
+        /*
+         * Some sources like TableStats use VoltTable to keep track of
+         * statistics. We need to use the table schema the VoltTable has in this
+         * case.
+         */
+        VoltTable.ColumnInfo columns[] = null;
+        if (!sSources.get(0).isEEStats())
+            columns = sSources.get(0).getColumnSchema().toArray(new VoltTable.ColumnInfo[0]);
+        else {
+            final VoltTable table = sSources.get(0).getStatsTable();
+            if (table == null)
+                return null;
+            columns = new VoltTable.ColumnInfo[table.getColumnCount()];
+            for (int i = 0; i < columns.length; i++)
+                columns[i] = new VoltTable.ColumnInfo(table.getColumnName(i),
+                                                      table.getColumnType(i));
+        }
+
+         // Append to previous results if provided.
+        final VoltTable resultTable = prevResults != null ? prevResults : new VoltTable(columns);
+
+        for (ArrayList<StatsSource> statsSources : siteIdToStatsSources.values()) {
+            assert statsSources != null;
+            for (final StatsSource ss : statsSources) {
+                assert ss != null;
+                /*
+                 * Some sources like TableStats use VoltTable to keep track of
+                 * statistics
+                 */
+                if (ss.isEEStats()) {
+                    final VoltTable table = ss.getStatsTable();
+                    // this table can be null during recovery, at least
+                    if (table != null) {
+                        while (table.advanceRow()) {
+                            resultTable.add(table);
+                        }
+                        table.resetRowPosition();
+                    }
+                } else {
+                    Object statsRows[][] = ss.getStatsRows(interval, now);
+                    for (Object[] row : statsRows) {
+                        resultTable.addRow(row);
+                    }
+                }
+            }
+        }
+        return resultTable;
     }
 
     /**
