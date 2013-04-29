@@ -110,6 +110,7 @@ public class FragmentTask extends TransactionTask
         taskLog.logTask(m_fragmentMsg);
         final FragmentResponseMessage response =
             new FragmentResponseMessage(m_fragmentMsg, m_initiator.getHSId());
+        response.m_sourceHSId = m_initiator.getHSId();
         response.setRecovering(true);
         response.setStatus(FragmentResponseMessage.SUCCESS, null);
 

@@ -37,6 +37,7 @@ import org.voltdb.utils.VoltFile;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Coordinates the sites to perform rejoin
@@ -48,7 +49,7 @@ public abstract class JoinCoordinator extends LocalMailbox {
      * m_handler is called when a SnapshotUtil.requestSnapshot response occurs.
      * This callback runs on the snapshot daemon thread.
      */
-    protected SnapshotUtil.SnapshotResponseHandler m_handler =
+    protected static final SnapshotUtil.SnapshotResponseHandler m_handler =
             new SnapshotUtil.SnapshotResponseHandler() {
         @Override
         public void handleResponse(ClientResponse resp)
@@ -84,6 +85,8 @@ public abstract class JoinCoordinator extends LocalMailbox {
         m_messenger = hostMessenger;
     }
 
+    public void initialize(int kfactor)
+        throws JSONException, KeeperException, InterruptedException, ExecutionException {}
     public void setClientInterface(ClientInterface ci) {}
     public void setPartitionsToHSIds(Map<Integer, Long> partsToHSIds) {}
     public List<Integer> getPartitionsToAdd() {
@@ -107,7 +110,7 @@ public abstract class JoinCoordinator extends LocalMailbox {
         m_messenger.removeMailbox(getHSId());
     }
 
-    protected void clearOverflowDir(String voltroot)
+    protected static void clearOverflowDir(String voltroot)
     {
         // clear overflow dir in case there are files left from previous runs
         try {
@@ -120,12 +123,12 @@ public abstract class JoinCoordinator extends LocalMailbox {
         }
     }
 
-    protected String makeSnapshotNonce(String type, long HSId)
+    public static String makeSnapshotNonce(String type, long HSId)
     {
         return type + "_" + HSId + "_" + System.currentTimeMillis();
     }
 
-    protected String makeSnapshotRequest(SnapshotRequestConfig config)
+    public static String makeSnapshotRequest(SnapshotRequestConfig config)
     {
         try {
             JSONStringer jsStringer = new JSONStringer();

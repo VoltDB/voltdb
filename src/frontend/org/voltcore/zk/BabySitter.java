@@ -117,6 +117,20 @@ public class BabySitter
         return new Pair<BabySitter, List<String>>(bs, initialChildren);
     }
 
+    /**
+     * Create a new BabySitter and make sure it reads the initial children list.
+     * Use the provided ExecutorService to queue events to, rather than
+     * creating a private ExecutorService.
+     */
+    public static BabySitter nonblockingFactory(ZooKeeper zk, String dir,
+                                                Callback cb, ExecutorService es)
+        throws InterruptedException, ExecutionException
+    {
+        BabySitter bs = new BabySitter(zk, dir, cb, es);
+        bs.m_es.submit(bs.m_eventHandler);
+        return bs;
+    }
+
     // eventHandler fetches the new children and resets the watch.
     // It is always run in m_es (the ExecutorService).
     private final Callable<List<String>> m_eventHandler = new Callable<List<String>>() {

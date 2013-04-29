@@ -71,6 +71,7 @@ public class SysprocFragmentTask extends TransactionTask
     {
         final FragmentResponseMessage response =
             new FragmentResponseMessage(m_fragmentMsg, m_initiator.getHSId());
+        response.m_sourceHSId = m_initiator.getHSId();
         response.setRecovering(true);
         response.setStatus(FragmentResponseMessage.SUCCESS, null);
 
