@@ -256,6 +256,8 @@ public class StatsAgent {
             }
         }
 
+        // Some selectors can provide a single answer based on global data.
+        // Intercept them and respond before doing the distributed stuff.
         if (selector.equals("TOPO")) {
             PendingStatsRequest psr = new PendingStatsRequest(
                 selector,
@@ -263,6 +265,15 @@ public class StatsAgent {
                 clientHandle,
                 System.currentTimeMillis());
             collectTopoStats(psr);
+            return;
+        }
+        else if (selector.equals("PARTITIONCOUNT")) {
+            PendingStatsRequest psr = new PendingStatsRequest(
+                selector,
+                c,
+                clientHandle,
+                System.currentTimeMillis());
+            collectPartitionCount(psr);
             return;
         }
 
@@ -370,6 +381,19 @@ public class StatsAgent {
         }
     }
 
+    private void collectPartitionCount(PendingStatsRequest psr)
+    {
+        List<Long> siteIds = Arrays.asList(new Long[] { 0L });
+        psr.aggregateTables = new VoltTable[1];
+        psr.aggregateTables[0] = getStats(SysProcSelector.PARTITIONCOUNT, siteIds, false, psr.startTime);
+
+        try {
+            sendStatsResponse(psr);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to return PARTITIONCOUNT to client", true, e);
+        }
+    }
+
     private void collectDistributedStats(JSONObject obj) throws Exception
     {
         long requestId = obj.getLong("requestId");
@@ -391,9 +415,6 @@ public class StatsAgent {
         }
         else if (selector == SysProcSelector.IOSTATS) {
             stats = collectIOStats(interval);
-        }
-        else if (selector == SysProcSelector.PARTITIONCOUNT) {
-            stats = collectPartitionCount(interval);
         }
         else if (selector == SysProcSelector.INITIATOR) {
             stats = collectInitiatorStats(interval);
@@ -488,20 +509,6 @@ public class StatsAgent {
         if (iStats != null) {
             stats = new VoltTable[1];
             stats[0] = iStats;
-        }
-        return stats;
-    }
-
-    private VoltTable[] collectPartitionCount(boolean interval)
-    {
-        List<Long> siteIds = Arrays.asList(new Long[] { 0L });
-        Long now = System.currentTimeMillis();
-        VoltTable[] stats = null;
-
-        VoltTable pcStats = getStats(SysProcSelector.PARTITIONCOUNT, siteIds, interval, now);
-        if (pcStats != null) {
-            stats = new VoltTable[1];
-            stats[0] = pcStats;
         }
         return stats;
     }
