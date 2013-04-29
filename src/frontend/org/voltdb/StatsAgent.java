@@ -411,6 +411,9 @@ public class StatsAgent {
         else if (selector == SysProcSelector.INITIATOR) {
             stats = collectInitiatorStats(interval);
         }
+        else if (selector == SysProcSelector.TABLE) {
+            stats = collectTableStats(interval);
+        }
 
         // Send a response with no data since the stats is not supported
         if (stats == null) {
@@ -510,6 +513,19 @@ public class StatsAgent {
         if (iStats != null) {
             stats = new VoltTable[1];
             stats[0] = iStats;
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectTableStats(boolean interval)
+    {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable tStats = getStatsAggregate(SysProcSelector.TABLE, interval, now);
+        if (tStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = tStats;
         }
         return stats;
     }
