@@ -417,6 +417,9 @@ public class StatsAgent {
         else if (selector == SysProcSelector.INDEX) {
             stats = collectIndexStats(interval);
         }
+        else if (selector == SysProcSelector.PROCEDURE) {
+            stats = collectProcedureStats(interval);
+        }
 
         // Send a response with no data since the stats is not supported
         if (stats == null) {
@@ -542,6 +545,19 @@ public class StatsAgent {
         if (tStats != null) {
             stats = new VoltTable[1];
             stats[0] = tStats;
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectProcedureStats(boolean interval)
+    {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable pStats = getStatsAggregate(SysProcSelector.PROCEDURE, interval, now);
+        if (pStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = pStats;
         }
         return stats;
     }
