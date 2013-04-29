@@ -366,7 +366,7 @@ public class StatsAgent {
         try {
             sendStatsResponse(psr);
         } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Screwed", true, e);
+            VoltDB.crashLocalVoltDB("Unable to return TOPO results to client.", true, e);
         }
     }
 
