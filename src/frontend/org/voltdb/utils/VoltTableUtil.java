@@ -175,6 +175,7 @@ public class VoltTableUtil {
                             vt.getColumnType(ii));
                 }
                 result = new VoltTable(columns);
+                result.setStatusCode(vt.getStatusCode());
                 break;
             }
         }

@@ -57,6 +57,7 @@ public class RejoinMessage extends VoltMessage {
     private Set<Long> m_snapshotSinkHSIds = null;
     private int m_tableId = -1;
     private ByteBuffer m_tableBlock = null;
+    private boolean m_shouldWaitForSnapshotCompletion = true;
 
     /** Empty constructor for de-serialization */
     public RejoinMessage() {
@@ -166,6 +167,14 @@ public class RejoinMessage extends VoltMessage {
 
     public ByteBuffer getTableBlock() {
         return m_tableBlock.duplicate();
+    }
+
+    public boolean shouldWaitForSnapshotCompletion() {
+        return m_shouldWaitForSnapshotCompletion;
+    }
+
+    public void setShouldWaitForSnapshotCompletion(boolean shouldWait) {
+        m_shouldWaitForSnapshotCompletion = shouldWait;
     }
 
     @Override
