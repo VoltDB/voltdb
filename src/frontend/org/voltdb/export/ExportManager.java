@@ -174,10 +174,8 @@ public class ExportManager
                                     }
                                 }
                             }
-                        } catch (ClassNotFoundException e) {} catch (InstantiationException e) {
-                            exportLog.error(e);
-                        } catch (IllegalAccessException e) {
-                            exportLog.error(e);
+                        } catch (Exception e) {
+                            VoltDB.crashLocalVoltDB("Error creating next export processor", true, e);
                         }
                         oldProcessor = m_processor.getAndSet(newProcessor);
                     }
@@ -257,7 +255,7 @@ public class ExportManager
                 try {
                     VoltFile.recursivelyDelete(f);
                 } catch (IOException e) {
-                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                    VoltDB.crashLocalVoltDB("Error deleting export overflow data", true, e);
                 }
             }
         }

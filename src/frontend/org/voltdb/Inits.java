@@ -41,7 +41,6 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
@@ -55,7 +54,6 @@ import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.HTTPAdminListener;
-import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 
@@ -612,9 +610,8 @@ public class Inits {
                         m_rvdb.m_messenger,
                         m_rvdb.m_partitionsToSitesAtStartupForExportInit
                         );
-            } catch (ExportManager.SetupException e) {
-                hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ExportInitFailure.name(), e);
-                System.exit(-1);
+            } catch (Throwable t) {
+                VoltDB.crashLocalVoltDB("Error setting up export", true, t);
             }
         }
     }
