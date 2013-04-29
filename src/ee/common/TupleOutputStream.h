@@ -55,7 +55,8 @@ public:
     /**
      * Write a tuple and return the number of bytes written.
      */
-    std::size_t writeRow(TupleSerializer &serializer, const TableTuple &tuple);
+    std::size_t writeRow(TupleSerializer &tupleSerializer,
+                         const TableTuple &tuple);
 
     /**
      * Return true if nbytes can fit in the buffer's remaining space.

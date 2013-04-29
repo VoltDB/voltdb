@@ -301,6 +301,7 @@ CTX.INPUT['storage'] = """
  TableCatalogDelegate.cpp
  tablefactory.cpp
  TableStats.cpp
+ TableStreamer.cpp
  tableutil.cpp
  temptable.cpp
  TempTableLimits.cpp

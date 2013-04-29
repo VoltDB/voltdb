@@ -50,15 +50,14 @@
 #include <vector>
 #include <cassert>
 #include <boost/shared_ptr.hpp>
-#include <boost/scoped_ptr.hpp>
 #include "common/ids.h"
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
 #include "storage/table.h"
 #include "storage/TupleStreamWrapper.h"
 #include "storage/TableStats.h"
+#include "storage/TableStreamer.h"
 #include "storage/PersistentTableStats.h"
-#include "storage/CopyOnWriteContext.h"
 #include "storage/RecoveryContext.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
@@ -83,6 +82,7 @@ class Topend;
 class MaterializedViewMetadata;
 class RecoveryProtoMsg;
 class TupleOutputStreamProcessor;
+class ReferenceSerializeInput;
 
 /**
  * Represents a non-temporary table which permanently resides in
@@ -123,6 +123,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     friend class ::CopyOnWriteTest_CopyOnWriteIterator;
     friend class ::CompactionTest_BasicCompaction;
     friend class ::CompactionTest_CompactionWithCopyOnWrite;
+
   private:
     // no default ctor, no copy, no assignment
     PersistentTable();
@@ -210,6 +211,14 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
 
     /** Add/drop/list materialized views to this table */
     void addMaterializedView(MaterializedViewMetadata *view);
+
+    /** Prepare table for streaming from serialized data. */
+    bool activateStream(TupleSerializer &tupleSerializer,
+                                 TableStreamType streamType,
+                                 int32_t partitionId,
+                                 CatalogId tableId,
+                                 ReferenceSerializeInput &serializeIn);
+
     void dropMaterializedView(MaterializedViewMetadata *targetView);
     void segregateMaterializedViews(std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & start,
                                     std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & end,
@@ -219,46 +228,19 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
                                     std::vector<MaterializedViewMetadata*> &changingViewsOut,
                                     std::vector<MaterializedViewMetadata*> &obsoleteViewsOut);
     void updateMaterializedViewTargetTable(PersistentTable* target);
-    /**
-     * Switch the table to copy on write mode.
-     * doDelete==true causes the tuple to be deleted after streaming.
-     * Returns true if the table was already in copy on write mode.
-     * Support predicates for filtering results.
-     */
-    bool activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId,
-                             const std::vector<std::string> &predicate_strings,
-                             bool doDelete);
 
     /**
-     * COW activation wrapper for backward compatibility with some tests that don't provide predicates.
+     * Attempt to stream more tuples from the table to the provided
+     * output stream.
+     * Return remaining tuple count, 0 if done, or -1 on error.
      */
-    bool activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId) {
-        std::vector<std::string> predicate_strings;
-        return activateCopyOnWrite(serializer, partitionId, predicate_strings, false);
-    }
-
-    /**
-     * Create a recovery stream for this table. Returns true if the table already has an active recovery stream
-     */
-    bool activateRecoveryStream(int32_t tableId);
-
-    /**
-     * Serialize the next message in the stream of recovery messages. Returns true if there are
-     * more messages and false otherwise.
-     */
-    bool nextRecoveryMessage(ReferenceSerializeOutput *out);
+    int64_t streamMore(TupleOutputStreamProcessor &outputStreams,
+                       std::vector<int> &retPositions);
 
     /**
      * Process the updates from a recovery message
      */
     void processRecoveryMessage(RecoveryProtoMsg* message, Pool *pool);
-
-    /**
-     * Attempt to serialize more tuples from the table to the provided
-     * output stream.
-     * Return remaining tuple count, 0 if done, or -1 on error.
-     */
-    int64_t serializeMore(TupleOutputStreamProcessor &outputStreams);
 
     /**
      * Create a tree index on the primary key and then iterate it and hash
@@ -286,9 +268,24 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
         return m_data.size();
     }
 
+    bool isCopyOnWriteActive() const {
+        return m_tableStreamer.get() != NULL && m_tableStreamer->isCopyOnWriteActive();
+    }
+
+    bool isRecoveryActive() const {
+        return m_tableStreamer.get() != NULL && m_tableStreamer->isRecoveryActive();
+    }
+
+    bool canSafelyFreeTuple(TableTuple &tuple) const {
+        return m_tableStreamer.get() != NULL && m_tableStreamer->canSafelyFreeTuple(tuple);
+    }
+
     // This is a testability feature not intended for use in product logic.
     int getTuplesPendingDeleteCount() const { return m_tuplesPendingDeleteCount; }
+
   private:
+
+    bool activateStream(CatalogId tableId);
 
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
         if (nextBlock != NULL) {
@@ -364,13 +361,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     // is Export enabled
     bool m_exportEnabled;
 
-    // Snapshot stuff
-    boost::scoped_ptr<CopyOnWriteContext> m_COWContext;
-
-    //Recovery stuff
-    boost::scoped_ptr<RecoveryContext> m_recoveryContext;
-
-
 
     // STORAGE TRACKING
 
@@ -387,6 +377,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     // Set of blocks with non-empty free lists or available tuples
     // that have never been allocated
     stx::btree_set<TBPtr > m_blocksWithSpace;
+
+    // Provides access to all table streaming apparatuses, including COW and recovery.
+    boost::shared_ptr<TableStreamer> m_tableStreamer;
 
   private:
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
