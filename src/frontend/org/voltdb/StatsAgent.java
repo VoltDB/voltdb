@@ -20,7 +20,6 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -67,8 +66,6 @@ public class StatsAgent {
     private final HashMap<SysProcSelector, HashMap<Long, ArrayList<StatsSource>>> registeredStatsSources =
         new HashMap<SysProcSelector, HashMap<Long, ArrayList<StatsSource>>>();
 
-    private final HashSet<SysProcSelector> handledSelectors = new HashSet<SysProcSelector>();
-
     private HostMessenger m_messenger;
 
     // Things that would be nice in the future:
@@ -105,8 +102,6 @@ public class StatsAgent {
         for (int ii = 0; ii < selectors.length; ii++) {
             registeredStatsSources.put(selectors[ii], new HashMap<Long, ArrayList<StatsSource>>());
         }
-        handledSelectors.add(SysProcSelector.PROCEDURE);
-        handledSelectors.add(SysProcSelector.PLANNER);
         m_messenger = null;
     }
 
