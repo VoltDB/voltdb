@@ -48,22 +48,6 @@ public:
                   ReferenceSerializeInput &serializeIn);
 
     /**
-     * Constructor with predicates to be copied.
-     */
-    TableStreamer(TupleSerializer &tupleSerializer,
-                  TableStreamType streamType,
-                  int32_t partitionId,
-                  const std::vector<std::string> &predicateStrings,
-                  bool doDelete);
-
-    /**
-     * Constructor without predicates or delete flag.
-     */
-    TableStreamer(TupleSerializer &tupleSerializer,
-                  TableStreamType streamType,
-                  int32_t partitionId);
-
-    /**
      * Destructor.
      */
     virtual ~TableStreamer();

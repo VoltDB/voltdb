@@ -894,7 +894,7 @@ TableStats* PersistentTable::getTableStats() {
 }
 
 /** Prepare table for streaming from serialized data. */
-bool PersistentTable::activateStreamForEngine(
+bool PersistentTable::activateStream(
     TupleSerializer &tupleSerializer,
     TableStreamType streamType,
     int32_t partitionId,
@@ -902,47 +902,15 @@ bool PersistentTable::activateStreamForEngine(
     ReferenceSerializeInput &serializeIn) {
 
     // Expect m_tableStreamer to be null. Only make it fatal in debug builds.
-    if (m_tableStreamer.get() != NULL) {
-        assert(m_tableStreamer.get() != NULL);
-    }
-    else {
+    assert(m_tableStreamer.get() == NULL);
+
+    if (m_tableStreamer.get() == NULL) {
         // Prepare a TableStreamer.
         m_tableStreamer.reset(
             new TableStreamer(tupleSerializer, streamType, partitionId, serializeIn));
     }
 
     return activateStream(tableId);
-}
-
-/** Prepare table for streaming from pre-parsed data (predicates are copied). */
-bool PersistentTable::activateStreamForTest(
-    TupleSerializer &tupleSerializer,
-    TableStreamType streamType,
-    int32_t partitionId,
-    CatalogId tableId,
-    const std::vector<std::string> &predicateStrings,
-    bool doDelete) {
-
-    // Expect m_tableStreamer to be null. Only make it fatal in debug builds.
-    if (m_tableStreamer.get() != NULL) {
-        assert(m_tableStreamer.get() != NULL);
-    }
-    else {
-        // Prepare a TableStreamer.
-        m_tableStreamer.reset(
-            new TableStreamer(tupleSerializer, streamType, partitionId, predicateStrings, doDelete));
-    }
-
-    return activateStream(tableId);
-}
-
-/** Prepare table for streaming from pre-parsed data (no predicates). */
-bool PersistentTable::activateStreamForTest(TupleSerializer &tupleSerializer,
-                           TableStreamType streamType,
-                           int32_t partitionId,
-                           CatalogId tableId) {
-    std::vector<std::string> predicateStrings;
-    return activateStreamForTest(tupleSerializer, streamType, partitionId, tableId, predicateStrings, false);
 }
 
 /** Prepare table for streaming. */

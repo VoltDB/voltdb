@@ -55,35 +55,6 @@ TableStreamer::TableStreamer(TupleSerializer &tupleSerializer,
     }
 }
 
-/**
- * Constructor with predicates to be copied.
- */
-TableStreamer::TableStreamer(TupleSerializer &tupleSerializer,
-                             TableStreamType streamType,
-                             int32_t partitionId,
-                             const std::vector<std::string> &predicateStrings,
-                             bool doDelete) :
-    m_tupleSerializer(tupleSerializer),
-    m_streamType(streamType),
-    m_partitionId(partitionId),
-    m_predicateStrings(predicateStrings),
-    m_doDelete(doDelete)
-{
-}
-
-/**
- * Constructor without predicates or delete flag.
- */
-TableStreamer::TableStreamer(TupleSerializer &tupleSerializer,
-                             TableStreamType streamType,
-                             int32_t partitionId) :
-    m_tupleSerializer(tupleSerializer),
-    m_streamType(streamType),
-    m_partitionId(partitionId),
-    m_doDelete(false)
-{
-}
-
 TableStreamer::~TableStreamer()
 {}
 

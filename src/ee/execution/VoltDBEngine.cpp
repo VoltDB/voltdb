@@ -1378,7 +1378,7 @@ bool VoltDBEngine::activateTableStream(
     }
 
     // Crank up the necessary persistent table streaming mechanism(s).
-    if (table->activateStreamForEngine(m_tupleSerializer, streamType, m_partitionId, tableId, serializeIn)) {
+    if (table->activateStream(m_tupleSerializer, streamType, m_partitionId, tableId, serializeIn)) {
         return false;
     }
 

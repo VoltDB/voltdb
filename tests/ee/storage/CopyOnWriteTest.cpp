@@ -413,7 +413,11 @@ TEST_F(CopyOnWriteTest, BigTest) {
             ASSERT_TRUE(inserted);
         }
 
-        m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId);
+        char config[5];
+        ::memset(config, 0, 5);
+        ReferenceSerializeInput input(config, 5);
+
+        m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
 
         stx::btree_set<int64_t> COWTuples;
         char serializationBuffer[BUFFER_SIZE];
@@ -475,7 +479,10 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
             ASSERT_TRUE(inserted);
         }
 
-        m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId);
+        char config[5];
+        ::memset(config, 0, 5);
+        ReferenceSerializeInput input(config, 5);
+        m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
 
         stx::btree_set<int64_t> COWTuples;
         char serializationBuffer[BUFFER_SIZE];
@@ -538,7 +545,10 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
             ASSERT_TRUE(inserted);
         }
 
-        m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId);
+        char config[5];
+        ::memset(config, 0, 5);
+        ReferenceSerializeInput input(config, 5);
+        m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
 
         stx::btree_set<int64_t> COWTuples;
         char serializationBuffer[BUFFER_SIZE];
@@ -806,6 +816,14 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
             }
         }
 
+        char buffer[1024 * 256];
+        ReferenceSerializeOutput output(buffer, 1024 * 256);
+        output.writeByte((int8_t)(doDelete ? 1 : 0));
+        output.writeInt(npartitions);
+        for (std::vector<std::string>::iterator i = strings.begin(); i != strings.end(); i++) {
+            output.writeTextString(*i);
+        }
+
         tool.context("precalculate");
 
         // Map original tuples to expected partitions.
@@ -830,7 +848,8 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
 
         tool.context("activate");
 
-        bool alreadyActivated = m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, strings, doDelete);
+        ReferenceSerializeInput input(buffer, output.position());
+        bool alreadyActivated = m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
         if (alreadyActivated) {
             tool.error("COW was previously activated");
         }
@@ -977,7 +996,10 @@ TEST_F(CopyOnWriteTest, BufferBoundaryCondition) {
     // This should succeed in one call to serializeMore().
     DefaultTupleSerializer serializer;
     char serializationBuffer[bufferSize];
-    m_table->activateStreamForTest(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId);
+    char config[5];
+    ::memset(config, 0, 5);
+    ReferenceSerializeInput input(config, 5);
+    m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
     TupleOutputStreamProcessor outputStreams(serializationBuffer, bufferSize);
     std::vector<int> retPositions;
     int64_t remaining = m_table->streamMore(outputStreams, retPositions);
