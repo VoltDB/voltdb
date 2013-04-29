@@ -353,7 +353,7 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         }
     }
 
-    if (m_tableStreamer.get() != NULL) {
+    if (m_tableStreamer != NULL) {
         m_tableStreamer->notifyTupleUpdate(targetTupleToUpdate);
     }
 
@@ -565,7 +565,7 @@ void PersistentTable::deleteTupleRelease(char* tupleData)
 void PersistentTable::deleteTupleFinalize(TableTuple &target)
 {
     // A snapshot (background scan) in progress can still cause a hold-up.
-    if (   m_tableStreamer.get() != NULL
+    if (   m_tableStreamer != NULL
         && m_tableStreamer->isCopyOnWriteActive()
         && ! m_tableStreamer->canSafelyFreeTuple(target)) {
         // Mark it pending delete and let the snapshot land the finishing blow.
