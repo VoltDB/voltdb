@@ -49,6 +49,7 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.rejoin.RejoinDataAckMessage;
 import org.voltdb.rejoin.RejoinDataMessage;
+import org.voltdb.sysprocs.saverestore.SnapshotOutputBuffers;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
@@ -374,7 +375,11 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
             /*
              * Ask the engine to serialize more data.
              */
-            int serialized = m_engine.tableStreamSerializeMore(container, table.m_tableId, TableStreamType.RECOVERY);
+            SnapshotOutputBuffers output = new SnapshotOutputBuffers();
+            output.addContainer(container);
+            int serialized = m_engine.tableStreamSerializeMore(table.m_tableId,
+                                                               TableStreamType.RECOVERY,
+                                                               output)[0];
 
             if (serialized <= 0) {
                 /*
@@ -585,7 +590,11 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                  * Ask the engine to serialize more data.
                  */
                 long startSerializing = System.currentTimeMillis();
-                int serialized = m_engine.tableStreamSerializeMore(container, table.m_tableId, TableStreamType.RECOVERY);
+                SnapshotOutputBuffers output = new SnapshotOutputBuffers();
+                output.addContainer(container);
+                int serialized = m_engine.tableStreamSerializeMore(table.m_tableId,
+                                                                   TableStreamType.RECOVERY,
+                                                                   output)[0];
                 long endSerializing = System.currentTimeMillis();
                 m_timeSpentSerializing.addAndGet(endSerializing - startSerializing);
 
