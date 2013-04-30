@@ -426,6 +426,9 @@ public class StatsAgent {
         else if (selector == SysProcSelector.PLANNER) {
             stats = collectPlannerStats(interval);
         }
+        else if (selector == SysProcSelector.MANAGEMENT) {
+            stats = collectManagementStats(interval);
+        }
 
         // Send a response with no data since the stats is not supported
         if (stats == null) {
@@ -591,6 +594,21 @@ public class StatsAgent {
             stats = new VoltTable[1];
             stats[0] = pStats;
         }
+        return stats;
+    }
+
+    // This is just a roll-up of MEMORY, TABLE, INDEX, PROCEDURE, INITIATOR, IO, and
+    // STARVATION
+    private VoltTable[] collectManagementStats(boolean interval)
+    {
+        VoltTable[] stats = new VoltTable[7];
+        stats[0] = collectMemoryStats(interval)[0];
+        stats[1] = collectInitiatorStats(interval)[0];
+        stats[2] = collectProcedureStats(interval)[0];
+        stats[3] = collectIOStats(interval)[0];
+        stats[4] = collectTableStats(interval)[0];
+        stats[5] = collectIndexStats(interval)[0];
+        stats[6] = collectStarvationStats(interval)[0];
         return stats;
     }
 
