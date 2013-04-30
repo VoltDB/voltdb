@@ -32,7 +32,6 @@ public class SnapshotTableTask
     final boolean m_deleteTuples;
     final boolean m_isReplicated;
     final String m_name;
-    final boolean m_isDevNull;
 
     public SnapshotTableTask(
             final int tableId,
@@ -50,7 +49,6 @@ public class SnapshotTableTask
         m_deleteTuples = deleteTuples;
         m_isReplicated = isReplicated;
         m_name = tableName;
-        m_isDevNull = m_target instanceof DevNullSnapshotTarget;
     }
 
     public int getTableId() {

@@ -409,17 +409,11 @@ public class SnapshotSiteProcessor {
                                                     task.m_deleteTuples);
             }
 
-            /*
-             * Why do the extra work for a /dev/null target
-             * Check if it is dev null and don't activate COW
-             */
-            if (!task.m_isDevNull) {
-                if (!ee.activateTableStream(task.m_tableId, TableStreamType.SNAPSHOT, predicates)) {
-                    SNAP_LOG.error("Attempted to activate copy on write mode for table "
-                            + task.m_name + " and failed");
-                    SNAP_LOG.error(task);
-                    VoltDB.crashLocalVoltDB("No additional info", false, null);
-                }
+            if (!ee.activateTableStream(task.m_tableId, TableStreamType.SNAPSHOT, predicates)) {
+                SNAP_LOG.error("Attempted to activate copy on write mode for table "
+                               + task.m_name + " and failed");
+                SNAP_LOG.error(task);
+                VoltDB.crashLocalVoltDB("No additional info", false, null);
             }
         }
         /*
