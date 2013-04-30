@@ -42,6 +42,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.sysprocs.saverestore.StreamSnapshotRequestConfig;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * Thread Safety: this is a reentrant class. All mutable datastructures
@@ -68,7 +69,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     // contains all sites that are waiting to start a snapshot
     private final Queue<Long> m_snapshotSites = new LinkedList<Long>();
     // Mapping of source to destination HSIds for the current snapshot
-    private final Map<Long, Long> m_destToSource = new HashMap<Long, Long>();
+    private final Map<Long, List<Long>> m_destToSource = new HashMap<Long, List<Long>>();
     // contains all sites that haven't finished replaying transactions
     private final Queue<Long> m_rejoiningSites = new LinkedList<Long>();
     // true if performing live rejoin
@@ -127,7 +128,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         }
     }
 
-    private String makeSnapshotRequest(Map<Long, Long> sourceToDests)
+    private String makeSnapshotRequest(Map<Long, List<Long>> sourceToDests)
     {
         StreamSnapshotRequestConfig config =
             new StreamSnapshotRequestConfig(null, sourceToDests, null);
@@ -220,7 +221,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         String data = null;
         synchronized(m_lock) {
             m_snapshotSites.remove(HSId);
-            m_destToSource.put(masterHSId, dataSinkHSId);
+            MiscUtils.multimapPut(m_destToSource, masterHSId, dataSinkHSId);
             m_rejoiningSites.add(HSId);
             nonce = m_nonces.get(HSId);
             if (m_snapshotSites.isEmpty()) {
