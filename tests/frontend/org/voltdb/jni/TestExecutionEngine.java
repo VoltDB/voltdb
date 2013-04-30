@@ -49,6 +49,7 @@ import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.sysprocs.saverestore.SnapshotOutputBuffers;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 
 /**
@@ -187,26 +188,36 @@ public class TestExecutionEngine extends TestCase {
                 public void discard() {
                 }};
 
-            int serialized = sourceEngine.tableStreamSerializeMore( container, WAREHOUSE_TABLEID, TableStreamType.RECOVERY);
+            SnapshotOutputBuffers output = new SnapshotOutputBuffers();
+            output.addContainer(container);
+            int serialized = sourceEngine.tableStreamSerializeMore(WAREHOUSE_TABLEID,
+                                                                   TableStreamType.RECOVERY,
+                                                                   output)[0];
             assertTrue(serialized > 0);
             container.b.limit(serialized);
             destinationEngine.get().processRecoveryMessage( container.b, container.address);
 
 
-            serialized = sourceEngine.tableStreamSerializeMore( container, WAREHOUSE_TABLEID, TableStreamType.RECOVERY);
+            serialized = sourceEngine.tableStreamSerializeMore(WAREHOUSE_TABLEID,
+                                                               TableStreamType.RECOVERY,
+                                                               output)[0];
             assertEquals( 5, serialized);
             assertEquals( RecoveryMessageType.Complete.ordinal(), container.b.get());
 
             assertEquals( sourceEngine.tableHashCode(WAREHOUSE_TABLEID), destinationEngine.get().tableHashCode(WAREHOUSE_TABLEID));
 
             container.b.clear();
-            serialized = sourceEngine.tableStreamSerializeMore( container, STOCK_TABLEID, TableStreamType.RECOVERY);
+            serialized = sourceEngine.tableStreamSerializeMore(STOCK_TABLEID,
+                                                               TableStreamType.RECOVERY,
+                                                               output)[0];
             assertTrue(serialized > 0);
             container.b.limit(serialized);
             destinationEngine.get().processRecoveryMessage( container.b, container.address);
 
 
-            serialized = sourceEngine.tableStreamSerializeMore( container, STOCK_TABLEID, TableStreamType.RECOVERY);
+            serialized = sourceEngine.tableStreamSerializeMore(STOCK_TABLEID,
+                                                               TableStreamType.RECOVERY,
+                                                               output)[0];
             assertEquals( 5, serialized);
             assertEquals( RecoveryMessageType.Complete.ordinal(), container.b.get());
             assertEquals( STOCK_TABLEID, container.b.getInt());

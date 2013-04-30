@@ -27,7 +27,6 @@ import java.util.Map.Entry;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.ExecutionSite;
 import org.voltdb.FragmentPlanSource;
 import org.voltdb.PlannerStatsCollector;
@@ -41,6 +40,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.sysprocs.saverestore.SnapshotOutputBuffers;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTableUtil;
@@ -317,12 +317,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     /**
      * Serialize more tuples from the specified table that already has a stream enabled
-     * @param bbcontainers Buffers to receive serialized tuple data
      * @param tableId Catalog ID of the table to serialize
+     * @param outputBuffers Buffers to receive serialized tuple data
      * @return A positive number indicating the number of bytes serialized or 0 if there is no more data.
      *        -1 is returned if there is an error (such as the table not having the specified stream type activated).
      */
-    public abstract int tableStreamSerializeMore(BBContainer c, int tableId, TableStreamType type);
+    public abstract int[] tableStreamSerializeMore(int tableId, TableStreamType type,
+                                                   SnapshotOutputBuffers outputBuffers);
 
     public abstract void processRecoveryMessage( ByteBuffer buffer, long pointer);
 

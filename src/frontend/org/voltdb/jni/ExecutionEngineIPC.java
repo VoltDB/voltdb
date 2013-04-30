@@ -24,6 +24,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -44,6 +45,7 @@ import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 
 import com.google.common.base.Charsets;
+import org.voltdb.sysprocs.saverestore.SnapshotOutputBuffers;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 
 /* Serializes data over a connection that presumably is being read
@@ -1088,16 +1090,14 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public int tableStreamSerializeMore(BBContainer c, int tableId, TableStreamType streamType) {
-        int bytesReturned = -1;
-        ByteBuffer view = c.b.duplicate();
+    public int[] tableStreamSerializeMore(int tableId, TableStreamType streamType,
+                                          SnapshotOutputBuffers outputBuffers) {
         try {
             m_data.clear();
             m_data.putInt(Commands.TableStreamSerializeMore.m_id);
             m_data.putInt(tableId);
             m_data.putInt(streamType.ordinal());
-            m_data.putInt(1);                   // Number of buffers
-            m_data.putInt(c.b.remaining());     // Byte limit
+            m_data.put(outputBuffers.toBytes());
 
             m_data.flip();
             m_connection.write();
@@ -1114,13 +1114,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
             countBuffer.flip();
             final int count = countBuffer.getInt();
-
-            /*
-             * Error or no more tuple data for this table.
-             */
-            if (count == -1 || count == 0) {
-                return count;
-            }
+            assert count == outputBuffers.getContainers().size();
 
             // Get the remaining tuple count.
             ByteBuffer remainingBuffer = ByteBuffer.allocate(8);
@@ -1131,31 +1125,40 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 }
             }
             remainingBuffer.flip();
-            //TODO: Do something useful with the remaining count.
-            /*final long remaining = */ remainingBuffer.getLong();
+            final long remaining = remainingBuffer.getLong();
 
-            // Get the first length.
-            ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
-            while (lengthBuffer.hasRemaining()) {
-                int read = m_connection.m_socketChannel.read(lengthBuffer);
-                if (read == -1) {
-                    throw new EOFException();
+            /*
+             * Error or no more tuple data for this table.
+             */
+            if (remaining == -1 || remaining == -2) {
+                return new int[] {(int) remaining};
+            }
+
+            List<BBContainer> snapshotBuffers = outputBuffers.getContainers();
+            final int[] serialized = new int[count];
+            for (int i = 0; i < count; i++) {
+                ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
+                while (lengthBuffer.hasRemaining()) {
+                    int read = m_connection.m_socketChannel.read(lengthBuffer);
+                    if (read == -1) {
+                        throw new EOFException();
+                    }
+                }
+                lengthBuffer.flip();
+                serialized[i] = lengthBuffer.getInt();
+
+                ByteBuffer view = snapshotBuffers.get(i).b.duplicate();
+                view.limit(view.position() + serialized[i]);
+                while (view.hasRemaining()) {
+                    m_connection.m_socketChannel.read(view);
                 }
             }
-            lengthBuffer.flip();
-            final int length = lengthBuffer.getInt();
 
-            bytesReturned = length;
-            view.limit(view.position() + length);
-            while (view.hasRemaining()) {
-                m_connection.m_socketChannel.read(view);
-            }
+            return serialized;
         } catch (final IOException e) {
             System.out.println("Exception: " + e.getMessage());
             throw new RuntimeException(e);
         }
-
-        return bytesReturned;
     }
 
     @Override

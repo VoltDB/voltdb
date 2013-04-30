@@ -33,6 +33,7 @@ import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.export.ExportProtoMessage;
+import org.voltdb.sysprocs.saverestore.SnapshotOutputBuffers;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 
 public class MockExecutionEngine extends ExecutionEngine {
@@ -187,8 +188,8 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public int tableStreamSerializeMore(BBContainer c, int tableId, TableStreamType type) {
-        return 0;
+    public int[] tableStreamSerializeMore(int tableId, TableStreamType type, SnapshotOutputBuffers outputBuffers) {
+        return new int[] {0};
     }
 
     @Override
