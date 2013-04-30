@@ -429,6 +429,9 @@ public class StatsAgent {
         else if (selector == SysProcSelector.LIVECLIENTS) {
             stats = collectLiveClientsStats(interval);
         }
+        else if (selector == SysProcSelector.LATENCY) {
+            stats = collectLatencyStats(interval);
+        }
         else if (selector == SysProcSelector.MANAGEMENT) {
             stats = collectManagementStats(interval);
         }
@@ -606,6 +609,22 @@ public class StatsAgent {
         VoltTable[] stats = null;
 
         VoltTable lStats = getStatsAggregate(SysProcSelector.LIVECLIENTS, interval, now);
+        if (lStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = lStats;
+        }
+        return stats;
+    }
+
+    // Latency stats have been broken since 3.0.  Putting these hooks
+    // in here so that ALL selectors in SysProcSelector go through
+    // this path and nothing uses the legacy sysproc
+    private VoltTable[] collectLatencyStats(boolean interval)
+    {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable lStats = getStatsAggregate(SysProcSelector.LATENCY, interval, now);
         if (lStats != null) {
             stats = new VoltTable[1];
             stats[0] = lStats;
