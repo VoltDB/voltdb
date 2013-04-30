@@ -27,7 +27,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientInterface;
 import org.voltdb.DependencyPair;
-import org.voltdb.LiveClientStats;
+import org.voltdb.LiveClientsStats;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SysProcSelector;
@@ -354,7 +354,7 @@ public class Statistics extends VoltSystemProcedure {
         else if (fragmentId == SysProcFragmentId.PF_liveClientData) {
             // Choose the lowest site ID on this host to do the scan
             // All other sites should just return empty results tables.
-            VoltTable result = new VoltTable(LiveClientStats.liveClientColumnInfo);
+            VoltTable result = new VoltTable(LiveClientsStats.liveClientColumnInfo);
             if (context.isLowestSiteId()) {
                 assert(params.toArray().length == 2);
                 final Long now = (Long)params.toArray()[1];
