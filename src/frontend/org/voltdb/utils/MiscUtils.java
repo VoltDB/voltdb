@@ -28,6 +28,7 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -633,5 +634,22 @@ public class MiscUtils {
             System.exit(-1);
             return 0;
         }
+    }
+
+    /**
+     * Put a value into a "multimap".
+     * @return true if the value is successfully stored in the map
+     */
+    public static <K, V> boolean multimapPut(Map<K, List<V>> map, K key, V value)
+    {
+        if (map == null) return false;
+
+        List<V> values = map.get(key);
+        if (values == null) {
+            values = new ArrayList<V>();
+            map.put(key, values);
+        }
+
+        return values.add(value);
     }
 }
