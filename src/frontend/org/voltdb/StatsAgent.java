@@ -426,6 +426,9 @@ public class StatsAgent {
         else if (selector == SysProcSelector.PLANNER) {
             stats = collectPlannerStats(interval);
         }
+        else if (selector == SysProcSelector.LIVECLIENTS) {
+            stats = collectLiveClientsStats(interval);
+        }
         else if (selector == SysProcSelector.MANAGEMENT) {
             stats = collectManagementStats(interval);
         }
@@ -593,6 +596,19 @@ public class StatsAgent {
         if (pStats != null) {
             stats = new VoltTable[1];
             stats[0] = pStats;
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectLiveClientsStats(boolean interval)
+    {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable lStats = getStatsAggregate(SysProcSelector.LIVECLIENTS, interval, now);
+        if (lStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = lStats;
         }
         return stats;
     }

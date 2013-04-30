@@ -161,7 +161,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private MemoryStats m_memoryStats = null;
     private StatsManager m_statsManager = null;
     private SnapshotCompletionMonitor m_snapshotCompletionMonitor;
+    // These are unused locally, but they need to be registered with the StatsAgent so they're
+    // globally available
+    @SuppressWarnings("unused")
     private InitiatorStats m_initiatorStats;
+    @SuppressWarnings("unused")
+    private LiveClientsStats m_liveClientsStats = null;
     int m_myHostId;
     long m_depCRC = -1;
     String m_serializedCatalog;
@@ -548,6 +553,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_statsAgent.registerStatsSource(SysProcSelector.PARTITIONCOUNT,
                     0, m_partitionCountStats);
             m_initiatorStats = new InitiatorStats(m_myHostId);
+            m_liveClientsStats = new LiveClientsStats();
+            m_statsAgent.registerStatsSource(SysProcSelector.LIVECLIENTS, 0, m_liveClientsStats);
             m_latencyStats = new LatencyStats(m_myHostId);
 
             /*
