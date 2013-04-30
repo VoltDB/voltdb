@@ -423,6 +423,9 @@ public class StatsAgent {
         else if (selector == SysProcSelector.STARVATION) {
             stats = collectStarvationStats(interval);
         }
+        else if (selector == SysProcSelector.PLANNER) {
+            stats = collectPlannerStats(interval);
+        }
 
         // Send a response with no data since the stats is not supported
         if (stats == null) {
@@ -574,6 +577,19 @@ public class StatsAgent {
         if (sStats != null) {
             stats = new VoltTable[1];
             stats[0] = sStats;
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectPlannerStats(boolean interval)
+    {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable pStats = getStatsAggregate(SysProcSelector.PLANNER, interval, now);
+        if (pStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = pStats;
         }
         return stats;
     }

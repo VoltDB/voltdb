@@ -1663,7 +1663,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (selector.equals("DR") || selector.equals("TOPO") || selector.equals("SNAPSHOTSTATUS") ||
                 selector.equals("MEMORY") || selector.equals("IOSTATS") || selector.equals("PARTITIONCOUNT") ||
                 selector.equals("INITIATOR") || selector.equals("TABLE") || selector.equals("INDEX") ||
-                selector.equals("PROCEDURE") || selector.equals("STARVATION"))
+                selector.equals("PROCEDURE") || selector.equals("STARVATION") || selector.equals("PLANNER"))
             {
                try {
                    VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, selector, interval);
