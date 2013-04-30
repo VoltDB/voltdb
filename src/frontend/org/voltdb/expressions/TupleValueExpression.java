@@ -34,6 +34,7 @@ public class TupleValueExpression extends AbstractValueExpression {
     public enum Members {
         COLUMN_IDX,
         TABLE_NAME,
+        COLUMN_NAME,
     }
 
     protected int m_columnIndex = -1;
@@ -181,12 +182,17 @@ public class TupleValueExpression extends AbstractValueExpression {
         super.toJSONString(stringer);
         stringer.key(Members.COLUMN_IDX.name()).value(m_columnIndex);
         stringer.key(Members.TABLE_NAME.name()).value(m_tableName);
+        // Column name is not required in the EE but testing showed that it is
+        // needed to support type resolution of indexed expressions in the planner
+        // after they get round-tripped through the catalog's index definition.
+        stringer.key(Members.COLUMN_NAME.name()).value(m_columnName);
     }
 
     @Override
     protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {
         m_columnIndex = obj.getInt(Members.COLUMN_IDX.name());
         m_tableName = obj.getString(Members.TABLE_NAME.name());
+        m_columnName = obj.getString(Members.COLUMN_NAME.name());
     }
 
     @Override
