@@ -390,50 +390,58 @@ public class StatsAgent {
         String selectorString = obj.getString("selector");
         boolean interval = obj.getBoolean("interval");
         SysProcSelector selector = SysProcSelector.valueOf(selectorString);
-        if (selector == SysProcSelector.DR) {
-            stats = collectDRStats();
-        }
-        else if (selector == SysProcSelector.DRNODE) {
-            stats = collectDRNodeStats();
-        }
-        else if (selector == SysProcSelector.DRPARTITION) {
-            stats = collectDRPartitionStats();
-        }
-        else if (selector == SysProcSelector.SNAPSHOTSTATUS) {
-            stats = collectSnapshotStatusStats();
-        }
-        else if (selector == SysProcSelector.MEMORY) {
-            stats = collectMemoryStats(interval);
-        }
-        else if (selector == SysProcSelector.IOSTATS) {
-            stats = collectIOStats(interval);
-        }
-        else if (selector == SysProcSelector.INITIATOR) {
-            stats = collectInitiatorStats(interval);
-        }
-        else if (selector == SysProcSelector.TABLE) {
-            stats = collectTableStats(interval);
-        }
-        else if (selector == SysProcSelector.INDEX) {
-            stats = collectIndexStats(interval);
-        }
-        else if (selector == SysProcSelector.PROCEDURE) {
-            stats = collectProcedureStats(interval);
-        }
-        else if (selector == SysProcSelector.STARVATION) {
-            stats = collectStarvationStats(interval);
-        }
-        else if (selector == SysProcSelector.PLANNER) {
-            stats = collectPlannerStats(interval);
-        }
-        else if (selector == SysProcSelector.LIVECLIENTS) {
-            stats = collectLiveClientsStats(interval);
-        }
-        else if (selector == SysProcSelector.LATENCY) {
-            stats = collectLatencyStats(interval);
-        }
-        else if (selector == SysProcSelector.MANAGEMENT) {
-            stats = collectManagementStats(interval);
+        switch (selector) {
+            case DR:
+                stats = collectDRStats();
+                break;
+            case DRNODE:
+                stats = collectDRNodeStats();
+                break;
+            case DRPARTITION:
+                stats = collectDRPartitionStats();
+                break;
+            case SNAPSHOTSTATUS:
+                stats = collectSnapshotStatusStats();
+                break;
+            case MEMORY:
+                stats = collectMemoryStats(interval);
+                break;
+            case IOSTATS:
+                stats = collectIOStats(interval);
+                break;
+            case INITIATOR:
+                stats = collectInitiatorStats(interval);
+                break;
+            case TABLE:
+                stats = collectTableStats(interval);
+                break;
+            case INDEX:
+                stats = collectIndexStats(interval);
+                break;
+            case PROCEDURE:
+                stats = collectProcedureStats(interval);
+                break;
+            case STARVATION:
+                stats = collectStarvationStats(interval);
+                break;
+            case PLANNER:
+                stats = collectPlannerStats(interval);
+                break;
+            case LIVECLIENTS:
+                stats = collectLiveClientsStats(interval);
+                break;
+            case LATENCY:
+                stats = collectLatencyStats(interval);
+                break;
+            case MANAGEMENT:
+                stats = collectManagementStats(interval);
+                break;
+            default:
+                // Should have been successfully groomed in ClientInterface.dispatchStatistics().  Log something
+                // for our information but let the null check below return harmlessly
+                hostLog.warn("Received unknown stats selector in StatsAgent: " + selector.name() +
+                        ", this should be impossible.");
+                stats = null;
         }
 
         // Send a response with no data since the stats is not supported
