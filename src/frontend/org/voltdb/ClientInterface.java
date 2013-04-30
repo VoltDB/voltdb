@@ -1667,8 +1667,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
         String selector = (String)first;
         try {
-            @SuppressWarnings("unused")
-            SysProcSelector s = SysProcSelector.valueOf(selector);
+            SysProcSelector s = SysProcSelector.valueOf(selector.toUpperCase());
+            selector = s.name();
         }
         catch (Exception e) {
             return errorResponse(ccxn, task.clientHandle, ClientResponse.GRACEFUL_FAILURE,

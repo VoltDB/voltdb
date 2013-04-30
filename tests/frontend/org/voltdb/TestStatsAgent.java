@@ -161,9 +161,27 @@ public class TestStatsAgent {
         assertEquals(ClientResponse.GRACEFUL_FAILURE, response.getStatus());
         VoltTable results[] = response.getResults();
         assertEquals(0, results.length);
-        assertTrue(
-                "Requested statistic \"DR\" is not supported in the current configuration".equals(
-                response.getStatusString()));
+        assertEquals(
+                "Requested statistic \"DR\" is not supported in the current configuration",
+                response.getStatusString());
+        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DRNODE", false);
+        response = responses.take();
+
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, response.getStatus());
+        results = response.getResults();
+        assertEquals(0, results.length);
+        assertEquals(
+                "Requested statistic \"DRNODE\" is not supported in the current configuration",
+                response.getStatusString());
+        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DRPARTITION", false);
+        response = responses.take();
+
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, response.getStatus());
+        results = response.getResults();
+        assertEquals(0, results.length);
+        assertEquals(
+                "Requested statistic \"DRPARTITION\" is not supported in the current configuration",
+                response.getStatusString());
     }
 
     @Test

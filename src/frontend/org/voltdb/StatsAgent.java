@@ -288,16 +288,10 @@ public class StatsAgent {
         STATS_COLLECTION_TIMEOUT,
         TimeUnit.MILLISECONDS);
 
-        // DR has external/internal deltas, fix them here
-        String realSelector = selector;
-        if (selector.equalsIgnoreCase("DR")) {
-            realSelector = "DRNODE";
-        }
-
         JSONObject obj = new JSONObject();
         obj.put("requestId", requestId);
         obj.put("returnAddress", m_mailbox.getHSId());
-        obj.put("selector", realSelector);
+        obj.put("selector", selector);
         obj.put("interval", interval);
         byte payloadBytes[] = CompressionService.compressBytes(obj.toString(4).getBytes("UTF-8"));
         for (int hostId : m_messenger.getLiveHostIds()) {
@@ -396,8 +390,14 @@ public class StatsAgent {
         String selectorString = obj.getString("selector");
         boolean interval = obj.getBoolean("interval");
         SysProcSelector selector = SysProcSelector.valueOf(selectorString);
-        if (selector == SysProcSelector.DRNODE) {
+        if (selector == SysProcSelector.DR) {
             stats = collectDRStats();
+        }
+        else if (selector == SysProcSelector.DRNODE) {
+            stats = collectDRNodeStats();
+        }
+        else if (selector == SysProcSelector.DRPARTITION) {
+            stats = collectDRPartitionStats();
         }
         else if (selector == SysProcSelector.SNAPSHOTSTATUS) {
             stats = collectSnapshotStatusStats();
@@ -470,18 +470,42 @@ public class StatsAgent {
 
     }
 
-    // This could probably eventually move to the stats source
     private VoltTable[] collectDRStats()
+    {
+        VoltTable[] stats = null;
+
+        VoltTable[] partitionStats = collectDRPartitionStats();
+        VoltTable[] nodeStats = collectDRNodeStats();
+        if (partitionStats != null && nodeStats != null) {
+            stats = new VoltTable[2];
+            stats[0] = partitionStats[0];
+            stats[1] = nodeStats[0];
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectDRNodeStats()
+    {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable nodeStats = getStatsAggregate(SysProcSelector.DRNODE, false, now);
+        if (nodeStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = nodeStats;
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectDRPartitionStats()
     {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
         VoltTable partitionStats = getStatsAggregate(SysProcSelector.DRPARTITION, false, now);
-        VoltTable nodeStats = getStatsAggregate(SysProcSelector.DRNODE, false, now);
-        if (partitionStats != null && nodeStats != null) {
-            stats = new VoltTable[2];
+        if (partitionStats != null) {
+            stats = new VoltTable[1];
             stats[0] = partitionStats;
-            stats[1] = nodeStats;
         }
         return stats;
     }
@@ -738,15 +762,15 @@ public class StatsAgent {
         final HashMap<Long, ArrayList<StatsSource>> siteIdToStatsSources = registeredStatsSources.get(selector);
         assert siteIdToStatsSources != null;
 
-        ArrayList<StatsSource> sSources = siteIdToStatsSources.values().iterator().next();
         //Let these two be null since they are for pro features
         if (selector == SysProcSelector.DRNODE || selector == SysProcSelector.DRPARTITION) {
-            if (sSources == null || sSources.isEmpty()) {
+            if (siteIdToStatsSources == null || siteIdToStatsSources.isEmpty()) {
                 return null;
             }
         } else {
-            assert sSources != null && !sSources.isEmpty();
+            assert siteIdToStatsSources != null && !siteIdToStatsSources.isEmpty();
         }
+        ArrayList<StatsSource> sSources = siteIdToStatsSources.values().iterator().next();
 
         /*
          * Some sources like TableStats use VoltTable to keep track of
