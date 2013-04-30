@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -47,6 +48,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListenableFutureTask;
 import jsr166y.LinkedTransferQueue;
 
 import org.voltcore.logging.VoltLogger;
@@ -252,6 +255,34 @@ public class CoreUtils {
                 return t;
             }
         };
+    }
+
+    /**
+     * Wraps a collection of listenable futures into one future.
+     * @param futures
+     * @return A single listenable future that waits until all underlying futures are finished.
+     * If any of them throws an exception, the returned future will forward the exception. The
+     * result of the returned future is a list of objects returned by the underlying futures.
+     */
+    public static ListenableFuture<?> wrapListenableFutures(final Collection<ListenableFuture<?>>
+                                                                futures)
+    {
+        // Wraps all listenable futures into one future
+        return MoreExecutors.sameThreadExecutor().submit(new Callable<List<Object>>() {
+            @Override
+            public List<Object> call() throws Exception
+            {
+                List<Object> results = new ArrayList<Object>();
+
+                for (ListenableFuture<?> future : futures) {
+                    if (future != null) {
+                        results.add(future.get());
+                    }
+                }
+
+                return results;
+            }
+        });
     }
 
     /**
