@@ -29,19 +29,22 @@ import java.util.List;
  * A helper class to encapsulate the serialization of snapshot predicates.
  */
 public class SnapshotPredicates {
-    private final List<AbstractExpression> m_predicates;
-    private boolean m_deleteTuples;
+    private final List<AbstractExpression> m_predicates = new ArrayList<AbstractExpression>();
+    private final boolean m_deleteTuples;
 
     public SnapshotPredicates()
     {
-        m_predicates = new ArrayList<AbstractExpression>();
         m_deleteTuples = false;
     }
 
-    public SnapshotPredicates(List<AbstractExpression> predicates, boolean deleteTuples)
+    public SnapshotPredicates(boolean deleteTuples)
     {
-        m_predicates = ImmutableList.copyOf(predicates);
         m_deleteTuples = deleteTuples;
+    }
+
+    public void addPredicate(AbstractExpression predicate)
+    {
+        m_predicates.add(predicate);
     }
 
     public byte[] toBytes()
