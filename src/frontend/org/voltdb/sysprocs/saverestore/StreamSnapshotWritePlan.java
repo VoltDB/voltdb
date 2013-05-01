@@ -150,7 +150,10 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         boolean deleteTuples = false;
         if (!table.getIsreplicated()) {
             predicate = createPredicateForTable(table, config);
-            deleteTuples = true;
+            // Only delete tuples if there is a predicate, e.g. elastic join
+            if (predicate != null) {
+                deleteTuples = true;
+            }
         }
 
         /*
