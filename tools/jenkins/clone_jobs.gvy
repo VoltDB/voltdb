@@ -1,6 +1,6 @@
 /*
 A jenkins groovy script written as a first exercise with
-jenkins and goovy that clones all the system-test jobs 
+jenkins and goovy that clones all the system-test jobs
 to new jobs which build a different branch and set the
 email notification to a different set or recipients
 */
@@ -29,10 +29,10 @@ for(item in Hudson.instance.items)
 
       //create the new project name
       newName = item.getName().replace("nextrelease", str_branch)
-      
-      // delete existing job with new name  
+
+      // delete existing job with new name
       nj = Hudson.instance.getJob(newName)
-      if (nj) 
+      if (nj)
             nj.delete()
 
       // copy the job, disable and save it
@@ -41,12 +41,17 @@ for(item in Hudson.instance.items)
       //job.save()
 
       AbstractProject project = job
-/*
-      // set the branch to build
-      branch = project.parametersDefinitionProperty.getParameterDefinition("BRANCH")
-      if (branch)
-            branch.setDefaultValue(str_branch)
-*/
+
+
+      // set the any parameter named BRANCH to the branch to build
+      for ( ParametersDefinitionProperty pd: project.getActions(ParametersDefinitionProperty))
+      {
+        pd.parameterDefinitions.each
+        {
+          if (it.name == "BRANCH")
+            it.defaultValue = str_branch
+        }
+      }
 
       // if the job has a cloned workspace, replace it with the new kitbuild workspace
       if (project.scm instanceof hudson.plugins.cloneworkspace.CloneWorkspaceSCM) {
