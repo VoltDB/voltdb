@@ -160,18 +160,18 @@ public class CommandLine extends VoltDB.Configuration
 
     public CommandLine startCommand(String command)
     {
-        String upcmd = command.toUpperCase();
-        VoltDB.START_ACTION action = VoltDB.START_ACTION.CREATE;
-        try {
-            action = VoltDB.START_ACTION.valueOf(upcmd);
-        }
-        catch (IllegalArgumentException iae)
-        {
+        VoltDB.START_ACTION action = VoltDB.START_ACTION.monickerFor(command);
+        if (action == null) {
             // command wasn't a valid enum type, throw an exception.
             String msg = "Unknown action: " + command + ". ";
             hostLog.warn(msg);
             throw new IllegalArgumentException(msg);
         }
+        m_startAction = action;
+        return this;
+    }
+
+    public CommandLine startCommand(START_ACTION action) {
         m_startAction = action;
         return this;
     }
@@ -509,20 +509,14 @@ public class CommandLine extends VoltDB.Configuration
         // VOLTDB main() parameters
         //
         cmdline.add("org.voltdb.VoltDB");
-
-        if (m_startAction == START_ACTION.LIVE_REJOIN) {
-            // annoying, have to special case live rejoin
-            cmdline.add("live rejoin");
-        } else {
-            cmdline.add(m_startAction.toString().toLowerCase());
-        }
+        cmdline.add(m_startAction.verb());
 
         cmdline.add("host"); cmdline.add(m_leader);
         cmdline.add("catalog"); cmdline.add(jarFileName());
         cmdline.add("deployment"); cmdline.add(pathToDeployment());
 
         // rejoin has no replication role
-        if (m_startAction != START_ACTION.REJOIN && m_startAction != START_ACTION.LIVE_REJOIN) {
+        if (!m_startAction.doesRejoin()) {
             if (m_replicationRole == ReplicationRole.REPLICA) {
                 cmdline.add("replica");
             }

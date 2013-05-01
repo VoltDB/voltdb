@@ -340,8 +340,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
             boolean isRejoin = false;
-            if (config.m_startAction == START_ACTION.REJOIN ||
-                    config.m_startAction == START_ACTION.LIVE_REJOIN) {
+            if (config.m_startAction.doesRejoin()) {
                 isRejoin = true;
             }
             m_rejoining = isRejoin;

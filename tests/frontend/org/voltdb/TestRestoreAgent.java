@@ -23,8 +23,6 @@
 
 package org.voltdb;
 
-import java.io.FileOutputStream;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -33,6 +31,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -626,7 +625,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     @Test
     public void testMultipleHostAgreementFailure() throws Exception {
         // Don't run this test if we are in recovery mode
-        if (action == START_ACTION.RECOVER) {
+        if (action.doesRecover()) {
             return;
         }
 

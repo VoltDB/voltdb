@@ -32,9 +32,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.junit.Test;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.START_ACTION;
-import org.voltdb.client.ProcCallException;
 
 public class TestCommandLine
 {
@@ -93,6 +91,10 @@ public class TestCommandLine
         assertTrue(cl.toString().contains("create"));
         cl.startCommand("RECOVER");
         assertTrue(cl.toString().contains("recover"));
+        cl.startCommand("LIVE    REJOIN");
+        assertTrue(cl.toString().contains("live rejoin"));
+        cl.startCommand("RECOVER SAFE MODE");
+        assertTrue(cl.toString().contains("recover safe mode"));
         try
         {
             cl.startCommand("NONSENSE");
@@ -109,6 +111,10 @@ public class TestCommandLine
         {
             assertTrue(rte.getMessage().contains("Unknown action"));
         }
+        cl = new CommandLine(START_ACTION.LIVE_REJOIN);
+        assertTrue(cl.toString().contains("live rejoin"));
+        cl = new CommandLine(START_ACTION.SAFE_RECOVER);
+        assertTrue(cl.toString().contains("recover safe mode"));
     }
 
     @Test

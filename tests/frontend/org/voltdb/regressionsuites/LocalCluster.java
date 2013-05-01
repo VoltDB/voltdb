@@ -581,7 +581,7 @@ public class LocalCluster implements VoltServerConfig {
             cmdln.zkport(portGenerator.next());
 
             if (startAction == START_ACTION.JOIN) {
-                cmdln.startCommand(startAction.name());
+                cmdln.startCommand(startAction);
                 int portNoToRejoin = m_cmdLines.get(0).internalPort();
                 cmdln.leader(":" + portNoToRejoin);
             }
@@ -743,7 +743,7 @@ public class LocalCluster implements VoltServerConfig {
             CommandLine rejoinCmdLn = m_cmdLines.get(hostId);
             // some tests need this
             rejoinCmdLn.javaProperties = templateCmdLine.javaProperties;
-            rejoinCmdLn.startCommand(startAction.name());
+            rejoinCmdLn.startCommand(startAction);
 
             // This shouldn't collide but apparently it sucks.
             // Bump it to avoid collisions on rejoin.

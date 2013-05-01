@@ -83,6 +83,9 @@ public class TestVoltDB extends TestCase {
         String args15[] = { "recover" };
         VoltDB.Configuration cfg15 = new VoltDB.Configuration(args15);
         assertEquals(START_ACTION.RECOVER, cfg15.m_startAction);
+        String args16[] = { "recover", "safe", "mode" };
+        VoltDB.Configuration cfg16 = new VoltDB.Configuration(args16);
+        assertEquals(START_ACTION.SAFE_RECOVER, cfg16.m_startAction);
 
         String args17[] = { "replica" };
         VoltDB.Configuration cfg17 = new VoltDB.Configuration(args17);

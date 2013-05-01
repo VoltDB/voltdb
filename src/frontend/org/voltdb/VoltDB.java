@@ -27,12 +27,15 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.TimeZone;
+import java.util.regex.Pattern;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -100,13 +103,59 @@ public class VoltDB {
     public static final String ANON_STMT_NAME = "sql";
 
     public enum START_ACTION {
-        CREATE, RECOVER, REJOIN, LIVE_REJOIN, JOIN
+
+        CREATE("create"),
+        RECOVER("recover"),
+        SAFE_RECOVER("recover safe mode"),
+        REJOIN("rejoin"),
+        LIVE_REJOIN("live rejoin"),
+        JOIN("join");
+
+        final static Pattern spaces = Pattern.compile("\\s+");
+
+        final static Map<String, START_ACTION> verbMoniker =
+                new HashMap<String, VoltDB.START_ACTION>();
+
+        final static EnumSet<START_ACTION> recoverSet =
+                EnumSet.of(RECOVER,SAFE_RECOVER);
+
+        final static EnumSet<START_ACTION> rejoinSet =
+                EnumSet.of(REJOIN,LIVE_REJOIN);
+
+        final String m_verb;
+
+        static {
+            for (START_ACTION action: START_ACTION.values()) {
+                verbMoniker.put(action.m_verb, action);
+            }
+        }
+
+        START_ACTION(String verb) {
+            m_verb = verb;
+        }
+
+        public static START_ACTION monickerFor(String verb) {
+            if (verb == null) return null;
+            verb = spaces.matcher(verb.trim().toLowerCase()).replaceAll(" ");
+            return verbMoniker.get(verb);
+        }
+
+        public String verb() {
+            return m_verb;
+        }
+
+        public boolean doesRecover() {
+            return recoverSet.contains(this);
+        }
+
+        public boolean doesRejoin() {
+            return rejoinSet.contains(this);
+        }
     }
 
     public static boolean createForRejoin(VoltDB.START_ACTION startAction)
     {
-        return startAction == VoltDB.START_ACTION.REJOIN ||
-               startAction == VoltDB.START_ACTION.LIVE_REJOIN;
+        return startAction.doesRejoin();
     }
 
     public static final Charset UTF8ENCODING = Charset.forName("UTF-8");
@@ -386,6 +435,11 @@ public class VoltDB {
                     m_startAction = START_ACTION.CREATE;
                 } else if (arg.equals("recover")) {
                     m_startAction = START_ACTION.RECOVER;
+                    if (   args.length > i + 2
+                        && args[++i].trim().equals("safe")
+                        && args[++i].trim().equals("mode")) {
+                        m_startAction = START_ACTION.SAFE_RECOVER;
+                    }
                 } else if (arg.equals("rejoin")) {
                     m_startAction = START_ACTION.REJOIN;
                 } else if (arg.startsWith("live rejoin")) {
@@ -462,7 +516,7 @@ public class VoltDB {
             // ENG-3035 Warn if 'recover' action has a catalog since we won't
             // be using it. Only cover the 'recover' action since 'start' sometimes
             // acts as 'recover' and other times as 'create'.
-            if (m_startAction == START_ACTION.RECOVER && m_pathToCatalog != null) {
+            if (m_startAction.doesRecover() && m_pathToCatalog != null) {
                 hostLog.warn("Catalog is ignored for 'recover' action.");
             }
 
@@ -472,8 +526,7 @@ public class VoltDB {
              * only valid leader value ("localhost").
              */
             if (m_leader == null && m_pathToDeployment == null &&
-                (m_startAction != START_ACTION.REJOIN &&
-                 m_startAction != START_ACTION.LIVE_REJOIN)) {
+                !m_startAction.doesRejoin()) {
                 m_leader = "localhost";
             }
         }
@@ -521,7 +574,7 @@ public class VoltDB {
                 }
 
                 if (m_replicationRole == ReplicationRole.REPLICA) {
-                    if (m_startAction == START_ACTION.RECOVER) {
+                    if (m_startAction.doesRecover()) {
                         isValid = false;
                         hostLog.fatal("Replica cluster only supports create database");
                     } else {
