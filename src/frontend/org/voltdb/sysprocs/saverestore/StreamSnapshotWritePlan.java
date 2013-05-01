@@ -166,13 +166,11 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                 target.setOnCloseHandler(onClose);
 
                 final SnapshotTableTask task =
-                    new SnapshotTableTask(table.getRelativeIndex(),
+                    new SnapshotTableTask(table,
                                           target,
                                           new SnapshotDataFilter[0], // This task no longer needs partition filtering
                                           predicate,
-                                          deleteTuples,
-                                          table.getIsreplicated(),
-                                          table.getTypeName());
+                                          deleteTuples);
 
                 tasksForThisTable.add(task);
             }

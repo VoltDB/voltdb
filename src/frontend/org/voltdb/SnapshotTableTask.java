@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 
 /**
@@ -25,39 +26,36 @@ import org.voltdb.expressions.AbstractExpression;
  */
 public class SnapshotTableTask
 {
-    final int m_tableId;
+    final Table m_table;
     final SnapshotDataTarget m_target;
     final SnapshotDataFilter m_filters[];
     final AbstractExpression m_predicate;
     final boolean m_deleteTuples;
-    final boolean m_isReplicated;
-    final String m_name;
 
     public SnapshotTableTask(
-            final int tableId,
+            final Table table,
             final SnapshotDataTarget target,
             final SnapshotDataFilter filters[],
             final AbstractExpression predicate,
-            final boolean deleteTuples,
-            boolean isReplicated,
-            final String tableName)
+            final boolean deleteTuples)
     {
-        m_tableId = tableId;
+        m_table = table;
         m_target = target;
         m_filters = filters;
         m_predicate = predicate;
         m_deleteTuples = deleteTuples;
-        m_isReplicated = isReplicated;
-        m_name = tableName;
     }
 
-    public int getTableId() {
-        return m_tableId;
+    public int getTableId()
+    {
+        return m_table.getRelativeIndex();
     }
 
     @Override
-    public String toString() {
-        return ("SnapshotTableTask for " + m_name + " replicated " + m_isReplicated);
+    public String toString()
+    {
+        return ("SnapshotTableTask for " + m_table.getTypeName() +
+                " replicated " + m_table.getIsreplicated());
     }
 }
 
