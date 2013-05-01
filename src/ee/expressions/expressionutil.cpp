@@ -304,7 +304,6 @@ tupleValueFactory(PlannerDomValue obj, ExpressionType et,
     // read the tuple value expression specific data
     int columnIndex = obj.valueForKey("COLUMN_IDX").asInt();
     std::string tableName = obj.valueForKey("TABLE_NAME").asStr();
-    std::string columnName = obj.valueForKey("COLUMN_NAME").asStr();
 
     // verify input
     if (columnIndex < 0) {
@@ -312,7 +311,8 @@ tupleValueFactory(PlannerDomValue obj, ExpressionType et,
                                       "tupleValueFactory: invalid column_idx.");
     }
 
-    return new TupleValueExpression(columnIndex, tableName, columnName);
+    //TODO: The columnName argument should be deprecated. The member is not used anywhere.
+    return new TupleValueExpression(columnIndex, tableName, "");
 }
 
 AbstractExpression *

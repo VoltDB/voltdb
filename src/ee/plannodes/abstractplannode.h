@@ -121,14 +121,34 @@ public:
     const std::vector<SchemaColumn*>& getOutputSchema() const;
 
     /**
+     * Get the output number of columns -- strictly for use with plannode
+     * classes that "project" a new output schema (vs. passing one up from a child).
+     * This is cleaner than using "getOutputSchema().size()" in such cases, such as Projection nodes,
+     * when m_outputSchema and m_validOutputColumnCount are known to be valid and in agreement.
+     */
+    int getValidOutputColumnCount() const
+    {
+        // Assert that this plan node defined (derialized in) its own output schema.
+        assert(m_validOutputColumnCount >= 0);
+        return m_validOutputColumnCount;
+    }
+
+    /**
      * Convenience method:
      * Generate a TupleSchema based on the contents of the output schema
      * from the plan
      *
      * @param allowNulls whether or not the generated schema should
-     * permit null values in the output columns
+     * permit null values in the output columns.
+     *TODO: -- This is always passed true, so deprecate it?
      */
-    TupleSchema* generateTupleSchema(bool allowNulls);
+    TupleSchema* generateTupleSchema(bool allowNulls=true) const;
+
+    /**
+     * Convenience method:
+     * Generate a TupleSchema based on the expected format for DML results.
+     */
+    static TupleSchema* generateDMLCountTupleSchema();
 
     // ------------------------------------------------------------------
     // UTILITY METHODS
@@ -193,6 +213,15 @@ protected:
     std::map<PlanNodeType, AbstractPlanNode*> m_inlineNodes;
     bool m_isInline;
 
+private:
+    static const int SCHEMA_UNDEFINED_SO_GET_FROM_INLINE_PROJECTION = -1;
+    static const int SCHEMA_UNDEFINED_SO_GET_FROM_CHILD = -2;
+
+    // This is mostly used to hold one of the SCHEMA_UNDEFINED_SO_GET_FROM_ flags
+    // or some/any non-negative value indicating that m_outputSchema is valid.
+    // the fact that it also matches the size of m_outputSchema -- when it is valid
+    // -- MIGHT come in handy?
+    int m_validOutputColumnCount;
     std::vector<SchemaColumn*> m_outputSchema;
 };
 

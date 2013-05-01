@@ -104,6 +104,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_bindings = isp.getBindings();
 
         m_outputSchema = apn.getOutputSchema().clone();
+        m_hasSignificantOutputSchema = true;
 
         m_endType = endType;
         m_endkeyExpressions.addAll(endKeys);
