@@ -436,9 +436,10 @@ public class VoltDB {
                 } else if (arg.equals("recover")) {
                     m_startAction = START_ACTION.RECOVER;
                     if (   args.length > i + 2
-                        && args[++i].trim().equals("safe")
-                        && args[++i].trim().equals("mode")) {
+                        && args[i+1].trim().equals("safe")
+                        && args[i+2].trim().equals("mode")) {
                         m_startAction = START_ACTION.SAFE_RECOVER;
+                        i += 2;
                     }
                 } else if (arg.equals("rejoin")) {
                     m_startAction = START_ACTION.REJOIN;
