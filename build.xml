@@ -199,7 +199,8 @@ PRIMARY ENTRY POINTS
         <arg value="-DVOLT_ENABLEIV2=${VOLT_ENABLEIV2}" />
     </exec>
 </target>
-<target name='check_sql'
+
+<target name="check_sql"
     depends="licensecheck, compile, voltdbipc"
     description="Run Java and C++ JNI testcases stressing sql functionality over process architecture." >
     <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
@@ -1389,8 +1390,8 @@ TEST CASES
     </run_junit>
 </target>
 
-<target name='junit_sql'
-    description="Execute JUnit test suites.">
+<target name="junit_sql"
+    description="Execute JUnit test suites stressing sql functionality vs. process architecture.">
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
