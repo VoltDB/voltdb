@@ -126,6 +126,217 @@ public class TestParameterSet extends TestCase {
         System.out.println(out2.toJSONString());
     }
 
+    public void testNullInObjectArray() throws IOException {
+        // This test passes nulls and VoltType nulls in Object[] arrays where the arrays contain
+        // all supported datatypes (with the exception that we currently don't support Timestamp or varbinary in Object arrays).
+        // Each Object[] type passes in "null" and the VoltType Null equivalent.  Note that Object[] containing Strings will
+        // support null and VoltType nulls as array elements.  But any other Sigil type class (big decimal, timestamp, varbinary)
+        // DO NOT support nulls or VoltType nulls in Object[] arrays.
+
+        Object o_array[] = null;
+        ParameterSet p1 = null;
+        Object first_param[] = null;
+        boolean failed = false;
+
+        // SHOULD FAIL: Object array of nulls
+        o_array = new Object[]{null, null, null};
+        failed = false;
+        try
+        {
+            p1 = ParameterSet.fromArrayNoCopy(o_array, 1);
+        }
+        catch (Exception ex)
+        {
+            failed = true;
+        }
+        assert(failed);
+
+        // SHOULD SUCCEED: Empty Object array of null
+        o_array = new Object[]{};
+        p1 = ParameterSet.fromArrayNoCopy(new Object[]{});
+        first_param = p1.toArray();
+        assertEquals(first_param.length, p1.toArray().length);
+
+        // SHOULD SUCCEED: Object array of Strings - pass null
+        o_array = new Object[]{"Null", null, "not null"};
+        p1 = ParameterSet.fromArrayNoCopy(o_array, 1);
+        first_param = p1.toArray();
+        assertEquals(first_param.length, p1.toArray().length);
+
+        // SHOULD SUCCEED: Object array of Strings - pass VoltType null
+        o_array = new Object[]{"Null", VoltType.NULL_STRING_OR_VARBINARY, "not null" };
+        p1 = ParameterSet.fromArrayNoCopy(o_array, 1);
+        first_param = p1.toArray();
+        assertEquals(first_param.length, p1.toArray().length);
+
+        // SHOULD FAIL: Object array of BigDecimal - pass both null
+        o_array = new Object[]{ BigDecimal.ONE, null, BigDecimal.TEN };
+        failed = false;
+        try
+        {
+            p1 = ParameterSet.fromArrayNoCopy(o_array, 1);
+        }
+        catch (Exception ex)
+        {
+            failed = true;
+        }
+        assert(failed);
+
+        // SHOULD FAIL: Object array of BigDecimal - pass both VoltType null
+        o_array = new Object[]{ BigDecimal.ONE, VoltType.NULL_DECIMAL, BigDecimal.TEN };
+        failed = false;
+        try
+        {
+            p1 = ParameterSet.fromArrayNoCopy(o_array, 1);
+        }
+        catch (Exception ex)
+        {
+            failed = true;
+        }
+        assert(failed);
+
+
+        // SHOULD FAIL: Object array of Byte - pass null
+        o_array = new Object[]{new Byte((byte)3), null, new Byte((byte)15) };
+        failed = false;
+        try
+        {
+            p1 = ParameterSet.fromArrayNoCopy(o_array, 1);
+        }
+        catch (Exception ex)
+        {
+            failed = true;
+        }
+        assert(failed);
+
+        // SHOULD SUCCEED: Object array of Byte - pass VoltType null
+        o_array = new Object[]{new Byte((byte)3), VoltType.NULL_TINYINT, new Byte((byte)15) };
+        p1 = ParameterSet.fromArrayNoCopy(o_array, 1);
+        first_param = p1.toArray();
+        assertEquals(first_param.length, p1.toArray().length);
+
+        // SHOULD FAIL: Object array of Short - pass null
+        o_array = new Object[]{new Short((short)3), null, new Short((short)15) };
+        failed = false;
+        try
+        {
+            p1 = ParameterSet.fromArrayNoCopy(o_array, 1);
+        }
+        catch (Exception ex)
+        {
+            failed = true;
+        }
+        assert(failed);
+
+        // SHOULD SUCCEED: Object array of Short - pass VoltType null
+        o_array = new Object[]{new Short((short)3), VoltType.NULL_SMALLINT, new Short((short)15) };
+        p1 = ParameterSet.fromArrayNoCopy(o_array, 1);
+        first_param = p1.toArray();
+        assertEquals(first_param.length, p1.toArray().length);
+
+        // SHOULD FAIL: Object array of Integer - pass null
+        o_array = new Object[]{new Integer(3), null, new Integer(15) };
+        failed = false;
+        try
+        {
+            p1 = ParameterSet.fromArrayNoCopy(o_array, 1);
+        }
+        catch (Exception ex)
+        {
+            failed = true;
+        }
+        assert(failed);
+
+        // SHOULD SUCCEED: Integer array, pass VoltType null
+        o_array = new Object[]{new Integer(3), VoltType.NULL_SMALLINT, new Integer(15) };
+        p1 = ParameterSet.fromArrayNoCopy(o_array, 1);
+        first_param = p1.toArray();
+        assertEquals(first_param.length, p1.toArray().length);
+
+        // SHOULD FAIL: Object array of Long - pass null
+        o_array = new Object[]{new Long(3), null };
+        failed = false;
+        try
+        {
+            p1 = ParameterSet.fromArrayNoCopy(o_array, 1);
+        }
+        catch (Exception ex)
+        {
+            failed = true;
+        }
+        assert(failed);
+
+        // SHOULD SUCCEED: Object array of Long - pass VoltType null
+        o_array = new Object[]{VoltType.NULL_BIGINT, new Long(15) };
+        p1 = ParameterSet.fromArrayNoCopy(o_array, 1);
+        first_param = p1.toArray();
+        assertEquals(first_param.length, p1.toArray().length);
+
+        // SHOULD FAIL: Object array of Float - pass null
+        o_array = new Object[]{null, new Double(3.1415) };
+        failed = false;
+        try
+        {
+            p1 = ParameterSet.fromArrayNoCopy(o_array, 1);
+        }
+        catch (Exception ex)
+        {
+            failed = true;
+        }
+        assert(failed);
+
+        // SHOULD SUCCEED: Object array of Float - pass VoltType null
+        o_array = new Object[]{new Double(3.1415), VoltType.NULL_FLOAT};
+        p1 = ParameterSet.fromArrayNoCopy(o_array, 1);
+        first_param = p1.toArray();
+        assertEquals(first_param.length, p1.toArray().length);
+
+        // SHOULD FAIL: Object array of Decimal - pass null
+        o_array = new Object[]{new Double(3.1415), null, new Double(3.1415) };
+        failed = false;
+        try
+        {
+            p1 = ParameterSet.fromArrayNoCopy(o_array, 1);
+        }
+        catch (Exception ex)
+        {
+            failed = true;
+        }
+        assert(failed);
+
+        // Object array of Timestamp - pass both null and VoltType null
+        // Currently not supported
+        o_array = new Object[]{new org.voltdb.types.TimestampType(123432), null, new org.voltdb.types.TimestampType(1233) };
+        failed = false;
+        try
+        {
+            p1 = ParameterSet.fromArrayNoCopy(o_array, 1);
+        }
+        catch (Exception ex)
+        {
+            failed = true;
+        }
+        assert(failed);
+
+        // SHOULD FAIL: not supported
+        o_array = new Object[]{new org.voltdb.types.TimestampType(123432), VoltType.NULL_TIMESTAMP, new org.voltdb.types.TimestampType(1233)};
+        failed = false;
+        try
+        {
+            p1 = ParameterSet.fromArrayNoCopy(o_array, 1);
+        }
+        catch (Exception ex)
+        {
+            failed = true;
+        }
+        assert(failed);
+
+
+        // Object array of varbinary (byte array) - pass both null and VoltType null
+
+        // Currently not supported
+    }
+
     private boolean arrayLengthTester(Object[] objs)
     {
         params = ParameterSet.fromArrayNoCopy(objs);
