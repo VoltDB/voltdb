@@ -21,6 +21,7 @@ import java.io.IOException;
 
 import java.util.ArrayList;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Set;
 import java.util.SortedMap;
@@ -137,15 +138,16 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         return false;
     }
 
+    /**
+     * For each site, generate a task for each target it has for this table.
+     */
     private void createTasksForTable(Table table,
                                      Map<Long, List<SnapshotDataTarget>> dataTargets,
                                      StreamSnapshotRequestConfig config,
                                      AtomicInteger numTables,
                                      SnapshotRegistry.Snapshot snapshotRecord)
     {
-        final List<SnapshotTableTask> tasksForThisTable = new ArrayList<SnapshotTableTask>();
-        final List<Long> srcHSIds = new ArrayList<Long>(dataTargets.keySet());
-
+        // Predicate for the table is the same for all targets now, so create it here
         AbstractExpression predicate = null;
         boolean deleteTuples = false;
         if (!table.getIsreplicated()) {
@@ -156,13 +158,18 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             }
         }
 
-        /*
-         * There can be multiple data targets for a single site. Iterate through all data targets
-         * and create a task for each one.
-         */
-        for (List<SnapshotDataTarget> targets : dataTargets.values()) {
+        for (Entry<Long, List<SnapshotDataTarget>> siteTargets : dataTargets.entrySet()) {
+            long hsId = siteTargets.getKey();
+            List<SnapshotDataTarget> targets = siteTargets.getValue();
+
             m_targets.addAll(targets);
 
+            final List<SnapshotTableTask> tasksForThisTable = new ArrayList<SnapshotTableTask>();
+
+            /*
+             * There can be multiple data targets for a single site. Iterate through all data
+             * targets and create a task for each one.
+             */
             for (SnapshotDataTarget target : targets) {
                 final Runnable onClose = new TargetStatsClosure(target, table.getTypeName(),
                                                                 numTables, snapshotRecord);
@@ -177,15 +184,14 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
 
                 tasksForThisTable.add(task);
             }
-        }
 
-        // Stream snapshots need to write all partitioned tables to all
-        // selected partitions and all replicated tables to all selected
-        // partitions
-        if (table.getIsreplicated()) {
-            placeReplicatedTasks(tasksForThisTable, srcHSIds);
-        } else {
-            placePartitionedTasks(tasksForThisTable, srcHSIds);
+            // Stream snapshots need to write all partitioned tables to all selected partitions
+            // and all replicated tables to all selected partitions
+            if (table.getIsreplicated()) {
+                placeReplicatedTasks(tasksForThisTable, Arrays.asList(hsId));
+            } else {
+                placePartitionedTasks(tasksForThisTable, Arrays.asList(hsId));
+            }
         }
     }
 
