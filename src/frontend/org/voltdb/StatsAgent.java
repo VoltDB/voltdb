@@ -688,7 +688,11 @@ public class StatsAgent {
     }
 
     /**
-     * Get aggregate statistics.
+     * Get aggregate statistics on this node for the given selector.
+     * If you need both site-wise and node-wise stats, register the appropriate StatsSources for that
+     * selector with each siteId and then some other value for the node-level stats (PLANNER stats uses -1).
+     * This call will automagically aggregate every StatsSource registered for every 'site'ID for that selector.
+     *
      * @param selector    @Statistics selector keyword
      * @param interval    true if processing a reporting interval
      * @param now         current timestamp
