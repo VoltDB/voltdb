@@ -480,8 +480,16 @@ public class SnapshotSiteProcessor {
         }
     }
 
+    /**
+     * Create an output buffer for each task.
+     * @return null if not enough available buffers for all tasks
+     */
     private SnapshotOutputBuffers createOutputBuffers(List<SnapshotTableTask> tableTasks)
     {
+        if (m_availableSnapshotBuffers.size() < tableTasks.size()) {
+            return null;
+        }
+
         SnapshotOutputBuffers outputBuffers = new SnapshotOutputBuffers();
 
         for (SnapshotTableTask tableTask : tableTasks) {
@@ -601,9 +609,7 @@ public class SnapshotSiteProcessor {
          * a snapshot is finished. If the snapshot buffer is loaned out that means
          * it is pending I/O somewhere so there is no work to do until it comes back.
          */
-        if (m_snapshotTableTasks == null ||
-                m_availableSnapshotBuffers.isEmpty() ||
-                (!ignoreQuietPeriod && inQuietPeriod())) {
+        if (m_snapshotTableTasks == null || (!ignoreQuietPeriod && inQuietPeriod())) {
             return retval;
         }
 
@@ -619,7 +625,12 @@ public class SnapshotSiteProcessor {
             Map.Entry<Integer, List<SnapshotTableTask>> taskEntry = taskIter.next();
             final int tableId = taskEntry.getKey();
             final List<SnapshotTableTask> tableTasks = taskEntry.getValue();
+
             final SnapshotOutputBuffers outputBuffers = createOutputBuffers(tableTasks);
+            if (outputBuffers == null) {
+                // Not enough buffers available
+                break;
+            }
 
             final int[] serialized = ee.tableStreamSerializeMore(tableId,
                                                                  TableStreamType.SNAPSHOT,
