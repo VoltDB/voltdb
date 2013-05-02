@@ -55,6 +55,7 @@ public class SnapshotPredicates {
         for (AbstractExpression predicate : m_predicates) {
             predicates[i] = predicate.toJSONString().getBytes(Charsets.UTF_8);
             size += predicates[i].length;
+            i++;
         }
 
         ByteBuffer buf = ByteBuffer.allocate(1 + // deleteTuples
