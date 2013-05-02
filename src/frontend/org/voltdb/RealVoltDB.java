@@ -661,7 +661,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         MPHSId = null;
                     }
                     m_statsManager = (StatsManager)statsManagerClass.newInstance();
-                    m_statsManager.initialize(localHSIds, MPHSId);
+                    m_statsManager.initialize();
                 }
             } catch (Exception e) {
                 hostLog.error("Failed to instantiate the JMX stats manager: " + e.getMessage() +

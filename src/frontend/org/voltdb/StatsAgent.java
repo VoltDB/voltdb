@@ -52,11 +52,6 @@ public class StatsAgent {
     private static final int MAX_IN_FLIGHT_REQUESTS = 5;
     static int STATS_COLLECTION_TIMEOUT = 60 * 1000;
 
-    // The local site id that responds to global requests (site id == -1).
-    // Start at -1 until a winner is chosen.
-    // Updated in synchronized getStats() method.
-    private static Long m_idForGlobalStats = null;
-
     private long m_nextRequestId = 0;
     private Mailbox m_mailbox;
     private final ScheduledThreadPoolExecutor m_es =
@@ -693,22 +688,6 @@ public class StatsAgent {
     }
 
     /**
-     * Get statistics.
-     * @param selector    @Statistics selector keyword
-     * @param siteIds     site IDs of the sites from which to pull stats
-     * @param interval    true if processing a reporting interval
-     * @param now         current timestamp
-     * @return  statistics VoltTable results
-     */
-    public synchronized VoltTable getStats(
-            final SysProcSelector selector,
-            final List<Long> siteIds,
-            final boolean interval,
-            final Long now) {
-        return getStatsInternal(selector, siteIds, interval, now, null);
-    }
-
-    /**
      * Get aggregate statistics.
      * @param selector    @Statistics selector keyword
      * @param interval    true if processing a reporting interval
@@ -720,44 +699,6 @@ public class StatsAgent {
             final boolean interval,
             final Long now) {
         return getStatsAggregateInternal(selector, interval, now, null);
-    }
-
-    /**
-     * Get statistics once for global stats, e.g. PLANNER. Chooses an arbitrary site
-     * as the one that triggers retrievals.
-     * @param selector  statistics selector keyword
-     * @param interval  true if processing a reporting interval
-     * @param now       current timestamp
-     * @param siteId    siteId of the calling site
-     * @return  statistics VoltTable results
-     */
-    public synchronized VoltTable getSiteAndHostStats(
-            final SysProcSelector selector,
-            final boolean interval,
-            final Long now,
-            final long siteId) {
-        // If it's the first site make it the chosen site for host-global statistics.
-        if (m_idForGlobalStats == null) {
-            m_idForGlobalStats = siteId;
-        }
-
-        // First get the site-specific statistics.
-        VoltTable results;
-        {
-            ArrayList<Long> siteIds = new ArrayList<Long>();
-            siteIds.add(siteId);
-            results = getStatsInternal(selector, siteIds, interval, now, null);
-        }
-
-        // Then append global results if it's the chosen site.
-        if (siteId == m_idForGlobalStats) {
-            // -1 is always the global site id.
-            ArrayList<Long> siteIds = new ArrayList<Long>();
-            siteIds.add(-1L);
-            results = getStatsInternal(selector, siteIds, interval, now, results);
-        }
-
-        return results;
     }
 
     private synchronized VoltTable getStatsAggregateInternal(
@@ -805,88 +746,6 @@ public class StatsAgent {
             assert statsSources != null;
             for (final StatsSource ss : statsSources) {
                 assert ss != null;
-                /*
-                 * Some sources like TableStats use VoltTable to keep track of
-                 * statistics
-                 */
-                if (ss.isEEStats()) {
-                    final VoltTable table = ss.getStatsTable();
-                    // this table can be null during recovery, at least
-                    if (table != null) {
-                        while (table.advanceRow()) {
-                            resultTable.add(table);
-                        }
-                        table.resetRowPosition();
-                    }
-                } else {
-                    Object statsRows[][] = ss.getStatsRows(interval, now);
-                    for (Object[] row : statsRows) {
-                        resultTable.addRow(row);
-                    }
-                }
-            }
-        }
-        return resultTable;
-    }
-
-    /**
-     * Internal statistics retrieval. Optionally append results to an existing
-     * result set. This is used by getSiteAndHostStats() for PLANNER statistics.
-     * @param selector     statistics selector keyword
-     * @param interval     true if processing a reporting interval
-     * @param now          current timestamp
-     * @param prevResults  previous results, if any, to append to
-     * @return  statistics VoltTable results
-     */
-    private synchronized VoltTable getStatsInternal(
-            final SysProcSelector selector,
-            final List<Long> siteIds,
-            final boolean interval,
-            final Long now,
-            VoltTable prevResults) {
-        assert selector != null;
-        assert siteIds != null;
-        assert siteIds.size() > 0;
-        final HashMap<Long, ArrayList<StatsSource>> siteIdToStatsSources = registeredStatsSources.get(selector);
-        assert siteIdToStatsSources != null;
-
-        ArrayList<StatsSource> statsSources = siteIdToStatsSources.get(siteIds.get(0));
-        //Let these two be null since they are for pro features
-        if (selector == SysProcSelector.DRNODE || selector == SysProcSelector.DRPARTITION) {
-            if (statsSources == null || statsSources.isEmpty()) {
-                return null;
-            }
-        } else {
-            assert statsSources != null && !statsSources.isEmpty();
-        }
-
-        /*
-         * Some sources like TableStats use VoltTable to keep track of
-         * statistics. We need to use the table schema the VoltTable has in this
-         * case.
-         */
-        VoltTable.ColumnInfo columns[] = null;
-        if (!statsSources.get(0).isEEStats())
-            columns = statsSources.get(0).getColumnSchema().toArray(new VoltTable.ColumnInfo[0]);
-        else {
-            final VoltTable table = statsSources.get(0).getStatsTable();
-            if (table == null)
-                return null;
-            columns = new VoltTable.ColumnInfo[table.getColumnCount()];
-            for (int i = 0; i < columns.length; i++)
-                columns[i] = new VoltTable.ColumnInfo(table.getColumnName(i),
-                                                      table.getColumnType(i));
-        }
-
-         // Append to previous results if provided.
-        final VoltTable resultTable = prevResults != null ? prevResults : new VoltTable(columns);
-
-        for (Long siteId : siteIds) {
-            statsSources = siteIdToStatsSources.get(siteId);
-            assert statsSources != null;
-            for (final StatsSource ss : statsSources) {
-                assert ss != null;
-
                 /*
                  * Some sources like TableStats use VoltTable to keep track of
                  * statistics
