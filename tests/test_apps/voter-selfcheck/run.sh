@@ -82,12 +82,9 @@ function async-benchmark() {
         --duration=120 \
         --servers=localhost \
         --contestants=6 \
-        --voter=905000000 \
         --maxvotes=2 \
         --ratelimit=100000 \
         --autotune=false \
-        --username=myuser \
-        --password=voltdb \
         --latencytarget=10
 }
 
