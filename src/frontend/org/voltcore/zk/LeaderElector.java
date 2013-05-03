@@ -57,6 +57,11 @@ public class LeaderElector {
         public void run() {
             try {
                 leader = watchNextLowerNode();
+            } catch (KeeperException.SessionExpiredException e) {
+                // lost the full connection. some test cases do this...
+                // means zk shutdown without the elector being shutdown.
+                // ignore.
+                e.printStackTrace();
             } catch (KeeperException.ConnectionLossException e) {
                 // lost the full connection. some test cases do this...
                 // means shutdoown without the elector being
@@ -84,6 +89,11 @@ public class LeaderElector {
         public void run() {
             try {
                 checkForChildChanges();
+            } catch (KeeperException.SessionExpiredException e) {
+                // lost the full connection. some test cases do this...
+                // means zk shutdown without the elector being shutdown.
+                // ignore.
+                e.printStackTrace();
             } catch (KeeperException.ConnectionLossException e) {
                 // lost the full connection. some test cases do this...
                 // means shutdoown without the elector being
