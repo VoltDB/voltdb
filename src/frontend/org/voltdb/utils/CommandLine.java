@@ -28,8 +28,8 @@ import java.util.TreeMap;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.ReplicationRole;
+import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltDB.START_ACTION;
 
 
 // VoltDB.Configuration represents all of the VoltDB command line parameters.
@@ -52,7 +52,7 @@ public class CommandLine extends VoltDB.Configuration
 
     public static final String VEM_TAG_PROPERTY = "org.voltdb.vemtag";
 
-    public CommandLine(VoltDB.START_ACTION start_action)
+    public CommandLine(StartAction start_action)
     {
         m_startAction = start_action;
     }
@@ -160,7 +160,7 @@ public class CommandLine extends VoltDB.Configuration
 
     public CommandLine startCommand(String command)
     {
-        VoltDB.START_ACTION action = VoltDB.START_ACTION.monickerFor(command);
+        StartAction action = StartAction.monickerFor(command);
         if (action == null) {
             // command wasn't a valid enum type, throw an exception.
             String msg = "Unknown action: " + command + ". ";
@@ -171,7 +171,7 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
-    public CommandLine startCommand(START_ACTION action) {
+    public CommandLine startCommand(StartAction action) {
         m_startAction = action;
         return this;
     }

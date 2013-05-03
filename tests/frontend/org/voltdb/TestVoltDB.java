@@ -28,7 +28,6 @@ import java.io.IOException;
 
 import junit.framework.TestCase;
 
-import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
@@ -79,13 +78,13 @@ public class TestVoltDB extends TestCase {
 
         String args14[] = { "create" };
         VoltDB.Configuration cfg14 = new VoltDB.Configuration(args14);
-        assertEquals(START_ACTION.CREATE, cfg14.m_startAction);
+        assertEquals(StartAction.CREATE, cfg14.m_startAction);
         String args15[] = { "recover" };
         VoltDB.Configuration cfg15 = new VoltDB.Configuration(args15);
-        assertEquals(START_ACTION.RECOVER, cfg15.m_startAction);
-        String args16[] = { "recover", "safe", "mode" };
+        assertEquals(StartAction.RECOVER, cfg15.m_startAction);
+        String args16[] = { "recover", "safemode" };
         VoltDB.Configuration cfg16 = new VoltDB.Configuration(args16);
-        assertEquals(START_ACTION.SAFE_RECOVER, cfg16.m_startAction);
+        assertEquals(StartAction.SAFE_RECOVER, cfg16.m_startAction);
 
         String args17[] = { "replica" };
         VoltDB.Configuration cfg17 = new VoltDB.Configuration(args17);
@@ -141,7 +140,7 @@ public class TestVoltDB extends TestCase {
         String[] args9 = {"host", "hola", "deployment", "teststring4", "catalog", "catalog.jar", "replica"};
         config = new VoltDB.Configuration(args9);
         assertTrue(config.validate());
-        assertEquals(START_ACTION.CREATE, config.m_startAction);
+        assertEquals(StartAction.CREATE, config.m_startAction);
 
         // valid config
         String[] args10 = {"create", "leader", "localhost", "deployment", "te", "catalog", "catalog.jar"};

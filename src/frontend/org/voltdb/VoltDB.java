@@ -27,15 +27,12 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
-import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.TimeZone;
-import java.util.regex.Pattern;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -102,58 +99,7 @@ public class VoltDB {
     // The name of the SQLStmt implied by a statement procedure's sql statement.
     public static final String ANON_STMT_NAME = "sql";
 
-    public enum START_ACTION {
-
-        CREATE("create"),
-        RECOVER("recover"),
-        SAFE_RECOVER("recover safe mode"),
-        REJOIN("rejoin"),
-        LIVE_REJOIN("live rejoin"),
-        JOIN("join");
-
-        final static Pattern spaces = Pattern.compile("\\s+");
-
-        final static Map<String, START_ACTION> verbMoniker =
-                new HashMap<String, VoltDB.START_ACTION>();
-
-        final static EnumSet<START_ACTION> recoverSet =
-                EnumSet.of(RECOVER,SAFE_RECOVER);
-
-        final static EnumSet<START_ACTION> rejoinSet =
-                EnumSet.of(REJOIN,LIVE_REJOIN);
-
-        final String m_verb;
-
-        static {
-            for (START_ACTION action: START_ACTION.values()) {
-                verbMoniker.put(action.m_verb, action);
-            }
-        }
-
-        START_ACTION(String verb) {
-            m_verb = verb;
-        }
-
-        public static START_ACTION monickerFor(String verb) {
-            if (verb == null) return null;
-            verb = spaces.matcher(verb.trim().toLowerCase()).replaceAll(" ");
-            return verbMoniker.get(verb);
-        }
-
-        public String verb() {
-            return m_verb;
-        }
-
-        public boolean doesRecover() {
-            return recoverSet.contains(this);
-        }
-
-        public boolean doesRejoin() {
-            return rejoinSet.contains(this);
-        }
-    }
-
-    public static boolean createForRejoin(VoltDB.START_ACTION startAction)
+    public static boolean createForRejoin(StartAction startAction)
     {
         return startAction.doesRejoin();
     }
@@ -242,7 +188,7 @@ public class VoltDB {
         public int m_deadHostTimeoutMS = 10000;
 
         /** start up action */
-        public START_ACTION m_startAction = null;
+        public StartAction m_startAction = null;
 
         /** start mode: normal, paused*/
         public OperationMode m_startMode = OperationMode.RUNNING;
@@ -287,7 +233,7 @@ public class VoltDB {
             m_enableIV2 = VoltDB.checkTestEnvForIv2();
             // Set start action create.  The cmd line validates that an action is specified, however,
             // defaulting it to create for local cluster test scripts
-            m_startAction = VoltDB.START_ACTION.CREATE;
+            m_startAction = StartAction.CREATE;
         }
 
         /** Behavior-less arg used to differentiate command lines from "ps" */
@@ -307,7 +253,7 @@ public class VoltDB {
             m_zkInterface = "127.0.0.1:" + ports.next();
             // Set start action create.  The cmd line validates that an action is specified, however,
             // defaulting it to create for local cluster test scripts
-            m_startAction = VoltDB.START_ACTION.CREATE;
+            m_startAction = StartAction.CREATE;
         }
 
         public Configuration(String args[]) {
@@ -423,37 +369,36 @@ public class VoltDB {
                 }
                 // synonym for "rejoin host" for backward compatibility
                 else if (arg.equals("rejoinhost")) {
-                    m_startAction = START_ACTION.REJOIN;
+                    m_startAction = StartAction.REJOIN;
                     m_leader = args[++i].trim();
                 }
                 else if (arg.startsWith("rejoinhost ")) {
-                    m_startAction = START_ACTION.REJOIN;
+                    m_startAction = StartAction.REJOIN;
                     m_leader = arg.substring("rejoinhost ".length()).trim();
                 }
 
                 else if (arg.equals("create")) {
-                    m_startAction = START_ACTION.CREATE;
+                    m_startAction = StartAction.CREATE;
                 } else if (arg.equals("recover")) {
-                    m_startAction = START_ACTION.RECOVER;
-                    if (   args.length > i + 2
-                        && args[i+1].trim().equals("safe")
-                        && args[i+2].trim().equals("mode")) {
-                        m_startAction = START_ACTION.SAFE_RECOVER;
-                        i += 2;
+                    m_startAction = StartAction.RECOVER;
+                    if (   args.length > i + 1
+                        && args[i+1].trim().equals("safemode")) {
+                        m_startAction = StartAction.SAFE_RECOVER;
+                        i += 1;
                     }
                 } else if (arg.equals("rejoin")) {
-                    m_startAction = START_ACTION.REJOIN;
+                    m_startAction = StartAction.REJOIN;
                 } else if (arg.startsWith("live rejoin")) {
-                    m_startAction = START_ACTION.LIVE_REJOIN;
+                    m_startAction = StartAction.LIVE_REJOIN;
                 } else if (arg.equals("live") && args.length > i + 1 && args[++i].trim().equals("rejoin")) {
-                    m_startAction = START_ACTION.LIVE_REJOIN;
+                    m_startAction = StartAction.LIVE_REJOIN;
                 } else if (arg.startsWith("join")) {
-                    m_startAction = START_ACTION.JOIN;
+                    m_startAction = StartAction.JOIN;
                 }
 
                 else if (arg.equals("replica")) {
                     // We're starting a replica, so we must create a new database.
-                    m_startAction = START_ACTION.CREATE;
+                    m_startAction = StartAction.CREATE;
                     m_replicationRole = ReplicationRole.REPLICA;
                 }
                 else if (arg.equals("dragentportstart")) {
@@ -546,7 +491,7 @@ public class VoltDB {
                     hostLog.fatal("The startup action is missing (either create, recover, replica or rejoin).");
                 }
 
-            if (m_startAction == START_ACTION.CREATE &&
+            if (m_startAction == StartAction.CREATE &&
                 m_pathToCatalog == null) {
                 isValid = false;
                 hostLog.fatal("The catalog location is missing.");
@@ -566,8 +511,8 @@ public class VoltDB {
             }
 
             // require deployment file location
-            if (m_startAction != START_ACTION.REJOIN && m_startAction != START_ACTION.LIVE_REJOIN
-                    && m_startAction != START_ACTION.JOIN) {
+            if (m_startAction != StartAction.REJOIN && m_startAction != StartAction.LIVE_REJOIN
+                    && m_startAction != StartAction.JOIN) {
                 // require deployment file location (null is allowed to receive default deployment)
                 if (m_pathToDeployment != null && m_pathToDeployment.isEmpty()) {
                     isValid = false;
@@ -579,11 +524,11 @@ public class VoltDB {
                         isValid = false;
                         hostLog.fatal("Replica cluster only supports create database");
                     } else {
-                        m_startAction = START_ACTION.CREATE;
+                        m_startAction = StartAction.CREATE;
                     }
                 }
             } else {
-                if (!m_isEnterprise && m_startAction == START_ACTION.LIVE_REJOIN) {
+                if (!m_isEnterprise && m_startAction == StartAction.LIVE_REJOIN) {
                     // pauseless rejoin is only available in pro
                     isValid = false;
                     hostLog.fatal("Live rejoin is only available in the Enterprise Edition");

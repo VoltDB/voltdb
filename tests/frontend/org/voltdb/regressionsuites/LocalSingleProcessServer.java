@@ -29,10 +29,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.StartAction;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 /**
@@ -201,7 +201,7 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
         // m_jarFileName is already prefixed with test output path.
         config.m_pathToCatalog = m_jarFileName;
         config.m_pathToDeployment = m_pathToDeployment;
-        config.m_startAction = START_ACTION.CREATE;
+        config.m_startAction = StartAction.CREATE;
         config.m_enableIV2 = VoltDB.checkTestEnvForIv2();
 
         config.m_ipcPorts = java.util.Collections.synchronizedList(new ArrayList<Integer>());
