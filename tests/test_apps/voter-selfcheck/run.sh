@@ -48,7 +48,7 @@ function srccompile() {
 # build an application catalog
 function catalog() {
     srccompile
-    $VOLTDB compile --classpath obj -o $APPNAME.jar -p project.xml
+    $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -81,14 +81,16 @@ function async-benchmark() {
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
-        --port=21212 \
         --contestants=6 \
         --voter=905000000 \
         --maxvotes=2 \
         --ratelimit=100000 \
         --autotune=false \
+        --username=myuser \
+        --password=voltdb \
         --latencytarget=10
 }
+
 
 # Multi-threaded synchronous benchmark sample
 # Use this target for argument help
@@ -105,7 +107,6 @@ function sync-benchmark() {
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
-        --port=21212 \
         --contestants=6 \
         --maxvotes=2
 }
@@ -125,7 +126,6 @@ function jdbc-benchmark() {
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
-        --port=21212 \
         --contestants=6 \
         --maxvotes=2
 }
