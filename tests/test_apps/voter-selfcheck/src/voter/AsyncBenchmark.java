@@ -129,7 +129,7 @@ public class AsyncBenchmark {
         String statsfile = "";
 
         @Option(desc = "User name for connection.")
-        String user = "";
+        String username = "";
 
         @Option(desc = "Password for connection.")
         String password = "";
@@ -169,7 +169,7 @@ public class AsyncBenchmark {
     public AsyncBenchmark(VoterConfig config) {
         this.config = config;
 
-        ClientConfig clientConfig = new ClientConfig(config.user, config.password, new StatusListener());
+        ClientConfig clientConfig = new ClientConfig(config.username, config.password, new StatusListener());
         if (config.autotune) {
             clientConfig.enableAutoTune();
             clientConfig.setAutoTuneTargetInternalLatency(config.latencytarget);
