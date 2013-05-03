@@ -59,10 +59,12 @@ public abstract class SubPlanAssembler {
     /** Describes the specified and inferred partition context. */
     final PartitioningForStatement m_partitioning;
 
-    // This works on the assumption that it is only used to return final "leaf node" bindingLists that
-    // are never updated "in place", but just get their contents dumped into a summary List that was created
+    // This cached value saves work on the assumption that it is only used to return
+    // final "leaf node" bindingLists that are never updated "in place",
+    // but just get their contents dumped into a summary List that was created
     // inline and NOT initialized here.
-    private final static List<AbstractExpression> s_reusableImmutableEmptyBinding = new ArrayList<AbstractExpression>();
+    private final static List<AbstractExpression> s_reusableImmutableEmptyBinding =
+        new ArrayList<AbstractExpression>();
 
     SubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, PartitioningForStatement partitioning)
     {
@@ -186,17 +188,19 @@ public abstract class SubPlanAssembler {
         // This list remains null if the index is just on simple columns.
         List<AbstractExpression> indexedExprs = null;
         // This vector of indexed columns remains null if indexedExprs is in use.
-        List<ColumnRef> sortedColumns = null;
-        int[] colIds = null;
+        List<ColumnRef> indexedColRefs = null;
+        int[] indexedColIds = null;
         int keyComponentCount;
         if (exprsjson.isEmpty()) {
-            // Don't bother to build a dummy indexedExprs list -- just leave it null and deal with that.
-            sortedColumns = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
-            keyComponentCount = sortedColumns.size();
-            colIds = new int[keyComponentCount];
+            // Don't bother to build a dummy indexedExprs list for a simple index on columns.
+            // Just leave it null and handle this simpler case specially via indexedColRefs or
+            // indexedColIds, all along the way.
+            indexedColRefs = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
+            keyComponentCount = indexedColRefs.size();
+            indexedColIds = new int[keyComponentCount];
             int ii = 0;
-            for (ColumnRef cr : sortedColumns) {
-                colIds[ii++] = cr.getColumn().getIndex();
+            for (ColumnRef cr : indexedColRefs) {
+                indexedColIds[ii++] = cr.getColumn().getIndex();
             }
         } else {
             try {
@@ -209,7 +213,6 @@ public abstract class SubPlanAssembler {
                 assert(false);
                 return null;
             }
-            // There may be a missing step here in which the base column expressions get normalized to the table.
         }
 
         // Hope for the best -- full coverage with equality matches on every expression in the index.
@@ -217,69 +220,15 @@ public abstract class SubPlanAssembler {
         retval.use = IndexUseType.COVERING_UNIQUE_EQUALITY;
         retval.index = index;
 
-        // See if we can use index scan for ORDER BY.
-        // The only scenario where we can use index scan is when the ORDER BY
-        // columns/expressions list is a valid binding of the prefix or match of the tree index columns/expressions,
-        // in the same order from left to right.
-        // It also requires that all columns are ordered in the same direction.
-        // For example, if a table has a tree index of columns
-        // A, B, C, then 'ORDER BY A, B' or 'ORDER BY A DESC, B DESC, C DESC'
-        // work, but not 'ORDER BY A, C' or 'ORDER BY A, B DESC'.
-        // Currently only ascending key indexes can be defined and supported.
-        // Also, these ascending key indexes can support descending ORDER BYs
-        // but only if the index scan can start at the very end (to work backwards).
-        // That means no equality conditions and no upper bound conditions.
-        // Those conditions must be tested later, and the sortDirection invalidated if they fail.
-
-        // TODO: One flaw in the following algorithm is that it doesn't properly account for
-        // index keys that are constrained by filters to be equal to constants or parameters
-        // (vs. equal to columns/expressions from previously scanned tables).
-        // Since they are logically constant, there would be no real reason to "ORDER BY" them in the query,
-        // but skipping them in the ORDER BY is enough to throw off the logic here and force an "ORDER BY".
-        // Similarly, but less probably, any column or expression that is constrained by the query to equal
-        // a constant (or parameter) value, SHOULD have no effect when it is listed anywhere in an
-        // ORDER BY clause (even tagged for descending order, makes no difference), yet that could also throw
-        // off this code's ability to identify this index scan's result as equivalently sorted.
-        // The cost of these misses is an unnecessary sorting step after the index scan.
+        // Try to use the index scan's inherent ordering to implement the ORDER BY clause.
+        // The effects of determineIndexOrdering are reflected in
+        // retval.sortDirection and bindingsForOrder.
+        // In some borderline cases, the determination to use the index's order is optimistic and
+        // provisional; it can be undone later in this function as new info comes to light.
         List<AbstractExpression> bindingsForOrder = new ArrayList<AbstractExpression>();
-        if (m_parsedStmt instanceof ParsedSelectStmt) {
-            ParsedSelectStmt parsedSelectStmt = (ParsedSelectStmt) m_parsedStmt;
-            int countOrderBys = parsedSelectStmt.orderColumns.size();
-            // There need to be enough indexed expressions to provide full sort coverage.
-            if (countOrderBys > 0 && countOrderBys <= keyComponentCount) {
-                Iterator<ColumnRef> colRefIter = (indexedExprs == null) ? sortedColumns.iterator() : null;
-                boolean ascending = parsedSelectStmt.orderColumns.get(0).ascending;
-                retval.sortDirection = ascending ? SortDirectionType.ASC : SortDirectionType.DESC;
-                int jj = 0;
-                for (ParsedColInfo colInfo : parsedSelectStmt.orderColumns) {
-                    if (colInfo.ascending == ascending) {
-                        // Explicitly advance nextExpr or colRefIter to the next indexed expression/column
-                        // in synch with the loop over orderColumns
-                        // to match the index's "ON" expressions with the query's "ORDER BY" expressions
-                        if (indexedExprs == null) {
-                            assert(colRefIter.hasNext());
-                            ColumnRef colRef = colRefIter.next();
-                            if (colInfo.expression instanceof TupleValueExpression &&
-                                colInfo.tableName.equals(table.getTypeName()) &&
-                                colInfo.columnName.equals(colRef.getColumn().getTypeName())) {
-                                continue;
-                            }
-                        } else {
-                            assert(jj < indexedExprs.size());
-                            AbstractExpression nextExpr = indexedExprs.get(jj++);
-                            List<AbstractExpression> moreBindings = colInfo.expression.bindingToIndexedExpression(nextExpr);
-                            if (moreBindings != null) {
-                                bindingsForOrder.addAll(moreBindings);
-                                continue;
-                            }
-                        }
-                    }
-                    retval.sortDirection = SortDirectionType.INVALID;
-                    bindingsForOrder = null;
-                    break;
-                }
-            }
-        }
+        determineIndexOrdering(table, keyComponentCount,
+                               indexedExprs, indexedColRefs,
+                               retval, bindingsForOrder);
 
         // Use as many covering indexed expressions as possible to optimize comparator expressions that can use them.
 
@@ -289,7 +238,7 @@ public abstract class SubPlanAssembler {
         int coveringColId = -1;
         for ( ; coveredCount < keyComponentCount; ++coveredCount) {
             if (indexedExprs == null) {
-                coveringColId = colIds[coveredCount];
+                coveringColId = indexedColIds[coveredCount];
             } else {
                 coveringExpr = indexedExprs.get(coveredCount);
             }
@@ -319,12 +268,15 @@ public abstract class SubPlanAssembler {
             }
             return retval;
         }
+
         if ( ! IndexType.isScannable(index.getType()) ) {
             // Failure to equality-match all expressions in a non-scannable index is unacceptable.
             return null;
         }
 
-        // Scannable indexes provide more options.
+        //
+        // Scannable indexes provide more options...
+        //
 
         IndexableExpression startingBoundExpr = null;
         IndexableExpression endingBoundExpr = null;
@@ -344,7 +296,8 @@ public abstract class SubPlanAssembler {
             // For simplicity of implementation:
             // In some odd edge cases e.g.
             // " FIELD(DOC, 'title') LIKE 'a%' AND FIELD(DOC, 'title') > 'az' ",
-            // arbitrarily choose to index-optimize the LIKE expression rather than the inequality ON THAT SAME COLUMN.
+            // arbitrarily choose to index-optimize the LIKE expression rather than the inequality
+            // ON THAT SAME COLUMN.
             // This MIGHT not always provide the most selective filtering.
             if (doubleBoundExpr != null) {
                 startingBoundExpr = doubleBoundExpr.extractStartFromPrefixLike();
@@ -451,6 +404,133 @@ public abstract class SubPlanAssembler {
     }
 
     /**
+     * Try to use the index scan's inherent ordering to implement the ORDER BY clause.
+     * The most common scenario for this optimization is when the ORDER BY "columns"
+     * (actually a list of columns OR expressions) corresponds to a prefix or a complete
+     * match of a tree index's key components (also columns/expressions),
+     * in the same order from major to minor.
+     * For example, if a table has a tree index on columns "(A, B)", then
+     * "ORDER BY A" or "ORDER BY A, B" are considered a match
+     * but NOT "ORDER BY A, C" or "ORDER BY A, B, C" or "ORDER BY B" or "ORDER BY B, A".
+     *
+     * TODO: In theory, we COULD leverage index ordering when the index covers only a prefix of
+     * the ORDER BY list, such as the "ORDER BY A, B, C" case listed above.
+     * But that still requires an ORDER BY plan node.
+     * To gain any substantial advantage, the ORDER BY plan node would have to be smart enough
+     * to apply just an incremental "minor" sort on "C" to subsets of the result "grouped by"
+     * equal A and B values.  The ORDER BY plan node is not yet that smart.
+     * So, for now, this case is handled by tagging the index output as not sorted,
+     * leaving the ORDER BY to do the full job.
+     *
+     * There are some additional considerations that might disqualify a match.
+     * A match also requires that all columns are ordered in the same direction.
+     * For example, if a table has a tree index on columns "(A, B, C)", then
+     * "ORDER BY A, B" or "ORDER BY A DESC, B DESC, C DESC" are considered a match
+     * but not "ORDER BY A, B DESC" or "ORDER BY A DESC, B".
+     *
+     * TODO: Currently only ascending key index definitions are supported
+     * -- the DESC keyword is not supported in the index creation DDL.
+     * If that is ever enabled, the checks here may need to be generalized
+     * to maintain the current level of support for only exact matching or
+     * "exact reverse" matching of the ASC/DESC qualifiers on all columns,
+     * but no other cases.
+     *
+     * Caveat: "Reverse scans", that is, support for descending ORDER BYs using ascending key
+     * indexes only work when the index scan can start at the very end of the index
+     * (to work backwards).
+     * That means no equality conditions or upper bound conditions can be allowed that would
+     * interfere with the start of the backward scan.
+     * To minimize re-work, those query qualifications are not checked here.
+     * It is easier to tentatively claim the reverse sort order of the index output, here,
+     * and later invalidate that sortDirection upon detecting that the reverse scan
+     * is not supportable.
+     *
+     * Some special cases are supported in addition to the simple match of all the ORDER BY "columns":
+     *
+     * It is possible for an ORDER BY "column" to have a parameterized form that neither strictly
+     * equals nor contradicts an index key component.
+     * For example, an index might be defined on a particular character of a column "(substr(A, 1, 1))".
+     * This trivially matches "ORDER BY substr(A, 1, 1)".
+     * It trivially refuses to match "ORDER BY substr(A, 2, 1)" or even "ORDER BY substr(A, 2, ?)"
+     * The more interesting case is "ORDER BY substr(A, ?, 1)" where a match
+     * must be predicated on the user specifying the correct value "1" for the parameter.
+     * This is handled by allowing the optimization but by generating and returning a
+     * "parameter binding" that describes its inherent usage restriction.
+     * Such parameterized plans are used for ad hoc statements only; it is easy to validate
+     * immediately that they have been passed the correct parameter value.
+     * Compiled stored procedure statements need to be more specific about constants
+     * used in index expressions, even if that means compiling a separate statement with a
+     * constant hard-coded in the place of the parameter to purposely match the indexed expression.
+     *
+     *TODO: A case not accounted for, here, is an ORDER BY list that uses a combination of
+     * columns/expressions from different tables -- the most common missed case would be
+     * when the major ORDER BY columns are from an outer table (index scan) of a join (NLIJ)
+     * and the minor columns from its inner table index scan.
+     * This would have to be detected from a wider perspective than that of a single table/index.
+     *
+     * @param table              only used here to validate base table names of ORDER BY columns' .
+     * @param keyComponentCount  the length of indexedExprs or indexedColRefs,
+     *                           ONE of which must be valid
+     * @param indexedExprs       expressions for key components in the general case
+     * @param indexedColRefs     column references for key components in the simpler case
+     * @param retval the eventual result of getRelevantAccessPathForIndex,
+     *               the bearer of a (tentative) sortDirection determined here
+     * @param bindingsForOrder   restrictions on parameter settings that are prerequisite to the
+     *                           any ordering optimization determined here
+     */
+    private void determineIndexOrdering(Table table, int keyComponentCount,
+            List<AbstractExpression> indexedExprs, List<ColumnRef> indexedColRefs,
+            AccessPath retval,
+            List<AbstractExpression> bindingsForOrder)
+    {
+        if ( ! (m_parsedStmt instanceof ParsedSelectStmt)) {
+            return;
+        }
+        ParsedSelectStmt parsedSelectStmt = (ParsedSelectStmt) m_parsedStmt;
+        int countOrderBys = parsedSelectStmt.orderColumns.size();
+        // There need to be enough indexed expressions to provide full ORDER BY coverage.
+        if (countOrderBys > 0 && countOrderBys <= keyComponentCount) {
+            boolean ascending = parsedSelectStmt.orderColumns.get(0).ascending;
+            retval.sortDirection = ascending ? SortDirectionType.ASC : SortDirectionType.DESC;
+            int jj = 0;
+            for (ParsedColInfo colInfo : parsedSelectStmt.orderColumns) {
+                if (colInfo.ascending == ascending) {
+                    // Explicitly advance to the each indexed expression/column
+                    // to match them with the query's "ORDER BY" expressions.
+                    if (indexedExprs == null) {
+                        if (colInfo.expression instanceof TupleValueExpression) {
+                            ColumnRef nextColRef = indexedColRefs.get(jj++);
+                            //TODO: match the TVE attributes as they may potentially be more
+                            // reliable than these colInfo attributes?
+                            if (colInfo.tableName.equals(table.getTypeName()) &&
+                                colInfo.columnName.equals(nextColRef.getColumn().getTypeName())) {
+                                continue;
+                            }
+                        }
+                    } else {
+                        assert(jj < indexedExprs.size());
+                        AbstractExpression nextExpr = nextExpr = indexedExprs.get(jj++);
+                        List<AbstractExpression> moreBindings =
+                            colInfo.expression.bindingToIndexedExpression(nextExpr);
+                        // Non-null bindings (even an empty list) denotes a match.
+                        if (moreBindings != null) {
+                            bindingsForOrder.addAll(moreBindings);
+                            continue;
+                        }
+                    }
+                }
+                // The ORDER BY column did not match the established ascending/descending
+                // pattern OR did not match the next index key component.
+                // This is an outright failure case.
+                // Undo any tentative result settings.
+                retval.sortDirection = SortDirectionType.INVALID;
+                bindingsForOrder.clear(); // suddenly irrelevant
+                return;
+            }
+        }
+    }
+
+    /**
      * For a given filter expression, return a normalized version of it that is always a comparison operator whose
      * left-hand-side references the table specified and whose right-hand-side does not.
      * Returns null if no such formulation of the filter expression is possible.
@@ -467,7 +547,7 @@ public abstract class SubPlanAssembler {
      * @param coveringExpr The indexed expression on the table's column that might match a query filter, possibly null.
      * @param coveringColId When coveringExpr is null, the id of the indexed column might match a query filter.
      * @param table The table on which the indexed expression is based
-     * @param filtersToCover The comparison expression to qualify and possibly normalize.
+     * @param filtersToCover query conditions that may contain the desired filter
      * @return An IndexableExpression -- really just a pairing of a normalized form of expr with the
      * potentially indexed expression on the left-hand-side and the potential index key expression on
      * the right of a comparison operator, and a list of parameter bindings that are required for the
