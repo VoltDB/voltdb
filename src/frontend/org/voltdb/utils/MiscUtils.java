@@ -27,6 +27,8 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -651,5 +653,33 @@ public class MiscUtils {
         }
 
         return values.add(value);
+    }
+
+    /**
+     * Zip the two lists up into a multimap
+     * @return null if one of the lists is empty
+     */
+    public static <K, V> Map<K, List<V>> zipToMap(List<K> keys, List<V> values)
+    {
+        if (keys.isEmpty() || values.isEmpty()) {
+            return null;
+        }
+
+        Iterator<K> keyIter = keys.iterator();
+        Iterator<V> valueIter = values.iterator();
+        Map<K, List<V>> result = new HashMap<K, List<V>>();
+
+        while (keyIter.hasNext() && valueIter.hasNext()) {
+            MiscUtils.multimapPut(result, keyIter.next(), valueIter.next());
+        }
+
+        // In case there are more values than keys, assign the rest of the
+        // values to the first key
+        K firstKey = keys.get(0);
+        while (valueIter.hasNext()) {
+            MiscUtils.multimapPut(result, firstKey, valueIter.next());
+        }
+
+        return result;
     }
 }
