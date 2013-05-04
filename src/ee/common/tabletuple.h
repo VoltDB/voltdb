@@ -212,7 +212,7 @@ public:
 
     void setNValue(const int idx, voltdb::NValue value);
     /*
-     * Copies range of NValues from aone tuple to another.
+     * Copies range of NValues from one tuple to another.
      */
     void setNValues(int beginIdx, TableTuple lhs, int begin, int end);
 
@@ -369,8 +369,8 @@ private:
     }
 };
 
-// A small class to hold together a tuple (not associated with any table)
-// and an allocated memory backing the tuple's values.
+// A small class to hold together a standalone tuple (not backed by any table)
+// and the associated tuple storage memory to keep the actual data.
 class StandAloneTupleStorage {
     public:
         /** Creates an uninitialized tuple */
@@ -456,6 +456,7 @@ inline void TableTuple::setNValue(const int idx, voltdb::NValue value) {
     const int32_t columnLength = m_schema->columnLength(idx);
     value.serializeToTupleStorage(dataPtr, isInlined, columnLength);
 }
+
 /** Multi column version. */
 inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int end) {
     assert(m_schema);

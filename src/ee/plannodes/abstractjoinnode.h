@@ -60,16 +60,12 @@ public:
     AbstractJoinPlanNode();
     virtual ~AbstractJoinPlanNode();
 
-    void setJoinType(JoinType join_type);
     JoinType getJoinType() const;
 
-    void setPreJoinPredicate(AbstractExpression* preJoinPredicate);
     AbstractExpression* getPreJoinPredicate() const;
 
-    void setJoinPredicate(AbstractExpression* joinPredicate);
     AbstractExpression* getJoinPredicate() const;
 
-    void setWherePredicate(AbstractExpression* wherePredicate);
     AbstractExpression* getWherePredicate() const;
 
     virtual std::string debugInfo(const std::string& spacer) const;
@@ -79,28 +75,23 @@ protected:
 
     void loadPredicateFromJSONObject(
         const char* predicateType, json_spirit::Object& obj, AbstractExpression*& predicate);
-    //
-    // This is the outer-table-only join expression. If the outer tuple fails it
-    // it is still part of the result set (pending other filtering)
+
+    // This is the outer-table-only join expression. If the outer tuple fails it,
+    // it may still be part of the result set (pending other filtering)
     // but can't be joined with any tuple from the inner table.
-    // be put into the output table
-    //
+    // In a left outer join, the failed outer tuple STILL gets null-padded in the output table.
     AbstractExpression* m_preJoinPredicate;
 
-    //
     // This is the predicate to figure out whether a joined tuple should
     // be put into the output table
-    //
     AbstractExpression* m_joinPredicate;
-    //
+
     // The additional filtering criteria specified by the WHERE clause
     // in case of outer joins. The predicated is applied to the whole
     // joined tuple after it's assembled
-    //
     AbstractExpression* m_wherePredicate;
-    //
-    // We currently don't do anything with this...
-    //
+
+    // Currently either inner or left outer.
     JoinType m_joinType;
 };
 

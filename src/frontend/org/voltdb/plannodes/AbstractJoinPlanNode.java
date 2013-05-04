@@ -122,7 +122,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         m_joinPredicate = clonePredicate(predicate);
     }
 
-   @Override
+    @Override
     public void generateOutputSchema(Database db)
     {
         // FUTURE: At some point it would be awesome to further
@@ -204,7 +204,8 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void toJSONString(JSONStringer stringer) throws JSONException {
+    public void toJSONString(JSONStringer stringer) throws JSONException
+    {
         super.toJSONString(stringer);
         stringer.key(Members.JOIN_TYPE.name()).value(m_joinType.toString());
         stringer.key(Members.PRE_JOIN_PREDICATE.name()).value(m_preJoinPredicate);
@@ -213,7 +214,8 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException
+    {
         helpLoadFromJSONObject(jobj, db);
         this.m_joinType = JoinType.get( jobj.getString( Members.JOIN_TYPE.name() ) );
         if( !jobj.isNull( Members.PRE_JOIN_PREDICATE.name() )) {
@@ -268,7 +270,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
                 if (index == -1)
                 {
                     throw new RuntimeException("Unable to find index for join TVE: " +
-                            tve.toString());
+                                               tve.toString());
                 }
             }
             tve.setColumnIndex(index);

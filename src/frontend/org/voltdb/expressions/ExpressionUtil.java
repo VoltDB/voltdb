@@ -118,9 +118,14 @@ public abstract class ExpressionUtil {
     }
 
     /**
-     * Similar to uncombine but for any type of the expressions.
+     * Convert one or more predicates, potentially in an arbitrarily nested conjunction tree
+     * into a flattened collection. Similar to uncombine but for arbitrary tree shapes and with no
+     * guarantee of the result collection type or of any ordering within the collection.
+     * In fact, it currently fills an ArrayDeque via a left=to-right breadth first traversal,
+     * but for no particular reason, so that's all subject to change.
      * @param expr
-     * @return
+     * @return a Collection containing expr or if expr is a conjunction, its top-level non-conjunction
+     * child expressions.
      */
     public static Collection<AbstractExpression> uncombineAny(AbstractExpression expr)
     {
@@ -404,40 +409,53 @@ public abstract class ExpressionUtil {
      * @return
      */
     public static boolean isNullRejectingExpression(AbstractExpression expr, String tableName) {
-        if (expr.getExpressionType() == ExpressionType.CONJUNCTION_AND) {
+        ExpressionType exprType = expr.getExpressionType();
+        if (exprType == ExpressionType.CONJUNCTION_AND) {
             assert(expr.m_left != null && expr.m_right != null);
             return isNullRejectingExpression(expr.m_left, tableName) || isNullRejectingExpression(expr.m_right, tableName);
-        } else if (expr.getExpressionType() == ExpressionType.CONJUNCTION_OR) {
+        } else if (exprType == ExpressionType.CONJUNCTION_OR) {
             assert(expr.m_left != null && expr.m_right != null);
             return isNullRejectingExpression(expr.m_left, tableName) && isNullRejectingExpression(expr.m_right, tableName);
-        } else if (expr.getExpressionType() == ExpressionType.OPERATOR_NOT) {
+        } else if (exprType == ExpressionType.OPERATOR_NOT) {
             assert(expr.m_left != null);
+            // "NOT ( P and Q )" is as null-rejecting as "NOT P or NOT Q"
+            // "NOT ( P or Q )" is as null-rejecting as "NOT P and NOT Q"
+            // Handling AND and OR expressions requires a "negated" flag to the recursion that tweaks
+            // (switches?) the handling of ANDs and ORs to enforce the above equivalences.
             if (expr.m_left.getExpressionType() == ExpressionType.OPERATOR_IS_NULL) {
-                return ExpressionUtil.containsMatchingTVE(expr, tableName);
+                return containsMatchingTVE(expr, tableName);
+            } else if (expr.m_left.getExpressionType() == ExpressionType.CONJUNCTION_AND ||
+                    expr.m_left.getExpressionType() == ExpressionType.CONJUNCTION_OR) {
+                assert(expr.m_left.m_left != null && expr.m_left.m_right != null);
+                AbstractExpression tempLeft = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr.m_left.m_left, null);
+                AbstractExpression tempRight = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr.m_left.m_right, null);
+                ExpressionType type = (expr.m_left.getExpressionType() == ExpressionType.CONJUNCTION_AND) ?
+                        ExpressionType.CONJUNCTION_OR : ExpressionType.CONJUNCTION_AND;
+                AbstractExpression tempExpr = new ComparisonExpression(type, tempLeft, tempRight);
+                return isNullRejectingExpression(tempExpr, tableName);
             } else {
                 return isNullRejectingExpression(expr.m_left, tableName);
             }
-        } else if (expr.getExpressionType() == ExpressionType.FUNCTION) {
-            FunctionExpression fe = (FunctionExpression) expr;
-            for (AbstractExpression arg : fe.m_args) {
-                if (ExpressionUtil.containsMatchingTVE(arg, tableName)) {
-                    return true;
-                }
-            }
-            return false;
-        } else if (expr.getExpressionType() == ExpressionType.OPERATOR_IS_NULL) {
-            // IS NOT NULL is NULL rejecting
+        } else if (exprType == ExpressionType.OPERATOR_IS_NULL) {
+            // IS NOT NULL is NULL rejecting -- IS NULL is not
             return false;
         } else {
             // @TODO ENG_3038 Is it safe to assume for the rest of the expressions that if
             // it contains a TVE with the matching table name then it is NULL rejection expression?
-            return ExpressionUtil.containsMatchingTVE(expr, tableName);
+            // Presently, yes, logical expressions are not expected to appear inside other
+            // generalized expressions, so since the handling of other kinds of expressions
+            // is pretty much "containsMatchingTVE", this fallback should be safe.
+            // The only planned developments that might contradict this restriction (AFAIK --paul)
+            // would be support for standard pseudo-functions that take logical condition arguments.
+            // These should probably be supported as special non-functions/operations for a number
+            // of reasons and may need special casing here.
+            return containsMatchingTVE(expr, tableName);
         }
     }
 
     private static boolean containsMatchingTVE(AbstractExpression expr, String tableName) {
         assert(expr != null);
-        List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(expr);
+        List<TupleValueExpression> tves = getTupleValueExpressions(expr);
         for (TupleValueExpression tve : tves) {
             if (tve.m_tableName == tableName) {
                 return true;

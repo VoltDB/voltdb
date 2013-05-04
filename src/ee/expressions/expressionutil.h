@@ -51,7 +51,6 @@
 #include "boost/shared_array.hpp"
 
 #include "common/common.h"
-#include "common/tabletuple.h"
 #include "expressions/abstractexpression.h"
 
 #include "json_spirit/json_spirit.h"
@@ -83,6 +82,7 @@ public:
 
     // Implemented in functionexpression.cpp because function expression handling is a system unto itself.
     static AbstractExpression * functionFactory(int functionId, const std::vector<AbstractExpression*>* arguments);
+
 };
 
 }

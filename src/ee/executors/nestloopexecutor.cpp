@@ -297,7 +297,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         if (join_type == JOIN_TYPE_LEFT && !match) {
             // Still needs to pass the filter
             if (wherePredicate == NULL || wherePredicate->eval(&outer_tuple, &null_tuple).isTrue()) {
-                joined.setNValues(outer_cols, m_null_tuple, 0, inner_cols);
+                joined.setNValues(outer_cols, null_tuple, 0, inner_cols);
                 output_table->insertTupleNonVirtual(joined);
             }
         }

@@ -451,7 +451,7 @@ public abstract class AbstractParsedStmt {
     /**
      * Build a combined WHERE expressions for the entire statement.
      */
-    public AbstractExpression  getCombinedFilterExpression() {
+    public AbstractExpression getCombinedFilterExpression() {
         return joinTree.getCombinedExpression();
     }
 
@@ -504,8 +504,8 @@ public abstract class AbstractParsedStmt {
            throw new PlanningErrorException("VoltDB does not support full outer joins");
        }
 
-       List<AbstractExpression> exprs = parseTableConditions(tableNode);
-       assert(exprs.size() == 2);
+       AbstractExpression joinExpr = parseJoinCondition(tableNode);
+       AbstractExpression whereExpr = parseWhereCondition(tableNode);
 
        tableList.add(table);
        // @TODO ENG_3038 This method of building a tree works for inner joins only
@@ -513,7 +513,8 @@ public abstract class AbstractParsedStmt {
        if (joinTree == null) {
            joinTree = new JoinTree();
        }
-       JoinNode joinNode = new JoinNode(table, joinType, exprs.get(0), exprs.get(1));
+
+       JoinNode joinNode = new JoinNode(table, joinType, joinExpr, whereExpr);
        if (joinTree.m_root == null) {
            // this is the first table
            joinTree.m_root = joinNode;
@@ -532,7 +533,6 @@ public abstract class AbstractParsedStmt {
     /**
      *
      * @param tablesNode
-     *
      */
     private void parseTables(VoltXMLElement tablesNode) {
         Set<Table> visited = new HashSet<Table>(tableList);
@@ -579,7 +579,7 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
-     * Collect value equivalence expressions across the entire SQL
+     * Collect value equivalence expressions across the entire SQL statement
      */
     void analyzeValueEquivalence() {
         if (joinTree == null || joinTree.m_root == null) {
@@ -667,7 +667,7 @@ public abstract class AbstractParsedStmt {
             }
             // Mark the join tree analyzed
             joinTree.m_wasAnalyzed = true;
-       }
+        }
         nextJoinTree.m_tableFilterList = joinTree.m_tableFilterList;
         nextJoinTree.m_joinSelectionList = joinTree.m_joinSelectionList;
     }
@@ -733,7 +733,7 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
-     * Split the input expression list info the three categories
+     * Split the input expression list into the three categories
      * 1. TVE expressions with outer tables only
      * 2. TVE expressions with inner tables only
      * 3. TVE expressions with inner and outer tables
@@ -790,7 +790,7 @@ public abstract class AbstractParsedStmt {
         }
     }
 
-   /**
+    /**
      *
      * @param expr
      * @param tables
@@ -943,35 +943,32 @@ public abstract class AbstractParsedStmt {
         }
     }
 
-    /** Parse a where clause. This behavior is common to all kinds of statements.
-     *  TODO: It's not clear why ParsedDeleteStmt has its own VERY SIMILAR code to do this in method parseCondition.
-     *  There's a minor difference in how "ANDs" are modeled -- are they multiple condition nodes or
-     *  single condition nodes with multiple children? That distinction may be due to an arbitrary difference
-     *  in the parser's handling of different statements, but even if it's justified, this method could easily
-     *  be extended to handle multiple multi-child conditionNodes.
+    /** Parse a where or join clause. This behavior is common to all kinds of statements.
      */
-   protected ArrayList<AbstractExpression> parseTableConditions(VoltXMLElement tableScan) {
-        AbstractExpression joinExpr = null;
-        AbstractExpression whereExpr = null;
+    private AbstractExpression parseTableCondition(VoltXMLElement tableScan, String joinOrWhere)
+    {
+        AbstractExpression condExpr = null;
         for (VoltXMLElement childNode : tableScan.children) {
-             if (childNode.name.equalsIgnoreCase("joincond") &&
-                    !childNode.children.isEmpty()) {
-                joinExpr = parseExpressionTree(childNode.children.get(0));
-            } else if (childNode.name.equalsIgnoreCase("wherecond") &&
-                    !childNode.children.isEmpty()) {
-                whereExpr = parseExpressionTree(childNode.children.get(0));
+            if ( ! childNode.name.equalsIgnoreCase(joinOrWhere)) {
+                continue;
             }
+            assert(childNode.children.size() == 1);
+            assert(condExpr == null);
+            condExpr = parseExpressionTree(childNode.children.get(0));
+            assert(condExpr != null);
+            ExpressionUtil.finalizeValueTypes(condExpr);
         }
-        if (joinExpr != null) {
-            ExpressionUtil.finalizeValueTypes(joinExpr);
-        }
-        if (whereExpr != null) {
-            ExpressionUtil.finalizeValueTypes(whereExpr);
-        }
-        ArrayList<AbstractExpression> joinWherePair = new ArrayList<AbstractExpression> ();
-        joinWherePair.add(joinExpr);
-        joinWherePair.add(whereExpr);
-        return joinWherePair;
+        return condExpr;
+    }
+
+    private AbstractExpression parseJoinCondition(VoltXMLElement tableScan)
+    {
+        return parseTableCondition(tableScan, "joincond");
+    }
+
+    private AbstractExpression parseWhereCondition(VoltXMLElement tableScan)
+    {
+        return parseTableCondition(tableScan, "wherecond");
     }
 
 }

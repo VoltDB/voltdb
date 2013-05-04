@@ -244,7 +244,7 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     if (node->getJoinType() == JOIN_TYPE_LEFT) {
         Table* inner_out_table = inline_node->getOutputTable();
         assert(inner_out_table);
-        m_nullTuple.init(inner_out_table->schema());
+        m_null_tuple.init(inner_out_table->schema());
     }
 
     index_values = TableTuple(index->getKeySchema());
@@ -360,10 +360,8 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     assert (outer_tuple.sizeInValues() == outer_table->columnCount());
     assert (inner_tuple.sizeInValues() == inner_table->columnCount());
     TableTuple &join_tuple = output_table->tempTuple();
-    TableTuple null_tuple = m_nullTuple;
-
-    Table* inner_out_table = inline_node->getOutputTable();
-    int num_of_inner_cols = inner_out_table->columnCount();
+    TableTuple null_tuple = m_null_tuple;
+    int num_of_inner_cols = (join_type == JOIN_TYPE_LEFT)? null_tuple.sizeInValues() : 0;
 
     VOLT_TRACE("<num_of_outer_cols>: %d\n", num_of_outer_cols);
     while (outer_iterator.next(outer_tuple)) {
@@ -564,7 +562,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
         //
         if (join_type == JOIN_TYPE_LEFT && !match ) {
             if (where_expression == NULL || where_expression->eval(&outer_tuple, &null_tuple).isTrue()) {
-                join_tuple.setNValues(num_of_outer_cols, m_nullTuple, 0, num_of_inner_cols);
+                join_tuple.setNValues(num_of_outer_cols, m_null_tuple, 0, num_of_inner_cols);
                 output_table->insertTupleNonVirtual(join_tuple);
             }
         }

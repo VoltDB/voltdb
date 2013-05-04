@@ -104,7 +104,7 @@ protected:
     JoinType join_type;
     std::vector<AbstractExpression*> m_outputExpressions;
     SortDirectionType m_sortDirection;
-    StandAloneTupleStorage m_nullTuple;
+    StandAloneTupleStorage m_null_tuple;
 
     //So valgrind doesn't report the data as lost.
     char *index_values_backing_store;

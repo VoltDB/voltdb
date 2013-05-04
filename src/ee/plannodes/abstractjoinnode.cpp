@@ -75,38 +75,14 @@ JoinType AbstractJoinPlanNode::getJoinType() const
     return m_joinType;
 }
 
-void AbstractJoinPlanNode::setJoinType(JoinType join_type)
-{
-    m_joinType = join_type;
-}
-
-void AbstractJoinPlanNode::setPreJoinPredicate(AbstractExpression* preJoinPredicate)
-{
-    assert(!m_preJoinPredicate);
-    m_preJoinPredicate = preJoinPredicate;
-}
-
 AbstractExpression* AbstractJoinPlanNode::getPreJoinPredicate() const
 {
     return m_preJoinPredicate;
 }
 
-
-void AbstractJoinPlanNode::setJoinPredicate(AbstractExpression* joinPredicate)
-{
-    assert(!m_joinPredicate);
-    m_joinPredicate = joinPredicate;
-}
-
 AbstractExpression* AbstractJoinPlanNode::getJoinPredicate() const
 {
     return m_joinPredicate;
-}
-
-void AbstractJoinPlanNode::setWherePredicate(AbstractExpression* wherePredicate)
-{
-    assert(!m_wherePredicate);
-    m_wherePredicate = wherePredicate;
 }
 
 AbstractExpression* AbstractJoinPlanNode::getWherePredicate() const

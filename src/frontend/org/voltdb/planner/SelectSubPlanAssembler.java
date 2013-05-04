@@ -116,14 +116,11 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 sb.append(parsedStmt.joinOrder).append("\" doesn't contain enough tables ");
                 throw new RuntimeException(sb.toString());
             }
-            if (isValidJoinOrder(tableNames)) {
-                m_parsedStmt.joinTree.m_joinOrder = tables;
-                m_joinOrders.add(m_parsedStmt.joinTree);
-            } else {
-                StringBuilder sb = new StringBuilder();
-                sb.append("The specified join order is invalid for the given query");
-                throw new RuntimeException(sb.toString());
+            if ( ! isValidJoinOrder(tableNames)) {
+                throw new RuntimeException("The specified join order is invalid for the given query");
             }
+            m_parsedStmt.joinTree.m_joinOrder = tables;
+            m_joinOrders.add(m_parsedStmt.joinTree);
         } else {
             queueAllJoinOrders();
         }
@@ -131,30 +128,34 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
     /**
      * Validate the specified join order against the join tree.
-     * In general, outer joins are not associative and commutative. Not all orders are valid
+     * In general, outer joins are not associative and commutative. Not all orders are valid.
      * @param tables list of tables to join
-     * @return true is the join order is valid
+     * @return true if the join order is valid
      */
-    private boolean isValidJoinOrder(List<String> tableNames){
-        if (m_parsedStmt.joinTree.m_hasOuterJoin == true) {
-            // In general, the outer joins are associative but changing the join order precedence
-            // includes moving ON clauses to preserve the initial SQL semantics. For example,
-            // T1 right join T2 on T1.C1 = T2.C1 left join T3 on T2.C2=T3.C2 can be rewritten as
-            // T1 right join (T2 left join T3 on T2.C2=T3.C2) on T1.C1 = T2.C1
-            // At the moment, such transformations are not supported. The specified joined order must
-            // match the SQL order
-            Table[] joinOrder = m_parsedStmt.joinTree.generateJoinOrder().toArray(new Table[0]);
-            assert(joinOrder.length == tableNames.size());
-            int i = 0;
-            for (Table table : joinOrder) {
-                if (!table.getTypeName().equalsIgnoreCase(tableNames.get(i))) {
-                    return false;
-                }
+    private boolean isValidJoinOrder(List<String> tableNames)
+    {
+        if ( ! m_parsedStmt.joinTree.m_hasOuterJoin) {
+            // The inner join is commutative. Any order is valid.
+            return true;
+        }
+
+        // In general, the outer joins are associative but changing the join order precedence
+        // includes moving ON clauses to preserve the initial SQL semantics. For example,
+        // T1 right join T2 on T1.C1 = T2.C1 left join T3 on T2.C2=T3.C2 can be rewritten as
+        // T1 right join (T2 left join T3 on T2.C2=T3.C2) on T1.C1 = T2.C1
+        // At the moment, such transformations are not supported. The specified joined order must
+        // match the SQL order
+        Table[] joinOrder = m_parsedStmt.joinTree.generateJoinOrder().toArray(new Table[0]);
+        assert(joinOrder.length == tableNames.size());
+        int i = 0;
+        for (Table table : joinOrder) {
+            if (!table.getTypeName().equalsIgnoreCase(tableNames.get(i))) {
+                return false;
             }
         }
-        // The inner join is commutative. Any order is valid.
+        // The outer join matched the specified join order.
         return true;
-   }
+    }
 
     /**
      * Compute every permutation of the list of involved tables and put them in a deque.
@@ -164,10 +165,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         assert(m_parsedStmt.multiTableSelectionList.size() == 0);
         assert(m_parsedStmt.noTableSelectionList.size() == 0);
 
-        if (m_parsedStmt.joinTree.m_hasOuterJoin == false) {
-            queueInnerSubJoinOrders();
-        } else {
+        if (m_parsedStmt.joinTree.m_hasOuterJoin) {
             queueOuterSubJoinOrders();
+        } else {
+            queueInnerSubJoinOrders();
         }
     }
 
@@ -278,25 +279,28 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         if (joinTree.m_root.m_rightNode != null && joinTree.m_root.m_rightNode.m_whereExpr != null) {
             exprs.add(joinTree.m_root.m_rightNode.m_whereExpr);
         }
-        simplifyOuterJoinRecurcively(joinTree.m_root, exprs);
+        simplifyOuterJoinRecursively(joinTree.m_root, exprs);
         joinTree.m_hasOuterJoin = joinTree.m_root.hasOuterJoin();
         return joinTree;
     }
 
-    private JoinNode simplifyOuterJoinRecurcively(JoinNode joinNode, List<AbstractExpression> exprs) {
+    private void simplifyOuterJoinRecursively(JoinNode joinNode, List<AbstractExpression> exprs) {
         assert (joinNode != null);
         if (joinNode.m_table != null) {
             // End of the recursion. Nothing to simplify
-            return joinNode;
+            return;
         }
-        assert(joinNode.m_leftNode != null && joinNode.m_rightNode != null);
-        assert(joinNode.m_leftNode.m_joinType == JoinType.INNER || joinNode.m_rightNode.m_joinType == JoinType.INNER);
+        assert(joinNode.m_leftNode != null);
+        assert(joinNode.m_rightNode != null);
+        JoinNode leftNode = joinNode.m_leftNode;
+        JoinNode rightNode = joinNode.m_rightNode;
+        assert(leftNode.m_joinType == JoinType.INNER || rightNode.m_joinType == JoinType.INNER);
         JoinNode innerNode = null;
-        if (joinNode.m_rightNode.m_joinType == JoinType.LEFT || joinNode.m_leftNode.m_joinType == JoinType.RIGHT) {
-            innerNode = joinNode.m_rightNode;
-        } else if (joinNode.m_rightNode.m_joinType == JoinType.RIGHT || joinNode.m_leftNode.m_joinType == JoinType.LEFT) {
-            innerNode = joinNode.m_leftNode;
-        } else {
+        if (rightNode.m_joinType == JoinType.LEFT || leftNode.m_joinType == JoinType.RIGHT) {
+            innerNode = rightNode;
+        } else if (rightNode.m_joinType == JoinType.RIGHT || leftNode.m_joinType == JoinType.LEFT) {
+            innerNode = leftNode;
+        } else if (!(rightNode.m_joinType == JoinType.INNER && leftNode.m_joinType == JoinType.INNER)) {
             // Full joins are not supported
             assert(false);
         }
@@ -305,8 +309,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 if (innerNode.m_table != null) {
                     if (ExpressionUtil.isNullRejectingExpression(expr, innerNode.m_table.getTypeName())) {
                         // We are done at this level
-                        joinNode.m_leftNode.m_joinType = JoinType.INNER;
-                        joinNode.m_rightNode.m_joinType = JoinType.INNER;
+                        leftNode.m_joinType = JoinType.INNER;
+                        rightNode.m_joinType = JoinType.INNER;
                         break;
                     }
                 } else {
@@ -317,8 +321,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                     for (Table table : tables) {
                         if (ExpressionUtil.isNullRejectingExpression(expr, table.getTypeName())) {
                             // We are done at this level
-                            joinNode.m_leftNode.m_joinType = JoinType.INNER;
-                            joinNode.m_rightNode.m_joinType = JoinType.INNER;
+                            leftNode.m_joinType = JoinType.INNER;
+                            rightNode.m_joinType = JoinType.INNER;
                             rejectNull = true;
                             break;
                         }
@@ -331,22 +335,20 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         }
 
         // Now add this node expression to the list and descend
-        if (joinNode.m_leftNode.m_joinExpr != null) {
-            exprs.add(joinNode.m_leftNode.m_joinExpr);
+        if (leftNode.m_joinExpr != null) {
+            exprs.add(leftNode.m_joinExpr);
         }
-        if (joinNode.m_leftNode.m_whereExpr != null) {
-            exprs.add(joinNode.m_leftNode.m_whereExpr);
+        if (leftNode.m_whereExpr != null) {
+            exprs.add(leftNode.m_whereExpr);
         }
-        if (joinNode.m_rightNode.m_joinExpr != null) {
-            exprs.add(joinNode.m_rightNode.m_joinExpr);
+        if (rightNode.m_joinExpr != null) {
+            exprs.add(rightNode.m_joinExpr);
         }
-        if (joinNode.m_rightNode.m_whereExpr != null) {
-            exprs.add(joinNode.m_rightNode.m_whereExpr);
+        if (rightNode.m_whereExpr != null) {
+            exprs.add(rightNode.m_whereExpr);
         }
-        simplifyOuterJoinRecurcively(joinNode.m_leftNode, exprs);
-        simplifyOuterJoinRecurcively(joinNode.m_rightNode, exprs);
-        return joinNode;
-
+        simplifyOuterJoinRecursively(joinNode.m_leftNode, exprs);
+        simplifyOuterJoinRecursively(joinNode.m_rightNode, exprs);
     }
 
     /**
@@ -683,7 +685,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         return retval;
     }
 
-    // @TODO ENG_3038 just for now. Can be merged with the above version fir inner joins
+    // @TODO ENG_3038 just for now. Can be merged with the above version for inner joins
     // if the order of inner/outer tables for NLJ can be reversed
     private AbstractPlanNode getSelectSubPlanForOuterAccessPathStep(JoinNode joinNode, AbstractPlanNode outerPlan, AbstractPlanNode innerPlan) {
         // Filter (post-join) expressions
@@ -715,8 +717,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             // get all the clauses that join the applicable two tables
             ArrayList<AbstractExpression> joinClauses = innerAccessPath.joinExprs;
             NestLoopPlanNode nljNode = new NestLoopPlanNode();
-            if ((joinClauses != null) && (joinClauses.size() > 0))
+            if ((joinClauses != null) && ! joinClauses.isEmpty()) {
                 nljNode.setJoinPredicate(ExpressionUtil.combine(joinClauses));
+            }
             nljNode.setJoinType(joinNode.m_rightNode.m_joinType);
 
             // combine the tails plan graph with the new head node
@@ -729,11 +732,11 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             retval = nljNode;
         }
 
-        if (joinNode.m_joinOuterList != null && !joinNode.m_joinOuterList.isEmpty()) {
+        if ((joinNode.m_joinOuterList != null) && ! joinNode.m_joinOuterList.isEmpty()) {
             retval.setPreJoinPredicate(ExpressionUtil.combine(joinNode.m_joinOuterList));
         }
 
-        if ((whereClauses != null) && (whereClauses.size() > 0)) {
+        if ((whereClauses != null) && ! whereClauses.isEmpty()) {
             retval.setWherePredicate(ExpressionUtil.combine(whereClauses));
         }
         return retval;
