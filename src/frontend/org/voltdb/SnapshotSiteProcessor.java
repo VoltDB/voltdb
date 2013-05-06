@@ -545,7 +545,8 @@ public class SnapshotSiteProcessor {
                                                              Collection<BBContainer> outputBuffers,
                                                              int[] serialized)
     {
-        final List<ListenableFuture<?>> writeFutures = new ArrayList<ListenableFuture<?>>();
+        final List<ListenableFuture<?>> writeFutures =
+            new ArrayList<ListenableFuture<?>>(outputBuffers.size());
 
         // The containers, the data targets, and the serialized byte counts should all line up
         Iterator<BBContainer> containerIter = outputBuffers.iterator();
