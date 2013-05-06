@@ -956,6 +956,7 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
         // Pass 1 - calculate size and allow for status code byte and count length integers.
         size_t outputSize = 1;
         for (size_t i = 0; i < bufferCount; i++) {
+            in1.readLong(); in1.readInt(); // skip address and offset, used for jni only
             outputSize += in1.readInt() + 4;
         }
 
@@ -976,6 +977,7 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
         ReferenceSerializeOutput out1(m_reusedResultBuffer, MAX_MSG_SZ);
         out1.writeInt(bufferCount);
         for (size_t i = 0; i < bufferCount; i++) {
+            in2.readLong(); in2.readInt(); // skip address and offset, used for jni only
             int length = in2.readInt();
             out1.writeLong((long)m_tupleBuffer);
             // Allow for the length int written later.

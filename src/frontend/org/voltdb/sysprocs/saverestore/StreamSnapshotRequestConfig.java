@@ -17,8 +17,10 @@
 
 package org.voltdb.sysprocs.saverestore;
 
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedMap;
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -26,14 +28,14 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
 
 public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
-    public final Map<Long, Long> streamPairs;
+    // src -> (dest1, dest2,...)
+    public final Map<Long, Collection<Long>> streamPairs;
     // partitions with the ranges each partition has
     public final Map<Integer, SortedMap<Long, Long>> partitionsToAdd;
 
@@ -43,7 +45,7 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
      * @param partitionsToAdd
      */
     public StreamSnapshotRequestConfig(List<Table> tables,
-                                       Map<Long, Long> streamPairs,
+                                       Map<Long, Collection<Long>> streamPairs,
                                        Map<Integer, Map<Long, Long>> partitionsToAdd)
     {
         super(tables);
@@ -115,10 +117,10 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
         return partitionBuilder.build();
     }
 
-    private static Map<Long, Long> parseStreamPairs(JSONObject jsData,
-                                                    Collection<Long> localHSIds)
+    private static Map<Long, Collection<Long>> parseStreamPairs(JSONObject jsData,
+                                                                Collection<Long> localHSIds)
     {
-        Map<Long, Long> streamPairs = new HashMap<Long, Long>();
+        ArrayListMultimap<Long, Long> streamPairs = ArrayListMultimap.create();
 
         if (jsData != null) {
             try {
@@ -129,10 +131,13 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
                     String key = it.next();
                     long sourceHSId = Long.valueOf(key);
                     // See whether this source HSID is a local site, if so, we need
-                    // the partition ID
+                    // the destination HSID
                     if (localHSIds.contains(sourceHSId)) {
-                        long destHSId = sp.getLong(key);
-                        streamPairs.put(sourceHSId, destHSId);
+                        JSONArray destJSONArray = sp.getJSONArray(key);
+                        for (int i = 0; i < destJSONArray.length(); i++) {
+                            long destHSId = destJSONArray.getLong(i);
+                            streamPairs.put(sourceHSId, destHSId);
+                        }
                     }
                 }
             } catch (JSONException e) {
@@ -140,7 +145,7 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
             }
         }
 
-        return streamPairs;
+        return streamPairs.asMap();
     }
 
     @Override
@@ -149,8 +154,12 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
         super.toJSONString(stringer);
 
         stringer.key("streamPairs").object();
-        for (Map.Entry<Long, Long> entry : streamPairs.entrySet()) {
-            stringer.key(Long.toString(entry.getKey())).value(Long.toString(entry.getValue()));
+        for (Map.Entry<Long, Collection<Long>> entry : streamPairs.entrySet()) {
+            stringer.key(Long.toString(entry.getKey())).array();
+            for (long destHSId : entry.getValue()) {
+                stringer.value(destHSId);
+            }
+            stringer.endArray();
         }
         stringer.endObject();
 
