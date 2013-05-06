@@ -28,8 +28,8 @@ import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.MemoryStats;
 import org.voltdb.NodeDRGateway;
+import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
-import org.voltdb.VoltDB;
 
 /**
  * Abstracts the top-level interface to create and configure an Iv2
@@ -42,7 +42,7 @@ public interface Initiator
                           CatalogContext catalogContext,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          VoltDB.START_ACTION startAction,
+                          StartAction startAction,
                           StatsAgent agent,
                           MemoryStats memStats,
                           CommandLog cl,

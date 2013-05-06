@@ -70,7 +70,6 @@ import org.voltcore.utils.COWMap;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
-import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
@@ -143,7 +142,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    private static final String m_defaultVersionString = "3.2.0.1";
+    private static final String m_defaultVersionString = "3.2.1";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
@@ -340,14 +339,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
             boolean isRejoin = false;
-            if (config.m_startAction == START_ACTION.REJOIN ||
-                    config.m_startAction == START_ACTION.LIVE_REJOIN) {
+            if (config.m_startAction.doesRejoin()) {
                 isRejoin = true;
             }
             m_rejoining = isRejoin;
             m_rejoinDataPending = isRejoin;
 
-            m_joining = config.m_startAction == START_ACTION.JOIN;
+            m_joining = config.m_startAction == StartAction.JOIN;
 
             // Set std-out/err to use the UTF-8 encoding and fail if UTF-8 isn't supported
             try {
@@ -488,9 +486,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
                     m_rejoinCoordinator = new Iv2RejoinCoordinator(m_messenger, hsidsToRejoin,
                             m_catalogContext.cluster.getVoltroot(),
-                            m_config.m_startAction == START_ACTION.LIVE_REJOIN);
+                            m_config.m_startAction == StartAction.LIVE_REJOIN);
                     m_messenger.registerMailbox(m_rejoinCoordinator);
-                    if (m_config.m_startAction == START_ACTION.LIVE_REJOIN) {
+                    if (m_config.m_startAction == StartAction.LIVE_REJOIN) {
                         hostLog.info("Using live rejoin.");
                     }
                     else {
@@ -738,10 +736,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     // Get topology information.  If rejoining, get it directly from
     // ZK.  Otherwise, try to do the write/read race to ZK on startup.
-    private JSONObject getTopology(START_ACTION startAction, Joiner joinCoordinator)
+    private JSONObject getTopology(StartAction startAction, Joiner joinCoordinator)
     {
         JSONObject topo = null;
-        if (startAction == START_ACTION.JOIN) {
+        if (startAction == StartAction.JOIN) {
             assert(joinCoordinator != null);
             topo = joinCoordinator.getTopology();
         }
@@ -769,7 +767,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     private List<Initiator> createIv2Initiators(Collection<Integer> partitions,
-                                                START_ACTION startAction,
+                                                StartAction startAction,
                                                 List<Pair<Integer, Long>> m_partitionsToSitesAtStartupForExportInit)
     {
         List<Initiator> initiators = new ArrayList<Initiator>();
@@ -1775,7 +1773,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
         }
 
-        if (m_config.m_startAction == START_ACTION.REJOIN) {
+        if (m_config.m_startAction == StartAction.REJOIN) {
             consoleLog.info(
                     "Node data recovery completed after " + delta + " seconds with " + megabytes +
                     " megabytes transferred at a rate of " +

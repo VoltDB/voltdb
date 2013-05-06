@@ -464,10 +464,17 @@ public class ParameterSet implements JSONString {
         int integers = 0;
         int strings = 0;
         int doubles = 0;
+        int nulls = 0;
 
         // handle empty arrays (too bad this is ints...)
         if (array.length == 0)
             return new int[0];
+
+        // A note on Object[] null handling.  For most object array types, nulls can be bassed in as 'null' and/or
+        // the VoltType Null equivalent.  Note that Object[] containing Strings supports null and VoltType nulls
+        // as array elements.  But any other Sigil type class (big decimal, timestamp, varbinary)
+        // DO NOT support nulls or VoltType nulls in Object[] arrays.  Also note that currently we do not
+        // support timestamp or varbinary in Object arrays.  Future work...
 
         // first pass counts value types
         for (int i = 0; i < array.length; i++) {
@@ -479,9 +486,11 @@ public class ParameterSet implements JSONString {
             else if (array[i] instanceof Integer) integers++;
             else if (array[i] instanceof Long) integers++;
             else if (array[i] instanceof String) strings++;
+            else if (array[i] == VoltType.NULL_STRING_OR_VARBINARY) nulls++;
+            else if (null == array[i]) nulls++;  // Handle nulls in an Object array.  Note only support nulls in STRING type, later we'll reject all other null usage.
             else {
                 String msg = String.format("Type %s not supported in parameter set arrays.",
-                        array[i].getClass().toString());
+                                        array[i].getClass().toString());
                 throw new RuntimeException(msg);
             }
         }
@@ -502,19 +511,33 @@ public class ParameterSet implements JSONString {
 
         // note: there can't be any tables past this point
 
+        // Verify that we don't have all null values.
+        if (nulls == array.length)
+            throw new RuntimeException("Unable to determine type. Parameter set array contains all NULL values.");
+
         if (strings > 0) {
             if ((integers + doubles) > 0) {
                 String msg = "Cannot mix strings and numbers in parameter set arrays.";
                 throw new RuntimeException(msg);
             }
-            assert(strings == array.length);
-            String[] retval = new String[strings];
+            assert((strings + nulls) == array.length);
+            String[] retval = new String[array.length];
             for (int i = 0; i < array.length; i++)
+            {
+                if (array[i] == VoltType.NULL_STRING_OR_VARBINARY) {
+                    array[i] = null;
+                }
                 retval[i] = (String) array[i];
+            }
             return retval;
         }
 
-        // note: there can't be any strings past this point
+        // note: there can't be any strings or nulls past this point
+
+        if (nulls > 0) {
+            String msg = "Cannot mix numerics and nulls in parameter set arrays.";
+            throw new RuntimeException(msg);
+        }
 
         if (doubles > 0) {
             // note, ok to mix integers and doubles

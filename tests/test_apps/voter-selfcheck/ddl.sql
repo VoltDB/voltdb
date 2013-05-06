@@ -73,8 +73,13 @@ AS
 PARTITION TABLE votes ON COLUMN phone_number;
 PARTITION TABLE rejected_votes_by_phone_number ON COLUMN phone_number;
 
-CREATE PROCEDURE FROM CLASS voter.procedures.Initialize;
-CREATE PROCEDURE FROM CLASS voter.procedures.Results;
-CREATE PROCEDURE FROM CLASS voter.procedures.Vote;
-CREATE PROCEDURE FROM CLASS voter.procedures.ContestantWinningStates;
-CREATE PROCEDURE FROM CLASS voter.procedures.GetStateHeatmap;
+CREATE ROLE dbuser WITH adhoc, defaultproc, export;
+CREATE ROLE adminuser WITH sysproc;
+CREATE ROLE hockey WITH adhoc;
+
+
+CREATE PROCEDURE ALLOW dbuser FROM CLASS voter.procedures.Initialize;
+CREATE PROCEDURE ALLOW dbuser FROM CLASS voter.procedures.Results;
+CREATE PROCEDURE ALLOW dbuser FROM CLASS voter.procedures.Vote;
+CREATE PROCEDURE ALLOW dbuser FROM CLASS voter.procedures.ContestantWinningStates;
+CREATE PROCEDURE ALLOW dbuser FROM CLASS voter.procedures.GetStateHeatmap;

@@ -62,6 +62,27 @@ function server() {
         license $LICENSE host $HOST
 }
 
+
+# run the voltdb server locally
+function secure-server() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create catalog $APPNAME.jar deployment deployment-secure.xml \
+        license $LICENSE host $HOST
+}
+
+function masked-server() {
+    $VOLTDB mask deployment-secure.xml deployment-masked.xml
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create catalog $APPNAME.jar deployment deployment-masked.xml \
+        license $LICENSE host $HOST
+}
+
+
+
 # run the client that drives the example
 function client() {
     async-benchmark
@@ -82,7 +103,20 @@ function async-benchmark() {
         --duration=120 \
         --servers=localhost \
         --contestants=6 \
-        --voter=905000000 \
+        --maxvotes=2 \
+        --ratelimit=100000 \
+        --autotune=false \
+        --latencytarget=10
+}
+
+function secure-benchmark() {
+    srccompile
+    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voter.AsyncBenchmark \
+        --displayinterval=5 \
+        --duration=120 \
+        --servers=localhost \
+        --contestants=6 \
         --maxvotes=2 \
         --ratelimit=100000 \
         --autotune=false \

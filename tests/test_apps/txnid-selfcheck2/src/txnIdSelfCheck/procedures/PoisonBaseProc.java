@@ -23,9 +23,11 @@
 
 package txnIdSelfCheck.procedures;
 
+import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
 public class PoisonBaseProc extends VoltProcedure {
+    final SQLStmt insert = new SQLStmt("insert into bigp values (?,?,?);");
 
     public static int SYSTEMDOTEXIT = 0;
     public static int NAVELGAZE = 1;
