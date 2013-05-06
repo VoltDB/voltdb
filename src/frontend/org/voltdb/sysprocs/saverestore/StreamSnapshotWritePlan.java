@@ -34,6 +34,7 @@ import java.util.Map;
 
 import java.util.Map.Entry;
 
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Longs;
@@ -63,7 +64,6 @@ import org.voltdb.SystemProcedureExecutionContext;
 
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.VoltTable;
-import org.voltdb.utils.MiscUtils;
 
 /**
  * Create a snapshot write plan for snapshots streamed to other sites
@@ -110,17 +110,16 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             schemas.put(table.getRelativeIndex(), schemaTable.getSchemaBytes());
         }
 
-        Map<Long, List<SnapshotDataTarget>> sdts = new HashMap<Long, List<SnapshotDataTarget>>();
+        ArrayListMultimap<Long, SnapshotDataTarget> sdts = ArrayListMultimap.create();
         if (config.streamPairs.size() > 0) {
             SNAP_LOG.debug("Sites to stream from: " +
                     CoreUtils.hsIdCollectionToString(config.streamPairs.keySet()));
-            for (Entry<Long, List<Long>> entry : config.streamPairs.entrySet()) {
+            for (Entry<Long, Collection<Long>> entry : config.streamPairs.entrySet()) {
                 long srcHSId = entry.getKey();
-                List<Long> destHSIds = entry.getValue();
+                Collection<Long> destHSIds = entry.getValue();
 
                 for (long destHSId : destHSIds) {
-                    MiscUtils.multimapPut(sdts, srcHSId,
-                                          new StreamSnapshotDataTarget(destHSId, schemas));
+                    sdts.put(srcHSId, new StreamSnapshotDataTarget(destHSId, schemas));
                 }
             }
         } else {
@@ -131,7 +130,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
 
         // For each table, create tasks where each task has a data target.
         for (final Table table : config.tables) {
-            createTasksForTable(table, sdts, config, numTables, snapshotRecord);
+            createTasksForTable(table, sdts.asMap(), config, numTables, snapshotRecord);
             result.addRow(context.getHostId(), hostname, table.getTypeName(), "SUCCESS", "");
         }
 
@@ -142,7 +141,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
      * For each site, generate a task for each target it has for this table.
      */
     private void createTasksForTable(Table table,
-                                     Map<Long, List<SnapshotDataTarget>> dataTargets,
+                                     Map<Long, Collection<SnapshotDataTarget>> dataTargets,
                                      StreamSnapshotRequestConfig config,
                                      AtomicInteger numTables,
                                      SnapshotRegistry.Snapshot snapshotRecord)
@@ -158,9 +157,9 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             }
         }
 
-        for (Entry<Long, List<SnapshotDataTarget>> siteTargets : dataTargets.entrySet()) {
+        for (Entry<Long, Collection<SnapshotDataTarget>> siteTargets : dataTargets.entrySet()) {
             long hsId = siteTargets.getKey();
-            List<SnapshotDataTarget> targets = siteTargets.getValue();
+            Collection<SnapshotDataTarget> targets = siteTargets.getValue();
 
             m_targets.addAll(targets);
 

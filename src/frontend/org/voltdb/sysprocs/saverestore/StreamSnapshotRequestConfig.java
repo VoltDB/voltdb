@@ -17,6 +17,7 @@
 
 package org.voltdb.sysprocs.saverestore;
 
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedMap;
 import org.json_voltpatches.JSONArray;
@@ -25,10 +26,8 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
-import org.voltdb.utils.MiscUtils;
 
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +35,7 @@ import java.util.SortedMap;
 
 public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
     // src -> (dest1, dest2,...)
-    public final Map<Long, List<Long>> streamPairs;
+    public final Map<Long, Collection<Long>> streamPairs;
     // partitions with the ranges each partition has
     public final Map<Integer, SortedMap<Long, Long>> partitionsToAdd;
 
@@ -46,7 +45,7 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
      * @param partitionsToAdd
      */
     public StreamSnapshotRequestConfig(List<Table> tables,
-                                       Map<Long, List<Long>> streamPairs,
+                                       Map<Long, Collection<Long>> streamPairs,
                                        Map<Integer, Map<Long, Long>> partitionsToAdd)
     {
         super(tables);
@@ -118,10 +117,10 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
         return partitionBuilder.build();
     }
 
-    private static Map<Long, List<Long>> parseStreamPairs(JSONObject jsData,
-                                                          Collection<Long> localHSIds)
+    private static Map<Long, Collection<Long>> parseStreamPairs(JSONObject jsData,
+                                                                Collection<Long> localHSIds)
     {
-        Map<Long, List<Long>> streamPairs = new HashMap<Long, List<Long>>();
+        ArrayListMultimap<Long, Long> streamPairs = ArrayListMultimap.create();
 
         if (jsData != null) {
             try {
@@ -137,7 +136,7 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
                         JSONArray destJSONArray = sp.getJSONArray(key);
                         for (int i = 0; i < destJSONArray.length(); i++) {
                             long destHSId = destJSONArray.getLong(i);
-                            MiscUtils.multimapPut(streamPairs, sourceHSId, destHSId);
+                            streamPairs.put(sourceHSId, destHSId);
                         }
                     }
                 }
@@ -146,7 +145,7 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
             }
         }
 
-        return streamPairs;
+        return streamPairs.asMap();
     }
 
     @Override
@@ -155,7 +154,7 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
         super.toJSONString(stringer);
 
         stringer.key("streamPairs").object();
-        for (Map.Entry<Long, List<Long>> entry : streamPairs.entrySet()) {
+        for (Map.Entry<Long, Collection<Long>> entry : streamPairs.entrySet()) {
             stringer.key(Long.toString(entry.getKey())).array();
             for (long destHSId : entry.getValue()) {
                 stringer.value(destHSId);

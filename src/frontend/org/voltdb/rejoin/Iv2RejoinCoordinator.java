@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.collect.ArrayListMultimap;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
@@ -42,7 +43,6 @@ import org.voltdb.VoltDB;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.sysprocs.saverestore.StreamSnapshotRequestConfig;
-import org.voltdb.utils.MiscUtils;
 
 /**
  * Thread Safety: this is a reentrant class. All mutable datastructures
@@ -59,28 +59,31 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     private final Object m_lock = new Object();
 
     // triggers specific test code for TestMidRejoinDeath
-    private static final boolean m_rejoinDeathTestMode = System.getProperties().containsKey("rejoindeathtestonrejoinside");
-    private static final boolean m_rejoinDeathTestCancel = System.getProperties().containsKey("rejoindeathtestcancel");
+    private static final boolean m_rejoinDeathTestMode   = System.getProperties()
+                                                                 .containsKey("rejoindeathtestonrejoinside");
+    private static final boolean m_rejoinDeathTestCancel = System.getProperties()
+                                                                 .containsKey("rejoindeathtestcancel");
 
     private static AtomicLong m_sitesRejoinedCount = new AtomicLong(0);
 
     // contains all sites that haven't started rejoin initialization
     private final Queue<Long> m_pendingSites;
     // contains all sites that are waiting to start a snapshot
-    private final Queue<Long> m_snapshotSites = new LinkedList<Long>();
+    private final Queue<Long>                   m_snapshotSites  = new LinkedList<Long>();
     // Mapping of source to destination HSIds for the current snapshot
-    private final Map<Long, List<Long>> m_destToSource = new HashMap<Long, List<Long>>();
+    private final ArrayListMultimap<Long, Long> m_destToSource   = ArrayListMultimap.create();
     // contains all sites that haven't finished replaying transactions
-    private final Queue<Long> m_rejoiningSites = new LinkedList<Long>();
+    private final Queue<Long>                   m_rejoiningSites = new LinkedList<Long>();
     // true if performing live rejoin
     private final boolean m_liveRejoin;
     // Need to remember the nonces we're using here (for now)
     private final Map<Long, String> m_nonces = new HashMap<Long, String>();
 
     public Iv2RejoinCoordinator(HostMessenger messenger,
-                                       Collection<Long> sites,
-                                       String voltroot,
-                                       boolean liveRejoin) {
+                                Collection<Long> sites,
+                                String voltroot,
+                                boolean liveRejoin)
+    {
         super(messenger);
         synchronized (m_lock) {
             m_liveRejoin = liveRejoin;
@@ -98,27 +101,29 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
      * Send rejoin initiation message to the local site
      * @param HSId
      */
-    private void initiateRejoinOnSites(long HSId) {
+    private void initiateRejoinOnSites(long HSId)
+    {
         List<Long> HSIds = new ArrayList<Long>();
         HSIds.add(HSId);
         initiateRejoinOnSites(HSIds);
     }
 
-    private void initiateRejoinOnSites(List<Long> HSIds) {
+    private void initiateRejoinOnSites(List<Long> HSIds)
+    {
         // We're going to share this snapshot across the provided HSIDs.
         // Steal just the first one to disabiguate it.
         String nonce = makeSnapshotNonce("Rejoin", HSIds.get(0));
         // Must not hold m_lock across the send() call to manage lock
         // acquisition ordering with other in-process mailboxes.
-        synchronized(m_lock) {
+        synchronized (m_lock) {
             for (long HSId : HSIds) {
                 m_nonces.put(HSId, nonce);
             }
         }
         RejoinMessage msg = new RejoinMessage(getHSId(),
-                m_liveRejoin ? RejoinMessage.Type.INITIATION :
-                               RejoinMessage.Type.INITIATION_COMMUNITY,
-                               nonce);
+                                              m_liveRejoin ? RejoinMessage.Type.INITIATION :
+                                              RejoinMessage.Type.INITIATION_COMMUNITY,
+                                              nonce);
         send(com.google.common.primitives.Longs.toArray(HSIds), msg);
 
         // For testing, exit if only one property is set...
@@ -128,7 +133,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         }
     }
 
-    private String makeSnapshotRequest(Map<Long, List<Long>> sourceToDests)
+    private String makeSnapshotRequest(Map<Long, Collection<Long>> sourceToDests)
     {
         StreamSnapshotRequestConfig config =
             new StreamSnapshotRequestConfig(null, sourceToDests, null);
@@ -221,11 +226,11 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         String data = null;
         synchronized(m_lock) {
             m_snapshotSites.remove(HSId);
-            MiscUtils.multimapPut(m_destToSource, masterHSId, dataSinkHSId);
+            m_destToSource.put(masterHSId, dataSinkHSId);
             m_rejoiningSites.add(HSId);
             nonce = m_nonces.get(HSId);
             if (m_snapshotSites.isEmpty()) {
-                data = makeSnapshotRequest(m_destToSource);
+                data = makeSnapshotRequest(m_destToSource.asMap());
                 m_destToSource.clear();
             }
         }

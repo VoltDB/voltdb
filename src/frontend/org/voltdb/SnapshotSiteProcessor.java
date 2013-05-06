@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -39,6 +38,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.util.concurrent.Futures;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
@@ -60,7 +60,6 @@ import org.voltdb.utils.CatalogUtil;
 import com.google.common.util.concurrent.Callables;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
-import org.voltdb.utils.MiscUtils;
 
 /**
  * Encapsulates the state needed to manage an ongoing snapshot at the
@@ -172,7 +171,7 @@ public class SnapshotSiteProcessor {
      * Once a table has finished serializing stuff, it's removed from the map.
      * Making it a TreeMap so that it works through one table at time, easier to debug.
      */
-    private TreeMap<Integer, List<SnapshotTableTask>> m_snapshotTableTasks = null;
+    private ArrayListMultimap<Integer, SnapshotTableTask> m_snapshotTableTasks = null;
 
     private long m_lastSnapshotTxnId;
     private int m_lastSnapshotNumHosts;
@@ -387,7 +386,7 @@ public class SnapshotSiteProcessor {
         m_lastSnapshotSucceded = true;
         m_lastSnapshotTxnId = txnId;
         m_lastSnapshotNumHosts = numHosts;
-        m_snapshotTableTasks = new TreeMap<Integer, List<SnapshotTableTask>>();
+        m_snapshotTableTasks = ArrayListMultimap.create();
         m_snapshotTargets = new ArrayList<SnapshotDataTarget>();
         m_snapshotTargetTerminators = new ArrayList<Thread>();
         m_exportSequenceNumbersToLogOnCompletion = exportSequenceNumbers;
@@ -437,7 +436,7 @@ public class SnapshotSiteProcessor {
             SNAP_LOG.debug("Examining SnapshotTableTask: " + task);
 
             // Add the task to the task list for the given table
-            MiscUtils.multimapPut(m_snapshotTableTasks, task.m_table.getRelativeIndex(), task);
+            m_snapshotTableTasks.put(task.m_table.getRelativeIndex(), task);
 
             // Make sure there is a predicate object for each table, the predicate could contain
             // empty expressions. So activateTableStream() doesn't have to do a null check.
@@ -483,7 +482,7 @@ public class SnapshotSiteProcessor {
      * Create an output buffer for each task.
      * @return null if not enough available buffers for all tasks
      */
-    private List<BBContainer> createOutputBuffers(List<SnapshotTableTask> tableTasks)
+    private List<BBContainer> createOutputBuffers(Collection<SnapshotTableTask> tableTasks)
     {
         if (m_availableSnapshotBuffers.size() < tableTasks.size()) {
             return null;
@@ -506,7 +505,7 @@ public class SnapshotSiteProcessor {
         return outputBuffers;
     }
 
-    private void asyncTerminateReplicatedTableTasks(List<SnapshotTableTask> tableTasks)
+    private void asyncTerminateReplicatedTableTasks(Collection<SnapshotTableTask> tableTasks)
     {
         for (final SnapshotTableTask tableTask : tableTasks) {
             /**
@@ -619,12 +618,12 @@ public class SnapshotSiteProcessor {
          * successfully serialized, break out of the loop and release the site thread for more
          * transaction work.
          */
-        Iterator<Map.Entry<Integer, List<SnapshotTableTask>>> taskIter =
-            m_snapshotTableTasks.entrySet().iterator();
+        Iterator<Map.Entry<Integer, Collection<SnapshotTableTask>>> taskIter =
+            m_snapshotTableTasks.asMap().entrySet().iterator();
         while (taskIter.hasNext()) {
-            Map.Entry<Integer, List<SnapshotTableTask>> taskEntry = taskIter.next();
+            Map.Entry<Integer, Collection<SnapshotTableTask>> taskEntry = taskIter.next();
             final int tableId = taskEntry.getKey();
-            final List<SnapshotTableTask> tableTasks = taskEntry.getValue();
+            final Collection<SnapshotTableTask> tableTasks = taskEntry.getValue();
 
             final List<BBContainer> outputBuffers = createOutputBuffers(tableTasks);
             if (outputBuffers == null) {
