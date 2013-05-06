@@ -124,13 +124,11 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
 
                 final SnapshotTableTask task =
                     new SnapshotTableTask(
-                            table.getRelativeIndex(),
+                            table,
                             sdt,
                             new SnapshotDataFilter[0],
                             null,
-                            false,
-                            table.getIsreplicated(),
-                            table.getTypeName());
+                            false);
 
                 SNAP_LOG.debug("ADDING TASK: " + task);
 

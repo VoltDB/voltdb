@@ -146,13 +146,11 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
 
                 final SnapshotTableTask task =
                     new SnapshotTableTask(
-                            table.getRelativeIndex(),
+                            table,
                             sdt,
                             filters.toArray(new SnapshotDataFilter[filters.size()]),
                             null,
-                            false,
-                            table.getIsreplicated(),
-                            table.getTypeName());
+                            false);
 
                 if (table.getIsreplicated()) {
                     replicatedSnapshotTasks.add(task);

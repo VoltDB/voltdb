@@ -25,12 +25,16 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collection;
 import java.util.Date;
 import java.util.GregorianCalendar;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.google.common.collect.ArrayListMultimap;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
@@ -633,5 +637,33 @@ public class MiscUtils {
             System.exit(-1);
             return 0;
         }
+    }
+
+    /**
+     * Zip the two lists up into a multimap
+     * @return null if one of the lists is empty
+     */
+    public static <K, V> Map<K, Collection<V>> zipToMap(List<K> keys, List<V> values)
+    {
+        if (keys.isEmpty() || values.isEmpty()) {
+            return null;
+        }
+
+        Iterator<K> keyIter = keys.iterator();
+        Iterator<V> valueIter = values.iterator();
+        ArrayListMultimap<K, V> result = ArrayListMultimap.create();
+
+        while (keyIter.hasNext() && valueIter.hasNext()) {
+            result.put(keyIter.next(), valueIter.next());
+        }
+
+        // In case there are more values than keys, assign the rest of the
+        // values to the first key
+        K firstKey = keys.get(0);
+        while (valueIter.hasNext()) {
+            result.put(firstKey, valueIter.next());
+        }
+
+        return result.asMap();
     }
 }

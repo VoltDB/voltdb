@@ -23,8 +23,10 @@
 
 package org.voltdb.jni;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import junit.framework.TestCase;
@@ -187,26 +189,36 @@ public class TestExecutionEngine extends TestCase {
                 public void discard() {
                 }};
 
-            int serialized = sourceEngine.tableStreamSerializeMore( container, WAREHOUSE_TABLEID, TableStreamType.RECOVERY);
+            List<BBContainer> output = new ArrayList<BBContainer>();
+            output.add(container);
+            int serialized = sourceEngine.tableStreamSerializeMore(WAREHOUSE_TABLEID,
+                                                                   TableStreamType.RECOVERY,
+                                                                   output)[0];
             assertTrue(serialized > 0);
             container.b.limit(serialized);
             destinationEngine.get().processRecoveryMessage( container.b, container.address);
 
 
-            serialized = sourceEngine.tableStreamSerializeMore( container, WAREHOUSE_TABLEID, TableStreamType.RECOVERY);
+            serialized = sourceEngine.tableStreamSerializeMore(WAREHOUSE_TABLEID,
+                                                               TableStreamType.RECOVERY,
+                                                               output)[0];
             assertEquals( 5, serialized);
             assertEquals( RecoveryMessageType.Complete.ordinal(), container.b.get());
 
             assertEquals( sourceEngine.tableHashCode(WAREHOUSE_TABLEID), destinationEngine.get().tableHashCode(WAREHOUSE_TABLEID));
 
             container.b.clear();
-            serialized = sourceEngine.tableStreamSerializeMore( container, STOCK_TABLEID, TableStreamType.RECOVERY);
+            serialized = sourceEngine.tableStreamSerializeMore(STOCK_TABLEID,
+                                                               TableStreamType.RECOVERY,
+                                                               output)[0];
             assertTrue(serialized > 0);
             container.b.limit(serialized);
             destinationEngine.get().processRecoveryMessage( container.b, container.address);
 
 
-            serialized = sourceEngine.tableStreamSerializeMore( container, STOCK_TABLEID, TableStreamType.RECOVERY);
+            serialized = sourceEngine.tableStreamSerializeMore(STOCK_TABLEID,
+                                                               TableStreamType.RECOVERY,
+                                                               output)[0];
             assertEquals( 5, serialized);
             assertEquals( RecoveryMessageType.Complete.ordinal(), container.b.get());
             assertEquals( STOCK_TABLEID, container.b.getInt());
