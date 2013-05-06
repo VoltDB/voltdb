@@ -46,6 +46,7 @@ import org.voltdb.MemoryStats;
 import org.voltdb.ParameterSet;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProcedureRunner;
+import org.voltdb.StartAction;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
 import org.voltdb.SnapshotDataTarget;
@@ -326,7 +327,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             long txnId,
             int partitionId,
             int numPartitions,
-            VoltDB.START_ACTION startAction,
+            StartAction startAction,
             int snapshotPriority,
             InitiatorMailbox initiatorMailbox,
             StatsAgent agent,
@@ -341,7 +342,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_numberOfPartitions = numPartitions;
         m_scheduler = scheduler;
         m_backend = backend;
-        m_rejoinState = VoltDB.createForRejoin(startAction) || startAction == VoltDB.START_ACTION
+        m_rejoinState = VoltDB.createForRejoin(startAction) || startAction == StartAction
                 .JOIN ? kStateRejoining :
                 kStateRunning;
         m_snapshotPriority = snapshotPriority;

@@ -23,8 +23,6 @@
 
 package org.voltdb;
 
-import java.io.FileOutputStream;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -33,6 +31,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -70,7 +69,6 @@ import org.voltcore.utils.InstanceId;
 import org.voltcore.zk.ZKTestBase;
 import org.voltdb.RestoreAgent.SnapshotInfo;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
-import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Catalog;
@@ -98,15 +96,15 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
     @Parameters
     public static Collection<Object[]> startActions() {
-        return Arrays.asList(new Object[][] {{START_ACTION.CREATE},
-                                             {START_ACTION.RECOVER}});
+        return Arrays.asList(new Object[][] {{StartAction.CREATE},
+                                             {StartAction.RECOVER}});
     }
 
     /**
      * The start action to use for some of the tests
      */
-    protected final START_ACTION action;
-    public TestRestoreAgent(START_ACTION action) {
+    protected final StartAction action;
+    public TestRestoreAgent(StartAction action) {
         this.action = action;
     }
 
@@ -626,7 +624,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     @Test
     public void testMultipleHostAgreementFailure() throws Exception {
         // Don't run this test if we are in recovery mode
-        if (action == START_ACTION.RECOVER) {
+        if (action.doesRecover()) {
             return;
         }
 
@@ -716,7 +714,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             } catch (InterruptedException e) {}
         }
 
-        if (action != START_ACTION.CREATE) {
+        if (action != StartAction.CREATE) {
             Long count = initiator.getProcCounts().get("@SnapshotRestore");
             assertEquals(new Long(1), count);
             assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
@@ -753,7 +751,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             } catch (InterruptedException e) {}
         }
 
-        if (action != START_ACTION.CREATE) {
+        if (action != StartAction.CREATE) {
             Long count = initiator.getProcCounts().get("@SnapshotRestore");
             assertEquals(new Long(1), count);
             assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
@@ -790,7 +788,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             } catch (InterruptedException e) {}
         }
 
-        if (action != START_ACTION.CREATE) {
+        if (action != StartAction.CREATE) {
             Long count = initiator.getProcCounts().get("@SnapshotRestore");
             assertEquals(new Long(1), count);
             assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
@@ -835,7 +833,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             } catch (InterruptedException e) {}
         }
 
-        if (action != START_ACTION.CREATE) {
+        if (action != StartAction.CREATE) {
             Long count = initiator.getProcCounts().get("@SnapshotRestore");
             assertEquals(new Long(1), count);
             assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
@@ -941,7 +939,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             } catch (InterruptedException e) {}
         }
 
-        if (action != START_ACTION.CREATE) {
+        if (action != StartAction.CREATE) {
             Long count = initiator.getProcCounts().get("@SnapshotRestore");
             assertEquals(new Long(1), count);
             assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
@@ -984,7 +982,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             } catch (InterruptedException e) {}
         }
 
-        if (action != START_ACTION.CREATE) {
+        if (action != StartAction.CREATE) {
             Long count = initiator.getProcCounts().get("@SnapshotRestore");
             assertEquals(new Long(1), count);
             assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
@@ -1027,7 +1025,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             } catch (InterruptedException e) {}
         }
 
-        if (action != START_ACTION.CREATE) {
+        if (action != StartAction.CREATE) {
             Long count = initiator.getProcCounts().get("@SnapshotRestore");
             assertEquals(new Long(1), count);
             assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
