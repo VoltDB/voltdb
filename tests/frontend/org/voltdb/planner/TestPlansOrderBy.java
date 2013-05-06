@@ -50,6 +50,7 @@ public class TestPlansOrderBy extends PlannerTestCase {
 
     public void testOrderByOne() {
         validatePlan("SELECT * from T ORDER BY T_PKEY", true, false, false, false);
+        validatePlan("SELECT * from T WHERE T_PKEY = 1 ORDER BY T_D1", true, false, false, false);
     }
 
     public void testOrderByTwo() {
@@ -73,6 +74,12 @@ public class TestPlansOrderBy extends PlannerTestCase {
     public void testNoOrderBy() {
         validatePlan("SELECT * FROM T ORDER BY T_D2", true, false, true, false);
         validatePlan("SELECT * FROM Tnokey ORDER BY T_D2", false, true, true, false);
+    }
+
+    public void testOrderByNLIJ() {
+        validatePlan("SELECT Tnokey.T_D1, T.T_PKEY, T.T_D1 from Tnokey, T " +
+                     "where Tnokey.T_D2 = 2 AND T.T_PKEY = Tnokey.T_PKEY " +
+                     "ORDER BY T.T_PKEY, T.T_D1", true, true, true, false);
     }
 
     //TODO: This test actually validates that we generate a sub-optimal plan for this query
