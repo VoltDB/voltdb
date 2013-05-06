@@ -23,8 +23,10 @@
 
 package org.voltdb.jni;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import junit.framework.TestCase;
@@ -49,7 +51,6 @@ import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.exceptions.EEException;
-import org.voltdb.sysprocs.saverestore.SnapshotOutputBuffers;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 
 /**
@@ -188,8 +189,8 @@ public class TestExecutionEngine extends TestCase {
                 public void discard() {
                 }};
 
-            SnapshotOutputBuffers output = new SnapshotOutputBuffers();
-            output.addContainer(container);
+            List<BBContainer> output = new ArrayList<BBContainer>();
+            output.add(container);
             int serialized = sourceEngine.tableStreamSerializeMore(WAREHOUSE_TABLEID,
                                                                    TableStreamType.RECOVERY,
                                                                    output)[0];

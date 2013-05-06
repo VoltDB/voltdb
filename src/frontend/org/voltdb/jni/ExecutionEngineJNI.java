@@ -20,6 +20,7 @@ package org.voltdb.jni;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
+import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -36,8 +37,8 @@ import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FastSerializer.BufferGrowCallback;
-import org.voltdb.sysprocs.saverestore.SnapshotOutputBuffers;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 /**
  * Wrapper for native Execution Engine library.
@@ -442,11 +443,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     public int[] tableStreamSerializeMore(int tableId,
                                           TableStreamType streamType,
-                                          SnapshotOutputBuffers outputBuffers) {
+                                          List<BBContainer> outputBuffers) {
         long remaining = nativeTableStreamSerializeMore(pointer,
                                                         tableId,
                                                         streamType.ordinal(),
-                                                        outputBuffers.toBytes());
+                                                        SnapshotUtil.OutputBuffersToBytes(outputBuffers));
         int[] positions = null;
         // -1 is end of stream.
         if (remaining == -1) {

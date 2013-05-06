@@ -20,9 +20,10 @@ package org.voltdb.jni;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
-import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool;
 import org.voltdb.FragmentPlanSource;
 import org.voltdb.ParameterSet;
 import org.voltdb.SysProcSelector;
@@ -33,7 +34,6 @@ import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.export.ExportProtoMessage;
-import org.voltdb.sysprocs.saverestore.SnapshotOutputBuffers;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 
 public class MockExecutionEngine extends ExecutionEngine {
@@ -188,7 +188,8 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public int[] tableStreamSerializeMore(int tableId, TableStreamType type, SnapshotOutputBuffers outputBuffers) {
+    public int[] tableStreamSerializeMore(int tableId, TableStreamType type,
+                                          List<DBBPool.BBContainer> outputBuffers) {
         return new int[] {0};
     }
 

@@ -20,6 +20,7 @@ package org.voltdb.jni;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +28,7 @@ import java.util.Map.Entry;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.DBBPool;
 import org.voltdb.ExecutionSite;
 import org.voltdb.FragmentPlanSource;
 import org.voltdb.PlannerStatsCollector;
@@ -40,7 +42,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.sysprocs.saverestore.SnapshotOutputBuffers;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTableUtil;
@@ -323,7 +324,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      *        -1 is returned if there is an error (such as the table not having the specified stream type activated).
      */
     public abstract int[] tableStreamSerializeMore(int tableId, TableStreamType type,
-                                                   SnapshotOutputBuffers outputBuffers);
+                                                   List<DBBPool.BBContainer> outputBuffers);
 
     public abstract void processRecoveryMessage( ByteBuffer buffer, long pointer);
 

@@ -45,8 +45,8 @@ import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 
 import com.google.common.base.Charsets;
-import org.voltdb.sysprocs.saverestore.SnapshotOutputBuffers;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 /* Serializes data over a connection that presumably is being read
  * by a voltdb execution engine. The serialization is currently a
@@ -1091,13 +1091,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public int[] tableStreamSerializeMore(int tableId, TableStreamType streamType,
-                                          SnapshotOutputBuffers outputBuffers) {
+                                          List<BBContainer> outputBuffers) {
         try {
             m_data.clear();
             m_data.putInt(Commands.TableStreamSerializeMore.m_id);
             m_data.putInt(tableId);
             m_data.putInt(streamType.ordinal());
-            m_data.put(outputBuffers.toBytes());
+            m_data.put(SnapshotUtil.OutputBuffersToBytes(outputBuffers));
 
             m_data.flip();
             m_connection.write();
@@ -1114,7 +1114,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
             countBuffer.flip();
             final int count = countBuffer.getInt();
-            assert count == outputBuffers.getContainers().size();
+            assert count == outputBuffers.size();
 
             // Get the remaining tuple count.
             ByteBuffer remainingBuffer = ByteBuffer.allocate(8);
@@ -1134,7 +1134,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 return new int[] {(int) remaining};
             }
 
-            List<BBContainer> snapshotBuffers = outputBuffers.getContainers();
             final int[] serialized = new int[count];
             for (int i = 0; i < count; i++) {
                 ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
@@ -1147,7 +1146,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 lengthBuffer.flip();
                 serialized[i] = lengthBuffer.getInt();
 
-                ByteBuffer view = snapshotBuffers.get(i).b.duplicate();
+                ByteBuffer view = outputBuffers.get(i).b.duplicate();
                 view.limit(view.position() + serialized[i]);
                 while (view.hasRemaining()) {
                     m_connection.m_socketChannel.read(view);

@@ -32,6 +32,7 @@ import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -54,6 +55,7 @@ import org.voltcore.network.Connection;
 import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.InstanceId;
@@ -1196,5 +1198,20 @@ public class SnapshotUtil {
         SimpleDateFormat sdf = new SimpleDateFormat(VoltDB.ODBC_DATE_FORMAT_STRING + "z");
         sdf.setTimeZone(VoltDB.VOLT_TIMEZONE);
         return sdf.format(new Date(timestamp));
+    }
+
+    public static byte[] OutputBuffersToBytes(Collection<BBContainer> outputContainers)
+    {
+        ByteBuffer buf = ByteBuffer.allocate(4 + // buffer count
+                                             (8 + 4 + 4) * outputContainers.size()); // buffer info
+
+        buf.putInt(outputContainers.size());
+        for (DBBPool.BBContainer container : outputContainers) {
+            buf.putLong(container.address);
+            buf.putInt(container.b.position());
+            buf.putInt(container.b.remaining());
+        }
+
+        return buf.array();
     }
 }

@@ -54,7 +54,6 @@ import org.voltdb.catalog.Table;
 import org.voltdb.iv2.SiteTaskerQueue;
 import org.voltdb.iv2.SnapshotTask;
 import org.voltdb.jni.ExecutionEngine;
-import org.voltdb.sysprocs.saverestore.SnapshotOutputBuffers;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.utils.CatalogUtil;
 
@@ -484,13 +483,13 @@ public class SnapshotSiteProcessor {
      * Create an output buffer for each task.
      * @return null if not enough available buffers for all tasks
      */
-    private SnapshotOutputBuffers createOutputBuffers(List<SnapshotTableTask> tableTasks)
+    private List<BBContainer> createOutputBuffers(List<SnapshotTableTask> tableTasks)
     {
         if (m_availableSnapshotBuffers.size() < tableTasks.size()) {
             return null;
         }
 
-        SnapshotOutputBuffers outputBuffers = new SnapshotOutputBuffers();
+        List<BBContainer> outputBuffers = new ArrayList<BBContainer>(tableTasks.size());
 
         for (SnapshotTableTask tableTask : tableTasks) {
             assert(tableTask != null);
@@ -501,7 +500,7 @@ public class SnapshotSiteProcessor {
             snapshotBuffer.b.clear();
             snapshotBuffer.b.position(headerSize);
 
-            outputBuffers.addContainer(snapshotBuffer);
+            outputBuffers.add(snapshotBuffer);
         }
 
         return outputBuffers;
@@ -543,13 +542,13 @@ public class SnapshotSiteProcessor {
      * @return A future that can used to wait for all targets to finish writing the buffers
      */
     private ListenableFuture<?> writeSnapshotBlocksToTargets(int tableId,
-                                                             SnapshotOutputBuffers outputBuffers,
+                                                             Collection<BBContainer> outputBuffers,
                                                              int[] serialized)
     {
         final List<ListenableFuture<?>> writeFutures = new ArrayList<ListenableFuture<?>>();
 
         // The containers, the data targets, and the serialized byte counts should all line up
-        Iterator<BBContainer> containerIter = outputBuffers.getContainers().iterator();
+        Iterator<BBContainer> containerIter = outputBuffers.iterator();
         Iterator<SnapshotTableTask> taskIter = m_snapshotTableTasks.get(tableId).iterator();
         int serializedIndex = 0;
 
@@ -626,7 +625,7 @@ public class SnapshotSiteProcessor {
             final int tableId = taskEntry.getKey();
             final List<SnapshotTableTask> tableTasks = taskEntry.getValue();
 
-            final SnapshotOutputBuffers outputBuffers = createOutputBuffers(tableTasks);
+            final List<BBContainer> outputBuffers = createOutputBuffers(tableTasks);
             if (outputBuffers == null) {
                 // Not enough buffers available
                 break;
@@ -652,7 +651,7 @@ public class SnapshotSiteProcessor {
                                ": " + tableTasks);
 
                 // Return all allocated snapshot output buffers
-                for (BBContainer container : outputBuffers.getContainers()) {
+                for (BBContainer container : outputBuffers) {
                     m_availableSnapshotBuffers.offer(container);
                 }
             } else {
