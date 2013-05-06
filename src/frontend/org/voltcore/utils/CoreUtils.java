@@ -258,34 +258,6 @@ public class CoreUtils {
     }
 
     /**
-     * Wraps a collection of listenable futures into one future.
-     * @param futures
-     * @return A single listenable future that waits until all underlying futures are finished.
-     * If any of them throws an exception, the returned future will forward the exception. The
-     * result of the returned future is a list of objects returned by the underlying futures.
-     */
-    public static ListenableFuture<?> wrapListenableFutures(final Collection<ListenableFuture<?>>
-                                                                futures)
-    {
-        // Wraps all listenable futures into one future
-        return MoreExecutors.sameThreadExecutor().submit(new Callable<List<Object>>() {
-            @Override
-            public List<Object> call() throws Exception
-            {
-                List<Object> results = new ArrayList<Object>();
-
-                for (ListenableFuture<?> future : futures) {
-                    if (future != null) {
-                        results.add(future.get());
-                    }
-                }
-
-                return results;
-            }
-        });
-    }
-
-    /**
      * Return the local hostname, if it's resolvable.  If not,
      * return the IPv4 address on the first interface we find, if it exists.
      * If not, returns whatever address exists on the first interface.

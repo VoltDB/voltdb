@@ -39,6 +39,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google.common.util.concurrent.Futures;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -46,7 +47,6 @@ import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Database;
@@ -597,7 +597,7 @@ public class SnapshotSiteProcessor {
         assert !containerIter.hasNext() && !taskIter.hasNext() && serializedIndex == serialized.length;
 
         // Wraps all write futures in one future
-        return CoreUtils.wrapListenableFutures(writeFutures);
+        return Futures.allAsList(writeFutures);
     }
 
     public Future<?> doSnapshotWork(SystemProcedureExecutionContext context,
