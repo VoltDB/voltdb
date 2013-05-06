@@ -626,7 +626,6 @@ public class TestPlansJoin extends TestCase {
         n = pn.getChild(0).getChild(0);
         assertTrue(n instanceof NestLoopIndexPlanNode);
         assertTrue(((NestLoopIndexPlanNode) n).getJoinType() == JoinType.LEFT);
-        assertTrue(((NestLoopIndexPlanNode) n).getJoinType() == JoinType.LEFT);
         assertTrue(((NestLoopIndexPlanNode) n).getPreJoinPredicate() == null);
         assertTrue(((NestLoopIndexPlanNode) n).getJoinPredicate() == null);
         assertTrue(((NestLoopIndexPlanNode) n).getWherePredicate() != null);
@@ -640,6 +639,16 @@ public class TestPlansJoin extends TestCase {
         seqScan = (SeqScanPlanNode) n.getChild(0);
         assertTrue(seqScan instanceof SeqScanPlanNode);
         assertTrue(((SeqScanPlanNode)seqScan).getPredicate().getExpressionType().equals(ExpressionType.COMPARE_GREATERTHAN));
+
+        pn = compile("select * FROM R3 LEFT JOIN R2 ON R3.A = R2.A WHERE R3.A > 3", 0, false, null);
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        NestLoopPlanNode nl = (NestLoopPlanNode) n;
+        assertTrue(nl.getJoinType() == JoinType.LEFT);
+        AbstractPlanNode outerScan = n.getChild(0);
+        assertTrue(outerScan instanceof IndexScanPlanNode);
+        indexScan = (IndexScanPlanNode) outerScan;
+        assertTrue(indexScan.getLookupType().equals(IndexLookupType.GT));
 
     }
 

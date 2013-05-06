@@ -788,4 +788,174 @@ public class TestExpressionUtil extends TestCase {
         result = notTheArgs.bindingToIndexedExpression(exprE);
         assertNull(result);
     }
+
+    // Test various expressions for NULL-rejection.
+    public void testIsNullRejectingExpression() throws Exception
+    {
+        {
+            // Test "IS NULL (T.C)" not NULL-rejecting
+            TupleValueExpression tve = new TupleValueExpression();
+            tve.setTableName("T");
+            tve.setColumnName("C");
+            OperatorExpression expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, tve, null);
+            assertTrue(!ExpressionUtil.isNullRejectingExpression(expr, "T"));
+        }
+
+        {
+            // Test "IS NOT NULL (T.C)" is NULL-rejecting
+            TupleValueExpression tve = new TupleValueExpression();
+            tve.setTableName("T");
+            tve.setColumnName("C");
+            OperatorExpression subexpr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, tve, null);
+            OperatorExpression expr = new OperatorExpression(ExpressionType.OPERATOR_NOT, subexpr, null);
+            assertTrue(ExpressionUtil.isNullRejectingExpression(expr, "T"));
+            // Wrong table
+            assertTrue(!ExpressionUtil.isNullRejectingExpression(expr, "TT"));
+        }
+
+        {
+            // Test "T1.C > T2.C" is NULL-rejecting
+            TupleValueExpression tve1 = new TupleValueExpression();
+            tve1.setTableName("T1");
+            tve1.setColumnName("C");
+            TupleValueExpression tve2 = new TupleValueExpression();
+            tve2.setTableName("T2");
+            tve2.setColumnName("C");
+            OperatorExpression expr = new OperatorExpression(ExpressionType.COMPARE_GREATERTHAN, tve1, tve2);
+            assertTrue(ExpressionUtil.isNullRejectingExpression(expr, "T1"));
+            // Wrong table
+            assertTrue(!ExpressionUtil.isNullRejectingExpression(expr, "T"));
+        }
+
+        {
+            // Test AND expressions
+            // Test "T1.C > T2.C AND T2.B IS NULL " is NULL-rejecting
+            TupleValueExpression tve1 = new TupleValueExpression();
+            tve1.setTableName("T1");
+            tve1.setColumnName("C");
+            TupleValueExpression tve2 = new TupleValueExpression();
+            tve2.setTableName("T2");
+            tve2.setColumnName("C");
+            OperatorExpression expr1 = new OperatorExpression(ExpressionType.COMPARE_GREATERTHAN, tve1, tve2);
+            TupleValueExpression tve3 = new TupleValueExpression();
+            tve2.setTableName("T2");
+            tve2.setColumnName("B");
+            OperatorExpression expr2 = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, tve3, null);
+            OperatorExpression expr = new OperatorExpression(ExpressionType.CONJUNCTION_AND, expr1, expr2);
+            assertTrue(ExpressionUtil.isNullRejectingExpression(expr, "T2"));
+            assertTrue(ExpressionUtil.isNullRejectingExpression(expr, "T1"));
+            // Wrong table
+            assertTrue(!ExpressionUtil.isNullRejectingExpression(expr, "T"));
+
+            // Test "T1.C IS NULL AND T2.B IS NULL " is NULL-rejecting
+            OperatorExpression expr3 = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, tve1, null);
+            expr = new OperatorExpression(ExpressionType.CONJUNCTION_AND, expr3, expr2);
+            assertTrue(!ExpressionUtil.isNullRejectingExpression(expr, "T2"));
+            assertTrue(!ExpressionUtil.isNullRejectingExpression(expr, "T1"));
+            // Wrong table
+            assertTrue(!ExpressionUtil.isNullRejectingExpression(expr, "T"));
+        }
+
+        {
+            // Test OR expressions
+            // Test "T1.C > T2.C OR T2.B IS NULL " is not NULL-rejecting
+            TupleValueExpression tve1 = new TupleValueExpression();
+            tve1.setTableName("T1");
+            tve1.setColumnName("C");
+            TupleValueExpression tve2 = new TupleValueExpression();
+            tve2.setTableName("T2");
+            tve2.setColumnName("C");
+            OperatorExpression expr1 = new OperatorExpression(ExpressionType.COMPARE_GREATERTHAN, tve1, tve2);
+            TupleValueExpression tve3 = new TupleValueExpression();
+            tve3.setTableName("T2");
+            tve3.setColumnName("B");
+            OperatorExpression expr2 = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, tve3, null);
+            OperatorExpression expr = new OperatorExpression(ExpressionType.CONJUNCTION_OR, expr1, expr2);
+            assertTrue(!ExpressionUtil.isNullRejectingExpression(expr, "T2"));
+            assertTrue(!ExpressionUtil.isNullRejectingExpression(expr, "T1"));
+            // Wrong table
+            assertTrue(!ExpressionUtil.isNullRejectingExpression(expr, "T"));
+
+            // Test "T1.C > T2.C OR T2.B > T1.C " is NULL-rejecting
+            OperatorExpression expr3 = new OperatorExpression(ExpressionType.COMPARE_GREATERTHAN, tve3, tve1);
+            expr = new OperatorExpression(ExpressionType.CONJUNCTION_OR, expr1, expr3);
+            assertTrue(ExpressionUtil.isNullRejectingExpression(expr, "T2"));
+            assertTrue(ExpressionUtil.isNullRejectingExpression(expr, "T1"));
+            // Wrong table
+            assertTrue(!ExpressionUtil.isNullRejectingExpression(expr, "T"));
+        }
+    }
+
+    {
+        // Test "ABS(T1.C) > 5" is NULL-rejecting
+        TupleValueExpression tve = new TupleValueExpression();
+        tve.setTableName("T1");
+        tve.setColumnName("C");
+        ArrayList<AbstractExpression> args = new ArrayList<AbstractExpression>();
+        args.add(tve);
+        FunctionExpression abs = new FunctionExpression();
+        abs.setArgs(args);
+        ConstantValueExpression cve = new ConstantValueExpression();
+        cve.setValue("5");
+        OperatorExpression expr = new OperatorExpression(ExpressionType.COMPARE_GREATERTHAN, abs, cve);
+        assertTrue(ExpressionUtil.isNullRejectingExpression(expr, "T1"));
+        // Wrong table
+        assertTrue(!ExpressionUtil.isNullRejectingExpression(expr, "T"));
+    }
+
+    {
+        // Test negation
+        // Test "!(T1.C > T2.C)" is NULL-rejecting
+        TupleValueExpression tve1 = new TupleValueExpression();
+        tve1.setTableName("T1");
+        tve1.setColumnName("C");
+        TupleValueExpression tve2 = new TupleValueExpression();
+        tve2.setTableName("T2");
+        tve2.setColumnName("C");
+        OperatorExpression expr1 = new OperatorExpression(ExpressionType.COMPARE_GREATERTHAN, tve1, tve2);
+        OperatorExpression expr2 = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr1, null);
+        assertTrue(ExpressionUtil.isNullRejectingExpression(expr2, "T1"));
+        assertTrue(ExpressionUtil.isNullRejectingExpression(expr2, "T2"));
+        // Wrong table
+        assertTrue(!ExpressionUtil.isNullRejectingExpression(expr2, "T"));
+
+        // Test "!(P AND Q)" is equivalent to "!P OR !Q"
+        // !(T1.C IS NULL AND T2.C IS NULL) is not NULL-rejecting
+        OperatorExpression expr3 = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, tve1, null);
+        OperatorExpression expr4 = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, tve2, null);
+        OperatorExpression expr5 = new OperatorExpression(ExpressionType.CONJUNCTION_AND, expr3, expr4);
+        OperatorExpression expr6 = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr5, null);
+        assertTrue(!ExpressionUtil.isNullRejectingExpression(expr6, "T1"));
+        assertTrue(!ExpressionUtil.isNullRejectingExpression(expr6, "T2"));
+        // Wrong table
+        assertTrue(!ExpressionUtil.isNullRejectingExpression(expr6, "T"));
+
+        // !(T1.C > T2.C AND T2.C IS NULL) is NULL-rejecting for T2 only
+        OperatorExpression expr7 = new OperatorExpression(ExpressionType.COMPARE_GREATERTHAN, tve1, tve2);
+        OperatorExpression expr8 = new OperatorExpression(ExpressionType.CONJUNCTION_AND, expr7, expr4);
+        OperatorExpression expr9 = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr8, null);
+        assertTrue(!ExpressionUtil.isNullRejectingExpression(expr9, "T1"));
+        assertTrue(ExpressionUtil.isNullRejectingExpression(expr9, "T2"));
+        // Wrong table
+        assertTrue(!ExpressionUtil.isNullRejectingExpression(expr9, "T"));
+
+        // Test "!(P OR Q)" is equivalent to "!P AND !Q"
+        // !(T1.C IS NULL OR T2.C IS NULL) is NULL-rejecting for T1 and T2
+        OperatorExpression expr10 = new OperatorExpression(ExpressionType.CONJUNCTION_OR, expr3, expr4);
+        OperatorExpression expr11 = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr10, null);
+        assertTrue(ExpressionUtil.isNullRejectingExpression(expr11, "T1"));
+        assertTrue(ExpressionUtil.isNullRejectingExpression(expr11, "T2"));
+        // Wrong table
+        assertTrue(!ExpressionUtil.isNullRejectingExpression(expr11, "T"));
+
+        // !(T1.C > T2.C OR T2.C IS NULL) is NULL-rejecting for T1 and T2
+        OperatorExpression expr12 = new OperatorExpression(ExpressionType.CONJUNCTION_OR, expr7, expr4);
+        OperatorExpression expr13 = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr12, null);
+        assertTrue(ExpressionUtil.isNullRejectingExpression(expr13, "T1"));
+        assertTrue(ExpressionUtil.isNullRejectingExpression(expr13, "T2"));
+        // Wrong table
+        assertTrue(!ExpressionUtil.isNullRejectingExpression(expr13, "T"));
+
+    }
+
 }

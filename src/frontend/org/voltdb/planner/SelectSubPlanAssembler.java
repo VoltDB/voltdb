@@ -460,10 +460,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         // inner_tuple > 0) it can be pushed down as a filter expression to the inner child
         if (parentNode != null) {
             if (parentNode.m_leftNode == childNode) {
-                // This is the outer table which can only have the naive access path.
+                // This is the outer table which can have the naive access path and possible index path(s)
                 // Optimizations - outer-table-only where expressions can be pushed down to the child node
                 // to pre-qualify the outer tuples before they enter the join.
-                childNode.m_accessPaths.add(getRelevantNaivePathForTable(null, parentNode.m_whereOuterList));
+                childNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(childNode.m_table, null,parentNode.m_whereOuterList));
             } else {
                 assert(parentNode.m_rightNode == childNode);
                 // This is the inner node

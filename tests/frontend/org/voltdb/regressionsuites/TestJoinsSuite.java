@@ -529,6 +529,17 @@ public void testThreeTableIndexInnerMultiJoin() throws NoConnectionsException, I
                              .getResults()[0];
     System.out.println(result.toString());
     assertEquals(0, result.getRowCount());
+
+    // Outer table index scan
+    // R3 1st eliminated by R3.A > 0 where filter
+    // R3 2nd joined with R3 2
+    // R3 3rd joined with R2 null
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM R3 LEFT JOIN R2 ON R3.A = R2.A WHERE R3.A > 1")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(2, result.getRowCount());
+
 }
 
   /**
@@ -571,6 +582,17 @@ public void testThreeTableIndexInnerMultiJoin() throws NoConnectionsException, I
                              .getResults()[0];
     System.out.println(result.toString());
     assertEquals(2, result.getRowCount());
+
+    // Outer table index scan
+    // P3 1st eliminated by P3.A > 0 where filter
+    // P3 2nd joined with P2 2
+    // P3 3nd joined with P2 4
+    // R3 4th joined with P2 null
+    result = client.callProcedure(
+            "@AdHoc", "select * FROM P3 LEFT JOIN P2 ON P3.A = P2.A WHERE P3.A > 1")
+                             .getResults()[0];
+    System.out.println(result.toString());
+    assertEquals(3, result.getRowCount());
 
   }
 

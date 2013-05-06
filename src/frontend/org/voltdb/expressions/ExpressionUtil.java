@@ -431,7 +431,7 @@ public abstract class ExpressionUtil {
                 AbstractExpression tempRight = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr.m_left.m_right, null);
                 ExpressionType type = (expr.m_left.getExpressionType() == ExpressionType.CONJUNCTION_AND) ?
                         ExpressionType.CONJUNCTION_OR : ExpressionType.CONJUNCTION_AND;
-                AbstractExpression tempExpr = new ComparisonExpression(type, tempLeft, tempRight);
+                AbstractExpression tempExpr = new OperatorExpression(type, tempLeft, tempRight);
                 return isNullRejectingExpression(tempExpr, tableName);
             } else {
                 return isNullRejectingExpression(expr.m_left, tableName);
