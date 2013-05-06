@@ -572,8 +572,8 @@ public class SnapshotSiteProcessor {
             }
 
             ListenableFuture<?> writeFuture = task.m_target.write(valueForTarget, task);
-            writeFutures.add(writeFuture);
             if (writeFuture != null) {
+                writeFutures.add(writeFuture);
                 final ListenableFuture<?> retvalFinal = writeFuture;
                 retvalFinal.addListener(new Runnable() {
                     @Override
