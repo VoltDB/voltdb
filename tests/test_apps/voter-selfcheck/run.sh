@@ -72,6 +72,17 @@ function secure-server() {
         license $LICENSE host $HOST
 }
 
+function masked-server() {
+    $VOLTDB mask deployment-secure.xml deployment-masked.xml
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create catalog $APPNAME.jar deployment deployment-masked.xml \
+        license $LICENSE host $HOST
+}
+
+
+
 # run the client that drives the example
 function client() {
     async-benchmark

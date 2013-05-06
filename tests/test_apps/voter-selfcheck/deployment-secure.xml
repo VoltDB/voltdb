@@ -6,7 +6,7 @@
     </httpd>
     <security enabled="true" />
     <users>
-      <user name="myuser" password="voltdb"  roles="dbuser" />
-      <user name="myadmin" password="voltdb"  roles="adminuser, hockey" />
+      <user name="myuser" password="voltdbuser"  roles="dbuser" />
+      <user name="myadmin" password="voltdbadmin"  roles="adminuser, hockey" />
     </users>
 </deployment>
