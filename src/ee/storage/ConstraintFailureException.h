@@ -50,7 +50,7 @@ public:
      * @param message Description of the partitioning failure.
      */
     ConstraintFailureException(PersistentTable *table, TableTuple tuple, std::string message);
-    
+
     virtual ~ConstraintFailureException();
 protected:
     void p_serialize(ReferenceSerializeOutput *output) const;
