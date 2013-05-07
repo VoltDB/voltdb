@@ -158,7 +158,16 @@ public class TestStatisticsSuite extends SaveRestoreBase {
             // to check specifically for this error, otherwise things that
             // crash the cluster also turn into ProcCallExceptions and don't
             // trigger failure (ENG-2347)
-            assertEquals("VOLTDB ERROR: PROCEDURE Statistics EXPECTS 3 PARAMS, BUT RECEIVED 1",
+            assertEquals("Incorrect number of arguments to @Statistics (expects 2, received 0)",
+                         ex.getMessage());
+        }
+        try {
+            // extra stuff
+            client.callProcedure("@Statistics", "table", 0, "OHHAI");
+            fail();
+        }
+        catch (ProcCallException ex) {
+            assertEquals("Incorrect number of arguments to @Statistics (expects 2, received 3)",
                          ex.getMessage());
         }
         try {
@@ -227,8 +236,11 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         System.out.println("\n\nTESTING PARTITION COUNT\n\n\n");
         Client client  = getFullyConnectedClient();
 
-        ColumnInfo[] expectedSchema = new ColumnInfo[1];
-        expectedSchema[0] = new ColumnInfo("PARTITION_COUNT", VoltType.INTEGER);
+        ColumnInfo[] expectedSchema = new ColumnInfo[4];
+        expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
+        expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
+        expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
+        expectedSchema[3] = new ColumnInfo("PARTITION_COUNT", VoltType.INTEGER);
         VoltTable expectedTable = new VoltTable(expectedSchema);
         VoltTable[] results = null;
 
@@ -640,6 +652,77 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         assertTrue("Failed total FAILURES == 0, value was: " + failures, failures == 0);
     }
 
+    public void testDRNodeStatistics() throws Exception {
+        if (!VoltDB.instance().getConfig().m_isEnterprise) {
+            System.out.println("SKIPPING DRNODE STATS TESTS FOR COMMUNITY VERSION");
+            return;
+        }
+        System.out.println("\n\nTESTING DRNODE STATS\n\n\n");
+        Client client  = getFullyConnectedClient();
+
+        ColumnInfo[] expectedSchema2 = new ColumnInfo[7];
+        expectedSchema2[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
+        expectedSchema2[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
+        expectedSchema2[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
+        expectedSchema2[3] = new ColumnInfo("ENABLED", VoltType.STRING);
+        expectedSchema2[4] = new ColumnInfo("SYNCSNAPSHOTSTATE", VoltType.STRING);
+        expectedSchema2[5] = new ColumnInfo("ROWSINSYNCSNAPSHOT", VoltType.BIGINT);
+        expectedSchema2[6] = new ColumnInfo("ROWSACKEDFORSYNCSNAPSHOT", VoltType.BIGINT);
+        VoltTable expectedTable2 = new VoltTable(expectedSchema2);
+
+        VoltTable[] results = null;
+        //
+        // DRNODE
+        //
+        results = client.callProcedure("@Statistics", "DRNODE", 0).getResults();
+        // one aggregate tables returned
+        assertEquals(1, results.length);
+        System.out.println("Test DRNODE table: " + results[0].toString());
+        validateSchema(results[0], expectedTable2);
+        // One row per host for DRNODE stats
+        results[0].advanceRow();
+        validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), true);
+    }
+
+    public void testDRPartitionStatistics() throws Exception {
+        if (!VoltDB.instance().getConfig().m_isEnterprise) {
+            System.out.println("SKIPPING DRPARTITION STATS TESTS FOR COMMUNITY VERSION");
+            return;
+        }
+        System.out.println("\n\nTESTING DRPARTITION STATS\n\n\n");
+        Client client  = getFullyConnectedClient();
+
+        ColumnInfo[] expectedSchema1 = new ColumnInfo[11];
+        expectedSchema1[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
+        expectedSchema1[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
+        expectedSchema1[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
+        expectedSchema1[3] = new ColumnInfo("PARTITION_ID", VoltType.INTEGER);
+        expectedSchema1[4] = new ColumnInfo("STREAMTYPE", VoltType.STRING);
+        expectedSchema1[5] = new ColumnInfo("TOTALBYTES", VoltType.BIGINT);
+        expectedSchema1[6] = new ColumnInfo("TOTALBYTESINMEMORY", VoltType.BIGINT);
+        expectedSchema1[7] = new ColumnInfo("TOTALBUFFERS", VoltType.BIGINT);
+        expectedSchema1[8] = new ColumnInfo("LASTACKTIMESTAMP", VoltType.BIGINT);
+        expectedSchema1[9] = new ColumnInfo("ISSYNCED", VoltType.STRING);
+        expectedSchema1[10] = new ColumnInfo("MODE", VoltType.STRING);
+        VoltTable expectedTable1 = new VoltTable(expectedSchema1);
+
+        VoltTable[] results = null;
+        //
+        // DRPARTITION
+        //
+        results = client.callProcedure("@Statistics", "DRPARTITION", 0).getResults();
+        // one aggregate tables returned
+        assertEquals(1, results.length);
+        System.out.println("Test DR table: " + results[0].toString());
+        validateSchema(results[0], expectedTable1);
+        // One row per site, don't have HSID for ease of check, just check a bunch of stuff
+        assertEquals(hosts * sites, results[0].getRowCount());
+        results[0].advanceRow();
+        validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), false);
+        results[0].advanceRow();
+        validateRowSeenAtAllPartitions(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), false);
+    }
+
     public void testDRStatistics() throws Exception {
         if (!VoltDB.instance().getConfig().m_isEnterprise) {
             System.out.println("SKIPPING DR STATS TESTS FOR COMMUNITY VERSION");
@@ -753,7 +836,8 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         validateSchema(results[0], expectedTable);
         // One row per site, we don't use HSID though, so hard to do straightforward
         // per-site unique check.  Finesse it.
-        assertEquals(hosts * sites, results[0].getRowCount());
+        // We also get starvation stats for the MPI, so we need to add a site per host.
+        assertEquals(hosts * (sites + 1), results[0].getRowCount());
         results[0].advanceRow();
         validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), false);
     }
