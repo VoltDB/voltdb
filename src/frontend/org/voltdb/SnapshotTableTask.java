@@ -55,7 +55,8 @@ public class SnapshotTableTask
     public String toString()
     {
         return ("SnapshotTableTask for " + m_table.getTypeName() +
-                " replicated " + m_table.getIsreplicated());
+                " replicated " + m_table.getIsreplicated() +
+                ", delete " + m_deleteTuples);
     }
 }
 

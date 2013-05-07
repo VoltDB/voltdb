@@ -249,6 +249,8 @@ public class InitiateResponseMessage extends VoltMessage {
         sb.append("\n CLIENT INTERFACE HANDLE: " + m_clientInterfaceHandle);
         sb.append("\n CLIENT CONNECTION ID: " + m_connectionId);
         sb.append("\n READ-ONLY: " + m_readOnly);
+        sb.append("\n RECOVERYING: " + m_recovering);
+        sb.append("\n MISPARTITIONED: " + m_mispartitioned);
         if (m_commit)
             sb.append("\n  COMMIT");
         else
