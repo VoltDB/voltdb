@@ -1379,17 +1379,28 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         System.out.println(results[0]);
 
         int foundItem = 0;
+        while (foundItem != 3) {
+            while (results[0].advanceRow())
+            {
+                if (results[0].getString("TABLE_NAME").equals("REPLICATED_TESTER"))
+                {
+                    ++foundItem;
+                }
+            }
+        }
+        assertEquals(3, foundItem);
+
+        results = client.callProcedure("@Statistics", "table", 0).getResults();
         while (results[0].advanceRow())
         {
             if (results[0].getString("TABLE_NAME").equals("REPLICATED_TESTER"))
             {
-                ++foundItem;
                 assertEquals((num_replicated_chunks * num_replicated_items_per_chunk),
                         results[0].getLong("TUPLE_COUNT"));
             }
         }
+
         // make sure all sites were loaded
-        assertEquals(3, foundItem);
 
         validateSnapshot(true);
     }
@@ -1511,8 +1522,6 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 if (results[0].getString("TABLE_NAME").equals("PARTITION_TESTER"))
                 {
                     ++foundItem;
-                    assertEquals((num_partitioned_items_per_chunk * num_partitioned_chunks) / 3,
-                            results[0].getLong("TUPLE_COUNT"));
                 }
             }
         }
@@ -1604,17 +1613,25 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         results = client.callProcedure("@Statistics", "table", 0).getResults();
 
         foundItem = 0;
+        while (foundItem != 3) {
+            while (results[0].advanceRow())
+            {
+                if (results[0].getString("TABLE_NAME").equals("PARTITION_TESTER"))
+                {
+                    ++foundItem;
+                }
+            }
+        }
+        assertEquals(3, foundItem);
+        results = client.callProcedure("@Statistics", "table", 0).getResults();
         while (results[0].advanceRow())
         {
             if (results[0].getString("TABLE_NAME").equals("PARTITION_TESTER"))
             {
-                ++foundItem;
                 assertEquals((num_partitioned_items_per_chunk * num_partitioned_chunks) / 3,
                         results[0].getLong("TUPLE_COUNT"));
             }
         }
-        // make sure all sites were loaded
-        assertEquals(3, foundItem);
     }
 
     // Test that we fail properly when there are no savefiles available
