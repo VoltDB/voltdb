@@ -723,7 +723,8 @@ public class StatsAgent {
         } else {
             assert siteIdToStatsSources != null && !siteIdToStatsSources.isEmpty();
         }
-        ArrayList<StatsSource> sSources = siteIdToStatsSources.values().iterator().next();
+        // Just need a random site's list to do some things
+        ArrayList<StatsSource> sSources = siteIdToStatsSources.entrySet().iterator().next().getValue();
 
         /*
          * Some sources like TableStats use VoltTable to keep track of
