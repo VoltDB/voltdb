@@ -1651,31 +1651,47 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     ClientResponseImpl dispatchStatistics(Config sysProc, ByteBuffer buf, StoredProcedureInvocation task,
-            ClientInputHandler handler, Connection ccxn) {
+            ClientInputHandler handler, Connection ccxn)
+    {
         ParameterSet params = task.getParams();
-        // dispatch selectors that do not us the @Statistics system procedure
-        if ((params.toArray().length != 0)) {
-            String selector = (String)params.toArray()[0];
-            if (selector.equals("DR") || selector.equals("TOPO") || selector.equals("SNAPSHOTSTATUS")) {
-               try {
-                   VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, selector);
-                   return null;
-               } catch (Exception e) {
-                   return errorResponse( ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);
-               }
-           }
+        if ((params.toArray().length < 1) || (params.toArray().length > 2)) {
+            return errorResponse(ccxn, task.clientHandle, ClientResponse.GRACEFUL_FAILURE,
+                    "Incorrect number of arguments to @Statistics (expects 2, received " +
+                    params.toArray().length + ")", null, false);
         }
-        int[] involvedPartitions = m_allPartitions;
-        createTransaction(handler.connectionId(), handler.m_hostname,
-                handler.isAdmin(),
-                task,
-                sysProc.getReadonly(),
-                sysProc.getSinglepartition(),
-                sysProc.getEverysite(),
-                involvedPartitions,
-                ccxn, buf.capacity(),
-                System.currentTimeMillis());
-        return null;
+        Object first = params.toArray()[0];
+        if (!(first instanceof String)) {
+            return errorResponse(ccxn, task.clientHandle, ClientResponse.GRACEFUL_FAILURE,
+                    "First argument to @Statistics must be a valid STRING selector, instead was " +
+                    first, null, false);
+        }
+        String selector = (String)first;
+        try {
+            SysProcSelector s = SysProcSelector.valueOf(selector.toUpperCase());
+            selector = s.name();
+        }
+        catch (Exception e) {
+            return errorResponse(ccxn, task.clientHandle, ClientResponse.GRACEFUL_FAILURE,
+                    "First argument to @Statistics must be a valid STRING selector, instead was " +
+                    first, null, false);
+        }
+
+        boolean interval = false;
+        try {
+            if (params.toArray().length == 2) {
+                interval = ((Number)(params.toArray()[1])).longValue() == 1L;
+            }
+        }
+        catch (Exception e) {
+            // ugh, don't care?
+        }
+
+        try {
+            VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, selector, interval);
+            return null;
+        } catch (Exception e) {
+            return errorResponse( ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);
+        }
     }
 
     ClientResponseImpl dispatchPromote(Config sysProc,

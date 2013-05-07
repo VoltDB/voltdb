@@ -36,6 +36,7 @@ public enum SysProcSelector {
      * DRPARTITION and DRNODE are internal names
      * Externally the selector is just "DR"
      */
+    DR,
     DRPARTITION,
     DRNODE,
 
