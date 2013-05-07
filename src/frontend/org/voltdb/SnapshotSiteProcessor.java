@@ -38,7 +38,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ListMultimap;
 import com.google.common.util.concurrent.Futures;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
@@ -60,6 +60,7 @@ import org.voltdb.utils.CatalogUtil;
 import com.google.common.util.concurrent.Callables;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * Encapsulates the state needed to manage an ongoing snapshot at the
@@ -171,7 +172,7 @@ public class SnapshotSiteProcessor {
      * Once a table has finished serializing stuff, it's removed from the map.
      * Making it a TreeMap so that it works through one table at time, easier to debug.
      */
-    private ArrayListMultimap<Integer, SnapshotTableTask> m_snapshotTableTasks = null;
+    private ListMultimap<Integer, SnapshotTableTask> m_snapshotTableTasks = null;
 
     private long m_lastSnapshotTxnId;
     private int m_lastSnapshotNumHosts;
@@ -386,7 +387,7 @@ public class SnapshotSiteProcessor {
         m_lastSnapshotSucceded = true;
         m_lastSnapshotTxnId = txnId;
         m_lastSnapshotNumHosts = numHosts;
-        m_snapshotTableTasks = ArrayListMultimap.create();
+        m_snapshotTableTasks = MiscUtils.sortedArrayListMultimap();
         m_snapshotTargets = new ArrayList<SnapshotDataTarget>();
         m_snapshotTargetTerminators = new ArrayList<Thread>();
         m_exportSequenceNumbersToLogOnCompletion = exportSequenceNumbers;
