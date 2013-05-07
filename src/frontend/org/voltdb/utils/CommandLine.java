@@ -28,8 +28,8 @@ import java.util.TreeMap;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.ReplicationRole;
+import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltDB.START_ACTION;
 
 
 // VoltDB.Configuration represents all of the VoltDB command line parameters.
@@ -52,7 +52,7 @@ public class CommandLine extends VoltDB.Configuration
 
     public static final String VEM_TAG_PROPERTY = "org.voltdb.vemtag";
 
-    public CommandLine(VoltDB.START_ACTION start_action)
+    public CommandLine(StartAction start_action)
     {
         m_startAction = start_action;
     }
@@ -160,18 +160,18 @@ public class CommandLine extends VoltDB.Configuration
 
     public CommandLine startCommand(String command)
     {
-        String upcmd = command.toUpperCase();
-        VoltDB.START_ACTION action = VoltDB.START_ACTION.CREATE;
-        try {
-            action = VoltDB.START_ACTION.valueOf(upcmd);
-        }
-        catch (IllegalArgumentException iae)
-        {
+        StartAction action = StartAction.monickerFor(command);
+        if (action == null) {
             // command wasn't a valid enum type, throw an exception.
             String msg = "Unknown action: " + command + ". ";
             hostLog.warn(msg);
             throw new IllegalArgumentException(msg);
         }
+        m_startAction = action;
+        return this;
+    }
+
+    public CommandLine startCommand(StartAction action) {
         m_startAction = action;
         return this;
     }
@@ -274,6 +274,12 @@ public class CommandLine extends VoltDB.Configuration
     boolean gcRollover = false;
     public CommandLine gcRollover(boolean gcRollover) {
         this.gcRollover = gcRollover;
+        return this;
+    }
+
+    boolean conditionalCardMark = false;
+    public CommandLine conditionalCardMark(boolean conditionalCardMark) {
+        this.conditionalCardMark = conditionalCardMark;
         return this;
     }
 
@@ -433,7 +439,6 @@ public class CommandLine extends VoltDB.Configuration
     public List<String> createCommandLine() {
         List<String> cmdline = new ArrayList<String>(50);
         cmdline.add(javaExecutable);
-        cmdline.add("-XX:-ReduceInitialCardMarks");
         cmdline.add("-XX:+HeapDumpOnOutOfMemoryError");
         cmdline.add("-Djava.library.path=" + java_library_path);
         if (rmi_host_name != null)
@@ -446,6 +451,15 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("-Xloggc:"+ volt_root + "/" + VEM_GC_ROLLOVER_FILE_NAME+" -verbose:gc -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCTimeStamps -XX:+UseGCLogFileRotation -XX:NumberOfGCLogFiles="+VEM_GC_ROLLOVER_FILE_COUNT+" -XX:GCLogFileSize="+VEM_GC_ROLLOVER_FILE_SIZE);
         }
         cmdline.add(maxHeap);
+        cmdline.add("-XX:+UseParNewGC");
+        cmdline.add("-XX:+UseConcMarkSweepGC");
+        cmdline.add("-XX:+CMSParallelRemarkEnabled");
+        cmdline.add("-XX:+UseTLAB");
+        cmdline.add("-XX:CMSInitiatingOccupancyFraction=75");
+        cmdline.add("-XX:+UseCMSInitiatingOccupancyOnly");
+        if (conditionalCardMark) {
+            cmdline.add("-XX:+UseCondCardMark");
+        }
         cmdline.add("-classpath"); cmdline.add(classPath);
 
         if (includeTestOpts)
@@ -495,20 +509,14 @@ public class CommandLine extends VoltDB.Configuration
         // VOLTDB main() parameters
         //
         cmdline.add("org.voltdb.VoltDB");
-
-        if (m_startAction == START_ACTION.LIVE_REJOIN) {
-            // annoying, have to special case live rejoin
-            cmdline.add("live rejoin");
-        } else {
-            cmdline.add(m_startAction.toString().toLowerCase());
-        }
+        cmdline.add(m_startAction.verb());
 
         cmdline.add("host"); cmdline.add(m_leader);
         cmdline.add("catalog"); cmdline.add(jarFileName());
         cmdline.add("deployment"); cmdline.add(pathToDeployment());
 
         // rejoin has no replication role
-        if (m_startAction != START_ACTION.REJOIN && m_startAction != START_ACTION.LIVE_REJOIN) {
+        if (!m_startAction.doesRejoin()) {
             if (m_replicationRole == ReplicationRole.REPLICA) {
                 cmdline.add("replica");
             }

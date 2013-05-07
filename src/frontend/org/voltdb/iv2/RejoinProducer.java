@@ -20,7 +20,6 @@ package org.voltdb.iv2;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
@@ -41,7 +40,6 @@ import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.rejoin.RejoinSiteProcessor;
 import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.TaskLog;
-
 import org.voltdb.utils.MiscUtils;
 
 /**
@@ -170,8 +168,6 @@ public class RejoinProducer extends JoinProducerBase {
             try {
                 taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class, boolean.class);
                 return (TaskLog) taskLogConstructor.newInstance(pid, overflowDir, true);
-            } catch (InvocationTargetException e) {
-                VoltDB.crashLocalVoltDB("Unable to construct rejoin task log", true, e.getCause());
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Unable to construct rejoin task log", true, e);
             }

@@ -225,6 +225,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             // into tuple value expressions with an column alias?
             // Is this always true for clone?  Or do we need a new method?
             m_outputSchema = proj.getOutputSchema().copyAndReplaceWithTVE();
+            m_hasSignificantOutputSchema = false; // It's just a cheap knock-off of the projection's
         }
         else
         {
@@ -252,11 +253,13 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 addInlinePlanNode(map);
                 // a bit redundant but logically consistent
                 m_outputSchema = map.getOutputSchema().copyAndReplaceWithTVE();
+                m_hasSignificantOutputSchema = false; // It's just a cheap knock-off of the projection's
             }
             else
             {
                 // just fill m_outputSchema with the table's columns
                 m_outputSchema = m_tableSchema.clone();
+                m_hasSignificantOutputSchema = true;
             }
         }
     }
@@ -283,6 +286,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         {
             proj.resolveColumnIndexesUsingSchema(m_tableSchema);
             m_outputSchema = proj.getOutputSchema().clone();
+            m_hasSignificantOutputSchema = false; // It's just a cheap knock-off of the projection's
         }
         else
         {
@@ -315,6 +319,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         if (limit != null)
         {
             limit.m_outputSchema = m_outputSchema.clone();
+            limit.m_hasSignificantOutputSchema = false; // It's just another cheap knock-off
         }
 
     }

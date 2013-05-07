@@ -31,6 +31,7 @@ import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProcedureRunnerFactory;
+import org.voltdb.StartAction;
 import org.voltdb.StarvationTracker;
 import org.voltdb.StatsAgent;
 import org.voltdb.SysProcSelector;
@@ -61,16 +62,16 @@ public abstract class BaseInitiator implements Initiator
     protected final RepairLog m_repairLog = new RepairLog();
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
             Scheduler scheduler, String whoamiPrefix, StatsAgent agent,
-            VoltDB.START_ACTION startAction)
+            StartAction startAction)
     {
         m_zkMailboxNode = zkMailboxNode;
         m_messenger = messenger;
         m_partitionId = partition;
         m_scheduler = scheduler;
-        boolean isLiveRejoin = startAction == VoltDB.START_ACTION.LIVE_REJOIN;
+        boolean isLiveRejoin = startAction == StartAction.LIVE_REJOIN;
         JoinProducerBase joinProducer;
 
-        if (startAction == VoltDB.START_ACTION.JOIN) {
+        if (startAction == StartAction.JOIN) {
             joinProducer = new JoinProducer(m_partitionId, scheduler.m_tasks);
         } else if (VoltDB.createForRejoin(startAction)) {
             joinProducer = new RejoinProducer(m_partitionId, scheduler.m_tasks, isLiveRejoin);
@@ -119,7 +120,7 @@ public abstract class BaseInitiator implements Initiator
                           CatalogContext catalogContext,
                           CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          VoltDB.START_ACTION startAction,
+                          StartAction startAction,
                           StatsAgent agent,
                           MemoryStats memStats,
                           CommandLog cl,
@@ -135,7 +136,7 @@ public abstract class BaseInitiator implements Initiator
 
             // demote rejoin to create for initiators that aren't rejoinable.
             if (VoltDB.createForRejoin(startAction) && !isRejoinable()) {
-                startAction = VoltDB.START_ACTION.CREATE;
+                startAction = StartAction.CREATE;
             }
 
             TaskLog taskLog = null;

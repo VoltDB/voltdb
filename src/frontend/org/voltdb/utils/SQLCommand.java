@@ -633,8 +633,6 @@ public class SQLCommand
                     else if (paramType.equals("statisticscomponent"))
                     {
                         String p = preprocessParam(param);
-                        if (!StatisticsComponents.contains(p))
-                            throw new Exception("Invalid Statistics Component: " + param);
                         objectParams[i] = p;
                     }
                     else if (paramType.equals("sysinfoselector"))
@@ -819,7 +817,6 @@ public class SQLCommand
 
     // VoltDB connection support
     private static Client VoltDB;
-    private static final List<String> StatisticsComponents = Arrays.asList("INDEX","INITIATOR","IOSTATS","MANAGEMENT","MEMORY","PROCEDURE","TABLE","PARTITIONCOUNT","STARVATION","LIVECLIENTS", "DR", "TOPO", "PLANNER", "SNAPSHOTSTATUS");
     private static final List<String> SysInfoSelectors = Arrays.asList("OVERVIEW","DEPLOYMENT");
     private static final List<String> MetaDataSelectors =
         Arrays.asList("TABLES", "COLUMNS", "INDEXINFO", "PRIMARYKEYS",
@@ -863,14 +860,6 @@ public class SQLCommand
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
         Procedures.put("@SnapshotStatus",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
-        Procedures.put("@AdHoc_RO_MP",
-                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
-        Procedures.put("@AdHoc_RO_SP",
-                ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "bigint")).build());
-        Procedures.put("@AdHoc_RW_MP",
-                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
-        Procedures.put("@AdHoc_RW_SP",
-                ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "bigint")).build());
         Procedures.put("@Explain",
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@ExplainProc",

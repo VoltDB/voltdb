@@ -61,6 +61,7 @@ import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.ProcInfo;
+import org.voltdb.StartAction;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
@@ -1058,7 +1059,7 @@ public class SnapshotRestore extends VoltSystemProcedure
          * the command logging is enabled and the database start action
          * was create
          */
-        final VoltDB.START_ACTION startAction = VoltDB.instance().getConfig().m_startAction;
+        final StartAction startAction = VoltDB.instance().getConfig().m_startAction;
         final org.voltdb.OperationMode mode = VoltDB.instance().getMode();
 
         /*
@@ -1067,12 +1068,12 @@ public class SnapshotRestore extends VoltSystemProcedure
          * we do want a truncation snapshot if CL is enabled.
          */
         final boolean isStartWithNoAutomatedRestore =
-            startAction == VoltDB.START_ACTION.CREATE && mode != org.voltdb.OperationMode.INITIALIZING;
+            startAction == StartAction.CREATE && mode != org.voltdb.OperationMode.INITIALIZING;
 
         final boolean isCLEnabled =
             VoltDB.instance().getCommandLog().getClass().getSimpleName().equals("CommandLogImpl");
 
-        final boolean isStartedWithCreateAction = startAction == VoltDB.START_ACTION.CREATE;
+        final boolean isStartedWithCreateAction = startAction == StartAction.CREATE;
 
         if ( isCLEnabled && (isStartedWithCreateAction || isStartWithNoAutomatedRestore)) {
 

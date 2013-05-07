@@ -20,11 +20,11 @@ package org.voltdb.plannodes;
 import java.util.ArrayList;
 
 import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONStringer;
 import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
-import org.voltdb.types.PlanNodeType;
 import org.voltdb.planner.ParsedUnionStmt;
+import org.voltdb.types.PlanNodeType;
 
 public class UnionPlanNode extends AbstractPlanNode {
 
@@ -33,7 +33,7 @@ public class UnionPlanNode extends AbstractPlanNode {
     }
 
     // Union Type
-    private ParsedUnionStmt.UnionType m_unionType;
+    private final ParsedUnionStmt.UnionType m_unionType;
 
     public UnionPlanNode() {
         super();
@@ -92,6 +92,7 @@ public class UnionPlanNode extends AbstractPlanNode {
             }
         }
         m_outputSchema = m_children.get(0).getOutputSchema();
+        m_hasSignificantOutputSchema = false; // It's just the first child's
         // Then check that they have the same types
    }
 
