@@ -65,7 +65,16 @@ public abstract class SubPlanAssembler {
     private final static List<AbstractExpression> s_reusableImmutableEmptyBinding =
         new ArrayList<AbstractExpression>();
 
+    // Constants to specify how getIndexableExpressionFromFilters should react
+    // to finding a filter that matches the current criteria.
+    /// For some calls, primarily related to index-based filtering,
+    /// the matched filter is going to be implemented by indexing,
+    /// so it needs to be "consumed" (removed from the list)
+    /// to not get redundantly applied as a post-condition.
     private final static boolean EXCLUDE_FROM_POST_FILTERS = true;
+    /// For other calls, related to index-based ordering,
+    /// the matched filter must remain in the list
+    /// to eventually be applied as a post-filter.
     private final static boolean KEEP_IN_POST_FILTERS = false;
 
     SubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, PartitioningForStatement partitioning)
@@ -237,6 +246,18 @@ public abstract class SubPlanAssembler {
 
         // Start with equality comparisons on as many (prefix) indexed expressions as possible.
         int coveredCount = 0;
+        // If determineIndexOrdering found one or more spoilers,
+        // index key components that might interfere with the desired ordering of the result,
+        // their ill effects are eliminated when they are constrained to be equal to constants.
+        // These are called "recovered spoilers".
+        // When their count reaches the count of spoilers, the order of the result will be as desired.
+        // Initial "prefix key component" spoilers can be recovered in the normal course
+        // of finding prefix equality filters for those key components.
+        // The spoiler key component positions are listed (ascending) in orderSpoilers.
+        // After the last prefix equality filter has been found,
+        // nRecoveredSpoilers in comparison to nSpoilers may indicate remaining unrecovered spoilers.
+        // That edge case motivates a renewed search for (non-prefix) equality filters solely for the purpose
+        // of recovering the spoilers and confirming the relevance of the result's index ordering.
         int nRecoveredSpoilers = 0;
         AbstractExpression coveringExpr = null;
         int coveringColId = -1;
