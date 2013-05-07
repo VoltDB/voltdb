@@ -429,7 +429,12 @@ if whichtests in ("${eetestsuite}", "plannodes"):
 
 # this function (in buildtools.py) generates the makefile
 # it's currently a bit ugly but it'll get cleaned up soon
-buildMakefile(CTX)
+if not os.environ.get('EESKIPBUILDMAKEFILE'):
+    print "build.py: Making the makefile"
+    buildMakefile(CTX)
+
+if os.environ.get('EEONLYBUILDMAKEFILE'):
+    sys.exit()
 
 ###############################################################################
 # RUN THE MAKEFILE

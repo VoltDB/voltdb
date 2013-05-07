@@ -1085,10 +1085,24 @@ NATIVE EE STUFF
     </exec>
 </target>
 
-<target name='ee' depends="catalog, jnicompile, buildinfo"
-    unless="makefile.uptodate"
+<target name='ee' depends="ee_buildmakefile, catalog, jnicompile, buildinfo"
     description="Build C++ JNI library and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
+        <env key="EESKIPBUILDMAKEFILE" value="true" />
+        <arg line="build.py ${build}" />
+    </exec>
+    <copy todir='voltdb'>
+        <fileset dir="${build.dir}/nativelibs">
+            <include name="libvoltdb-${dist.version}.*"/>
+        </fileset>
+    </copy>
+</target>
+
+<target name='ee_buildmakefile' depends="catalog, jnicompile, buildinfo"
+    unless="makefile.uptodate"
+    description="Just make the makefile for the C++ JNI library.">
+    <exec dir='.' executable='python' failonerror='true'>
+        <env key="EEONLYBUILDMAKEFILE" value="true"/>
         <arg line="build.py ${build}" />
     </exec>
     <copy todir='voltdb'>
