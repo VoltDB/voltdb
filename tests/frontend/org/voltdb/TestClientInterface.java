@@ -416,9 +416,7 @@ public class TestClientInterface {
         ByteBuffer msg = createMsg("@Statistics", "DR", 0);
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
-        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(m_statsAgent).collectStats(any(Connection.class), anyInt(), captor.capture(), any(Boolean.class));
-        assertEquals("DR", captor.getValue());
+        verify(m_statsAgent).collectStats(any(Connection.class), anyInt(), eq("DR"), any(Boolean.class));
     }
 
     @Test
@@ -426,9 +424,7 @@ public class TestClientInterface {
         ByteBuffer msg = createMsg("@Statistics", "table", 0);
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
-        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(m_statsAgent).collectStats(any(Connection.class), anyInt(), captor.capture(), any(Boolean.class));
-        assertEquals("TABLE", captor.getValue());
+        verify(m_statsAgent).collectStats(any(Connection.class), anyInt(), eq("TABLE"), any(Boolean.class));
     }
 
     @Test
