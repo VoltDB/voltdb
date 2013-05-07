@@ -18,7 +18,6 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 import org.json_voltpatches.JSONException;
@@ -65,6 +64,18 @@ public abstract class SubPlanAssembler {
     // inline and NOT initialized here.
     private final static List<AbstractExpression> s_reusableImmutableEmptyBinding =
         new ArrayList<AbstractExpression>();
+
+    // Constants to specify how getIndexableExpressionFromFilters should react
+    // to finding a filter that matches the current criteria.
+    /// For some calls, primarily related to index-based filtering,
+    /// the matched filter is going to be implemented by indexing,
+    /// so it needs to be "consumed" (removed from the list)
+    /// to not get redundantly applied as a post-condition.
+    private final static boolean EXCLUDE_FROM_POST_FILTERS = true;
+    /// For other calls, related to index-based ordering,
+    /// the matched filter must remain in the list
+    /// to eventually be applied as a post-filter.
+    private final static boolean KEEP_IN_POST_FILTERS = false;
 
     SubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, PartitioningForStatement partitioning)
     {
@@ -222,18 +233,32 @@ public abstract class SubPlanAssembler {
 
         // Try to use the index scan's inherent ordering to implement the ORDER BY clause.
         // The effects of determineIndexOrdering are reflected in
-        // retval.sortDirection and bindingsForOrder.
+        // retval.sortDirection, orderSpoilers, nSpoilers and bindingsForOrder.
         // In some borderline cases, the determination to use the index's order is optimistic and
         // provisional; it can be undone later in this function as new info comes to light.
+        int orderSpoilers[] = new int[keyComponentCount];
         List<AbstractExpression> bindingsForOrder = new ArrayList<AbstractExpression>();
-        determineIndexOrdering(table, keyComponentCount,
-                               indexedExprs, indexedColRefs,
-                               retval, bindingsForOrder);
+        int nSpoilers = determineIndexOrdering(table, keyComponentCount,
+                                               indexedExprs, indexedColRefs,
+                                               retval, orderSpoilers, bindingsForOrder);
 
         // Use as many covering indexed expressions as possible to optimize comparator expressions that can use them.
 
         // Start with equality comparisons on as many (prefix) indexed expressions as possible.
         int coveredCount = 0;
+        // If determineIndexOrdering found one or more spoilers,
+        // index key components that might interfere with the desired ordering of the result,
+        // their ill effects are eliminated when they are constrained to be equal to constants.
+        // These are called "recovered spoilers".
+        // When their count reaches the count of spoilers, the order of the result will be as desired.
+        // Initial "prefix key component" spoilers can be recovered in the normal course
+        // of finding prefix equality filters for those key components.
+        // The spoiler key component positions are listed (ascending) in orderSpoilers.
+        // After the last prefix equality filter has been found,
+        // nRecoveredSpoilers in comparison to nSpoilers may indicate remaining unrecovered spoilers.
+        // That edge case motivates a renewed search for (non-prefix) equality filters solely for the purpose
+        // of recovering the spoilers and confirming the relevance of the result's index ordering.
+        int nRecoveredSpoilers = 0;
         AbstractExpression coveringExpr = null;
         int coveringColId = -1;
         for ( ; coveredCount < keyComponentCount; ++coveredCount) {
@@ -245,7 +270,7 @@ public abstract class SubPlanAssembler {
             // Equality filters get first priority.
             IndexableExpression eqExpr = getIndexableExpressionFromFilters(
                 ExpressionType.COMPARE_EQUAL, ExpressionType.COMPARE_EQUAL,
-                coveringExpr, coveringColId, table, filtersToCover);
+                coveringExpr, coveringColId, table, filtersToCover, EXCLUDE_FROM_POST_FILTERS);
             if (eqExpr == null) {
                 break;
             }
@@ -255,6 +280,16 @@ public abstract class SubPlanAssembler {
             // A non-empty endExprs has the later side effect of invalidating descending sort order
             // in all cases except the edge case of full coverage equality comparison.
             retval.endExprs.add(comparator);
+
+            // If a provisional sort direction has been determined, the equality filter MAY confirm
+            // that a "spoiler" index key component (one missing from the ORDER BY) is constant-valued
+            // and so it can not spoil the scan result sort order established by other key components.
+            // In this case, consider the spoiler recovered.
+            if (nRecoveredSpoilers < nSpoilers &&
+                orderSpoilers[nRecoveredSpoilers] == coveredCount) {
+                // One recovery closer to confirming the sort order.
+                ++nRecoveredSpoilers;
+            }
         }
 
         // Make short work of the cases of full coverage with equality
@@ -264,6 +299,9 @@ public abstract class SubPlanAssembler {
             // to be applied after the "random access" to the exact index key.
             retval.otherExprs.addAll(filtersToCover);
             if (retval.sortDirection != SortDirectionType.INVALID) {
+                // This IS an odd (maybe non-existent) case
+                // -- equality filters found on on all ORDER BY expressions?
+                // That said, with all key components covered, there can't be any spoilers.
                 retval.bindings.addAll(bindingsForOrder);
             }
             return retval;
@@ -278,20 +316,53 @@ public abstract class SubPlanAssembler {
         // Scannable indexes provide more options...
         //
 
+        // Confirm or deny some provisional matches between the index key components and
+        // the ORDER BY columns.
+        // If there are still unrecovered "orderSpoilers", index key components that had to be skipped
+        // to find matches for the ORDER BY columns, determine whether that match was actually OK
+        // by continuing the search for (non-prefix) constant equality filters.
+        if (nRecoveredSpoilers < nSpoilers) {
+            assert(retval.sortDirection != SortDirectionType.INVALID); // There's an order to spoil.
+            // Try to associate each skipped index key component with an equality filter.
+            // If a key component equals a constant, its value can't actually spoil the ordering.
+            // This extra checking is only needed when all of these conditions hold:
+            //   -- There are three or more index key components.
+            //   -- Two or more of them are in the ORDER BY clause
+            //   -- One or more of them are "spoilers", i.e. are not in the ORDER BY clause.
+            //   -- A "spoiler" falls between two non-spoilers in the index key component list.
+            // e.g. "CREATE INDEX ... ON (A, B, C);" then "SELECT ... WHERE B=? ORDER BY A, C;"
+            List<AbstractExpression> otherBindingsForOrder =
+                recoverOrderSpoilers(orderSpoilers, nSpoilers, nRecoveredSpoilers,
+                                     indexedExprs, indexedColIds,
+                                     table, filtersToCover);
+            if (otherBindingsForOrder == null) {
+                // Some order spoiler didn't have an equality filter.
+                // Invalidate the provisional indexed ordering.
+                retval.sortDirection = SortDirectionType.INVALID;
+                bindingsForOrder.clear(); // suddenly irrelevant
+            }
+            else {
+                // Any non-null bindings list, even an empty one,
+                // denotes success -- all spoilers were equality filtered.
+                bindingsForOrder.addAll(otherBindingsForOrder);
+            }
+        }
+
         IndexableExpression startingBoundExpr = null;
         IndexableExpression endingBoundExpr = null;
         if ( ! filtersToCover.isEmpty()) {
-            // A scannable index allows inequality matches,
-            // but only on the indexed expression that was found to be missing a usable equality comparator.
+            // A scannable index allows inequality matches, but only on the first key component
+            // missing a usable equality comparator.
 
             // Look for a double-ended bound on it.
             // This is always the result of an edge case:
             // "indexed-general-expression LIKE prefix-constant".
-            // The simpler case "column LIKE prefix-constant" has already been re-written by the HSQL parser
+            // The simpler case "column LIKE prefix-constant"
+            // has already been re-written by the HSQL parser
             // into separate upper and lower bound inequalities.
             IndexableExpression doubleBoundExpr = getIndexableExpressionFromFilters(
                 ExpressionType.COMPARE_LIKE, ExpressionType.COMPARE_LIKE,
-                coveringExpr, coveringColId, table, filtersToCover);
+                coveringExpr, coveringColId, table, filtersToCover, EXCLUDE_FROM_POST_FILTERS);
 
             // For simplicity of implementation:
             // In some odd edge cases e.g.
@@ -307,12 +378,12 @@ public abstract class SubPlanAssembler {
                 // Look for a lower bound.
                 startingBoundExpr = getIndexableExpressionFromFilters(
                     ExpressionType.COMPARE_GREATERTHAN, ExpressionType.COMPARE_GREATERTHANOREQUALTO,
-                    coveringExpr, coveringColId, table, filtersToCover);
+                    coveringExpr, coveringColId, table, filtersToCover, EXCLUDE_FROM_POST_FILTERS);
 
                 // Look for an upper bound.
                 endingBoundExpr = getIndexableExpressionFromFilters(
                     ExpressionType.COMPARE_LESSTHAN, ExpressionType.COMPARE_LESSTHANOREQUALTO,
-                    coveringExpr, coveringColId, table, filtersToCover);
+                    coveringExpr, coveringColId, table, filtersToCover, EXCLUDE_FROM_POST_FILTERS);
             }
         }
 
@@ -357,7 +428,9 @@ public abstract class SubPlanAssembler {
         }
 
         // index not relevant to expression
-        if (retval.indexExprs.size() == 0 && retval.endExprs.size() == 0 && retval.sortDirection == SortDirectionType.INVALID) {
+        if (retval.indexExprs.size() == 0 &&
+            retval.endExprs.size() == 0 &&
+            retval.sortDirection == SortDirectionType.INVALID) {
             return null;
         }
 
@@ -462,72 +535,196 @@ public abstract class SubPlanAssembler {
      * used in index expressions, even if that means compiling a separate statement with a
      * constant hard-coded in the place of the parameter to purposely match the indexed expression.
      *
-     *TODO: A case not accounted for, here, is an ORDER BY list that uses a combination of
+     * It is possible for an index key to contain extra components that do not match the
+     * ORDER BY columns and yet do not interfere with the intended ordering for a particular query.
+     * For example, an index on "(A, B, C, D)" would not generally be considered a match for
+     * "ORDER BY A, D" but in the narrow context of a query that also includes a clause like
+     * "WHERE B = ? AND C = 1", the ORDER BY clause is functionally equivalent to
+     * "ORDER BY A, B, C, D" so it CAN be considered a match.
+     * This case is supported in 2 phases, one here and a later one in
+     * getRelevantAccessPathForIndex as follows:
+     * As long as each ORDER BY column is eventually found in the index key components
+     * (in its correct major-to-minor order and ASC/DESC direction),
+     * the positions of any non-matching key components that had to be
+     * skipped are simply collected in order into an array of "orderSpoilers".
+     * The index ordering is provisionally considered valid.
+     * Later, in the processing of getRelevantAccessPathForIndex,
+     * failure to find an equality filter for one of these "orderSpoilers"
+     * causes an override of the provisional sortDirection established here.
+     *
+     * In theory, a similar (arguably less probable) case could arise in which the ORDER BY columns
+     * contain values that are constrained by the WHERE clause to be equal to constants or parameters
+     * and the other ORDER BY columns match the index key components in the usual way.
+     * Such a case will simply fail to match, here, possibly resulting in suboptimal plans that
+     * make unneccesary use of ORDER BY plan nodes, and possibly even use sequential scan plan nodes.
+     * The rationale for not complicating this code to handle that case is that the case should be
+     * detected by a statement pre-processor that simplifies the ORDER BY clause prior to any
+     * "scan planning".
+     *
+     *TODO: Another case not accounted for is an ORDER BY list that uses a combination of
      * columns/expressions from different tables -- the most common missed case would be
      * when the major ORDER BY columns are from an outer table (index scan) of a join (NLIJ)
      * and the minor columns from its inner table index scan.
      * This would have to be detected from a wider perspective than that of a single table/index.
+     * For now, there is some wasted effort in the join case, as this sort order determination is
+     * carefully done for each scan in a join, but the result for all of them is ignored because
+     * they are never at the top of the plan tree -- the join is there.
+     * In theory, if the left-most child scan of a join tree
+     * is an index scan with a valid sort order,
+     * that should be enough to avoid an explicit sort.
+     * Also, if one or more left-most child scans in a join tree
+     * are constrained so that they are known to produce a single row result
+     * AND the next-left-most child scan is an index scan with a valid sort order,
+     * the explicit sort can be skipped.
+     * So, the effort to determine the sort direction of an index scan that participates in a join
+     * is currently ALWAYS wasted, and in the future, would continue to be wasted effort for the
+     * majority of index scans that do not fall into one of the narrow special cases just described.
      *
      * @param table              only used here to validate base table names of ORDER BY columns' .
+     * @param bindingsForOrder   restrictions on parameter settings that are prerequisite to the
+     *                           any ordering optimization determined here
      * @param keyComponentCount  the length of indexedExprs or indexedColRefs,
      *                           ONE of which must be valid
      * @param indexedExprs       expressions for key components in the general case
      * @param indexedColRefs     column references for key components in the simpler case
      * @param retval the eventual result of getRelevantAccessPathForIndex,
      *               the bearer of a (tentative) sortDirection determined here
+     * @param orderSpoilers      positions of key components which MAY invalidate the tentative
+     *                           sortDirection
      * @param bindingsForOrder   restrictions on parameter settings that are prerequisite to the
      *                           any ordering optimization determined here
+     * @return the number of discovered orderSpoilers that will need to be recovered from,
+     *         to maintain the established sortDirection - always 0 if no sort order was determined.
      */
-    private void determineIndexOrdering(Table table, int keyComponentCount,
+    private int determineIndexOrdering(Table table, int keyComponentCount,
             List<AbstractExpression> indexedExprs, List<ColumnRef> indexedColRefs,
-            AccessPath retval,
+            AccessPath retval, int[] orderSpoilers,
             List<AbstractExpression> bindingsForOrder)
     {
+        // Only select statements are allowed to have ORDER BY clauses.
         if ( ! (m_parsedStmt instanceof ParsedSelectStmt)) {
-            return;
+            return 0;
         }
+        int nSpoilers = 0;
         ParsedSelectStmt parsedSelectStmt = (ParsedSelectStmt) m_parsedStmt;
         int countOrderBys = parsedSelectStmt.orderColumns.size();
-        // There need to be enough indexed expressions to provide full ORDER BY coverage.
+        // There need to be enough indexed expressions to provide full sort coverage.
         if (countOrderBys > 0 && countOrderBys <= keyComponentCount) {
             boolean ascending = parsedSelectStmt.orderColumns.get(0).ascending;
             retval.sortDirection = ascending ? SortDirectionType.ASC : SortDirectionType.DESC;
             int jj = 0;
             for (ParsedColInfo colInfo : parsedSelectStmt.orderColumns) {
-                if (colInfo.ascending == ascending) {
-                    // Explicitly advance to the each indexed expression/column
-                    // to match them with the query's "ORDER BY" expressions.
-                    if (indexedExprs == null) {
-                        if (colInfo.expression instanceof TupleValueExpression) {
-                            ColumnRef nextColRef = indexedColRefs.get(jj++);
+                // This retry loop allows catching special cases that don't perfectly match the
+                // ORDER BY columns but may still be usable for ordering.
+                for ( ; jj < keyComponentCount; ++jj) {
+                    if (colInfo.ascending == ascending) {
+                        // Explicitly advance to the each indexed expression/column
+                        // to match them with the query's "ORDER BY" expressions.
+                        if (indexedExprs == null) {
+                            ColumnRef nextColRef = indexedColRefs.get(jj);
                             //TODO: match the TVE attributes as they may potentially be more
                             // reliable than these colInfo attributes?
-                            if (colInfo.tableName.equals(table.getTypeName()) &&
+                            if (colInfo.expression instanceof TupleValueExpression &&
+                                //TODO: match the TVE attributes as they may potentially be more
+                                // reliable than these colInfo attributes?
+                                colInfo.tableName.equals(table.getTypeName()) &&
                                 colInfo.columnName.equals(nextColRef.getColumn().getTypeName())) {
-                                continue;
+                                break;
+                            }
+                        } else {
+                            assert(jj < indexedExprs.size());
+                            AbstractExpression nextExpr = indexedExprs.get(jj);
+                            List<AbstractExpression> moreBindings =
+                                colInfo.expression.bindingToIndexedExpression(nextExpr);
+                            // Non-null bindings (even an empty list) denotes a match.
+                            if (moreBindings != null) {
+                                bindingsForOrder.addAll(moreBindings);
+                                break;
                             }
                         }
-                    } else {
-                        assert(jj < indexedExprs.size());
-                        AbstractExpression nextExpr = nextExpr = indexedExprs.get(jj++);
-                        List<AbstractExpression> moreBindings =
-                            colInfo.expression.bindingToIndexedExpression(nextExpr);
-                        // Non-null bindings (even an empty list) denotes a match.
-                        if (moreBindings != null) {
-                            bindingsForOrder.addAll(moreBindings);
-                            continue;
-                        }
                     }
+                    // The ORDER BY column did not match the established ascending/descending
+                    // pattern OR did not match the next index key component.
+                    // The only hope for the sort being preserved is that
+                    // (A) the ORDER BY column matches a later index key component
+                    // -- so keep searching -- AND
+                    // (B) the current (and each intervening) index key component is constrained
+                    // to a single value, i.e. it is equality-filtered.
+                    // -- so note the current component's position (jj).
+                    orderSpoilers[nSpoilers++] = jj;
                 }
-                // The ORDER BY column did not match the established ascending/descending
-                // pattern OR did not match the next index key component.
-                // This is an outright failure case.
-                // Undo any tentative result settings.
-                retval.sortDirection = SortDirectionType.INVALID;
-                bindingsForOrder.clear(); // suddenly irrelevant
-                return;
+                if (jj < keyComponentCount) {
+                    // The loop exited prematurely.
+                    // That means the current ORDER BY column matched the current key component,
+                    // so move on to the next key component (to match the next ORDER BY column).
+                    ++jj;
+                } else {
+                    // The current ORDER BY column ran out of key components to try to match.
+                    // This is an outright failure case.
+                    retval.sortDirection = SortDirectionType.INVALID;
+                    bindingsForOrder.clear(); // suddenly irrelevant
+                    return 0;  // Any orderSpoilers are also suddenly irrelevant.
+                }
             }
         }
+        return nSpoilers;
+    }
+
+
+    /**
+     * @param orderSpoilers  positions of index key components that would need to be
+     *                       equality filtered to keep from interfering with the desired order
+     * @param nSpoilers      the number of valid orderSpoilers
+     * @param coveredCount   the number of prefix key components already known to be filtered --
+     *                       orderSpoilers before this position are covered.
+     * @param indexedExprs   the index key component expressions in the general case
+     * @param colIds         the index key component columns in the simple case
+     * @param table          the index base table, used to validate column base tables
+     * @param filtersToCover query conditions that may contain the desired equality filters
+     */
+    private List<AbstractExpression> recoverOrderSpoilers(int[] orderSpoilers, int nSpoilers,
+        int nRecoveredSpoilers,
+        List<AbstractExpression> indexedExprs, int[] colIds,
+        Table table, List<AbstractExpression> filtersToCover)
+    {
+        // Filters leveraged for an optimization, such as the skipping of an ORDER BY plan node
+        // always risk adding a dependency on a particular parameterization, so be prepared to
+        // add prerequisite parameter bindings to the plan.
+        List<AbstractExpression> otherBindingsForOrder = new ArrayList<AbstractExpression>();
+        // Order spoilers must be recovered in the order they were found
+        // for the index ordering to be considered acceptable.
+        // Each spoiler key component is recovered by the detection of an equality filter on it.
+        for (; nRecoveredSpoilers < nSpoilers; ++nRecoveredSpoilers) {
+            // There may be more equality filters that weren't useful for "coverage"
+            // but may still serve to recover an otherwise order-spoiling index key component.
+            // The filter will only be applied as a post-condition,
+            // but that's good enough to satisfy the ORDER BY.
+            AbstractExpression coveringExpr = null;
+            int coveringColId = -1;
+            // This is a scaled down version of the coverage check in getRelevantAccessPathForIndex.
+            // This version leaves intact any filter it finds,
+            // so it will be picked up as a post-filter.
+            if (indexedExprs == null) {
+                coveringColId = colIds[orderSpoilers[nRecoveredSpoilers]];
+            } else {
+                coveringExpr = indexedExprs.get(orderSpoilers[nRecoveredSpoilers]);
+            }
+            List<AbstractExpression> moreBindings = null;
+            IndexableExpression eqExpr = getIndexableExpressionFromFilters(
+                ExpressionType.COMPARE_EQUAL, ExpressionType.COMPARE_EQUAL,
+                coveringExpr, coveringColId, table, filtersToCover,
+                KEEP_IN_POST_FILTERS);
+            if (eqExpr == null) {
+                return null;
+            }
+            // The equality filter confirms that the "spoiler" index key component
+            // (one missing from the ORDER BY) is constant-valued,
+            // so it can't spoil the scan result sort order established by other key components.
+            moreBindings = eqExpr.getBindings();
+            // Accumulate bindings (parameter constraints) across all recovered spoilers.
+            otherBindingsForOrder.addAll(moreBindings);
+        }
+        return otherBindingsForOrder;
     }
 
     /**
@@ -542,12 +739,18 @@ public abstract class SubPlanAssembler {
      * index. To help reduce false positives, the (base) columns and/or indexed expressions of the index are also
      * provided to help further reduce non-null returns in uninteresting cases.
      *
-     * @param targetComparator An allowed comparison operator -- its reverse is allowed in reversed expressions
-     * @param altTargetComparator An alternatively allowed comparison operator -- its reverse is allowed in reversed expressions
-     * @param coveringExpr The indexed expression on the table's column that might match a query filter, possibly null.
-     * @param coveringColId When coveringExpr is null, the id of the indexed column might match a query filter.
+     * @param targetComparator An allowed comparison operator
+     *                         -- its reverse is allowed in reversed expressions
+     * @param altTargetComparator An alternatively allowed comparison operator
+     *                            -- its reverse is allowed in reversed expressions
+     * @param coveringExpr The indexed expression on the table's column
+     *                     that might match a query filter, possibly null.
+     * @param coveringColId When coveringExpr is null,
+     *                      the id of the indexed column might match a query filter.
      * @param table The table on which the indexed expression is based
-     * @param filtersToCover query conditions that may contain the desired filter
+     * @param filtersToCover the query conditions that may contain the desired filter
+     * @param filterAction the desired disposition of the matched filter,
+                           either EXCLUDE_FROM_POST_FILTERS or KEEP_IN_POST_FILTERS
      * @return An IndexableExpression -- really just a pairing of a normalized form of expr with the
      * potentially indexed expression on the left-hand-side and the potential index key expression on
      * the right of a comparison operator, and a list of parameter bindings that are required for the
@@ -557,7 +760,7 @@ public abstract class SubPlanAssembler {
     private IndexableExpression getIndexableExpressionFromFilters(
         ExpressionType targetComparator, ExpressionType altTargetComparator,
         AbstractExpression coveringExpr, int coveringColId, Table table,
-        List<AbstractExpression> filtersToCover)
+        List<AbstractExpression> filtersToCover, boolean filterAction)
     {
         List<AbstractExpression> binding = null;
         AbstractExpression indexableExpr = null;
@@ -577,23 +780,28 @@ public abstract class SubPlanAssembler {
                     if (targetComparator == ExpressionType.COMPARE_LIKE) {
                         if (otherExpr instanceof ParameterValueExpression) {
                             ParameterValueExpression pve = (ParameterValueExpression)otherExpr;
-                            // Can't use an index for parameterized LIKE filters, e.g. "T1.column LIKE ?"
-                            // UNLESS the parameter was artificially substituted for a user-specified constant
-                            // AND that constant was a prefix pattern.
-                            // In that case, the parameter has to be added to the bound list for this index/statement.
+                            // Can't use an index for parameterized LIKE filters,
+                            // e.g. "T1.column LIKE ?"
+                            // UNLESS the parameter was artificially substituted
+                            // for a user-specified constant AND that constant was a prefix pattern.
+                            // In that case, the parameter has to be added to the bound list
+                            // for this index/statement.
                             ConstantValueExpression cve = pve.getOriginalValue();
                             if (cve == null || ! cve.isPrefixPatternString()) {
                                 binding = null; // the filter is not usable, so the binding is invalid
                                 continue;
                             }
-                            // Remember that the binding list returned by bindingIfValidIndexedFilterOperand above
+                            // Remember that the binding list returned by
+                            // bindingIfValidIndexedFilterOperand above
                             // is often a "shared object" and is intended to be treated as immutable.
                             // To add a parameter to it, first copy the List.
-                            List<AbstractExpression> moreBinding = new ArrayList<AbstractExpression>(binding);
+                            List<AbstractExpression> moreBinding =
+                                new ArrayList<AbstractExpression>(binding);
                             moreBinding.add(pve);
                             binding = moreBinding;
                         } else if (otherExpr instanceof ConstantValueExpression) {
-                            // Can't use an index for non-prefix LIKE filters, e.g. " T1.column LIKE '%ish' "
+                            // Can't use an index for non-prefix LIKE filters,
+                            // e.g. " T1.column LIKE '%ish' "
                             ConstantValueExpression cve = (ConstantValueExpression)otherExpr;
                             if ( ! cve.isPrefixPatternString()) {
                                 // The constant is not an index-friendly prefix pattern.
@@ -606,7 +814,9 @@ public abstract class SubPlanAssembler {
                             continue;
                         }
                     }
-                    filtersToCover.remove(filter);
+                    if (filterAction == EXCLUDE_FROM_POST_FILTERS) {
+                        filtersToCover.remove(filter);
+                    }
                     break;
                 }
             }
@@ -619,7 +829,9 @@ public abstract class SubPlanAssembler {
                 binding = bindingIfValidIndexedFilterOperand(table, indexableExpr, otherExpr,
                                                              coveringExpr, coveringColId);
                 if (binding != null) {
-                    filtersToCover.remove(filter);
+                    if (filterAction == EXCLUDE_FROM_POST_FILTERS) {
+                        filtersToCover.remove(filter);
+                    }
                     break;
                 }
             }
