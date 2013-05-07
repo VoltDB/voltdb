@@ -34,7 +34,12 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.google.common.base.Supplier;
 import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ListMultimap;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Multimaps;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
@@ -665,5 +670,20 @@ public class MiscUtils {
         }
 
         return result.asMap();
+    }
+
+    /**
+     * Create an ArrayListMultimap that uses TreeMap as the container map, so order is preserved.
+     */
+    public static <K extends Comparable, V> ListMultimap<K, V> sortedArrayListMultimap()
+    {
+        Map<K, Collection<V>> map = Maps.newTreeMap();
+        return Multimaps.newListMultimap(map, new Supplier<List<V>>() {
+            @Override
+            public List<V> get()
+            {
+                return Lists.newArrayList();
+            }
+        });
     }
 }
