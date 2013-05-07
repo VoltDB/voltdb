@@ -645,8 +645,10 @@ public class SnapshotSiteProcessor {
              * The enclosing loop ensures that the next table is then addressed.
              */
             if (serialized[0] == 0) {
-                taskIter.remove();
                 asyncTerminateReplicatedTableTasks(tableTasks);
+                // XXX: Guava's multimap will clear the tableTasks collection when the entry is
+                // removed from the containing map, so don't use the collection after removal!
+                taskIter.remove();
                 SNAP_LOG.debug("Finished snapshot tasks for table " + tableId +
                                ": " + tableTasks);
 
