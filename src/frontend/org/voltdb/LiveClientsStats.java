@@ -32,16 +32,13 @@ import org.voltcore.utils.Pair;
 // near as I can tell, this is because both the VoltNetwork and now the ClientInterface
 // have no catalog ID with which to associate these stats, so they just sort of hang out there
 // oddly.
-public class LiveClientStats extends StatsSource
+public class LiveClientsStats extends StatsSource
 {
     private Map<Long, Pair<String, long[]>> m_clientStats =
         new HashMap<Long, Pair<String,long[]>>();
 
     public static final ColumnInfo liveClientColumnInfo[] =
-        new ColumnInfo[] {new ColumnInfo("TIMESTAMP", VoltType.BIGINT),
-                          new ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID, VoltSystemProcedure.CTYPE_ID),
-                          new ColumnInfo("HOSTNAME", VoltType.STRING),
-                          new ColumnInfo("CONNECTION_ID", VoltType.BIGINT),
+        new ColumnInfo[] {new ColumnInfo("CONNECTION_ID", VoltType.BIGINT),
                           new ColumnInfo("CLIENT_HOSTNAME", VoltType.STRING),
                           new ColumnInfo("ADMIN", VoltType.TINYINT),
                           new ColumnInfo("OUTSTANDING_REQUEST_BYTES", VoltType.BIGINT),
@@ -76,7 +73,7 @@ public class LiveClientStats extends StatsSource
         }
     }
 
-    public LiveClientStats() {
+    public LiveClientsStats() {
         super(false);
     }
 

@@ -201,9 +201,20 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             } catch (ProcCallException e) {}
             client.callProcedure("@LoadMultipartitionTable", "ITEM",
                                  replicated_table);
-            VoltTable results[] = client.callProcedure("@Statistics", "table", 0).getResults();
 
             int foundItem = 0;
+            VoltTable results[] = client.callProcedure("@Statistics", "table", 0).getResults();
+            while (foundItem != 6) {
+                foundItem = 0;
+                results = client.callProcedure("@Statistics", "table", 0).getResults();
+                // Check that tables loaded correctly
+                while(results[0].advanceRow()) {
+                    if (results[0].getString("TABLE_NAME").equals("ITEM"))
+                    {
+                        ++foundItem;
+                    }
+                }
+            }
 
             System.out.println(results[0]);
 
