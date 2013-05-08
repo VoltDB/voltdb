@@ -31,7 +31,7 @@ Scanner::Scanner(PersistentTable &table) :
     m_blockMap(table.m_data),
     m_tupleSize(table.getTupleLength()),
     m_blockIterator(m_blockMap.begin()),
-    m_blockEnd(m_blockMap.begin()),
+    m_blockEnd(m_blockMap.end()),
     m_currentBlockPtr(NULL),
     m_tuplePtr(NULL),
     m_tupleIndex(0)

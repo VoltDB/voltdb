@@ -63,6 +63,7 @@
 #include "common/ThreadLocalPool.h"
 
 class CopyOnWriteTest_CopyOnWriteIterator;
+class CopyOnWriteTest_ElasticScannerTest;
 class CompactionTest_BasicCompaction;
 class CompactionTest_CompactionWithCopyOnWrite;
 
@@ -126,6 +127,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     friend class PersistentTableUndoInsertAction;
     friend class PersistentTableUndoUpdateAction;
     friend class ::CopyOnWriteTest_CopyOnWriteIterator;
+    friend class ::CopyOnWriteTest_ElasticScannerTest;
     friend class ::CompactionTest_BasicCompaction;
     friend class ::CompactionTest_CompactionWithCopyOnWrite;
 
@@ -396,7 +398,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     // that have never been allocated
     stx::btree_set<TBPtr > m_blocksWithSpace;
 
-    // Provides access to all table streaming apparatuses, including COW and recovery.
+    // Provides access to all table streaming apparati, including COW and recovery.
     boost::shared_ptr<elastic::Streamer> m_tableStreamer;
 
   private:
