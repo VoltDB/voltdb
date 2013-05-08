@@ -96,7 +96,7 @@ public class SystemInformation extends VoltSystemProcedure
             // All other sites should just return empty results tables.
             if (context.isLowestSiteId())
             {
-                result = populateOverviewTable(context);
+                result = populateOverviewTable();
             }
             else
             {
@@ -320,7 +320,8 @@ public class SystemInformation extends VoltSystemProcedure
      * This function does the real work. Everything else is
      * boilerplate sysproc stuff.
      */
-    private VoltTable populateOverviewTable(SystemProcedureExecutionContext context) {
+    private VoltTable populateOverviewTable()
+    {
         VoltTable vt = constructOverviewTable();
         int hostId = VoltDB.instance().getHostMessenger().getHostId();
 
