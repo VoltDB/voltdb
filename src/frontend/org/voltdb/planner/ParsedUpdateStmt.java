@@ -32,8 +32,6 @@ import org.voltdb.expressions.ExpressionUtil;
  *
  */
 public class ParsedUpdateStmt extends AbstractParsedStmt {
-    Table table = null;
-
     // maintaining column ordering is important for deterministic
     // schema generation: see ENG-1660.
     LinkedHashMap<Column, AbstractExpression> columns =
@@ -51,34 +49,12 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
     @Override
     void parse(VoltXMLElement stmtNode) {
         assert(tableList.size() == 1);
-        table = tableList.get(0);
+        Table table = tableList.get(0);
 
         for (VoltXMLElement child : stmtNode.children) {
-            if (child.name.equalsIgnoreCase("columns"))
-                parseColumns(child);
-        }
-    }
-
-    void parseColumns(VoltXMLElement columnsNode) {
-        for (VoltXMLElement child : columnsNode.children) {
-            assert(child.name.equals("column"));
-
-            Column col = null;
-            String tableName = child.attributes.get("table");
-            assert(tableName != null);
-            assert(tableName.equalsIgnoreCase(table.getTypeName()));
-            String name = child.attributes.get("name");
-            assert(name != null);
-            col = table.getColumns().getIgnoreCase(name.trim());
-
-            AbstractExpression expr = null;
-            assert(child.children.size() == 1);
-            VoltXMLElement subChild = child.children.get(0);
-            expr = parseExpressionTree(subChild);
-            assert(expr != null);
-            expr.refineValueType(VoltType.get((byte)col.getType()));
-            ExpressionUtil.finalizeValueTypes(expr);
-            columns.put(col, expr);
+            if (child.name.equalsIgnoreCase("columns")) {
+                parseTargetColumns(child, table, columns);
+            }
         }
     }
 

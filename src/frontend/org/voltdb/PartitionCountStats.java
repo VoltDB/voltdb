@@ -21,15 +21,29 @@ import java.util.ArrayList;
 import java.util.Iterator;
 
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.iv2.Cartographer;
 
 public class PartitionCountStats extends StatsSource {
     private final String COLUMN_NAME = "PARTITION_COUNT";
 
+    // Legacy has constant number of partitions, IV2 doesn't use this
     private final int m_partitionCount;
 
+    // IV2 asks the cartographer for partition count
+    private final Cartographer m_cartographer;
+
+    /** Legacy constructor */
     public PartitionCountStats(int partitionCount) {
         super(false);
         m_partitionCount = partitionCount;
+        m_cartographer = null;
+    }
+
+    /** IV2 constructor */
+    public PartitionCountStats(Cartographer cartographer) {
+        super(false);
+        m_partitionCount = 0;
+        m_cartographer = cartographer;
     }
 
     @Override
@@ -40,7 +54,11 @@ public class PartitionCountStats extends StatsSource {
 
     @Override
     protected void updateStatsRow(Object rowKey, Object[] rowValues) {
-        rowValues[columnNameToIndex.get(COLUMN_NAME)] = Integer.valueOf(m_partitionCount);
+        if (m_cartographer != null) {
+            rowValues[columnNameToIndex.get(COLUMN_NAME)] = m_cartographer.getPartitions().size();
+        } else {
+            rowValues[columnNameToIndex.get(COLUMN_NAME)] = Integer.valueOf(m_partitionCount);
+        }
         super.updateStatsRow(rowKey, rowValues);
     }
 

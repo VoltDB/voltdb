@@ -105,6 +105,8 @@ import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.xml.sax.SAXException;
 
+import com.google.common.base.Charsets;
+
 /**
  *
  */
@@ -113,7 +115,7 @@ public abstract class CatalogUtil {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     // The minimum version of catalog that's compatible with this version of Volt
-    public static final int[] minCompatibleVersion = {3, 0};
+    public static final int[] minCompatibleVersion = {3, 2};
 
     public static final String CATALOG_FILENAME = "catalog.txt";
     public static final String CATALOG_BUILDINFO_FILENAME = "buildinfo.txt";
@@ -534,7 +536,7 @@ public abstract class CatalogUtil {
         if (deployment == null) {
             return -1;
         }
-        return compileDeploymentAndGetCRC(catalog, deployment, crashOnFailedValidation, false);
+        return compileDeploymentAndGetCRC(catalog, deployment, crashOnFailedValidation);
     }
 
     public static long compileDeploymentStringAndGetCRC(Catalog catalog, String deploymentString, boolean crashOnFailedValidation) {
@@ -542,7 +544,7 @@ public abstract class CatalogUtil {
         if (deployment == null) {
             return -1;
         }
-        return compileDeploymentAndGetCRC(catalog, deployment, crashOnFailedValidation, true);
+        return compileDeploymentAndGetCRC(catalog, deployment, crashOnFailedValidation);
     }
 
     /**
@@ -555,8 +557,8 @@ public abstract class CatalogUtil {
      */
     public static long compileDeploymentAndGetCRC(Catalog catalog,
                                                   DeploymentType deployment,
-                                                  boolean crashOnFailedValidation,
-                                                  boolean printLog) {
+                                                  boolean crashOnFailedValidation)
+    {
 
         if (!validateDeployment(catalog, deployment)) {
             return -1;
@@ -566,7 +568,7 @@ public abstract class CatalogUtil {
         catalog.getClusters().get("cluster").getDeployment().add("deployment");
 
         // set the cluster info
-        setClusterInfo(catalog, deployment, printLog);
+        setClusterInfo(catalog, deployment);
 
         //Set the snapshot schedule
         setSnapshotInfo( catalog, deployment.getSnapshot());
@@ -579,8 +581,7 @@ public abstract class CatalogUtil {
         // because path locations for snapshots and partition detection don't
         // exist in the catalog until after those portions of the deployment
         // file are handled.
-        setPathsInfo(catalog, deployment.getPaths(), crashOnFailedValidation,
-                     printLog);
+        setPathsInfo(catalog, deployment.getPaths(), crashOnFailedValidation);
 
         // set the users info
         setUsersInfo(catalog, deployment.getUsers());
@@ -699,6 +700,7 @@ public abstract class CatalogUtil {
                 sb.append(u.getName()).append(",");
                 sb.append(Arrays.toString(mergeUserRoles(u).toArray()));
                 sb.append(",").append(u.getPassword()).append(",");
+                sb.append(u.isPlaintext()).append(",");
             }
         }
         sb.append("\n");
@@ -902,33 +904,13 @@ public abstract class CatalogUtil {
      * @param catalog The catalog to be updated.
      * @param printLog Whether or not to print cluster configuration.
      */
-    private static void setClusterInfo(Catalog catalog, DeploymentType deployment,
-                                       boolean printLog) {
+    private static void setClusterInfo(Catalog catalog, DeploymentType deployment) {
         ClusterType cluster = deployment.getCluster();
         int hostCount = cluster.getHostcount();
         int sitesPerHost = cluster.getSitesperhost();
         int kFactor = cluster.getKfactor();
 
         ClusterConfig config = new ClusterConfig(hostCount, sitesPerHost, kFactor);
-        if (printLog) {
-            hostLog.l7dlog(Level.INFO,
-                           LogKeys.compiler_VoltCompiler_LeaderAndHostCountAndSitesPerHost.name(),
-                           new Object[] { config.getHostCount(),
-                                          VoltDB.instance().getConfig().m_leader,
-                                          config.getSitesPerHost(),
-                                          config.getReplicationFactor() },
-                           null);
-        }
-        int replicas = config.getReplicationFactor() + 1;
-        int partitionCount = config.getSitesPerHost() * config.getHostCount() / replicas;
-        if (printLog) {
-            hostLog.info(String.format("The entire cluster has %d %s of%s %d logical partition%s.",
-                                       replicas,
-                                       replicas > 1 ? "copies" : "copy",
-                                       partitionCount > 1 ? " each of the" : "",
-                                       partitionCount,
-                                       partitionCount > 1 ? "s" : ""));
-        }
 
         if (!config.validate()) {
             hostLog.error(config.getErrorMsg());
@@ -952,15 +934,9 @@ public abstract class CatalogUtil {
                     else {
                         sched.setPrefix(defaultPPDPrefix);
                     }
-                    if (printLog) {
-                        hostLog.info("Detection of network partitions in the cluster is enabled.");
-                    }
                 }
                 else {
                     catCluster.setNetworkpartition(false);
-                    if (printLog) {
-                        hostLog.info("Detection of network partitions in the cluster is not enabled.");
-                    }
                 }
             }
             else {
@@ -970,15 +946,9 @@ public abstract class CatalogUtil {
                     CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
                     SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
                     sched.setPrefix(defaultPPDPrefix);
-                    if (printLog) {
-                        hostLog.info("Detection of network partitions in the cluster is enabled.");
-                    }
                 }
                 else {
                     catCluster.setNetworkpartition(false);
-                    if (printLog) {
-                        hostLog.info("Detection of network partitions in the cluster is not enabled.");
-                    }
                 }
             }
 
@@ -1237,17 +1207,13 @@ public abstract class CatalogUtil {
      * @param paths A reference to the <paths> element of the deployment.xml file.
      * @param printLog Whether or not to print paths info.
      */
-    private static void setPathsInfo(Catalog catalog, PathsType paths, boolean crashOnFailedValidation,
-                                     boolean printLog) {
+    private static void setPathsInfo(Catalog catalog, PathsType paths, boolean crashOnFailedValidation) {
         File voltDbRoot;
         final Cluster cluster = catalog.getClusters().get("cluster");
         // Handles default voltdbroot (and completely missing "paths" element).
         voltDbRoot = getVoltDbRoot(paths);
 
         validateDirectory("volt root", voltDbRoot, crashOnFailedValidation);
-        if (printLog) {
-            hostLog.info("Using \"" + voltDbRoot.getAbsolutePath() + "\" for voltdbroot directory.");
-        }
 
         PathEntry path_entry = null;
         if (paths != null)
@@ -1367,10 +1333,16 @@ public abstract class CatalogUtil {
 
         SecureRandom sr = new SecureRandom();
         for (UsersType.User user : users.getUser()) {
+
+            String sha1hex = user.getPassword();
+            if (user.isPlaintext()) {
+                sha1hex = extractPassword(user.getPassword());
+            }
             org.voltdb.catalog.User catUser = db.getUsers().add(user.getName());
+
             String hashedPW =
                     BCrypt.hashpw(
-                            extractPassword(user.getPassword()),
+                            sha1hex,
                             BCrypt.gensalt(BCrypt.GENSALT_DEFAULT_LOG2_ROUNDS,sr));
             catUser.setShadowpassword(hashedPW);
 
@@ -1446,29 +1418,31 @@ public abstract class CatalogUtil {
             hostLog.l7dlog(Level.FATAL, LogKeys.compiler_VoltCompiler_NoSuchAlgorithm.name(), e);
             System.exit(-1);
         }
-        final byte passwordHash[] = md.digest(password.getBytes());
+        final byte passwordHash[] = md.digest(password.getBytes(Charsets.UTF_8));
         return Encoder.hexEncode(passwordHash);
     }
 
     public static void
-        uploadCatalogToZK(ZooKeeper zk, int catalogVersion, long txnId, long uniqueId, byte catalogBytes[])
+        uploadCatalogToZK(ZooKeeper zk, int catalogVersion, long txnId, long uniqueId, byte[] catalogHash, byte catalogBytes[])
                 throws KeeperException, InterruptedException {
-        ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 20);
+        ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 20 + 20);
         versionAndBytes.putInt(catalogVersion);
         versionAndBytes.putLong(txnId);
         versionAndBytes.putLong(uniqueId);
+        versionAndBytes.put(catalogHash);
         versionAndBytes.put(catalogBytes);
         zk.create(VoltZK.catalogbytes,
                 versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
     }
 
     public static void
-        setCatalogToZK(ZooKeeper zk, int catalogVersion, long txnId, long uniqueId, byte catalogBytes[])
+        setCatalogToZK(ZooKeeper zk, int catalogVersion, long txnId, long uniqueId, byte[] catalogHash, byte catalogBytes[])
             throws KeeperException, InterruptedException {
-        ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 20);
+        ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 20 + 20);
         versionAndBytes.putInt(catalogVersion);
         versionAndBytes.putLong(txnId);
         versionAndBytes.putLong(uniqueId);
+        versionAndBytes.put(catalogHash);
         versionAndBytes.put(catalogBytes);
         zk.setData(VoltZK.catalogbytes,
                 versionAndBytes.array(), -1);
@@ -1478,12 +1452,14 @@ public abstract class CatalogUtil {
         public final long txnId;
         public final long uniqueId;
         public final int version;
+        public final byte hash[];
         public final byte bytes[];
 
-        public CatalogAndIds(long txnId, long uniqueId, int catalogVersion, byte catalogBytes[]) {
+        public CatalogAndIds(long txnId, long uniqueId, int catalogVersion, byte[] catalogHash, byte[] catalogBytes) {
             this.txnId = txnId;
             this.uniqueId = uniqueId;
             this.version = catalogVersion;
+            this.hash = catalogHash;
             this.bytes = catalogBytes;
         }
     }
@@ -1494,10 +1470,12 @@ public abstract class CatalogUtil {
         int version = versionAndBytes.getInt();
         long catalogTxnId = versionAndBytes.getLong();
         long catalogUniqueId = versionAndBytes.getLong();
-        byte catalogBytes[] = new byte[versionAndBytes.remaining()];
+        byte[] catalogHash = new byte[20]; // sha-1 hash size
+        versionAndBytes.get(catalogHash);
+        byte[] catalogBytes = new byte[versionAndBytes.remaining()];
         versionAndBytes.get(catalogBytes);
         versionAndBytes = null;
-        return new CatalogAndIds(catalogTxnId, catalogUniqueId, version, catalogBytes);
+        return new CatalogAndIds(catalogTxnId, catalogUniqueId, version, catalogHash, catalogBytes);
     }
 
 }

@@ -19,9 +19,8 @@ package org.voltdb.iv2;
 
 import java.io.IOException;
 import java.util.ArrayList;
-
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -97,15 +96,23 @@ public class MpProcedureTask extends ProcedureTask
     {
         hostLog.debug("STARTING: " + this);
         // Cast up. Could avoid ugliness with Iv2TransactionClass baseclass
-        MpTransactionState txn = (MpTransactionState)m_txn;
+        MpTransactionState txn = (MpTransactionState)m_txnState;
         // Check for restarting sysprocs
+        String spName = txn.m_initiationMsg.getStoredProcedureName();
+
+        // certain system procs can and can't be restarted
+        // Right now this is adhoc and catalog update. Since these are treated specially
+        // in a few places (here, recovery, dr), maybe we should add another metadata
+        // property the sysproc registry about whether a proc can be restarted/recovered/dr-ed
         if (m_isRestart &&
-            (txn.m_task.getStoredProcedureName().startsWith("@") &&
-             !txn.m_task.getStoredProcedureName().startsWith("@AdHoc"))) {
-            InitiateResponseMessage errorResp = new InitiateResponseMessage(txn.m_task);
+                spName.startsWith("@") &&
+                !spName.startsWith("@AdHoc") &&
+                !spName.equals("@UpdateApplicationCatalog"))
+        {
+            InitiateResponseMessage errorResp = new InitiateResponseMessage(txn.m_initiationMsg);
             errorResp.setResults(new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
                         new VoltTable[] {},
-                        "Failure while running system procedure " + txn.m_task.getStoredProcedureName() +
+                        "Failure while running system procedure " + txn.m_initiationMsg.getStoredProcedureName() +
                         ", and system procedures can not be restarted."));
             txn.setNeedsRollback();
             completeInitiateTask(siteConnection);
@@ -121,19 +128,19 @@ public class MpProcedureTask extends ProcedureTask
             CompleteTransactionMessage restart = new CompleteTransactionMessage(
                     m_initiator.getHSId(), // who is the "initiator" now??
                     m_initiator.getHSId(),
-                    m_txn.txnId,
-                    m_txn.isReadOnly(),
+                    m_txnState.txnId,
+                    m_txnState.isReadOnly(),
                     0,
                     true,
                     false,  // really don't want to have ack the ack.
-                    !m_txn.isReadOnly(),
+                    !m_txnState.isReadOnly(),
                     m_msg.isForReplay());
 
             restart.setTruncationHandle(m_msg.getTruncationHandle());
             restart.setOriginalTxnId(m_msg.getOriginalTxnId());
             m_initiator.send(com.google.common.primitives.Longs.toArray(m_initiatorHSIds), restart);
         }
-        final InitiateResponseMessage response = processInitiateTask(txn.m_task, siteConnection);
+        final InitiateResponseMessage response = processInitiateTask(txn.m_initiationMsg, siteConnection);
         // We currently don't want to restart read-only MP transactions because:
         // 1) We're not writing the Iv2InitiateTaskMessage to the first
         // FragmentTaskMessage in read-only case in the name of some unmeasured
@@ -179,10 +186,10 @@ public class MpProcedureTask extends ProcedureTask
         CompleteTransactionMessage complete = new CompleteTransactionMessage(
                 m_initiator.getHSId(), // who is the "initiator" now??
                 m_initiator.getHSId(),
-                m_txn.txnId,
-                m_txn.isReadOnly(),
-                m_txn.getHash(),
-                m_txn.needsRollback(),
+                m_txnState.txnId,
+                m_txnState.isReadOnly(),
+                m_txnState.getHash(),
+                m_txnState.needsRollback(),
                 false,  // really don't want to have ack the ack.
                 false,
                 m_msg.isForReplay());
@@ -190,7 +197,7 @@ public class MpProcedureTask extends ProcedureTask
         complete.setTruncationHandle(m_msg.getTruncationHandle());
         complete.setOriginalTxnId(m_msg.getOriginalTxnId());
         m_initiator.send(com.google.common.primitives.Longs.toArray(m_initiatorHSIds), complete);
-        m_txn.setDone();
+        m_txnState.setDone();
         m_queue.flush();
     }
 
@@ -199,7 +206,7 @@ public class MpProcedureTask extends ProcedureTask
         // We don't need to send restart messages here; the next SiteTasker
         // which will run on the MPI's Site thread will be the repair task,
         // which will send the necessary CompleteTransactionMessage to restart.
-        ((MpTransactionState)m_txn).restart();
+        ((MpTransactionState)m_txnState).restart();
         // Update the masters list with the list provided when restart was triggered
         updateMasters(m_restartMasters.get());
         m_isRestart = true;

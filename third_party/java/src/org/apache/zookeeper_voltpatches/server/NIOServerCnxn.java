@@ -161,11 +161,14 @@ public class NIOServerCnxn implements Watcher, ServerCnxn {
             }
         }
 
-        public void startup(ZooKeeperServer zks) throws IOException,
+        public Set<Long> startup(ZooKeeperServer zks) throws IOException,
                 InterruptedException {
             start();
-            zks.startup();
+            HashSet<Long> retval = new HashSet<Long>();
+            retval.add(zks.startup().getId());
             setZooKeeperServer(zks);
+            retval.add(getId());
+            return retval;
         }
 
         public void setZooKeeperServer(ZooKeeperServer zks) {

@@ -148,29 +148,29 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         String captured = capturer.toString("UTF-8");
         String[] lines = captured.split("\n");
 
-        assertTrue(foundLineMatching(lines, ".*\\[RO].*NondeterministicROProc.*"));
-        assertTrue(foundLineMatching(lines, ".*\\[RO].*NondeterministicROProc.*"));
-        assertTrue(foundLineMatching(lines, ".*\\[RO].*DeterministicRONonSeqProc.*"));
-        assertTrue(foundLineMatching(lines, ".*\\[RO].*\\[Seq].*DeterministicROSeqProc.*"));
-        assertTrue(foundLineMatching(lines, ".*\\[RW].*Insert.*"));
-        assertTrue(foundLineMatching(lines, ".*\\[RW].*BLAH.insert.*"));
-        assertTrue(foundLineMatching(lines, ".*\\[RW].*NondeterministicRWProc.*"));
-        assertTrue(foundLineMatching(lines, ".*\\[RW].*DeterministicRWProc.*"));
+        assertTrue(foundLineMatching(lines, ".*\\[READ].*NondeterministicROProc.*"));
+        assertTrue(foundLineMatching(lines, ".*\\[READ].*NondeterministicROProc.*"));
+        assertTrue(foundLineMatching(lines, ".*\\[READ].*DeterministicRONonSeqProc.*"));
+        assertTrue(foundLineMatching(lines, ".*\\[READ].*DeterministicROSeqProc.*"));
+        assertTrue(foundLineMatching(lines, ".*\\[WRITE].*Insert.*"));
+        assertTrue(foundLineMatching(lines, ".*\\[WRITE].*BLAH.insert.*"));
+        assertTrue(foundLineMatching(lines, ".*\\[WRITE].*NondeterministicRWProc.*"));
+        assertTrue(foundLineMatching(lines, ".*\\[WRITE].*DeterministicRWProc.*"));
 
-        assertTrue(countLinesMatching(lines, ".*\\[NDC].*NDC=true.*") == 2);
+        assertEquals(1, countLinesMatching(lines, ".*\\[NDC].*NDC=true.*"));
 
         assertFalse(foundLineMatching(lines, ".*\\[NDC].*NDC=false.*"));
 
-        assertFalse(foundLineMatching(lines, ".*\\[RW].*NondeterministicROProc.*"));
-        assertFalse(foundLineMatching(lines, ".*\\[RW].*DeterministicRONonSeqProc.*"));
-        assertFalse(foundLineMatching(lines, ".*\\[RW].*\\[Seq].*DeterministicROSeqProc.*"));
-        assertFalse(foundLineMatching(lines, ".*\\[Seq].*DeterministicRONonSeqProc.*"));
-        assertFalse(foundLineMatching(lines, ".*\\[RO].*Insert.*"));
-        assertFalse(foundLineMatching(lines, ".*\\[RO].*BLAH.insert.*"));
-        assertFalse(foundLineMatching(lines, ".*\\[Seq].*Insert.*"));
-        assertFalse(foundLineMatching(lines, ".*\\[Seq].*BLAH.insert.*"));
-        assertFalse(foundLineMatching(lines, ".*\\[RO].*NondeterministicRWProc.*"));
-        assertFalse(foundLineMatching(lines, ".*\\[RO].*DeterministicRWProc.*"));
+        assertFalse(foundLineMatching(lines, ".*\\[WRITE].*NondeterministicROProc.*"));
+        assertFalse(foundLineMatching(lines, ".*\\[WRITE].*DeterministicRONonSeqProc.*"));
+        assertFalse(foundLineMatching(lines, ".*\\[WRITE].*DeterministicROSeqProc.*"));
+        assertFalse(foundLineMatching(lines, ".*\\[TABLE SCAN].*DeterministicRONonSeqProc.*"));
+        assertFalse(foundLineMatching(lines, ".*\\[READ].*Insert.*"));
+        assertFalse(foundLineMatching(lines, ".*\\[READ].*BLAH.insert.*"));
+        assertFalse(foundLineMatching(lines, ".*\\[TABLE SCAN].*Insert.*"));
+        assertFalse(foundLineMatching(lines, ".*\\[TABLE SCAN].*BLAH.insert.*"));
+        assertFalse(foundLineMatching(lines, ".*\\[READ].*NondeterministicRWProc.*"));
+        assertFalse(foundLineMatching(lines, ".*\\[READ].*DeterministicRWProc.*"));
 
         assertFalse(foundLineMatching(lines, ".*DeterministicRWProc.*non-deterministic.*"));
 

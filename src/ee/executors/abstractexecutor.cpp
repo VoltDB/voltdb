@@ -126,7 +126,7 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
     try {
         if (!p_init(m_abstractNode, limits))
             return false;
-    } catch (exception& err) {
+    } catch (const exception& err) {
         char message[128];
         snprintf(message, 128, "The Executor failed to initialize PlanNode '%s'",
                 m_abstractNode->debug().c_str());
@@ -172,12 +172,8 @@ void AbstractExecutor::setTempOutputTable(TempTableLimits* limits, const string 
  * Called from p_init.
  */
 void AbstractExecutor::setDMLCountOutputTable(TempTableLimits* limits) {
-    TupleSchema* schema = m_abstractNode->generateTupleSchema(false);
-    // The column count (1) and column name for the DML counter column is hard-coded in the planner
-    // and passed via the output schema -- kind of pointless since they could just as easily be hard-coded here,
-    // possibly saving the trouble of serializing an outputSchema at all for DML nodes.
-    assert(m_abstractNode->getOutputSchema().size() == 1);
-    std::vector<std::string> columnNames(1, m_abstractNode->getOutputSchema()[0]->getColumnName());
+    TupleSchema* schema = m_abstractNode->generateDMLCountTupleSchema();
+    const std::vector<std::string> columnNames(1, "modified_tuples");
     m_abstractNode->setOutputTable(TableFactory::getTempTable(m_abstractNode->databaseId(),
                                                               "temp",
                                                               schema,

@@ -68,6 +68,10 @@ public class SSHTools {
         return cmdSSH(user, key, host, stringify(command));
     }
 
+    public SFTPSession getSftpSession(String hostname, VoltLogger logger) {
+        return new SFTPSession(m_username, m_keyFile, hostname, logger);
+    }
+
     /*
      * The code from here to the end of the file is code that integrates with an external
      * SSH library (JSCH, http://www.jcraft.com/jsch/).  If you wish to replaces this
@@ -104,28 +108,43 @@ public class SSHTools {
             InputStreamReader outStrRdr = new InputStreamReader(out, "UTF-8");
             Reader outStrBufRdr = new BufferedReader(outStrRdr);
 
+            StringBuffer stdout = new StringBuffer();
+            StringBuffer stderr = new StringBuffer();
+
             channel.connect(5000);  // timeout after 5 seconds
             while (true) {
                 if (channel.isClosed()) {
                     break;
                 }
+
+                // Read from both streams here so that they are not blocked,
+                // if they are blocked because the buffer is full, channel.isClosed() will never
+                // be true.
+                int ch;
+                while (outStrBufRdr.ready() && (ch = outStrBufRdr.read()) > -1) {
+                    stdout.append((char) ch);
+                }
+                while (errStrBufRdr.ready() && (ch = errStrBufRdr.read()) > -1) {
+                    stderr.append((char) ch);
+                }
+
                 try {
                     Thread.sleep(100);
                 } catch (InterruptedException ie) {
                 }
             }
 
-            // After the command is executed, gather the results (both stdin and stderr).
+            // In case there's still some more stuff in the buffers, read them
             int ch;
-            StringBuffer stdout = new StringBuffer();
             while ((ch = outStrBufRdr.read()) > -1) {
                 stdout.append((char) ch);
             }
-            result.append(stdout.toString());
-            StringBuffer stderr = new StringBuffer();
             while ((ch = errStrBufRdr.read()) > -1) {
                 stderr.append((char) ch);
             }
+
+            // After the command is executed, gather the results (both stdin and stderr).
+            result.append(stdout.toString());
             result.append(stderr.toString());
 
             // Shutdown the connection

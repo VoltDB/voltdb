@@ -276,15 +276,14 @@ public class TestVoltProcedure extends TestCase {
         site = new MockExecutionSite(
                 executionSiteId,
                 VoltDB.instance().getCatalogContext().catalog.serialize(),
-                VoltDB.instance().getSiteTracker()) {
+                null) {
 
             @Override
             public int getCorrespondingPartitionId() {
                 return 42;
             }
         };
-        nullParam = new ParameterSet();
-        nullParam.setParameters(new Object[]{null});
+        nullParam = ParameterSet.fromArrayNoCopy(new Object[]{null});
     }
 
     @Override
@@ -406,8 +405,7 @@ public class TestVoltProcedure extends TestCase {
                 wrapper, site, null,
                 site.m_context.database.getProcedures().get(LongProcedure.class.getName()), null);
 
-        ParameterSet params = new ParameterSet();
-        params.setParameters(1L);
+        ParameterSet params = ParameterSet.fromArrayNoCopy(1L);
         assertNotNull(agent.m_selector);
         assertNotNull(agent.m_source);
         assertEquals(agent.m_selector, SysProcSelector.PROCEDURE);

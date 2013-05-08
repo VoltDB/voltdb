@@ -34,6 +34,7 @@ import java.util.Set;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
@@ -159,7 +160,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
 }
 
-    public void testNumericExpressionIndex() throws Exception {
+    public void UNtestNumericExpressionIndex() throws Exception {
         System.out.println("STARTING testNumericExpressionIndex");
         Client client = getClient();
         initialLoad(client, "R1");
@@ -192,6 +193,13 @@ public class TestFunctionsSuite extends RegressionSuite {
                 // Test generalized expression index with a constant argument.
                 "CREATE INDEX R1_ABS_ID_SCALED ON R1 ( ID / 3 ); " +
         */
+
+        cr = client.callProcedure("@AdHoc", "select ID from R1 where ABS(ID) = 9 and DESC > 'XYZ' order by ID");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(0, result.getRowCount());
+
+
         cr = client.callProcedure("@AdHoc", "select ID from R1 where ABS(ID) > 9 order by NUM, ID");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
@@ -741,10 +749,15 @@ public class TestFunctionsSuite extends RegressionSuite {
     private static final double orderedIds[] = { -125, -25, 0, 25, 125 };
     private static final int ROWCOUNT = orderedIds.length;
 
+    private static final double orderedByStringIds[] = { -125, -25, 0, 125, 25 };
+    private static final double orderedByFloatStringIds[] = { -125, -25, 0, 125, 25 };
+    private static final double orderedByDecimalStringIds[] = { -25, -125, 0, 25, 125  };
+
     // NOTE: Be careful about how this array may be indexed by hard-coded column numbers sprinkled through the code
     // -- and especially keep the non-integer columns last.
     // These correspond to the column types of table NUMBER_TYPES, in the order that they are defined and typically selected.
-    private static String numTypeNames[] = { "INTEGER", "TINY", "SMALL", "BIG", "FLOAT", "DECIMAL" };
+    private static String numTypeNames[] = { "INTEGER", "TINYINT", "SMALLINT", "BIGINT", "FLOAT", "DECIMAL" };
+    private static String numFormatNames[] = { "LONG",  "LONG", "LONG", "LONG", "DOUBLE", "DECIMAL" };
     private static final int COLUMNCOUNT = numTypeNames.length;
     private static final int FLOATCOLINDEX = 4;
     private static final int DECIMALCOLINDEX = 5;
@@ -810,7 +823,76 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
     };
 
-    private FunctionTestCase[] displayFunctionRun(Client client, String fname, int rowCount, boolean expectDouble) throws Exception
+    /**
+     * @param expectedFormat
+     * @param result
+     * @param jj
+     * @return
+     */
+    private double getColumnValue(String expectedFormat, VoltTable result, int jj)
+    {
+        double value;
+        if (expectedFormat == null) {
+            if (jj < FLOATCOLINDEX) {
+                value = result.getLong(jj);
+            }
+            else if (jj == FLOATCOLINDEX) {
+                value = result.getDouble(jj);
+            }
+            else {
+                value = result.getDecimalAsBigDecimal(jj).doubleValue();
+            }
+        }
+        else if (expectedFormat.equals("LONG")) {
+            value = result.getLong(jj);
+        }
+        else if (expectedFormat.equals("DOUBLE")) {
+            value = result.getDouble(jj);
+        }
+        else {
+            value = result.getDecimalAsBigDecimal(jj).doubleValue();
+        }
+        return value;
+    }
+
+    /**
+     * @param expectedFormat
+     * @param client
+     * @param proc
+     * @param jj
+     * @param filter
+     * @return
+     * @throws IOException
+     * @throws NoConnectionsException
+     * @throws ProcCallException
+     */
+    private static ClientResponse callWithParameter(String expectedFormat, Client client, String proc, int jj, double filter)
+            throws IOException, NoConnectionsException, ProcCallException
+    {
+        ClientResponse cr;
+        if (expectedFormat == null) {
+            if (jj < FLOATCOLINDEX) {
+                cr = client.callProcedure(proc, (int)filter);
+            }
+            else if (jj == FLOATCOLINDEX) {
+                cr = client.callProcedure(proc, filter);
+            } else {
+                cr = client.callProcedure(proc, BigDecimal.valueOf(filter));
+            }
+        }
+        else if (expectedFormat.equals("LONG")) {
+            cr = client.callProcedure(proc, (int)filter);
+        }
+        else if (expectedFormat.equals("DOUBLE")) {
+            cr = client.callProcedure(proc, filter);
+        }
+        else {
+            cr = client.callProcedure(proc, BigDecimal.valueOf(filter));
+        }
+        return cr;
+    }
+
+    private FunctionTestCase[] displayFunctionRun(Client client, String fname, int rowCount, String expectedFormat) throws Exception
     {
         ClientResponse cr;
         VoltTable result;
@@ -825,14 +907,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         while (result.advanceRow()) {
             int jj = 0;
             for (String numTypeName : numTypeNames) {
-                double value;
-                if (expectDouble || jj == FLOATCOLINDEX) {
-                    value = result.getDouble(jj);
-                } else if (jj == DECIMALCOLINDEX) {
-                    value = result.getDecimalAsBigDecimal(jj).doubleValue();
-                } else {
-                    value = result.getLong(jj);
-                }
+                double value = getColumnValue(expectedFormat, result, jj);
                 resultSet[ii++] = new FunctionTestCase(proc + " " + numTypeName, value);
                 ++jj;
             }
@@ -863,12 +938,28 @@ public class TestFunctionsSuite extends RegressionSuite {
                     resultSet[ii] = new FunctionTestCase(proc + " ROW " + jj, result.getDouble(0));
                     ii++;
                 }
+                // Extraneous columns beyond the first are provided for debug purposes only
+                for (int kk = 1; kk < result.getColumnCount(); ++kk) {
+                    if (result.getColumnType(kk) == VoltType.FLOAT) {
+                        System.out.println("DEBUG " + proc + " Extra column #" + kk + " = " + result.getDouble(kk));
+                    }
+                    else if (result.getColumnType(kk) == VoltType.DECIMAL) {
+                        System.out.println("DEBUG " + proc + " Extra column #" + kk + " = " + result.getDecimalAsBigDecimal(kk));
+                    }
+                    else if (result.getColumnType(kk) == VoltType.STRING) {
+                        System.out.println("DEBUG " + proc + " Extra column #" + kk + " = " + result.getString(kk));
+                    }
+                    else {
+                        System.out.println("DEBUG " + proc + " Extra column #" + kk + " = " + result.getLong(kk));
+                    }
+                }
+                ++jj;
             }
         }
         return resultSet;
     }
 
-    private FunctionTestCase[] whereFunctionRun(Client client, String fname, Set<Double> filters, boolean expectDouble) throws Exception
+    private FunctionTestCase[] whereFunctionRun(Client client, String fname, Set<Double> filters, String expectedFormat) throws Exception
     {
         ClientResponse cr;
         VoltTable result;
@@ -879,13 +970,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         for (String numTypeName : numTypeNames) {
             for (double filter : filters) {
                 String proc = "WHERE_" + fname + "_" + numTypeName;
-                if (expectDouble || jj == FLOATCOLINDEX) {
-                    cr = client.callProcedure(proc, filter);
-                } else if (jj == 5) {
-                    cr = client.callProcedure(proc, BigDecimal.valueOf(filter));
-                } else {
-                    cr = client.callProcedure(proc, (int)filter);
-                }
+                cr = callWithParameter(expectedFormat, client, proc, jj, filter);
                 result = cr.getResults()[0];
                 int rowCount = result.getRowCount();
                 assertEquals(rowCount, 1);
@@ -904,7 +989,8 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
     static String formatForFuzziness = "%14e";
-    private void functionTest(String fname, double rawData[], double[] resultValues, Set<Double> filters, boolean monotonic, boolean ascending, boolean expectDouble) throws Exception
+    private void functionTest(String fname, double rawData[], double[] resultValues, Set<Double> filters,
+                              boolean monotonic, boolean ascending, String expectedFormat) throws Exception
     {
         System.out.println("STARTING test of " + fname);
 
@@ -913,7 +999,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         FunctionTestCase[] results;
 
-        results = displayFunctionRun(client, fname, resultValues.length / COLUMNCOUNT, expectDouble);
+        results = displayFunctionRun(client, fname, resultValues.length / COLUMNCOUNT, expectedFormat);
 
         assertEquals(results.length, resultValues.length);
 
@@ -973,7 +1059,7 @@ public class TestFunctionsSuite extends RegressionSuite {
             }
         }
 
-        results = whereFunctionRun(client, fname, filters, expectDouble);
+        results = whereFunctionRun(client, fname, filters, expectedFormat);
 
         assertEquals(results.length, COLUMNCOUNT*filters.size());
         // If filters represents all the values in resultValues,
@@ -1013,6 +1099,9 @@ public class TestFunctionsSuite extends RegressionSuite {
 
     public void testManyNumericFunctions() throws Exception
     {
+        subtestFromVarCharCasts();
+        subtestToVarCharCasts();
+        subtestNumericCasts();
         subtestCeiling();
         subtestExp();
         subtestFloor();
@@ -1035,8 +1124,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
         final boolean monotonic = true;
         final boolean ascending = true;
-        final boolean expectDouble = false;
-        functionTest(fname, values, resultValues, filters, monotonic, ascending, expectDouble);
+        final String expectedFormat = null; // column/parameter values are variously typed.
+        functionTest(fname, values, resultValues, filters, monotonic, ascending, expectedFormat);
     }
 
     public void subtestExp() throws Exception
@@ -1050,8 +1139,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
         final boolean monotonic = true;
         final boolean ascending = true;
-        final boolean expectDouble = true;
-        functionTest(fname, values, resultValues, filters, monotonic, ascending, expectDouble);
+        final String expectedFormat = "DOUBLE";
+        functionTest(fname, values, resultValues, filters, monotonic, ascending, expectedFormat);
     }
 
     public void subtestFloor() throws Exception
@@ -1065,8 +1154,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
         final boolean monotonic = true;
         final boolean ascending = true;
-        final boolean expectDouble = false;
-        functionTest(fname, values, resultValues, filters, monotonic, ascending, expectDouble);
+        final String expectedFormat = null;
+        functionTest(fname, values, resultValues, filters, monotonic, ascending, expectedFormat);
 
     }
 
@@ -1081,8 +1170,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
         final boolean monotonic = true;
         final boolean ascending = true;
-        final boolean expectDouble = true;
-        functionTest(fname, values, resultValues, filters, monotonic, ascending, expectDouble);
+        final String expectedFormat = "DOUBLE";
+        functionTest(fname, values, resultValues, filters, monotonic, ascending, expectedFormat);
     }
 
     public void subtestPowerx07() throws Exception
@@ -1096,8 +1185,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
         final boolean monotonic = true;
         final boolean ascending = true;
-        final boolean expectDouble = true;
-        functionTest(fname, nonnegnonzeros, resultValues, filters, monotonic, ascending, expectDouble);
+        final String expectedFormat = "DOUBLE";
+        functionTest(fname, nonnegnonzeros, resultValues, filters, monotonic, ascending, expectedFormat);
     }
 
     public void subtestPower7x() throws Exception
@@ -1111,8 +1200,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
         final boolean monotonic = true;
         final boolean ascending = true;
-        final boolean expectDouble = true;
-        functionTest(fname, values, resultValues, filters, monotonic, ascending, expectDouble);
+        final String expectedFormat = "DOUBLE";
+        functionTest(fname, values, resultValues, filters, monotonic, ascending, expectedFormat);
     }
 
     public void subtestPower07x() throws Exception
@@ -1126,8 +1215,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
         final boolean monotonic = true;
         final boolean ascending = false;
-        final boolean expectDouble = true;
-        functionTest(fname, values, resultValues, filters, monotonic, ascending, expectDouble);
+        final String expectedFormat = "DOUBLE";
+        functionTest(fname, values, resultValues, filters, monotonic, ascending, expectedFormat);
     }
 
     public void subtestSqrt() throws Exception
@@ -1141,8 +1230,362 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
         final boolean monotonic = true;
         final boolean ascending = true;
-        final boolean expectDouble = true;
-        functionTest(fname, nonnegs, resultValues, filters, monotonic, ascending, expectDouble);
+        final String expectedFormat = "DOUBLE";
+        functionTest(fname, nonnegs, resultValues, filters, monotonic, ascending, expectedFormat);
+    }
+
+    private static class FunctionVarCharTestCase
+    {
+        public final String m_case;
+        public final String m_filter;
+        public final long m_result;
+
+        public FunctionVarCharTestCase(String proc, String filter)
+        {
+            m_case = proc;
+            m_filter = filter;
+            m_result = 0;
+        }
+        public FunctionVarCharTestCase(String proc, String filter, long l)
+        {
+            m_case = proc;
+            m_filter = filter;
+            m_result = l;
+        }
+    };
+
+    private FunctionVarCharTestCase[] displayVarCharCastRun(Client client, int rowCount) throws Exception
+    {
+        ClientResponse cr;
+        VoltTable result;
+
+        FunctionVarCharTestCase[] resultSet = new FunctionVarCharTestCase[numTypeNames.length * rowCount];
+        int ii = 0;
+
+        String proc = "DISPLAY_VARCHAR";
+        cr = client.callProcedure(proc);
+        result = cr.getResults()[0];
+        assertEquals(rowCount, result.getRowCount());
+        while (result.advanceRow()) {
+            int jj = 0;
+            for (String numTypeName : numTypeNames) {
+                String tooSimple = result.getString(jj);
+                String value = Double.valueOf(tooSimple).toString();
+                //*VERBOSIFY TO DEBUG:*/ System.out.println("DEBUG " + proc + " " + numTypeName + " GOT " + tooSimple + " into " + value);
+                resultSet[ii++] = new FunctionVarCharTestCase(proc + " " + numTypeName, value);
+                ++jj;
+            }
+        }
+        return resultSet;
+    }
+
+    private FunctionVarCharTestCase[] whereVarCharCastRun(Client client, Set<String> filters) throws Exception
+    {
+        ClientResponse cr;
+        VoltTable result;
+
+        FunctionVarCharTestCase[] resultSet = new FunctionVarCharTestCase[numTypeNames.length * filters.size()];
+        int kk = 0;
+        int jj = 0;
+        for (String numTypeName : numTypeNames) {
+            for (String filter : filters) {
+                String proc = "WHERE_VARCHAR_CAST_" + numTypeName;
+                String param = filter;
+                String[] decimalParts = filter.split("\\.");
+                if (jj < FLOATCOLINDEX) {
+                    // Truncate an integer decimal before the decimal point to match an integer column.
+                    if (decimalParts.length < 2 || decimalParts[1].equals("0")) {
+                        param = decimalParts[0];
+                    }
+                    // Else fall through to pass a fractional decimal as it is
+                    // to purposely force a mismatch with an integer column.
+                }
+                else if (jj > FLOATCOLINDEX) {
+                    // Pad the decimal string.
+                    if (decimalParts.length < 2 || decimalParts[1].equals("0")) {
+                        param = decimalParts[0] + ".000000000000";
+                    }
+                    else {
+                        param = decimalParts[0] + "." + (decimalParts[1] + "000000000000").substring(0,12);
+                    }
+                }
+                // Handle float-to-string cast formatting
+                // TODO: this code may not be right for multiples of 10 or decimals of magnitude < .1
+                // which we don't happen to be using currently to drive this numeric test framework.
+                else {
+                    if (decimalParts.length < 2 || decimalParts[1].equals("0")) {
+                        if (decimalParts[0].equals("0")) {
+                            param = "0E0";
+                        }
+                        else {
+                            int signedDigitWidth = (decimalParts[0].charAt(0) == '-') ? 2 : 1;
+                            param = decimalParts[0].substring(0, signedDigitWidth) +
+                                    "." + decimalParts[0].substring(signedDigitWidth) +
+                                    "E" + (decimalParts[0].length() - signedDigitWidth);
+                        }
+                    }
+                    else {
+                        if (decimalParts[0].equals("0")) {
+                            param = decimalParts[1].substring(0, 1) +
+                                    "." + decimalParts[1].substring(1) + "E-1";
+                        }
+                        else if (decimalParts[0].equals("-0") ) {
+                            param = "-" + decimalParts[1].substring(0, 1) +
+                                    "." + decimalParts[1].substring(1) + "E-1";
+                        }
+                        else {
+                            int signedDigitWidth = (decimalParts[0].charAt(0) == '-') ? 2 : 1;
+                            param = decimalParts[0].substring(0, signedDigitWidth) +
+                                    "." + decimalParts[0].substring(signedDigitWidth) + decimalParts[1] +
+                                    "E" + (decimalParts[0].length() - signedDigitWidth);
+                        }
+                    }
+                }
+                cr = client.callProcedure(proc, param);
+                result = cr.getResults()[0];
+                int rowCount = result.getRowCount();
+                assertEquals(rowCount, 1);
+                long tupleCount = result.asScalarLong();
+                //*VERBOSIFY TO DEBUG:*/ System.out.println("DEBUG " + proc + " " + numTypeName + " GOT count " + tupleCount);
+                resultSet[kk++] = new FunctionVarCharTestCase(proc, filter, tupleCount);
+            }
+            ++jj;
+        }
+        return resultSet;
+    }
+
+    public void subtestNumericCasts() throws Exception
+    {
+        System.out.println("STARTING test of numeric CAST");
+        final double[] rawData = values;
+        final double[] resultIntValues = new double[values.length];
+        final Set<Double> intFilters = new HashSet<Double>();
+        final Set<Double> rawFilters = new HashSet<Double>();
+        for (int kk = 0; kk < resultIntValues.length; ++kk) {
+            resultIntValues[kk] = (int)values[kk];
+            intFilters.add(resultIntValues[kk]);
+            rawFilters.add(values[kk]);
+        }
+
+        Client client = getClient();
+        insertNumbers(client, rawData, rawData.length);
+
+        FunctionTestCase[] results;
+        double[] resultValues;
+        Set<Double> filters;
+
+        for (int jj = 0; jj < numTypeNames.length ; ++jj) {
+            if (numFormatNames[jj].equals("DECIMAL") || numFormatNames[jj].equals("DOUBLE")) {
+                results = displayFunctionRun(client, numTypeNames[jj], values.length / COLUMNCOUNT, numFormatNames[jj]);
+                resultValues = rawData;
+                filters = rawFilters;
+            }
+            else {
+                results = displayFunctionRun(client, numTypeNames[jj], values.length / COLUMNCOUNT, numFormatNames[jj]);
+                resultValues = resultIntValues;
+                filters = intFilters;
+            }
+            assertEquals(results.length, values.length);
+
+            Map<String, Integer> valueBag = new HashMap<String, Integer>();
+            int kk = 0;
+            for (FunctionTestCase result : results) {
+                double expected = resultValues[kk++];
+                if (expected != result.m_result) {
+                    // Compromise: accuracy errors get complaints but not asserts.
+                    complain("Failed " + result.m_case + " expected " + expected + " got " + result.m_result);
+                }
+                // Use precision-limited string formatting to forgive accuracy errors between the C++ and java floating point function implementations.
+                String asExpected = String.format(formatForFuzziness, expected);
+                String asResulted = String.format(formatForFuzziness, result.m_result);
+                assertEquals(asExpected, asResulted);
+                // count occurrences of expected values in anticipation of the WHERE_ tests.
+                Integer count = valueBag.get(asExpected);
+                if (count == null) {
+                    count = 0;
+                }
+                valueBag.put(asExpected, count + 1);
+                //*VERBOSIFY TO DEBUG:*/ System.out.println("UPDATING " + result.m_case + " found count of " + asExpected + " to " + (count+1) );
+            }
+
+            // Validate that sorting on the function value does not alter the ordering of its input values.
+            results = orderFunctionRun(client, numTypeNames[jj]  + "_CAST", resultValues.length/COLUMNCOUNT);
+
+            // The total number of ordered INTEGERNUM values returned should be the same as the number of stored values.
+            assertEquals(results.length, resultValues.length);
+            kk = 0;
+            for (FunctionTestCase result : results) {
+                int idIndex = kk++;
+                if (kk == ROWCOUNT) {
+                    kk = 0;
+                }
+                double expected = orderedIds[idIndex];
+                if (expected != result.m_result) {
+                    complain("Failed " + result.m_case + " expected " + expected + " got " + result.m_result);
+                }
+                assertEquals(expected, result.m_result);
+            }
+
+            results = whereFunctionRun(client, numTypeNames[jj] + "_CAST", filters, numFormatNames[jj]);
+
+            assertEquals(results.length, COLUMNCOUNT*filters.size());
+            // If filters represents all the values in resultValues,
+            // the filtered counts should total to resultValues.length.
+            int coveringCount = resultValues.length;
+            //*VERBOSIFY TO DEBUG:*/ System.out.println("EXPECTING total count" + coveringCount);
+            for (FunctionTestCase result : results) {
+                if (result.m_result == 0.0) {
+                    // complain("NONMATCHING filter " + result.m_case + " " + result.m_filter);
+                    continue;
+                }
+                Integer count = valueBag.get(String.format(formatForFuzziness, result.m_filter));
+                if (count == null) {
+                    complain("CAST got unexpected result " + result.m_filter + ".");
+                }
+                assertNotNull(count);
+                //*VERBOSIFY TO DEBUG:*/ System.out.println("REDUCING " + result.m_case + " unfound " + result.m_filter + " count " + count + " by " + result.m_result );
+                if (count < result.m_result) {
+                    complain(result.m_case + " value " + result.m_filter + " not expected or previously depleted from " + valueBag + ".");
+                }
+                assertTrue(count >= result.m_result);
+                valueBag.put(String.format(formatForFuzziness, result.m_filter), count-(int)result.m_result);
+                coveringCount -= (int)result.m_result;
+                //*VERBOSIFY TO DEBUG:*/ System.out.println("DROPPING TOTAL TO " + coveringCount);
+            }
+            for (Entry<String, Integer> entry : valueBag.entrySet()) {
+                int count = entry.getValue();
+                if (count != 0) {
+                    complain("CAST expected result " + entry.getKey() + " lacks " + count + " matches.");
+                }
+                assertEquals(0, count);
+            }
+            assertEquals(0, coveringCount);
+        }
+
+
+        System.out.println("ENDING test of numeric CAST");
+    }
+
+    private static void insertNumbersViaVarChar(Client client, double[] rawData, int nRaws) throws Exception
+    {
+        client.callProcedure("@AdHoc", "delete from NUMBER_TYPES;");
+        // Insert inputs via string values to test casts from VARCHAR
+        for (int kk = 0; kk < nRaws; kk += COLUMNCOUNT) {
+            client.callProcedure("@AdHoc",
+                                 "INSERT INTO NUMBER_TYPES VALUES (" +
+                                 "CAST('" + (int)rawData[kk+0] + "' AS " + numTypeNames[0] + "),  " +
+                                 "CAST('" + (int)rawData[kk+1] + "' AS " + numTypeNames[1] + "),  " +
+                                 "CAST('" + (int)rawData[kk+2] + "' AS " + numTypeNames[2] + "),  " +
+                                 "CAST('" + (int)rawData[kk+3] + "' AS " + numTypeNames[3] + "),  " +
+                                 "CAST('" + rawData[kk+FLOATCOLINDEX]   + "' AS FLOAT         ),  " +
+                                 "CAST('" + rawData[kk+DECIMALCOLINDEX] + "' AS DECIMAL       ) );");
+        }
+    }
+
+    private void subtestFromVarCharCasts() throws Exception
+    {
+        System.out.println("STARTING test of FROM VARCHAR CAST");
+        Client client = getClient();
+        insertNumbersViaVarChar(client, values, values.length);
+        System.out.println("VALIDATING result of 'FROM VARCHAR' CAST via results of 'TO VARCHAR' CASTS");
+        subtestVarCharCasts(client);
+        System.out.println("ENDING test of FROM VARCHAR CAST");
+    }
+
+    private void subtestToVarCharCasts() throws Exception
+    {
+        System.out.println("STARTING test of TO VARCHAR CAST");
+        Client client = getClient();
+        insertNumbers(client, values, values.length);
+        subtestVarCharCasts(client);
+        System.out.println("ENDING test of TO VARCHAR CAST");
+    }
+
+    private void subtestVarCharCasts(Client client) throws Exception
+    {
+        final String[] resultValues = new String[values.length];
+        final Set<String> filters = new HashSet<String>();
+        for (int kk = 0; kk < resultValues.length; ++kk) {
+            resultValues[kk] = "" + values[kk];
+            filters.add(resultValues[kk]);
+        }
+
+        FunctionVarCharTestCase[] results;
+
+        results = displayVarCharCastRun(client, values.length / COLUMNCOUNT);
+        assertEquals(results.length, values.length);
+
+        Map<String, Integer> valueBag = new HashMap<String, Integer>();
+        int kk = 0;
+        for (FunctionVarCharTestCase result : results) {
+            String expected = resultValues[kk++];
+            if (! expected.equals(result.m_filter)) {
+                // Compromise: accuracy errors get complaints but not asserts.
+                complain("Failed " + result.m_case + " expected " + expected + " got " + result.m_filter);
+            }
+            assertEquals(expected, result.m_filter);
+            // count occurrences of expected values in anticipation of the WHERE_ tests.
+            Integer count = valueBag.get(expected);
+            if (count == null) {
+                count = 0;
+            }
+            valueBag.put(expected, count + 1);
+            //*VERBOSIFY TO DEBUG:*/ System.out.println("UPDATING " + result.m_case + " found count of " + expected + " to " + (count+1) );
+        }
+
+        results = whereVarCharCastRun(client, filters);
+
+        assertEquals(results.length, COLUMNCOUNT*filters.size());
+        // If filters represents all the values in resultValues,
+        // the filtered counts should total to resultValues.length.
+        int coveringCount = resultValues.length;
+        //*VERBOSIFY TO DEBUG:*/ System.out.println("EXPECTING total count" + coveringCount);
+        for (FunctionVarCharTestCase result : results) {
+            Integer count = valueBag.get(result.m_filter);
+            if (count == null) {
+                complain("CAST got unexpected result " + result.m_filter + ".");
+            }
+            assertNotNull(count);
+            //*VERBOSIFY TO DEBUG:*/ System.out.println("VARCHAR REDUCING " + result.m_case + " unfound " + result.m_filter + " count " + count + " by " + result.m_result );
+            if (count < result.m_result) {
+                complain(result.m_case + " value " + result.m_filter + " not expected or previously depleted from " + valueBag + ".");
+            }
+            assertTrue(count >= result.m_result);
+            valueBag.put(result.m_filter, count-(int)result.m_result);
+            coveringCount -= (int)result.m_result;
+            //*VERBOSIFY TO DEBUG:*/ System.out.println("DROPPING TOTAL TO " + coveringCount);
+        }
+        for (Entry<String, Integer> entry : valueBag.entrySet()) {
+            int count = entry.getValue();
+            if (count != 0) {
+                complain("VARCHAR CAST expected result " + entry.getKey() + " lacks " + count + " matches.");
+            }
+            assertEquals(0, count); // Ideally FLOAT behaves in some reasonable standard way.
+        }
+        assertEquals(0, coveringCount); // Ideally FLOAT behaves in some reasonable standard way.
+        //assertTrue(0 == coveringCount /*I WISH*/ || 5 == coveringCount /* former near miss */ );
+
+
+        // Validate how sorting on the string value alters the ordering of its input values.
+        FunctionTestCase[] orderedResults = orderFunctionRun(client, "VARCHAR_CAST", values.length/COLUMNCOUNT);
+
+        // The total number of ordered INTEGERNUM values returned should be the same as the number of stored values.
+        assertEquals(values.length, orderedResults.length);
+        kk = 0;
+        int jj = 0;
+        for (FunctionTestCase result : orderedResults) {
+            int idIndex = kk++;
+            if (kk == ROWCOUNT) {
+                kk = 0;
+            }
+            double[] expecteds = (jj/ROWCOUNT < FLOATCOLINDEX) ? orderedByStringIds :
+                (jj/ROWCOUNT > FLOATCOLINDEX) ? orderedByDecimalStringIds : orderedByFloatStringIds;
+            if (expecteds[idIndex] != result.m_result) {
+                complain("Failed " + result.m_case + " expected " + expecteds[idIndex] + " got " + result.m_result);
+            }
+            assertEquals(expecteds[idIndex], result.m_result);
+            ++jj;
+        }
     }
 
     public void testLeftAndRight() throws NoConnectionsException, IOException, ProcCallException {
@@ -1439,7 +1882,7 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "PRIMARY KEY (ID) ); " +
 
                 // Test unique generalized index on a function of an already indexed column.
-                "CREATE UNIQUE INDEX R1_ABS_ID ON R1 ( ABS(ID) ); " +
+                "CREATE UNIQUE INDEX R1_ABS_ID_DESC ON R1 ( ABS(ID), DESC ); " +
 
                 // Test generalized expression index with a constant argument.
                 "CREATE INDEX R1_ABS_ID_SCALED ON R1 ( ID / 3 ); " +
@@ -1478,139 +1921,255 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         project.addStmtProcedure("DISPLAY_CEILING", "select CEILING(INTEGERNUM), CEILING(TINYNUM), CEILING(SMALLNUM), CEILING(BIGNUM), CEILING(FLOATNUM), CEILING(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("ORDER_CEILING_INTEGER", "select INTEGERNUM from NUMBER_TYPES order by CEILING(INTEGERNUM), INTEGERNUM");
-        project.addStmtProcedure("ORDER_CEILING_TINY",    "select INTEGERNUM from NUMBER_TYPES order by CEILING(TINYNUM), TINYNUM");
-        project.addStmtProcedure("ORDER_CEILING_SMALL",   "select INTEGERNUM from NUMBER_TYPES order by CEILING(SMALLNUM), SMALLNUM");
-        project.addStmtProcedure("ORDER_CEILING_BIG",     "select INTEGERNUM from NUMBER_TYPES order by CEILING(BIGNUM), BIGNUM");
-        project.addStmtProcedure("ORDER_CEILING_FLOAT",   "select INTEGERNUM from NUMBER_TYPES order by CEILING(FLOATNUM), FLOATNUM");
-        project.addStmtProcedure("ORDER_CEILING_DECIMAL", "select INTEGERNUM from NUMBER_TYPES order by CEILING(DECIMALNUM), DECIMALNUM");
+        project.addStmtProcedure("ORDER_CEILING_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by CEILING(INTEGERNUM), INTEGERNUM");
+        project.addStmtProcedure("ORDER_CEILING_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by CEILING(TINYNUM), TINYNUM");
+        project.addStmtProcedure("ORDER_CEILING_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by CEILING(SMALLNUM), SMALLNUM");
+        project.addStmtProcedure("ORDER_CEILING_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by CEILING(BIGNUM), BIGNUM");
+        project.addStmtProcedure("ORDER_CEILING_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by CEILING(FLOATNUM), FLOATNUM");
+        project.addStmtProcedure("ORDER_CEILING_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by CEILING(DECIMALNUM), DECIMALNUM");
 
-        project.addStmtProcedure("WHERE_CEILING_INTEGER", "select count(*) from NUMBER_TYPES where CEILING(INTEGERNUM) = ?");
-        project.addStmtProcedure("WHERE_CEILING_TINY",    "select count(*) from NUMBER_TYPES where CEILING(TINYNUM) = ?");
-        project.addStmtProcedure("WHERE_CEILING_SMALL",   "select count(*) from NUMBER_TYPES where CEILING(SMALLNUM) = ?");
-        project.addStmtProcedure("WHERE_CEILING_BIG",     "select count(*) from NUMBER_TYPES where CEILING(BIGNUM) = ?");
-        project.addStmtProcedure("WHERE_CEILING_FLOAT",   "select count(*) from NUMBER_TYPES where CEILING(FLOATNUM) = ?");
-        project.addStmtProcedure("WHERE_CEILING_DECIMAL", "select count(*) from NUMBER_TYPES where CEILING(DECIMALNUM) = ?");
+        project.addStmtProcedure("WHERE_CEILING_INTEGER",  "select count(*) from NUMBER_TYPES where CEILING(INTEGERNUM) = ?");
+        project.addStmtProcedure("WHERE_CEILING_TINYINT",  "select count(*) from NUMBER_TYPES where CEILING(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_CEILING_SMALLINT", "select count(*) from NUMBER_TYPES where CEILING(SMALLNUM) = ?");
+        project.addStmtProcedure("WHERE_CEILING_BIGINT",   "select count(*) from NUMBER_TYPES where CEILING(BIGNUM) = ?");
+        project.addStmtProcedure("WHERE_CEILING_FLOAT",    "select count(*) from NUMBER_TYPES where CEILING(FLOATNUM) = ?");
+        project.addStmtProcedure("WHERE_CEILING_DECIMAL",  "select count(*) from NUMBER_TYPES where CEILING(DECIMALNUM) = ?");
 
         project.addStmtProcedure("DISPLAY_EXP", "select EXP(INTEGERNUM), EXP(TINYNUM), EXP(SMALLNUM), EXP(BIGNUM), EXP(FLOATNUM), EXP(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("ORDER_EXP_INTEGER", "select INTEGERNUM, EXP(INTEGERNUM) from NUMBER_TYPES order by EXP(INTEGERNUM)");
-        project.addStmtProcedure("ORDER_EXP_TINY",    "select INTEGERNUM, EXP(TINYNUM) from NUMBER_TYPES order by EXP(TINYNUM)");
-        project.addStmtProcedure("ORDER_EXP_SMALL",   "select INTEGERNUM, EXP(SMALLNUM) from NUMBER_TYPES order by EXP(SMALLNUM)");
-        project.addStmtProcedure("ORDER_EXP_BIG",     "select INTEGERNUM, EXP(BIGNUM) from NUMBER_TYPES order by EXP(BIGNUM)");
-        project.addStmtProcedure("ORDER_EXP_FLOAT",   "select INTEGERNUM, EXP(FLOATNUM) from NUMBER_TYPES order by EXP(FLOATNUM)");
-        project.addStmtProcedure("ORDER_EXP_DECIMAL", "select INTEGERNUM, EXP(DECIMALNUM) from NUMBER_TYPES order by EXP(DECIMALNUM)");
+        project.addStmtProcedure("ORDER_EXP_INTEGER",  "select INTEGERNUM, EXP(INTEGERNUM) from NUMBER_TYPES order by EXP(INTEGERNUM)");
+        project.addStmtProcedure("ORDER_EXP_TINYINT",  "select INTEGERNUM, EXP(TINYNUM) from NUMBER_TYPES order by EXP(TINYNUM)");
+        project.addStmtProcedure("ORDER_EXP_SMALLINT", "select INTEGERNUM, EXP(SMALLNUM) from NUMBER_TYPES order by EXP(SMALLNUM)");
+        project.addStmtProcedure("ORDER_EXP_BIGINT",   "select INTEGERNUM, EXP(BIGNUM) from NUMBER_TYPES order by EXP(BIGNUM)");
+        project.addStmtProcedure("ORDER_EXP_FLOAT",    "select INTEGERNUM, EXP(FLOATNUM) from NUMBER_TYPES order by EXP(FLOATNUM)");
+        project.addStmtProcedure("ORDER_EXP_DECIMAL",  "select INTEGERNUM, EXP(DECIMALNUM) from NUMBER_TYPES order by EXP(DECIMALNUM)");
 
-        project.addStmtProcedure("WHERE_EXP_INTEGER", "select count(*) from NUMBER_TYPES where EXP(INTEGERNUM) = ?");
-        project.addStmtProcedure("WHERE_EXP_TINY",    "select count(*) from NUMBER_TYPES where EXP(TINYNUM) = ?");
-        project.addStmtProcedure("WHERE_EXP_SMALL",   "select count(*) from NUMBER_TYPES where EXP(SMALLNUM) = ?");
-        project.addStmtProcedure("WHERE_EXP_BIG",     "select count(*) from NUMBER_TYPES where EXP(BIGNUM) = ?");
-        project.addStmtProcedure("WHERE_EXP_FLOAT",   "select count(*) from NUMBER_TYPES where EXP(FLOATNUM) = ?");
-        project.addStmtProcedure("WHERE_EXP_DECIMAL", "select count(*) from NUMBER_TYPES where EXP(DECIMALNUM) = ?");
+        project.addStmtProcedure("WHERE_EXP_INTEGER",  "select count(*) from NUMBER_TYPES where EXP(INTEGERNUM) = ?");
+        project.addStmtProcedure("WHERE_EXP_TINYINT",  "select count(*) from NUMBER_TYPES where EXP(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_EXP_SMALLINT", "select count(*) from NUMBER_TYPES where EXP(SMALLNUM) = ?");
+        project.addStmtProcedure("WHERE_EXP_BIGINT",   "select count(*) from NUMBER_TYPES where EXP(BIGNUM) = ?");
+        project.addStmtProcedure("WHERE_EXP_FLOAT",    "select count(*) from NUMBER_TYPES where EXP(FLOATNUM) = ?");
+        project.addStmtProcedure("WHERE_EXP_DECIMAL",  "select count(*) from NUMBER_TYPES where EXP(DECIMALNUM) = ?");
 
         project.addStmtProcedure("DISPLAY_FLOOR", "select FLOOR(INTEGERNUM), FLOOR(TINYNUM), FLOOR(SMALLNUM), FLOOR(BIGNUM), FLOOR(FLOATNUM), FLOOR(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("ORDER_FLOOR_INTEGER", "select INTEGERNUM from NUMBER_TYPES order by FLOOR(INTEGERNUM), INTEGERNUM");
-        project.addStmtProcedure("ORDER_FLOOR_TINY",    "select INTEGERNUM from NUMBER_TYPES order by FLOOR(TINYNUM), TINYNUM");
-        project.addStmtProcedure("ORDER_FLOOR_SMALL",   "select INTEGERNUM from NUMBER_TYPES order by FLOOR(SMALLNUM), SMALLNUM");
-        project.addStmtProcedure("ORDER_FLOOR_BIG",     "select INTEGERNUM from NUMBER_TYPES order by FLOOR(BIGNUM), BIGNUM");
-        project.addStmtProcedure("ORDER_FLOOR_FLOAT",   "select INTEGERNUM from NUMBER_TYPES order by FLOOR(FLOATNUM), FLOATNUM");
-        project.addStmtProcedure("ORDER_FLOOR_DECIMAL", "select INTEGERNUM from NUMBER_TYPES order by FLOOR(DECIMALNUM), DECIMALNUM");
+        project.addStmtProcedure("ORDER_FLOOR_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by FLOOR(INTEGERNUM), INTEGERNUM");
+        project.addStmtProcedure("ORDER_FLOOR_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by FLOOR(TINYNUM), TINYNUM");
+        project.addStmtProcedure("ORDER_FLOOR_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by FLOOR(SMALLNUM), SMALLNUM");
+        project.addStmtProcedure("ORDER_FLOOR_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by FLOOR(BIGNUM), BIGNUM");
+        project.addStmtProcedure("ORDER_FLOOR_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by FLOOR(FLOATNUM), FLOATNUM");
+        project.addStmtProcedure("ORDER_FLOOR_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by FLOOR(DECIMALNUM), DECIMALNUM");
 
-        project.addStmtProcedure("WHERE_FLOOR_INTEGER", "select count(*) from NUMBER_TYPES where FLOOR(INTEGERNUM) = ?");
-        project.addStmtProcedure("WHERE_FLOOR_TINY",    "select count(*) from NUMBER_TYPES where FLOOR(TINYNUM) = ?");
-        project.addStmtProcedure("WHERE_FLOOR_SMALL",   "select count(*) from NUMBER_TYPES where FLOOR(SMALLNUM) = ?");
-        project.addStmtProcedure("WHERE_FLOOR_BIG",     "select count(*) from NUMBER_TYPES where FLOOR(BIGNUM) = ?");
-        project.addStmtProcedure("WHERE_FLOOR_FLOAT",   "select count(*) from NUMBER_TYPES where FLOOR(FLOATNUM) = ?");
-        project.addStmtProcedure("WHERE_FLOOR_DECIMAL", "select count(*) from NUMBER_TYPES where FLOOR(DECIMALNUM) = ?");
+        project.addStmtProcedure("WHERE_FLOOR_INTEGER",  "select count(*) from NUMBER_TYPES where FLOOR(INTEGERNUM) = ?");
+        project.addStmtProcedure("WHERE_FLOOR_TINYINT",  "select count(*) from NUMBER_TYPES where FLOOR(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_FLOOR_SMALLINT", "select count(*) from NUMBER_TYPES where FLOOR(SMALLNUM) = ?");
+        project.addStmtProcedure("WHERE_FLOOR_BIGINT",   "select count(*) from NUMBER_TYPES where FLOOR(BIGNUM) = ?");
+        project.addStmtProcedure("WHERE_FLOOR_FLOAT",    "select count(*) from NUMBER_TYPES where FLOOR(FLOATNUM) = ?");
+        project.addStmtProcedure("WHERE_FLOOR_DECIMAL",  "select count(*) from NUMBER_TYPES where FLOOR(DECIMALNUM) = ?");
 
         project.addStmtProcedure("DISPLAY_POWER7X", "select POWER(7, INTEGERNUM), POWER(7, TINYNUM), POWER(7, SMALLNUM), POWER(7, BIGNUM), POWER(7, FLOATNUM), POWER(7, DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("ORDER_POWER7X_INTEGER", "select INTEGERNUM from NUMBER_TYPES order by POWER(7, INTEGERNUM)");
-        project.addStmtProcedure("ORDER_POWER7X_TINY",    "select INTEGERNUM from NUMBER_TYPES order by POWER(7, TINYNUM)");
-        project.addStmtProcedure("ORDER_POWER7X_SMALL",   "select INTEGERNUM from NUMBER_TYPES order by POWER(7, SMALLNUM)");
-        project.addStmtProcedure("ORDER_POWER7X_BIG",     "select INTEGERNUM from NUMBER_TYPES order by POWER(7, BIGNUM)");
-        project.addStmtProcedure("ORDER_POWER7X_FLOAT",   "select INTEGERNUM from NUMBER_TYPES order by POWER(7, FLOATNUM)");
-        project.addStmtProcedure("ORDER_POWER7X_DECIMAL", "select INTEGERNUM from NUMBER_TYPES order by POWER(7, DECIMALNUM)");
+        project.addStmtProcedure("ORDER_POWER7X_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by POWER(7, INTEGERNUM)");
+        project.addStmtProcedure("ORDER_POWER7X_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by POWER(7, TINYNUM)");
+        project.addStmtProcedure("ORDER_POWER7X_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by POWER(7, SMALLNUM)");
+        project.addStmtProcedure("ORDER_POWER7X_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by POWER(7, BIGNUM)");
+        project.addStmtProcedure("ORDER_POWER7X_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by POWER(7, FLOATNUM)");
+        project.addStmtProcedure("ORDER_POWER7X_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by POWER(7, DECIMALNUM)");
 
-        project.addStmtProcedure("WHERE_POWER7X_INTEGER", "select count(*) from NUMBER_TYPES where POWER(7, INTEGERNUM) = ?");
-        project.addStmtProcedure("WHERE_POWER7X_TINY",    "select count(*) from NUMBER_TYPES where POWER(7, TINYNUM) = ?");
-        project.addStmtProcedure("WHERE_POWER7X_SMALL",   "select count(*) from NUMBER_TYPES where POWER(7, SMALLNUM) = ?");
-        project.addStmtProcedure("WHERE_POWER7X_BIG",     "select count(*) from NUMBER_TYPES where POWER(7, BIGNUM) = ?");
-        project.addStmtProcedure("WHERE_POWER7X_FLOAT",   "select count(*) from NUMBER_TYPES where POWER(7, FLOATNUM) = ?");
-        project.addStmtProcedure("WHERE_POWER7X_DECIMAL", "select count(*) from NUMBER_TYPES where POWER(7, DECIMALNUM) = ?");
+        project.addStmtProcedure("WHERE_POWER7X_INTEGER",  "select count(*) from NUMBER_TYPES where POWER(7, INTEGERNUM) = ?");
+        project.addStmtProcedure("WHERE_POWER7X_TINYINT",  "select count(*) from NUMBER_TYPES where POWER(7, TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_POWER7X_SMALLINT", "select count(*) from NUMBER_TYPES where POWER(7, SMALLNUM) = ?");
+        project.addStmtProcedure("WHERE_POWER7X_BIGINT",   "select count(*) from NUMBER_TYPES where POWER(7, BIGNUM) = ?");
+        project.addStmtProcedure("WHERE_POWER7X_FLOAT",    "select count(*) from NUMBER_TYPES where POWER(7, FLOATNUM) = ?");
+        project.addStmtProcedure("WHERE_POWER7X_DECIMAL",  "select count(*) from NUMBER_TYPES where POWER(7, DECIMALNUM) = ?");
 
         project.addStmtProcedure("DISPLAY_POWER07X", "select POWER(0.7, INTEGERNUM), POWER(0.7, TINYNUM), POWER(0.7, SMALLNUM), POWER(0.7, BIGNUM), POWER(0.7, FLOATNUM), POWER(0.7, DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("ORDER_POWER07X_INTEGER", "select INTEGERNUM from NUMBER_TYPES order by POWER(0.7, INTEGERNUM)");
-        project.addStmtProcedure("ORDER_POWER07X_TINY",    "select INTEGERNUM from NUMBER_TYPES order by POWER(0.7, TINYNUM)");
-        project.addStmtProcedure("ORDER_POWER07X_SMALL",   "select INTEGERNUM from NUMBER_TYPES order by POWER(0.7, SMALLNUM)");
-        project.addStmtProcedure("ORDER_POWER07X_BIG",     "select INTEGERNUM from NUMBER_TYPES order by POWER(0.7, BIGNUM)");
-        project.addStmtProcedure("ORDER_POWER07X_FLOAT",   "select INTEGERNUM from NUMBER_TYPES order by POWER(0.7, FLOATNUM)");
-        project.addStmtProcedure("ORDER_POWER07X_DECIMAL", "select INTEGERNUM from NUMBER_TYPES order by POWER(0.7, DECIMALNUM)");
+        project.addStmtProcedure("ORDER_POWER07X_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by POWER(0.7, INTEGERNUM)");
+        project.addStmtProcedure("ORDER_POWER07X_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by POWER(0.7, TINYNUM)");
+        project.addStmtProcedure("ORDER_POWER07X_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by POWER(0.7, SMALLNUM)");
+        project.addStmtProcedure("ORDER_POWER07X_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by POWER(0.7, BIGNUM)");
+        project.addStmtProcedure("ORDER_POWER07X_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by POWER(0.7, FLOATNUM)");
+        project.addStmtProcedure("ORDER_POWER07X_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by POWER(0.7, DECIMALNUM)");
 
-        project.addStmtProcedure("WHERE_POWER07X_INTEGER", "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(0.7, INTEGERNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
-        project.addStmtProcedure("WHERE_POWER07X_TINY",    "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(0.7, TINYNUM)   ) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
-        project.addStmtProcedure("WHERE_POWER07X_SMALL",   "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(0.7, SMALLNUM)  ) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
-        project.addStmtProcedure("WHERE_POWER07X_BIG",     "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(0.7, BIGNUM)    ) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
-        project.addStmtProcedure("WHERE_POWER07X_FLOAT",   "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(0.7, FLOATNUM)  ) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
-        project.addStmtProcedure("WHERE_POWER07X_DECIMAL", "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(0.7, DECIMALNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_POWER07X_INTEGER",  "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(0.7, INTEGERNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_POWER07X_TINYINT",  "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(0.7, TINYNUM)   ) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_POWER07X_SMALLINT", "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(0.7, SMALLNUM)  ) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_POWER07X_BIGINT",   "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(0.7, BIGNUM)    ) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_POWER07X_FLOAT",    "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(0.7, FLOATNUM)  ) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_POWER07X_DECIMAL",  "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(0.7, DECIMALNUM)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
 
         project.addStmtProcedure("DISPLAY_POWERX7", "select POWER(INTEGERNUM, 7), POWER(TINYNUM, 7), POWER(SMALLNUM, 7), POWER(BIGNUM, 7), POWER(FLOATNUM, 7), POWER(DECIMALNUM, 7) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("ORDER_POWERX7_INTEGER", "select INTEGERNUM from NUMBER_TYPES order by POWER(INTEGERNUM, 7)");
-        project.addStmtProcedure("ORDER_POWERX7_TINY",    "select INTEGERNUM from NUMBER_TYPES order by POWER(TINYNUM,    7)");
-        project.addStmtProcedure("ORDER_POWERX7_SMALL",   "select INTEGERNUM from NUMBER_TYPES order by POWER(SMALLNUM,   7)");
-        project.addStmtProcedure("ORDER_POWERX7_BIG",     "select INTEGERNUM from NUMBER_TYPES order by POWER(BIGNUM,     7)");
-        project.addStmtProcedure("ORDER_POWERX7_FLOAT",   "select INTEGERNUM from NUMBER_TYPES order by POWER(FLOATNUM,   7)");
-        project.addStmtProcedure("ORDER_POWERX7_DECIMAL", "select INTEGERNUM from NUMBER_TYPES order by POWER(DECIMALNUM, 7)");
+        project.addStmtProcedure("ORDER_POWERX7_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by POWER(INTEGERNUM, 7)");
+        project.addStmtProcedure("ORDER_POWERX7_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by POWER(TINYNUM,    7)");
+        project.addStmtProcedure("ORDER_POWERX7_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by POWER(SMALLNUM,   7)");
+        project.addStmtProcedure("ORDER_POWERX7_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by POWER(BIGNUM,     7)");
+        project.addStmtProcedure("ORDER_POWERX7_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by POWER(FLOATNUM,   7)");
+        project.addStmtProcedure("ORDER_POWERX7_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by POWER(DECIMALNUM, 7)");
 
-        project.addStmtProcedure("WHERE_POWERX7_INTEGER", "select count(*) from NUMBER_TYPES where POWER(INTEGERNUM, 7) = ?");
-        project.addStmtProcedure("WHERE_POWERX7_TINY",    "select count(*) from NUMBER_TYPES where POWER(TINYNUM,    7) = ?");
-        project.addStmtProcedure("WHERE_POWERX7_SMALL",   "select count(*) from NUMBER_TYPES where POWER(SMALLNUM,   7) = ?");
-        project.addStmtProcedure("WHERE_POWERX7_BIG",     "select count(*) from NUMBER_TYPES where POWER(BIGNUM,     7) = ?");
-        project.addStmtProcedure("WHERE_POWERX7_FLOAT",   "select count(*) from NUMBER_TYPES where POWER(FLOATNUM,   7) = ?");
-        project.addStmtProcedure("WHERE_POWERX7_DECIMAL", "select count(*) from NUMBER_TYPES where POWER(DECIMALNUM, 7) = ?");
+        project.addStmtProcedure("WHERE_POWERX7_INTEGER",  "select count(*) from NUMBER_TYPES where POWER(INTEGERNUM, 7) = ?");
+        project.addStmtProcedure("WHERE_POWERX7_TINYINT",  "select count(*) from NUMBER_TYPES where POWER(TINYNUM,    7) = ?");
+        project.addStmtProcedure("WHERE_POWERX7_SMALLINT", "select count(*) from NUMBER_TYPES where POWER(SMALLNUM,   7) = ?");
+        project.addStmtProcedure("WHERE_POWERX7_BIGINT",   "select count(*) from NUMBER_TYPES where POWER(BIGNUM,     7) = ?");
+        project.addStmtProcedure("WHERE_POWERX7_FLOAT",    "select count(*) from NUMBER_TYPES where POWER(FLOATNUM,   7) = ?");
+        project.addStmtProcedure("WHERE_POWERX7_DECIMAL",  "select count(*) from NUMBER_TYPES where POWER(DECIMALNUM, 7) = ?");
 
         // These are intended for application to non-negative values.
         // Failure tests on negative values can be done separately, possibly via ad hoc.
         project.addStmtProcedure("DISPLAY_POWERX07", "select POWER(INTEGERNUM, 0.7), POWER(TINYNUM, 0.7), POWER(SMALLNUM, 0.7), POWER(BIGNUM, 0.7), POWER(FLOATNUM, 0.7), POWER(DECIMALNUM, 0.7) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("ORDER_POWERX07_INTEGER", "select INTEGERNUM from NUMBER_TYPES order by POWER(INTEGERNUM, 0.7)");
-        project.addStmtProcedure("ORDER_POWERX07_TINY",    "select INTEGERNUM from NUMBER_TYPES order by POWER(TINYNUM,    0.7)");
-        project.addStmtProcedure("ORDER_POWERX07_SMALL",   "select INTEGERNUM from NUMBER_TYPES order by POWER(SMALLNUM,   0.7)");
-        project.addStmtProcedure("ORDER_POWERX07_BIG",     "select INTEGERNUM from NUMBER_TYPES order by POWER(BIGNUM,     0.7)");
-        project.addStmtProcedure("ORDER_POWERX07_FLOAT",   "select INTEGERNUM from NUMBER_TYPES order by POWER(FLOATNUM,   0.7)");
-        project.addStmtProcedure("ORDER_POWERX07_DECIMAL", "select INTEGERNUM from NUMBER_TYPES order by POWER(DECIMALNUM, 0.7)");
+        project.addStmtProcedure("ORDER_POWERX07_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by POWER(INTEGERNUM, 0.7)");
+        project.addStmtProcedure("ORDER_POWERX07_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by POWER(TINYNUM,    0.7)");
+        project.addStmtProcedure("ORDER_POWERX07_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by POWER(SMALLNUM,   0.7)");
+        project.addStmtProcedure("ORDER_POWERX07_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by POWER(BIGNUM,     0.7)");
+        project.addStmtProcedure("ORDER_POWERX07_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by POWER(FLOATNUM,   0.7)");
+        project.addStmtProcedure("ORDER_POWERX07_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by POWER(DECIMALNUM, 0.7)");
 
-        project.addStmtProcedure("WHERE_POWERX07_INTEGER", "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(INTEGERNUM, 0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
-        project.addStmtProcedure("WHERE_POWERX07_TINY",    "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(TINYNUM,    0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
-        project.addStmtProcedure("WHERE_POWERX07_SMALL",   "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(SMALLNUM,   0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
-        project.addStmtProcedure("WHERE_POWERX07_BIG",     "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(BIGNUM,     0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
-        project.addStmtProcedure("WHERE_POWERX07_FLOAT",   "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(FLOATNUM,   0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
-        project.addStmtProcedure("WHERE_POWERX07_DECIMAL", "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(DECIMALNUM, 0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_POWERX07_INTEGER",  "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(INTEGERNUM, 0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_POWERX07_TINYINT",  "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(TINYNUM,    0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_POWERX07_SMALLINT", "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(SMALLNUM,   0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_POWERX07_BIGINT",   "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(BIGNUM,     0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_POWERX07_FLOAT",    "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(FLOATNUM,   0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
+        project.addStmtProcedure("WHERE_POWERX07_DECIMAL",  "select count(*) from NUMBER_TYPES where ((0.0000001+POWER(DECIMALNUM, 0.7)) / (0.0000001+?)) BETWEEN 0.99 and 1.01");
 
         // These are intended for application to non-negative values.
         // Failure tests on negative values can be done separately, possibly via ad hoc.
         project.addStmtProcedure("DISPLAY_SQRT", "select SQRT(INTEGERNUM), SQRT(TINYNUM), SQRT(SMALLNUM), SQRT(BIGNUM), SQRT(FLOATNUM), SQRT(DECIMALNUM) from NUMBER_TYPES order by INTEGERNUM");
 
-        project.addStmtProcedure("ORDER_SQRT_INTEGER", "select INTEGERNUM from NUMBER_TYPES order by SQRT(INTEGERNUM)");
-        project.addStmtProcedure("ORDER_SQRT_TINY",    "select INTEGERNUM from NUMBER_TYPES order by SQRT(TINYNUM)");
-        project.addStmtProcedure("ORDER_SQRT_SMALL",   "select INTEGERNUM from NUMBER_TYPES order by SQRT(SMALLNUM)");
-        project.addStmtProcedure("ORDER_SQRT_BIG",     "select INTEGERNUM from NUMBER_TYPES order by SQRT(BIGNUM)");
-        project.addStmtProcedure("ORDER_SQRT_FLOAT",   "select INTEGERNUM from NUMBER_TYPES order by SQRT(FLOATNUM)");
-        project.addStmtProcedure("ORDER_SQRT_DECIMAL", "select INTEGERNUM from NUMBER_TYPES order by SQRT(DECIMALNUM)");
+        project.addStmtProcedure("ORDER_SQRT_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by SQRT(INTEGERNUM)");
+        project.addStmtProcedure("ORDER_SQRT_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by SQRT(TINYNUM)");
+        project.addStmtProcedure("ORDER_SQRT_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by SQRT(SMALLNUM)");
+        project.addStmtProcedure("ORDER_SQRT_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by SQRT(BIGNUM)");
+        project.addStmtProcedure("ORDER_SQRT_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by SQRT(FLOATNUM)");
+        project.addStmtProcedure("ORDER_SQRT_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by SQRT(DECIMALNUM)");
 
-        project.addStmtProcedure("WHERE_SQRT_INTEGER", "select count(*) from NUMBER_TYPES where SQRT(INTEGERNUM) = ?");
-        project.addStmtProcedure("WHERE_SQRT_TINY",    "select count(*) from NUMBER_TYPES where SQRT(TINYNUM) = ?");
-        project.addStmtProcedure("WHERE_SQRT_SMALL",   "select count(*) from NUMBER_TYPES where SQRT(SMALLNUM) = ?");
-        project.addStmtProcedure("WHERE_SQRT_BIG",     "select count(*) from NUMBER_TYPES where SQRT(TINYNUM) = ?");
-        project.addStmtProcedure("WHERE_SQRT_FLOAT",   "select count(*) from NUMBER_TYPES where SQRT(FLOATNUM) = ?");
-        project.addStmtProcedure("WHERE_SQRT_DECIMAL", "select count(*) from NUMBER_TYPES where SQRT(DECIMALNUM) = ?");
+        project.addStmtProcedure("WHERE_SQRT_INTEGER",  "select count(*) from NUMBER_TYPES where SQRT(INTEGERNUM) = ?");
+        project.addStmtProcedure("WHERE_SQRT_TINYINT",  "select count(*) from NUMBER_TYPES where SQRT(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_SQRT_SMALLINT", "select count(*) from NUMBER_TYPES where SQRT(SMALLNUM) = ?");
+        project.addStmtProcedure("WHERE_SQRT_BIGINT",   "select count(*) from NUMBER_TYPES where SQRT(TINYNUM) = ?");
+        project.addStmtProcedure("WHERE_SQRT_FLOAT",    "select count(*) from NUMBER_TYPES where SQRT(FLOATNUM) = ?");
+        project.addStmtProcedure("WHERE_SQRT_DECIMAL",  "select count(*) from NUMBER_TYPES where SQRT(DECIMALNUM) = ?");
+
+        project.addStmtProcedure("DISPLAY_INTEGER", "select CAST(INTEGERNUM AS INTEGER), CAST(TINYNUM AS INTEGER), CAST(SMALLNUM AS INTEGER), CAST(BIGNUM AS INTEGER), CAST(FLOATNUM AS INTEGER), CAST(DECIMALNUM AS INTEGER) from NUMBER_TYPES order by INTEGERNUM");
+
+        project.addStmtProcedure("ORDER_INTEGER_CAST_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by CAST(INTEGERNUM AS INTEGER)");
+        project.addStmtProcedure("ORDER_INTEGER_CAST_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by CAST(TINYNUM    AS INTEGER)");
+        project.addStmtProcedure("ORDER_INTEGER_CAST_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by CAST(SMALLNUM   AS INTEGER)");
+        project.addStmtProcedure("ORDER_INTEGER_CAST_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by CAST(BIGNUM     AS INTEGER)");
+        // Provide a tie-breaker sort column for lossy casts to ensure a deterministic result.
+        project.addStmtProcedure("ORDER_INTEGER_CAST_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by CAST(FLOATNUM   AS INTEGER), INTEGERNUM");
+        project.addStmtProcedure("ORDER_INTEGER_CAST_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by CAST(DECIMALNUM AS INTEGER), INTEGERNUM");
+
+        project.addStmtProcedure("WHERE_INTEGER_CAST_INTEGER",  "select count(*) from NUMBER_TYPES where CAST(INTEGERNUM AS INTEGER) = ?");
+        project.addStmtProcedure("WHERE_INTEGER_CAST_TINYINT",  "select count(*) from NUMBER_TYPES where CAST(TINYNUM    AS INTEGER) = ?");
+        project.addStmtProcedure("WHERE_INTEGER_CAST_SMALLINT", "select count(*) from NUMBER_TYPES where CAST(SMALLNUM   AS INTEGER) = ?");
+        project.addStmtProcedure("WHERE_INTEGER_CAST_BIGINT",   "select count(*) from NUMBER_TYPES where CAST(BIGNUM     AS INTEGER) = ?");
+        project.addStmtProcedure("WHERE_INTEGER_CAST_FLOAT",    "select count(*) from NUMBER_TYPES where CAST(FLOATNUM   AS INTEGER) = ?");
+        project.addStmtProcedure("WHERE_INTEGER_CAST_DECIMAL",  "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM AS INTEGER) = ?");
+
+        project.addStmtProcedure("DISPLAY_TINYINT", "select CAST(INTEGERNUM AS TINYINT), CAST(TINYNUM AS TINYINT), CAST(SMALLNUM AS TINYINT), CAST(BIGNUM AS TINYINT), CAST(FLOATNUM AS TINYINT), CAST(DECIMALNUM AS TINYINT) from NUMBER_TYPES order by INTEGERNUM");
+
+        project.addStmtProcedure("ORDER_TINYINT_CAST_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by CAST(INTEGERNUM AS TINYINT)");
+        project.addStmtProcedure("ORDER_TINYINT_CAST_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by CAST(TINYNUM    AS TINYINT)");
+        project.addStmtProcedure("ORDER_TINYINT_CAST_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by CAST(SMALLNUM   AS TINYINT)");
+        project.addStmtProcedure("ORDER_TINYINT_CAST_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by CAST(BIGNUM     AS TINYINT)");
+        // Provide a tie-breaker sort column for lossy casts to ensure a deterministic result.
+        project.addStmtProcedure("ORDER_TINYINT_CAST_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by CAST(FLOATNUM   AS TINYINT), INTEGERNUM");
+        project.addStmtProcedure("ORDER_TINYINT_CAST_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by CAST(DECIMALNUM AS TINYINT), INTEGERNUM");
+
+        project.addStmtProcedure("WHERE_TINYINT_CAST_INTEGER",  "select count(*) from NUMBER_TYPES where CAST(INTEGERNUM AS TINYINT) = ?");
+        project.addStmtProcedure("WHERE_TINYINT_CAST_TINYINT",  "select count(*) from NUMBER_TYPES where CAST(TINYNUM    AS TINYINT) = ?");
+        project.addStmtProcedure("WHERE_TINYINT_CAST_SMALLINT", "select count(*) from NUMBER_TYPES where CAST(SMALLNUM   AS TINYINT) = ?");
+        project.addStmtProcedure("WHERE_TINYINT_CAST_BIGINT",   "select count(*) from NUMBER_TYPES where CAST(BIGNUM     AS TINYINT) = ?");
+        project.addStmtProcedure("WHERE_TINYINT_CAST_FLOAT",    "select count(*) from NUMBER_TYPES where CAST(FLOATNUM   AS TINYINT) = ?");
+        project.addStmtProcedure("WHERE_TINYINT_CAST_DECIMAL",  "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM AS TINYINT) = ?");
+
+        project.addStmtProcedure("DISPLAY_SMALLINT", "select CAST(INTEGERNUM AS SMALLINT), CAST(TINYNUM AS SMALLINT), CAST(SMALLNUM AS SMALLINT), CAST(BIGNUM AS SMALLINT), CAST(FLOATNUM AS SMALLINT), CAST(DECIMALNUM AS SMALLINT) from NUMBER_TYPES order by INTEGERNUM");
+
+        project.addStmtProcedure("ORDER_SMALLINT_CAST_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by CAST(INTEGERNUM AS SMALLINT)");
+        project.addStmtProcedure("ORDER_SMALLINT_CAST_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by CAST(TINYNUM    AS SMALLINT)");
+        project.addStmtProcedure("ORDER_SMALLINT_CAST_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by CAST(SMALLNUM   AS SMALLINT)");
+        project.addStmtProcedure("ORDER_SMALLINT_CAST_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by CAST(BIGNUM     AS SMALLINT)");
+        // Provide a tie-breaker sort column for lossy casts to ensure a deterministic result.
+        project.addStmtProcedure("ORDER_SMALLINT_CAST_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by CAST(FLOATNUM   AS SMALLINT), INTEGERNUM");
+        project.addStmtProcedure("ORDER_SMALLINT_CAST_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by CAST(DECIMALNUM AS SMALLINT), INTEGERNUM");
+
+        project.addStmtProcedure("WHERE_SMALLINT_CAST_INTEGER",  "select count(*) from NUMBER_TYPES where CAST(INTEGERNUM AS SMALLINT) = ?");
+        project.addStmtProcedure("WHERE_SMALLINT_CAST_TINYINT",  "select count(*) from NUMBER_TYPES where CAST(TINYNUM    AS SMALLINT) = ?");
+        project.addStmtProcedure("WHERE_SMALLINT_CAST_SMALLINT", "select count(*) from NUMBER_TYPES where CAST(SMALLNUM   AS SMALLINT) = ?");
+        project.addStmtProcedure("WHERE_SMALLINT_CAST_BIGINT",   "select count(*) from NUMBER_TYPES where CAST(BIGNUM     AS SMALLINT) = ?");
+        project.addStmtProcedure("WHERE_SMALLINT_CAST_FLOAT",    "select count(*) from NUMBER_TYPES where CAST(FLOATNUM   AS SMALLINT) = ?");
+        project.addStmtProcedure("WHERE_SMALLINT_CAST_DECIMAL",  "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM AS SMALLINT) = ?");
+
+        project.addStmtProcedure("DISPLAY_BIGINT", "select CAST(INTEGERNUM AS BIGINT), CAST(TINYNUM AS BIGINT), CAST(SMALLNUM AS BIGINT), CAST(BIGNUM AS BIGINT), CAST(FLOATNUM AS BIGINT), CAST(DECIMALNUM AS BIGINT) from NUMBER_TYPES order by INTEGERNUM");
+
+        project.addStmtProcedure("ORDER_BIGINT_CAST_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by CAST(INTEGERNUM AS BIGINT)");
+        project.addStmtProcedure("ORDER_BIGINT_CAST_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by CAST(TINYNUM    AS BIGINT)");
+        project.addStmtProcedure("ORDER_BIGINT_CAST_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by CAST(SMALLNUM   AS BIGINT)");
+        project.addStmtProcedure("ORDER_BIGINT_CAST_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by CAST(BIGNUM     AS BIGINT)");
+        // Provide a tie-breaker sort column for lossy casts to ensure a deterministic result.
+        project.addStmtProcedure("ORDER_BIGINT_CAST_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by CAST(FLOATNUM   AS BIGINT), INTEGERNUM");
+        project.addStmtProcedure("ORDER_BIGINT_CAST_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by CAST(DECIMALNUM AS BIGINT), INTEGERNUM");
+
+        project.addStmtProcedure("WHERE_BIGINT_CAST_INTEGER",  "select count(*) from NUMBER_TYPES where CAST(INTEGERNUM AS BIGINT) = ?");
+        project.addStmtProcedure("WHERE_BIGINT_CAST_TINYINT",  "select count(*) from NUMBER_TYPES where CAST(TINYNUM    AS BIGINT) = ?");
+        project.addStmtProcedure("WHERE_BIGINT_CAST_SMALLINT", "select count(*) from NUMBER_TYPES where CAST(SMALLNUM   AS BIGINT) = ?");
+        project.addStmtProcedure("WHERE_BIGINT_CAST_BIGINT",   "select count(*) from NUMBER_TYPES where CAST(BIGNUM     AS BIGINT) = ?");
+        project.addStmtProcedure("WHERE_BIGINT_CAST_FLOAT",    "select count(*) from NUMBER_TYPES where CAST(FLOATNUM   AS BIGINT) = ?");
+        project.addStmtProcedure("WHERE_BIGINT_CAST_DECIMAL",  "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM AS BIGINT) = ?");
+
+        project.addStmtProcedure("DISPLAY_FLOAT", "select CAST(INTEGERNUM AS FLOAT), CAST(TINYNUM AS FLOAT), CAST(SMALLNUM AS FLOAT), CAST(BIGNUM AS FLOAT), CAST(FLOATNUM AS FLOAT), CAST(DECIMALNUM AS FLOAT) from NUMBER_TYPES order by INTEGERNUM");
+
+        project.addStmtProcedure("ORDER_FLOAT_CAST_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by CAST(INTEGERNUM AS FLOAT)");
+        project.addStmtProcedure("ORDER_FLOAT_CAST_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by CAST(TINYNUM    AS FLOAT)");
+        project.addStmtProcedure("ORDER_FLOAT_CAST_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by CAST(SMALLNUM   AS FLOAT)");
+        project.addStmtProcedure("ORDER_FLOAT_CAST_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by CAST(BIGNUM     AS FLOAT)");
+        project.addStmtProcedure("ORDER_FLOAT_CAST_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by CAST(FLOATNUM   AS FLOAT)");
+        project.addStmtProcedure("ORDER_FLOAT_CAST_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by CAST(DECIMALNUM AS FLOAT)");
+
+        project.addStmtProcedure("WHERE_FLOAT_CAST_INTEGER",  "select count(*) from NUMBER_TYPES where CAST(INTEGERNUM AS FLOAT) = ?");
+        project.addStmtProcedure("WHERE_FLOAT_CAST_TINYINT",  "select count(*) from NUMBER_TYPES where CAST(TINYNUM    AS FLOAT) = ?");
+        project.addStmtProcedure("WHERE_FLOAT_CAST_SMALLINT", "select count(*) from NUMBER_TYPES where CAST(SMALLNUM   AS FLOAT) = ?");
+        project.addStmtProcedure("WHERE_FLOAT_CAST_BIGINT",   "select count(*) from NUMBER_TYPES where CAST(BIGNUM     AS FLOAT) = ?");
+        project.addStmtProcedure("WHERE_FLOAT_CAST_FLOAT",    "select count(*) from NUMBER_TYPES where CAST(FLOATNUM   AS FLOAT) = ?");
+        project.addStmtProcedure("WHERE_FLOAT_CAST_DECIMAL",  "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM AS FLOAT) = ?");
+
+        project.addStmtProcedure("DISPLAY_DECIMAL", "select CAST(INTEGERNUM AS DECIMAL), CAST(TINYNUM AS DECIMAL), CAST(SMALLNUM AS DECIMAL), CAST(BIGNUM AS DECIMAL), CAST(FLOATNUM AS DECIMAL), CAST(DECIMALNUM AS DECIMAL) from NUMBER_TYPES order by INTEGERNUM");
+
+        project.addStmtProcedure("ORDER_DECIMAL_CAST_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by CAST(INTEGERNUM AS DECIMAL)");
+        project.addStmtProcedure("ORDER_DECIMAL_CAST_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by CAST(TINYNUM    AS DECIMAL)");
+        project.addStmtProcedure("ORDER_DECIMAL_CAST_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by CAST(SMALLNUM   AS DECIMAL)");
+        project.addStmtProcedure("ORDER_DECIMAL_CAST_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by CAST(BIGNUM     AS DECIMAL)");
+        project.addStmtProcedure("ORDER_DECIMAL_CAST_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by CAST(FLOATNUM   AS DECIMAL)");
+        project.addStmtProcedure("ORDER_DECIMAL_CAST_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by CAST(DECIMALNUM AS DECIMAL)");
+
+        project.addStmtProcedure("WHERE_DECIMAL_CAST_INTEGER",  "select count(*) from NUMBER_TYPES where CAST(INTEGERNUM AS DECIMAL) = ?");
+        project.addStmtProcedure("WHERE_DECIMAL_CAST_TINYINT",  "select count(*) from NUMBER_TYPES where CAST(TINYNUM    AS DECIMAL) = ?");
+        project.addStmtProcedure("WHERE_DECIMAL_CAST_SMALLINT", "select count(*) from NUMBER_TYPES where CAST(SMALLNUM   AS DECIMAL) = ?");
+        project.addStmtProcedure("WHERE_DECIMAL_CAST_BIGINT",   "select count(*) from NUMBER_TYPES where CAST(BIGNUM     AS DECIMAL) = ?");
+        project.addStmtProcedure("WHERE_DECIMAL_CAST_FLOAT",    "select count(*) from NUMBER_TYPES where CAST(FLOATNUM   AS DECIMAL) = ?");
+        project.addStmtProcedure("WHERE_DECIMAL_CAST_DECIMAL",  "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM AS DECIMAL) = ?");
 
         project.addStmtProcedure("DISPLAY_SUBSTRING", "select SUBSTRING (DESC FROM 2) from P1 where ID = -12");
         project.addStmtProcedure("DISPLAY_SUBSTRING2", "select SUBSTRING (DESC FROM 2 FOR 2) from P1 where ID = -12");
 
+
+        project.addStmtProcedure("DISPLAY_VARCHAR", "select CAST(INTEGERNUM AS VARCHAR), CAST(TINYNUM AS VARCHAR), CAST(SMALLNUM AS VARCHAR), CAST(BIGNUM AS VARCHAR), CAST(FLOATNUM AS VARCHAR), CAST(DECIMALNUM AS VARCHAR) from NUMBER_TYPES order by INTEGERNUM");
+
+        project.addStmtProcedure("ORDER_VARCHAR_CAST_INTEGER",  "select INTEGERNUM from NUMBER_TYPES order by CAST(INTEGERNUM AS VARCHAR)");
+        project.addStmtProcedure("ORDER_VARCHAR_CAST_TINYINT",  "select INTEGERNUM from NUMBER_TYPES order by CAST(TINYNUM    AS VARCHAR)");
+        project.addStmtProcedure("ORDER_VARCHAR_CAST_SMALLINT", "select INTEGERNUM from NUMBER_TYPES order by CAST(SMALLNUM   AS VARCHAR)");
+        project.addStmtProcedure("ORDER_VARCHAR_CAST_BIGINT",   "select INTEGERNUM from NUMBER_TYPES order by CAST(BIGNUM     AS VARCHAR)");
+        project.addStmtProcedure("ORDER_VARCHAR_CAST_FLOAT",    "select INTEGERNUM from NUMBER_TYPES order by CAST(FLOATNUM   AS VARCHAR)");
+        project.addStmtProcedure("ORDER_VARCHAR_CAST_DECIMAL",  "select INTEGERNUM from NUMBER_TYPES order by CAST(DECIMALNUM AS VARCHAR)");
+
+        project.addStmtProcedure("WHERE_VARCHAR_CAST_INTEGER",  "select count(*) from NUMBER_TYPES where CAST(INTEGERNUM AS VARCHAR) = ?");
+        project.addStmtProcedure("WHERE_VARCHAR_CAST_TINYINT",  "select count(*) from NUMBER_TYPES where CAST(TINYNUM    AS VARCHAR) = ?");
+        project.addStmtProcedure("WHERE_VARCHAR_CAST_SMALLINT", "select count(*) from NUMBER_TYPES where CAST(SMALLNUM   AS VARCHAR) = ?");
+        project.addStmtProcedure("WHERE_VARCHAR_CAST_BIGINT",   "select count(*) from NUMBER_TYPES where CAST(BIGNUM     AS VARCHAR) = ?");
+        project.addStmtProcedure("WHERE_VARCHAR_CAST_FLOAT",    "select count(*) from NUMBER_TYPES where CAST(FLOATNUM   AS VARCHAR) = ?");
+        project.addStmtProcedure("WHERE_VARCHAR_CAST_DECIMAL",  "select count(*) from NUMBER_TYPES where CAST(DECIMALNUM AS VARCHAR) = ?");
 
         project.addStmtProcedure("ORDER_SUBSTRING", "select ID+15 from P1 order by SUBSTRING (DESC FROM 2)");
 

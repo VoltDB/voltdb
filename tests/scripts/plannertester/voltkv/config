@@ -1,0 +1,14 @@
+DDL:
+../../../examples/voltkv/ddl.sql
+
+SQL:
+SELECT key, value FROM store WHERE key = ?;
+DELETE FROM store;
+INSERT INTO store (key, value) VALUES (?, ?);
+SELECT key FROM store WHERE key = ?;
+UPDATE store SET value = ? WHERE key = ?;
+INSERT INTO store (key, value) VALUES (?, ?);
+DELETE FROM store WHERE key = ?;
+
+Partition Columns:
+store.key

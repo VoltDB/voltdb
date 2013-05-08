@@ -17,12 +17,18 @@
 
 package org.voltdb.compiler;
 
+import org.voltdb.client.ProcedureInvocationType;
+
 public class CatalogChangeResult extends AsyncCompilerResult {
     private static final long serialVersionUID = 5065393610771307485L;
 
+    public byte[] catalogHash;
     public byte[] catalogBytes;
     public String deploymentString;
     public String encodedDiffCommands;
     public long deploymentCRC;
-
+    public boolean requiresSnapshotIsolation;
+    public ProcedureInvocationType invocationType;
+    public long originalTxnId;
+    public long originalUniqueId;
 }

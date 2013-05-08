@@ -116,6 +116,14 @@ public class CoreUtils {
             final int threads) {
         return getListeningExecutorService(name, threads, new LinkedTransferQueue<Runnable>(), null);
     }
+
+    public static ListeningExecutorService getListeningExecutorService(
+            final String name,
+            final int coreThreads,
+            final int threads) {
+        return getListeningExecutorService(name, coreThreads, threads, new LinkedTransferQueue<Runnable>(), null);
+    }
+
     public static ListeningExecutorService getListeningExecutorService(
             final String name,
             final int threads,
@@ -141,6 +149,40 @@ public class CoreUtils {
         return MoreExecutors.listeningDecorator(
                 new ThreadPoolExecutor(threads, threads,
                         0L, TimeUnit.MILLISECONDS,
+                        queue,
+                        getThreadFactory(null, name, SMALL_STACK_SIZE, threads > 1 ? true : false, coreList)));
+    }
+
+    public static ListeningExecutorService getListeningExecutorService(
+            final String name,
+            int coreThreadsTemp,
+            int threadsTemp,
+            final BlockingQueue<Runnable> queue,
+            final Queue<String> coreList) {
+        if (coreThreadsTemp < 0) {
+            throw new IllegalArgumentException("Must specify >= 0 core threads");
+        }
+        if (coreThreadsTemp > threadsTemp) {
+            throw new IllegalArgumentException("Core threads must be <= threads");
+        }
+
+        if (coreList != null && !coreList.isEmpty()) {
+            threadsTemp = coreList.size();
+            if (coreThreadsTemp > threadsTemp) {
+                coreThreadsTemp = threadsTemp;
+            }
+        }
+        final int coreThreads = coreThreadsTemp;
+        final int threads = threadsTemp;
+        if (threads < 1) {
+            throw new IllegalArgumentException("Must specify > 0 threads");
+        }
+        if (name == null) {
+            throw new IllegalArgumentException("Name cannot be null");
+        }
+        return MoreExecutors.listeningDecorator(
+                new ThreadPoolExecutor(coreThreads, threads,
+                        1L, TimeUnit.MINUTES,
                         queue,
                         getThreadFactory(null, name, SMALL_STACK_SIZE, threads > 1 ? true : false, coreList)));
     }

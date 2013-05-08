@@ -62,6 +62,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.SnapshotDaemon;
 import org.voltdb.SnapshotDaemon.ForwardClientException;
 import org.voltdb.SnapshotFormat;
+import org.voltdb.SnapshotInitiationInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.CatalogMap;
@@ -377,10 +378,10 @@ public class SnapshotUtil {
      * Storage for information about files that are part of a specific snapshot
      */
     public static class Snapshot {
-        public Snapshot(String nonce, long txnId)
+        public Snapshot(String nonce)
         {
             m_nonce = nonce;
-            m_txnId = txnId;
+            m_txnId = Long.MIN_VALUE;
         }
 
         public void setInstanceId(InstanceId id)
@@ -401,6 +402,14 @@ public class SnapshotUtil {
             return m_instanceId;
         }
 
+        public void setTxnId(long txnId)
+        {
+            if (m_txnId != Long.MIN_VALUE) {
+                assert(txnId == m_txnId);
+            }
+            m_txnId = txnId;
+        }
+
         public long getTxnId()
         {
             return m_txnId;
@@ -409,6 +418,7 @@ public class SnapshotUtil {
         public final List<File> m_digests = new ArrayList<File>();
         public final List<Set<String>> m_digestTables = new ArrayList<Set<String>>();
         public final Map<String, TableFiles> m_tableFiles = new TreeMap<String, TableFiles>();
+        public File m_catalogFile = null;
 
         private String m_nonce;
         private InstanceId m_instanceId = null;
@@ -443,6 +453,9 @@ public class SnapshotUtil {
             if (pathname.getName().endsWith(".digest") || pathname.getName().endsWith(".vpt")) {
                 return true;
             }
+            if (pathname.getName().endsWith(".jar")) {
+                return true;
+            }
             return false;
         }
     };
@@ -470,7 +483,8 @@ public class SnapshotUtil {
             for (String snapshotName : snapshotNames) {
                 // izzy: change this to use parseNonceFromSnapshotFilename at some point
                 if (pathname.getName().startsWith(snapshotName + "-")  ||
-                        pathname.getName().equals(snapshotName + ".digest")) {
+                    pathname.getName().equals(snapshotName + ".digest") ||
+                    pathname.getName().equals(snapshotName + ".jar")) {
                     return true;
                 }
             }
@@ -543,9 +557,10 @@ public class SnapshotUtil {
                     String nonce = parseNonceFromSnapshotFilename(f.getName());
                     Snapshot named_s = namedSnapshots.get(nonce);
                     if (named_s == null) {
-                        named_s = new Snapshot(nonce, snapshotTxnId);
+                        named_s = new Snapshot(nonce);
                         namedSnapshots.put(nonce, named_s);
                     }
+                    named_s.setTxnId(snapshotTxnId);
                     InstanceId iid = new InstanceId(0,0);
                     if (digest.has("instanceId")) {
                         iid = new InstanceId(digest.getJSONObject("instanceId"));
@@ -558,6 +573,14 @@ public class SnapshotUtil {
                     }
                     named_s.m_digestTables.add(tableSet);
                     named_s.m_digests.add(f);
+                } else if (f.getName().endsWith(".jar")) {
+                    String nonce = parseNonceFromSnapshotFilename(f.getName());
+                    Snapshot named_s = namedSnapshots.get(nonce);
+                    if (named_s == null) {
+                        named_s = new Snapshot(nonce);
+                        namedSnapshots.put(nonce, named_s);
+                    }
+                    named_s.m_catalogFile = f;
                 } else {
                     HashSet<Integer> partitionIds = new HashSet<Integer>();
                     TableSaveFile saveFile = new TableSaveFile(fis.getChannel(), 1, null, true);
@@ -577,10 +600,10 @@ public class SnapshotUtil {
                         String nonce = parseNonceFromSnapshotFilename(f.getName());
                         Snapshot named_s = namedSnapshots.get(nonce);
                         if (named_s == null) {
-                            named_s = new Snapshot(nonce, saveFile.getTxnId());
+                            named_s = new Snapshot(nonce);
                             namedSnapshots.put(nonce, named_s);
                         }
-
+                        named_s.setTxnId(saveFile.getTxnId());
                         TableFiles namedTableFiles = named_s.m_tableFiles.get(saveFile.getTableName());
                         if (namedTableFiles == null) {
                             namedTableFiles = new TableFiles(saveFile.isReplicated());
@@ -1017,7 +1040,9 @@ public class SnapshotUtil {
                                        final SnapshotFormat format,
                                        final String data,
                                        final SnapshotResponseHandler handler,
-                                       final boolean notifyChanges) {
+                                       final boolean notifyChanges)
+    {
+        final SnapshotInitiationInfo snapInfo = new SnapshotInitiationInfo(path, nonce, blocking, format, data);
         final Exchanger<ClientResponse> responseExchanger = new Exchanger<ClientResponse>();
         final Connection c = new Connection() {
             @Override
@@ -1122,8 +1147,7 @@ public class SnapshotUtil {
                 while (System.currentTimeMillis() - startTime <= (120 * 60000)) {
                     try {
                         if (!hasRequested) {
-                            sd.createAndWatchRequestNode(clientHandle, c, path, nonce, blocking,
-                                                         format, data, notifyChanges);
+                            sd.createAndWatchRequestNode(clientHandle, c, snapInfo, notifyChanges);
                             hasRequested = true;
                         }
 
@@ -1152,8 +1176,8 @@ public class SnapshotUtil {
                         try {
                             Thread.sleep(5000);
                         } catch (InterruptedException e1) {}
-                        new VoltLogger("HOST").warn("Partition detection was unable to submit a snapshot request" +
-                                                     "because one already existed. Retrying.");
+                        new VoltLogger("SNAPSHOT").warn("Partition detection was unable to submit a snapshot request" +
+                                "because one already existed. Retrying.");
                         continue;
                     } catch (InterruptedException ignore) {}
                 }

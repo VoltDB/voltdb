@@ -30,6 +30,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.Encoder;
 
 /**
  *  A client that connects to one or more nodes in a VoltCluster
@@ -92,7 +93,12 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
                 config.m_useClientAffinity);
         m_distributer.addClientStatusListener(new CSL());
         m_username = config.m_username;
-        m_passwordHash = ConnectionUtil.getHashedPassword(config.m_password);
+
+        if (config.m_cleartext) {
+            m_passwordHash = ConnectionUtil.getHashedPassword(config.m_password);
+        } else {
+            m_passwordHash = Encoder.hexDecode(config.m_password);
+        }
         if (config.m_listener != null) {
             m_distributer.addClientStatusListener(config.m_listener);
         }
@@ -353,7 +359,12 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     throws IOException {
         Object[] params = new Object[2];
         params[0] = CatalogUtil.toBytes(catalogPath);
-        params[1] = new String(CatalogUtil.toBytes(deploymentPath), "UTF-8");
+        if (deploymentPath != null) {
+            params[1] = new String(CatalogUtil.toBytes(deploymentPath), "UTF-8");
+        }
+        else {
+            params[1] = null;
+        }
         return params;
     }
 

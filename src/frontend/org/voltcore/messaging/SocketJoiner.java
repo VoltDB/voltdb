@@ -507,7 +507,7 @@ public class SocketJoiner {
                         hostSocket = SocketChannel.open(hostAddr);
                     }
                     catch (java.net.ConnectException e) {
-                        LOG.warn("Joining primary failed: " + e.getMessage() + " retrying..");
+                        LOG.warn("Joining host failed: " + e.getMessage() + " retrying..");
                         try {
                             Thread.sleep(250); //  milliseconds
                         }

@@ -262,13 +262,13 @@ public class TestCSVLoader extends TestCase {
         };
 
         String []myData = {
-                "1,\\N,1,11111111,\"\"NULL\"\",1.10,1.11",
-                "2,\"\\N\",1,11111111,\"NULL\",1.10,1.11",
-                "3,\\N,1,11111111,  \\N  ,1.10,1.11",
-                "4,\\N,1,11111111,  \"\\N\"  ,1.10,1.11",
-                "5,\\N,1,11111111, \"  \\N  \",1.10,1.11",
-                "6,\\N,1,11111111, \"  \\N L \",1.10,1.11",
-                "7,\\N,1,11111111,  \"abc\\N\"  ,1.10,1.11"
+                "1," + VoltTable.CSV_NULL        + ",1,11111111,\"\"NULL\"\",1.10,1.11",
+                "2," + VoltTable.QUOTED_CSV_NULL + ",1,11111111,\"NULL\",1.10,1.11",
+                "3," + VoltTable.CSV_NULL        + ",1,11111111,  " + VoltTable.CSV_NULL        + "  ,1.10,1.11",
+                "4," + VoltTable.CSV_NULL        + ",1,11111111,  " + VoltTable.QUOTED_CSV_NULL + "  ,1.10,1.11",
+                "5," + VoltTable.CSV_NULL        + ",1,11111111, \"  " + VoltTable.CSV_NULL   + "  \",1.10,1.11",
+                "6," + VoltTable.CSV_NULL        + ",1,11111111, \"  " + VoltTable.CSV_NULL  + " L \",1.10,1.11",
+                "7," + VoltTable.CSV_NULL        + ",1,11111111,  \"abc" + VoltTable.CSV_NULL + "\"  ,1.10,1.11"
         };
         int invalidLineCnt = 0;
         test_Interface( mySchema, myOptions, myData, invalidLineCnt );

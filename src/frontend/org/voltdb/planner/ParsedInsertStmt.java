@@ -47,45 +47,24 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
 
     @Override
     void parse(VoltXMLElement stmtNode) {
-        assert(tableList.size() <= 1);
+        // A simple INSERT ... VALUES statement (all that's supported initially) has no underlying
+        // table scans, so the table list should actually be empty until the statement's target
+        // table is inserted, below.
+        // TODO: When INSERT ... SELECT is supported, it's unclear how the source and target tables will
+        // be distinguished (positionally? in separate members?) and/or how soon thereafter the SELECT
+        // clause will need to allow joins.
+        assert(tableList.isEmpty());
 
         String tableName = stmtNode.attributes.get("table");
         Table table = getTableFromDB(tableName);
 
-        // if the table isn't in the list add it
-        // if it's there, good
-        // if something else is there, we have a problem
-        if (tableList.size() == 0)
-            tableList.add(table);
-        else
-            assert(tableList.get(0) == table);
+        tableList.add(table);
 
         for (VoltXMLElement node : stmtNode.children) {
             if (node.name.equalsIgnoreCase("columns")) {
-                for (VoltXMLElement colNode : node.children) {
-                    if (colNode.name.equalsIgnoreCase("column")) {
-                         parseInsertColumn(colNode, table);
-                    }
-                }
+                parseTargetColumns(node, table, columns);
             }
         }
-    }
-
-    void parseInsertColumn(VoltXMLElement columnNode, Table table) {
-        String tableName = columnNode.attributes.get("table");
-        String columnName = columnNode.attributes.get("name");
-
-        assert(tableName.equalsIgnoreCase(table.getTypeName()));
-        Column column = table.getColumns().getIgnoreCase(columnName);
-
-        AbstractExpression expr = null;
-        for (VoltXMLElement node : columnNode.children) {
-            expr = parseExpressionTree(node);
-            expr.refineValueType(VoltType.get((byte)column.getType()));
-            ExpressionUtil.finalizeValueTypes(expr);
-        }
-
-        columns.put(column, expr);
     }
 
     @Override

@@ -29,6 +29,8 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
+import org.voltdb.catalog.Database;
+import org.voltdb.iv2.Cartographer;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.utils.VoltFile;
@@ -41,7 +43,7 @@ import org.voltdb.utils.VoltFile;
  * when leaving this class.
  */
 public class SequentialRejoinCoordinator extends RejoinCoordinator {
-    private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
+    private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
 
     // This lock synchronizes all data structure access. Do not hold this
     // across blocking external calls.
@@ -104,7 +106,7 @@ public class SequentialRejoinCoordinator extends RejoinCoordinator {
     }
 
     @Override
-    public void startRejoin() {
+    public boolean startJoin(Database catalog, Cartographer cartographer) {
         long firstSite;
         synchronized (m_lock) {
             firstSite = m_pendingSites.poll();
@@ -113,6 +115,7 @@ public class SequentialRejoinCoordinator extends RejoinCoordinator {
         String HSIdString = CoreUtils.hsIdToString(firstSite);
         rejoinLog.info("Initiating snapshot stream to first site: " + HSIdString);
         initiateRejoinOnSite(firstSite);
+        return true;
     }
 
     private void onSnapshotStreamFinished(long HSId) {

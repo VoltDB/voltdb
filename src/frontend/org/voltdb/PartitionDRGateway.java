@@ -39,7 +39,8 @@ public class PartitionDRGateway {
      */
     public static PartitionDRGateway getInstance(int partitionId,
                                                  NodeDRGateway nodeGateway,
-                                                 boolean iv2Enabled)
+                                                 boolean iv2Enabled,
+                                                 boolean isRejoin)
     {
         final VoltDBInterface vdb = VoltDB.instance();
         LicenseApi api = vdb.getLicenseApi();
@@ -57,7 +58,7 @@ public class PartitionDRGateway {
 
         // init the instance and return
         try {
-            pdrg.init(partitionId, nodeGateway);
+            pdrg.init(partitionId, nodeGateway, isRejoin);
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
         }
@@ -83,7 +84,8 @@ public class PartitionDRGateway {
 
     // empty methods for community edition
     protected void init(int partitionId,
-                        NodeDRGateway gateway) throws IOException {}
+                        NodeDRGateway gateway,
+                        boolean isRejoin) throws IOException {}
     public void onSuccessfulProcedureCall(long txnId, long uniqueId, int hash,
                                           StoredProcedureInvocation spi,
                                           ClientResponseImpl response) {}

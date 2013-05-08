@@ -70,11 +70,12 @@ public class SpInitiator extends BaseInitiator implements Promotable
     };
 
     public SpInitiator(HostMessenger messenger, Integer partition, StatsAgent agent,
-            SnapshotCompletionMonitor snapMonitor, boolean forRejoin)
+            SnapshotCompletionMonitor snapMonitor,
+            VoltDB.START_ACTION startAction)
     {
         super(VoltZK.iv2masters, messenger, partition,
                 new SpScheduler(partition, new SiteTaskerQueue(), snapMonitor),
-                "SP", agent, forRejoin);
+                "SP", agent, startAction);
         m_leaderCache = new LeaderCache(messenger.getZK(), VoltZK.iv2appointees, m_leadersChangeHandler);
         m_tickProducer = new TickProducer(m_scheduler.m_tasks);
     }
@@ -97,10 +98,17 @@ public class SpInitiator extends BaseInitiator implements Promotable
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to configure SpInitiator.", true, e);
         }
+
+        // configure DR
+        PartitionDRGateway drGateway =
+                PartitionDRGateway.getInstance(m_partitionId, nodeDRGateway, true,
+                        VoltDB.createForRejoin(startAction));
+        ((SpScheduler) m_scheduler).setDRGateway(drGateway);
+
         super.configureCommon(backend, serializedCatalog, catalogContext,
                 csp, numberOfPartitions,
                 startAction,
-                agent, memStats, cl, coreBindIds);
+                agent, memStats, cl, coreBindIds, drGateway);
 
         m_tickProducer.start();
 
@@ -109,11 +117,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
         LeaderElector.createParticipantNode(m_messenger.getZK(),
                 LeaderElector.electionDirForPartition(m_partitionId),
                 Long.toString(getInitiatorHSId()), null);
-
-        // configure DR
-        ((SpScheduler) m_scheduler).setDRGateway(PartitionDRGateway.getInstance(m_partitionId,
-                                                                                nodeDRGateway,
-                                                                                true));
     }
 
     @Override
@@ -170,7 +173,6 @@ public class SpInitiator extends BaseInitiator implements Promotable
                             + "trying. Retrying.");
                 }
             }
-            super.acceptPromotion();
             // Tag along and become the export master too
             ExportManager.instance().acceptMastership(m_partitionId);
         } catch (Exception e) {

@@ -20,10 +20,13 @@ package org.voltdb;
 import java.io.File;
 import java.io.PrintStream;
 import java.io.PrintWriter;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.Charset;
+import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -32,6 +35,7 @@ import java.util.Queue;
 import java.util.TimeZone;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.PortGenerator;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.MiscUtils;
@@ -76,11 +80,27 @@ public class VoltDB {
         }
     }
 
+    // Utility to try to figure out if this is a test case.  Various junit targets in
+    // build.xml set this environment variable to give us a hint
+    public static boolean isThisATest()
+    {
+        String test = System.getenv().get("VOLT_JUSTATEST");
+        if (test == null) {
+            test = System.getProperty("VOLT_JUSTATEST");
+        }
+        if (test != null && test.equalsIgnoreCase("YESYESYES")) {
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
     // The name of the SQLStmt implied by a statement procedure's sql statement.
     public static final String ANON_STMT_NAME = "sql";
 
     public enum START_ACTION {
-        CREATE, RECOVER, REJOIN, LIVE_REJOIN
+        CREATE, RECOVER, REJOIN, LIVE_REJOIN, JOIN
     }
 
     public static boolean createForRejoin(VoltDB.START_ACTION startAction)
@@ -122,7 +142,9 @@ public class VoltDB {
 
         protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
-        /** use normal JNI backend or optional IPC or HSQLDB backends */
+        /** select normal JNI backend.
+         *  IPC, Valgrind, and HSQLDB are the other options.
+         */
         public BackendTarget m_backend = BackendTarget.NATIVE_EE_JNI;
 
         /** leader hostname */
@@ -370,6 +392,8 @@ public class VoltDB {
                     m_startAction = START_ACTION.LIVE_REJOIN;
                 } else if (arg.equals("live") && args.length > i + 1 && args[++i].trim().equals("rejoin")) {
                     m_startAction = START_ACTION.LIVE_REJOIN;
+                } else if (arg.startsWith("join")) {
+                    m_startAction = START_ACTION.JOIN;
                 }
 
                 else if (arg.equals("replica")) {
@@ -488,7 +512,8 @@ public class VoltDB {
             }
 
             // require deployment file location
-            if (m_startAction != START_ACTION.REJOIN && m_startAction != START_ACTION.LIVE_REJOIN) {
+            if (m_startAction != START_ACTION.REJOIN && m_startAction != START_ACTION.LIVE_REJOIN
+                    && m_startAction != START_ACTION.JOIN) {
                 // require deployment file location (null is allowed to receive default deployment)
                 if (m_pathToDeployment != null && m_pathToDeployment.isEmpty()) {
                     isValid = false;
@@ -608,119 +633,201 @@ public class VoltDB {
         return m_config.m_backend;
     }
 
-    /**
-     * Exit the process with an error message, optionally with a stack trace.
+    /*
+     * Create a file that starts with the supplied message that contains
+     * human readable stack traces for all java threads in the current process.
      */
-    public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
-        wasCrashCalled = true;
-        crashMessage = errMsg;
-        if (ignoreCrash) {
-            throw new AssertionError("Faux crash of VoltDB successful.");
+    public static void dropStackTrace(String message) {
+        if (VoltDB.isThisATest()) {
+            VoltLogger log = new VoltLogger("HOST");
+            log.warn("Declining to drop a stack trace during a junit test.");
+            return;
+        }
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd-HH:mm:ss.SSSZ");
+        String dateString = sdf.format(new Date());
+        CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
+        HostMessenger hm = VoltDB.instance().getHostMessenger();
+        int hostId = 0;
+        if (hm != null) {
+            hostId = hm.getHostId();
+        }
+        String root = catalogContext != null ? catalogContext.cluster.getVoltroot() + File.separator : "";
+        try {
+            PrintWriter writer = new PrintWriter(root + "host" + hostId + "-" + dateString + ".txt");
+            writer.println(message);
+            printStackTraces(writer);
+        } catch (Exception e) {
+            try
+            {
+                VoltLogger log = new VoltLogger("HOST");
+                log.error("Error while dropping stack trace for \"" + message + "\"", e);
+            }
+            catch (RuntimeException rt_ex)
+            {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    /*
+     * Print stack traces for all java threads in the current process to the supplied writer
+     */
+    public static void printStackTraces(PrintWriter writer) {
+        printStackTraces(writer, null);
+    }
+
+    /*
+     * Print stack traces for all threads in the process to the supplied writer.
+     * If a List is supplied then the stack frames for the current thread will be placed in it
+     */
+    public static void printStackTraces(PrintWriter writer, List<String> currentStacktrace) {
+        if (currentStacktrace == null) {
+            currentStacktrace = new ArrayList<String>();
         }
 
-        // Even if the logger is null, don't stop.  We want to log the stack trace and
-        // any other pertinent information to a .dmp file for crash diagnosis
-        List<String> currentStacktrace = new ArrayList<String>();
-        currentStacktrace.add("Stack trace from crashLocalVoltDB() method:");
         Map<Thread, StackTraceElement[]> traces = Thread.getAllStackTraces();
         StackTraceElement[] myTrace = traces.get(Thread.currentThread());
         for (StackTraceElement ste : myTrace) {
             currentStacktrace.add(ste.toString());
         }
 
-        // Create a special dump file to hold the stack trace
-        try
-        {
-            TimestampType ts = new TimestampType(new java.util.Date());
-            CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
-            String root = catalogContext != null ? catalogContext.cluster.getVoltroot() + File.separator : "";
-            PrintWriter writer = new PrintWriter(root + "voltdb_crash" + ts.toString().replace(' ', '-') + ".txt");
-            writer.println("Time: " + ts);
-            writer.println("Message: " + errMsg);
+        writer.println();
+        writer.println("****** Current Thread ****** ");
+        for (String currentStackElem : currentStacktrace) {
+            writer.println(currentStackElem);
+        }
 
+        writer.println("****** All Threads ******");
+        Iterator<Thread> it = traces.keySet().iterator();
+        while (it.hasNext())
+        {
+            Thread key = it.next();
             writer.println();
-            writer.println("Platform Properties:");
-            PlatformProperties pp = PlatformProperties.getPlatformProperties();
-            String[] lines = pp.toLogLines().split("\n");
-            for (String line : lines) {
-                writer.println(line.trim());
-            }
-
-            if (thrown != null) {
-                writer.println();
-                writer.println("****** Exception Thread ****** ");
-                thrown.printStackTrace(writer);
-            }
-
-            writer.println();
-            writer.println("****** Current Thread ****** ");
-            for (String currentStackElem : currentStacktrace) {
-                writer.println(currentStackElem);
-            }
-
-            writer.println("****** All Threads ******");
-            Iterator<Thread> it = traces.keySet().iterator();
-            while (it.hasNext())
-            {
-                Thread key = it.next();
-                writer.println();
-                StackTraceElement[] st = traces.get(key);
-                writer.println("****** " + key + " ******");
-                for (StackTraceElement ste : st)
-                    writer.println(ste);
-            }
-            writer.close();
+            StackTraceElement[] st = traces.get(key);
+            writer.println("****** " + key + " ******");
+            for (StackTraceElement ste : st)
+                writer.println(ste);
         }
-        catch (Throwable err)
-        {
-            // shouldn't fail, but..
-            err.printStackTrace();
+    }
+
+    /**
+     * Exit the process with an error message, optionally with a stack trace.
+     */
+    public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
+        /*
+         * InvocationTargetException suppresses information about the cause, so unwrap until
+         * we get to the root cause
+         */
+        while (thrown instanceof InvocationTargetException) {
+            thrown = ((InvocationTargetException)thrown).getCause();
         }
 
-        VoltLogger log = null;
-        try
-        {
-            log = new VoltLogger("HOST");
+        // for test code
+        wasCrashCalled = true;
+        crashMessage = errMsg;
+        if (ignoreCrash) {
+            throw new AssertionError("Faux crash of VoltDB successful.");
         }
-        catch (RuntimeException rt_ex)
-        { /* ignore */ }
+        if (VoltDB.isThisATest()) {
+            VoltLogger log = new VoltLogger("HOST");
+            log.warn("Declining to drop a crash file during a junit test.");
+        }
+        // end test code
 
-        if (log != null)
-        {
-            log.fatal(errMsg);
-            if (thrown != null) {
-                if (stackTrace) {
-                    log.fatal("Fatal exception", thrown);
-                } else {
-                    log.fatal(thrown.toString());
+        // try/finally block does its best to ensure death, no matter what context this
+        // is called in
+        try {
+            // slightly less important than death, this try/finally block protects code that
+            // prints a message to stdout
+            try {
+
+                // Even if the logger is null, don't stop.  We want to log the stack trace and
+                // any other pertinent information to a .dmp file for crash diagnosis
+                List<String> currentStacktrace = new ArrayList<String>();
+                currentStacktrace.add("Stack trace from crashLocalVoltDB() method:");
+
+                // Create a special dump file to hold the stack trace
+                try
+                {
+                    TimestampType ts = new TimestampType(new java.util.Date());
+                    CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
+                    String root = catalogContext != null ? catalogContext.cluster.getVoltroot() + File.separator : "";
+                    PrintWriter writer = new PrintWriter(root + "voltdb_crash" + ts.toString().replace(' ', '-') + ".txt");
+                    writer.println("Time: " + ts);
+                    writer.println("Message: " + errMsg);
+
+                    writer.println();
+                    writer.println("Platform Properties:");
+                    PlatformProperties pp = PlatformProperties.getPlatformProperties();
+                    String[] lines = pp.toLogLines().split("\n");
+                    for (String line : lines) {
+                        writer.println(line.trim());
+                    }
+
+                    if (thrown != null) {
+                        writer.println();
+                        writer.println("****** Exception Thread ****** ");
+                        thrown.printStackTrace(writer);
+                    }
+
+                    printStackTraces(writer, currentStacktrace);
+                    writer.close();
                 }
-            } else {
-                if (stackTrace) {
-                    for (String currentStackElem : currentStacktrace) {
-                        log.fatal(currentStackElem);
+                catch (Throwable err)
+                {
+                    // shouldn't fail, but..
+                    err.printStackTrace();
+                }
+
+                VoltLogger log = null;
+                try
+                {
+                    log = new VoltLogger("HOST");
+                }
+                catch (RuntimeException rt_ex)
+                { /* ignore */ }
+
+                if (log != null)
+                {
+                    log.fatal(errMsg);
+                    if (thrown != null) {
+                        if (stackTrace) {
+                            log.fatal("Fatal exception", thrown);
+                        } else {
+                            log.fatal(thrown.toString());
+                        }
+                    } else {
+                        if (stackTrace) {
+                            for (String currentStackElem : currentStacktrace) {
+                                log.fatal(currentStackElem);
+                            }
+                        }
+                    }
+                } else {
+                    System.err.println(errMsg);
+                    if (thrown != null) {
+                        if (stackTrace) {
+                            thrown.printStackTrace();
+                        } else {
+                            System.err.println(thrown.toString());
+                        }
+                    } else {
+                        if (stackTrace) {
+                            for (String currentStackElem : currentStacktrace) {
+                                System.err.println(currentStackElem);
+                            }
+                        }
                     }
                 }
             }
-        } else {
-            System.err.println(errMsg);
-            if (thrown != null) {
-                if (stackTrace) {
-                    thrown.printStackTrace();
-                } else {
-                    System.err.println(thrown.toString());
-                }
-            } else {
-                if (stackTrace) {
-                    for (String currentStackElem : currentStacktrace) {
-                        System.err.println(currentStackElem);
-                    }
-                }
+            finally {
+                System.err.println("VoltDB has encountered an unrecoverable error and is exiting.");
+                System.err.println("The log may contain additional information.");
             }
         }
-
-        System.err.println("VoltDB has encountered an unrecoverable error and is exiting.");
-        System.err.println("The log may contain additional information.");
-        System.exit(-1);
+        finally {
+            System.exit(-1);
+        }
     }
 
     /*
@@ -738,18 +845,29 @@ public class VoltDB {
      * Also notify all connected peers that the node is going down.
      */
     public static void crashGlobalVoltDB(String errMsg, boolean stackTrace, Throwable t) {
+        // for test code
         wasCrashCalled = true;
         crashMessage = errMsg;
         if (ignoreCrash) {
             throw new AssertionError("Faux crash of VoltDB successful.");
         }
+        // end test code
+
         try {
+            // instruct the rest of the cluster to die
             instance().getHostMessenger().sendPoisonPill(errMsg);
+            // give the pill a chance to make it through the network buffer
+            Thread.sleep(500);
         } catch (Exception e) {
             e.printStackTrace();
+            // sleep even on exception in case the pill got sent before the exception
+            try { Thread.sleep(500); } catch (InterruptedException e2) {}
         }
-        try { Thread.sleep(500); } catch (InterruptedException e) {}
-        crashLocalVoltDB(errMsg, stackTrace, t);
+        // finally block does its best to ensure death, no matter what context this
+        // is called in
+        finally {
+            crashLocalVoltDB(errMsg, stackTrace, t);
+        }
     }
 
     /**

@@ -17,73 +17,52 @@
 
 package org.voltdb.iv2;
 
+import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
-import java.util.Map;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
-import org.voltdb.ClientResponseImpl;
-import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SiteProcedureConnection;
-import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
-import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSaveAPI;
-import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.rejoin.RejoinSiteProcessor;
 import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.TaskLog;
-import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
-
-import com.google.common.base.Throwables;
-import com.google.common.util.concurrent.SettableFuture;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * Manages the lifecycle of snapshot serialization to a site
  * for the purposes of rejoin.
  */
-public class RejoinProducer extends SiteTasker
-{
-    private static final VoltLogger HOSTLOG = new VoltLogger("HOST");
+public class RejoinProducer extends JoinProducerBase {
     private static final VoltLogger REJOINLOG = new VoltLogger("REJOIN");
 
-    private final SettableFuture<SnapshotCompletionEvent> m_completionMonitorAwait;
-    private final SiteTaskerQueue m_taskQueue;
-    private final int m_partitionId;
-    private final String m_snapshotNonce;
-    private final String m_whoami;
     private final AtomicBoolean m_currentlyRejoining;
     private ScheduledFuture<?> m_timeFuture;
-    private InitiatorMailbox m_mailbox;
-    private long m_rejoinCoordinatorHsId;
     private RejoinSiteProcessor m_rejoinSiteProcessor;
-    private AtomicReference<ReplayCompletionAction> m_replayCompleteAction
-        = new AtomicReference<ReplayCompletionAction>();
 
     // True: use live rejoin; false use community blocking implementation.
-    private boolean m_liveRejoin;
+    private final boolean m_liveRejoin;
+    private TaskLog m_rejoinTaskLog = null;
 
     boolean useLiveRejoin()
     {
         return m_liveRejoin;
     }
 
-    // Calculate the snapshot nonce first.
+    // Get the snapshot nonce from the RejoinCoordinator's INITIATION message.
     // Then register the completion interest.
     //
     // When the completion interest callback fires for the nonce,
@@ -124,85 +103,24 @@ public class RejoinProducer extends SiteTasker
     // from multiple threads
 
     /**
-     * SnapshotCompletionAction waits for the completion
-     * notice of m_snapshotNonce and instructs the replay agent
-     * that the snapshot completed.
-     *
-     * Inner class references m_mailbox, m_nonce, m_rejoinCoordinatorHsId.
-     */
-    private class SnapshotCompletionAction implements SnapshotCompletionInterest
-    {
-        private void register()
-        {
-            REJOINLOG.debug(m_whoami + "registering snapshot completion action");
-            VoltDB.instance().getSnapshotCompletionMonitor().addInterest(this);
-        }
-
-        private void deregister()
-        {
-            REJOINLOG.debug(m_whoami + "deregistering snapshot completion action");
-            VoltDB.instance().getSnapshotCompletionMonitor().removeInterest(this);
-        }
-
-        @Override
-        public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event)
-        {
-            if (event.nonce.equals(m_snapshotNonce)) {
-                REJOINLOG.debug(m_whoami + "counting down snapshot monitor completion. "
-                        + "Snapshot txnId is: " + event.multipartTxnId);
-                Runnable action = new Runnable() {
-                    @Override
-                    public void run()
-                    {
-                        REJOINLOG.debug(m_whoami + "informing rejoinCoordinator "
-                                + CoreUtils.hsIdToString(m_rejoinCoordinatorHsId)
-                                + " of REPLAY_FINISHED");
-                        RejoinMessage replay_complete = new RejoinMessage(
-                                m_rejoinCoordinatorHsId, Type.REPLAY_FINISHED);
-                        m_mailbox.send(m_rejoinCoordinatorHsId, replay_complete);
-                        m_currentlyRejoining.set(false);
-                    }
-                };
-                m_replayCompleteAction.set(
-                        new ReplayCompletionAction(event.multipartTxnId, action));
-                deregister();
-                kickWatchdog(true);
-                m_completionMonitorAwait.set(event);
-            } else {
-                REJOINLOG.debug(m_whoami
-                        + " observed completion of irrelevant snapshot nonce: "
-                        + event.nonce);
-            }
-            return null;
-        }
-    }
-
-    /**
      * ReplayCompletionAction communicates the snapshot txn id to
      * the site and offers a run() method that closes the open
      * rejoin state with the rejoin coordinator once the site has
      * concluded rejoin.
      */
-    public static class ReplayCompletionAction implements Runnable
+    public class ReplayCompletionAction extends JoinCompletionAction
     {
-        private final long m_snapshotTxnId;
-        private final Runnable m_action;
-
-        ReplayCompletionAction(long snapshotTxnId, Runnable action)
-        {
-            m_snapshotTxnId = snapshotTxnId;
-            m_action = action;
-        }
-
-        long getSnapshotTxnId()
-        {
-            return m_snapshotTxnId;
-        }
-
         @Override
         public void run()
         {
-            m_action.run();
+            REJOINLOG.debug(m_whoami + "informing rejoinCoordinator "
+                    + CoreUtils.hsIdToString(m_coordinatorHsId)
+                    + " of REPLAY_FINISHED");
+            RejoinMessage replay_complete = new RejoinMessage(
+                    m_mailbox.getHSId(), RejoinMessage.Type.REPLAY_FINISHED);
+            m_mailbox.send(m_coordinatorHsId, replay_complete);
+            m_currentlyRejoining.set(false);
+
             SnapshotSaveAPI.recoveringSiteCount.decrementAndGet();
         }
     }
@@ -229,34 +147,78 @@ public class RejoinProducer extends SiteTasker
     // m_currentlyRejoining gates promotion to master. If the rejoin producer
     // is instantiated, it must complete its execution and set currentlyRejoining
     // to false.
-    public RejoinProducer(int partitionId, SiteTaskerQueue taskQueue)
+    public RejoinProducer(int partitionId, SiteTaskerQueue taskQueue, boolean isLiveRejoin)
     {
-        m_partitionId = partitionId;
-        m_taskQueue = taskQueue;
-        m_snapshotNonce = "Rejoin_" + m_partitionId + "_" + System.currentTimeMillis();
-        m_completionMonitorAwait = SettableFuture.create();
-        m_whoami = "Rejoin producer:" + m_partitionId + " ";
+        super(partitionId, "Rejoin producer:" + partitionId + " ", taskQueue);
         m_currentlyRejoining = new AtomicBoolean(true);
+        m_completionAction = new ReplayCompletionAction();
+        m_liveRejoin = isLiveRejoin;
+
         REJOINLOG.debug(m_whoami + "created.");
     }
 
-    public void setMailbox(InitiatorMailbox mailbox)
+    private static TaskLog initializeForLiveRejoin(String voltroot, int pid)
     {
-        m_mailbox = mailbox;
+        // Construct task log and start logging task messages
+        File overflowDir = new File(voltroot, "rejoin_overflow");
+        Class<?> taskLogKlass =
+                MiscUtils.loadProClass("org.voltdb.rejoin.TaskLogImpl", "Rejoin", false);
+        if (taskLogKlass != null) {
+            Constructor<?> taskLogConstructor;
+            try {
+                taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class, boolean.class);
+                return (TaskLog) taskLogConstructor.newInstance(pid, overflowDir, true);
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unable to construct rejoin task log", true, e);
+            }
+        }
+        return null;
     }
 
+    private static TaskLog initializeForCommunityRejoin()
+    {
+        return new TaskLog() {
+            @Override
+            public void logTask(TransactionInfoBaseMessage message)
+                    throws IOException {
+            }
 
+            @Override
+            public TransactionInfoBaseMessage getNextMessage()
+                    throws IOException {
+                return null;
+            }
+
+            @Override
+            public void setEarliestTxnId(long txnId) {
+            }
+
+            @Override
+            public boolean isEmpty() throws IOException {
+                return true;
+            }
+
+            @Override
+            public void close() throws IOException {
+            }
+        };
+    }
+
+    @Override
     public boolean acceptPromotion()
     {
         return !m_currentlyRejoining.get();
     }
 
+    @Override
     public void deliver(RejoinMessage message)
     {
         if (message.getType() == RejoinMessage.Type.INITIATION) {
+            assert(m_liveRejoin);
             doInitiation(message);
         }
         else if (message.getType() == RejoinMessage.Type.INITIATION_COMMUNITY) {
+            assert(m_liveRejoin == false);
             doInitiation(message);
         }
         else {
@@ -266,8 +228,20 @@ public class RejoinProducer extends SiteTasker
         }
     }
 
+    @Override
+    public TaskLog constructTaskLog(String voltroot)
+    {
+        if (m_liveRejoin) {
+            m_rejoinTaskLog = initializeForLiveRejoin(voltroot, m_partitionId);
+        } else {
+            m_rejoinTaskLog = initializeForCommunityRejoin();
+        }
+        return m_rejoinTaskLog;
+    }
+
     // cancel and maybe rearm the snapshot data-segment watchdog.
-    private void kickWatchdog(boolean rearm)
+    @Override
+    protected void kickWatchdog(boolean rearm)
     {
         synchronized (this) {
             if (m_timeFuture != null) {
@@ -290,9 +264,9 @@ public class RejoinProducer extends SiteTasker
      */
     void doInitiation(RejoinMessage message)
     {
-        m_liveRejoin = message.getType() == RejoinMessage.Type.INITIATION;
-        m_rejoinCoordinatorHsId = message.m_sourceHSId;
+        m_coordinatorHsId = message.m_sourceHSId;
         m_rejoinSiteProcessor = new StreamSnapshotSink();
+        String snapshotNonce = message.getSnapshotNonce();
 
         // MUST choose the leader as the source.
         long sourceSite = m_mailbox.getMasterHsId(m_partitionId);
@@ -303,15 +277,15 @@ public class RejoinProducer extends SiteTasker
                 + m_liveRejoin + ". Source site is: "
                 + CoreUtils.hsIdToString(sourceSite)
                 + " and destination rejoin processor is: "
-                + CoreUtils.hsIdToString(hsId));
+                + CoreUtils.hsIdToString(hsId)
+                + " and snapshot nonce is: "
+                + snapshotNonce);
 
-        // Initiate a snapshot with stream snapshot target
-        String data = makeSnapshotRequest(hsId, sourceSite);
-        SnapshotCompletionAction interest = new SnapshotCompletionAction();
+        SnapshotCompletionAction interest = new SnapshotCompletionAction(snapshotNonce);
         interest.register();
-
-        SnapshotUtil.requestSnapshot(0l, "", m_snapshotNonce, !useLiveRejoin(), // community rejoin uses blocking snapshot (true)
-                SnapshotFormat.STREAM, data, m_handler, true);
+        // Tell the RejoinCoordinator everything it will need to know to get us our snapshot stream.
+        RejoinMessage initResp = new RejoinMessage(m_mailbox.getHSId(), sourceSite, hsId);
+        m_mailbox.send(m_coordinatorHsId, initResp);
 
         // A little awkward here...
         // The site must stay unblocked until the first snapshot data block arrrives.
@@ -339,65 +313,14 @@ public class RejoinProducer extends SiteTasker
         firstSnapshotBlock.start();
     }
 
-    private String makeSnapshotRequest(long hsId, long sourceSite)
-    {
-        try {
-            JSONStringer jsStringer = new JSONStringer();
-            jsStringer.object();
-            jsStringer.key("hsId").value(hsId);
-            jsStringer.key("target_hsid").value(sourceSite);
-            jsStringer.endObject();
-            return jsStringer.toString();
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Failed to serialize to JSON", true, e);
-        }
-        // unreachable;
-        return null;
-    }
-
-    /*
-     * m_handler is called when a SnapshotUtil.requestSnapshot response occurs.
-     * This callback runs on the snapshot daemon thread.
-     */
-    SnapshotResponseHandler m_handler = new SnapshotResponseHandler() {
-        @Override
-        public void handleResponse(ClientResponse resp)
-        {
-            if (resp == null) {
-                VoltDB.crashLocalVoltDB("Failed to initiate rejoin snapshot",
-                        false, null);
-            } else if (resp.getStatus() != ClientResponseImpl.SUCCESS) {
-                VoltDB.crashLocalVoltDB("Failed to initiate rejoin snapshot: "
-                        + resp.getStatusString(), false, null);
-            }
-
-            VoltTable[] results = resp.getResults();
-            if (SnapshotUtil.didSnapshotRequestSucceed(results)) {
-                String appStatus = resp.getAppStatusString();
-                if (appStatus == null) {
-                    VoltDB.crashLocalVoltDB("Rejoin snapshot request failed: "
-                            + resp.getStatusString(), false, null);
-                }
-                else {
-                    // success is buried down here...
-                    return;
-                }
-            } else {
-                VoltDB.crashLocalVoltDB("Snapshot request for rejoin failed",
-                        false, null);
-            }
-        }
-    };
-
     /**
      * SiteTasker run -- load this site!
      *
      * run() is invoked when the RejoinProducer (this) submits itself to the
      * site tasker. RejoinProducer submits itself to the site tasker queue
      * when rejoin data is available. Rejoin data is available after the
-     * snapshot request is fulfilled. The snapshot request is triggered
-     * by the node-wise snapshot coordinator telling this producer that it's
-     * its turn to start the rejoin sequence.
+     * snapshot request is fulfilled. The snapshot request is made by the rejoin
+     * coordinator on our behalf.
      */
     @Override
     public void run(SiteProcedureConnection siteConnection)
@@ -460,8 +383,8 @@ public class RejoinProducer extends SiteTasker
                         + "snapshot monitor completed. "
                         + "Sending SNAPSHOT_FINISHED and Handing off to site.");
                 RejoinMessage snap_complete = new RejoinMessage(
-                        m_rejoinCoordinatorHsId, Type.SNAPSHOT_FINISHED);
-                m_mailbox.send(m_rejoinCoordinatorHsId, snap_complete);
+                        m_mailbox.getHSId(), Type.SNAPSHOT_FINISHED);
+                m_mailbox.send(m_coordinatorHsId, snap_complete);
 
             } catch (InterruptedException crashme) {
                 VoltDB.crashLocalVoltDB(
@@ -472,7 +395,7 @@ public class RejoinProducer extends SiteTasker
                         "Unexpected exception awaiting snapshot completion.",
                         true, e);
             }
-            setRejoinComplete(siteConnection, event.exportSequenceNumbers);
+            setJoinComplete(siteConnection, event.exportSequenceNumbers);
         }
     }
 
@@ -491,7 +414,7 @@ public class RejoinProducer extends SiteTasker
             try {
                 rejoinWork = m_rejoinSiteProcessor.take();
             } catch (InterruptedException e) {
-                HOSTLOG.warn("RejoinProducer interrupted at take()");
+                REJOINLOG.warn("RejoinProducer interrupted at take()");
                 rejoinWork = null;
             }
         }
@@ -500,6 +423,13 @@ public class RejoinProducer extends SiteTasker
 
         // m_rejoinSnapshotBytes = m_rejoinSiteProcessor.bytesTransferred();
         // m_rejoinSiteProcessor = null;
+
+        // A bit of a hack; in some large database cases with more than 2 nodes,
+        // one of the nodes can finish streaming its sites LONG before the other
+        // nodes.  Since we won't see the SnapshotCompletionMonitor fire until
+        // all sites are done, the watchdog can fire first and abort the rejoin.
+        // Just turn the watchdog off after we've gotten the last block.
+        kickWatchdog(false);
 
         /*
          * Don't notify the rejoin coordinator yet. The stream snapshot may
@@ -520,8 +450,8 @@ public class RejoinProducer extends SiteTasker
             REJOINLOG.debug(m_whoami + " monitor completed. Sending SNAPSHOT_FINISHED "
                     + "and handing off to site.");
             RejoinMessage snap_complete = new RejoinMessage(
-                    m_rejoinCoordinatorHsId, Type.SNAPSHOT_FINISHED);
-            m_mailbox.send(m_rejoinCoordinatorHsId, snap_complete);
+                    m_mailbox.getHSId(), Type.SNAPSHOT_FINISHED);
+            m_mailbox.send(m_coordinatorHsId, snap_complete);
         } catch (InterruptedException crashme) {
             VoltDB.crashLocalVoltDB(
                     "Interrupted awaiting snapshot completion.", true, crashme);
@@ -530,30 +460,6 @@ public class RejoinProducer extends SiteTasker
                     "Unexpected exception awaiting snapshot completion.", true,
                     e);
         }
-        setRejoinComplete(siteConnection, event.exportSequenceNumbers);
-    }
-
-    // Received a datablock. Reset the watchdog timer and hand the block to the Site.
-    void restoreBlock(Pair<Integer, ByteBuffer> rejoinWork,
-            SiteProcedureConnection siteConnection)
-    {
-        kickWatchdog(true);
-
-        int tableId = rejoinWork.getFirst();
-        ByteBuffer buffer = rejoinWork.getSecond();
-        VoltTable table = PrivateVoltTableFactory.createVoltTableFromBuffer(
-                buffer.duplicate(), true);
-
-        // Currently, only export cares about this TXN ID.  Since we don't have one handy, and IV2
-        // doesn't yet care about export, just use Long.MIN_VALUE
-        siteConnection.loadTable(Long.MIN_VALUE, tableId, table);
-    }
-
-    // Completed all criteria: Kill the watchdog and inform the site.
-    void setRejoinComplete(SiteProcedureConnection siteConnection,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers)
-    {
-        kickWatchdog(false);
-        siteConnection.setRejoinComplete(m_replayCompleteAction.get(), exportSequenceNumbers);
+        setJoinComplete(siteConnection, event.exportSequenceNumbers);
     }
 }

@@ -17,17 +17,12 @@
 
 package org.voltdb;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.nio.ByteBuffer;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
+
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -52,18 +47,16 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
-import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.TxnEgo;
-import org.voltdb.rejoin.StreamSnapshotDataTarget;
-import org.voltdb.sysprocs.SnapshotRegistry;
+
+import org.voltdb.sysprocs.saverestore.CSVSnapshotWritePlan;
+import org.voltdb.sysprocs.saverestore.NativeSnapshotWritePlan;
+import org.voltdb.sysprocs.saverestore.SnapshotWritePlan;
+import org.voltdb.sysprocs.saverestore.StreamSnapshotWritePlan;
 import org.voltdb.sysprocs.SnapshotSave;
-import org.voltdb.sysprocs.saverestore.SnapshotUtil;
-import org.voltdb.utils.CatalogUtil;
 
 import com.google.common.base.Charsets;
-import com.google.common.primitives.Ints;
-import com.google.common.primitives.Longs;
 
 /**
  * SnapshotSaveAPI extracts reusuable snapshot production code
@@ -74,10 +67,28 @@ import com.google.common.primitives.Longs;
 public class SnapshotSaveAPI
 {
     private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotSaveAPI.class.getName());
-    private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
+    private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
 
     // ugh, ick, ugh
+    // IV2 does not do any snapshot work on any sites on a rejoining node.
+    // The new snapshot planning stuff post-3.0 depends on it.
     public static final AtomicInteger recoveringSiteCount = new AtomicInteger(0);
+
+    /**
+     * Global collections populated by snapshot creator, poll'd by individual sites
+     */
+    // The four items containing createSetup artifacts below are all synchronized on m_createLock.
+    private static final Object m_createLock = new Object();
+    private static final Map<Long, Deque<SnapshotTableTask>> m_taskListsForHSIds =
+        new HashMap<Long, Deque<SnapshotTableTask>>();
+    private static final List<SnapshotDataTarget> m_snapshotDataTargets =
+        new ArrayList<SnapshotDataTarget>();
+    private static final AtomicReference<VoltTable> m_createResult = new AtomicReference<VoltTable>();
+    private static final AtomicBoolean m_createSuccess = new AtomicBoolean(false);
+
+    //Protected by SnapshotSiteProcessor.m_snapshotCreateLock when accessed from SnapshotSaveAPI.startSnanpshotting
+    private static Map<Integer, Long> m_partitionLastSeenTransactionIds =
+            new HashMap<Integer, Long>();
 
     /*
      * Ugh!, needs to be visible to all the threads doing the snapshot,
@@ -121,31 +132,29 @@ public class SnapshotSaveAPI
                 @Override
                 public void run() {
                     Map<Integer, Long>  partitionTransactionIds = new HashMap<Integer, Long>();
-                    if (VoltDB.instance().isIV2Enabled()) {
-                        partitionTransactionIds = SnapshotSiteProcessor.m_partitionLastSeenTransactionIds;
-                        HOST_LOG.debug("Last seen partition transaction ids " + partitionTransactionIds);
-                        SnapshotSiteProcessor.m_partitionLastSeenTransactionIds = new HashMap<Integer, Long>();
-                        partitionTransactionIds.put(TxnEgo.getPartitionId(multiPartTxnId), multiPartTxnId);
+                    partitionTransactionIds = m_partitionLastSeenTransactionIds;
+                    SNAP_LOG.debug("Last seen partition transaction ids " + partitionTransactionIds);
+                    m_partitionLastSeenTransactionIds = new HashMap<Integer, Long>();
+                    partitionTransactionIds.put(TxnEgo.getPartitionId(multiPartTxnId), multiPartTxnId);
 
 
-                        /*
-                         * Do a quick sanity check that the provided IDs
-                         * don't conflict with currently active partitions. If they do
-                         * it isn't fatal we can just skip it.
-                         */
-                        for (long txnId : legacyPerPartitionTxnIds) {
-                            final int legacyPartition = TxnEgo.getPartitionId(txnId);
-                            if (partitionTransactionIds.containsKey(legacyPartition)) {
-                                HOST_LOG.warn("While saving a snapshot and propagating legacy " +
-                                        "transaction ids found an id that matches currently active partition" +
-                                        partitionTransactionIds.get(legacyPartition));
-                            } else {
-                                partitionTransactionIds.put( legacyPartition, txnId);
-                            }
+                    /*
+                     * Do a quick sanity check that the provided IDs
+                     * don't conflict with currently active partitions. If they do
+                     * it isn't fatal we can just skip it.
+                     */
+                    for (long txnId : legacyPerPartitionTxnIds) {
+                        final int legacyPartition = TxnEgo.getPartitionId(txnId);
+                        if (partitionTransactionIds.containsKey(legacyPartition)) {
+                            SNAP_LOG.warn("While saving a snapshot and propagating legacy " +
+                                "transaction ids found an id that matches currently active partition" +
+                                partitionTransactionIds.get(legacyPartition));
+                        } else {
+                            partitionTransactionIds.put( legacyPartition, txnId);
                         }
                     }
                     exportSequenceNumbers = SnapshotSiteProcessor.getExportSequenceNumbers();
-                    createSetup(
+                    createSetupIv2(
                             file_path,
                             file_nonce,
                             format,
@@ -168,28 +177,54 @@ public class SnapshotSaveAPI
             //From within this EE, record the sequence numbers as of the start of the snapshot (now)
             //so that the info can be put in the digest.
             SnapshotSiteProcessor.populateExportSequenceNumbersForExecutionSite(context);
-            if (VoltDB.instance().isIV2Enabled()) {
-                HOST_LOG.debug("Registering transaction id " + partitionTxnId + " for " +
-                        TxnEgo.getPartitionId(partitionTxnId));
-                SnapshotSiteProcessor.m_partitionLastSeenTransactionIds.put(
-                        TxnEgo.getPartitionId(partitionTxnId), partitionTxnId);
-            }
+            SNAP_LOG.debug("Registering transaction id " + partitionTxnId + " for " +
+                    TxnEgo.getPartitionId(partitionTxnId));
+            m_partitionLastSeenTransactionIds.put(TxnEgo.getPartitionId(partitionTxnId), partitionTxnId);
         }
 
         try {
             SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.await();
             try {
-                /*
-                 * The synchronized block doesn't throw IE or BBE, but wrapping
-                 * both barriers saves writing the exception handling twice
-                 */
-                synchronized (SnapshotSiteProcessor.m_taskListsForSites) {
-                    final Deque<SnapshotTableTask> m_taskList = SnapshotSiteProcessor.m_taskListsForSites.poll();
-                    if (m_taskList == null) {
-                        return result;
-                    } else {
+                synchronized (m_createLock) {
+                    SNAP_LOG.debug("Found tasks for HSIds: " +
+                            CoreUtils.hsIdCollectionToString(m_taskListsForHSIds.keySet()));
+                    SNAP_LOG.debug("Looking for local HSID: " +
+                            CoreUtils.hsIdToString(context.getSiteId()));
+                    Deque<SnapshotTableTask> taskList = m_taskListsForHSIds.remove(context.getSiteId());
+                    List<SnapshotDataTarget> targetList = new ArrayList<SnapshotDataTarget>(m_snapshotDataTargets);
+                    // If createSetup failed, then the first site to reach here is going
+                    // to send the results table generated by createSetup, and then empty out the table.
+                    // All other sites to reach here will send the appropriate empty table.
+                    // If createSetup was a success but the taskList is null, then we'll use the block
+                    // switch to figure out what flavor of empty SnapshotSave result table to return.
+                    if (!m_createSuccess.get()) {
+                        // There shouldn't be any work for any site if we failed
+                        assert(m_taskListsForHSIds.isEmpty());
+                        VoltTable finalresult = m_createResult.get();
+                        if (finalresult != null) {
+                            m_createResult.set(null);
+                            return finalresult;
+                        }
+                        else {
+                            // We returned a non-empty NodeResultsTable with the failures in it,
+                            // every other site needs to return a NodeResultsTable as well.
+                            return SnapshotSave.constructNodeResultsTable();
+                        }
+                    }
+                    else if (taskList == null) {
+                        // This node is participating in the snapshot but this site has nothing to do.
+                        // Send back an appropriate empty table based on the block flag
+                        if (block != 0) {
+                            return SnapshotSave.constructPartitionResultsTable();
+                        }
+                        else {
+                            return SnapshotSave.constructNodeResultsTable();
+                        }
+                    }
+                    else {
                         context.getSiteSnapshotConnection().initiateSnapshots(
-                                m_taskList,
+                                taskList,
+                                targetList,
                                 multiPartTxnId,
                                 context.getSiteTrackerForSnapshot().getAllHosts().size(),
                                 exportSequenceNumbers);
@@ -280,7 +315,7 @@ public class SnapshotSaveAPI
                     VoltZK.nodes_currently_snapshotting + "/" + VoltDB.instance().getHostMessenger().getHostId(),
                     snapshotTxnId.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL, cb1, null);
         } catch (NodeExistsException e) {
-            HOST_LOG.warn("Didn't expect the snapshot node to already exist", e);
+            SNAP_LOG.warn("Didn't expect the snapshot node to already exist", e);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
@@ -322,7 +357,7 @@ public class SnapshotSaveAPI
         try {
             cb1.get();
         } catch (NodeExistsException e) {
-            HOST_LOG.warn("Didn't expect the snapshot node to already exist", e);
+            SNAP_LOG.warn("Didn't expect the snapshot node to already exist", e);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
@@ -494,401 +529,76 @@ public class SnapshotSaveAPI
         }
     }
 
-    private void createSetup(
+    private void createSetupIv2(
             String file_path, String file_nonce, SnapshotFormat format,
             long txnId, Map<Integer, Long> partitionTransactionIds,
             String data, SystemProcedureExecutionContext context,
             String hostname, final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            SiteTracker tracker, long timestamp) {
-        {
-            final int numLocalSites =
-                    (tracker.getLocalSites().length - recoveringSiteCount.get());
-
-            // non-null if targeting only one site (used for rejoin)
-            // set later from the "data" JSON string
-            Long targetHSid = null;
-
-            JSONObject jsData = null;
-            if (data != null && !data.isEmpty()) {
-                try {
-                    jsData = new JSONObject(data);
-                }
-                catch (JSONException e) {
-                    HOST_LOG.error(String.format("JSON exception on snapshot data \"%s\".", data),
-                            e);
-                }
-            }
-
-            MessageDigest digest;
+            SiteTracker tracker, long timestamp)
+    {
+        JSONObject jsData = null;
+        String truncReqId = "";
+        if (data != null && !data.isEmpty()) {
             try {
-                digest = MessageDigest.getInstance("SHA-1");
-            } catch (NoSuchAlgorithmException e) {
-                throw new AssertionError(e);
-            }
-
-            /*
-             * List of partitions to include if this snapshot is
-             * going to be deduped. Attempts to break up the work
-             * by seeding and RNG selecting
-             * a random replica to do the work. Will not work in failure
-             * cases, but we don't use dedupe when we want durability.
-             *
-             * Originally used the partition id as the seed, but it turns out
-             * that nextInt(2) returns a 1 for seeds 0-4095. Now use SHA-1
-             * on the txnid + partition id.
-             */
-            List<Integer> partitionsToInclude = new ArrayList<Integer>();
-            List<Long> sitesToInclude = new ArrayList<Long>();
-            for (long localSite : tracker.getLocalSites()) {
-                final int partitionId = tracker.getPartitionForSite(localSite);
-                List<Long> sites =
-                        new ArrayList<Long>(tracker.getSitesForPartition(tracker.getPartitionForSite(localSite)));
-                Collections.sort(sites);
-
-                digest.update(Longs.toByteArray(txnId));
-                final long seed = Longs.fromByteArray(Arrays.copyOf( digest.digest(Ints.toByteArray(partitionId)), 8));
-
-                int siteIndex = new java.util.Random(seed).nextInt(sites.size());
-                if (localSite == sites.get(siteIndex)) {
-                    partitionsToInclude.add(partitionId);
-                    sitesToInclude.add(localSite);
+                jsData = new JSONObject(data);
+                if (jsData.has("truncReqId")) {
+                    truncReqId = jsData.getString("truncReqId");
                 }
             }
-
-            assert(partitionsToInclude.size() == sitesToInclude.size());
-
-            /*
-             * Used to close targets on failure
-             */
-            final ArrayList<SnapshotDataTarget> targets = new ArrayList<SnapshotDataTarget>();
-            try {
-                final ArrayDeque<SnapshotTableTask> partitionedSnapshotTasks =
-                    new ArrayDeque<SnapshotTableTask>();
-                final ArrayList<SnapshotTableTask> replicatedSnapshotTasks =
-                    new ArrayList<SnapshotTableTask>();
-                assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty());
-
-                final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
+            catch (JSONException e) {
+                SNAP_LOG.error(String.format("JSON exception on snapshot data \"%s\".", data),
+                        e);
+            }
+        }
+        SnapshotWritePlan plan = null;
+        if (format == SnapshotFormat.NATIVE) {
+            plan = new NativeSnapshotWritePlan();
+        }
+        else if (format == SnapshotFormat.CSV) {
+            plan = new CSVSnapshotWritePlan();
+        }
+        else if (format == SnapshotFormat.STREAM) {
+            plan = new StreamSnapshotWritePlan();
+        }
+        else {
+            throw new RuntimeException("BAD BAD BAD");
+        }
+        boolean abort = plan.createSetup(file_path, file_nonce, txnId, partitionTransactionIds,
+                jsData, context, hostname, result, exportSequenceNumbers, tracker, timestamp);
+        synchronized (m_createLock) {
+            //Seems like this should be cleared out just in case
+            //Log if there is actually anything to clear since it is unexpected
+            if (!m_taskListsForHSIds.isEmpty()) {
+                SNAP_LOG.warn("Found lingering snapshot tasks while setting up a snapshot");
+            }
+            m_taskListsForHSIds.clear();
+            m_snapshotDataTargets.clear();
+            m_createSuccess.set(!abort);
+            m_createResult.set(result);
+            if (!abort) {
+                m_taskListsForHSIds.putAll(plan.getTaskListsForHSIds());
+                m_snapshotDataTargets.addAll(plan.getSnapshotDataTargets());
+                // HACK HACK HACK.  If the task list is empty, this host has no work to do for
+                // this snapshot.  We're going to create an empty list of tasks for one of the sites to do
+                // so that we'll have a SnapshotSiteProcessor which will do the logSnapshotCompleteToZK.
+                if (m_taskListsForHSIds.isEmpty()) {
+                    SNAP_LOG.debug("Node had no snapshot work to do.  Creating a null task to drive completion.");
+                    m_taskListsForHSIds.put(context.getSiteId(), new ArrayDeque<SnapshotTableTask>());
+                }
+                SNAP_LOG.debug("Planned tasks: " +
+                        CoreUtils.hsIdCollectionToString(plan.getTaskListsForHSIds().keySet()));
+                SNAP_LOG.debug("Created tasks for HSIds: " +
+                        CoreUtils.hsIdCollectionToString(m_taskListsForHSIds.keySet()));
                 /*
-                 * For a file based snapshot
+                 * Inform the SnapshotCompletionMonitor of what the partition specific txnids for
+                 * this snapshot were so it can forward that to completion interests.
                  */
-                if (format.isFileBased()) {
-                    Runnable completionTask = SnapshotUtil.writeSnapshotDigest(
-                                                  txnId,
-                                                  context.getCatalogCRC(),
-                                                  file_path,
-                                                  file_nonce,
-                                                  tables,
-                                                  context.getHostId(),
-                                                  exportSequenceNumbers,
-                                                  partitionTransactionIds,
-                                                  VoltDB.instance().getHostMessenger().getInstanceId(),
-                                                  timestamp);
-                    if (completionTask != null) {
-                        SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
-                    }
-                    completionTask = SnapshotUtil.writeSnapshotCatalog(file_path, file_nonce);
-                    if (completionTask != null) {
-                        SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
-                    }
-                }
-
-                final AtomicInteger numTables = new AtomicInteger(tables.size());
-                final SnapshotRegistry.Snapshot snapshotRecord =
-                    SnapshotRegistry.startSnapshot(
-                            txnId,
-                            context.getHostId(),
-                            file_path,
-                            file_nonce,
-                            format,
-                            tables.toArray(new Table[0]));
-
-                SnapshotDataTarget sdt = null;
-                if (!format.isTableBased()) {
-                    // table schemas for all the tables we'll snapshot on this partition
-                    Map<Integer, byte[]> schemas = new HashMap<Integer, byte[]>();
-                    for (final Table table : SnapshotUtil.getTablesToSave(context.getDatabase())) {
-                        VoltTable schemaTable = CatalogUtil.getVoltTable(table);
-                        schemas.put(table.getRelativeIndex(), schemaTable.getSchemaBytes());
-                    }
-
-                    if (format == SnapshotFormat.STREAM && jsData != null) {
-                        long hsId = jsData.getLong("hsId");
-
-                        // if a target_hsid exists, set it for filtering a snapshot for a specific site
-                        try {
-                            targetHSid = jsData.getLong("target_hsid");
-                        }
-                        catch (JSONException e) {} // leave value as null on exception
-
-                        // if this snapshot targets a specific site...
-                        if (targetHSid != null) {
-                            // get the list of sites on this node
-                            List<Long> localHSids = tracker.getSitesForHost(context.getHostId());
-                            // if the target site is local to this node...
-                            if (localHSids.contains(targetHSid)) {
-                                sdt = new StreamSnapshotDataTarget(hsId, schemas);
-                            }
-                            else {
-                                sdt = new DevNullSnapshotTarget();
-                            }
-                        }
-                    }
-                }
-
-                for (final Table table : SnapshotUtil.getTablesToSave(context.getDatabase()))
-                {
-                    /*
-                     * For a deduped csv snapshot, only produce the replicated tables on the "leader"
-                     * host.
-                     */
-                    if (format == SnapshotFormat.CSV && table.getIsreplicated() && !tracker.isFirstHost()) {
-                        snapshotRecord.removeTable(table.getTypeName());
-                        continue;
-                    }
-                    String canSnapshot = "SUCCESS";
-                    String err_msg = "";
-
-                    File saveFilePath = null;
-                    if (format.isFileBased()) {
-                        saveFilePath = SnapshotUtil.constructFileForTable(
-                                    table,
-                                    file_path,
-                                    file_nonce,
-                                    format,
-                                    context.getHostId());
-                    }
-
-                    try {
-                        if (format == SnapshotFormat.CSV) {
-                            sdt = new SimpleFileSnapshotDataTarget(saveFilePath);
-                        } else if (format == SnapshotFormat.NATIVE) {
-                            sdt =
-                                constructSnapshotDataTargetForTable(
-                                        context,
-                                        saveFilePath,
-                                        table,
-                                        context.getHostId(),
-                                        tracker.m_numberOfPartitions,
-                                        txnId,
-                                        timestamp,
-                                        tracker.getPartitionsForHost(context.getHostId()));
-                        }
-
-                        if (sdt == null) {
-                            throw new IOException("Unable to create snapshot target");
-                        }
-
-                        targets.add(sdt);
-                        final SnapshotDataTarget sdtFinal = sdt;
-                        final Runnable onClose = new Runnable() {
-                            @SuppressWarnings("synthetic-access")
-                            @Override
-                            public void run() {
-                                snapshotRecord.updateTable(table.getTypeName(),
-                                        new SnapshotRegistry.Snapshot.TableUpdater() {
-                                    @Override
-                                    public SnapshotRegistry.Snapshot.Table update(
-                                            SnapshotRegistry.Snapshot.Table registryTable) {
-                                        return snapshotRecord.new Table(
-                                                registryTable,
-                                                sdtFinal.getBytesWritten(),
-                                                sdtFinal.getLastWriteException());
-                                    }
-                                });
-                                int tablesLeft = numTables.decrementAndGet();
-                                if (tablesLeft == 0) {
-                                    final SnapshotRegistry.Snapshot completed =
-                                        SnapshotRegistry.finishSnapshot(snapshotRecord);
-                                    final double duration =
-                                        (completed.timeFinished - completed.timeStarted) / 1000.0;
-                                    HOST_LOG.info(
-                                            "Snapshot " + snapshotRecord.nonce + " finished at " +
-                                             completed.timeFinished + " and took " + duration
-                                             + " seconds ");
-                                }
-                            }
-                        };
-
-                        sdt.setOnCloseHandler(onClose);
-
-                        List<SnapshotDataFilter> filters = new ArrayList<SnapshotDataFilter>();
-                        if (format == SnapshotFormat.CSV) {
-                            /*
-                             * Don't need to do filtering on a replicated table.
-                             */
-                            if (!table.getIsreplicated()) {
-                                filters.add(
-                                        new PartitionProjectionSnapshotFilter(
-                                                Ints.toArray(partitionsToInclude),
-                                                0));
-                            }
-                            filters.add(new CSVSnapshotFilter(CatalogUtil.getVoltTable(table), ',', null));
-                        }
-
-                        // if this snapshot targets a specific site...
-                        if (targetHSid != null) {
-                            // get the list of sites on this node
-                            List<Long> localHSids = tracker.getSitesForHost(context.getHostId());
-                            // if the target site is local to this node...
-                            if (localHSids.contains(targetHSid)) {
-                                // ...get its partition id...
-                                int partitionId = tracker.getPartitionForSite(targetHSid);
-                                // ...and build a filter to only get that partition
-                                filters.add(new PartitionProjectionSnapshotFilter(
-                                        new int[] { partitionId }, sdt.getHeaderSize()));
-                            }
-                            else {
-                                // filter EVERYTHING because the site we want isn't local
-                                filters.add(new PartitionProjectionSnapshotFilter(
-                                        new int[0], sdt.getHeaderSize()));
-                            }
-                        }
-
-                        final SnapshotTableTask task =
-                            new SnapshotTableTask(
-                                    table.getRelativeIndex(),
-                                    sdt,
-                                    filters.toArray(new SnapshotDataFilter[filters.size()]),
-                                    table.getIsreplicated(),
-                                    table.getTypeName());
-
-                        if (table.getIsreplicated()) {
-                            replicatedSnapshotTasks.add(task);
-                        } else {
-                            partitionedSnapshotTasks.offer(task);
-                        }
-                    } catch (IOException ex) {
-                        /*
-                         * Creation of this specific target failed. Close it if it was created.
-                         * Continue attempting the snapshot anyways so that at least some of the data
-                         * can be retrieved.
-                         */
-                        try {
-                            if (sdt != null) {
-                                targets.remove(sdt);
-                                sdt.close();
-                            }
-                        } catch (Exception e) {
-                            HOST_LOG.error(e);
-                        }
-
-                        StringWriter sw = new StringWriter();
-                        PrintWriter pw = new PrintWriter(sw);
-                        ex.printStackTrace(pw);
-                        pw.flush();
-                        canSnapshot = "FAILURE";
-                        err_msg = "SNAPSHOT INITIATION OF " + file_nonce +
-                        "RESULTED IN IOException: \n" + sw.toString();
-                    }
-
-                    result.addRow(context.getHostId(),
-                            hostname,
-                            table.getTypeName(),
-                            canSnapshot,
-                            err_msg);
-                }
-
-                synchronized (SnapshotSiteProcessor.m_taskListsForSites) {
-                    //Seems like this should be cleared out just in case
-                    //Log if there is actually anything to clear since it is unexpected
-                    if (!SnapshotSiteProcessor.m_taskListsForSites.isEmpty()) {
-                        HOST_LOG.warn("Found lingering snapshot tasks while setting up a snapshot");
-                        SnapshotSiteProcessor.m_taskListsForSites.clear();
-                    }
-                    boolean aborted = false;
-                    if (!partitionedSnapshotTasks.isEmpty() || !replicatedSnapshotTasks.isEmpty()) {
-                        for (int ii = 0; ii < numLocalSites; ii++) {
-                            SnapshotSiteProcessor.m_taskListsForSites.add(new ArrayDeque<SnapshotTableTask>());
-                        }
-                    } else {
-                        SnapshotRegistry.discardSnapshot(snapshotRecord);
-                        aborted = true;
-                    }
-
-                    /**
-                     * Distribute the writing of replicated tables to exactly one partition.
-                     */
-                    for (int ii = 0; ii < numLocalSites && !partitionedSnapshotTasks.isEmpty(); ii++) {
-                        SnapshotSiteProcessor.m_taskListsForSites.get(ii).addAll(partitionedSnapshotTasks);
-                        if (!format.isTableBased()) {
-                            SnapshotSiteProcessor.m_taskListsForSites.get(ii).addAll(replicatedSnapshotTasks);
-                        }
-                    }
-
-                    if (format.isTableBased()) {
-                        int siteIndex = 0;
-                        for (SnapshotTableTask t : replicatedSnapshotTasks) {
-                            SnapshotSiteProcessor.m_taskListsForSites.get(siteIndex++ % numLocalSites).offer(t);
-                        }
-                    }
-                    if (!aborted) {
-                        /*
-                         * Inform the SnapshotCompletionMonitor of what the partition specific txnids for
-                         * this snapshot were so it can forward that to completion interests.
-                         */
-                        VoltDB.instance().getSnapshotCompletionMonitor().registerPartitionTxnIdsForSnapshot(
-                                txnId, partitionTransactionIds);
-                        // Provide the truncation request ID so the monitor can recognize a specific snapshot.
-                        String truncReqId = "";
-                        if (jsData != null && jsData.has("truncReqId")) {
-                            truncReqId = jsData.getString("truncReqId");
-                        }
-                        logSnapshotStartToZK( txnId, context, file_nonce, truncReqId);
-                    }
-                }
-            } catch (Exception ex) {
-                /*
-                 * Close all the targets to release the threads. Don't let sites get any tasks.
-                 */
-                SnapshotSiteProcessor.m_taskListsForSites.clear();
-                for (SnapshotDataTarget sdt : targets) {
-                    try {
-                        sdt.close();
-                    } catch (Exception e) {
-                        HOST_LOG.error(ex);
-                    }
-                }
-
-                StringWriter sw = new StringWriter();
-                PrintWriter pw = new PrintWriter(sw);
-                ex.printStackTrace(pw);
-                pw.flush();
-                result.addRow(
-                        context.getHostId(),
-                        hostname,
-                        "",
-                        "FAILURE",
-                        "SNAPSHOT INITIATION OF " + file_path + file_nonce +
-                        "RESULTED IN Exception: \n" + sw.toString());
-                HOST_LOG.error(ex);
+                VoltDB.instance().getSnapshotCompletionMonitor().registerPartitionTxnIdsForSnapshot(
+                        txnId, partitionTransactionIds);
+                // Provide the truncation request ID so the monitor can recognize a specific snapshot.
+                logSnapshotStartToZK( txnId, context, file_nonce, truncReqId);
             }
         }
     }
-
-    private final SnapshotDataTarget constructSnapshotDataTargetForTable(
-            SystemProcedureExecutionContext context,
-            File f,
-            Table table,
-            int hostId,
-            int numPartitions,
-            long txnId,
-            long timestamp,
-            List<Integer> partitionsForHost)
-    throws IOException
-    {
-        return new DefaultSnapshotDataTarget(f,
-                                             hostId,
-                                             context.getCluster().getTypeName(),
-                                             context.getDatabase().getTypeName(),
-                                             table.getTypeName(),
-                                             numPartitions,
-                                             table.getIsreplicated(),
-                                             partitionsForHost,
-                                             CatalogUtil.getVoltTable(table),
-                                             txnId,
-                                             timestamp);
-    }
-
 }

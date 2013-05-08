@@ -27,8 +27,12 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.math.BigDecimal;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLConnection;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -44,12 +48,12 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import jline.Terminal;
 import jline.console.CursorBuffer;
 import jline.console.KeyMap;
 import jline.console.completer.Completer;
 import jline.console.history.FileHistory;
 
+import org.voltdb.RealVoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -58,9 +62,6 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-
-import sun.misc.Signal;
-import sun.misc.SignalHandler;
 
 import com.google.common.collect.ImmutableMap;
 
@@ -73,6 +74,21 @@ public class SQLCommand
     private static final Pattern AutoSplit = Pattern.compile("(\\s|((\\(\\s*)+))(select|insert|update|delete|exec|execute|explain|explainproc)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern SetOp = Pattern.compile("(\\s|\\))\\s*(union|except|intersect)(\\s\\s*all)?((\\s*\\({0,1}\\s*)*)select", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
+    /**
+     * Matches a command followed by and SQL CRUD statement verb
+     */
+    private static final Pattern ParserStringKeywords = Pattern.compile(
+            "\\s*" + // 0 or more spaces
+            "(" + // start group 1
+              "exec|execute|explain|explainproc" + // command
+            ")" +  // end group 1
+            "\\s+" + // one or more spaces
+            "(" + // start group 2
+              "select|insert|update|delete" + // SQL CRUD statement verb
+            ")" + // end group 2
+            "\\s+", // one or more spaces
+            Pattern.MULTILINE|Pattern.CASE_INSENSITIVE
+    );
     private static final String readme = "SQLCommandReadme.txt";
 
     public static String getReadme() {
@@ -88,19 +104,33 @@ public class SQLCommand
         if (query == null)
             return null;
 
-        String[] command = new String[] {"exec", "execute", "explain", "explainproc"};
-        String[] keyword = new String[] {"select", "insert", "update", "delete"};
-        for(int i = 0;i<command.length;i++)
-        {
-            for(int j = 0;j<keyword.length;j++)
-            {
-                Pattern r = Pattern.compile("\\s*(" + command[i].replace(" ","\\s+") + ")\\s+(" + keyword[j] + ")\\s*", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
-                query = r.matcher(query).replaceAll(" $1 #SQL_PARSER_STRING_KEYWORD#$2 ");
-            }
-        }
-
+        /*
+         * Mark any parser string keyword matches by interposing the #SQL_PARDER_STRING_KEYWORD#
+         * tag. Which is later stripped at the end of this procedure. This tag is here to
+         * aide the evaluation of SetOp and AutoSplit REGEXPs, meaning that an
+         * 'explain select foo from bar will cause SetOp and AutoSplit match on the select as
+         * is prefixed with the #SQL_PARDER_STRING_KEYWORD#
+         *
+         * For example
+         *     'explain select foo from bar'
+         *  becomes
+         *     'explain #SQL_PARSER_STRING_KEYWORD#select foo from bar'
+         */
+        query = ParserStringKeywords.matcher(query).replaceAll(" $1 #SQL_PARSER_STRING_KEYWORD#$2 ");
+        /*
+         * strip out single line comments
+         */
         query = SingleLineComments.matcher(query).replaceAll("");
+        /*
+         * replace all escaped single quotes with the #(SQL_PARSER_ESCAPE_SINGLE_QUOTE) tag
+         */
         query = EscapedSingleQuote.matcher(query).replaceAll("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)");
+
+        /*
+         * move all single quoted strings into the string fragments list, and do in place
+         * replacements with numbered instances of the #(SQL_PARSER_STRING_FRAGMENT#[n]) tag
+         *
+         */
         Matcher stringFragmentMatcher = Extract.matcher(query);
         ArrayList<String> stringFragments = new ArrayList<String>();
         int i = 0;
@@ -112,8 +142,11 @@ public class SQLCommand
             i++;
         }
 
+        /*
+         * Mark all subsequent set portions of a query with SQL_PARSER_SETOP_SELECT tag
+         */
         query = SetOp.matcher(query).replaceAll("$1$2$3$4SQL_PARSER_SETOP_SELECT");
-        query = AutoSplit.matcher(query).replaceAll(";$2$4 ");
+        query = AutoSplit.matcher(query).replaceAll(";$2$4 "); // there be dragons here
         query = query.replaceAll("SQL_PARSER_SETOP_SELECT", "select");
         String[] sqlFragments = query.split("\\s*;+\\s*");
 
@@ -786,7 +819,7 @@ public class SQLCommand
 
     // VoltDB connection support
     private static Client VoltDB;
-    private static final List<String> StatisticsComponents = Arrays.asList("INDEX","INITIATOR","IOSTATS","MANAGEMENT","MEMORY","PROCEDURE","TABLE","PARTITIONCOUNT","STARVATION","LIVECLIENTS", "DR", "TOPO", "PLANNER");
+    private static final List<String> StatisticsComponents = Arrays.asList("INDEX","INITIATOR","IOSTATS","MANAGEMENT","MEMORY","PROCEDURE","TABLE","PARTITIONCOUNT","STARVATION","LIVECLIENTS", "DR", "TOPO", "PLANNER", "SNAPSHOTSTATUS");
     private static final List<String> SysInfoSelectors = Arrays.asList("OVERVIEW","DEPLOYMENT");
     private static final List<String> MetaDataSelectors =
         Arrays.asList("TABLES", "COLUMNS", "INDEXINFO", "PRIMARYKEYS",
@@ -830,14 +863,6 @@ public class SQLCommand
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
         Procedures.put("@SnapshotStatus",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
-        Procedures.put("@AdHoc_RO_MP",
-                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
-        Procedures.put("@AdHoc_RO_SP",
-                ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "bigint")).build());
-        Procedures.put("@AdHoc_RW_MP",
-                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
-        Procedures.put("@AdHoc_RW_SP",
-                ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "bigint")).build());
         Procedures.put("@Explain",
                 ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
         Procedures.put("@ExplainProc",
@@ -1110,6 +1135,9 @@ public class SQLCommand
             // Split server list
             String[] servers = serverList.split(",");
 
+            // Phone home to see if there is a newer version of VoltDB
+            openURLAsync();
+
             // Load system procedures
             loadSystemProcedures();
 
@@ -1228,4 +1256,47 @@ public class SQLCommand
         }
     }
 
+    // The following two methods implement a "phone home" version check for VoltDB.
+    // Asynchronously ping VoltDB to see what the current released version is.
+    // If it is newer than the one running here, then notify the user in some manner TBD.
+    // Note that this processing should not impact utility use in any way.  Ignore all
+    // errors.
+    private static void openURLAsync()
+    {
+        Thread t = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                 openURL();
+            }
+        });
+
+        // Set the daemon flag so that this won't hang the process if it runs into difficulty
+        t.setDaemon(true);
+        t.start();
+    }
+
+    private static void openURL()
+    {
+        URL url;
+
+        try {
+            // Read the response from VoltDB
+            String a="http://community.voltdb.com/versioncheck?app=sqlcmd&ver=" + org.voltdb.VoltDB.instance().getVersionString();
+            url = new URL(a);
+            URLConnection conn = url.openConnection();
+
+            // open the stream and put it into BufferedReader
+            BufferedReader br = new BufferedReader(
+                               new InputStreamReader(conn.getInputStream()));
+
+            String inputLine;
+            while ((inputLine = br.readLine()) != null) {
+                // At this time do nothing, just drain the stream.
+                // In the future we'll notify the user that a new version of VoltDB is available.
+            }
+            br.close();
+        } catch (Throwable e) {
+            // ignore any error
+        }
+    }
 }

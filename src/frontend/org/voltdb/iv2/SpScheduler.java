@@ -32,18 +32,19 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+
+import org.voltdb.client.ClientResponse;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
 
 import org.voltdb.messaging.DumpMessage;
+import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -52,7 +53,8 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2LogFaultMessage;
-import org.voltdb.messaging.MultiPartitionParticipantMessage;
+
+import org.voltdb.VoltTable;
 
 import com.google.common.primitives.Longs;
 
@@ -141,9 +143,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
-
-    // helper class to put command log work in order
-    private final ReplaySequencer m_replaySequencer = new ReplaySequencer();
 
     SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor)
     {
@@ -248,31 +247,98 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      * Poll the replay sequencer and process the messages until it returns null
      */
     private void deliverReadyTxns() {
+        // First, pull all the sequenced messages, if any.
         VoltMessage m = m_replaySequencer.poll();
         while(m != null) {
-            deliver2(m);
+            deliver(m);
             m = m_replaySequencer.poll();
         }
-    }
-
-    /**
-     * Poll the replay sequencer and respond to all SPs with an IGNORED response
-     */
-    private void drainReplaySequencer()
-    {
-        VoltMessage m = m_replaySequencer.poll();
+        // Then, try to pull all the drainable messages, if any.
+        m = m_replaySequencer.drain();
         while (m != null) {
             if (m instanceof Iv2InitiateTaskMessage) {
                 // Send IGNORED response for all SPs
                 Iv2InitiateTaskMessage task = (Iv2InitiateTaskMessage) m;
                 final InitiateResponseMessage response = new InitiateResponseMessage(task);
                 response.setResults(new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
-                                                           new VoltTable[0],
-                                                           ClientResponseImpl.IGNORED_TRANSACTION));
+                            new VoltTable[0],
+                            ClientResponseImpl.IGNORED_TRANSACTION));
                 m_mailbox.send(response.getInitiatorHSId(), response);
             }
-            m = m_replaySequencer.poll();
+            m = m_replaySequencer.drain();
         }
+    }
+
+    /**
+     * Sequence the message for replay if it's for CL or DR.
+     *
+     * @param message
+     * @return true if the message can be delivered directly to the scheduler,
+     * false if the message is queued
+     */
+    public boolean sequenceForReplay(VoltMessage message)
+    {
+        boolean canDeliver = false;
+        long sequenceWithTxnId = Long.MIN_VALUE;
+
+        boolean commandLog = (message instanceof TransactionInfoBaseMessage &&
+                (((TransactionInfoBaseMessage)message).isForReplay()));
+
+        boolean dr = ((message instanceof TransactionInfoBaseMessage &&
+                ((TransactionInfoBaseMessage)message).isForDR()));
+
+        boolean sentinel = message instanceof MultiPartitionParticipantMessage;
+
+        boolean replay = commandLog || sentinel || dr;
+        boolean sequenceForReplay = m_isLeader && replay;
+
+        assert(!(commandLog && dr));
+
+        if (commandLog || sentinel) {
+            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getTxnId();
+        }
+        else if (dr) {
+            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
+        }
+
+        if (sequenceForReplay) {
+            InitiateResponseMessage dupe = m_replaySequencer.dedupe(sequenceWithTxnId,
+                    (TransactionInfoBaseMessage) message);
+            if (dupe != null) {
+                // Duplicate initiate task message, send response
+                m_mailbox.send(dupe.getInitiatorHSId(), dupe);
+            }
+            else if (!m_replaySequencer.offer(sequenceWithTxnId, (TransactionInfoBaseMessage) message)) {
+                canDeliver = true;
+            }
+            else {
+                deliverReadyTxns();
+            }
+
+            // If it's a DR sentinel, send an acknowledgement
+            if (sentinel && !commandLog) {
+                MultiPartitionParticipantMessage mppm = (MultiPartitionParticipantMessage) message;
+                final InitiateResponseMessage response = new InitiateResponseMessage(mppm);
+                ClientResponseImpl clientResponse =
+                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                new VoltTable[0], ClientResponseImpl.IGNORED_TRANSACTION);
+                response.setResults(clientResponse);
+                m_mailbox.send(response.getInitiatorHSId(), response);
+            }
+        }
+        else {
+            if (replay) {
+                // Update last seen and last polled txnId for replicas
+                m_replaySequencer.updateLastSeenTxnId(sequenceWithTxnId,
+                        (TransactionInfoBaseMessage) message);
+                m_replaySequencer.updateLastPolledTxnId(sequenceWithTxnId,
+                        (TransactionInfoBaseMessage) message);
+            }
+
+            canDeliver = true;
+        }
+
+        return canDeliver;
     }
 
     // SpInitiators will see every message type.  The Responses currently come
@@ -280,49 +346,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // implemented
     @Override
     public void deliver(VoltMessage message)
-    {
-        long sequenceWithTxnId = Long.MIN_VALUE;
-
-        boolean sequenceForCommandLog =
-            (m_isLeader && message instanceof TransactionInfoBaseMessage &&
-             (((TransactionInfoBaseMessage)message).isForReplay()));
-
-        boolean sequenceForDR = m_isLeader &&
-             ((message instanceof TransactionInfoBaseMessage &&
-                ((TransactionInfoBaseMessage)message).isForDR()));
-
-        boolean sequenceForSentinel = m_isLeader &&
-            (message instanceof MultiPartitionParticipantMessage);
-
-        boolean sequenceForReplay =
-                sequenceForCommandLog || sequenceForSentinel || sequenceForDR;
-
-        assert(!(sequenceForCommandLog && sequenceForDR));
-
-        if (sequenceForCommandLog || sequenceForSentinel) {
-            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getTxnId();
-        }
-        else if (sequenceForDR) {
-            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
-        }
-
-        if (sequenceForReplay) {
-            if (!m_replaySequencer.offer(sequenceWithTxnId, (TransactionInfoBaseMessage)message)) {
-                deliver2(message);
-            }
-            else if (m_replaySequencer.isMPIEOLReached()) {
-                drainReplaySequencer();
-            }
-            else {
-                deliverReadyTxns();
-            }
-        }
-        else {
-            deliver2(message);
-        }
-    }
-
-    private void deliver2(VoltMessage message)
     {
         if (message instanceof Iv2InitiateTaskMessage) {
             handleIv2InitiateTaskMessage((Iv2InitiateTaskMessage)message);
@@ -357,133 +380,132 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // procedures only.
     public void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
     {
-        final String procedureName = message.getStoredProcedureName();
-        if (message.isSinglePartition()) {
-            long newSpHandle;
-            long uniqueId = Long.MIN_VALUE;
-            Iv2InitiateTaskMessage msg = message;
-            if (m_isLeader || message.isReadOnly()) {
-                /*
-                 * A short circuit read is a read where the client interface is local to
-                 * this node. The CI will let a replica perform a read in this case and
-                 * it does looser tracking of client handles since it can't be
-                 * partitioned from the local replica.
-                 */
-                if (!m_isLeader &&
-                        CoreUtils.getHostIdFromHSId(msg.getInitiatorHSId()) !=
-                        CoreUtils.getHostIdFromHSId(m_mailbox.getHSId())) {
-                    VoltDB.crashLocalVoltDB("Only allowed to do short circuit reads locally", true, null);
-                }
-
-                /*
-                 * If this is for CL replay or DR, update the unique ID generator
-                 */
-                if (message.isForReplay()) {
-                    uniqueId = message.getUniqueId();
-                    m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(uniqueId);
-                } else if (message.isForDR()) {
-                    uniqueId = message.getStoredProcedureInvocation().getOriginalUniqueId();
-                    // @LoadSinglepartitionTable does not have a valid uid
-                    if (UniqueIdGenerator.getPartitionIdFromUniqueId(uniqueId) == m_partitionId) {
-                        m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(uniqueId);
-                    }
-                }
-
-                /*
-                 * If this is CL replay use the txnid from the CL and also
-                 * update the txnid to match the one from the CL
-                 */
-                if (message.isForReplay()) {
-                    newSpHandle = message.getTxnId();
-                    setMaxSeenTxnId(newSpHandle);
-                } else if (m_isLeader) {
-                    TxnEgo ego = advanceTxnEgo();
-                    newSpHandle = ego.getTxnId();
-                    uniqueId = m_uniqueIdGenerator.getNextUniqueId();
-                } else {
-                    /*
-                     * The short circuit read case. Since we are not a master
-                     * we can't create new transaction IDs, so reuse the last seen
-                     * txnid. For a timestamp, might as well give a reasonable one
-                     * for a read heavy workload so time isn't bursty.
-                     */
-                    uniqueId = UniqueIdGenerator.makeIdFromComponents(
-                            Math.max(System.currentTimeMillis(), m_uniqueIdGenerator.lastUsedTime),
-                            0,
-                            m_uniqueIdGenerator.partitionId);
-                    //Don't think it wise to make a new one for a short circuit read
-                    newSpHandle = getCurrentTxnId();
-                }
-
-                // Need to set the SP handle on the received message
-                // Need to copy this or the other local sites handling
-                // the same initiate task message will overwrite each
-                // other's memory -- the message isn't copied on delivery
-                // to other local mailboxes.
-                msg = new Iv2InitiateTaskMessage(
-                        message.getInitiatorHSId(),
-                        message.getCoordinatorHSId(),
-                        m_repairLogTruncationHandle,
-                        message.getTxnId(),
-                        message.getUniqueId(),
-                        message.isReadOnly(),
-                        message.isSinglePartition(),
-                        message.getStoredProcedureInvocation(),
-                        message.getClientInterfaceHandle(),
-                        message.getConnectionId(),
-                        message.isForReplay());
-
-                msg.setSpHandle(newSpHandle);
-
-                // Also, if this is a vanilla single-part procedure, make the TXNID
-                // be the SpHandle (for now)
-                // Only system procedures are every-site, so we'll check through the SystemProcedureCatalog
-                if (SystemProcedureCatalog.listing.get(procedureName) == null ||
-                    !SystemProcedureCatalog.listing.get(procedureName).getEverysite()) {
-                    msg.setTxnId(newSpHandle);
-                    msg.setUniqueId(uniqueId);
-                }
-
-                //Don't replicate reads, this really assumes that DML validation
-                //is going to be integrated soonish
-                if (m_isLeader && !msg.isReadOnly() && m_sendToHSIds.length > 0) {
-                    Iv2InitiateTaskMessage replmsg =
-                        new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
-                                m_mailbox.getHSId(),
-                                m_repairLogTruncationHandle,
-                                msg.getTxnId(),
-                                msg.getUniqueId(),
-                                msg.isReadOnly(),
-                                msg.isSinglePartition(),
-                                msg.getStoredProcedureInvocation(),
-                                msg.getClientInterfaceHandle(),
-                                msg.getConnectionId(),
-                                msg.isForReplay());
-                    // Update the handle in the copy since the constructor doesn't set it
-                    replmsg.setSpHandle(newSpHandle);
-                    for (long hsId : m_sendToHSIds) {
-                        m_mailbox.send(hsId,
-                                replmsg);
-                    }
-                    DuplicateCounter counter = new DuplicateCounter(
-                            msg.getInitiatorHSId(),
-                            msg.getTxnId(), m_replicaHSIds);
-                    m_duplicateCounters.put(new DuplicateCounterKey(msg.getTxnId(), newSpHandle), counter);
-                }
-            }
-            else {
-                setMaxSeenTxnId(msg.getSpHandle());
-                newSpHandle = msg.getSpHandle();
-                uniqueId = msg.getUniqueId();
-            }
-            Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), msg.getTxnId(), newSpHandle);
-            doLocalInitiateOffer(msg);
-            return;
-        }
-        else {
+        if (!message.isSinglePartition()) {
             throw new RuntimeException("SpScheduler.handleIv2InitiateTaskMessage " +
                     "should never receive multi-partition initiations.");
         }
+
+        final String procedureName = message.getStoredProcedureName();
+        long newSpHandle;
+        long uniqueId = Long.MIN_VALUE;
+        Iv2InitiateTaskMessage msg = message;
+        if (m_isLeader || message.isReadOnly()) {
+            /*
+             * A short circuit read is a read where the client interface is local to
+             * this node. The CI will let a replica perform a read in this case and
+             * it does looser tracking of client handles since it can't be
+             * partitioned from the local replica.
+             */
+            if (!m_isLeader &&
+                    CoreUtils.getHostIdFromHSId(msg.getInitiatorHSId()) !=
+                    CoreUtils.getHostIdFromHSId(m_mailbox.getHSId())) {
+                VoltDB.crashLocalVoltDB("Only allowed to do short circuit reads locally", true, null);
+                    }
+
+            /*
+             * If this is for CL replay or DR, update the unique ID generator
+             */
+            if (message.isForReplay()) {
+                uniqueId = message.getUniqueId();
+                m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(uniqueId);
+            } else if (message.isForDR()) {
+                uniqueId = message.getStoredProcedureInvocation().getOriginalUniqueId();
+                // @LoadSinglepartitionTable does not have a valid uid
+                if (UniqueIdGenerator.getPartitionIdFromUniqueId(uniqueId) == m_partitionId) {
+                    m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(uniqueId);
+                }
+            }
+
+            /*
+             * If this is CL replay use the txnid from the CL and also
+             * update the txnid to match the one from the CL
+             */
+            if (message.isForReplay()) {
+                newSpHandle = message.getTxnId();
+                setMaxSeenTxnId(newSpHandle);
+            } else if (m_isLeader) {
+                TxnEgo ego = advanceTxnEgo();
+                newSpHandle = ego.getTxnId();
+                uniqueId = m_uniqueIdGenerator.getNextUniqueId();
+            } else {
+                /*
+                 * The short circuit read case. Since we are not a master
+                 * we can't create new transaction IDs, so reuse the last seen
+                 * txnid. For a timestamp, might as well give a reasonable one
+                 * for a read heavy workload so time isn't bursty.
+                 */
+                uniqueId = UniqueIdGenerator.makeIdFromComponents(
+                        Math.max(System.currentTimeMillis(), m_uniqueIdGenerator.lastUsedTime),
+                        0,
+                        m_uniqueIdGenerator.partitionId);
+                //Don't think it wise to make a new one for a short circuit read
+                newSpHandle = getCurrentTxnId();
+            }
+
+            // Need to set the SP handle on the received message
+            // Need to copy this or the other local sites handling
+            // the same initiate task message will overwrite each
+            // other's memory -- the message isn't copied on delivery
+            // to other local mailboxes.
+            msg = new Iv2InitiateTaskMessage(
+                    message.getInitiatorHSId(),
+                    message.getCoordinatorHSId(),
+                    m_repairLogTruncationHandle,
+                    message.getTxnId(),
+                    message.getUniqueId(),
+                    message.isReadOnly(),
+                    message.isSinglePartition(),
+                    message.getStoredProcedureInvocation(),
+                    message.getClientInterfaceHandle(),
+                    message.getConnectionId(),
+                    message.isForReplay());
+
+            msg.setSpHandle(newSpHandle);
+
+            // Also, if this is a vanilla single-part procedure, make the TXNID
+            // be the SpHandle (for now)
+            // Only system procedures are every-site, so we'll check through the SystemProcedureCatalog
+            if (SystemProcedureCatalog.listing.get(procedureName) == null ||
+                    !SystemProcedureCatalog.listing.get(procedureName).getEverysite()) {
+                msg.setTxnId(newSpHandle);
+                msg.setUniqueId(uniqueId);
+                    }
+
+            //Don't replicate reads, this really assumes that DML validation
+            //is going to be integrated soonish
+            if (m_isLeader && !msg.isReadOnly() && m_sendToHSIds.length > 0) {
+                Iv2InitiateTaskMessage replmsg =
+                    new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
+                            m_mailbox.getHSId(),
+                            m_repairLogTruncationHandle,
+                            msg.getTxnId(),
+                            msg.getUniqueId(),
+                            msg.isReadOnly(),
+                            msg.isSinglePartition(),
+                            msg.getStoredProcedureInvocation(),
+                            msg.getClientInterfaceHandle(),
+                            msg.getConnectionId(),
+                            msg.isForReplay());
+                // Update the handle in the copy since the constructor doesn't set it
+                replmsg.setSpHandle(newSpHandle);
+                for (long hsId : m_sendToHSIds) {
+                    m_mailbox.send(hsId,
+                            replmsg);
+                }
+                DuplicateCounter counter = new DuplicateCounter(
+                        msg.getInitiatorHSId(),
+                        msg.getTxnId(), m_replicaHSIds);
+                m_duplicateCounters.put(new DuplicateCounterKey(msg.getTxnId(), newSpHandle), counter);
+            }
+        }
+        else {
+            setMaxSeenTxnId(msg.getSpHandle());
+            newSpHandle = msg.getSpHandle();
+            uniqueId = msg.getUniqueId();
+        }
+        Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), msg.getTxnId(), newSpHandle);
+        doLocalInitiateOffer(msg);
+        return;
     }
 
     /**
@@ -760,6 +782,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             logThis = (msg.getInitiateTask() != null && !msg.getInitiateTask().isReadOnly());
         }
 
+        // Check to see if this is the final task for this txn, and if so, if we can close it out early
+        // Right now, this just means read-only.
+        // NOTE: this overlaps slightly with CompleteTransactionMessage handling completion.  It's so tiny
+        // that for now, meh, but if this scope grows then it should get refactored out
+        if (msg.isFinalTask() && txn.isReadOnly()) {
+            m_outstandingTxns.remove(msg.getTxnId());
+        }
+
         TransactionTask task;
         if (msg.isSysProcTask()) {
             task =
@@ -810,10 +840,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     public void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
-        if (m_sendToHSIds.length > 0) {
-            CompleteTransactionMessage replmsg = message;
-            m_mailbox.send(m_sendToHSIds,
-                    replmsg);
+        if (m_isLeader) {
+            CompleteTransactionMessage replmsg = new CompleteTransactionMessage(message);
+            // Set the spHandle so that on repair the new master will set the max seen spHandle
+            // correctly
+            replmsg.setSpHandle(getCurrentTxnId());
+            if (m_sendToHSIds.length > 0) {
+                m_mailbox.send(m_sendToHSIds, replmsg);
+            }
+        } else {
+            setMaxSeenTxnId(message.getSpHandle());
         }
         TransactionState txn = m_outstandingTxns.get(message.getTxnId());
         // We can currently receive CompleteTransactionMessages for multipart procedures

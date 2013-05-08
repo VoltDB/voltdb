@@ -49,7 +49,6 @@
 
 #include <stdexcept>
 
-using namespace json_spirit;
 using namespace std;
 using namespace voltdb;
 
@@ -113,16 +112,9 @@ string AbstractJoinPlanNode::debugInfo(const string& spacer) const
 }
 
 void
-AbstractJoinPlanNode::loadFromJSONObject(Object& obj)
+AbstractJoinPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
-    Value joinTypeValue = find_value(obj, "JOIN_TYPE");
-    if (joinTypeValue == Value::null)
-    {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AbstractJoinPlanNode::loadFromJSONObject:"
-                                      " Couldn't find JOIN_TYPE value");
-    }
-    m_joinType = stringToJoin(joinTypeValue.get_str());
+    m_joinType = stringToJoin(obj.valueForKey("JOIN_TYPE").asStr());
 
     loadPredicateFromJSONObject("PRE_JOIN_PREDICATE", obj, m_preJoinPredicate);
     loadPredicateFromJSONObject("JOIN_PREDICATE", obj, m_joinPredicate);
@@ -131,16 +123,12 @@ AbstractJoinPlanNode::loadFromJSONObject(Object& obj)
 
 
 void
-AbstractJoinPlanNode::loadPredicateFromJSONObject(const char* predictateType, Object& obj, AbstractExpression*& predicate)
+AbstractJoinPlanNode::loadPredicateFromJSONObject(const char* predicateType, const PlannerDomValue& obj, AbstractExpression*& predicate)
 {
-    Value predicateValue = find_value(obj, predictateType);
-    if (predicateValue == Value::null)
-    {
-        predicate = NULL;
+    if (obj.hasNonNullKey(predicateType)) {
+        predicate = AbstractExpression::buildExpressionTree(obj.valueForKey(predicateType));
     }
-    else
-    {
-        Object predicateObject = predicateValue.get_obj();
-        predicate = AbstractExpression::buildExpressionTree(predicateObject);
+    else {
+        predicate = NULL;
     }
 }

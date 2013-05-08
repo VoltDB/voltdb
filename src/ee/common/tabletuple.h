@@ -72,18 +72,15 @@ class TableColumn;
 class StandAloneTupleStorage;
 
 class TableTuple {
-    friend class TableFactory;
+    // friend access is intended to allow write access to the tuple flags -- try not to abuse it...
     friend class Table;
     friend class TempTable;
     friend class PersistentTable;
-    friend class PersistentTableUndoDeleteAction;
-    friend class PersistentTableUndoUpdateAction;
+    friend class PoolBackedTupleStorage;
     friend class CopyOnWriteIterator;
     friend class CopyOnWriteContext;
     friend class ::CopyOnWriteTest_TestTableTupleFlags;
-    friend class StandAloneTupleStorage;
-    template<std::size_t keySize> friend class IntsKey;
-    template<std::size_t keySize> friend class GenericKey;
+    friend class StandAloneTupleStorage; // ... OK, this friend can also update m_schema.
 
 public:
     /** Initialize a tuple unassociated with a table (bad idea... dangerous) */
@@ -291,7 +288,10 @@ public:
     // verify assumptions for copy. do not use at runtime (expensive)
     bool compatibleForCopy(const TableTuple &source);
     void copyForPersistentInsert(const TableTuple &source, Pool *pool = NULL);
-    void copyForPersistentUpdate(const TableTuple &source);
+    // The vector "output" arguments detail the non-inline object memory management
+    // required of the upcoming release or undo.
+    void copyForPersistentUpdate(const TableTuple &source,
+                                 std::vector<char*> &oldObjects, std::vector<char*> &newObjects);
     void copy(const TableTuple &source);
 
     /** this does set NULL in addition to clear string count.*/
@@ -310,7 +310,7 @@ public:
     void freeObjectColumns();
     size_t hashCode(size_t seed) const;
     size_t hashCode() const;
-protected:
+private:
     inline void setActiveTrue() {
         // treat the first "value" as a boolean flag
         *(reinterpret_cast<char*> (m_data)) |= static_cast<char>(ACTIVE_MASK);
@@ -355,7 +355,7 @@ protected:
      * representing whether the tuple is active or deleted
      */
     char *m_data;
-private:
+
     inline char* getDataPtr(const int idx) {
         assert(m_schema);
         assert(m_data);
@@ -367,6 +367,36 @@ private:
         assert(m_data);
         return &m_data[m_schema->columnOffset(idx) + TUPLE_HEADER_SIZE];
     }
+};
+
+/**
+ * Convenience class for Tuples that get their (inline) storage from a pool.
+ * The pool is specified on initial allocation and retained for later reallocations.
+ * The tuples can be used like normal tuples except for allocation/reallocation.
+ * The caller takes responsibility for consistently using the specialized methods below for that.
+ */
+class PoolBackedTupleStorage {
+public:
+    PoolBackedTupleStorage(const TupleSchema* schema, Pool* pool) : m_tuple(schema), m_pool(pool) { }
+
+    void allocateActiveTuple()
+    {
+        char* storage = reinterpret_cast<char*>(m_pool->allocateZeroes(m_tuple.getSchema()->tupleLength() + TUPLE_HEADER_SIZE));
+        m_tuple.move(storage);
+        m_tuple.setActiveTrue();
+    }
+
+    /** Operator conversion to get an access to the underline tuple.
+     * To prevent clients from repointing the tuple to some other backing
+     * storage via move()or address() calls the tuple is returned by value
+     */
+    operator TableTuple& () {
+        return m_tuple;
+    }
+
+private:
+    TableTuple m_tuple;
+    Pool* m_pool;
 };
 
 // A small class to hold together a standalone tuple (not backed by any table)
@@ -550,7 +580,9 @@ inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source
  * With a persistent update the copy should only do an allocation for
  * a string if the source and destination pointers are different.
  */
-inline void TableTuple::copyForPersistentUpdate(const TableTuple &source) {
+inline void TableTuple::copyForPersistentUpdate(const TableTuple &source,
+                                                std::vector<char*> &oldObjects, std::vector<char*> &newObjects)
+{
     assert(m_schema);
     assert(m_schema == source.m_schema);
     const int columnCount = m_schema->columnCount();
@@ -571,28 +603,46 @@ inline void TableTuple::copyForPersistentUpdate(const TableTuple &source) {
          */
         for (uint16_t ii = 0; ii < columnCount; ii++) {
             if (ii == nextUninlineableObjectColumnInfoIndex) {
-                const char *mPtr = *reinterpret_cast<char* const*>(getDataPtr(ii));
-                const char *oPtr = *reinterpret_cast<char* const*>(source.getDataPtr(ii));
-                if (mPtr != oPtr) {
-                    // Make a copy of the input string. Don't need to
-                    // delete the old string because that will be done
-                    // by the UndoAction for the update.
+                char *       *mPtr = reinterpret_cast<char**>(getDataPtr(ii));
+                char * const *oPtr = reinterpret_cast<char* const*>(source.getDataPtr(ii));
+                if (*mPtr != *oPtr) {
+                    // Make a copy of the input string. Don't want to delete the old string
+                    // because it's either from the temp pool or persistently referenced elsewhere.
+                    oldObjects.push_back(*mPtr);
+                    // TODO: Here, it's known that the column is an object type, and yet
+                    // setNValueAllocateForObjectCopies is called to figure this all out again.
                     setNValueAllocateForObjectCopies(ii, source.getNValue(ii), NULL);
+                    // Yes, uses the same old pointer as two statements ago to get a new value. Neat.
+                    newObjects.push_back(*mPtr);
                 }
                 uninlineableObjectColumnIndex++;
                 if (uninlineableObjectColumnIndex < uninlineableObjectColumnCount) {
                     nextUninlineableObjectColumnInfoIndex =
                       m_schema->getUninlinedObjectColumnInfoIndex(uninlineableObjectColumnIndex);
                 } else {
+                    // This is completely optional -- the value from here on has to be one that can't
+                    // be reached by incrementing from the current value.
+                    // Zero works, but then again so does the current value.
                     nextUninlineableObjectColumnInfoIndex = 0;
                 }
             } else {
+                // TODO: Here, it's known that the column value is some kind of scalar or inline, yet
+                // setNValueAllocateForObjectCopies is called to figure this all out again.
+                // This seriously complicated function is going to boil down to an incremental
+                // memcpy of a few more bytes of the tuple.
+                // Solution? It would likely be faster even for object-heavy tuples to work in three passes:
+                // 1) collect up all the "changed object pointer" offsets.
+                // 2) do the same wholesale tuple memcpy as in the no-objects "else" clause, below,
+                // 3) replace the object pointer at each "changed object pointer offset"
+                //    with a pointer to an object copy of its new referent.
                 setNValueAllocateForObjectCopies(ii, source.getNValue(ii), NULL);
             }
         }
+        // This obscure assignment is propagating the tuple flags rather than leaving it to the caller.
+        // TODO: It would be easier for the caller to simply set the values it wants upon return.
         m_data[0] = source.m_data[0];
     } else {
-        // copy the data AND the isActive flag
+        // copy the tuple flags and the data (all inline/scalars)
         ::memcpy(m_data, source.m_data, m_schema->tupleLength() + TUPLE_HEADER_SIZE);
     }
 }
@@ -754,9 +804,12 @@ inline size_t TableTuple::hashCode() const {
  */
 inline void TableTuple::freeObjectColumns() {
     const uint16_t unlinlinedColumnCount = m_schema->getUninlinedObjectColumnCount();
+    std::vector<char*> oldObjects;
     for (int ii = 0; ii < unlinlinedColumnCount; ii++) {
-        getNValue(m_schema->getUninlinedObjectColumnInfoIndex(ii)).free();
+        char** dataPtr = reinterpret_cast<char**>(getDataPtr(m_schema->getUninlinedObjectColumnInfoIndex(ii)));
+        oldObjects.push_back(*dataPtr);
     }
+    NValue::freeObjectsFromTupleStorage(oldObjects);
 }
 
 /**

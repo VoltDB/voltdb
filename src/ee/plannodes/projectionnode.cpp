@@ -171,15 +171,16 @@ ProjectionPlanNode::debugInfo(const string& spacer) const
 
 
 void
-ProjectionPlanNode::loadFromJSONObject(json_spirit::Object& obj)
+ProjectionPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
     // XXX-IZZY move this to init at some point
     for (int ii = 0; ii < getOutputSchema().size(); ii++)
     {
         SchemaColumn* outputColumn = getOutputSchema()[ii];
         m_outputColumnNames.push_back(outputColumn->getColumnName());
-        m_outputColumnTypes.push_back(outputColumn->getType());
-        m_outputColumnSizes.push_back(outputColumn->getSize());
-        m_outputColumnExpressions.push_back(outputColumn->getExpression());
+        AbstractExpression* expr = outputColumn->getExpression();
+        m_outputColumnTypes.push_back(expr->getValueType());
+        m_outputColumnSizes.push_back(expr->getValueSize());
+        m_outputColumnExpressions.push_back(expr);
     }
 }

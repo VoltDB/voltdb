@@ -15,6 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "common/debuglog.h"
 #include "common/SerializableEEException.h"
 #include "common/serializeio.h"
 #include "execution/VoltDBEngine.h"
@@ -23,10 +24,28 @@
 
 namespace voltdb {
 
-SerializableEEException::SerializableEEException(VoltEEExceptionType exceptionType, std::string message) :
-    m_exceptionType(exceptionType), m_message(message) {}
+#ifdef VOLT_DEBUG_ENABLED
+static const char* translateVoltEEExceptionTypeToString(VoltEEExceptionType exceptionType)
+{
+    switch(exceptionType) {
+    case VOLT_EE_EXCEPTION_TYPE_NONE: return "VOLT_EE_EXCEPTION_TYPE_NONE";
+    case VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION: return "VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION";
+    case VOLT_EE_EXCEPTION_TYPE_SQL: return "VOLT_EE_EXCEPTION_TYPE_SQL";
+    case VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION: return "VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION";
+    default: return "UNKNOWN";
+    }
+}
+#endif
 
-void SerializableEEException::serialize(ReferenceSerializeOutput *output) {
+
+SerializableEEException::SerializableEEException(VoltEEExceptionType exceptionType, std::string message) :
+    m_exceptionType(exceptionType), m_message(message)
+{
+    VOLT_DEBUG("Created SerializableEEException: type: %s message: %s",
+               translateVoltEEExceptionTypeToString(exceptionType), message.c_str());
+}
+
+void SerializableEEException::serialize(ReferenceSerializeOutput *output) const {
     const std::size_t lengthPosition = output->reserveBytes(sizeof(int32_t));
     output->writeByte(static_cast<int8_t>(m_exceptionType));
     const char *messageBytes = m_message.c_str();

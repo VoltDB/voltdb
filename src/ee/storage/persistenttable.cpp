@@ -74,6 +74,8 @@
 #include "storage/CopyOnWriteContext.h"
 #include "storage/tableiterator.h"
 
+#include <algorithm>    // std::find
+
 using namespace voltdb;
 
 void* keyTupleStorage = NULL;
@@ -88,7 +90,8 @@ PersistentTable::PersistentTable(int partitionColumn) :
     m_partitionColumn(partitionColumn),
     stats_(this),
     m_COWContext(NULL),
-    m_failedCompactionCount(0)
+    m_failedCompactionCount(0),
+    m_tuplesPendingDeleteCount(0)
 {
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
@@ -96,8 +99,8 @@ PersistentTable::PersistentTable(int partitionColumn) :
     }
 }
 
-PersistentTable::~PersistentTable() {
-
+PersistentTable::~PersistentTable()
+{
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad[ii]->clear();
         m_blocksPendingSnapshotLoad[ii]->clear();
@@ -106,9 +109,7 @@ PersistentTable::~PersistentTable() {
     // delete all tuples to free strings
     TableIterator ti(this, m_data.begin());
     TableTuple tuple(m_schema);
-
     while (ti.next(tuple)) {
-        // indexes aren't released as they don't have ownership of strings
         tuple.freeObjectColumns();
         tuple.setActiveFalse();
     }
@@ -150,6 +151,7 @@ void PersistentTable::nextFreeTuple(TableTuple *tuple) {
         }
 
         tuple->move(retval.first);
+        ++m_tupleCount;
         if (!block->hasFreeTuples()) {
             m_blocksWithSpace.erase(block);
         }
@@ -185,8 +187,7 @@ void PersistentTable::nextFreeTuple(TableTuple *tuple) {
     }
 
     tuple->move(retval.first);
-    //cout << "table::nextFreeTuple(" << reinterpret_cast<const void *>(this) << ") m_usedTuples == " << m_usedTuples << endl;
-
+    ++m_tupleCount;
     if (block->hasFreeTuples()) {
         m_blocksWithSpace.insert(block);
     }
@@ -210,12 +211,19 @@ void setSearchKeyFromTuple(TableTuple &source) {
  * Regular tuple insertion that does an allocation and copy for
  * uninlined strings and creates and registers an UndoAction.
  */
-bool PersistentTable::insertTuple(TableTuple &source) {
+bool PersistentTable::insertTuple(TableTuple &source)
+{
+    insertPersistentTuple(source, true);
+    return true;
+}
 
-    // not null checks at first
-    FAIL_IF(!checkNulls(source)) {
-        throw ConstraintFailureException(this, source, TableTuple(),
-                                         CONSTRAINT_TYPE_NOT_NULL);
+void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
+{
+    if (fallible) {
+        // not null checks at first
+        FAIL_IF(!checkNulls(source)) {
+            throw ConstraintFailureException(this, source, TableTuple(), CONSTRAINT_TYPE_NOT_NULL);
+        }
     }
 
     //
@@ -223,17 +231,20 @@ bool PersistentTable::insertTuple(TableTuple &source) {
     // This will either give us one from the free slot list, or
     // grab a tuple at the end of our chunk of memory
     //
-    nextFreeTuple(&m_tmpTarget1);
-    m_tupleCount++;
-    m_usedTupleCount++;
+    TableTuple target(m_schema);
+    PersistentTable::nextFreeTuple(&target);
 
     //
     // Then copy the source into the target
     //
-    m_tmpTarget1.copyForPersistentInsert(source); // tuple in freelist must be already cleared
-    m_tmpTarget1.setActiveTrue();
-    m_tmpTarget1.setPendingDeleteFalse();
-    m_tmpTarget1.setPendingDeleteOnUndoReleaseFalse();
+    target.copyForPersistentInsert(source); // tuple in freelist must be already cleared
+    if (m_schema->getUninlinedObjectColumnCount() != 0) {
+        increaseStringMemCount(target.getNonInlinedMemorySize());
+    }
+
+    target.setActiveTrue();
+    target.setPendingDeleteFalse();
+    target.setPendingDeleteOnUndoReleaseFalse();
 
     /**
      * Inserts never "dirty" a tuple since the tuple is new, but...  The
@@ -242,65 +253,61 @@ bool PersistentTable::insertTuple(TableTuple &source) {
      * is on have it decide. COW should always set the dirty to false unless the
      * tuple is in a to be scanned area.
      */
-    if (m_COWContext.get() != NULL) {
-        m_COWContext->markTupleDirty(m_tmpTarget1, true);
+    if (m_COWContext) {
+        m_COWContext->markTupleDirty(target, true);
     } else {
-        m_tmpTarget1.setDirtyFalse();
+        target.setDirtyFalse();
     }
-    m_tmpTarget1.isDirty();
 
-    if (!tryInsertOnAllIndexes(&m_tmpTarget1)) {
-        // Careful to delete allocated objects
-        m_tmpTarget1.freeObjectColumns();
-        deleteTupleStorage(m_tmpTarget1);
+    if (!tryInsertOnAllIndexes(&target)) {
+        deleteTupleStorage(target); // also frees object columns
         throw ConstraintFailureException(this, source, TableTuple(),
                                          CONSTRAINT_TYPE_UNIQUE);
     }
 
-    if (m_schema->getUninlinedObjectColumnCount() != 0)
-    {
-        increaseStringMemCount(m_tmpTarget1.getNonInlinedMemorySize());
+    // this is skipped for inserts that are never expected to fail,
+    // like some (initially, all) cases of tuple migration on schema change
+    if (fallible) {
+        /*
+         * Create and register an undo action.
+         */
+        UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+        if (uq) {
+            char* tupleData = uq->allocatePooledCopy(target.address(), target.tupleLength());
+            uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, this));
+        }
     }
-    /*
-     * Create and register an undo action.
-     */
-    UndoQuantum *undoQuantum = ExecutorContext::currentUndoQuantum();
-    assert(undoQuantum);
-    Pool *pool = undoQuantum->getDataPool();
-    assert(pool);
-    PersistentTableUndoInsertAction *ptuia =
-      new (pool->allocate(sizeof(PersistentTableUndoInsertAction)))
-      PersistentTableUndoInsertAction(m_tmpTarget1, this, pool);
-    undoQuantum->registerUndoAction(ptuia);
 
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
-        m_views[i]->processTupleInsert(source);
+        m_views[i]->processTupleInsert(source, fallible);
     }
-
-    return true;
 }
 
 /*
  * Insert a tuple but don't allocate a new copy of the uninlineable
  * strings or create an UndoAction or update a materialized view.
  */
-void PersistentTable::insertTupleForUndo(char *tuple) {
-
-    m_tmpTarget1.move(tuple);
-    m_tmpTarget1.setPendingDeleteOnUndoReleaseFalse();
+void PersistentTable::insertTupleForUndo(char *tuple)
+{
+    TableTuple target(m_schema);
+    target.move(tuple);
+    target.setPendingDeleteOnUndoReleaseFalse();
     m_tuplesPinnedByUndo--;
-    m_usedTupleCount++;
 
     /*
      * The only thing to do is reinsert the tuple into the indexes. It was never moved,
      * just marked as deleted.
      */
-    if (!tryInsertOnAllIndexes(&m_tmpTarget1)) {
-        deleteTupleStorage(m_tmpTarget1);
+    if (!tryInsertOnAllIndexes(&target)) {
+        // First off, it should be impossible to violate a constraint when RESTORING an index to a
+        // known good state via an UNDO of a delete.  So, assume that something is badly broken, here.
+        // It's probably safer NOT to do too much cleanup -- such as trying to call deleteTupleStorage --
+        // as there's no guarantee that it will improve things, and is likely just to tamper with
+        // the crime scene.
         throwFatalException("Failed to insert tuple into table %s for undo:"
                             " unique constraint violation\n%s\n", m_name.c_str(),
-                            m_tmpTarget1.debugNoHeader().c_str());
+                            target.debugNoHeader().c_str());
     }
 }
 
@@ -311,51 +318,54 @@ void PersistentTable::insertTupleForUndo(char *tuple) {
  */
 bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
                                                      TableTuple &sourceTupleWithNewValues,
-                                                     std::vector<TableIndex*> &indexesToUpdate)
+                                                     std::vector<TableIndex*> const &indexesToUpdate,
+                                                     bool fallible)
 {
+    UndoQuantum *uq = NULL;
+    char* oldTupleData = NULL;
+    int tupleLength = targetTupleToUpdate.tupleLength();
     /**
      * Check for index constraint violations.
      */
-    if (!checkUpdateOnUniqueIndexes(targetTupleToUpdate,
-                                    sourceTupleWithNewValues,
-                                    indexesToUpdate))
-    {
-        throw ConstraintFailureException(this, targetTupleToUpdate,
-                                         sourceTupleWithNewValues,
-                                         CONSTRAINT_TYPE_UNIQUE);
+    if (fallible) {
+        if ( ! checkUpdateOnUniqueIndexes(targetTupleToUpdate,
+                                          sourceTupleWithNewValues,
+                                          indexesToUpdate)) {
+            throw ConstraintFailureException(this, targetTupleToUpdate,
+                                             sourceTupleWithNewValues,
+                                             CONSTRAINT_TYPE_UNIQUE);
+        }
+
+        /**
+         * Check for null constraint violations. Assumes source tuple is fully fleshed out.
+         */
+        FAIL_IF(!checkNulls(sourceTupleWithNewValues)) {
+            throw ConstraintFailureException(this, targetTupleToUpdate,
+                                             sourceTupleWithNewValues,
+                                             CONSTRAINT_TYPE_NOT_NULL);
+        }
+
+        uq = ExecutorContext::currentUndoQuantum();
+        if (uq) {
+            /*
+             * For undo purposes, before making any changes, save a copy of the state of the tuple
+             * into the undo pool temp storage and hold onto it with oldTupleData.
+             */
+            oldTupleData = uq->allocatePooledCopy(targetTupleToUpdate.address(), targetTupleToUpdate.tupleLength());
+        }
     }
 
-    /**
-     * Check for null constraint violations. Assumes source tuple is fully fleshed out.
-     */
-    FAIL_IF(!checkNulls(sourceTupleWithNewValues)) {
-        throw ConstraintFailureException(this, targetTupleToUpdate,
-                                         sourceTupleWithNewValues,
-                                         CONSTRAINT_TYPE_NOT_NULL);
-    }
-
-    /*
-     * Create and register an undo action and then use the copy of
-     * the target (old value with no updates)
-     */
-    UndoQuantum *undoQuantum = ExecutorContext::currentUndoQuantum();
-    assert(undoQuantum);
-    Pool *pool = undoQuantum->getDataPool();
-    assert(pool);
-    PersistentTableUndoUpdateAction *ptuua =
-        new (pool->allocate(sizeof(PersistentTableUndoUpdateAction)))
-             PersistentTableUndoUpdateAction(targetTupleToUpdate, this, pool);
-
-    if (m_COWContext.get() != NULL) {
+    if (m_COWContext) {
         m_COWContext->markTupleDirty(targetTupleToUpdate, false);
     }
 
     /**
      * Remove the current tuple from any indexes.
      */
+    bool someIndexGotUpdated = false;
     bool indexRequiresUpdate[indexesToUpdate.size()];
     if (indexesToUpdate.size()) {
-        ptuua->needToRevertIndexes();
+        someIndexGotUpdated = true;
         for (int i = 0; i < indexesToUpdate.size(); i++) {
             TableIndex *index = indexesToUpdate[i];
             if (!index->keyUsesNonInlinedMemory()) {
@@ -371,32 +381,57 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
             }
         }
     }
+
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
-        m_views[i]->processTupleDelete(targetTupleToUpdate);
+        m_views[i]->processTupleDelete(targetTupleToUpdate, fallible);
     }
 
-    if (m_schema->getUninlinedObjectColumnCount() != 0)
-    {
+    if (m_schema->getUninlinedObjectColumnCount() != 0) {
         decreaseStringMemCount(targetTupleToUpdate.getNonInlinedMemorySize());
         increaseStringMemCount(sourceTupleWithNewValues.getNonInlinedMemorySize());
     }
 
+    // TODO: This is a little messed up.
+    // We know what we want the target tuple's flags to look like after the copy,
+    // so we carefully set them (rather than, say, ignore them) on the source tuple
+    // and make sure to copy them (rather than, say, ignore them) in copyForPersistentUpdate
+    // and that allows us to ignore them (rather than, say, set them) afterwards on the actual
+    // target tuple that matters. What could be simpler?
     sourceTupleWithNewValues.setActiveTrue();
+    // The isDirty flag is especially interesting because the COWcontext found it more convenient
+    // to mark it on the target tuple. So, no problem, just copy it from the target tuple to the
+    // source tuple so it can get copied back to the target tuple in copyForPersistentUpdate. Brilliant!
     //Copy the dirty status that was set by markTupleDirty.
     if (targetTupleToUpdate.isDirty()) {
         sourceTupleWithNewValues.setDirtyTrue();
     } else {
         sourceTupleWithNewValues.setDirtyFalse();
     }
+
+    // Either the "before" or "after" object reference values that change will come in handy later,
+    // so collect them up.
+    std::vector<char*> oldObjects;
+    std::vector<char*> newObjects;
+
     // this is the actual write of the new values
-    targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues);
+    targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
 
-    ptuua->setNewTuple(targetTupleToUpdate, pool);
-
-    if (!undoQuantum->isDummy()) {
-        //DummyUndoQuantum calls destructor upon register.
-        undoQuantum->registerUndoAction(ptuua);
+    if (uq) {
+        /*
+         * Create and register an undo action with copies of the "before" and "after" tuple storage
+         * and the "before" and "after" object pointers for non-inlined columns that changed.
+         */
+        char* newTupleData = uq->allocatePooledCopy(targetTupleToUpdate.address(), tupleLength);
+        uq->registerUndoAction(new (*uq) PersistentTableUndoUpdateAction(oldTupleData, newTupleData,
+                                                                         oldObjects, newObjects,
+                                                                         this, someIndexGotUpdated));
+    } else {
+        // This is normally handled by the Undo Action's release (i.e. when there IS an Undo Action)
+        // -- though maybe even that case should delegate memory management back to the PersistentTable
+        // to keep the UndoAction stupid simple?
+        // Anyway, there is no Undo Action in this case, so DIY.
+        NValue::freeObjectsFromTupleStorage(oldObjects);
     }
 
     /**
@@ -412,33 +447,39 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
                                 m_name.c_str(), index->getName().c_str());
         }
     }
+
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
-        m_views[i]->processTupleInsert(targetTupleToUpdate);
+        m_views[i]->processTupleInsert(targetTupleToUpdate, fallible);
     }
-
-    if (undoQuantum->isDummy()) {
-        //DummyUndoQuantum calls destructor upon register so it can't be called
-        //earlier
-        undoQuantum->registerUndoAction(ptuua);
-    }
-
     return true;
 }
 
 /*
- * sourceTupleWithNewValues contains the tuple before the update
- * and targetTupleToUpdate is a reference to the updated tuple
- * including the actual table storage. First remove the current
- * tuple value from any indexes (if asked to do so). Then revert the
- * tuple to the original preupdate values by copying the source to
- * the target. Then insert the new (or rather, old) value back into
- * the indexes.
+ * sourceTupleWithNewValues contains a copy of the tuple data before the update
+ * and tupleWithUnwantedValues contains a copy of the updated tuple data.
+ * First remove the current tuple value from any indexes (if asked to do so).
+ * Then revert the tuple to the original preupdate values by copying the source to the target.
+ * Then insert the new (or rather, old) value back into the indexes.
  */
-void PersistentTable::updateTupleForUndo(TableTuple &targetTupleToUpdate,
-                                         TableTuple &sourceTupleWithNewValues,
+void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
+                                         char* sourceTupleDataWithNewValues,
                                          bool revertIndexes)
 {
+    TableTuple matchable(m_schema);
+    // Get the address of the tuple in the table from one of the copies on hand.
+    // Any TableScan OR a primary key lookup on an already updated index will find the tuple
+    // by its unwanted updated values.
+    if (revertIndexes || primaryKeyIndex() == NULL) {
+        matchable.move(tupleWithUnwantedValues);
+    }
+    // A primary key lookup on a not-yet-updated index will find the tuple by its original/new values.
+    else {
+        matchable.move(sourceTupleDataWithNewValues);
+    }
+    TableTuple targetTupleToUpdate = lookupTuple(matchable);
+    TableTuple sourceTupleWithNewValues(sourceTupleDataWithNewValues, m_schema);
+
     //If the indexes were never updated there is no need to revert them.
     if (revertIndexes) {
         BOOST_FOREACH(TableIndex *index, m_indexes) {
@@ -475,7 +516,7 @@ void PersistentTable::updateTupleForUndo(TableTuple &targetTupleToUpdate,
     }
 }
 
-bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedStrings) {
+bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
     // May not delete an already deleted tuple.
     assert(target.isActive());
 
@@ -485,27 +526,81 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
     // Just like insert, we want to remove this tuple from all of our indexes
     deleteFromAllIndexes(&target);
 
-    target.setPendingDeleteOnUndoReleaseTrue();
-    m_tuplesPinnedByUndo++;
-    m_usedTupleCount--;
-
-    /*
-     * Create and register an undo action.
-     */
-    UndoQuantum *undoQuantum = ExecutorContext::currentUndoQuantum();
-    assert(undoQuantum);
-    Pool *pool = undoQuantum->getDataPool();
-    assert(pool);
-    PersistentTableUndoDeleteAction *ptuda =
-            new (pool->allocate(sizeof(PersistentTableUndoDeleteAction))) PersistentTableUndoDeleteAction( target.address(), this);
-
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
-        m_views[i]->processTupleDelete(target);
+        m_views[i]->processTupleDelete(target, fallible);
     }
 
-    undoQuantum->registerUndoAction(ptuda, this);
+    if (fallible) {
+        UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+        if (uq) {
+            target.setPendingDeleteOnUndoReleaseTrue();
+            m_tuplesPinnedByUndo++;
+            // Create and register an undo action.
+            uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), this), this);
+            return true;
+        }
+    }
+
+    // Here, for reasons of infallibility or no active UndoLog, there is no undo, there is only DO.
+    deleteTupleFinalize(target);
     return true;
+}
+
+
+/**
+ * This entry point is triggered by the successful release of an UndoDeleteAction.
+ */
+void PersistentTable::deleteTupleRelease(char* tupleData)
+{
+    TableTuple target(m_schema);
+    target.move(tupleData);
+    target.setPendingDeleteOnUndoReleaseFalse();
+    m_tuplesPinnedByUndo--;
+    deleteTupleFinalize(target);
+}
+
+/**
+ * Actually follow through with a "delete" -- this is common code between UndoDeleteAction release and the
+ * all-at-once infallible deletes that bypass Undo processing.
+ */
+void PersistentTable::deleteTupleFinalize(TableTuple &target)
+{
+    // A snapshot (background scan) in progress can still cause a hold-up.
+    if (m_COWContext && ! m_COWContext->canSafelyFreeTuple(target)) {
+        // Mark it pending delete and let the snapshot land the finishing blow.
+
+        // This "already pending delete" guard prevents any
+        // (possible?) case of double-counting a doubly-applied pending delete
+        // before it gets ignored.
+        // This band-aid guard just keeps such a condition from becoming an
+        // inconvenience to a "testability feature" implemented in tableutil.cpp
+        // for the benefit of CopyOnWriteTest.cpp.
+        // Maybe it should just be an assert --
+        // maybe we are missing a final opportunity to detect the "inconceivable",
+        // which, if ignored, may leave a wake of mysterious and catastrophic side effects.
+        // There's always the option of setting a breakpoint on this return.
+        if (target.isPendingDelete()) {
+            return;
+        }
+
+        target.setPendingDeleteTrue();
+        // This count is a testability feature not intended for use in product logic.
+        ++m_tuplesPendingDeleteCount;
+        return;
+    }
+
+    // No snapshot in progress cares, just whack it.
+    deleteTupleStorage(target); // also frees object columns
+}
+
+/**
+ * Assumptions:
+ *  All tuples will be deleted in storage order.
+ *  Indexes and views have been destroyed first.
+ */
+void PersistentTable::deleteTupleForSchemaChange(TableTuple &target) {
+    deleteTupleStorage(target); // also frees object columns
 }
 
 /*
@@ -517,33 +612,22 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
  * correct dirty setting when the tuple was originally inserted.
  * TODO remove duplication with regular delete. Also no view updates.
  */
-void PersistentTable::deleteTupleForUndo(TableTuple &tupleCopy) {
-    TableTuple target = lookupTuple(tupleCopy);
+void PersistentTable::deleteTupleForUndo(char* tupleData) {
+    TableTuple target(tupleData, m_schema);
+    // The UndoInsertAction got a pooled copy of the tupleData.
+    // Relocate the original tuple actually in the table.
+    target = lookupTuple(target);
     if (target.isNullTuple()) {
         throwFatalException("Failed to delete tuple from table %s:"
                             " tuple does not exist\n%s\n", m_name.c_str(),
-                            tupleCopy.debugNoHeader().c_str());
+                            target.debugNoHeader().c_str());
     }
-    else {
-        // Make sure that they are not trying to delete the same tuple twice
-        assert(target.isActive());
 
-        // Also make sure they are not trying to delete our m_tempTuple
-        assert(&target != &m_tempTuple);
+    // Ensure against trying to delete the same tuple twice.
+    assert(target.isActive());
 
-        // Just like insert, we want to remove this tuple from all of our indexes
-        deleteFromAllIndexes(&target);
-
-        if (m_schema->getUninlinedObjectColumnCount() != 0)
-        {
-            decreaseStringMemCount(tupleCopy.getNonInlinedMemorySize());
-        }
-
-        // Delete the strings/objects
-        target.freeObjectColumns();
-        deleteTupleStorage(target);
-        m_usedTupleCount--;
-    }
+    deleteFromAllIndexes(&target);
+    deleteTupleStorage(target); // also frees object columns
 }
 
 TableTuple PersistentTable::lookupTuple(TableTuple tuple) {
@@ -603,7 +687,7 @@ bool PersistentTable::tryInsertOnAllIndexes(TableTuple *tuple) {
 
 bool PersistentTable::checkUpdateOnUniqueIndexes(TableTuple &targetTupleToUpdate,
                                                  const TableTuple &sourceTupleWithNewValues,
-                                                 std::vector<TableIndex*> &indexesToUpdate)
+                                                 std::vector<TableIndex*> const &indexesToUpdate)
 {
     BOOST_FOREACH(TableIndex* index, indexesToUpdate) {
         if (index->isUniqueIndex()) {
@@ -625,7 +709,7 @@ bool PersistentTable::checkUpdateOnUniqueIndexes(TableTuple &targetTupleToUpdate
 bool PersistentTable::checkNulls(TableTuple &tuple) const {
     assert (m_columnCount == tuple.sizeInValues());
     for (int i = m_columnCount - 1; i >= 0; --i) {
-        if (tuple.isNull(i) && !m_allowNulls[i]) {
+        if (( ! m_allowNulls[i]) && tuple.isNull(i)) {
             VOLT_TRACE ("%d th attribute was NULL. It is non-nillable attribute.", i);
             return false;
         }
@@ -636,8 +720,92 @@ bool PersistentTable::checkNulls(TableTuple &tuple) const {
 /*
  * claim ownership of a view. table is responsible for this view*
  */
-void PersistentTable::addMaterializedView(MaterializedViewMetadata *view) {
+void PersistentTable::addMaterializedView(MaterializedViewMetadata *view)
+{
     m_views.push_back(view);
+}
+
+/*
+ * drop a view. the table is no longer feeding it.
+ * The destination table will go away when the view metadata is deleted (or later?) as its refcount goes to 0.
+ */
+void PersistentTable::dropMaterializedView(MaterializedViewMetadata *targetView)
+{
+    assert( ! m_views.empty());
+    MaterializedViewMetadata *lastView = m_views.back();
+    if (targetView != lastView) {
+        // iterator to vector element:
+        std::vector<MaterializedViewMetadata*>::iterator toView = find(m_views.begin(), m_views.end(), targetView);
+        assert(toView != m_views.end());
+        // Use the last view to patch the potential hole.
+        *toView = lastView;
+    }
+    // The last element is now excess.
+    m_views.pop_back();
+    delete targetView;
+}
+
+void
+PersistentTable::segregateMaterializedViews(std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & start,
+                                            std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & end,
+                                            std::vector< catalog::MaterializedViewInfo*> &survivingInfosOut,
+                                            std::vector<MaterializedViewMetadata*> &survivingViewsOut,
+                                            std::vector<catalog::MaterializedViewInfo*> &changingInfosOut,
+                                            std::vector<MaterializedViewMetadata*> &changingViewsOut,
+                                            std::vector<MaterializedViewMetadata*> &obsoleteViewsOut)
+{
+    //////////////////////////////////////////////////////////
+    // find all of the materialized views to remove or keep
+    //////////////////////////////////////////////////////////
+
+    // iterate through all of the existing views
+    BOOST_FOREACH(MaterializedViewMetadata* currView, m_views) {
+        std::string currentViewId = currView->targetTable()->name();
+
+        // iterate through all of the catalog views, looking for a match.
+        std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator viewIter;
+        bool viewfound = false;
+        for (viewIter = start; viewIter != end; ++viewIter) {
+            catalog::MaterializedViewInfo* catalogViewInfo = viewIter->second;
+            if (currentViewId == catalogViewInfo->name()) {
+                viewfound = true;
+                //TODO: This MIGHT be a good place to identify the need for view re-definition.
+                survivingInfosOut.push_back(catalogViewInfo);
+                survivingViewsOut.push_back(currView);
+                break;
+            }
+        }
+
+        // if the table has a view that the catalog doesn't, then prepare to remove (or fail to migrate) the view
+        if (!viewfound) {
+            obsoleteViewsOut.push_back(currView);
+        }
+    }
+}
+
+void
+PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target)
+{
+    std::string targetName = target->name();
+    // find the materialized view that uses the table or its precursor (by the same name).
+    BOOST_FOREACH(MaterializedViewMetadata* currView, m_views) {
+        PersistentTable* currTarget = currView->targetTable();
+        if (currTarget == target) {
+            // The view is already up to date.
+            return;
+        }
+
+        std::string currName = currTarget->name();
+        if (currName == targetName) {
+            // A match on name only indicates that the target table has been re-defined since
+            // the view was initialized, so re-initialize the view.
+            currView->setTargetTable(target);
+            return;
+        }
+    }
+    DEBUG_STREAM_HERE("Failed to find mat view " << targetName << "@" << target <<
+                      " in " << m_views.size() << " on " << name() << "@" << this);
+    assert(false); // Should have found an existing view for the table.
 }
 
 // ------------------------------------------------------------------
@@ -705,7 +873,7 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple) {
 
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
-        m_views[i]->processTupleInsert(m_tmpTarget1);
+        m_views[i]->processTupleInsert(tuple, true);
     }
 
     // Account for non-inlined memory allocated via bulk load or recovery
@@ -835,7 +1003,7 @@ void PersistentTable::notifyBlockWasCompactedAway(TBPtr block) {
     if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
         assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
     } else {
-        assert(m_COWContext != NULL);
+        assert(m_COWContext);
         assert(m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end());
         m_COWContext->notifyBlockWasCompactedAway(block);
     }

@@ -44,6 +44,7 @@ import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.utils.VoltTableUtil;
 
 import com.google.common.primitives.Longs;
 
@@ -51,7 +52,7 @@ import com.google.common.primitives.Longs;
 public class SnapshotSave extends VoltSystemProcedure
 {
     private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotSave.class.getName());
-    private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
+    private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
 
     private static final int DEP_saveTest = (int)
         SysProcFragmentId.PF_saveTest | DtxnConstants.MULTIPARTITION_DEPENDENCY;
@@ -128,7 +129,8 @@ public class SnapshotSave extends VoltSystemProcedure
         }
         else if (fragmentId == SysProcFragmentId.PF_saveTestResults)
         {
-            return saveTestResults(dependencies);
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_saveTest));
+            return new DependencyPair( DEP_saveTestResults, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_createSnapshotTargets)
         {
@@ -174,7 +176,8 @@ public class SnapshotSave extends VoltSystemProcedure
         }
         else if (fragmentId == SysProcFragmentId.PF_createSnapshotTargetsResults)
         {
-            return createSnapshotTargetsResults(dependencies);
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_createSnapshotTargets));
+            return new DependencyPair(DEP_createSnapshotTargetsResults, result);
         } else if (fragmentId == SysProcFragmentId.PF_snapshotSaveQuiesce) {
             // tell each site to quiesce
             context.getSiteProcedureConnection().quiesce();
@@ -189,39 +192,6 @@ public class SnapshotSave extends VoltSystemProcedure
         }
         assert (false);
         return null;
-    }
-
-    private DependencyPair createSnapshotTargetsResults(
-            Map<Integer, List<VoltTable>> dependencies) {
-        {
-            TRACE_LOG.trace("Aggregating create snapshot target results");
-            assert (dependencies.size() > 0);
-            List<VoltTable> dep = dependencies.get(DEP_createSnapshotTargets);
-            VoltTable result = null;
-            for (VoltTable table : dep)
-            {
-                /**
-                 * XXX Ning: There are two different tables here. We have to
-                 * detect which table we are looking at in order to create the
-                 * result table with the proper schema. Maybe we should make the
-                 * result table consistent?
-                 */
-                if (result == null) {
-                    if (table.getColumnType(2).equals(VoltType.INTEGER))
-                        result = constructPartitionResultsTable();
-                    else
-                        result = constructNodeResultsTable();
-                }
-
-                while (table.advanceRow())
-                {
-                    // this will add the active row of table
-                    result.add(table);
-                }
-            }
-            return new
-                DependencyPair( DEP_createSnapshotTargetsResults, result);
-        }
     }
 
     private DependencyPair saveTest(String file_path, String file_nonce,
@@ -239,7 +209,7 @@ public class SnapshotSave extends VoltSystemProcedure
                                 + file_path + ", " + file_nonce);
                 final int numSitesSnapshotting = SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.size();
                 if (numSitesSnapshotting > 0) {
-                    HOST_LOG.debug("Snapshot in progress, " +
+                    SNAP_LOG.debug("Snapshot in progress, " +
                             numSitesSnapshotting +
                             " sites are still snapshotting");
                     result.addRow(
@@ -310,25 +280,6 @@ public class SnapshotSave extends VoltSystemProcedure
         }
     }
 
-    private DependencyPair saveTestResults(
-            Map<Integer, List<VoltTable>> dependencies) {
-        {
-            TRACE_LOG.trace("Aggregating save feasiblity results");
-            assert (dependencies.size() > 0);
-            List<VoltTable> dep = dependencies.get(DEP_saveTest);
-            VoltTable result = constructNodeResultsTable();
-            for (VoltTable table : dep)
-            {
-                while (table.advanceRow())
-                {
-                    // this will add the active row of table
-                    result.add(table);
-                }
-            }
-            return new DependencyPair( DEP_saveTestResults, result);
-        }
-    }
-
     public VoltTable[] run(SystemProcedureExecutionContext ctx, String command) throws Exception
     {
         final long startTime = System.currentTimeMillis();
@@ -348,7 +299,7 @@ public class SnapshotSave extends VoltSystemProcedure
              * Not going to make this fatal because I don't want people to
              * be blocked from getting their data out via snapshots.
              */
-            HOST_LOG.error(
+            SNAP_LOG.error(
                     "Failed to retrieve per partition transaction ids array from SnapshotDaemon." +
                     "This shouldn't happen and it prevents the snapshot from including transaction ids " +
                     "for partitions that are no longer active in the cluster. Those ids are necessary " +
@@ -361,9 +312,9 @@ public class SnapshotSave extends VoltSystemProcedure
         }
 
         if (format == SnapshotFormat.STREAM) {
-            HOST_LOG.info(async + " streaming database, ID: " + nonce + " at " + startTime);
+            SNAP_LOG.info(async + " streaming database, ID: " + nonce + " at " + startTime);
         } else {
-            HOST_LOG.info(async + " saving database to path: " + path + ", ID: " + nonce + " at " + startTime);
+            SNAP_LOG.info(async + " saving database to path: " + path + ", ID: " + nonce + " at " + startTime);
         }
 
         ColumnInfo[] error_result_columns = new ColumnInfo[2];
@@ -417,12 +368,12 @@ public class SnapshotSave extends VoltSystemProcedure
             stringer.endObject();
             setAppStatusString(stringer.toString());
         } catch (Exception e) {
-            HOST_LOG.warn(e);
+            SNAP_LOG.warn(e);
         }
 
         final long finishTime = System.currentTimeMillis();
         final long duration = finishTime - startTime;
-        HOST_LOG.info("Snapshot initiation took " + duration + " milliseconds");
+        SNAP_LOG.info("Snapshot initiation took " + duration + " milliseconds");
         return results;
     }
 
@@ -440,9 +391,7 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[0].outputDepId = DEP_saveTest;
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
-        ParameterSet params = new ParameterSet();
-        params.setParameters(filePath, fileNonce, format.name(), data);
-        pfs[0].parameters = params;
+        pfs[0].parameters = ParameterSet.fromArrayNoCopy(filePath, fileNonce, format.name(), data);
 
         // This fragment aggregates the save-to-disk sanity check results
         pfs[1] = new SynthesizedPlanFragment();
@@ -450,7 +399,7 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[1].outputDepId = DEP_saveTestResults;
         pfs[1].inputDepIds = new int[] { DEP_saveTest };
         pfs[1].multipartition = false;
-        pfs[1].parameters = new ParameterSet();
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
 
         VoltTable[] results;
         results = executeSysProcPlanFragments(pfs, DEP_saveTestResults);
@@ -474,10 +423,8 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[0].outputDepId = DEP_createSnapshotTargets;
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
-        ParameterSet params = new ParameterSet();
-        params.setParameters(
+        pfs[0].parameters = ParameterSet.fromArrayNoCopy(
                 filePath, fileNonce, txnId, perPartitionTxnIds, block, format.name(), data, System.currentTimeMillis());
-        pfs[0].parameters = params;
 
         // This fragment aggregates the results of creating those files
         pfs[1] = new SynthesizedPlanFragment();
@@ -485,7 +432,7 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[1].outputDepId = DEP_createSnapshotTargetsResults;
         pfs[1].inputDepIds = new int[] { DEP_createSnapshotTargets };
         pfs[1].multipartition = false;
-        pfs[1].parameters = new ParameterSet();
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
 
         VoltTable[] results;
         results = executeSysProcPlanFragments(pfs, DEP_createSnapshotTargetsResults);
@@ -503,7 +450,7 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[0].outputDepId = DEP_snapshotSaveQuiesce;
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
-        pfs[0].parameters = new ParameterSet();
+        pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         // This fragment aggregates the quiesce results
         pfs[1] = new SynthesizedPlanFragment();
@@ -511,7 +458,7 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[1].outputDepId = DEP_snapshotSaveQuiesceResults;
         pfs[1].inputDepIds = new int[] { DEP_snapshotSaveQuiesce };
         pfs[1].multipartition = false;
-        pfs[1].parameters = new ParameterSet();
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
 
         VoltTable[] results;
         results = executeSysProcPlanFragments(pfs, DEP_snapshotSaveQuiesceResults);

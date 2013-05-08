@@ -72,7 +72,7 @@ class UpdatePlanNode : public AbstractOperationPlanNode {
         bool doesUpdateIndexes() { return m_updatesIndexes; }
 
     protected:
-        virtual void loadFromJSONObject(json_spirit::Object &obj);
+        virtual void loadFromJSONObject(PlannerDomValue obj);
 
         bool m_updatesIndexes;
 };

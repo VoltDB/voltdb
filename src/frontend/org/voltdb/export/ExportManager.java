@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -35,6 +36,7 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.network.InputHandler;
 import org.voltcore.utils.COWSortedMap;
 import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.Pair;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
@@ -172,10 +174,8 @@ public class ExportManager
                                     }
                                 }
                             }
-                        } catch (ClassNotFoundException e) {} catch (InstantiationException e) {
-                            exportLog.error(e);
-                        } catch (IllegalAccessException e) {
-                            exportLog.error(e);
+                        } catch (Exception e) {
+                            VoltDB.crashLocalVoltDB("Error creating next export processor", true, e);
                         }
                         oldProcessor = m_processor.getAndSet(newProcessor);
                     }
@@ -206,7 +206,8 @@ public class ExportManager
             int myHostId,
             CatalogContext catalogContext,
             boolean isRejoin,
-            HostMessenger messenger)
+            HostMessenger messenger,
+            List<Pair<Integer, Long>> partitions)
     throws ExportManager.SetupException
     {
         /*
@@ -216,7 +217,7 @@ public class ExportManager
         if (isRejoin) {
             deleteExportOverflowData(catalogContext);
         }
-        ExportManager tmp = new ExportManager(myHostId, catalogContext, messenger);
+        ExportManager tmp = new ExportManager(myHostId, catalogContext, messenger, partitions);
         m_self = tmp;
     }
 
@@ -254,7 +255,7 @@ public class ExportManager
                 try {
                     VoltFile.recursivelyDelete(f);
                 } catch (IOException e) {
-                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                    VoltDB.crashLocalVoltDB("Error deleting export overflow data", true, e);
                 }
             }
         }
@@ -280,7 +281,11 @@ public class ExportManager
      * Read the catalog to setup manager and loader(s)
      * @param siteTracker
      */
-    private ExportManager(int myHostId, CatalogContext catalogContext, HostMessenger messenger)
+    private ExportManager(
+            int myHostId,
+            CatalogContext catalogContext,
+            HostMessenger messenger,
+            List<Pair<Integer, Long>> partitions)
     throws ExportManager.SetupException
     {
         m_hostId = myHostId;
@@ -305,13 +310,14 @@ public class ExportManager
 
         m_loaderClass = conn.getLoaderclass();
 
-        createInitialExportProcessor(catalogContext, conn, true);
+        createInitialExportProcessor(catalogContext, conn, true, partitions);
     }
 
     private void createInitialExportProcessor(
             CatalogContext catalogContext,
             final Connector conn,
-            boolean startup) {
+            boolean startup,
+            List<Pair<Integer, Long>> partitions) {
         try {
             exportLog.info("Creating connector " + m_loaderClass);
             ExportDataProcessor newProcessor = null;
@@ -340,7 +346,7 @@ public class ExportManager
                             catalogContext.m_uniqueId,
                             m_onGenerationDrained,
                             exportOverflowDirectory);
-                currentGeneration.initializeGenerationFromCatalog(conn, m_hostId, m_messenger);
+                currentGeneration.initializeGenerationFromCatalog(conn, m_hostId, m_messenger, partitions);
                 m_generations.put( catalogContext.m_uniqueId, currentGeneration);
             }
             final ExportGeneration nextGeneration = m_generations.firstEntry().getValue();
@@ -453,7 +459,7 @@ public class ExportManager
         m_processorConfig = newConfig;
     }
 
-    public synchronized void updateCatalog(CatalogContext catalogContext)
+    public synchronized void updateCatalog(CatalogContext catalogContext, List<Pair<Integer, Long>> partitions)
     {
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
@@ -477,7 +483,7 @@ public class ExportManager
         } catch (IOException e1) {
             VoltDB.crashLocalVoltDB("Error processing catalog update in export system", true, e1);
         }
-        newGeneration.initializeGenerationFromCatalog(conn, m_hostId, m_messenger);
+        newGeneration.initializeGenerationFromCatalog(conn, m_hostId, m_messenger, partitions);
 
         m_generations.put(catalogContext.m_uniqueId, newGeneration);
 
@@ -486,7 +492,7 @@ public class ExportManager
          * This occurs when export is turned on/off at runtime.
          */
         if (m_processor.get() == null) {
-            createInitialExportProcessor(catalogContext, conn, false);
+            createInitialExportProcessor(catalogContext, conn, false, partitions);
         }
     }
 

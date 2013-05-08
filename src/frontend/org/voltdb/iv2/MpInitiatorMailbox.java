@@ -169,7 +169,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
     public MpInitiatorMailbox(int partitionId,
             Scheduler scheduler,
             HostMessenger messenger, RepairLog repairLog,
-            RejoinProducer rejoinProducer)
+            JoinProducerBase rejoinProducer)
     {
         super(partitionId, scheduler, messenger, repairLog, rejoinProducer);
         m_taskThread.start();
@@ -207,15 +207,15 @@ public class MpInitiatorMailbox extends InitiatorMailbox
         });
     }
 
-  @Override
-  public void deliver(final VoltMessage message) {
-      m_taskQueue.offer(new Runnable() {
-          @Override
-          public void run() {
-              deliverInternal(message);
-          }
-      });
-  }
+    @Override
+    public void deliver(final VoltMessage message) {
+        m_taskQueue.offer(new Runnable() {
+            @Override
+            public void run() {
+                deliverInternal(message);
+            }
+        });
+    }
 
     @Override
     void repairReplicasWith(final List<Long> needsRepair, final VoltMessage repairWork)
@@ -250,6 +250,7 @@ public class MpInitiatorMailbox extends InitiatorMailbox
         if (repairWork instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)repairWork;
             Iv2InitiateTaskMessage work = new Iv2InitiateTaskMessage(m.getInitiatorHSId(), getHSId(), m);
+            m_scheduler.updateLastSeenTxnIds(work);
             m_scheduler.handleMessageRepair(needsRepair, work);
         }
         else if (repairWork instanceof CompleteTransactionMessage) {
@@ -258,5 +259,12 @@ public class MpInitiatorMailbox extends InitiatorMailbox
         else {
             throw new RuntimeException("During MPI repair: Invalid repair message type: " + repairWork);
         }
+    }
+
+    // This will be called from the internal task thread, deliver->deliverInternal->handleInitiateResponse
+    // when the MpScheduler needs to log the completion of a transaction to its local repair log
+    void deliverToRepairLog(VoltMessage msg) {
+        assert(Thread.currentThread().getId() == m_taskThreadId);
+        m_repairLog.deliver(msg);
     }
 }

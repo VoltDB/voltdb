@@ -28,10 +28,11 @@ import java.util.Map.Entry;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.DependencyPair;
-import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
@@ -44,7 +45,7 @@ import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.User;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltcore.logging.VoltLogger;
+import org.voltdb.utils.VoltTableUtil;
 
 /**
  * Access key/value tables of cluster info that correspond to the REST
@@ -108,7 +109,7 @@ public class SystemInformation extends VoltSystemProcedure
         }
         else if (fragmentId == SysProcFragmentId.PF_systemInformationOverviewAggregate)
         {
-            VoltTable result = unionTables(dependencies.get(DEP_DISTRIBUTE));
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_DISTRIBUTE));
             return new DependencyPair(DEP_AGGREGATE, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_systemInformationDeployment)
@@ -268,7 +269,7 @@ public class SystemInformation extends VoltSystemProcedure
         spf[0].outputDepId = DEP_DISTRIBUTE;
         spf[0].inputDepIds = new int[] {};
         spf[0].multipartition = true;
-        spf[0].parameters = new ParameterSet();
+        spf[0].parameters = ParameterSet.emptyParameterSet();
 
         spf[1] = new SynthesizedPlanFragment();
         spf[1] = new SynthesizedPlanFragment();
@@ -276,7 +277,7 @@ public class SystemInformation extends VoltSystemProcedure
         spf[1].outputDepId = DEP_AGGREGATE;
         spf[1].inputDepIds = new int[] { DEP_DISTRIBUTE };
         spf[1].multipartition = false;
-        spf[1].parameters = new ParameterSet();
+        spf[1].parameters = ParameterSet.emptyParameterSet();
 
         return executeSysProcPlanFragments(spf, DEP_AGGREGATE);
     }
@@ -290,8 +291,7 @@ public class SystemInformation extends VoltSystemProcedure
         pfs[1].outputDepId = DEP_systemInformationDeployment;
         pfs[1].inputDepIds = new int[]{};
         pfs[1].multipartition = true;
-        pfs[1].parameters = new ParameterSet();
-        //pfs[1].parameters.setParameters((byte)interval, now);
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
 
         // create a work fragment to aggregate the results.
         pfs[0] = new SynthesizedPlanFragment();
@@ -299,7 +299,7 @@ public class SystemInformation extends VoltSystemProcedure
         pfs[0].outputDepId = DEP_systemInformationAggregate;
         pfs[0].inputDepIds = new int[]{DEP_systemInformationDeployment};
         pfs[0].multipartition = false;
-        pfs[0].parameters = new ParameterSet();
+        pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         // distribute and execute these fragments providing pfs and id of the
         // aggregator's output dependency table.

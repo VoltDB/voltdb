@@ -50,9 +50,12 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.JdbcDatabaseMetaDataGenerator;
+import org.voltdb.LegacyHashinator;
 import org.voltdb.TheHashinator;
+import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
+import org.voltdb.iv2.MpInitiator;
 
 /**
  *   De/multiplexes transactions across a cluster
@@ -83,11 +86,14 @@ class Distributer {
     private final boolean m_useClientAffinity;
 
     private static final class Procedure {
+        final static int PARAMETER_NONE = -1;
+        private final boolean multiPart;
         private final boolean readOnly;
         private final int partitionParameter;
-        private Procedure(boolean readOnly, int partitionParameter) {
+        private Procedure(boolean multiPart,boolean readOnly, int partitionParameter) {
+            this.multiPart = multiPart;
             this.readOnly = readOnly;
-            this.partitionParameter = partitionParameter;
+            this.partitionParameter = multiPart? PARAMETER_NONE : partitionParameter;
         }
     }
 
@@ -100,6 +106,7 @@ class Distributer {
 
     // timeout for individual procedure calls
     private final long m_procedureCallTimeoutMS;
+    private static final long MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
     private final long m_connectionResponseTimeoutMS;
 
     public final RateLimiter m_rateLimiter = new RateLimiter();
@@ -127,9 +134,8 @@ class Distributer {
             try {
                 synchronized (Distributer.this) {
                     VoltTable results[] = clientResponse.getResults();
-                    if (results != null && results.length == 1) {
-                        VoltTable vt = results[0];
-                        updateAffinityTopology(vt);
+                    if (results != null && results.length > 1) {
+                        updateAffinityTopology(results);
                     }
                 }
             }
@@ -202,6 +208,18 @@ class Distributer {
                             // if the timeout is expired, call the callback and remove the
                             // bookeeping data
                             if ((now - cb.timestamp) > m_procedureCallTimeoutMS) {
+
+                                // make the minimum timeout for certain long running system procedures
+                                //  higher than the default 2m.
+                                // you can still set the default timeout higher than even this value
+                                boolean isLongOp = false;
+                                // this form allows you to list ops to treat specially
+                                isLongOp |= cb.name.equals("@UpdateApplicationCatalog");
+                                isLongOp |= cb.name.equals("@SnapshotSave");
+                                if (isLongOp && ((now - cb.timestamp) < MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS)) {
+                                    continue;
+                                }
+
                                 ClientResponseImpl r = new ClientResponseImpl(
                                         ClientResponse.CONNECTION_TIMEOUT,
                                         ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
@@ -282,6 +300,8 @@ class Distributer {
                     } catch (Exception e) {
                         uncaughtException(callback, r, e);
                     }
+                    // for bookkeeping, but it feels dishonest to call this here
+                    m_rateLimiter.transactionResponseReceived(now, -1);
                     return;
                 }
 
@@ -486,6 +506,7 @@ class Distributer {
                     m_rateLimiter.transactionResponseReceived(System.currentTimeMillis(), -1);
                     m_callbacksToInvoke.decrementAndGet();
                 }
+                m_callbacks.clear();
             }
         }
 
@@ -620,17 +641,18 @@ class Distributer {
         cxn.m_connection = c;
         m_connections.add(cxn);
 
-        synchronized (this) {
-            if (m_useClientAffinity) {
-                ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
-                //The handle is specific to topology updates and has special cased handling
-                queue(spi, new TopoUpdateCallback(), true);
-
-                spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@SystemCatalog", "PROCEDURES");
-                //The handle is specific to procedure updates and has special cased handling
-                queue(spi, new ProcUpdateCallback(), true);
+        if (m_useClientAffinity) {
+            synchronized (this) {
                 m_hostIdToConnection.put(hostId, cxn);
             }
+
+            ProcedureInvocation spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@Statistics", "TOPO", 0);
+            //The handle is specific to topology updates and has special cased handling
+            queue(spi, new TopoUpdateCallback(), true);
+
+            spi = new ProcedureInvocation(m_sysHandle.getAndDecrement(), "@SystemCatalog", "PROCEDURES");
+            //The handle is specific to procedure updates and has special cased handling
+            queue(spi, new ProcUpdateCallback(), true);
         }
     }
 
@@ -671,13 +693,16 @@ class Distributer {
              */
             if (m_useClientAffinity && m_hashinatorInitialized) {
                 final Procedure procedureInfo = m_procedureInfo.get(invocation.getProcName());
-                if (procedureInfo != null) {
-                    Integer hashedPartition = invocation.getHashinatedParam(procedureInfo.partitionParameter);
 
+                if (procedureInfo != null) {
+                    Integer hashedPartition = MpInitiator.MP_INIT_PID;
+                    if (!procedureInfo.multiPart) {
+                        hashedPartition = invocation.getHashinatedParam(procedureInfo.partitionParameter);
+                    }
                     /*
-                     * If the procedure is read only, load balance across replicas
+                     * If the procedure is read only and single part, load balance across replicas
                      */
-                    if (procedureInfo.readOnly) {
+                    if (!procedureInfo.multiPart && procedureInfo.readOnly) {
                         NodeConnection partitionReplicas[] = m_partitionReplicas.get(hashedPartition);
                         if (partitionReplicas != null && partitionReplicas.length > 0) {
                             cxn = partitionReplicas[ThreadLocalRandom.current().nextInt(partitionReplicas.length)];
@@ -858,10 +883,26 @@ class Distributer {
         return Collections.unmodifiableList(addressList);
     }
 
-    private void updateAffinityTopology(VoltTable vt) {
-        // We're going to get the MPI back in this table, so subtract it out from the number of partitions.
-        int numPartitions = vt.getRowCount() - 1;
-        TheHashinator.initialize(numPartitions);
+    private void updateAffinityTopology(VoltTable tables[]) {
+        //First table contains the description of partition ids master/slave relationships
+        VoltTable vt = tables[0];
+        if (tables.length == 1) {
+            //Just in case the new client connects to the old version of Volt that only returns 1 topology table
+            // We're going to get the MPI back in this table, so subtract it out from the number of partitions.
+            int numPartitions = vt.getRowCount() - 1;
+            TheHashinator.initialize(LegacyHashinator.class, LegacyHashinator.getConfigureBytes(numPartitions));
+        } else {
+            //Second table contains the hash function
+            boolean advanced = tables[1].advanceRow();
+            if (!advanced) {
+                System.err.println("Topology description received from Volt was incomplete " +
+                                   "performance will be lower because transactions can't be routed at this client");
+                return;
+            }
+            TheHashinator.initialize(
+                    HashinatorType.valueOf(tables[1].getString("HASHTYPE")).hashinatorClass,
+                    tables[1].getVarbinary("HASHCONFIG"));
+        }
         m_hashinatorInitialized = true;
         m_partitionMasters.clear();
         m_partitionReplicas.clear();
@@ -894,13 +935,17 @@ class Distributer {
             try {
                 //Data embedded in JSON object in remarks column
                 String jsString = vt.getString(6);
+                String procedureName = vt.getString(2);
                 JSONObject jsObj = new JSONObject(jsString);
+                boolean readOnly = jsObj.getBoolean(JdbcDatabaseMetaDataGenerator.JSON_READ_ONLY);
                 if (jsObj.getBoolean(JdbcDatabaseMetaDataGenerator.JSON_SINGLE_PARTITION)) {
                     int partitionParameter = jsObj.getInt(JdbcDatabaseMetaDataGenerator.JSON_PARTITION_PARAMETER);
-                    boolean readOnly = jsObj.getBoolean(JdbcDatabaseMetaDataGenerator.JSON_READ_ONLY);
-                    String procedureName = vt.getString(2);
-                    m_procedureInfo.put(procedureName, new Procedure(readOnly, partitionParameter));
+                    m_procedureInfo.put(procedureName, new Procedure(false,readOnly, partitionParameter));
+                } else {
+                    // Multi Part procedure JSON descriptors omit the partitionParameter
+                    m_procedureInfo.put(procedureName, new Procedure(true, readOnly, Procedure.PARAMETER_NONE));
                 }
+
             } catch (JSONException e) {
                 e.printStackTrace();
             }

@@ -16,13 +16,10 @@
  */
 package org.voltdb;
 
-import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
-import java.util.ArrayList;
-import java.util.concurrent.Semaphore;
 
-import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public interface CommandLog {
@@ -54,8 +51,6 @@ public interface CommandLog {
 
     public abstract boolean needsInitialization();
 
-    public abstract void log(InitiateTaskMessage message);
-
     /*
      * Returns a boolean indicating whether synchronous command logging is enabled.
      *
@@ -70,24 +65,17 @@ public interface CommandLog {
     public abstract void shutdown() throws InterruptedException;
 
     /**
-     * @param failedInitiators
-     * @param faultedTxns
-     * @return null if the logger is not initialized
-     */
-    public abstract Semaphore logFault(Set<Long> failedInitiators,
-                                       Set<Long> faultedTxns);
-
-    /**
      * IV2-only method.  Write this Iv2FaultLogEntry to the fault log portion of the command log
      */
     public abstract void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
             int partitionId, long spHandle);
 
-    public abstract void logHeartbeat(final long txnId);
-
-    public abstract long getFaultSequenceNumber();
-
     public interface DurabilityListener {
         public void onDurability(ArrayList<Object> durableThings);
     }
+
+    /**
+     * Is Command logging enabled?
+     */
+    public abstract boolean isEnabled();
 }

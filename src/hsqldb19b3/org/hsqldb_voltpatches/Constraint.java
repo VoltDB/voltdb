@@ -66,7 +66,6 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.RangeVariable.RangeIteratorBase;
 import org.hsqldb_voltpatches.index.Index;
@@ -1056,50 +1055,24 @@ public final class Constraint implements SchemaObject {
      * some names.
      * @return XML, correctly indented, representing this object.
      */
-    VoltXMLElement voltGetXML(Session session)
-    throws HSQLParseException
+    VoltXMLElement voltGetConstraintXML()
     {
-        VoltXMLElement constraint = null;
-
-        // Skip "MAIN" constraints, as they are the parent of foreign key references
-        if (this.constType != MAIN) {
-            constraint = new VoltXMLElement("constraint");
-
-            constraint.attributes.put("name", getName().name);
-            constraint.attributes.put("type", getTypeName());
-
-            // Foreign Keys
-            if (this.constType == FOREIGN_KEY) {
-                Table our_table = this.getRef();
-                int our_cols[] = this.getRefColumns();
-
-                Table fkey_table = this.getMain();
-                int fkey_cols[] = this.getMainColumns();
-
-                constraint.attributes.put("foreignkeytable", fkey_table.getName().statementName);
-
-                // XXX Can bad SQL get us here or does HSQL barf before that?
-                assert(our_cols.length == fkey_cols.length);
-                for (int i = 0; i < our_cols.length; i++) {
-                    String our_colname = our_table.getColumn(our_cols[i]).getName().statementName;
-                    String fkey_colname = fkey_table.getColumn(fkey_cols[i]).getName().statementName;
-
-                    VoltXMLElement ref = new VoltXMLElement("constraint");
-                    constraint.children.add(ref);
-                    assert(ref != null);
-                    ref.attributes.put("from", our_colname);
-                    ref.attributes.put("to", fkey_colname);
-                }
-            }
-            // All other constraints...
-            else {
-                if (core.mainIndex != null)
-                    constraint.attributes.put("index", core.mainIndex.getName().name);
-                else
-                    constraint.attributes.put("index", "");
-            }
+        // Skip "MAIN" constraints, as they are a side effect of foreign key constraints and add no new info.
+        if (this.constType == MAIN) {
+            return null;
         }
 
+        VoltXMLElement constraint = new VoltXMLElement("constraint");
+        constraint.attributes.put("name", getName().name);
+        constraint.attributes.put("constrainttype", getTypeName());
+
+        // VoltDB implements constraints by defining an index, by annotating metadata (such as for NOT NULL columns),
+        // or by issuing a "not supported" warning (such as for foreign keys).
+        // Any constraint implemented as an index must have an index name attribute.
+        // No other constraint details are currently used by VoltDB.
+        if (this.constType != FOREIGN_KEY && core.mainIndex != null) {
+            constraint.attributes.put("index", core.mainIndex.getName().name);
+        }
         return constraint;
     }
 

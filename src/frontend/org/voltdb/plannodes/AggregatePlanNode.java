@@ -105,6 +105,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
     {
         // aggregates currently have their output schema specified
         m_outputSchema = schema.clone();
+        m_hasSignificantOutputSchema = true;
     }
 
 
@@ -193,7 +194,6 @@ public class AggregatePlanNode extends AbstractPlanNode {
                              Integer aggOutputColumn,
                              AbstractExpression aggInputExpr)
     {
-        assert(aggInputExpr != null);
         m_aggregateTypes.add(aggType);
         if (isDistinct)
         {
@@ -206,7 +206,13 @@ public class AggregatePlanNode extends AbstractPlanNode {
         m_aggregateOutputColumns.add(aggOutputColumn);
         try
         {
-            m_aggregateExpressions.add((AbstractExpression) aggInputExpr.clone());
+            if (aggType == ExpressionType.AGGREGATE_COUNT_STAR) {
+                assert(aggInputExpr == null);
+                m_aggregateExpressions.add(null);
+            } else {
+                assert(aggInputExpr != null);
+                m_aggregateExpressions.add((AbstractExpression) aggInputExpr.clone());
+            }
         }
         catch (CloneNotSupportedException e)
         {
@@ -244,10 +250,13 @@ public class AggregatePlanNode extends AbstractPlanNode {
             stringer.key(Members.AGGREGATE_TYPE.name()).value(m_aggregateTypes.get(ii).name());
             stringer.key(Members.AGGREGATE_DISTINCT.name()).value(m_aggregateDistinct.get(ii));
             stringer.key(Members.AGGREGATE_OUTPUT_COLUMN.name()).value(m_aggregateOutputColumns.get(ii));
-            stringer.key(Members.AGGREGATE_EXPRESSION.name());
-            stringer.object();
-            m_aggregateExpressions.get(ii).toJSONString(stringer);
-            stringer.endObject();
+            AbstractExpression ae = m_aggregateExpressions.get(ii);
+            if (ae != null) {
+                stringer.key(Members.AGGREGATE_EXPRESSION.name());
+                stringer.object();
+                ae.toJSONString(stringer);
+                stringer.endObject();
+            }
             stringer.endObject();
         }
         stringer.endArray();
@@ -289,20 +298,23 @@ public class AggregatePlanNode extends AbstractPlanNode {
         helpLoadFromJSONObject(jobj, db);
         JSONArray jarray = jobj.getJSONArray( Members.AGGREGATE_COLUMNS.name() );
         int size = jarray.length();
-        for( int i = 0; i < size; i++ ) {
+        for (int i = 0; i < size; i++) {
             JSONObject tempObj = jarray.getJSONObject( i );
             m_aggregateTypes.add( ExpressionType.get( tempObj.getString( Members.AGGREGATE_TYPE.name() )));
             m_aggregateDistinct.add( tempObj.getInt( Members.AGGREGATE_DISTINCT.name() ) );
             m_aggregateOutputColumns.add( tempObj.getInt( Members.AGGREGATE_OUTPUT_COLUMN.name() ));
 
-            if( !tempObj.isNull( Members.AGGREGATE_EXPRESSION.name() ) ) {
+            if (tempObj.isNull(Members.AGGREGATE_EXPRESSION.name())) {
+                m_aggregateExpressions.add(null);
+            }
+            else {
                 m_aggregateExpressions.add(
                         AbstractExpression.fromJSONObject(
                                 tempObj.getJSONObject( Members.AGGREGATE_EXPRESSION.name() ),
                                 db) );
             }
         }
-        if( !jobj.isNull(Members.GROUPBY_EXPRESSIONS.name() ) ) {
+        if ( ! jobj.isNull(Members.GROUPBY_EXPRESSIONS.name()) ) {
             jarray = jobj.getJSONArray( Members.GROUPBY_EXPRESSIONS.name() );
             size = jarray.length();
             for( int i = 0; i < size; i++ ) {

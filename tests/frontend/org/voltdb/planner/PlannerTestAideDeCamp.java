@@ -41,9 +41,10 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DatabaseEstimates;
-import org.voltdb.compiler.VoltDDLElementTracker;
+import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.compiler.VoltCompiler;
+import org.voltdb.compiler.VoltDDLElementTracker;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.plannodes.SchemaColumn;
@@ -108,6 +109,17 @@ public class PlannerTestAideDeCamp {
         return m_currentPlan;
     }
 
+    /**
+     * Compile a statement and return the head of the plan.
+     * @param sql
+     * @param detMode
+     */
+    public CompiledPlan compileAdHocPlan(String sql, DeterminismMode detMode)
+    {
+        compile(sql, 0, null, null, true, false, detMode);
+        return m_currentPlan;
+    }
+
     public List<AbstractPlanNode> compile(String sql, int paramCount)
     {
         return compile(sql, paramCount, false, null);
@@ -125,12 +137,14 @@ public class PlannerTestAideDeCamp {
         return compile(sql, paramCount, joinOrder, partitionBy, true, false);
     }
 
+    public List<AbstractPlanNode> compile(String sql, int paramCount, String joinOrder, Object partitionParameter, boolean inferSP, boolean lockInSP) {
+        return compile(sql, paramCount, joinOrder, partitionParameter, inferSP, lockInSP, DeterminismMode.SAFER);
+    }
+
     /**
      * Compile and cache the statement and plan and return the final plan graph.
-     * @param sql
-     * @param paramCount
      */
-    public List<AbstractPlanNode> compile(String sql, int paramCount, String joinOrder, Object partitionParameter, boolean inferSP, boolean lockInSP)
+    public List<AbstractPlanNode> compile(String sql, int paramCount, String joinOrder, Object partitionParameter, boolean inferSP, boolean lockInSP, DeterminismMode detMode)
     {
         Statement catalogStmt = proc.getStatements().add("stmt-" + String.valueOf(compileCounter++));
         catalogStmt.setSqltext(sql);
@@ -164,7 +178,7 @@ public class PlannerTestAideDeCamp {
             new QueryPlanner(catalogStmt.getSqltext(), catalogStmt.getTypeName(),
                     catalogStmt.getParent().getTypeName(), catalog.getClusters().get("cluster"),
                     db, partitioning, hsql, estimates, false, StatementCompiler.DEFAULT_MAX_JOIN_TABLES,
-                    costModel, null, joinOrder);
+                    costModel, null, joinOrder, detMode);
 
         CompiledPlan plan = null;
         planner.parse();

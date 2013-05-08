@@ -266,14 +266,18 @@ public class MyTPCC
 
         try
         {
-            if ((int)(m_clientCon.execute(LoadStatus.class.getSimpleName()).getResults()[0].fetchRow(0).getLong(0)) == 0)
+            try {
+                m_clientCon.execute("@AdHoc", "INSERT INTO LOADER_PERMIT VALUES ( 42 );");
                 (new MyLoader(args, m_clientCon)).run();
-            else
-                while ((int)(m_clientCon.execute(LoadStatus.class.getSimpleName()).getResults()[0].fetchRow(0).getLong(0)) < warehouses)
+                m_clientCon.execute("@AdHoc", "INSERT INTO RUN_PERMIT VALUES ( 42 );");
+            } catch (ProcCallException e) {
+                while ((int)(m_clientCon.execute("@AdHoc", "SELECT COUNT(*) FROM RUN_PERMIT").getResults()[0].fetchRow(0).getLong(0)) < 1)
                     ;
+            }
         }
         catch (Exception e)
         {
+            e.printStackTrace();
             System.exit(-1);
         }
 
@@ -468,13 +472,15 @@ public class MyTPCC
         public void clientCallback(ClientResponse clientResponse)
         {
             // TODO: Necessary?
+            /*
             boolean abortExpected = false;
             if (m_procedureName != null && (m_procedureName.equals(Constants.ORDER_STATUS_BY_NAME)
                 || m_procedureName.equals(Constants.ORDER_STATUS_BY_ID)))
                 abortExpected = true;
-            boolean status = clientResponse.getStatus() == ClientResponse.SUCCESS && abortExpected;
+            boolean status = (clientResponse.getStatus() == ClientResponse.SUCCESS || abortExpected;
             assert status;
-            if (m_transactionType != null)
+            */
+            if (m_transactionType != null && clientResponse.getStatus() == ClientResponse.SUCCESS)
             {
                 procCounts[m_transactionType.ordinal()].incrementAndGet();
 

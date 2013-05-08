@@ -60,6 +60,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         m_outputSchema =
             m_children.get(0).getOutputSchema().
             join(inlineScan.getOutputSchema()).copyAndReplaceWithTVE();
+        m_hasSignificantOutputSchema = true;
     }
 
     @Override
@@ -165,6 +166,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
             new_output_schema.addColumn(col);
         }
         m_outputSchema = new_output_schema;
+        m_hasSignificantOutputSchema = true;
     }
 
     @Override

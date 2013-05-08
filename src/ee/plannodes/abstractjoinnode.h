@@ -71,10 +71,10 @@ public:
     virtual std::string debugInfo(const std::string& spacer) const;
 
 protected:
-    virtual void loadFromJSONObject(json_spirit::Object& obj);
+    virtual void loadFromJSONObject(PlannerDomValue obj);
 
     void loadPredicateFromJSONObject(
-        const char* predicateType, json_spirit::Object& obj, AbstractExpression*& predicate);
+        const char* predicateType, const PlannerDomValue& obj, AbstractExpression*& predicate);
 
     // This is the outer-table-only join expression. If the outer tuple fails it,
     // it may still be part of the result set (pending other filtering)

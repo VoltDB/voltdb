@@ -23,6 +23,8 @@ import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -39,7 +41,6 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
@@ -53,9 +54,10 @@ import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.HTTPAdminListener;
-import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
+
+import com.google.common.collect.ImmutableSet;
 
 /**
  * This breaks up VoltDB initialization tasks into discrete units.
@@ -289,12 +291,23 @@ public class Inits {
                                 org.voltdb.TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0);
                     }
 
+                    // get a hash of the catalog - should never actually throw
+                    MessageDigest md = null;
+                    try {
+                        md = MessageDigest.getInstance("SHA-1");
+                    } catch (NoSuchAlgorithmException e) {
+                        VoltDB.crashLocalVoltDB("Bad JVM has no SHA-1 hash.", true, e);
+                    }
+                    md.update(catalogBytes);
+                    byte[] catalogHash = md.digest();
+                    assert(catalogHash.length == 20); // sha-1 length
 
                     // publish the catalog bytes to ZK
                     CatalogUtil.uploadCatalogToZK(
                             m_rvdb.getHostMessenger().getZK(),
                             0, catalogTxnId,
                             catalogUniqueId,
+                            catalogHash,
                             catalogBytes);
                 }
                 catch (IOException e) {
@@ -332,7 +345,7 @@ public class Inits {
             try {
                 m_rvdb.m_serializedCatalog = CatalogUtil.loadCatalogFromJar(catalogStuff.bytes, hostLog);
             } catch (IOException e) {
-                VoltDB.crashLocalVoltDB("Unable to load catalog: " + e.getMessage(), false, null);
+                VoltDB.crashLocalVoltDB("Unable to load catalog", true, e);
             }
 
             if ((m_rvdb.m_serializedCatalog == null) || (m_rvdb.m_serializedCatalog.length() == 0))
@@ -344,8 +357,7 @@ public class Inits {
 
             // note if this fails it will print an error first
             try {
-                m_rvdb.m_depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_deployment,
-                                                                         true, false);
+                m_rvdb.m_depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_deployment, true);
                 if (m_rvdb.m_depCRC < 0)
                     System.exit(-1);
             } catch (Exception e) {
@@ -591,10 +603,15 @@ public class Inits {
         public void run() {
             // Let the Export system read its configuration from the catalog.
             try {
-                ExportManager.initialize(m_rvdb.m_myHostId, m_rvdb.m_catalogContext, m_isRejoin, m_rvdb.m_messenger);
-            } catch (ExportManager.SetupException e) {
-                hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ExportInitFailure.name(), e);
-                System.exit(-1);
+                ExportManager.initialize(
+                        m_rvdb.m_myHostId,
+                        m_rvdb.m_catalogContext,
+                        m_isRejoin,
+                        m_rvdb.m_messenger,
+                        m_rvdb.m_partitionsToSitesAtStartupForExportInit
+                        );
+            } catch (Throwable t) {
+                VoltDB.crashLocalVoltDB("Error setting up export", true, t);
             }
         }
     }
@@ -605,12 +622,10 @@ public class Inits {
 
         @Override
         public void run() {
-            int hostCount = m_deployment.getCluster().getHostcount();
-            int kFactor = m_deployment.getCluster().getKfactor();
-            int sitesPerHost = m_deployment.getCluster().getSitesperhost();
-
             // Initialize the complex partitioning scheme
-            TheHashinator.initialize((hostCount * sitesPerHost) / (kFactor + 1));
+            TheHashinator.initialize(
+                    TheHashinator.getConfiguredHashinatorClass(),
+                    TheHashinator.getConfigureBytes(m_rvdb.m_configuredNumberOfPartitions));
         }
     }
 
@@ -625,7 +640,6 @@ public class Inits {
                 m_rvdb.getStatsAgent().getMailbox(
                             VoltDB.instance().getHostMessenger(),
                             statsAgentHSId);
-                m_rvdb.getMailboxPublisher().publish(VoltDB.instance().getHostMessenger().getZK());
                 m_rvdb.getAsyncCompilerAgent().createMailbox(
                             VoltDB.instance().getHostMessenger(),
                             m_rvdb.getHostMessenger().getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID));
@@ -642,13 +656,16 @@ public class Inits {
 
         @Override
         public void run() {
-            if (!m_isRejoin && !m_config.m_isRejoinTest) {
+            if (!m_isRejoin && !m_config.m_isRejoinTest && !m_rvdb.m_joining) {
                 String snapshotPath = null;
                 if (m_rvdb.m_catalogContext.cluster.getDatabases().get("database").getSnapshotschedule().get("default") != null) {
                     snapshotPath = m_rvdb.m_catalogContext.cluster.getDatabases().get("database").getSnapshotschedule().get("default").getPath();
                 }
 
-                int[] allPartitions = m_rvdb.getSiteTracker().getAllPartitions();
+                int[] allPartitions = new int[m_rvdb.m_configuredNumberOfPartitions];
+                for (int ii = 0; ii < allPartitions.length; ii++) {
+                    allPartitions[ii] = ii;
+                }
 
                 org.voltdb.catalog.CommandLog cl = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log");
 
@@ -664,14 +681,13 @@ public class Inits {
                                                       cl.getInternalsnapshotpath(),
                                                       snapshotPath,
                                                       allPartitions,
-                                                      m_rvdb.m_siteTracker.getAllHosts());
+                                                      ImmutableSet.copyOf(m_rvdb.m_messenger.getLiveHostIds()));
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Unable to establish a ZooKeeper connection: " +
                             e.getMessage(), false, e);
                 }
 
                 m_rvdb.m_restoreAgent.setCatalogContext(m_rvdb.m_catalogContext);
-                m_rvdb.m_restoreAgent.setSiteTracker(m_rvdb.m_siteTracker);
                 // Generate plans and get (hostID, catalogPath) pair
                 Pair<Integer,String> catalog = m_rvdb.m_restoreAgent.findRestoreCatalog();
 

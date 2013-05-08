@@ -17,6 +17,8 @@
 
 package org.voltdb.sysprocs;
 
+import org.voltdb.VoltSystemProcedure;
+
 public class SysProcFragmentId
 {
     // @LastCommittedTransaction
@@ -80,8 +82,9 @@ public class SysProcFragmentId
      */
     public static final long PF_snapshotSaveQuiesceResults = 45;
 
-    public static boolean isSnapshotSaveFragment(long fragId)
-    {
+    public static boolean isSnapshotSaveFragment(byte[] planHash) {
+        long fragId = VoltSystemProcedure.hashToFragId(planHash);
+
         return (fragId == PF_saveTest || fragId == PF_createSnapshotTargets ||
                 fragId == PF_snapshotSaveQuiesce);
     }
@@ -115,10 +118,6 @@ public class SysProcFragmentId
     // @Quiesce
     public static final long PF_quiesce_sites = 100;
     public static final long PF_quiesce_processed_sites = 101;
-
-    // @SnapshotStatus
-    public static final long PF_scanSnapshotRegistries = 110;
-    public static final long PF_scanSnapshotRegistriesResults = 111;
 
     // @SnapshotScan
     public static final long PF_snapshotDigestScan = 124;
@@ -154,4 +153,14 @@ public class SysProcFragmentId
     // @Update application catalog
     public static final long PF_updateCatalog = 210;
     public static final long PF_updateCatalogAggregate = 211;
+
+    public static boolean isCatalogUpdateFragment(byte[] planHash) {
+        long fragId = VoltSystemProcedure.hashToFragId(planHash);
+
+        return (fragId == PF_updateCatalog || fragId == PF_updateCatalogAggregate);
+    }
+
+    // @Update topology
+    public static final long PF_updateTopology = 230;
+    public static final long PF_updateTopologyAggregate = 231;
 }

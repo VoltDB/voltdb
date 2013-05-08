@@ -335,14 +335,14 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
+    VoltXMLElement voltGetColumnXML(Session session) throws HSQLParseException
     {
         VoltXMLElement column = new VoltXMLElement("column");
 
         // output column metadata
         column.attributes.put("name", columnName.name);
         String typestring = Types.getTypeName(dataType.typeCode);
-        column.attributes.put("type", typestring);
+        column.attributes.put("valuetype", typestring);
         column.attributes.put("nullable", String.valueOf(isNullable()));
         column.attributes.put("size", String.valueOf(dataType.precision));
 
@@ -364,7 +364,6 @@ public final class ColumnSchema extends ColumnBase implements SchemaObject {
             // add default value to body of column element
             VoltXMLElement defaultElem = new VoltXMLElement("default");
             column.children.add(defaultElem);
-            assert(defaultElem != null);
             defaultElem.children.add(exp.voltGetXML(session));
         }
 

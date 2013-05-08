@@ -18,10 +18,10 @@
 #define VOLTDBSCHEMACOLUMN_H
 
 #include "common/types.h"
+#include "common/PlannerDomValue.h"
 #include "expressions/abstractexpression.h"
 
 #include "boost/shared_ptr.hpp"
-#include "json_spirit/json_spirit.h"
 
 #include <string>
 
@@ -38,22 +38,16 @@ namespace voltdb
 class SchemaColumn
 {
 public:
-    SchemaColumn(json_spirit::Object& colObject);
+    SchemaColumn(PlannerDomValue colObject);
     ~SchemaColumn();
 
-    std::string getTableName() const;
     std::string getColumnName() const;
-    std::string getColumnAlias() const;
-    ValueType getType() const;
-    int32_t getSize() const;
 
     // SchemaColumn retains responsibility for the deletion of
     // the expression
     AbstractExpression* getExpression();
 
 private:
-    const json_spirit::Object& m_colObject;
-
     std::string m_tableName;
     std::string m_columnName;
     std::string m_columnAlias;

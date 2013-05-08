@@ -19,10 +19,11 @@ package org.voltdb;
 
 import java.io.File;
 import java.io.FileFilter;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -53,11 +54,11 @@ import org.voltcore.zk.LeaderElector;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionCreator;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.TableFiles;
+import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 
 /**
@@ -421,18 +422,13 @@ SnapshotCompletionInterest
             }
         } catch (Exception e) {
             VoltDB.crashGlobalVoltDB("Unable to instantiate command log reinitiator",
-                                     false, e instanceof InvocationTargetException ? e.getCause() : e);
+                                     true, e);
         }
         m_replayAgent.setCallback(this);
     }
 
     public void setCatalogContext(CatalogContext context) {
         m_replayAgent.setCatalogContext(context);
-    }
-
-    public void setSiteTracker(SiteTracker siteTracker)
-    {
-        m_replayAgent.setSiteTracker(siteTracker);
     }
 
     public void setInitiator(TransactionCreator initiator) {
@@ -670,6 +666,10 @@ SnapshotCompletionInterest
             }
         }
 
+        if (s.m_digests.isEmpty()) {
+            LOG.debug("Rejecting snapshot because it had no valid digest file.");
+            return null;
+        }
         File digest = s.m_digests.get(0);
         Long catalog_crc = null;
         Map<Integer,Long> pidToTxnMap = new TreeMap<Integer,Long>();
@@ -707,6 +707,46 @@ SnapshotCompletionInterest
             LOG.info("Unable to extract catalog CRC from digest: " +
                     digest.getAbsolutePath() + " due to: " + je.getMessage());
             return null;
+        }
+
+        if (s.m_catalogFile == null) {
+            LOG.debug("Rejecting snapshot because it had no catalog.");
+            return null;
+        }
+
+        FileInputStream fin = null;
+        try {
+            fin = new FileInputStream(s.m_catalogFile);
+            byte[] buffer = new byte[(int)s.m_catalogFile.length() + 1000];
+            int readBytes = 0;
+            int totalBytes = 0;
+            try {
+                while (readBytes >= 0) {
+                    totalBytes += readBytes;
+                    readBytes = fin.read(buffer, totalBytes, buffer.length - totalBytes - 1);
+                }
+            } finally {
+                fin.close();
+                fin = null;
+            }
+            byte[] catalogBytes = Arrays.copyOf(buffer, totalBytes);
+            InMemoryJarfile jarfile = new InMemoryJarfile(catalogBytes);
+            if (jarfile.getCRC() != catalog_crc) {
+                LOG.debug("Rejecting snapshot because catalog CRC did not match digest.");
+                return null;
+            }
+        }
+        catch (IOException ioe) {
+            LOG.debug("Rejecting snapshot because catalog CRC could not be validated");
+            return null;
+        }
+        finally {
+            if (fin != null) {
+                try {
+                    fin.close();
+                }
+                catch (Exception e) {}
+            }
         }
 
         SnapshotInfo info =
@@ -1048,8 +1088,7 @@ SnapshotCompletionInterest
         spi.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
             @Override
             public ParameterSet call() throws Exception {
-                ParameterSet params = new ParameterSet();
-                params.setParameters(invocation.getSecond());
+                ParameterSet params = ParameterSet.fromArrayWithCopy(invocation.getSecond());
                 return params;
             }
         });
@@ -1069,20 +1108,18 @@ SnapshotCompletionInterest
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
                                           restoreProc.getEverysite(),
-                                          m_allPartitions, m_allPartitions.length,
+                                          m_allPartitions,
                                           m_restoreAdapter, 0,
-                                          EstTime.currentTimeMillis(),
-                                          false);
+                                          EstTime.currentTimeMillis());
         } else {
             m_initiator.createTransaction(m_restoreAdapter.connectionId(), "CommandLog", true,
                                           txnId, System.currentTimeMillis(), spi,
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
                                           restoreProc.getEverysite(),
-                                          m_allPartitions, m_allPartitions.length,
+                                          m_allPartitions,
                                           m_restoreAdapter, 0,
-                                          EstTime.currentTimeMillis(),
-                                          false);
+                                          EstTime.currentTimeMillis());
         }
     }
 

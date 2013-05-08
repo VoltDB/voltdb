@@ -75,7 +75,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                     StringBuilder sb = new StringBuilder();
                     sb.append("The specified join order \"");
                     sb.append(parsedStmt.joinOrder).append("\" contains duplicate tables. ");
-                    sb.append("Self-joins are not supported yet.");
                     throw new RuntimeException(sb.toString());
                 }
             }

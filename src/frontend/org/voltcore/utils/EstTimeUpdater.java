@@ -18,11 +18,37 @@
 package org.voltcore.utils;
 
 public class EstTimeUpdater {
+    //Report inconsistent update frequency at most every sixty seconds
+    public static final long maxErrorReportInterval = 60 * 1000;
+    //Warn if estimated time upates are > 2 seconds apart (should be at most five millis)
+    public static final long maxTolerableUpdateDelta = 2000;
+    public static long lastErrorReport = System.currentTimeMillis() - maxErrorReportInterval;
+
     public static boolean update(final long now) {
-        if (EstTime.m_now.get() == now) {
+        final long estNow = EstTime.m_now.get();
+        if (estNow == now) {
             return false;
         }
         EstTime.m_now.lazySet(now);
-        return true;
+        /*
+         * Check if updating the estimated time was especially tardy.
+         * I am concerned that the thread responsible for updating the estimated
+         * time might be blocking on something and want to be able to log if
+         * that happens
+         */
+        if (now - estNow > 2000) {
+            /*
+             * Only report the error every 60 seconds to cut down on log spam
+             */
+            if (lastErrorReport > now) {
+                //Time moves backwards on occasion, check and reset
+                lastErrorReport = now;
+            }
+            if (now - lastErrorReport > maxErrorReportInterval) {
+                lastErrorReport = now;
+                return true;
+            }
+        }
+        return false;
     }
 }

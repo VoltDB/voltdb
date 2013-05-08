@@ -183,12 +183,13 @@ public class Iv2Trace
                 iv2log.error("FragmentTaskMessage SP HANDLE conflict.  Message: " + ftask.getSpHandle() +
                         ", locally held: " + spHandle);
             }
-            String logmsg = "%s %s from %s txnId %s spHandle %s trunc %s";
+            String logmsg = "%s %s from %s txnId %s spHandle %s trunc %s readonly %s";
             iv2log.trace(String.format(logmsg, label, CoreUtils.hsIdToString(localHSId),
                         CoreUtils.hsIdToString(ftask.m_sourceHSId),
                         txnIdToString(ftask.getTxnId()),
                         txnIdToString(spHandle),
-                        txnIdToString(ftask.getTruncationHandle())));
+                        txnIdToString(ftask.getTruncationHandle()),
+                        ftask.isReadOnly()));
         }
     }
 
@@ -210,7 +211,7 @@ public class Iv2Trace
             String logmsg = "txnQOffer txnId %s spHandle %s type %s";
             iv2queuelog.trace(String.format(logmsg, txnIdToString(task.getTxnId()),
                         txnIdToString(task.getSpHandle()),
-                    task.m_txn.isSinglePartition() ? "SP" : "MP"));
+                    task.m_txnState.isSinglePartition() ? "SP" : "MP"));
         }
     }
 
@@ -220,7 +221,7 @@ public class Iv2Trace
             String logmsg = "tskQOffer txnId %s spHandle %s type %s";
             iv2queuelog.trace(String.format(logmsg, txnIdToString(task.getTxnId()),
                             txnIdToString(task.getSpHandle()),
-                    task.m_txn.isSinglePartition() ? "SP" : "MP"));
+                    task.m_txnState.isSinglePartition() ? "SP" : "MP"));
         }
     }
 }

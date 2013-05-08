@@ -26,6 +26,7 @@ import java.io.File;
 import java.util.Properties;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.LegacyHashinator;
 import org.voltdb.TheHashinator;
 import org.voltdb.client.Client;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -111,7 +112,7 @@ public class TestExportSnapshotPreservesSequenceNumber extends TestExportBase {
 
     static public junit.framework.Test suite() throws Exception
     {
-        TheHashinator.initialize(2);
+        TheHashinator.initialize(LegacyHashinator.class, LegacyHashinator.getConfigureBytes(2));
         LocalCluster config;
 
         final MultiConfigSuiteBuilder builder =

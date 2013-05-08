@@ -8,18 +8,10 @@ var QueryUI = (function(queryTab){
 			var Extract = new RegExp(/'[^']*'/gm);
 			var AutoSplit = /\s(select|insert|update|delete|exec|execute|explain|explainproc)\s/gim;
 			var AutoSplitParameters = /[\s,]+/gm;
+                        var ParserStringKeywords = /\s*(exec|execute|explain|explainproc)\s+(select|insert|update|delete)\s+/gim;
 			this.parse = function(src)
 			{
-                var command = ["exec", "execute", "explain", "explainproc"];
-                var keyword = ["select", "insert", "update", "delete"];
-                for(var i = 0;i<command.length;i++)
-                {
-                    for(var j = 0;j<keyword.length;j++)
-                    {
-                        var r = new RegExp("\\s*(" + command[i].replace(" ","\\s+") + ")\\s+(" + keyword[j] + ")\\s*", "gmi");
-                        src = src.replace(r, " $1 #SQL_PARSER_STRING_KEYWORD#$2 ");
-                    }
-                }
+                                src = src.replace(ParserStringKeywords, " $1 #SQL_PARSER_STRING_KEYWORD#$2 ");
 				src = src.replace(SingleLineComments,'');
 				src = src.replace(/''/g, '$(SQL_PARSER_ESCAPE_SINGLE_QUOTE)');
 				var k = Extract.exec(src);

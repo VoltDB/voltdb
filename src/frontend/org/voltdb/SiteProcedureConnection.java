@@ -25,6 +25,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.iv2.JoinProducerBase;
 
 /**
  * VoltProcedures invoke SiteProcedureConnection methods to
@@ -78,12 +79,6 @@ public interface SiteProcedureConnection {
     public void loadTable(long txnId, int tableId, VoltTable data);
 
     /**
-     * Get the EE's plan fragment ID for a given JSON plan.
-     * May pull from cache or load on the spot.
-     */
-    public long loadPlanFragment(byte[] plan) throws EEException;
-
-    /**
      * Execute a set of plan fragments.
      * Note: it's ok to pass null for inputDepIds if the fragments
      * have no dependencies.
@@ -92,7 +87,7 @@ public interface SiteProcedureConnection {
             int numFragmentIds,
             long[] planFragmentIds,
             long[] inputDepIds,
-            ParameterSet[] parameterSets,
+            Object[] parameterSets,
             long spHandle,
             long uniqueId,
             boolean readOnly) throws EEException;
@@ -143,7 +138,7 @@ public interface SiteProcedureConnection {
      * if configured to do so and it will also set export sequence numbers
      */
     public void setRejoinComplete(
-            org.voltdb.iv2.RejoinProducer.ReplayCompletionAction action,
+            JoinProducerBase.JoinCompletionAction action,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers);
 
     public long[] getUSOForExportTable(String signature);
@@ -166,4 +161,26 @@ public interface SiteProcedureConnection {
     // Snapshot services provided by the site
     public Future<?> doSnapshotWork(boolean ignoreQuietPeriod);
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds);
+
+    /**
+     * Get the site-local fragment id for a given plan identified by 20-byte sha-1 hash
+     */
+    public long getFragmentIdForPlanHash(byte[] planHash);
+
+    /**
+     * Get the site-local fragment id for a given plan identified by 20-byte sha-1 hash
+     * If the plan isn't known to this SPC, load it up. Otherwise addref it.
+     */
+    public long loadOrAddRefPlanFragment(byte[] planHash, byte[] plan);
+
+    /**
+     * Decref the plan associated with this site-local fragment id. If the refcount
+     * goes to 0, the plan may be removed (depending on caching policy).
+     */
+    public void decrefPlanFragmentById(long fragmentId);
+
+    /**
+     * Get the full JSON plan associated with a given site-local fragment id.
+     */
+    public byte[] planForFragmentId(long fragmentId);
 }

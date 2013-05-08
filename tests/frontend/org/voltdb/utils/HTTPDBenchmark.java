@@ -269,7 +269,7 @@ public class HTTPDBenchmark extends TestCase {
     }
 
     class JSONClient extends Thread {
-        final ParameterSet pset = new ParameterSet();
+        final ParameterSet pset = ParameterSet.emptyParameterSet();
         final int m_iterations;
         public long totalExecTime = 0;
         final int m_id;

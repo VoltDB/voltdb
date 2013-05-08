@@ -45,12 +45,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# JVM detection taken from Apache Cassandra
+# Determine the sort of JVM we'll be running on.
+
+java_ver_output=`"${JAVA:-java}" -version 2>&1`
+
+jvmver=`echo "$java_ver_output" | awk -F'"' 'NR==1 {print $2}'`
+JVM_VERSION=${jvmver%_*}
+JVM_PATCH_VERSION=${jvmver#*_}
+
+jvm=`echo "$java_ver_output" | awk 'NR==2 {print $1}'`
+case "$jvm" in
+    OpenJDK)
+        JVM_VENDOR=OpenJDK
+        # this will be "64-Bit" or "32-Bit"
+        JVM_ARCH=`echo "$java_ver_output" | awk 'NR==3 {print $2}'`
+        ;;
+    "Java(TM)")
+        JVM_VENDOR=Oracle
+        # this will be "64-Bit" or "32-Bit"
+        JVM_ARCH=`echo "$java_ver_output" | awk 'NR==3 {print $3}'`
+        ;;
+    *)
+        # Help fill in other JVM values
+        JVM_VENDOR=other
+        JVM_ARCH=unknown
+        ;;
+esac
 
 # The VoltDB command script
 #
 # Environment Variables
 #   JAVA_HOME        The java implementation to use.  Overrides JAVA_HOME.
-#   JAVA_HEAP_MAX    The maximum amount of heap to use, in MB. Default is 1024.
+#   VOLTDB_HEAPSIZE    The maximum amount of heap to use, in MB. Default is 1024.
 #   VOLTDB_OPTS     Extra Java runtime options.
 #   LOG4J_CONFIG_PATH     Path to alternate log4j configuration
 
@@ -69,11 +96,19 @@ this="$(pwd -P)/$this"
 popd > /dev/null
 
 # the root of the VoltDB installation
-export VOLTDB_HOME=$(dirname $(dirname "$this"))
+if [ -z "${VOLTDB_HOME}" ]; then
+    export VOLTDB_HOME=$(dirname $(dirname "$this"))
+fi
+
 #echo $VOLTDB_HOME
 
 # compilation is handled by tools/volt
 if [ "$1" = "compile" ]; then
+    exec $VOLTDB_HOME/tools/volt "$@"
+fi
+
+# deployment masking is handled by tools/volt
+if [ "$1" = "mask" ]; then
     exec $VOLTDB_HOME/tools/volt "$@"
 fi
 
@@ -120,7 +155,7 @@ fi
 
 VOLTDBJAR=`ls $VOLTDB_VOLTDB/voltdb-3.*.jar | grep -v "doc.jar" | head -1`
 if [ -n "${VOLTDBJAR}" ]; then
-  CLASSPATH=$VOLTDBJAR
+  CLASSPATH=$CLASSPATH:$VOLTDBJAR
 else
   echo "Couldn't find compiled VoltDB jar to run."
   exit 1
@@ -148,7 +183,14 @@ fi
 
 # run it
 export CMDVAL="$JAVA -server -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp "
-export CMDVAL=$CMDVAL"-XX:-ReduceInitialCardMarks $JAVA_HEAP_MAX $VOLTDB_OPTS "
+export CMDVAL=$CMDVAL"-XX:+UseConcMarkSweepGC -XX:+CMSParallelRemarkEnabled "
+# note: bash evals '1.7.x' as > '1.7' so this is really a >= 1.7 jvm check
+if [ "$JVM_VERSION" \> "1.7" ] ; then
+    export CMDVAL=$CMDVAL"-XX:+UseCondCardMark "
+fi
+export CMDVAL=$CMDVAL"-XX:+UseTLAB -XX:CMSInitiatingOccupancyFraction=75 -XX:+UseCMSInitiatingOccupancyOnly "
+export CMDVAL=$CMDVAL"-XX:+UseParNewGC "
+export CMDVAL=$CMDVAL"$JAVA_HEAP_MAX $VOLTDB_OPTS "
 export CMDVAL=$CMDVAL"-Dlog4j.configuration=file://${LOG4J_CONFIG_PATH} "
 export CMDVAL=$CMDVAL"-Djava.library.path=${JAVA_LIBRARY_PATH} -classpath $CLASSPATH "
 export CMDVAL=$CMDVAL"org.voltdb.VoltDB $@"

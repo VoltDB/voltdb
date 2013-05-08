@@ -677,10 +677,12 @@ final class RangeVariable {
             isBeforeFirst      = true;
         }
 
+        @Override
         public boolean isBeforeFirst() {
             return isBeforeFirst;
         }
 
+        @Override
         public boolean next() {
 
             if (isBeforeFirst) {
@@ -702,26 +704,32 @@ final class RangeVariable {
             }
         }
 
+        @Override
         public Row getCurrentRow() {
             return currentRow;
         }
 
+        @Override
         public Object[] getCurrent() {
             return currentData;
         }
 
+        @Override
         public long getRowid() {
             return currentRow == null ? 0
                                       : currentRow.getId();
         }
 
+        @Override
         public Object getRowidObject() {
             return currentRow == null ? null
                                       : Long.valueOf(currentRow.getId());
         }
 
+        @Override
         public void remove() {}
 
+        @Override
         public void reset() {
 
             if (it != null) {
@@ -733,6 +741,7 @@ final class RangeVariable {
             isBeforeFirst = true;
         }
 
+        @Override
         public int getRangePosition() {
             return rangePosition;
         }
@@ -766,10 +775,12 @@ final class RangeVariable {
             }
         }
 
+        @Override
         public boolean isBeforeFirst() {
             return isBeforeFirst;
         }
 
+        @Override
         public boolean next() {
 
             if (isBeforeFirst) {
@@ -785,8 +796,10 @@ final class RangeVariable {
             return findNext();
         }
 
+        @Override
         public void remove() {}
 
+        @Override
         public void reset() {
 
             if (it != null) {
@@ -800,6 +813,7 @@ final class RangeVariable {
             isBeforeFirst = true;
         }
 
+        @Override
         public int getRangePosition() {
             return rangeVar.rangePosition;
         }
@@ -1025,8 +1039,10 @@ final class RangeVariable {
             it                 = rangeVar.rangeIndex.firstRow(session, store);
         }
 
+        @Override
         protected void initialiseIterator() {}
 
+        @Override
         protected boolean findNext() {
 
             boolean result;
@@ -1082,10 +1098,12 @@ final class RangeVariable {
             this.rangeIterators = rangeIterators;
         }
 
+        @Override
         public boolean isBeforeFirst() {
             return isBeforeFirst;
         }
 
+        @Override
         public boolean next() {
 
             while (currentIndex >= 0) {
@@ -1122,6 +1140,7 @@ final class RangeVariable {
             return false;
         }
 
+        @Override
         public void reset() {}
     }
 
@@ -1136,7 +1155,7 @@ final class RangeVariable {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    VoltXMLElement voltGetXML(Session session)
+    VoltXMLElement voltGetRangeVariableXML(Session session)
     throws HSQLParseException
     {
         Index        index;
@@ -1150,9 +1169,9 @@ final class RangeVariable {
         isSeqScan    = indexCondition == null;
 
         if (rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
-            throw new HSQLParseException("VoltDB does not yet support subqueries, consider using views instead");
+            throw new HSQLParseException("VoltDB does not support subqueries, consider using views instead");
         }
-        
+
         // get the index for this scan (/filter)
         // note: ignored if scan if full table scan
         if (index == null)
@@ -1165,7 +1184,6 @@ final class RangeVariable {
         // output open tag
         VoltXMLElement scan = new VoltXMLElement("tablescan");
 
-        // output metadata
         scan.attributes.put("table", rangeTable.getName().name);
 
         if (tableAlias != null && !rangeTable.getName().name.equals(tableAlias)) {
@@ -1207,7 +1225,7 @@ final class RangeVariable {
             joinCond.children.add(cond.voltGetXML(session));
             scan.children.add(joinCond);
         }
-        
+
         // then go to the nonIndexWhereCondition
         if (nonIndexWhereCondition != null) {
             VoltXMLElement whereCond = new VoltXMLElement("wherecond");

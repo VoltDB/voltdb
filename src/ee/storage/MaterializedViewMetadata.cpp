@@ -19,6 +19,7 @@
 #include <cstdio>
 #include "boost/shared_array.hpp"
 #include "common/types.h"
+#include "common/PlannerDomValue.h"
 #include "common/FatalException.hpp"
 #include "catalog/catalog.h"
 #include "catalog/columnref.h"
@@ -34,8 +35,12 @@ namespace voltdb {
 
 MaterializedViewMetadata::MaterializedViewMetadata(
         PersistentTable *srcTable, PersistentTable *destTable, catalog::MaterializedViewInfo *metadata)
-        : m_target(destTable), m_filterPredicate(NULL) {
-
+        : m_target(destTable), m_filterPredicate(NULL)
+{
+DEBUG_STREAM_HERE("New mat view on source table " << srcTable->name() << " @" << srcTable << " view table " << m_target->name() << " @" << m_target);
+    // best not to have to worry about the destination table disappearing out from under the source table that feeds it.
+    m_target->incrementRefcount();
+    srcTable->addMaterializedView(this);
     // try to load the predicate from the catalog view
     parsePredicate(metadata);
 
@@ -74,6 +79,54 @@ MaterializedViewMetadata::MaterializedViewMetadata(
     }
 
     m_index = m_target->primaryKeyIndex();
+
+    allocateBackedTuples();
+
+    // Catch up on pre-existing source tuples UNLESS target tuples have already been migrated in.
+    if (srcTable->activeTupleCount() != 0 && m_target->activeTupleCount() == 0) {
+        TableTuple scannedTuple(srcTable->schema());
+        TableIterator &iterator = srcTable->iterator();
+        while (iterator.next(scannedTuple)) {
+            processTupleInsert(scannedTuple, false);
+        }
+    }
+}
+
+MaterializedViewMetadata::~MaterializedViewMetadata() {
+DEBUG_STREAM_HERE("Delete mat view " << m_target->name() << " w/ table @" << m_target);
+    freeBackedTuples();
+    delete[] m_groupByColumns;
+    delete[] m_outputColumnSrcTableIndexes;
+    delete[] m_outputColumnAggTypes;
+    delete m_filterPredicate;
+    m_target->decrementRefcount();
+}
+
+void MaterializedViewMetadata::setTargetTable(PersistentTable * target)
+{
+    PersistentTable * oldTarget = m_target;
+
+    m_target = target;
+    target->incrementRefcount();
+
+    // Re-initialize dependencies on the target table, allowing for widened columns
+    m_index = m_target->primaryKeyIndex();
+
+    freeBackedTuples();
+    allocateBackedTuples();
+
+    oldTarget->decrementRefcount();
+}
+
+void MaterializedViewMetadata::freeBackedTuples()
+{
+    delete[] m_searchKeyBackingStore;
+    delete[] m_updatedTupleBackingStore;
+    delete[] m_emptyTupleBackingStore;
+}
+
+void MaterializedViewMetadata::allocateBackedTuples()
+{
     m_searchKey = TableTuple(m_index->getKeySchema());
     m_searchKeyBackingStore = new char[m_index->getKeySchema()->tupleLength() + 1];
     memset(m_searchKeyBackingStore, 0, m_index->getKeySchema()->tupleLength() + 1);
@@ -92,15 +145,6 @@ MaterializedViewMetadata::MaterializedViewMetadata(
     m_emptyTuple.move(m_emptyTupleBackingStore);
 }
 
-MaterializedViewMetadata::~MaterializedViewMetadata() {
-    delete[] m_searchKeyBackingStore;
-    delete[] m_updatedTupleBackingStore;
-    delete[] m_emptyTupleBackingStore;
-    delete[] m_groupByColumns;
-    delete[] m_outputColumnSrcTableIndexes;
-    delete[] m_outputColumnAggTypes;
-    delete m_filterPredicate;
-}
 
 void MaterializedViewMetadata::parsePredicate(catalog::MaterializedViewInfo *metadata) {
     std::string hexString = metadata->predicate();
@@ -111,17 +155,15 @@ void MaterializedViewMetadata::parsePredicate(catalog::MaterializedViewInfo *met
     int bufferLength = (int)hexString.size() / 2 + 1;
     boost::shared_array<char> buffer(new char[bufferLength]);
     catalog::Catalog::hexDecodeString(hexString, buffer.get());
-    std::string bufferString(buffer.get());
-    json_spirit::Value predicateValue;
-    json_spirit::read( bufferString, predicateValue );
 
-    if (!(predicateValue == json_spirit::Value::null)) {
-        json_spirit::Object predicateObject = predicateValue.get_obj();
-        m_filterPredicate = AbstractExpression::buildExpressionTree(predicateObject);
+    PlannerDomRoot domRoot(buffer.get());
+    if (!domRoot.isNull()) {
+        PlannerDomValue expr = domRoot.rootObject();
+        m_filterPredicate = AbstractExpression::buildExpressionTree(expr);
     }
 }
 
-void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple) {
+void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple, bool fallible) {
     // don't change the view if this tuple doesn't match the predicate
     if (m_filterPredicate
         && (m_filterPredicate->eval(&newTuple, NULL).isFalse()))
@@ -182,14 +224,14 @@ void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple) {
     if (exists) {
         // shouldn't need to update indexes as this shouldn't ever change the
         // key
-        m_target->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple, m_emptyIndexUpdateList);
+        m_target->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple, m_emptyIndexUpdateList, fallible);
     }
     else {
-        m_target->insertTuple(m_updatedTuple);
+        m_target->insertPersistentTuple(m_updatedTuple, fallible);
     }
 }
 
-void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple) {
+void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fallible) {
     // don't change the view if this tuple doesn't match the predicate
     if (m_filterPredicate && (m_filterPredicate->eval(&oldTuple, NULL).isFalse()))
         return;
@@ -249,7 +291,7 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple) {
 
     // update the row
     // shouldn't need to update indexes as this shouldn't ever change the key
-    m_target->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple, m_emptyIndexUpdateList);
+    m_target->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple, m_emptyIndexUpdateList, fallible);
 }
 
 bool MaterializedViewMetadata::findExistingTuple(TableTuple &oldTuple, bool expected) {

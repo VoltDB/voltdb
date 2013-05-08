@@ -28,8 +28,6 @@ import org.voltdb.expressions.ExpressionUtil;
  *
  */
 public class ParsedDeleteStmt extends AbstractParsedStmt {
-    Table table = null;
-
     /**
     * Class constructor
     * @param paramValues
@@ -42,15 +40,6 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
     @Override
     void parse(VoltXMLElement stmtNode) {
         assert(tableList.size() == 1);
-        table = tableList.get(0);
     }
 
-    @Override
-    public String toString() {
-        String retval = super.toString() + "\n";
-
-        retval = retval.trim();
-
-        return retval;
-    }
 }

@@ -29,7 +29,7 @@
     bundles = VOLT.AdminBundle(),
     description = 'Restore a VoltDB database snapshot.',
     arguments = (
-        VOLT.StringArgument('directory', 'the local snapshot directory path'),
+        VOLT.PathArgument('directory', 'the snapshot server directory', absolute = True),
         VOLT.StringArgument('nonce', 'the unique snapshot identifier (nonce)')
     )
 )

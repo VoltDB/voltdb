@@ -34,7 +34,6 @@ package org.hsqldb_voltpatches;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.types.Type;
 
 
@@ -88,24 +87,39 @@ public class FunctionForVoltDB extends FunctionSQL {
         // These ID numbers need to be unique values for FunctionSQL.functType.
         // Assume that 1-19999 are reserved for existing HSQL functions.
         // That leaves new VoltDB-specific functions free to use values in the 20000s.
-        private static final int FUNC_VOLT_SQL_ERROR = 20000;
-        private static final int FUNC_VOLT_DECODE = 20001;
-        private static final int FUNC_VOLT_FIELD = 20002;
+        private static final int FUNC_VOLT_SQL_ERROR     = 20000;
+        private static final int FUNC_VOLT_DECODE        = 20001;
+        private static final int FUNC_VOLT_FIELD         = 20002;
+        private static final int FUNC_VOLT_ARRAY_ELEMENT = 20003;
+        private static final int FUNC_VOLT_ARRAY_LENGTH  = 20004;
         private static final FunctionId[] instances = {
 
-            new FunctionId("sql_error", null, FUNC_VOLT_SQL_ERROR, 0, new Type[] { null, Type.SQL_VARCHAR }, new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+            new FunctionId("sql_error", null, FUNC_VOLT_SQL_ERROR, 0,
+                    new Type[] { null, Type.SQL_VARCHAR },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
+                                  Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
 
-            new FunctionId("decode", null, FUNC_VOLT_DECODE, 2, new Type[] { null, null },
-
+            new FunctionId("decode", null, FUNC_VOLT_DECODE, 2,
+                    new Type[] { null, null },
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION,
                                   Tokens.X_REPEAT, 2, Tokens.COMMA, Tokens.QUESTION,
                                   Tokens.CLOSEBRACKET }),
 
-            new FunctionId("field", Type.SQL_VARCHAR, FUNC_VOLT_FIELD, -1,  new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR },
-
+            new FunctionId("field", Type.SQL_VARCHAR, FUNC_VOLT_FIELD, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR },
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
                                   Tokens.COMMA, Tokens.QUESTION,
                                   Tokens.CLOSEBRACKET}),
+
+            new FunctionId("array_element", Type.SQL_VARCHAR, FUNC_VOLT_ARRAY_ELEMENT, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_INTEGER },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
+                                  Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.CLOSEBRACKET}),
+
+            new FunctionId("array_length", Type.SQL_INTEGER, FUNC_VOLT_ARRAY_LENGTH, -1,
+                    new Type[] { Type.SQL_VARCHAR },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET}),
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();
@@ -273,7 +287,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                 if ((argType != null) || ! nodes[ii].isParam) {
                     continue;
                 }
-                // This is the same test as above for determining that the argument 
+                // This is the same test as above for determining that the argument
                 // is a candidate result vs. a candidate input.
                 if ((((ii % 2) == 0) || ii == nodes.length-1) && (ii != 0)) {
                     nodes[ii].dataType = resultTypeInferred;
@@ -296,7 +310,12 @@ public class FunctionForVoltDB extends FunctionSQL {
                 if (paramTypes[i] == null) {
                     continue; // accept all argument types
                 }
-                if (paramTypes[i].canConvertFrom(nodes[i].dataType)) {
+                if (nodes[i].dataType == null) {
+                    // assert that the ambiguous argument (e.g. '?' parameter) has the required type
+                    nodes[i].dataType = paramTypes[i];
+                    continue;
+                }
+                else if (paramTypes[i].canConvertFrom(nodes[i].dataType)) {
                     continue; // accept compatible argument types
                 }
                 throw Error.error(ErrorCode.X_42565); // incompatible data type
@@ -324,10 +343,4 @@ public class FunctionForVoltDB extends FunctionSQL {
         }
     }
 
-    @Override
-    VoltXMLElement voltGetXML(Session session) throws HSQLParseException {
-        VoltXMLElement exp = super.voltGetXML(session);
-        exp.attributes.put("volt_alias", m_def.getName());
-        return exp;
-    }
 }

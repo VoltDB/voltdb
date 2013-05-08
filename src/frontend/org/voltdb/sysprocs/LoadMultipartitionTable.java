@@ -21,11 +21,10 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.DependencyPair;
-import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
-import org.voltdb.ProcedureRunner;
 import org.voltdb.SQLStmt;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -182,7 +181,7 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
 
         // create a SQLStmt instance on the fly (unusual to do)
         SQLStmt stmt = new SQLStmt(catStmt.getSqltext());
-        ProcedureRunner.initSQLStmt(stmt, catStmt);
+        m_runner.initSQLStmt(stmt, catStmt);
 
         if (catTable.getIsreplicated()) {
             long queued = 0;

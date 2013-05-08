@@ -54,12 +54,24 @@ class StreamedTable : public Table {
     virtual TableIterator& iterator();
     virtual TableIterator* makeIterator();
 
+    // ------------------------------------------------------------------
+    // GENERIC TABLE OPERATIONS
+    // ------------------------------------------------------------------
     virtual void deleteAllTuples(bool freeAllocatedStrings);
-    virtual bool insertTuple(TableTuple &source);
+    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
+    // The bool argument is irrelevent to StreamedTable.
+    virtual bool deleteTuple(TableTuple &tuple, bool=true);
+    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
+    virtual bool insertTuple(TableTuple &tuple);
+    // Updating streamed tuples is not supported
+    // Update is irrelevent to StreamedTable.
+    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
                                                 TableTuple &sourceTupleWithNewValues,
-                                                std::vector<TableIndex*> &indexesToUpdate);
-    virtual bool deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings);
+                                                std::vector<TableIndex*> const &indexesToUpdate,
+                                                bool=true);
+
+
     virtual void loadTuplesFrom(SerializeInput &serialize_in, Pool *stringPool = NULL);
     virtual void flushOldTuples(int64_t timeInMillis);
     virtual void setSignatureAndGeneration(std::string signature, int64_t generation);
@@ -97,18 +109,18 @@ class StreamedTable : public Table {
     virtual int64_t activeTupleCount() const {
         return m_sequenceNo;
     }
-  protected:
+
+private:
     // Stats
-    voltdb::StreamedTableStats stats_;
     voltdb::TableStats *getTableStats();
 
     // Just say 0
     size_t allocatedBlockCount() const;
 
     TBPtr allocateNextBlock();
-    void nextFreeTuple(TableTuple *tuple);
+    virtual void nextFreeTuple(TableTuple *tuple);
 
-  private:
+    voltdb::StreamedTableStats stats_;
     ExecutorContext *m_executorContext;
     TupleStreamWrapper *m_wrapper;
     int64_t m_sequenceNo;

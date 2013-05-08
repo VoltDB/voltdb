@@ -33,13 +33,14 @@ import org.voltdb.VoltType;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.VoltFile;
+import org.voltdb.utils.VoltTableUtil;
 
 @ProcInfo(singlePartition = false)
 public class SnapshotDelete extends VoltSystemProcedure {
 
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
 
-    private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotStatus.class.getName());
+    private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotDelete.class.getName());
 
     private static final int DEP_snapshotDelete = (int)
         SysProcFragmentId.PF_snapshotDelete | DtxnConstants.MULTIPARTITION_DEPENDENCY;
@@ -95,27 +96,17 @@ public class SnapshotDelete extends VoltSystemProcedure {
                                 }
                             }
                         }
-                        hostLog.info(sb.toString());
+                        SNAP_LOG.info(sb.toString());
                     }
                 }.start();
             }
 
             return new DependencyPair( DEP_snapshotDelete, result);
         } else if (fragmentId == SysProcFragmentId.PF_snapshotDeleteResults) {
-            final VoltTable results = constructFragmentResultsTable();
             TRACE_LOG.trace("Aggregating Snapshot Delete  results");
             assert (dependencies.size() > 0);
-            List<VoltTable> dep = dependencies.get(DEP_snapshotDelete);
-            for (VoltTable table : dep)
-            {
-                while (table.advanceRow())
-                {
-                    // this will add the active row of table
-                    results.add(table);
-                }
-            }
-            return new
-                DependencyPair( DEP_snapshotDeleteResults, results);
+            final VoltTable results = VoltTableUtil.unionTables(dependencies.get(DEP_snapshotDelete));
+            return new DependencyPair( DEP_snapshotDeleteResults, results);
         }
         assert (false);
         return null;
@@ -181,7 +172,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
 
         final long endTime = System.currentTimeMillis();
         final long duration = endTime -startTime;
-        hostLog.info("Finished deleting snapshots. Took " + duration + " milliseconds");
+        SNAP_LOG.info("Finished deleting snapshots. Took " + duration + " milliseconds");
         return results;
     }
 
@@ -249,8 +240,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
         pfs[0].fragmentId = SysProcFragmentId.PF_snapshotDelete;
         pfs[0].outputDepId = DEP_snapshotDelete;
         pfs[0].multipartition = true;
-        ParameterSet params = new ParameterSet();
-        params.setParameters(paths, nonces);
+        ParameterSet params = ParameterSet.fromArrayNoCopy(paths, nonces);
         pfs[0].parameters = params;
 
         pfs[1] = new SynthesizedPlanFragment();
@@ -258,7 +248,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
         pfs[1].outputDepId = DEP_snapshotDeleteResults;
         pfs[1].inputDepIds  = new int[] { DEP_snapshotDelete };
         pfs[1].multipartition = false;
-        pfs[1].parameters = new ParameterSet();
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
 
 
         VoltTable[] results;

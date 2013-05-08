@@ -17,7 +17,11 @@
 
 package org.voltdb.compiler;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Column;
@@ -26,7 +30,6 @@ import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
-import org.voltdb.messaging.FastSerializer;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.planner.PlanningErrorException;
@@ -54,7 +57,8 @@ public abstract class StatementCompiler {
 
     static void compile(VoltCompiler compiler, HSQLInterface hsql,
             Catalog catalog, Database db, DatabaseEstimates estimates,
-            Statement catalogStmt, String stmt, String joinOrder, PartitioningForStatement partitioning)
+            Statement catalogStmt, String stmt, String joinOrder,
+            DeterminismMode detMode, PartitioningForStatement partitioning)
     throws VoltCompiler.VoltCompilerException {
 
         // Cleanup whitespace newlines for catalog compatibility
@@ -64,45 +68,9 @@ public abstract class StatementCompiler {
         compiler.addInfo("Compiling Statement: " + stmt);
 
         // determine the type of the query
-        QueryType qtype = QueryType.INVALID;
-        boolean statementRO = true;
-        if (stmt.toLowerCase().startsWith("insert")) {
-            qtype = QueryType.INSERT;
-            statementRO = false;
-        }
-        else if (stmt.toLowerCase().startsWith("update")) {
-            qtype = QueryType.UPDATE;
-            statementRO = false;
-        }
-        else if (stmt.toLowerCase().startsWith("delete")) {
-            qtype = QueryType.DELETE;
-            statementRO = false;
-        }
-        else if (stmt.toLowerCase().startsWith("select")) {
-            // This covers simple select statements as well as UNIONs and other set operations that are being used with default precedence
-            // as in "select ... from ... UNION select ... from ...;"
-            // Even if set operations are not currently supported, let them pass as "select" statements to let the parser sort them out.
-            qtype = QueryType.SELECT;
-        }
-        else if (stmt.toLowerCase().startsWith("(")) {
-            // There does not seem to be a need to support parenthesized DML statements, so assume a read-only statement.
-            // If that assumption is wrong, then it has probably gotten to the point that we want to drop this up-front
-            // logic in favor of relying on the full parser/planner to determine the cataloged query type and read-only-ness.
-            // Parenthesized query statements are typically complex set operations (UNIONS, etc.)
-            // requiring parenthesis to explicitly determine precedence,
-            // but they MAY be as simple as a needlessly parenthesized single select statement:
-            // "( select * from table );" is valid SQL.
-            // So, assume QueryType.SELECT.
-            // If set operations require their own QueryType in the future, that's probably another case
-            // motivating diving right in to the full parser/planner without this pre-check.
-            // We don't want to be re-implementing the parser here -- this has already gone far enough.
-            qtype = QueryType.SELECT;
-        }
-        // else:
-        // All the known statements are handled above, so default to cataloging an invalid read-only statement
-        // and leave it to the parser/planner to more intelligently reject the statement as unsupported.
+        QueryType qtype = QueryType.getFromSQL(stmt);
 
-        catalogStmt.setReadonly(statementRO);
+        catalogStmt.setReadonly(qtype.isReadOnly());
         catalogStmt.setQuerytype(qtype.getValue());
 
         // put the data in the catalog that we have
@@ -110,7 +78,6 @@ public abstract class StatementCompiler {
         catalogStmt.setSinglepartition(partitioning.wasSpecifiedAsSingle());
         catalogStmt.setBatched(false);
         catalogStmt.setParamnum(0);
-
 
         String name = catalogStmt.getParent().getTypeName() + "-" + catalogStmt.getTypeName();
         String sql = catalogStmt.getSqltext();
@@ -120,7 +87,7 @@ public abstract class StatementCompiler {
         QueryPlanner planner = new QueryPlanner(
                 sql, stmtName, procName,  catalog.getClusters().get("cluster"), db,
                 partitioning, hsql, estimates, false, DEFAULT_MAX_JOIN_TABLES,
-                costModel, null, joinOrder);
+                costModel, null, joinOrder, detMode);
 
         CompiledPlan plan = null;
         try {
@@ -194,20 +161,39 @@ public abstract class StatementCompiler {
         // set the explain plan output into the catalog (in hex)
         catalogStmt.setExplainplan(Encoder.hexEncode(plan.explainedPlan));
 
+        // compute a hash of the plan
+        MessageDigest md = null;
+        try {
+            md = MessageDigest.getInstance("SHA-1");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+            assert(false);
+            System.exit(-1); // should never happen with healthy jvm
+        }
+
         // Now update our catalog information
         PlanFragment planFragment = catalogStmt.getFragments().add("0");
         planFragment.setHasdependencies(plan.subPlanGraph != null);
         // mark a fragment as non-transactional if it never touches a persistent table
         planFragment.setNontransactional(!fragmentReferencesPersistentTable(plan.rootPlanGraph));
         planFragment.setMultipartition(plan.subPlanGraph != null);
-        writePlanBytes(compiler, planFragment, plan.rootPlanGraph);
+        byte[] planBytes = writePlanBytes(compiler, planFragment, plan.rootPlanGraph);
+        md.update(planBytes, 0, planBytes.length);
+        // compute the 40 bytes of hex from the 20 byte sha1 hash of the plans
+        md.reset();
+        md.update(planBytes);
+        planFragment.setPlanhash(Encoder.hexEncode(md.digest()));
 
         if (plan.subPlanGraph != null) {
             planFragment = catalogStmt.getFragments().add("1");
             planFragment.setHasdependencies(false);
             planFragment.setNontransactional(false);
             planFragment.setMultipartition(true);
-            writePlanBytes(compiler, planFragment, plan.subPlanGraph);
+            byte[] subBytes = writePlanBytes(compiler, planFragment, plan.subPlanGraph);
+            // compute the 40 bytes of hex from the 20 byte sha1 hash of the plans
+            md.reset();
+            md.update(subBytes);
+            planFragment.setPlanhash(Encoder.hexEncode(md.digest()));
         }
 
         // Planner should have rejected with an exception any statement with an unrecognized type.
@@ -215,22 +201,20 @@ public abstract class StatementCompiler {
         assert(validType != QueryType.INVALID.getValue());
     }
 
-    static void writePlanBytes(VoltCompiler compiler, PlanFragment fragment, AbstractPlanNode planGraph)
+    /**
+     * Update the plan fragment and return the bytes of the plan
+     */
+    static byte[] writePlanBytes(VoltCompiler compiler, PlanFragment fragment, AbstractPlanNode planGraph)
     throws VoltCompilerException {
         // get the plan bytes
         PlanNodeList node_list = new PlanNodeList(planGraph);
         String json = node_list.toJSONString();
         compiler.captureDiagnosticJsonFragment(json);
         // Place serialized version of PlanNodeTree into a PlanFragment
-        try {
-            FastSerializer fs = new FastSerializer(true, false);
-            fs.write(json.getBytes());
-            String hexString = fs.getHexEncodedBytes();
-            fragment.setPlannodetree(hexString);
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw compiler.new VoltCompilerException(e.getMessage());
-        }
+        byte[] jsonBytes = json.getBytes(VoltDB.UTF8ENCODING);
+        String bin64String = Encoder.base64Encode(jsonBytes);
+        fragment.setPlannodetree(bin64String);
+        return jsonBytes;
     }
 
     /**

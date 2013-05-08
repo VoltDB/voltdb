@@ -62,6 +62,8 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 
+import com.google.common.collect.ImmutableSet;
+
 /*
  * A wrapper around a single node ZK server. The server is a modified version of ZK that speaks the ZK
  * wire protocol and data model, but has no durability. Agreement is provided
@@ -103,7 +105,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     final AgreementTxnIdSafetyState m_safetyState;
     private volatile boolean m_shouldContinue = true;
     private volatile boolean m_recovering = false;
-    private static final VoltLogger m_recoveryLog = new VoltLogger("JOIN");
+    private static final VoltLogger m_recoveryLog = new VoltLogger("REJOIN");
     private static final VoltLogger m_agreementLog = new VoltLogger("AGREEMENT");
     private long m_minTxnIdAfterRecovery = Long.MIN_VALUE;
     private final CountDownLatch m_shutdownComplete = new CountDownLatch(1);
@@ -181,8 +183,13 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         }
     }
 
+    private Set<Long> m_threadIds;
     public void start() throws InterruptedException, IOException {
-        m_cnxnFactory.startup(m_server);
+        m_threadIds = ImmutableSet.<Long>copyOf(m_cnxnFactory.startup(m_server));
+    }
+
+    public Set<Long> getThreadIds() {
+        return m_threadIds;
     }
 
     public void shutdown() throws InterruptedException {
@@ -311,8 +318,8 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                     }
                 }
             }
-        } catch (Exception e) {
-            org.voltdb.VoltDB.crashLocalVoltDB("Error in agreement site", false, e);
+        } catch (Throwable e) {
+            org.voltdb.VoltDB.crashLocalVoltDB("Error in agreement site", true, e);
         } finally {
             try {
                 shutdownInternal();

@@ -23,11 +23,18 @@
 
 package org.voltdb;
 
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -66,7 +73,7 @@ public class TestVoltTableUtil {
         String[] values = captor.getValue();
         assertEquals(6, values.length);
         for (String v : values) {
-            assertEquals("\\N", v);
+            assertEquals(VoltTable.CSV_NULL, v);
         }
     }
 
@@ -95,5 +102,31 @@ public class TestVoltTableUtil {
         assertEquals(1, values.length);
         TimestampType newTs = new TimestampType(values[0]);
         assertEquals(ts, newTs);
+    }
+
+    @Test
+    public void testUnionTables()
+    {
+        VoltTable.ColumnInfo[] columns =
+                new VoltTable.ColumnInfo[] {new VoltTable.ColumnInfo("ID", VoltType.BIGINT)};
+        VoltTable table1 = new VoltTable(columns);
+        table1.addRow(1);
+        VoltTable table2 = new VoltTable(columns);
+        table2.addRow(2);
+
+        VoltTable result = VoltTableUtil.unionTables(Arrays.asList(null, table1,
+                null, table2));
+        assertNotNull(result);
+
+        Set<Long> numbers = new HashSet<Long>();
+        result.resetRowPosition();
+        while (result.advanceRow()) {
+            long i = result.getLong(0);
+            numbers.add(i);
+        }
+
+        assertEquals(2, numbers.size());
+        assertTrue(numbers.contains(1l));
+        assertTrue(numbers.contains(2l));
     }
 }

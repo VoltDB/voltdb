@@ -95,7 +95,7 @@ public abstract class AdHocQueryTester extends TestCase {
                         org.voltdb_testprocs.adhoc.executeSQLSPWRITE.class,} );
     }
 
-    public static VoltDB.Configuration setUpSPDB(boolean useIv2) throws IOException, Exception {
+    public static VoltDB.Configuration setUpSPDB() throws IOException, Exception {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocsp.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("adhocsp.xml");
 
@@ -111,7 +111,6 @@ public abstract class AdHocQueryTester extends TestCase {
         VoltDB.Configuration config = new VoltDB.Configuration(new PortGenerator());
         config.m_pathToCatalog = pathToCatalog;
         config.m_pathToDeployment = pathToDeployment;
-        config.m_enableIV2 = useIv2;
         return config;
     }
 

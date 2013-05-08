@@ -21,6 +21,7 @@ import java.io.StringWriter;
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.TimeZone;
 
 import org.voltcore.utils.Pair;
@@ -35,9 +36,6 @@ import au.com.bytecode.opencsv_voltpatches.CSVWriter;
  * Utility methods for work with VoltTables.
  */
 public class VoltTableUtil {
-
-    // String used to indicate NULL value in the output CSV file
-    private static final String CSV_NULL = "\\N";
 
     /*
      * Ugly hack to allow SnapshotConverter which
@@ -70,47 +68,43 @@ public class VoltTableUtil {
                         || type == VoltType.TINYINT) {
                     final long value = vt.getLong(ii);
                     if (vt.wasNull()) {
-                        fields[ii] = CSV_NULL;
+                        fields[ii] =VoltTable. CSV_NULL;
                     } else {
                         fields[ii] = Long.toString(value);
                     }
                 } else if (type == VoltType.FLOAT) {
                     final double value = vt.getDouble(ii);
                     if (vt.wasNull()) {
-                        fields[ii] = CSV_NULL;
+                        fields[ii] =VoltTable. CSV_NULL;
                     } else {
                         fields[ii] = Double.toString(value);
                     }
                 } else if (type == VoltType.DECIMAL) {
-                    final BigDecimal bd = vt
-                            .getDecimalAsBigDecimal(ii);
+                    final BigDecimal bd = vt.getDecimalAsBigDecimal(ii);
                     if (vt.wasNull()) {
-                        fields[ii] = CSV_NULL;
+                        fields[ii] = VoltTable.CSV_NULL;
                     } else {
                         fields[ii] = bd.toString();
                     }
                 } else if (type == VoltType.STRING) {
                     final String str = vt.getString(ii);
                     if (vt.wasNull()) {
-                        fields[ii] = CSV_NULL;
+                        fields[ii] = VoltTable.CSV_NULL;
                     } else {
                         fields[ii] = str;
                     }
                 } else if (type == VoltType.TIMESTAMP) {
-                    final TimestampType timestamp = vt
-                            .getTimestampAsTimestamp(ii);
+                    final TimestampType timestamp = vt.getTimestampAsTimestamp(ii);
                     if (vt.wasNull()) {
-                        fields[ii] = CSV_NULL;
+                        fields[ii] = VoltTable.CSV_NULL;
                     } else {
-                        fields[ii] = sdf.format(timestamp
-                                .asApproximateJavaDate());
-                        fields[ii] += String.valueOf(timestamp
-                                .getUSec());
+                        fields[ii] = sdf.format(timestamp.asApproximateJavaDate());
+                        fields[ii] += String.valueOf(timestamp.getUSec());
                     }
                 } else if (type == VoltType.VARBINARY) {
                    byte bytes[] = vt.getVarbinary(ii);
                    if (vt.wasNull()) {
-                       fields[ii] = CSV_NULL;
+                       fields[ii] = VoltTable.CSV_NULL;
                    } else {
                        fields[ii] = Encoder.hexEncode(bytes);
                    }
@@ -159,5 +153,37 @@ public class VoltTableUtil {
         toCSVWriter(writer, vt, columns);
         String csvString = sw.toString();
         return Pair.of(csvString.length(), csvString.getBytes(com.google.common.base.Charsets.UTF_8));
+    }
+
+    /**
+     * Utility to aggregate a list of tables sharing a schema. Common for
+     * sysprocs to do this, to aggregate results.
+     */
+    public static VoltTable unionTables(List<VoltTable> operands) {
+        VoltTable result = null;
+
+        // Locate the first non-null table to get the schema
+        for (VoltTable vt : operands) {
+            if (vt != null) {
+                VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[vt.getColumnCount()];
+                for (int ii = 0; ii < vt.getColumnCount(); ii++) {
+                    columns[ii] = new VoltTable.ColumnInfo(vt.getColumnName(ii),
+                            vt.getColumnType(ii));
+                }
+                result = new VoltTable(columns);
+                break;
+            }
+        }
+
+        if (result != null) {
+            for (VoltTable vt : operands) {
+                // elastic joining nodes will return null tables
+                while (vt != null && vt.advanceRow()) {
+                    result.add(vt);
+                }
+            }
+        }
+
+        return result;
     }
 }

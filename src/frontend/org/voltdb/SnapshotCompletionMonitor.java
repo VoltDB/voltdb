@@ -41,7 +41,7 @@ import org.voltdb.SnapshotCompletionInterest.SnapshotCompletionEvent;
 import com.google.common.collect.ImmutableMap;
 
 public class SnapshotCompletionMonitor {
-    private static final VoltLogger LOG = new VoltLogger("HOST");
+    private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
     final CopyOnWriteArrayList<SnapshotCompletionInterest> m_interests =
             new CopyOnWriteArrayList<SnapshotCompletionInterest>();
     private ZooKeeper m_zk;
@@ -77,7 +77,7 @@ public class SnapshotCompletionMonitor {
             new HashMap<Long, Map<Integer, Long>>();
 
     public void registerPartitionTxnIdsForSnapshot(long snapshotTxnId, Map<Integer, Long> partitionTxnIds) {
-        LOG.debug("Registering per partition txnids " + partitionTxnIds);
+        SNAP_LOG.debug("Registering per partition txnids " + partitionTxnIds);
         synchronized (m_snapshotTxnIdsToPartitionTxnIds) {
             assert(!m_snapshotTxnIdsToPartitionTxnIds.containsKey(snapshotTxnId));
             m_snapshotTxnIdsToPartitionTxnIds.put(snapshotTxnId, partitionTxnIds);
@@ -204,14 +204,18 @@ public class SnapshotCompletionMonitor {
             Iterator<SnapshotCompletionInterest> iter = m_interests.iterator();
             while (iter.hasNext()) {
                 SnapshotCompletionInterest interest = iter.next();
-                interest.snapshotCompleted(
-                        new SnapshotCompletionEvent(
-                            nonce,
-                            txnId,
-                            partitionTxnIdsMap,
-                            truncation,
-                            truncReqId,
-                            exportSequenceNumbers));
+                try {
+                    interest.snapshotCompleted(
+                            new SnapshotCompletionEvent(
+                                nonce,
+                                txnId,
+                                partitionTxnIdsMap,
+                                truncation,
+                                truncReqId,
+                                exportSequenceNumbers));
+                } catch (Exception e) {
+                    SNAP_LOG.warn("Exception while executing snapshot completion interest", e);
+                }
             }
         }
     }

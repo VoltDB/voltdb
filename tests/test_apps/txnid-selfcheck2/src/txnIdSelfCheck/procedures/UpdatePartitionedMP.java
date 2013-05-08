@@ -25,10 +25,12 @@ package txnIdSelfCheck.procedures;
 
 import org.voltdb.VoltTable;
 
-public class UpdatePartitionedMP extends UpdateBaseProc {
+public class UpdatePartitionedMP extends ReplicatedUpdateBaseProc {
 
     public VoltTable[] run(byte cid, long rid, byte[] value, byte rollback) {
-        return doWork(p_getCIDData, p_cleanUp, p_insert, p_getAdhocData,
+        VoltTable[] results = doWork(p_getCIDData, p_cleanUp, p_insert, p_getAdhocData,
                 cid, rid, value, rollback);
+
+        return doSummaryAndCombineResults(results);
     }
 }

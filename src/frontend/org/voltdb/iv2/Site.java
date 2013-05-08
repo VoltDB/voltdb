@@ -17,14 +17,14 @@
 
 package org.voltdb.iv2;
 
-import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.TreeMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -38,20 +38,24 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DependencyPair;
+import org.voltdb.FragmentPlanSource;
 import org.voltdb.HsqlBackend;
 import org.voltdb.IndexStats;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
 import org.voltdb.ParameterSet;
+import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
+import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.StatsAgent;
 import org.voltdb.SysProcSelector;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStats;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
@@ -66,18 +70,18 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.jni.MockExecutionEngine;
+import org.voltdb.jni.Sha1Wrapper;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.LogKeys;
-import org.voltdb.utils.MiscUtils;
 
 import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 import com.google.common.collect.ImmutableMap;
 
-public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
+public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection, FragmentPlanSource
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
@@ -90,7 +94,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     final int m_snapshotPriority;
 
     // Partition count is important for some reason.
-    final int m_numberOfPartitions;
+    int m_numberOfPartitions;
 
     // What type of EE is controlled
     final BackendTarget m_backend;
@@ -100,9 +104,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     private final static int kStateRejoining = 1;
     private final static int kStateReplayingRejoin = 2;
     private int m_rejoinState;
-    private TaskLog m_rejoinTaskLog;
-    private RejoinProducer.ReplayCompletionAction m_replayCompletionAction;
-    private final VoltDB.START_ACTION m_startAction;
+    private final TaskLog m_rejoinTaskLog;
+    private JoinProducerBase.JoinCompletionAction m_replayCompletionAction;
 
     // Enumerate execution sites by host.
     private static final AtomicInteger siteIndexCounter = new AtomicInteger(0);
@@ -136,6 +139,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     // Currently available procedure
     volatile LoadedProcedureSet m_loadedProcedures;
+
+    // Cache the DR gateway here so that we can pass it to tasks as they are reconstructed from
+    // the task log
+    private final PartitionDRGateway m_drGateway;
 
     // Current topology
     int m_partitionId;
@@ -280,6 +287,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
+        public void setNumberOfPartitions(int partitionCount) {
+            Site.this.setNumberOfPartitions(partitionCount);
+        }
+
+        @Override
         public SiteProcedureConnection getSiteProcedureConnection()
         {
             return Site.this;
@@ -297,8 +309,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp) {
-            return Site.this.updateCatalog(diffCmds, context, csp, false);
+        public boolean updateCatalog(String diffCmds, CatalogContext context,
+                CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation)
+        {
+            return Site.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation, false);
         }
     };
 
@@ -317,7 +331,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             InitiatorMailbox initiatorMailbox,
             StatsAgent agent,
             MemoryStats memStats,
-            String coreBindIds)
+            String coreBindIds,
+            TaskLog rejoinTaskLog,
+            PartitionDRGateway drGateway)
     {
         m_siteId = siteId;
         m_context = context;
@@ -325,8 +341,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_numberOfPartitions = numPartitions;
         m_scheduler = scheduler;
         m_backend = backend;
-        m_startAction = startAction;
-        m_rejoinState = VoltDB.createForRejoin(startAction) ? kStateRejoining : kStateRunning;
+        m_rejoinState = VoltDB.createForRejoin(startAction) || startAction == VoltDB.START_ACTION
+                .JOIN ? kStateRejoining :
+                kStateRunning;
         m_snapshotPriority = snapshotPriority;
         // need this later when running in the final thread.
         m_startupConfig = new StartupConfig(serializedCatalog, context.m_uniqueId);
@@ -335,6 +352,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_currentTxnId = Long.MIN_VALUE;
         m_initiatorMailbox = initiatorMailbox;
         m_coreBindIds = coreBindIds;
+        m_rejoinTaskLog = rejoinTaskLog;
+        m_drGateway = drGateway;
 
         if (agent != null) {
             m_tableStats = new TableStats(m_siteId);
@@ -365,12 +384,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     {
         if (m_backend == BackendTarget.NONE) {
             m_hsql = null;
-            m_ee = new MockExecutionEngine();
+            m_ee = new MockExecutionEngine(this);
         }
         else if (m_backend == BackendTarget.HSQLDB_BACKEND) {
             m_hsql = HsqlBackend.initializeHSQLBackend(m_siteId,
                                                        m_context);
-            m_ee = new MockExecutionEngine();
+            m_ee = new MockExecutionEngine(this);
         }
         else {
             m_hsql = null;
@@ -390,59 +409,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 return (now - 5) > m_lastTxnTime;
             }
         });
-
-        if (m_startAction == VoltDB.START_ACTION.LIVE_REJOIN) {
-            initializeForLiveRejoin();
-        }
-
-        if (m_rejoinTaskLog == null) {
-            m_rejoinTaskLog = new TaskLog() {
-                @Override
-                public void logTask(TransactionInfoBaseMessage message)
-                        throws IOException {
-                }
-
-                @Override
-                public TransactionInfoBaseMessage getNextMessage()
-                        throws IOException {
-                    return null;
-                }
-
-                @Override
-                public void setEarliestTxnId(long txnId) {
-                }
-
-                @Override
-                public boolean isEmpty() throws IOException {
-                    return true;
-                }
-
-                @Override
-                public void close() throws IOException {
-                }
-            };
-        }
-    }
-
-
-    void initializeForLiveRejoin()
-    {
-        // Construct task log and start logging task messages
-        File overflowDir =
-            new File(m_context.cluster.getVoltroot(), "rejoin_overflow");
-        Class<?> taskLogKlass =
-            MiscUtils.loadProClass("org.voltdb.rejoin.TaskLogImpl", "Rejoin", false);
-        if (taskLogKlass != null) {
-            Constructor<?> taskLogConstructor;
-            try {
-                taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class, boolean.class);
-                m_rejoinTaskLog = (TaskLog) taskLogConstructor.newInstance(m_partitionId, overflowDir, true);
-            } catch (InvocationTargetException e) {
-                VoltDB.crashLocalVoltDB("Unable to construct rejoin task log", true, e.getCause());
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Unable to construct rejoin task log", true, e);
-            }
-        }
     }
 
     /** Create a native VoltDB execution engine */
@@ -461,7 +427,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         hostname,
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getMaxtemptablesize(),
-                        m_numberOfPartitions);
+                        TheHashinator.getConfiguredHashinatorType(),
+                        TheHashinator.getConfigureBytes(m_numberOfPartitions),
+                        this);
                 eeTemp.loadCatalog( timestamp, serializedCatalog);
             }
             else {
@@ -477,7 +445,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             getSystemsettings().get("systemsettings").getMaxtemptablesize(),
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPorts.remove(0),
-                            m_numberOfPartitions);
+                            TheHashinator.getConfiguredHashinatorType(),
+                            TheHashinator.getConfigureBytes(m_numberOfPartitions),
+                            this);
                 eeTemp.loadCatalog( timestamp, serializedCatalog);
             }
         }
@@ -564,7 +534,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)tibm;
                 SpProcedureTask t = new SpProcedureTask(
                         m_initiatorMailbox, m.getStoredProcedureName(),
-                        null, m, null);
+                        null, m, m_drGateway);
                 if (!filter(tibm)) {
                     t.runFromTaskLog(this);
                 }
@@ -588,7 +558,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 // Only complete transactions that are open...
                 if (global_replay_mpTxn != null) {
                     CompleteTransactionMessage m = (CompleteTransactionMessage)tibm;
-                    CompleteTransactionTask t = new CompleteTransactionTask(global_replay_mpTxn, null, m, null);
+                    CompleteTransactionTask t = new CompleteTransactionTask(global_replay_mpTxn,
+                            null, m, m_drGateway);
                     if (!m.isRestart()) {
                         global_replay_mpTxn = null;
                     }
@@ -668,10 +639,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void initiateSnapshots(
             Deque<SnapshotTableTask> tasks,
+            List<SnapshotDataTarget> targets,
             long txnId,
             int numLiveHosts,
             Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers) {
-        m_snapshotter.initiateSnapshots(m_ee, tasks, txnId, numLiveHosts, exportSequenceNumbers);
+        m_snapshotter.initiateSnapshots(m_ee, tasks, targets, txnId, numLiveHosts, exportSequenceNumbers);
     }
 
     /*
@@ -792,7 +764,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             ParameterSet params)
     {
         ProcedureRunner runner = m_loadedProcedures.getSysproc(fragmentId);
-        return runner.executePlanFragment(txnState, dependencies, fragmentId, params);
+        return runner.executeSysProcPlanFragment(txnState, dependencies, fragmentId, params);
     }
 
     @Override
@@ -934,7 +906,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     @Override
     public void setRejoinComplete(
-            RejoinProducer.ReplayCompletionAction replayComplete,
+            JoinProducerBase.JoinCompletionAction replayComplete,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
         // transition from kStateRejoining to live rejoin replay.
         // pass through this transition in all cases; if not doing
@@ -985,14 +957,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public long loadPlanFragment(byte[] plan) throws EEException {
-        return m_ee.loadPlanFragment(plan);
-    }
-
-    @Override
     public VoltTable[] executePlanFragments(int numFragmentIds,
             long[] planFragmentIds, long[] inputDepIds,
-            ParameterSet[] parameterSets, long spHandle, long uniqueId, boolean readOnly)
+            Object[] parameterSets, long spHandle, long uniqueId, boolean readOnly)
             throws EEException {
         return m_ee.executePlanFragments(
                 numFragmentIds,
@@ -1014,17 +981,36 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      * Update the catalog.  If we're the MPI, don't bother with the EE.
      */
     public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp,
-            boolean isMPI)
+            boolean requiresSnapshotIsolationboolean, boolean isMPI)
     {
         m_context = context;
         m_loadedProcedures.loadProcedures(m_context, m_backend, csp);
 
-        if (!isMPI) {
-            //Necessary to quiesce before updating the catalog
-            //so export data for the old generation is pushed to Java.
-            m_ee.quiesce(m_lastCommittedTxnId);
-            m_ee.updateCatalog(m_context.m_uniqueId, diffCmds);
+        if (isMPI) {
+            // the rest of the work applies to sites with real EEs
+            return true;
         }
+
+        // if a snapshot is in process, wait for it to finish
+        // don't bother if this isn't a schema change
+        //
+        if (requiresSnapshotIsolationboolean && m_snapshotter.isEESnapshotting()) {
+            hostLog.info(String.format("Site %d performing schema change operation must block until snapshot is locally complete.",
+                    CoreUtils.getSiteIdFromHSId(m_siteId)));
+            try {
+                m_snapshotter.completeSnapshotWork(m_ee);
+                hostLog.info(String.format("Site %d locally finished snapshot. Will update catalog now.",
+                        CoreUtils.getSiteIdFromHSId(m_siteId)));
+            }
+            catch (InterruptedException e) {
+                VoltDB.crashLocalVoltDB("Unexpected Interrupted Exception while finishing a snapshot for a catalog update.", true, e);
+            }
+        }
+
+        //Necessary to quiesce before updating the catalog
+        //so export data for the old generation is pushed to Java.
+        m_ee.quiesce(m_lastCommittedTxnId);
+        m_ee.updateCatalog(m_context.m_uniqueId, diffCmds);
 
         return true;
     }
@@ -1054,5 +1040,175 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         if (!foundMultipartTxnId) {
             VoltDB.crashLocalVoltDB("Didn't find a multipart txnid on restore", false, null);
         }
+    }
+
+    public void setNumberOfPartitions(int partitionCount)
+    {
+        m_numberOfPartitions = partitionCount;
+        m_ee.updateHashinator(TheHashinator.getConfiguredHashinatorType(),
+                TheHashinator.getConfigureBytes(m_numberOfPartitions));
+    }
+
+    /// A plan fragment entry in the cache.
+    private static class FragInfo {
+        final Sha1Wrapper hash;
+        final long fragId;
+        final byte[] plan;
+        int refCount;
+        /// The ticker value current when this fragment was last (dis)used.
+        /// A new FragInfo or any other not in the LRU map because it is being referenced has value 0.
+        /// A non-zero value is either the fragment's current key in the LRU map OR its intended/future
+        /// key, if it has been lazily updated after the fragment was reused.
+        long lastUse;
+
+        FragInfo(Sha1Wrapper key, byte[] plan, long nextId)
+        {
+            this.hash = key;
+            this.plan = plan;
+            this.fragId = nextId;
+            this.refCount = 0;
+            this.lastUse = 0;
+        }
+
+    }
+
+    HashMap<Sha1Wrapper, FragInfo> m_plansByHash = new HashMap<Sha1Wrapper, FragInfo>();
+    HashMap<Long, FragInfo> m_plansById = new HashMap<Long, FragInfo>();
+    TreeMap<Long, FragInfo> m_plansLRU = new TreeMap<Long, FragInfo>();
+    /// A ticker that provides temporary ids for all cached fragments, for communicating with the EE.
+    long m_nextFragId = 5000;
+    /// A ticker that allows the sequencing of all fragment uses, providing a key to the LRU map.
+    long m_nextFragUse = 1;
+
+    @Override
+    public long getFragmentIdForPlanHash(byte[] planHash) {
+        Sha1Wrapper key = new Sha1Wrapper(planHash);
+        FragInfo frag = null;
+        synchronized (FragInfo.class) {
+            frag = m_plansByHash.get(key);
+        }
+        assert(frag != null);
+        return frag.fragId;
+    }
+
+    @Override
+    public long loadOrAddRefPlanFragment(byte[] planHash, byte[] plan) {
+        Sha1Wrapper key = new Sha1Wrapper(planHash);
+        synchronized (FragInfo.class) {
+            FragInfo frag = m_plansByHash.get(key);
+            if (frag == null) {
+                frag = new FragInfo(key, plan, m_nextFragId++);
+                m_plansByHash.put(frag.hash, frag);
+                m_plansById.put(frag.fragId, frag);
+                if (m_plansById.size() > ExecutionEngine.EE_PLAN_CACHE_SIZE) {
+                    evictLRUfragment();
+                }
+            }
+            // The fragment MAY be in the LRU map.
+            // An incremented refCount is a lazy way to keep it safe from eviction
+            // without having to update the map.
+            // This optimizes for popular fragments in a small or stable cache that may be reused
+            // many times before the eviction process needs to take any notice.
+            frag.refCount++;
+            return frag.fragId;
+        }
+    }
+
+    /// Evict the least recently used fragment (if any are currently unused).
+    /// Along the way, update any obsolete entries that were left
+    /// by the laziness of the fragment state changes (fragment reuse).
+    /// In the rare case of a cache bloated beyond its usual limit,
+    /// keep evicting as needed and as entries are available until the bloat is gone.
+    void evictLRUfragment()
+    {
+        while ( ! m_plansLRU.isEmpty()) {
+            // Remove the earliest entry.
+            Entry<Long, FragInfo> lru = m_plansLRU.pollFirstEntry();
+            FragInfo frag = lru.getValue();
+            if (frag.refCount > 0) {
+                // The fragment is being re-used, it is no longer an eviction candidate.
+                // It is only in the map due to the laziness in loadOrAddRefPlanFragment.
+                // It will be re-considered (at a later key) once it is no longer referenced.
+                // Resetting its lastUse to 0, here, restores it to a state identical to that
+                // of a new fragment.
+                // It eventually causes decrefPlanFragmentById to put it back in the map
+                // at its then up-to-date key.
+                // This makes it safe to keep out of the LRU map for now.
+                // See the comment in decrefPlanFragmentById and the one in the next code block.
+                frag.lastUse = 0;
+            }
+            else if (lru.getKey() != frag.lastUse) {
+                // The fragment is not in use but has been re-used more recently than the key reflects.
+                // This is a result of the laziness in decrefPlanFragmentById.
+                // Correct the entry's key in the LRU map to reflect its last use.
+                // This may STILL be the least recently used entry.
+                // If so, it will be picked off in a later iteration of this loop;
+                // its key will now match its lastUse value.
+                m_plansLRU.put(frag.lastUse, frag);
+            }
+            else {
+                // Found and removed the actual up-to-date least recently used entry from the LRU map.
+                // Remove the entry from the other collections.
+                m_plansById.remove(frag.fragId);
+                m_plansByHash.remove(frag.hash);
+                // Normally, one eviction for each new fragment is enough to restore order.
+                // BUT, if a prior call ever failed to find an unused fragment in the cache,
+                // the cache may have grown beyond its normal size. In that rare case,
+                // one eviction is not enough to reduce the cache to the desired size,
+                // so take another bite at the apple.
+                // Otherwise, trading exactly one evicted fragment for each new fragment
+                // would never reduce the cache.
+                if (m_plansById.size() > ExecutionEngine.EE_PLAN_CACHE_SIZE) {
+                     continue;
+                }
+                return;
+            }
+        }
+        // Strange. All FragInfo entries appear to be in use. There's nothing to evict.
+        // Let the cache bloat a little and try again later after the next new fragment.
+    }
+
+    @Override
+    public void decrefPlanFragmentById(long fragmentId) {
+        // skip dummy/invalid fragment ids
+        if (fragmentId <= 0) return;
+
+        FragInfo frag = null;
+        synchronized (FragInfo.class) {
+            frag = m_plansById.get(fragmentId);
+            assert(frag != null);
+            if (--frag.refCount == 0) {
+                // The disused fragment belongs in the LRU map at the end -- at the current "ticker".
+                // If its lastUse value is 0 like a new entry's, it is not currently in the map.
+                // Put into the map in its proper position.
+                // If it is already in the LRU map (at a "too early" entry), just set its lastUse value
+                // as a cheap way to notify evictLRUfragment that it is not ready for eviction but
+                // should instead be re-ordered further forward in the map.
+                // This re-ordering only needs to happen when the eviction process considers the entry.
+                // For a popular fragment in a small or stable cache, that may be after MANY
+                // re-uses like this.
+                // This prevents thrashing of the LRU map, repositioning recent entries.
+                boolean notInLRUmap = (frag.lastUse == 0); // check this BEFORE updating lastUse
+                frag.lastUse = ++m_nextFragUse;
+                if (notInLRUmap) {
+                    m_plansLRU.put(frag.lastUse, frag);
+                }
+            }
+        }
+    }
+
+    /**
+     * Called from the execution engine to fetch a plan for a given hash.
+     */
+    @Override
+    public byte[] planForFragmentId(long fragmentId) {
+        assert(fragmentId > 0);
+
+        FragInfo frag = null;
+        synchronized (FragInfo.class) {
+            frag = m_plansById.get(fragmentId);
+        }
+        assert(frag != null);
+        return frag.plan;
     }
 }

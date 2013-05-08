@@ -234,49 +234,12 @@ public class View extends TableDerived {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
+    VoltXMLElement voltGetTableXML(Session session) throws HSQLParseException
     {
-        VoltXMLElement table = new VoltXMLElement("table");
+        VoltXMLElement table = super.voltGetTableXML(session);
 
-        // add table metadata
-        table.attributes.put("name", getName().name);
+        // add view metadata
         table.attributes.put("query", statement);
-
-        // read all the columns
-        VoltXMLElement columns = new VoltXMLElement("columns");
-        table.children.add(columns);
-        assert(columns != null);
-        int[] columnIndices = getColumnMap();
-        for (int i : columnIndices) {
-            ColumnSchema column = getColumn(i);
-            VoltXMLElement colChild = column.voltGetXML(session);
-            columns.children.add(colChild);
-            assert(colChild != null);
-        }
-
-        // read all the indexes
-        VoltXMLElement indexes = new VoltXMLElement("indexes");
-        table.children.add(indexes);
-        assert(indexes != null);
-        for (Index index : getIndexes()) {
-            VoltXMLElement indexChild = index.voltGetXML(session);
-            indexes.children.add(indexChild);
-            assert(indexChild != null);
-        }
-
-        // read all the constraints
-        VoltXMLElement constraints = new VoltXMLElement("constraints");
-        table.children.add(constraints);
-        assert(constraints != null);
-        for (Constraint constraint : getConstraints()) {
-            // giant hack to ignore "CHECK" constraint
-            if (constraint.getConstraintType() != Constraint.CHECK) {
-                VoltXMLElement constraintChild = constraint.voltGetXML(session);
-                constraints.children.add(constraintChild);
-                assert(constraintChild != null);
-            }
-        }
-
         return table;
     }
 }

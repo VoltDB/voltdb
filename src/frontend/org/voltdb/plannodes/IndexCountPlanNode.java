@@ -104,6 +104,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_bindings = isp.getBindings();
 
         m_outputSchema = apn.getOutputSchema().clone();
+        m_hasSignificantOutputSchema = true;
 
         m_endType = endType;
         m_endkeyExpressions.addAll(endKeys);
@@ -199,7 +200,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     public void resolveColumnIndexes(){}
 
     @Override
-    public boolean computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
 
         // HOW WE COST INDEXES
         // unique, covering index always wins
@@ -216,8 +217,6 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
         stats.incrementStatistic(0, StatsField.TUPLES_READ, 1);
         m_estimatedOutputTupleCount = 1;
-
-        return true;
     }
 
     @Override

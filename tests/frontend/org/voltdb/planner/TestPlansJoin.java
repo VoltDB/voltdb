@@ -31,7 +31,14 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.plannodes.*;
+import org.voltdb.plannodes.AbstractJoinPlanNode;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractScanPlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.NestLoopIndexPlanNode;
+import org.voltdb.plannodes.NestLoopPlanNode;
+import org.voltdb.plannodes.ReceivePlanNode;
+import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.JoinType;
@@ -325,7 +332,7 @@ public class TestPlansJoin extends TestCase {
         assertTrue(indexScan.getLookupType().equals(IndexLookupType.EQ));
         assertTrue(indexScan.getEndExpression().getExpressionType() == ExpressionType.COMPARE_EQUAL);
         assertTrue(indexScan.getPredicate().getExpressionType() == ExpressionType.COMPARE_GREATERTHAN);
-        AbstractPlanNode seqScan = (SeqScanPlanNode) n.getChild(0);
+        AbstractPlanNode seqScan = n.getChild(0);
         assertTrue(seqScan instanceof SeqScanPlanNode);
         assertTrue(((SeqScanPlanNode)seqScan).getPredicate().getExpressionType().equals(ExpressionType.COMPARE_GREATERTHANOREQUALTO));
 
@@ -336,7 +343,7 @@ public class TestPlansJoin extends TestCase {
         indexScan = (IndexScanPlanNode)n.getInlinePlanNode(PlanNodeType.INDEXSCAN);
         assertTrue(indexScan.getLookupType().equals(IndexLookupType.EQ));
         assertTrue(indexScan.getEndExpression().getExpressionType() == ExpressionType.COMPARE_EQUAL);
-        seqScan = (SeqScanPlanNode) n.getChild(0);
+        seqScan = n.getChild(0);
         assertTrue(seqScan instanceof SeqScanPlanNode);
         assertTrue(((SeqScanPlanNode)seqScan).getPredicate().getExpressionType().equals(ExpressionType.COMPARE_GREATERTHANOREQUALTO));
 
@@ -347,7 +354,7 @@ public class TestPlansJoin extends TestCase {
         indexScan = (IndexScanPlanNode)n.getInlinePlanNode(PlanNodeType.INDEXSCAN);
         assertTrue(indexScan.getLookupType().equals(IndexLookupType.EQ));
         assertTrue(indexScan.getEndExpression().getExpressionType() == ExpressionType.COMPARE_EQUAL);
-        seqScan = (SeqScanPlanNode) n.getChild(0);
+        seqScan = n.getChild(0);
         assertTrue(seqScan instanceof SeqScanPlanNode);
         assertTrue(((SeqScanPlanNode)seqScan).getPredicate().getExpressionType().equals(ExpressionType.COMPARE_GREATERTHANOREQUALTO));
 
@@ -367,7 +374,7 @@ public class TestPlansJoin extends TestCase {
         indexScan = (IndexScanPlanNode)nlij.getInlinePlanNode(PlanNodeType.INDEXSCAN);
         assertTrue(indexScan.getLookupType().equals(IndexLookupType.EQ));
         assertTrue(indexScan.getEndExpression().getExpressionType() == ExpressionType.COMPARE_EQUAL);
-        seqScan = (SeqScanPlanNode) nlij.getChild(0);
+        seqScan = nlij.getChild(0);
         assertTrue(seqScan instanceof SeqScanPlanNode);
         assertTrue(((SeqScanPlanNode)seqScan).getPredicate().getExpressionType().equals(ExpressionType.COMPARE_GREATERTHANOREQUALTO));
 
@@ -618,7 +625,7 @@ public class TestPlansJoin extends TestCase {
         assertTrue(indexScan.getLookupType().equals(IndexLookupType.EQ));
         assertTrue(indexScan.getEndExpression().getExpressionType() == ExpressionType.COMPARE_EQUAL);
         assertTrue(indexScan.getPredicate().getExpressionType() == ExpressionType.COMPARE_GREATERTHAN);
-        AbstractPlanNode seqScan = (SeqScanPlanNode) n.getChild(0);
+        AbstractPlanNode seqScan = n.getChild(0);
         assertTrue(seqScan instanceof SeqScanPlanNode);
         assertTrue(((SeqScanPlanNode)seqScan).getPredicate() == null);
 
@@ -636,7 +643,7 @@ public class TestPlansJoin extends TestCase {
         indexScan = (IndexScanPlanNode)n.getInlinePlanNode(PlanNodeType.INDEXSCAN);
         assertTrue(indexScan.getLookupType().equals(IndexLookupType.EQ));
         assertTrue(indexScan.getEndExpression().getExpressionType() == ExpressionType.COMPARE_EQUAL);
-        seqScan = (SeqScanPlanNode) n.getChild(0);
+        seqScan = n.getChild(0);
         assertTrue(seqScan instanceof SeqScanPlanNode);
         assertTrue(((SeqScanPlanNode)seqScan).getPredicate().getExpressionType().equals(ExpressionType.COMPARE_GREATERTHAN));
 
@@ -652,7 +659,7 @@ public class TestPlansJoin extends TestCase {
 
     }
 
-    public void testDistrebutedIndexJoinConditions() {
+    public void testDistributedIndexJoinConditions() {
         List<AbstractPlanNode> lpn =  aide.compile("select *  FROM P2 RIGHT JOIN R3 ON R3.A = P2.A AND P2.A < 0 WHERE P2.A IS NULL", 0, false, null);
         assertTrue(lpn.size() == 2);
         AbstractPlanNode n = lpn.get(0).getChild(0).getChild(0);
@@ -665,8 +672,8 @@ public class TestPlansJoin extends TestCase {
         c = n.getChild(1);
         assertTrue(c instanceof ReceivePlanNode);
         n = lpn.get(1).getChild(0);
-        assertTrue(n instanceof SeqScanPlanNode);
-        assertTrue(((SeqScanPlanNode) n).getPredicate() == null);
+        assertTrue(n instanceof AbstractScanPlanNode);
+        assertTrue(((AbstractScanPlanNode) n).getPredicate() == null);
 
         lpn = aide.compile("select *  FROM P2 RIGHT JOIN P3 ON P3.A = P2.A AND P2.A < 0 WHERE P2.A IS NULL", 0, false, null);
         assertTrue(lpn.size() == 2);

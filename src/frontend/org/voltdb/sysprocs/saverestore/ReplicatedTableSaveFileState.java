@@ -24,7 +24,6 @@ import java.util.TreeSet;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ParameterSet;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
 import org.voltdb.VoltTableRow;
 import org.voltdb.catalog.Table;
@@ -33,7 +32,7 @@ import org.voltdb.sysprocs.SysProcFragmentId;
 
 public class ReplicatedTableSaveFileState extends TableSaveFileState
 {
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
 
     ReplicatedTableSaveFileState(String tableName, long txnId)
     {
@@ -80,7 +79,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         else
         {
             // Not implemented until we're going to support catalog changes
-            hostLog.error("Unable to convert replicated table " + getTableName() + " to partitioned because " +
+            SNAP_LOG.error("Unable to convert replicated table " + getTableName() + " to partitioned because " +
                     "the conversion is currently unsupported.");
         }
         return restore_plan;
@@ -158,9 +157,9 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         plan_fragment.outputDepId = result_dependency_id;
         plan_fragment.inputDepIds = new int[] {};
         addPlanDependencyId(result_dependency_id);
-        ParameterSet params = new ParameterSet();
-        params.setParameters(getTableName(), result_dependency_id);
-        plan_fragment.parameters = params;
+        plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
+                getTableName(),
+                result_dependency_id);
         return plan_fragment;
     }
 
@@ -177,10 +176,10 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         plan_fragment.outputDepId = result_dependency_id;
         plan_fragment.inputDepIds = new int[] {};
         addPlanDependencyId(result_dependency_id);
-        ParameterSet params = new ParameterSet();
-        params.setParameters(getTableName(), destinationSiteId,
-                             result_dependency_id);
-        plan_fragment.parameters = params;
+        plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
+                getTableName(),
+                destinationSiteId,
+                result_dependency_id);
         return plan_fragment;
     }
 
@@ -195,9 +194,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         plan_fragment.outputDepId = result_dependency_id;
         plan_fragment.inputDepIds = getPlanDependencyIds();
         setRootDependencyId(result_dependency_id);
-        ParameterSet params = new ParameterSet();
-        params.setParameters(result_dependency_id);
-        plan_fragment.parameters = params;
+        plan_fragment.parameters = ParameterSet.fromArrayNoCopy(result_dependency_id);
         return plan_fragment;
     }
 

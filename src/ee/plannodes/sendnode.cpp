@@ -56,7 +56,7 @@ std::string SendPlanNode::debugInfo(const std::string &spacer) const {
     return (buffer.str());
 }
 
-void SendPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
+void SendPlanNode::loadFromJSONObject(PlannerDomValue obj) {
 }
 
 }

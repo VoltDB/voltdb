@@ -33,6 +33,7 @@ public class TableCountPlanNode extends AbstractScanPlanNode {
     public TableCountPlanNode(AbstractScanPlanNode child, AggregatePlanNode apn) {
         super();
         m_outputSchema = apn.getOutputSchema().clone();
+        m_hasSignificantOutputSchema = true;
         m_estimatedOutputTupleCount = 1;
         m_targetTableAlias = child.getTargetTableAlias();
         m_targetTableName = child.getTargetTableName();
@@ -51,13 +52,12 @@ public class TableCountPlanNode extends AbstractScanPlanNode {
     public void resolveColumnIndexes(){}
 
     @Override
-    public boolean computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
 //        Table target = db.getTables().getIgnoreCase(m_targetTableName);
 //        assert(target != null);
 //        DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(target.getTypeName());
 //        stats.incrementStatistic(0, StatsField.TUPLES_READ, tableEstimates.maxTuples);
         m_estimatedOutputTupleCount = 1;
-        return true;
     }
 
     @Override

@@ -58,11 +58,14 @@ public interface SystemProcedureExecutionContext {
 
     public int getNumberOfPartitions();
 
+    public void setNumberOfPartitions(int partitionCount);
+
     public SiteProcedureConnection getSiteProcedureConnection();
 
     public SiteSnapshotConnection getSiteSnapshotConnection();
 
     public void updateBackendLogLevels();
 
-    public boolean updateCatalog(String catalogDiffCommands, CatalogContext context, CatalogSpecificPlanner csp);
+    public boolean updateCatalog(String catalogDiffCommands, CatalogContext context,
+            CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation);
 }

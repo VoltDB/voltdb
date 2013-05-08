@@ -57,7 +57,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     new SiteTaskerQueue()),
                 "MP",
                 agent,
-                false /* never for rejoin */);
+                VoltDB.START_ACTION.CREATE /* never for rejoin */);
     }
 
     @Override
@@ -79,7 +79,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
         }
 
         super.configureCommon(backend, serializedCatalog, catalogContext,
-                csp, numberOfPartitions, startAction, null, null, cl, coreBindIds);
+                csp, numberOfPartitions, startAction, null, null, cl, coreBindIds, null);
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),
@@ -134,7 +134,6 @@ public class MpInitiator extends BaseInitiator implements Promotable
                              + "trying. Retrying.");
                 }
             }
-            super.acceptPromotion();
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
         }
@@ -172,7 +171,8 @@ public class MpInitiator extends BaseInitiator implements Promotable
      */
     public void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
     {
-        m_executionSite.updateCatalog(diffCmds, context, csp, true);
+        // note this will never require snapshot isolation because the MPI has no snapshot funtionality
+        m_executionSite.updateCatalog(diffCmds, context, csp, false, true);
     }
 
     @Override

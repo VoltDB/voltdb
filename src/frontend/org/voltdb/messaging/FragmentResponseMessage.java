@@ -172,10 +172,15 @@ public class FragmentResponseMessage extends VoltMessage {
         // one int per dependency ID
         msgsize += 4 * m_dependencyCount;
 
+        // one byte to indicate null dependency result table
+        msgsize += m_dependencies.size();
+
         // Add the actual result lengths
         for (VoltTable dep : m_dependencies)
         {
-            msgsize += dep.getSerializedSize();
+            if (dep != null) {
+                msgsize += dep.getSerializedSize();
+            }
         }
 
         if (m_exception != null) {
@@ -206,7 +211,13 @@ public class FragmentResponseMessage extends VoltMessage {
 
         for (int i = 0; i < m_dependencyCount; i++)
         {
-            m_dependencies.get(i).flattenToBuffer(buf);
+            VoltTable dep = m_dependencies.get(i);
+            if (dep == null) {
+                buf.put((byte) 0);
+            } else {
+                buf.put((byte) 1);
+                dep.flattenToBuffer(buf);
+            }
         }
 
         if (m_exception != null) {
@@ -232,9 +243,14 @@ public class FragmentResponseMessage extends VoltMessage {
         for (int i = 0; i < m_dependencyCount; i++)
             m_dependencyIds.add(buf.getInt());
         for (int i = 0; i < m_dependencyCount; i++) {
+            boolean isNull = buf.get() == 0 ? true : false;
             FastDeserializer fds = new FastDeserializer(buf);
             try {
-                m_dependencies.add(fds.readObject(VoltTable.class));
+                if (isNull) {
+                    m_dependencies.add(null);
+                } else {
+                    m_dependencies.add(fds.readObject(VoltTable.class));
+                }
             } catch (IOException e) {
                 e.printStackTrace();
                 assert(false);

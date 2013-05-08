@@ -20,9 +20,7 @@ package org.voltdb.iv2;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
-import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.BackendTarget;
@@ -31,11 +29,13 @@ import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
+import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.StarvationTracker;
 import org.voltdb.StatsAgent;
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltDB;
+import org.voltdb.rejoin.TaskLog;
 
 /**
  * Subclass of Initiator to manage single-partition operations.
@@ -45,9 +45,6 @@ import org.voltdb.VoltDB;
 public abstract class BaseInitiator implements Initiator
 {
     VoltLogger tmLog = new VoltLogger("TM");
-
-    public static final String JSON_PARTITION_ID = "partitionId";
-    public static final String JSON_INITIATOR_HSID = "initiatorHSId";
 
     // External references/config
     protected final HostMessenger m_messenger;
@@ -63,35 +60,44 @@ public abstract class BaseInitiator implements Initiator
     protected Thread m_siteThread = null;
     protected final RepairLog m_repairLog = new RepairLog();
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
-            Scheduler scheduler, String whoamiPrefix, StatsAgent agent, boolean forRejoin)
+            Scheduler scheduler, String whoamiPrefix, StatsAgent agent,
+            VoltDB.START_ACTION startAction)
     {
         m_zkMailboxNode = zkMailboxNode;
         m_messenger = messenger;
         m_partitionId = partition;
         m_scheduler = scheduler;
-        RejoinProducer rejoinProducer = forRejoin ?
-            new RejoinProducer(m_partitionId, scheduler.m_tasks) :
-            null;
+        boolean isLiveRejoin = startAction == VoltDB.START_ACTION.LIVE_REJOIN;
+        JoinProducerBase joinProducer;
+
+        if (startAction == VoltDB.START_ACTION.JOIN) {
+            joinProducer = new JoinProducer(m_partitionId, scheduler.m_tasks);
+        } else if (VoltDB.createForRejoin(startAction)) {
+            joinProducer = new RejoinProducer(m_partitionId, scheduler.m_tasks, isLiveRejoin);
+        } else {
+            joinProducer = null;
+        }
+
         if (m_partitionId == MpInitiator.MP_INIT_PID) {
             m_initiatorMailbox = new MpInitiatorMailbox(
                     m_partitionId,
                     m_scheduler,
                     m_messenger,
                     m_repairLog,
-                    rejoinProducer);
+                    joinProducer);
         } else {
             m_initiatorMailbox = new InitiatorMailbox(
                     m_partitionId,
                     m_scheduler,
                     m_messenger,
                     m_repairLog,
-                    rejoinProducer);
+                    joinProducer);
         }
 
         // Now publish the initiator mailbox to friends and family
         m_messenger.createMailbox(null, m_initiatorMailbox);
-        if (rejoinProducer != null) {
-            rejoinProducer.setMailbox(m_initiatorMailbox);
+        if (joinProducer != null) {
+            joinProducer.setMailbox(m_initiatorMailbox);
         }
         m_scheduler.setMailbox(m_initiatorMailbox);
         StarvationTracker st = new StarvationTracker(getInitiatorHSId());
@@ -117,7 +123,8 @@ public abstract class BaseInitiator implements Initiator
                           StatsAgent agent,
                           MemoryStats memStats,
                           CommandLog cl,
-                          String coreBindIds)
+                          String coreBindIds,
+                          PartitionDRGateway drGateway)
         throws KeeperException, ExecutionException, InterruptedException
     {
             int snapshotPriority = 6;
@@ -129,6 +136,11 @@ public abstract class BaseInitiator implements Initiator
             // demote rejoin to create for initiators that aren't rejoinable.
             if (VoltDB.createForRejoin(startAction) && !isRejoinable()) {
                 startAction = VoltDB.START_ACTION.CREATE;
+            }
+
+            TaskLog taskLog = null;
+            if (m_initiatorMailbox.getJoinProducer() != null) {
+                taskLog = m_initiatorMailbox.getJoinProducer().constructTaskLog(catalogContext.cluster.getVoltroot());
             }
 
             m_executionSite = new Site(m_scheduler.getQueue(),
@@ -143,7 +155,9 @@ public abstract class BaseInitiator implements Initiator
                                        m_initiatorMailbox,
                                        agent,
                                        memStats,
-                                       coreBindIds);
+                                       coreBindIds,
+                                       taskLog,
+                                       drGateway);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite, m_executionSite.m_sysprocContext);
 
@@ -151,8 +165,7 @@ public abstract class BaseInitiator implements Initiator
                     m_executionSite,
                     prf,
                     m_initiatorMailbox.getHSId(),
-                    0, // this has no meaning
-                    numberOfPartitions);
+                    0); // this has no meaning
             procSet.loadProcedures(catalogContext, backend, csp);
             m_executionSite.setLoadedProcedures(procSet);
             m_scheduler.setCommandLog(cl);
@@ -199,19 +212,5 @@ public abstract class BaseInitiator implements Initiator
         return m_initiatorMailbox.getHSId();
     }
 
-    protected void acceptPromotion() throws Exception {
-        /*
-         * Notify all known client interfaces that the mastership has changed
-         * for the specified partition and that no responses from previous masters will be forthcoming
-         */
-        JSONStringer stringer = new JSONStringer();
-        stringer.object();
-        stringer.key(JSON_PARTITION_ID).value(m_partitionId);
-        stringer.key(JSON_INITIATOR_HSID).value(m_initiatorMailbox.getHSId());
-        stringer.endObject();
-        BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], stringer.toString().getBytes("UTF-8"));
-        for (Integer hostId : m_messenger.getLiveHostIds()) {
-            m_messenger.send(CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID), bpm);
-        }
-    }
+    abstract protected void acceptPromotion() throws Exception;
 }

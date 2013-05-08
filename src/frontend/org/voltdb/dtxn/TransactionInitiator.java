@@ -48,8 +48,6 @@ public abstract class TransactionInitiator implements TransactionCreator {
      * @param invocation The data describing the work to be done.
      * @param partitions The partitions (from the catalog) involved in this
      * transaction (Errs on the side of too many).
-     * @param numPartitions Number of relevant partitions in the array (allows
-     * for the array to be oversized).
      * @param clientData Client data returned with the completed transaction
      * @param messageSize Size in bytes of the message that created this invocation
      */
@@ -63,11 +61,9 @@ public abstract class TransactionInitiator implements TransactionCreator {
             boolean isSinglePartition,
             boolean isEverySite,
             int partitions[],
-            int numPartitions,
             Object clientData,
             int messageSize,
-            long now,
-            boolean allowMismatchedResults);
+            long now);
 
     /**
      * <p>
@@ -93,9 +89,6 @@ public abstract class TransactionInitiator implements TransactionCreator {
      * @param partitions
      *            The partitions (from the catalog) involved in this transaction
      *            (Errs on the side of too many).
-     * @param numPartitions
-     *            Number of relevant partitions in the array (allows for the
-     *            array to be oversized).
      * @param clientData
      *            Client data returned with the completed transaction
      * @param messageSize
@@ -113,11 +106,9 @@ public abstract class TransactionInitiator implements TransactionCreator {
             boolean isSinglePartition,
             boolean isEverySite,
             int partitions[],
-            int numPartitions,
             Object clientData,
             int messageSize,
-            long now,
-            boolean allowMismatchedResults);
+            long now);
 
     /**
      * This method should be called every X ms or so, where X is probably

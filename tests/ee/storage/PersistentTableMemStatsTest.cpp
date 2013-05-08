@@ -44,7 +44,8 @@ class PersistentTableMemStatsTest : public Test {
 public:
     PersistentTableMemStatsTest() {
         m_engine = new VoltDBEngine();
-        m_engine->initialize(1,1, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY, 1);
+        int partitionCount = 1;
+        m_engine->initialize(1,1, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY, HASHINATOR_LEGACY, (char*)&partitionCount);
 
         m_columnNames.push_back("0");
         m_columnNames.push_back("1");

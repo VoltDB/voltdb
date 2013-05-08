@@ -75,6 +75,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     protected long m_estimatedOutputTupleCount = 0;
 
     // The output schema for this node
+    protected boolean m_hasSignificantOutputSchema;
     protected NodeSchema m_outputSchema;
 
     /**
@@ -108,9 +109,9 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      */
     protected void produceCopyForTransformation(AbstractPlanNode copy) {
         copy.m_outputSchema = m_outputSchema;
+        copy.m_hasSignificantOutputSchema = m_hasSignificantOutputSchema;
         copy.m_outputColumnHints = m_outputColumnHints;
         copy.m_estimatedOutputTupleCount = m_estimatedOutputTupleCount;
-        copy.m_outputSchema = m_outputSchema;
 
         // clone is not yet implemented for every node.
         assert(m_inlineNodes.size() == 0);
@@ -130,10 +131,23 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      *
      * Right now it's best to call this on every node after it gets added
      * and linked to the top of the current plan graph.
+     * FIXME: "it's best to call this" means "to be on the paranoid safe side".
+     * It used to be that there was a hacky dependency in some non-critical aggregate code,
+     * so it would crash if generateOutputSchema had not been run earlier on its subtree.
+     * Historically, there may have been other dependencies like this, too,
+     * but they are mostly gone or otherwise completely avoidable.
+     * This means that one definitive depth-first recursive call that combines the effects
+     * of resolveColumnIndexes and then generateOutputSchema should suffice,
+     * if applied to a complete plan tree just before it gets fragmentized.
+     * The newest twist is that most of this repeated effort goes into generating
+     * redundant pass-thorugh structures that get ignored by the serializer.
      *
      * Many nodes will need to override this method in order to take whatever
      * action is appropriate (so, joins will combine two schemas, projections
-     * will already have schemas defined and do nothing, etc)
+     * will already have schemas defined and do nothing, etc).
+     * They should set m_hasSignificantOutputSchema to true so that the serialization knows
+     * not to ignore their work.
+     *
      * @param db  A reference to the Database object from the catalog.
      */
     public void generateOutputSchema(Database db)
@@ -146,6 +160,11 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         // we resolve the indexes in these TVEs they will point back at the
         // correct input column, which we are assuming that the child node
         // has filled in with whatever expression was here before the replacement.
+        // Output schemas defined using this standard algorithm
+        // are just cached "fillers" that satisfy the legacy
+        // resolveColumnIndexes/generateOutputSchema/getOutputSchema protocol
+        // until it can be fixed up  -- see the FIXME comment on generateOutputSchema.
+        m_hasSignificantOutputSchema = false;
         m_outputSchema =
             m_children.get(0).getOutputSchema().copyAndReplaceWithTVE();
     }
@@ -161,6 +180,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      *
      * Should get called on the plan graph after any optimizations but before
      * the plan gets fragmented.
+     * FIXME: This needs to be reworked with generateOutputSchema to eliminate redundancies.
      */
     public abstract void resolveColumnIndexes();
 
@@ -243,7 +263,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         return getPlanNodeType() + "[" + m_id + "]";
     }
 
-    public boolean computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
         assert(estimates != null);
 
         m_outputColumnHints.clear();
@@ -251,15 +271,12 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
         // recursively compute and collect stats from children
         for (AbstractPlanNode child : m_children) {
-            boolean result = child.computeEstimatesRecursively(stats, cluster, db, estimates, paramHints);
-            assert(result);
+            child.computeEstimatesRecursively(stats, cluster, db, estimates, paramHints);
             m_outputColumnHints.addAll(child.m_outputColumnHints);
             m_estimatedOutputTupleCount += child.m_estimatedOutputTupleCount;
 
             stats.incrementStatistic(0, StatsField.TUPLES_READ, m_estimatedOutputTupleCount);
         }
-
-        return true;
     }
 
     /**
@@ -273,6 +290,12 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     /**
      * Get this PlanNode's output schema
+     * FIXME: This needs to be reworked with generateOutputSchema to eliminate redundancies.
+     * In short, if generateOutputSchema was called definitively ONCE and returned the child's
+     * effective outputSchema to its parent -- possibly without even caching it as m_outputSchema,
+     * m_outputSchema could be used to cache only significant non-redundant output schemas.
+     * For now, the m_hasSignificantOutputSchema flag is checked separately to determine whether
+     * m_outputSchema is worth looking at.
      * @return the NodeSchema which represents this node's output schema
      */
     public NodeSchema getOutputSchema()
@@ -618,13 +641,15 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
         stringer.endArray(); //end inlineNodes
 
-        stringer.key(Members.OUTPUT_SCHEMA.name());
-        stringer.array();
-        for (int col = 0; col < m_outputSchema.getColumns().size(); col++) {
-            SchemaColumn column = m_outputSchema.getColumns().get(col);
-            column.toJSONString(stringer);
+        if (m_hasSignificantOutputSchema) {
+            stringer.key(Members.OUTPUT_SCHEMA.name());
+            stringer.array();
+            for (int col = 0; col < m_outputSchema.getColumns().size(); col++) {
+                SchemaColumn column = m_outputSchema.getColumns().get(col);
+                column.toJSONString(stringer);
+            }
+            stringer.endArray();
         }
-        stringer.endArray();
     }
 
     public String toExplainPlanString() {
@@ -727,14 +752,15 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
         //children and parents list loading implemented in planNodeTree.loadFromJsonArray
 
-        //load output shchema
-        m_outputSchema = new NodeSchema();
-        if( !jobj.isNull( Members.OUTPUT_SCHEMA.name() ) ){
+        // load the output schema if it was marked significant.
+        if ( !jobj.isNull( Members.OUTPUT_SCHEMA.name() ) ) {
+            m_outputSchema = new NodeSchema();
+            m_hasSignificantOutputSchema = true;
             jarray = jobj.getJSONArray( Members.OUTPUT_SCHEMA.name() );
-        }
-        int size = jarray.length();
-        for( int i = 0; i < size; i++ ) {
-            m_outputSchema.addColumn( SchemaColumn.fromJSONObject(jarray.getJSONObject(i), db) );
+            int size = jarray.length();
+            for( int i = 0; i < size; i++ ) {
+                m_outputSchema.addColumn( SchemaColumn.fromJSONObject(jarray.getJSONObject(i), db) );
+            }
         }
     }
 

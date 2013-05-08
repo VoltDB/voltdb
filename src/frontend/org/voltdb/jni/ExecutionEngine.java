@@ -29,12 +29,13 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.ExecutionSite;
-import org.voltdb.ParameterSet;
+import org.voltdb.FragmentPlanSource;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.StatsAgent;
 import org.voltdb.SysProcSelector;
 import org.voltdb.TableStreamType;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
@@ -56,12 +57,22 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public static final int ERRORCODE_SUCCESS = 0;
     public static final int ERRORCODE_ERROR = 1; // just error or not so far.
     public static final int ERRORCODE_WRONG_SERIALIZED_BYTES = 101;
+    public static final int ERRORCODE_NEED_PLAN = 110;
+
+    /** For now sync this value with the value in the EE C++ code to get good stats. */
+    public static final int EE_PLAN_CACHE_SIZE = 1000;
 
     /** Partition ID */
     protected final int m_partitionId;
 
     /** Statistics collector (provided later) */
     private PlannerStatsCollector m_plannerStats = null;
+
+    // used for tracking statistics about the plan cache in the EE
+    private int m_cacheMisses = 0;
+    private int m_eeCacheSize = 0;
+
+    protected FragmentPlanSource m_planSource;
 
     /** Make the EE clean and ready to do new transactional work. */
     public void resetDirtyStatus() {
@@ -75,7 +86,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     /** Utility method to verify return code and throw as required */
     final protected void checkErrorCode(final int errorCode) {
-        if (errorCode != ERRORCODE_SUCCESS) {
+        if ((errorCode != ERRORCODE_SUCCESS) && (errorCode != ERRORCODE_NEED_PLAN)) {
             throwExceptionForError(errorCode);
         }
     }
@@ -92,7 +103,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     /** Create an ee and load the volt shared library */
-    public ExecutionEngine(long siteId, int partitionId) {
+    public ExecutionEngine(long siteId, int partitionId, FragmentPlanSource planSource) {
         m_partitionId = partitionId;
         org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
         // In mock test environments there may be no stats agent.
@@ -101,12 +112,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             m_plannerStats = new PlannerStatsCollector(siteId);
             statsAgent.registerStatsSource(SysProcSelector.PLANNER, siteId, m_plannerStats);
         }
+        m_planSource = planSource;
     }
 
     /** Alternate constructor without planner statistics tracking. */
-    public ExecutionEngine() {
+    public ExecutionEngine(FragmentPlanSource planSource) {
         m_partitionId = 0;  // not used
         m_plannerStats = null;
+        m_planSource = planSource;
     }
 
     /*
@@ -276,6 +289,19 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
     }
 
+    /**
+     * Called from the execution engine to fetch a plan for a given hash.
+     * Also update cache stats.
+     */
+    public byte[] planForFragmentId(long fragmentId) {
+        // track cache misses
+        m_cacheMisses++;
+        // estimate the cache size by the number of misses
+        m_eeCacheSize = Math.max(EE_PLAN_CACHE_SIZE, m_eeCacheSize + 1);
+        // get the plan for realz
+        return m_planSource.planForFragmentId(fragmentId);
+    }
+
     /*
      * Interface frontend invokes to communicate to CPP execution engine.
      */
@@ -302,18 +328,39 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Pass diffs to apply to the EE's catalog to update it */
     abstract public void updateCatalog(final long timestamp, final String diffCommands) throws EEException;
 
-    /** Load a fragment, given a plan, into the EE with a specific fragment id */
-    abstract public long loadPlanFragment(byte[] plan) throws EEException;
-
     /** Run multiple plan fragments */
-    abstract public VoltTable[] executePlanFragments(int numFragmentIds,
-                                                     long[] planFragmentIds,
-                                                     long[] inputDepIds,
-                                                     ParameterSet[] parameterSets,
-                                                     long spHandle,
-                                                     long lastCommittedSpHandle,
-                                                     long uniqueId,
-                                                     long undoQuantumToken) throws EEException;
+    public VoltTable[] executePlanFragments(int numFragmentIds,
+                                            long[] planFragmentIds,
+                                            long[] inputDepIds,
+                                            Object[] parameterSets,
+                                            long spHandle,
+                                            long lastCommittedSpHandle,
+                                            long uniqueId,
+                                            long undoQuantumToken) throws EEException
+    {
+        try {
+            VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
+                    parameterSets, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
+            m_plannerStats.updateEECacheStats(m_eeCacheSize, numFragmentIds - m_cacheMisses,
+                    m_cacheMisses, m_partitionId);
+            return results;
+        }
+        finally {
+            // don't count any cache misses when there's an exception. This is a lie and they
+            // will still be used to estimate the cache size, but it's hard to count cache hits
+            // during an exception, so we don't count cache misses either to get the right ratio.
+            m_cacheMisses = 0;
+        }
+    }
+
+    protected abstract VoltTable[] coreExecutePlanFragments(int numFragmentIds,
+                                                            long[] planFragmentIds,
+                                                            long[] inputDepIds,
+                                                            Object[] parameterSets,
+                                                            long spHandle,
+                                                            long lastCommittedSpHandle,
+                                                            long uniqueId,
+                                                            long undoQuantumToken) throws EEException;
 
     /** Used for test code only (AFAIK jhugg) */
     abstract public VoltTable serializeTable(int tableId) throws EEException;
@@ -408,7 +455,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      *
      * THIS METHOD IS CURRENTLY ONLY USED FOR TESTING
      */
-    public abstract int hashinate(Object value, int partitionCount);
+    public abstract int hashinate(Object value, TheHashinator.HashinatorType type, byte config[]);
+
+    /**
+     * Updates the hashinator with new config
+     * @param type hashinator type
+     * @param config new hashinator config
+     */
+    public abstract void updateHashinator(TheHashinator.HashinatorType type, byte[] config);
 
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
@@ -453,7 +507,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int hostId,
             byte hostname[],
             long tempTableMemory,
-            int totalPartitions);
+            int hashinatorType,
+            byte hashinatorConfig[]);
 
     /**
      * Sets (or re-sets) all the shared direct byte buffers in the EE.
@@ -501,8 +556,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table,
             long spHandle, long lastCommittedSpHandle);
-
-    protected native int nativeLoadPlanFragment(long pointer, byte[] plan);
 
     /**
      * Executes multiple plan fragments with the given parameter sets and gets the results.
@@ -568,12 +621,16 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /**
      * Use the EE's hashinator to compute the partition to which the
      * value provided in the input parameter buffer maps.  This is
-     * currently a test-only method.
-     * @param pointer
-     * @param partitionCount
+     * currently a test-only method. Hashinator type and config are also
+     * in the parameter buffer
      * @return
      */
-    protected native int nativeHashinate(long pointer, int partitionCount);
+    protected native int nativeHashinate(long pointer);
+
+    /**
+     * Updates the EE's hashinator
+     */
+    protected native void nativeUpdateHashinator(long pointer);
 
     /**
      * Retrieve the thread local counter of pooled memory that has been allocated

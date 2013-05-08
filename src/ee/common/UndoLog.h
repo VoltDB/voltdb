@@ -17,9 +17,6 @@
 
 #ifndef UNDOLOG_H_
 #define UNDOLOG_H_
-#include "common/Pool.hpp"
-#include "common/UndoQuantum.h"
-#include "boost/pool/object_pool.hpp"
 
 #include <vector>
 #include <deque>
@@ -27,6 +24,8 @@
 #include <iostream>
 #include <cassert>
 
+#include "common/Pool.hpp"
+#include "common/UndoQuantum.h"
 
 namespace voltdb
 {
@@ -62,9 +61,7 @@ namespace voltdb
                 m_undoDataPools.pop_back();
             }
             assert(pool);
-            UndoQuantum *undoQuantum =
-                new (pool->allocate(sizeof(UndoQuantum)))
-                UndoQuantum(nextUndoToken, pool);
+            UndoQuantum *undoQuantum = new (*pool) UndoQuantum(nextUndoToken, pool);
             m_undoQuantums.push_back(undoQuantum);
             return undoQuantum;
         }
@@ -78,7 +75,12 @@ namespace voltdb
             //          << " lastUndo: " << m_lastUndoToken
             //          << " lastRelease: " << m_lastReleaseToken << std::endl;
             // This ensures that undo is only ever called after
-            assert(m_lastReleaseToken < m_lastUndoToken);
+
+            // commenting out this assertion because it isn't valid (hugg 3/29/13)
+            // if you roll back a proc that hasn't done any work, you can run
+            // into this situation. Needs a better fix than this.
+            // assert(m_lastReleaseToken < m_lastUndoToken);
+
             // This ensures that we don't attempt to undo something in
             // the distant past.  In some cases ExecutionSite may hand
             // us the largest token value that definitely doesn't
@@ -103,8 +105,8 @@ namespace voltdb
                 }
 
                 m_undoQuantums.pop_back();
-                Pool *pool = undoQuantum->getDataPool();
-                undoQuantum->undo();
+                // Destroy the quantum, but retain its pool for reuse.
+                Pool *pool = undoQuantum->undo();
                 pool->purge();
                 m_undoDataPools.push_back(pool);
 
@@ -133,8 +135,8 @@ namespace voltdb
                 }
 
                 m_undoQuantums.pop_front();
-                Pool *pool = undoQuantum->getDataPool();
-                undoQuantum->release();
+                // Destroy the quantum, but retain its pool for reuse.
+                Pool *pool = undoQuantum->release();
                 pool->purge();
                 m_undoDataPools.push_back(pool);
                 if(undoQuantumToken == undoToken) {
