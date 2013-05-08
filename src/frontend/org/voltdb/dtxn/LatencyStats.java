@@ -78,9 +78,7 @@ public class LatencyStats extends SiteStatsSource {
             Long[] buckets = {0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l,
                 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l,
                 0l, 0l, 0l, 0l, 0l, 0l};
-            ImmutableList.Builder<Long> builder = ImmutableList.builder();
-            builder.add(buckets);
-            m_latencyStats = builder.build();
+            m_latencyStats = ImmutableList.copyOf(buckets);
             m_max = (m_latencyStats.size() - 1) * BUCKET_RANGE;
         }
 
@@ -107,6 +105,8 @@ public class LatencyStats extends SiteStatsSource {
 
         void mergeLatencyInfo(LatencyInfo other)
         {
+            assert(other != null);
+            assert(m_latencyStats.size() == other.m_latencyStats.size());
             m_max = Math.max(m_max, other.m_max);
             ImmutableList.Builder<Long> builder = ImmutableList.builder();
             for (int i = 0; i < m_latencyStats.size(); i++) {
