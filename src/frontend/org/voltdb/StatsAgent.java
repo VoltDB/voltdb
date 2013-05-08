@@ -101,6 +101,7 @@ public class StatsAgent {
 
     public void getMailbox(final HostMessenger hostMessenger, final long hsId) {
         m_messenger = hostMessenger;
+        m_messenger.generateMailboxId(hsId);
         m_mailbox = new LocalMailbox(hostMessenger, hsId) {
             @Override
             public void deliver(final VoltMessage message) {
