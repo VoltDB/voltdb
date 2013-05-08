@@ -476,6 +476,15 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         assertTrue("Failed AVG_PARAMETER_SET_SIZE < 1,000,000, value was: " +
                    avg_parameter_set_size,
                    avg_parameter_set_size < 1000000L);
+
+        // Validate the PROCEDUREPROFILE aggregation.
+        results = client.callProcedure("@Statistics", "procedureprofile", 0).getResults();
+        System.out.println("\n\n\n" + results[0].toString() + "\n\n\n");
+
+        // expect NEW_ORDER.insert, GoSleep and SystemCatalog
+        // see TestStatsProcProfile.java for tests of the aggregation itself.
+        assertEquals("Validate site filtering for PROCEDUREPROFILE",
+                3, results[0].getRowCount());
     }
 
     public void testIOStatistics() throws Exception {
