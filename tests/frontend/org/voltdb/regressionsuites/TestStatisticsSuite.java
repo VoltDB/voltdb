@@ -47,10 +47,10 @@ import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestStatisticsSuite extends SaveRestoreBase {
 
-    private static int sites = 2;
-    private static int hosts = 3;
-    private static int kfactor = 1;
-    private static int partitions = (sites * hosts) / (kfactor + 1);
+    private static int SITES = 2;
+    private static int HOSTS = 3;
+    private static int KFACTOR = 1;
+    private static int PARTITIONS = (SITES * HOSTS) / (KFACTOR + 1);
     private static boolean hasLocalServer = false;
 
     static final Class<?>[] PROCEDURES =
@@ -95,7 +95,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
                 hostsSeen.add(thisHostId);
             }
         }
-        assertEquals(hosts, hostsSeen.size());
+        assertEquals(HOSTS, hostsSeen.size());
     }
 
     // For the provided table, verify that there is a row for each site in the cluster where
@@ -118,7 +118,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
                 sitesSeen.add(thisSiteId);
             }
         }
-        assertEquals(hosts * sites, sitesSeen.size());
+        assertEquals(HOSTS * SITES, sitesSeen.size());
     }
 
     // For the provided table, verify that there is a row for each partition in the cluster where
@@ -139,7 +139,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
                 partsSeen.add(thisPartId);
             }
         }
-        assertEquals(partitions, partsSeen.size());
+        assertEquals(PARTITIONS, partsSeen.size());
     }
 
     public void testInvalidCalls() throws Exception {
@@ -179,6 +179,46 @@ public class TestStatisticsSuite extends SaveRestoreBase {
 
     }
 
+    public void testLatencyStatistics() throws Exception {
+        System.out.println("\n\nTESTING LATENCY STATS\n\n\n");
+        Client client  = getFullyConnectedClient();
+
+        ColumnInfo[] expectedSchema = new ColumnInfo[7];
+        expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
+        expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
+        expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
+        expectedSchema[3] = new ColumnInfo("SITE_ID", VoltType.INTEGER);
+        expectedSchema[4] = new ColumnInfo("BUCKET_MIN", VoltType.INTEGER);
+        expectedSchema[5] = new ColumnInfo("BUCKET_MAX", VoltType.INTEGER);
+        expectedSchema[6] = new ColumnInfo("INVOCATIONS", VoltType.BIGINT);
+        VoltTable expectedTable = new VoltTable(expectedSchema);
+
+        VoltTable[] results = null;
+
+        // Do some stuff to generate some latency stats
+        for (int i = 0; i < SITES * HOSTS; i++) {
+            results = client.callProcedure("NEW_ORDER.insert", i).getResults();
+        }
+        results = client.callProcedure("@Statistics", "LATENCY", 0).getResults();
+        // one aggregate table returned
+        assertEquals(1, results.length);
+        System.out.println("Test latency table: " + results[0].toString());
+
+        validateSchema(results[0], expectedTable);
+        // should have at least one row from each host
+        results[0].advanceRow();
+        validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), false);
+        // actually, there are 26 rows per host so:
+        assertEquals(26 * HOSTS, results[0].getRowCount());
+        // Check for non-zero invocations (ENG-4668)
+        long invocations = 0;
+        results[0].resetRowPosition();
+        while (results[0].advanceRow()) {
+            invocations += results[0].getLong("INVOCATIONS");
+        }
+        assertTrue(invocations > 0);
+    }
+
     public void testInitiatorStatistics() throws Exception {
         System.out.println("\n\nTESTING INITIATOR STATS\n\n\n");
         Client client  = getFullyConnectedClient();
@@ -204,7 +244,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         //
         VoltTable results[] = null;
         // This should get us an invocation at each host
-        for (int i = 0; i < sites * hosts; i++) {
+        for (int i = 0; i < SITES * HOSTS; i++) {
             results = client.callProcedure("NEW_ORDER.insert", i).getResults();
         }
         results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
@@ -214,7 +254,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         // Check the schema
         validateSchema(results[0], expectedTable);
         // One WAREHOUSE.select row per host, plus a row for @SystemCatalog
-        assertEquals(hosts + 1, results[0].getRowCount());
+        assertEquals(HOSTS + 1, results[0].getRowCount());
 
         // Verify the invocation counts
         int counts = 0;
@@ -222,12 +262,12 @@ public class TestStatisticsSuite extends SaveRestoreBase {
             String procName = results[0].getString("PROCEDURE_NAME");
             if (procName.equals("@SystemCatalog")) {
                 // One for each connection from the client
-                assertEquals(hosts, results[0].getLong("INVOCATIONS"));
+                assertEquals(HOSTS, results[0].getLong("INVOCATIONS"));
             } else if (procName.equals("NEW_ORDER.insert")) {
                 counts += results[0].getLong("INVOCATIONS");
             }
         }
-        assertEquals(hosts * sites, counts);
+        assertEquals(HOSTS * SITES, counts);
         // verify that each node saw a NEW_ORDER.insert initiation
         validateRowSeenAtAllHosts(results[0], "PROCEDURE_NAME", "NEW_ORDER.insert", true);
     }
@@ -252,7 +292,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         assertEquals(1, results[0].getRowCount());
         results[0].advanceRow();
         int partCount = (int)results[0].getLong("PARTITION_COUNT");
-        assertEquals(partitions, partCount);
+        assertEquals(PARTITIONS, partCount);
     }
 
     public void testTableStatistics() throws Exception {
@@ -282,7 +322,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         assertEquals(1, results.length);
         validateSchema(results[0], expectedTable);
         // with 10 rows per site. Can be two values depending on the test scenario of cluster vs. local.
-        assertEquals(hosts * sites * 3, results[0].getRowCount());
+        assertEquals(HOSTS * SITES * 3, results[0].getRowCount());
         // Validate that each site returns a result for each table
         validateRowSeenAtAllSites(results[0], "TABLE_NAME", "WAREHOUSE", true);
         validateRowSeenAtAllSites(results[0], "TABLE_NAME", "NEW_ORDER", true);
@@ -389,7 +429,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         // Induce procedure invocations on all partitions.  May fail in non-legacy hashing case
         // this plus R/W replication should ensure that every site on every node runs this transaction
         // at least once
-        for (int i = 0; i < hosts * sites; i++) {
+        for (int i = 0; i < HOSTS * SITES; i++) {
             client.callProcedure("NEW_ORDER.insert", i);
         }
         // 3 seconds translates to 3 billion nanos, which overflows internal
@@ -537,7 +577,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         validateSchema(results[1], expectedTable2);
         VoltTable topo = results[0];
         // Should have partitions + 1 rows in the first table
-        assertEquals(partitions + 1, results[0].getRowCount());
+        assertEquals(PARTITIONS + 1, results[0].getRowCount());
         // Make sure we can find the MPI, at least
         boolean found = false;
         while (topo.advanceRow()) {
@@ -716,7 +756,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         System.out.println("Test DR table: " + results[0].toString());
         validateSchema(results[0], expectedTable1);
         // One row per site, don't have HSID for ease of check, just check a bunch of stuff
-        assertEquals(hosts * sites, results[0].getRowCount());
+        assertEquals(HOSTS * SITES, results[0].getRowCount());
         results[0].advanceRow();
         validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), false);
         results[0].advanceRow();
@@ -767,7 +807,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         validateSchema(results[0], expectedTable1);
         validateSchema(results[1], expectedTable2);
         // One row per site, don't have HSID for ease of check, just check a bunch of stuff
-        assertEquals(hosts * sites, results[0].getRowCount());
+        assertEquals(HOSTS * SITES, results[0].getRowCount());
         results[0].advanceRow();
         validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), false);
         results[0].advanceRow();
@@ -837,7 +877,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         // One row per site, we don't use HSID though, so hard to do straightforward
         // per-site unique check.  Finesse it.
         // We also get starvation stats for the MPI, so we need to add a site per host.
-        assertEquals(hosts * (sites + 1), results[0].getRowCount());
+        assertEquals(HOSTS * (SITES + 1), results[0].getRowCount());
         results[0].advanceRow();
         validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), false);
     }
@@ -942,8 +982,8 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         /*
          * Add a cluster configuration for sysprocs too
          */
-        config = new LocalCluster("statistics-cluster.jar", TestStatisticsSuite.sites,
-                TestStatisticsSuite.hosts, TestStatisticsSuite.kfactor,
+        config = new LocalCluster("statistics-cluster.jar", TestStatisticsSuite.SITES,
+                TestStatisticsSuite.HOSTS, TestStatisticsSuite.KFACTOR,
                 BackendTarget.NATIVE_EE_JNI);
         ((LocalCluster) config).setHasLocalServer(hasLocalServer);
         boolean success = config.compile(project);
