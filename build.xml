@@ -1106,11 +1106,6 @@ NATIVE EE STUFF
         <env key="EEONLYBUILDMAKEFILE" value="true"/>
         <arg line="build.py ${build}" />
     </exec>
-    <copy todir='voltdb'>
-        <fileset dir="${build.dir}/nativelibs">
-            <include name="libvoltdb-${dist.version}.*"/>
-        </fileset>
-    </copy>
 </target>
 
 <target name='recompile_ee_nodepends'
