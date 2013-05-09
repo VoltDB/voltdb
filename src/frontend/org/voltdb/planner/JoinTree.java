@@ -76,6 +76,8 @@ public class JoinTree {
         public AbstractExpression m_joinExpr = null;
         // Additional filter expression (WHERE) associated with this node
         public AbstractExpression m_whereExpr = null;
+        // True if either all children are replicated or table is replicated. False otherwise
+        boolean m_isReplicated = false;
 
         // Buckets for children expression classification
         public ArrayList<AbstractExpression> m_joinOuterList = new ArrayList<AbstractExpression>();
@@ -274,4 +276,28 @@ public class JoinTree {
         }
         return new ArrayList<Table>();
     }
+
+    /**
+     * Sets isReplicated flag for all nodes in the tree
+     */
+    public void setReplicatedFlag() {
+        if (m_root != null) {
+            setReplicatedFlag(m_root);
+        }
+    }
+
+    /**
+     * Sets isReplicated flag for all nodes in the tree recursively
+     */
+    private void setReplicatedFlag(JoinNode joinNode) {
+        if (joinNode.m_table != null) {
+            joinNode.m_isReplicated = joinNode.m_table.getIsreplicated();
+        } else {
+            assert (joinNode.m_rightNode != null &  joinNode.m_leftNode != null);
+            setReplicatedFlag(joinNode.m_leftNode);
+            setReplicatedFlag(joinNode.m_rightNode);
+            joinNode.m_isReplicated = joinNode.m_rightNode.m_isReplicated && joinNode.m_leftNode.m_isReplicated;
+        }
+    }
+
 }

@@ -561,6 +561,8 @@ public abstract class AbstractParsedStmt {
                 }
             }
         }
+        // Once the join tree is build set isReplicated flag for each node
+        joinTree.setReplicatedFlag();
     }
 
     private void parseParameters(VoltXMLElement paramsNode) {

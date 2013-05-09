@@ -640,7 +640,7 @@ public class TestPlansJoin extends TestCase {
         assertTrue(seqScan instanceof SeqScanPlanNode);
         assertTrue(((SeqScanPlanNode)seqScan).getPredicate().getExpressionType().equals(ExpressionType.COMPARE_GREATERTHAN));
 
-        pn = compile("select * FROM R3 LEFT JOIN R2 ON R3.A = R2.A WHERE R3.A > 3", 0, false, null);
+        pn = compile("select * FROM R3 LEFT JOIN R2 ON R3.A = R2.A WHERE R3.A > 3 AND R3.C < 0", 0, false, null);
         n = pn.getChild(0).getChild(0);
         assertTrue(n instanceof NestLoopPlanNode);
         NestLoopPlanNode nl = (NestLoopPlanNode) n;
@@ -649,11 +649,13 @@ public class TestPlansJoin extends TestCase {
         assertTrue(outerScan instanceof IndexScanPlanNode);
         indexScan = (IndexScanPlanNode) outerScan;
         assertTrue(indexScan.getLookupType().equals(IndexLookupType.GT));
+        assertTrue(indexScan.getPredicate() != null);
+        assertTrue(indexScan.getPredicate().getExpressionType() == ExpressionType.COMPARE_LESSTHAN);
 
     }
 
     public void testDistrebutedIndexJoinConditions() {
-        List<AbstractPlanNode> lpn =  aide.compile("select *  FROM P2 RIGHT JOIN R3 ON R3.A = P2.A AND P2.A < 0 WHERE P2.A IS NULL", 0, false, null);
+        List<AbstractPlanNode> lpn =  aide.compile("select *  FROM P2 RIGHT JOIN R3 ON R3.A = P2.A AND P2.A < 0 AND P2.E > 3 WHERE P2.A IS NULL", 0, false, null);
         assertTrue(lpn.size() == 2);
         AbstractPlanNode n = lpn.get(0).getChild(0).getChild(0);
         assertTrue(n instanceof NestLoopPlanNode);
@@ -665,8 +667,11 @@ public class TestPlansJoin extends TestCase {
         c = n.getChild(1);
         assertTrue(c instanceof ReceivePlanNode);
         n = lpn.get(1).getChild(0);
-        assertTrue(n instanceof SeqScanPlanNode);
-        assertTrue(((SeqScanPlanNode) n).getPredicate() == null);
+        assertTrue(n instanceof IndexScanPlanNode);
+        IndexScanPlanNode in = (IndexScanPlanNode) n;
+        assertTrue(in.getPredicate() != null);
+        assertTrue(in.getPredicate().getExpressionType() == ExpressionType.COMPARE_GREATERTHAN);
+        assertTrue(in.getLookupType().equals(IndexLookupType.GTE));
 
         lpn = aide.compile("select *  FROM P2 RIGHT JOIN P3 ON P3.A = P2.A AND P2.A < 0 WHERE P2.A IS NULL", 0, false, null);
         assertTrue(lpn.size() == 2);
