@@ -51,14 +51,10 @@ from XMLUtils import prettify # To create a human readable xml file
 
 hostname = socket.gethostname()
 pkgName = {'comm': 'LINUX-voltdb',
-           'voltkv': 'LINUX-voltdb-voltkv',
-           'voltcache': 'LINUX-voltdb-voltcache',
            'pro': 'LINUX-voltdb-ent'}
 pkgDict = {'comm': 'Community',
            'pro': 'Enterprise',
-           'voltkv': 'Voltkv',
-           'voltcache': 'Voltcache',
-           'all': "Community, Pro, Voltkv, Voltcache"}
+           'all': "Community, Pro"}
 suiteDict = {'helloworld': 'HelloWorld',
              'voltcache': 'Voltcache',
              'voltkv': 'Voltkv',
@@ -181,7 +177,6 @@ def installVoltDB(pkg, release):
             % (dest, workDir)
 
     if "ent" in thispkg:
-        print "hear me"
         info["license"] = getEnterpriseLicense(workDir, release)
     return info
 # end of installVoltDB(pkg, release):
