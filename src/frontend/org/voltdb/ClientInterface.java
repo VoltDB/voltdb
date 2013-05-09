@@ -69,6 +69,8 @@ import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientInterfaceHandleManager.Iv2InFlight;
+
+import org.voltdb.dtxn.LatencyStats.LatencyInfo;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
@@ -2559,5 +2561,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             statsIterators.add(acg.getInitiationStatsIterator());
         }
         return statsIterators;
+    }
+
+    public List<LatencyInfo> getLatencyStats() {
+        List<LatencyInfo> latencyStats = new ArrayList<LatencyInfo>();
+        for (AdmissionControlGroup acg : m_allACGs) {
+            latencyStats.add(acg.getLatencyInfo());
+        }
+        return latencyStats;
     }
 }

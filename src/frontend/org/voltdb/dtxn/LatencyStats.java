@@ -19,12 +19,16 @@ package org.voltdb.dtxn;
 
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 
+import org.voltdb.ClientInterface;
 import org.voltdb.SiteStatsSource;
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+
+import com.google.common.collect.ImmutableList;
 
 /**
  * Class that provides latency information in buckets. Each bucket contains the
@@ -32,21 +36,22 @@ import org.voltdb.VoltType;
  */
 public class LatencyStats extends SiteStatsSource {
     /**
-     * A dummy iterator that wraps an integer and provides the
+     * A dummy iterator that wraps and int and provides the
      * Iterator<Object> necessary for getStatsRowKeyIterator()
      *
      */
     private static class BucketIterator implements Iterator<Object> {
-        private final int max;
+        private final int buckets;
         private int current = -1;
 
-        private BucketIterator(int max) {
-            this.max = max - 1; // minus one so that it's easier to compare later
+        private BucketIterator(int buckets) {
+            // Store the 0-indexed size
+            this.buckets = buckets - 1;
         }
 
         @Override
         public boolean hasNext() {
-            if (current == max) {
+            if (current == buckets) {
                 return false;
             }
             return true;
@@ -63,40 +68,83 @@ public class LatencyStats extends SiteStatsSource {
         }
     }
 
-    /**
-     * Latency buckets to store overall latency distribution. It's divided into
-     * 26 buckets, each stores 10ms latency range invocation info. The last
-     * bucket covers invocations with latencies larger than 250ms.
-     */
-    private final long[] m_latencyBuckets = {0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l,
-                                             0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l,
-                                             0l, 0l, 0l, 0l, 0l, 0l};
-    private long m_max = (m_latencyBuckets.length - 1) * BUCKET_RANGE;
+    public static class LatencyInfo
+    {
+        private volatile ImmutableList<Long> m_latencyStats;
+        private volatile long m_max;
+
+        public LatencyInfo()
+        {
+            Long[] buckets = {0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l,
+                0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l, 0l,
+                0l, 0l, 0l, 0l, 0l, 0l};
+            m_latencyStats = ImmutableList.copyOf(buckets);
+            m_max = (m_latencyStats.size() - 1) * BUCKET_RANGE;
+        }
+
+        public void addSample(int delta)
+        {
+            int bucketIndex = Math.min((int) (delta / BUCKET_RANGE), m_latencyStats.size() - 1);
+
+            // if the host's clock moves backwards, bucketIndex can be negative
+            // this next line of code is a lie, but a beautiful one that keeps your server up
+            if (bucketIndex < 0) bucketIndex = 0;
+
+            m_max = Math.max(delta, m_max);
+            ImmutableList.Builder<Long> builder = ImmutableList.builder();
+            for (int i = 0; i < m_latencyStats.size(); i++) {
+                if (i == bucketIndex) {
+                    builder.add(m_latencyStats.get(i) + 1);
+                }
+                else {
+                    builder.add(m_latencyStats.get(i));
+                }
+            }
+            m_latencyStats = builder.build();
+        }
+
+        void mergeLatencyInfo(LatencyInfo other)
+        {
+            assert(other != null);
+            assert(m_latencyStats.size() == other.m_latencyStats.size());
+            m_max = Math.max(m_max, other.m_max);
+            ImmutableList.Builder<Long> builder = ImmutableList.builder();
+            for (int i = 0; i < m_latencyStats.size(); i++) {
+                builder.add(m_latencyStats.get(i) + other.m_latencyStats.get(i));
+            }
+            m_latencyStats = builder.build();
+        }
+
+        List<Long> getBuckets()
+        {
+            return m_latencyStats;
+        }
+
+        long getMax()
+        {
+            return m_max;
+        }
+    }
+
     private static final long BUCKET_RANGE = 10; // 10ms
+    private LatencyInfo m_totals;
 
     public LatencyStats(long siteId) {
         super(siteId, false);
         VoltDB.instance().getStatsAgent().registerStatsSource(SysProcSelector.LATENCY, 0, this);
     }
 
-    /**
-     * Called by the Initiator every time a transaction is completed
-     * @param delta Time the procedure took to round trip intra cluster
-     */
-    public synchronized void logTransactionCompleted(int delta) {
-        int bucketIndex = Math.min((int) (delta / BUCKET_RANGE), m_latencyBuckets.length - 1);
-
-        // if the host's clock moves backwards, bucketIndex can be negative
-        // this next line of code is a lie, but a beautiful one that keeps your server up
-        if (bucketIndex < 0) bucketIndex = 0;
-
-        m_max = Math.max(delta, m_max);
-        m_latencyBuckets[bucketIndex]++;
-    }
-
     @Override
-    protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
-        return new BucketIterator(m_latencyBuckets.length);
+    protected Iterator<Object> getStatsRowKeyIterator(boolean interval)
+    {
+        m_totals = new LatencyInfo();
+        for (ClientInterface ci : VoltDB.instance().getClientInterfaces()) {
+            List<LatencyInfo> thisci = ci.getLatencyStats();
+            for (LatencyInfo info : thisci) {
+                m_totals.mergeLatencyInfo(info);
+            }
+        }
+        return new BucketIterator(m_totals.getBuckets().size());
     }
 
     @Override
@@ -112,13 +160,13 @@ public class LatencyStats extends SiteStatsSource {
         final int bucket = (Integer) rowKey;
 
         rowValues[columnNameToIndex.get("BUCKET_MIN")] = bucket * BUCKET_RANGE;
-        if (bucket < m_latencyBuckets.length - 1) {
+        if (bucket < m_totals.getBuckets().size() - 1) {
             rowValues[columnNameToIndex.get("BUCKET_MAX")] = (bucket + 1) * BUCKET_RANGE;
         } else {
             // max for the last bucket is the max of the largest latency
-            rowValues[columnNameToIndex.get("BUCKET_MAX")] = m_max;
+            rowValues[columnNameToIndex.get("BUCKET_MAX")] = m_totals.getMax();
         }
-        rowValues[columnNameToIndex.get("INVOCATIONS")] = m_latencyBuckets[bucket];
+        rowValues[columnNameToIndex.get("INVOCATIONS")] = m_totals.getBuckets().get(bucket);
         super.updateStatsRow(rowKey, rowValues);
     }
 }

@@ -38,6 +38,11 @@ public class PoisonBaseProc extends VoltProcedure {
 
     protected long poisonTheWell(int toxinType)
     {
+        // make sure it gets logged to the command log
+        try {
+            Thread.sleep(10 * 1000);
+        } catch (InterruptedException ignoreIt) {}
+
         if (toxinType == SYSTEMDOTEXIT) {
             System.exit(37);
         }

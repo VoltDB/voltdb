@@ -824,7 +824,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             // update table stats
             final VoltTable[] s1 =
                 m_ee.getStats(SysProcSelector.TABLE, tableIds, false, time);
-            if (s1 != null) {
+            if ((s1 != null) && (s1.length > 0)) {
                 VoltTable stats = s1[0];
                 assert(stats != null);
 

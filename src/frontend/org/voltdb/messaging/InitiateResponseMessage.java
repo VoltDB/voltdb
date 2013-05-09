@@ -216,6 +216,8 @@ public class InitiateResponseMessage extends VoltMessage {
             sb.append("\n  COMMIT");
         else
             sb.append("\n  ROLLBACK/ABORT, ");
+        sb.append("\n CLIENT RESPONSE: \n");
+        sb.append(m_response.toJSONString());
 
         return sb.toString();
     }
