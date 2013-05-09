@@ -23,10 +23,15 @@
 
 package txnIdSelfCheck.procedures;
 
+import java.util.UUID;
+
 public class PoisonMP extends PoisonBaseProc
 {
     public long run(int toxinType)
     {
+        voltQueueSQL(insert, getUniqueId(),getUniqueId(), UUID.randomUUID().toString().getBytes());
+        voltExecuteSQL();
+
         return poisonTheWell(toxinType);
     }
 }

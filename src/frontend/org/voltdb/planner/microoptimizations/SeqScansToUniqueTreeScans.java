@@ -34,6 +34,14 @@ import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.SortDirectionType;
 
+/// An end-stage plan rewriter that replaces a plan that uses sequential scans
+/// with a slightly less efficient one that uses deterministic (unique)
+/// index scans in their place.
+/// This optimization is intended for use where a non-deterministic result
+/// can lead to unreliability -- where a query might be feeding information
+/// to a database write within the same transaction.
+/// Unlike the other MicroOptimization classes, this is not actually a
+/// performance optimization. It is instead "optimizing for reliability".
 public class SeqScansToUniqueTreeScans extends MicroOptimization {
 
     /**
@@ -48,6 +56,9 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
     public List<CompiledPlan> apply(CompiledPlan plan, Database db) {
         ArrayList<CompiledPlan> retval = new ArrayList<CompiledPlan>();
 
+        //TODO: This should not further penalize seqscan plans that have
+        // already been post-sorted into strict order determinism,
+        // so, check first for plan.isOrderDeterministic()?
         AbstractPlanNode planGraph = plan.rootPlanGraph;
         planGraph = recursivelyApply(planGraph, db);
         plan.rootPlanGraph = planGraph;

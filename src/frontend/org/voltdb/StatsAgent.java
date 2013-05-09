@@ -18,9 +18,7 @@ package org.voltdb;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -54,11 +52,6 @@ public class StatsAgent {
     private static final int MAX_IN_FLIGHT_REQUESTS = 5;
     static int STATS_COLLECTION_TIMEOUT = 60 * 1000;
 
-    // The local site id that responds to global requests (site id == -1).
-    // Start at -1 until a winner is chosen.
-    // Updated in synchronized getStats() method.
-    private static Long m_idForGlobalStats = null;
-
     private long m_nextRequestId = 0;
     private Mailbox m_mailbox;
     private final ScheduledThreadPoolExecutor m_es =
@@ -66,8 +59,6 @@ public class StatsAgent {
 
     private final HashMap<SysProcSelector, HashMap<Long, ArrayList<StatsSource>>> registeredStatsSources =
         new HashMap<SysProcSelector, HashMap<Long, ArrayList<StatsSource>>>();
-
-    private final HashSet<SysProcSelector> handledSelectors = new HashSet<SysProcSelector>();
 
     private HostMessenger m_messenger;
 
@@ -105,13 +96,12 @@ public class StatsAgent {
         for (int ii = 0; ii < selectors.length; ii++) {
             registeredStatsSources.put(selectors[ii], new HashMap<Long, ArrayList<StatsSource>>());
         }
-        handledSelectors.add(SysProcSelector.PROCEDURE);
-        handledSelectors.add(SysProcSelector.PLANNER);
         m_messenger = null;
     }
 
-    public void getMailbox(final HostMessenger hostMessenger, final long hsId) {
+    public void registerMailbox(final HostMessenger hostMessenger, final long hsId) {
         m_messenger = hostMessenger;
+        m_messenger.generateMailboxId(hsId);
         m_mailbox = new LocalMailbox(hostMessenger, hsId) {
             @Override
             public void deliver(final VoltMessage message) {
@@ -211,12 +201,14 @@ public class StatsAgent {
         siteIdToStatsSources.clear();
     }
 
-    public void collectStats(final Connection c, final long clientHandle, final String selector) throws Exception {
+    public void collectStats(final Connection c, final long clientHandle, final String selector,
+            final boolean interval) throws Exception
+    {
         m_es.submit(new Runnable() {
             @Override
             public void run() {
                 try {
-                    collectStatsImpl(c, clientHandle, selector);
+                    collectStatsImpl(c, clientHandle, selector, interval);
                 } catch (Throwable e) {
                     hostLog.warn("Exception while attempting to collect stats", e);
                 }
@@ -224,7 +216,9 @@ public class StatsAgent {
         });
     }
 
-    private void collectStatsImpl(Connection c, long clientHandle, String selector) throws Exception {
+    private void collectStatsImpl(Connection c, long clientHandle, String selector, boolean interval)
+        throws Exception
+    {
         if (m_pendingRequests.size() > MAX_IN_FLIGHT_REQUESTS) {
             /*
              * Defensively check for an expired request not caught
@@ -252,23 +246,24 @@ public class StatsAgent {
             }
         }
 
+        // Some selectors can provide a single answer based on global data.
+        // Intercept them and respond before doing the distributed stuff.
         if (selector.equals("TOPO")) {
-            if (!VoltDB.instance().isIV2Enabled()) {
-                final ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
-                                             new VoltTable[0], "IV2 is not enabled", clientHandle);
-                ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-                buf.putInt(buf.capacity() - 4);
-                errorResponse.flattenToBuffer(buf).flip();
-                c.writeStream().enqueue(buf);
-                return;
-            }
             PendingStatsRequest psr = new PendingStatsRequest(
                 selector,
                 c,
                 clientHandle,
                 System.currentTimeMillis());
             collectTopoStats(psr);
+            return;
+        }
+        else if (selector.equals("PARTITIONCOUNT")) {
+            PendingStatsRequest psr = new PendingStatsRequest(
+                selector,
+                c,
+                clientHandle,
+                System.currentTimeMillis());
+            collectPartitionCount(psr);
             return;
         }
 
@@ -289,16 +284,11 @@ public class StatsAgent {
         STATS_COLLECTION_TIMEOUT,
         TimeUnit.MILLISECONDS);
 
-        // DR has external/internal deltas, fix them here
-        String realSelector = selector;
-        if (selector.equalsIgnoreCase("DR")) {
-            realSelector = "DRNODE";
-        }
-
         JSONObject obj = new JSONObject();
         obj.put("requestId", requestId);
         obj.put("returnAddress", m_mailbox.getHSId());
-        obj.put("selector", realSelector);
+        obj.put("selector", selector);
+        obj.put("interval", interval);
         byte payloadBytes[] = CompressionService.compressBytes(obj.toString(4).getBytes("UTF-8"));
         for (int hostId : m_messenger.getLiveHostIds()) {
             long agentHsId = CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.STATS_SITE_ID);
@@ -358,9 +348,8 @@ public class StatsAgent {
 
     private void collectTopoStats(PendingStatsRequest psr)
     {
-        List<Long> siteIds = Arrays.asList(new Long[] { 0L });
         psr.aggregateTables = new VoltTable[2];
-        psr.aggregateTables[0] = getStats(SysProcSelector.TOPO, siteIds, false, psr.startTime);
+        psr.aggregateTables[0] = getStatsAggregate(SysProcSelector.TOPO, false, psr.startTime);
         VoltTable vt =
                 new VoltTable(
                 new VoltTable.ColumnInfo("HASHTYPE", VoltType.STRING),
@@ -371,7 +360,19 @@ public class StatsAgent {
         try {
             sendStatsResponse(psr);
         } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Screwed", true, e);
+            VoltDB.crashLocalVoltDB("Unable to return TOPO results to client.", true, e);
+        }
+    }
+
+    private void collectPartitionCount(PendingStatsRequest psr)
+    {
+        psr.aggregateTables = new VoltTable[1];
+        psr.aggregateTables[0] = getStatsAggregate(SysProcSelector.PARTITIONCOUNT, false, psr.startTime);
+
+        try {
+            sendStatsResponse(psr);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to return PARTITIONCOUNT to client", true, e);
         }
     }
 
@@ -383,12 +384,60 @@ public class StatsAgent {
         VoltTable[] stats = null;
         // dispatch to collection
         String selectorString = obj.getString("selector");
+        boolean interval = obj.getBoolean("interval");
         SysProcSelector selector = SysProcSelector.valueOf(selectorString);
-        if (selector == SysProcSelector.DRNODE) {
-            stats = collectDRStats();
-        }
-        else if (selector == SysProcSelector.SNAPSHOTSTATUS) {
-            stats = collectSnapshotStatusStats();
+        switch (selector) {
+            case DR:
+                stats = collectDRStats();
+                break;
+            case DRNODE:
+                stats = collectDRNodeStats();
+                break;
+            case DRPARTITION:
+                stats = collectDRPartitionStats();
+                break;
+            case SNAPSHOTSTATUS:
+                stats = collectSnapshotStatusStats();
+                break;
+            case MEMORY:
+                stats = collectMemoryStats(interval);
+                break;
+            case IOSTATS:
+                stats = collectIOStats(interval);
+                break;
+            case INITIATOR:
+                stats = collectInitiatorStats(interval);
+                break;
+            case TABLE:
+                stats = collectTableStats(interval);
+                break;
+            case INDEX:
+                stats = collectIndexStats(interval);
+                break;
+            case PROCEDURE:
+                stats = collectProcedureStats(interval);
+                break;
+            case STARVATION:
+                stats = collectStarvationStats(interval);
+                break;
+            case PLANNER:
+                stats = collectPlannerStats(interval);
+                break;
+            case LIVECLIENTS:
+                stats = collectLiveClientsStats(interval);
+                break;
+            case LATENCY:
+                stats = collectLatencyStats(interval);
+                break;
+            case MANAGEMENT:
+                stats = collectManagementStats(interval);
+                break;
+            default:
+                // Should have been successfully groomed in ClientInterface.dispatchStatistics().  Log something
+                // for our information but let the null check below return harmlessly
+                hostLog.warn("Received unknown stats selector in StatsAgent: " + selector.name() +
+                        ", this should be impossible.");
+                stats = null;
         }
 
         // Send a response with no data since the stats is not supported
@@ -425,34 +474,204 @@ public class StatsAgent {
 
     }
 
-    // This could probably eventually move to the stats source
     private VoltTable[] collectDRStats()
     {
-        List<Long> siteIds = Arrays.asList(new Long[] { 0L });
+        VoltTable[] stats = null;
+
+        VoltTable[] partitionStats = collectDRPartitionStats();
+        VoltTable[] nodeStats = collectDRNodeStats();
+        if (partitionStats != null && nodeStats != null) {
+            stats = new VoltTable[2];
+            stats[0] = partitionStats[0];
+            stats[1] = nodeStats[0];
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectDRNodeStats()
+    {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable partitionStats = getStats(SysProcSelector.DRPARTITION, siteIds, false, now);
-        VoltTable nodeStats = getStats(SysProcSelector.DRNODE, siteIds, false, now);
-        if (partitionStats != null && nodeStats != null) {
-            stats = new VoltTable[2];
+        VoltTable nodeStats = getStatsAggregate(SysProcSelector.DRNODE, false, now);
+        if (nodeStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = nodeStats;
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectDRPartitionStats()
+    {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable partitionStats = getStatsAggregate(SysProcSelector.DRPARTITION, false, now);
+        if (partitionStats != null) {
+            stats = new VoltTable[1];
             stats[0] = partitionStats;
-            stats[1] = nodeStats;
         }
         return stats;
     }
 
     private VoltTable[] collectSnapshotStatusStats()
     {
-        List<Long> siteIds = Arrays.asList(new Long[] { 0L });
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable ssStats = getStats(SysProcSelector.SNAPSHOTSTATUS, siteIds, false, now);
+        VoltTable ssStats = getStatsAggregate(SysProcSelector.SNAPSHOTSTATUS, false, now);
         if (ssStats != null) {
             stats = new VoltTable[1];
             stats[0] = ssStats;
         }
+        return stats;
+    }
+
+    private VoltTable[] collectMemoryStats(boolean interval)
+    {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable mStats = getStatsAggregate(SysProcSelector.MEMORY, interval, now);
+        if (mStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = mStats;
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectIOStats(boolean interval)
+    {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable iStats = getStatsAggregate(SysProcSelector.IOSTATS, interval, now);
+        if (iStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = iStats;
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectInitiatorStats(boolean interval)
+    {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable iStats = getStatsAggregate(SysProcSelector.INITIATOR, interval, now);
+        if (iStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = iStats;
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectTableStats(boolean interval)
+    {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable tStats = getStatsAggregate(SysProcSelector.TABLE, interval, now);
+        if (tStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = tStats;
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectIndexStats(boolean interval)
+    {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable tStats = getStatsAggregate(SysProcSelector.INDEX, interval, now);
+        if (tStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = tStats;
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectProcedureStats(boolean interval)
+    {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable pStats = getStatsAggregate(SysProcSelector.PROCEDURE, interval, now);
+        if (pStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = pStats;
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectStarvationStats(boolean interval)
+    {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable sStats = getStatsAggregate(SysProcSelector.STARVATION, interval, now);
+        if (sStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = sStats;
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectPlannerStats(boolean interval)
+    {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable pStats = getStatsAggregate(SysProcSelector.PLANNER, interval, now);
+        if (pStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = pStats;
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectLiveClientsStats(boolean interval)
+    {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable lStats = getStatsAggregate(SysProcSelector.LIVECLIENTS, interval, now);
+        if (lStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = lStats;
+        }
+        return stats;
+    }
+
+    // Latency stats have been broken since 3.0.  Putting these hooks
+    // in here so that ALL selectors in SysProcSelector go through
+    // this path and nothing uses the legacy sysproc
+    private VoltTable[] collectLatencyStats(boolean interval)
+    {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable lStats = getStatsAggregate(SysProcSelector.LATENCY, interval, now);
+        if (lStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = lStats;
+        }
+        return stats;
+    }
+
+    // This is just a roll-up of MEMORY, TABLE, INDEX, PROCEDURE, INITIATOR, IO, and
+    // STARVATION
+    private VoltTable[] collectManagementStats(boolean interval)
+    {
+        VoltTable[] stats = new VoltTable[7];
+        stats[0] = collectMemoryStats(interval)[0];
+        stats[1] = collectInitiatorStats(interval)[0];
+        stats[2] = collectProcedureStats(interval)[0];
+        stats[3] = collectIOStats(interval)[0];
+        stats[4] = collectTableStats(interval)[0];
+        stats[5] = collectIndexStats(interval)[0];
+        stats[6] = collectStarvationStats(interval)[0];
         return stats;
     }
 
@@ -470,89 +689,43 @@ public class StatsAgent {
     }
 
     /**
-     * Get statistics.
+     * Get aggregate statistics on this node for the given selector.
+     * If you need both site-wise and node-wise stats, register the appropriate StatsSources for that
+     * selector with each siteId and then some other value for the node-level stats (PLANNER stats uses -1).
+     * This call will automagically aggregate every StatsSource registered for every 'site'ID for that selector.
+     *
      * @param selector    @Statistics selector keyword
-     * @param siteIds     site IDs of the sites from which to pull stats
      * @param interval    true if processing a reporting interval
      * @param now         current timestamp
      * @return  statistics VoltTable results
      */
-    public synchronized VoltTable getStats(
+    public synchronized VoltTable getStatsAggregate(
             final SysProcSelector selector,
-            final List<Long> siteIds,
             final boolean interval,
             final Long now) {
-        return getStatsInternal(selector, siteIds, interval, now, null);
+        return getStatsAggregateInternal(selector, interval, now, null);
     }
 
-    /**
-     * Get statistics once for global stats, e.g. PLANNER. Chooses an arbitrary site
-     * as the one that triggers retrievals.
-     * @param selector  statistics selector keyword
-     * @param interval  true if processing a reporting interval
-     * @param now       current timestamp
-     * @param siteId    siteId of the calling site
-     * @return  statistics VoltTable results
-     */
-    public synchronized VoltTable getSiteAndHostStats(
+    private synchronized VoltTable getStatsAggregateInternal(
             final SysProcSelector selector,
             final boolean interval,
             final Long now,
-            final long siteId) {
-        // If it's the first site make it the chosen site for host-global statistics.
-        if (m_idForGlobalStats == null) {
-            m_idForGlobalStats = siteId;
-        }
-
-        // First get the site-specific statistics.
-        VoltTable results;
-        {
-            ArrayList<Long> siteIds = new ArrayList<Long>();
-            siteIds.add(siteId);
-            results = getStatsInternal(selector, siteIds, interval, now, null);
-        }
-
-        // Then append global results if it's the chosen site.
-        if (siteId == m_idForGlobalStats) {
-            // -1 is always the global site id.
-            ArrayList<Long> siteIds = new ArrayList<Long>();
-            siteIds.add(-1L);
-            results = getStatsInternal(selector, siteIds, interval, now, results);
-        }
-
-        return results;
-    }
-
-    /**
-     * Internal statistics retrieval. Optionally append results to an existing
-     * result set. This is used by getSiteAndHostStats() for PLANNER statistics.
-     * @param selector     statistics selector keyword
-     * @param interval     true if processing a reporting interval
-     * @param now          current timestamp
-     * @param prevResults  previous results, if any, to append to
-     * @return  statistics VoltTable results
-     */
-    private synchronized VoltTable getStatsInternal(
-            final SysProcSelector selector,
-            final List<Long> siteIds,
-            final boolean interval,
-            final Long now,
-            VoltTable prevResults) {
+            VoltTable prevResults)
+    {
         assert selector != null;
-        assert siteIds != null;
-        assert siteIds.size() > 0;
         final HashMap<Long, ArrayList<StatsSource>> siteIdToStatsSources = registeredStatsSources.get(selector);
         assert siteIdToStatsSources != null;
 
-        ArrayList<StatsSource> statsSources = siteIdToStatsSources.get(siteIds.get(0));
         //Let these two be null since they are for pro features
         if (selector == SysProcSelector.DRNODE || selector == SysProcSelector.DRPARTITION) {
-            if (statsSources == null || statsSources.isEmpty()) {
+            if (siteIdToStatsSources == null || siteIdToStatsSources.isEmpty()) {
                 return null;
             }
         } else {
-            assert statsSources != null && !statsSources.isEmpty();
+            assert siteIdToStatsSources != null && !siteIdToStatsSources.isEmpty();
         }
+        // Just need a random site's list to do some things
+        ArrayList<StatsSource> sSources = siteIdToStatsSources.entrySet().iterator().next().getValue();
 
         /*
          * Some sources like TableStats use VoltTable to keep track of
@@ -560,10 +733,10 @@ public class StatsAgent {
          * case.
          */
         VoltTable.ColumnInfo columns[] = null;
-        if (!statsSources.get(0).isEEStats())
-            columns = statsSources.get(0).getColumnSchema().toArray(new VoltTable.ColumnInfo[0]);
+        if (!sSources.get(0).isEEStats())
+            columns = sSources.get(0).getColumnSchema().toArray(new VoltTable.ColumnInfo[0]);
         else {
-            final VoltTable table = statsSources.get(0).getStatsTable();
+            final VoltTable table = sSources.get(0).getStatsTable();
             if (table == null)
                 return null;
             columns = new VoltTable.ColumnInfo[table.getColumnCount()];
@@ -575,12 +748,10 @@ public class StatsAgent {
          // Append to previous results if provided.
         final VoltTable resultTable = prevResults != null ? prevResults : new VoltTable(columns);
 
-        for (Long siteId : siteIds) {
-            statsSources = siteIdToStatsSources.get(siteId);
+        for (ArrayList<StatsSource> statsSources : siteIdToStatsSources.values()) {
             assert statsSources != null;
             for (final StatsSource ss : statsSources) {
                 assert ss != null;
-
                 /*
                  * Some sources like TableStats use VoltTable to keep track of
                  * statistics

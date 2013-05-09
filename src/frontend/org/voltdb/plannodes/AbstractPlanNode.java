@@ -523,7 +523,11 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             }
         }
 
-        // NOTE: ignores inline nodes.
+        for (AbstractPlanNode inlined : m_inlineNodes.values()) {
+            if (inlined.hasAnyNodeOfType(type)) {
+                return true;
+            }
+        }
 
         return false;
     }

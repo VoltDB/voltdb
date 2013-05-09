@@ -70,7 +70,6 @@ import org.voltcore.utils.COWMap;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
-import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
@@ -161,7 +160,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private MemoryStats m_memoryStats = null;
     private StatsManager m_statsManager = null;
     private SnapshotCompletionMonitor m_snapshotCompletionMonitor;
+    // These are unused locally, but they need to be registered with the StatsAgent so they're
+    // globally available
+    @SuppressWarnings("unused")
     private InitiatorStats m_initiatorStats;
+    @SuppressWarnings("unused")
+    private LiveClientsStats m_liveClientsStats = null;
     int m_myHostId;
     long m_depCRC = -1;
     String m_serializedCatalog;
@@ -340,14 +344,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
             boolean isRejoin = false;
-            if (config.m_startAction == START_ACTION.REJOIN ||
-                    config.m_startAction == START_ACTION.LIVE_REJOIN) {
+            if (config.m_startAction.doesRejoin()) {
                 isRejoin = true;
             }
             m_rejoining = isRejoin;
             m_rejoinDataPending = isRejoin;
 
-            m_joining = config.m_startAction == START_ACTION.JOIN;
+            m_joining = config.m_startAction == StartAction.JOIN;
 
             // Set std-out/err to use the UTF-8 encoding and fail if UTF-8 isn't supported
             try {
@@ -470,10 +473,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
                 clusterConfig = new ClusterConfig(topo);
 
-                final long statsHSId = m_messenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID);
-                m_messenger.generateMailboxId(statsHSId);
-                hostLog.info("Registering stats mailbox id " + CoreUtils.hsIdToString(statsHSId));
-
                 // Make a list of HDIds to join
                 List<Long> hsidsToRejoin = new ArrayList<Long>();
                 for (Initiator init : m_iv2Initiators) {
@@ -488,9 +487,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
                     m_rejoinCoordinator = new Iv2RejoinCoordinator(m_messenger, hsidsToRejoin,
                             m_catalogContext.cluster.getVoltroot(),
-                            m_config.m_startAction == START_ACTION.LIVE_REJOIN);
+                            m_config.m_startAction == StartAction.LIVE_REJOIN);
                     m_messenger.registerMailbox(m_rejoinCoordinator);
-                    if (m_config.m_startAction == START_ACTION.LIVE_REJOIN) {
+                    if (m_config.m_startAction == StartAction.LIVE_REJOIN) {
                         hostLog.info("Using live rejoin.");
                     }
                     else {
@@ -548,6 +547,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_statsAgent.registerStatsSource(SysProcSelector.PARTITIONCOUNT,
                     0, m_partitionCountStats);
             m_initiatorStats = new InitiatorStats(m_myHostId);
+            m_liveClientsStats = new LiveClientsStats();
+            m_statsAgent.registerStatsSource(SysProcSelector.LIVECLIENTS, 0, m_liveClientsStats);
             m_latencyStats = new LatencyStats(m_myHostId);
 
             /*
@@ -654,7 +655,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         MPHSId = null;
                     }
                     m_statsManager = (StatsManager)statsManagerClass.newInstance();
-                    m_statsManager.initialize(localHSIds, MPHSId);
+                    m_statsManager.initialize();
                 }
             } catch (Exception e) {
                 hostLog.error("Failed to instantiate the JMX stats manager: " + e.getMessage() +
@@ -690,8 +691,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
             }
 
-            if (!m_joining && (m_cartographer.getPartitions().size() - 1) !=
-                    m_configuredNumberOfPartitions) {
+            if (!m_joining && (m_cartographer.getPartitionCount()) != m_configuredNumberOfPartitions) {
                 for (Map.Entry<Integer, ImmutableList<Long>> entry :
                     getSiteTrackerForSnapshot().m_partitionsToSitesImmutable.entrySet()) {
                     hostLog.info(entry.getKey() + " -- "
@@ -699,7 +699,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
                 VoltDB.crashGlobalVoltDB("Mismatch between configured number of partitions (" +
                         m_configuredNumberOfPartitions + ") and actual (" +
-                        (m_cartographer.getPartitions().size() - 1) + ")",
+                        m_cartographer.getPartitionCount() + ")",
                         true, null);
             }
 
@@ -738,10 +738,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     // Get topology information.  If rejoining, get it directly from
     // ZK.  Otherwise, try to do the write/read race to ZK on startup.
-    private JSONObject getTopology(START_ACTION startAction, Joiner joinCoordinator)
+    private JSONObject getTopology(StartAction startAction, Joiner joinCoordinator)
     {
         JSONObject topo = null;
-        if (startAction == START_ACTION.JOIN) {
+        if (startAction == StartAction.JOIN) {
             assert(joinCoordinator != null);
             topo = joinCoordinator.getTopology();
         }
@@ -769,7 +769,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     private List<Initiator> createIv2Initiators(Collection<Integer> partitions,
-                                                START_ACTION startAction,
+                                                StartAction startAction,
                                                 List<Pair<Integer, Long>> m_partitionsToSitesAtStartupForExportInit)
     {
         List<Initiator> initiators = new ArrayList<Initiator>();
@@ -1775,7 +1775,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
         }
 
-        if (m_config.m_startAction == START_ACTION.REJOIN) {
+        if (m_config.m_startAction == StartAction.REJOIN) {
             consoleLog.info(
                     "Node data recovery completed after " + delta + " seconds with " + megabytes +
                     " megabytes transferred at a rate of " +

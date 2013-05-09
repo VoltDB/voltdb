@@ -52,7 +52,6 @@ import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
 import org.voltdb.SystemProcedureCatalog.Config;
-import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.TransactionCreator;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -88,6 +87,7 @@ SnapshotCompletionInterest
     }
 
     private final static VoltLogger LOG = new VoltLogger("HOST");
+
     private String m_generatedRestoreBarrier2;
 
     // Different states the restore process can be in
@@ -119,7 +119,7 @@ SnapshotCompletionInterest
     private final SnapshotCompletionMonitor m_snapshotMonitor;
     private final Callback m_callback;
     private final Integer m_hostId;
-    private final START_ACTION m_action;
+    private final StartAction m_action;
     private final boolean m_clEnabled;
     private final String m_clPath;
     private final String m_clSnapshotPath;
@@ -373,7 +373,7 @@ SnapshotCompletionInterest
     }
 
     public RestoreAgent(ZooKeeper zk, SnapshotCompletionMonitor snapshotMonitor,
-                        Callback callback, int hostId, START_ACTION action, boolean clEnabled,
+                        Callback callback, int hostId, StartAction action, boolean clEnabled,
                         String clPath, String clSnapshotPath,
                         String snapshotPath, int[] allPartitions,
                         Set<Integer> liveHosts)
@@ -402,7 +402,7 @@ SnapshotCompletionInterest
             if (replayClass != null) {
                 Constructor<?> constructor =
                     replayClass.getConstructor(int.class,
-                                               START_ACTION.class,
+                                               StartAction.class,
                                                ZooKeeper.class,
                                                int.class,
                                                String.class,
@@ -556,7 +556,7 @@ SnapshotCompletionInterest
         Map<String, Snapshot> snapshots = new HashMap<String, SnapshotUtil.Snapshot>();
 
         // Only scan if startup might require a snapshot restore.
-        if (m_action == START_ACTION.RECOVER) {
+        if (m_action.doesRecover()) {
             snapshots = getSnapshots();
         }
 
@@ -632,7 +632,7 @@ SnapshotCompletionInterest
          * Generate the replay plan here so that we don't have to wait until the
          * snapshot restore finishes.
          */
-        if (m_action == START_ACTION.RECOVER) {
+        if (m_action.doesRecover()) {
             m_replayAgent.generateReplayPlan();
         }
 
@@ -907,7 +907,7 @@ SnapshotCompletionInterest
         List<String> children = waitOnVoltZK_restore();
 
         // If not recovering, nothing to do.
-        if (m_action == START_ACTION.CREATE) {
+        if (m_action == StartAction.CREATE) {
             return null;
         }
 
@@ -1155,7 +1155,7 @@ SnapshotCompletionInterest
     @Override
     public void onReplayCompletion() {
         if (!m_hasRestored && !m_replayAgent.hasReplayedSegments() &&
-            m_action == START_ACTION.RECOVER) {
+            m_action.doesRecover()) {
             /*
              * This means we didn't restore any snapshot, and there's no command
              * log to replay. But the user asked for recover
