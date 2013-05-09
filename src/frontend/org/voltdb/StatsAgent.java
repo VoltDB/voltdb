@@ -440,7 +440,7 @@ public class StatsAgent {
                 stats = null;
         }
 
-        // Send a response with no data since the stats is not supported
+        // Send a response with no data since the stats is not supported or not yet available
         if (stats == null) {
             ByteBuffer responseBuffer = ByteBuffer.allocate(8);
             responseBuffer.putLong(requestId);
@@ -714,15 +714,11 @@ public class StatsAgent {
     {
         assert selector != null;
         final HashMap<Long, ArrayList<StatsSource>> siteIdToStatsSources = registeredStatsSources.get(selector);
-        assert siteIdToStatsSources != null;
 
-        //Let these two be null since they are for pro features
-        if (selector == SysProcSelector.DRNODE || selector == SysProcSelector.DRPARTITION) {
-            if (siteIdToStatsSources == null || siteIdToStatsSources.isEmpty()) {
-                return null;
-            }
-        } else {
-            assert siteIdToStatsSources != null && !siteIdToStatsSources.isEmpty();
+        // There are cases early in rejoin where we can get polled before the server is ready to provide
+        // stats.  Just return null for now, which will result in no tables from this node.
+        if (siteIdToStatsSources == null || siteIdToStatsSources.isEmpty()) {
+            return null;
         }
         // Just need a random site's list to do some things
         ArrayList<StatsSource> sSources = siteIdToStatsSources.entrySet().iterator().next().getValue();
