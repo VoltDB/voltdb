@@ -57,10 +57,8 @@ import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.VoltProcedure.VoltAbortException;
-import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.SiteTracker;
@@ -118,7 +116,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     final HsqlBackend hsql;
     public volatile boolean m_shouldContinue = true;
 
-    private final long m_startupTime = System.currentTimeMillis();
     private PartitionDRGateway m_partitionDRGateway = null;
 
     /*
@@ -222,10 +219,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
     // Trigger if shutdown has been run already.
     private boolean haveShutdownAlready;
-
-    private final TableStats m_tableStats;
-    private final IndexStats m_indexStats;
-    private final StarvationTracker m_starvationTracker;
 
     // This message is used to start a local snapshot. The snapshot
     // is *not* automatically coordinated across the full node set.
@@ -612,7 +605,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
         // invoke native ee tick if at least one second has passed
         final long time = EstTime.currentTimeMillis();
-        final long prevLastTickTime = lastTickTime;
         if ((time - lastTickTime) >= 1000) {
             if ((lastTickTime != 0) && (ee != null)) {
                 ee.tick(time, lastCommittedTxnId);
@@ -621,87 +613,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         }
 
         // do other periodic work
-        m_snapshotter.doSnapshotWork(m_systemProcedureContext, ee, false);
-
-        /*
-         * grab the table statistics from ee and put it into the statistics
-         * agent if at least 1/3 of the statistics broadcast interval has past.
-         * This ensures that when the statistics are broadcasted, they are
-         * relatively up-to-date.
-         */
-        if (m_tableStats != null
-            && (time - prevLastTickTime) >= StatsManager.POLL_INTERVAL * 2) {
-            CatalogMap<Table> tables = m_context.database.getTables();
-            int[] tableIds = new int[tables.size()];
-            int i = 0;
-            for (Table table : tables) {
-                tableIds[i++] = table.getRelativeIndex();
-            }
-
-            // data to aggregate
-            long tupleCount = 0;
-            int tupleDataMem = 0;
-            int tupleAllocatedMem = 0;
-            int indexMem = 0;
-            int stringMem = 0;
-
-            // update table stats
-            final VoltTable[] s1 =
-                ee.getStats(SysProcSelector.TABLE, tableIds, false, time);
-            if (s1 != null) {
-                VoltTable stats = s1[0];
-                assert(stats != null);
-
-                // rollup the table memory stats for this site
-                while (stats.advanceRow()) {
-                    //Assert column index matches name for ENG-4092
-                    assert(stats.getColumnName(7).equals("TUPLE_COUNT"));
-                    tupleCount += stats.getLong(7);
-                    assert(stats.getColumnName(8).equals("TUPLE_ALLOCATED_MEMORY"));
-                    tupleAllocatedMem += (int) stats.getLong(8);
-                    assert(stats.getColumnName(9).equals("TUPLE_DATA_MEMORY"));
-                    tupleDataMem += (int) stats.getLong(9);
-                    assert(stats.getColumnName(10).equals("STRING_DATA_MEMORY"));
-                    stringMem += (int) stats.getLong(10);
-                }
-                stats.resetRowPosition();
-
-                m_tableStats.setStatsTable(stats);
-
-            }
-
-            // update index stats
-            final VoltTable[] s2 =
-                ee.getStats(SysProcSelector.INDEX, tableIds, false, time);
-            if ((s2 != null) && (s2.length > 0)) {
-                VoltTable stats = s2[0];
-                assert(stats != null);
-
-                // rollup the index memory stats for this site
-                while (stats.advanceRow()) {
-                    //Assert column index matches name for ENG-4092
-                    assert(stats.getColumnName(11).equals("MEMORY_ESTIMATE"));
-                    indexMem += stats.getLong(11);
-                }
-                stats.resetRowPosition();
-
-                m_indexStats.setStatsTable(stats);
-            }
-
-            // update the rolled up memory statistics
-            MemoryStats memoryStats = VoltDB.instance().getMemoryStatsSource();
-            if (memoryStats != null) {
-                memoryStats.eeUpdateMemStats(m_siteId,
-                                             tupleCount,
-                                             tupleDataMem,
-                                             tupleAllocatedMem,
-                                             indexMem,
-                                             stringMem,
-                                             ee.getThreadLocalPoolAllocations());
-            }
-        }
     }
-
 
     /**
      * SystemProcedures are "friends" with ExecutionSites and granted
@@ -796,9 +708,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         m_loadedProcedures = new LoadedProcedureSet(this, null, m_siteId, siteIndex);
         m_snapshotter = null;
         m_mailbox = null;
-        m_starvationTracker = null;
-        m_tableStats = null;
-        m_indexStats = null;
 
         // initialize the DR gateway
         m_partitionDRGateway = new PartitionDRGateway(false);
@@ -885,30 +794,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             snapshotPriority = m_context.cluster.getDeployment().get("deployment").
                 getSystemsettings().get("systemsettings").getSnapshotpriority();
         }
-        // TODO: Commented out because the constructor no longer takes a runnable.
-//        m_snapshotter = new SnapshotSiteProcessor(new Runnable() {
-//            @Override
-//            public void run() {
-//                m_mailbox.deliver(new PotentialSnapshotWorkMessage());
-//            }
-//        },
-//         snapshotPriority);
         m_snapshotter = null;
-
-        final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
-        m_starvationTracker = new StarvationTracker(getCorrespondingSiteId());
-        statsAgent.registerStatsSource(SysProcSelector.STARVATION,
-                                       m_siteId,
-                                       m_starvationTracker);
-        m_tableStats = new TableStats( getCorrespondingSiteId());
-        statsAgent.registerStatsSource(SysProcSelector.TABLE,
-                                       m_siteId,
-                                       m_tableStats);
-        m_indexStats = new IndexStats(getCorrespondingSiteId());
-        statsAgent.registerStatsSource(SysProcSelector.INDEX,
-                                       m_siteId,
-                                       m_indexStats);
-
     }
 
     private ExecutionEngine
@@ -983,9 +869,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                         if (hadWork) {
                             continue;
                         } else {
-                            m_starvationTracker.beginStarvation();
                             message = m_mailbox.recvBlocking(5);
-                            m_starvationTracker.endStarvation();
                         }
                     }
 
@@ -1299,64 +1183,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         }
     }
 
-    private void completeTransaction(TransactionState txnState) {
-        if (m_txnlog.isTraceEnabled())
-        {
-            m_txnlog.trace("FUZZTEST completeTransaction " + txnState.txnId);
-        }
-        if (!txnState.isReadOnly()) {
-            assert(latestUndoToken != kInvalidUndoToken);
-            assert(latestUndoToken >= txnState.getBeginUndoToken());
-
-            if (txnState.getBeginUndoToken() == kInvalidUndoToken) {
-                if (m_rejoining == false) {
-                    throw new AssertionError("Non-recovering write txn has invalid undo state.");
-                }
-            }
-            // release everything through the end of the current window.
-            else if (latestUndoToken > txnState.getBeginUndoToken()) {
-                ee.releaseUndoToken(latestUndoToken);
-            }
-
-            /*
-             * send to DR Agent if conditions are right
-             *
-             * If the txnId is from before the process started, caused by command
-             * log replay, then ignore it.
-             */
-            StoredProcedureInvocation invocation = txnState.getInvocation();
-            long ts = TransactionIdManager.getTimestampFromTransactionId(txnState.txnId);
-            if ((invocation != null) && (m_rejoining == false) && (ts > m_startupTime)) {
-                if (!txnState.needsRollback()) {
-                    m_partitionDRGateway.onSuccessfulProcedureCall(txnState.txnId,
-                                                                   ts,
-                                                                   txnState.getHash(),
-                                                                   invocation,
-                                                                   txnState.getResults());
-                }
-            }
-
-            // reset for error checking purposes
-            txnState.setBeginUndoToken(kInvalidUndoToken);
-        }
-
-        // advance the committed transaction point. Necessary for both Export
-        // commit tracking and for fault detection transaction partial-transaction
-        // resolution.
-        if (!txnState.needsRollback())
-        {
-            if (txnState.txnId > lastCommittedTxnId) {
-                lastCommittedTxnId = txnState.txnId;
-                lastCommittedTxnTime = EstTime.currentTimeMillis();
-                if (!txnState.isSinglePartition() && !txnState.isReadOnly())
-                {
-                    lastKnownGloballyCommitedMultiPartTxnId =
-                        Math.max(txnState.txnId, lastKnownGloballyCommitedMultiPartTxnId);
-                }
-            }
-        }
-    }
-
     private void handleMailboxMessage(VoltMessage message) {
         if (m_rejoining == true && m_recoveryProcessor == null && m_currentTransactionState != null) {
             m_recoveryMessageHandler.handleMessage(message, m_currentTransactionState.txnId);
@@ -1597,13 +1423,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                 }
             }
         }
-
-        /*
-         * Check and make sure the delta between site trackers matches the report of sites
-         * that have failed e.g. we got the right one
-         */
-        HashSet<Long> delta = new HashSet<Long>(m_tracker.m_allSitesImmutable);
-        delta.removeAll(newTracker.m_allSitesImmutable);
 
         /*
          * In this case there were concurrent failures and the necessary matching site trackers
@@ -1895,8 +1714,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             }
             m_rejoinLog.info("Scheduling snapshot after txnId " + globalInitiationPoint +
                                " for cluster partition fault. Current commit point: " + this.lastCommittedTxnId);
-
-            SnapshotSchedule schedule = m_context.cluster.getFaultsnapshots().get("CLUSTER_PARTITION");
         }
 
         // Fix safe transaction scoreboard in transaction queue
@@ -2189,26 +2006,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         return response;
     }
 
-    /**
-     * Try to execute a single partition procedure if one is available in the
-     * priority queue.
-     *
-     * @return false if there is no possibility for speculative work.
-     */
-    private boolean tryToSneakInASinglePartitionProcedure() {
-        // poll for an available message. don't block
-        VoltMessage message = m_mailbox.recv();
-        tick(); // unclear if this necessary (rtb)
-        if (message != null) {
-            handleMailboxMessage(message);
-            return true;
-        }
-        else {
-            // multipartition is next or no work
-            return false;
-        }
-    }
-
     public PartitionDRGateway getPartitionDRGateway() {
         return m_partitionDRGateway;
     }
@@ -2341,7 +2138,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
     @Override
     public byte[] planForFragmentId(long fragmentId) {
-        // TODO Auto-generated method stub
         return null;
     }
 }

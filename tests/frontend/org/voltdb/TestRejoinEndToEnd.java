@@ -27,7 +27,6 @@ import java.net.InetSocketAddress;
 
 import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
@@ -134,7 +133,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             try {
                 VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
                 config.m_enableIV2 = true;
-                config.m_startAction = START_ACTION.REJOIN;
+                config.m_startAction = StartAction.REJOIN;
                 config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
                 config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
                 config.m_leader = ":" + cluster.internalPort(1);
@@ -373,7 +372,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
         config.m_enableIV2 = true;
-        config.m_startAction = START_ACTION.REJOIN;
+        config.m_startAction = StartAction.REJOIN;
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         config.m_leader = ":" + cluster.internalPort(1);
@@ -443,7 +442,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
         config.m_enableIV2 = true;
-        config.m_startAction = START_ACTION.REJOIN;
+        config.m_startAction = StartAction.REJOIN;
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         config.m_leader = ":" + cluster.internalPort(1);
@@ -563,7 +562,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
         config.m_enableIV2 = true;
-        config.m_startAction = START_ACTION.REJOIN;
+        config.m_startAction = StartAction.REJOIN;
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         config.m_leader = ":" + cluster.internalPort(1);
@@ -675,7 +674,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
         config.m_enableIV2 = true;
-        config.m_startAction = START_ACTION.REJOIN;
+        config.m_startAction = StartAction.REJOIN;
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         config.m_leader = ":" + cluster.internalPort(1);
@@ -761,7 +760,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
         config.m_enableIV2 = true;
-        config.m_startAction = START_ACTION.REJOIN;
+        config.m_startAction = StartAction.REJOIN;
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         config.m_leader = ":" + cluster.internalPort(1);

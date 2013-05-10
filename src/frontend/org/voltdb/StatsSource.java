@@ -72,6 +72,10 @@ public abstract class StatsSource {
         m_hostname = hostname;
         m_hostId = hostId;
 
+        // Fill in an empty table for m_table so we're not returning null before
+        // tick() populates stats (in the EE cases, at least)
+        m_table = new VoltTable(columns.toArray(new ColumnInfo[columns.size()]));
+
         m_isEEStats = isEE;
     }
 

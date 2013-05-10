@@ -105,6 +105,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
     {
         // aggregates currently have their output schema specified
         m_outputSchema = schema.clone();
+        m_hasSignificantOutputSchema = true;
     }
 
 

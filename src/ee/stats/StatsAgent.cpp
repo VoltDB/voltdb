@@ -95,7 +95,6 @@ Table* StatsAgent::getStats(StatisticsSelectorType sst,
                             vector<CatalogId> catalogIds,
                             bool interval, int64_t now)
 {
-    assert (catalogIds.size() > 0);
     if (catalogIds.size() < 1) {
         return NULL;
     }

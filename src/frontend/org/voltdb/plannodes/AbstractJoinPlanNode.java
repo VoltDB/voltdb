@@ -107,6 +107,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         m_outputSchema =
             m_children.get(0).getOutputSchema().
             join(m_children.get(1).getOutputSchema()).copyAndReplaceWithTVE();
+        m_hasSignificantOutputSchema = true;
     }
 
     // Given any non-inlined type of join, this method will resolve the column
@@ -162,6 +163,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
             new_output_schema.addColumn(col);
         }
         m_outputSchema = new_output_schema;
+        m_hasSignificantOutputSchema = true;
 
         // Finally, resolve m_predicate
         List<TupleValueExpression> predicate_tves =

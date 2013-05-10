@@ -125,7 +125,7 @@ public class MockVoltDB implements VoltDBInterface
 
             m_hostMessenger.generateMailboxId(m_hostMessenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID));
             m_statsAgent = new StatsAgent();
-            m_statsAgent.getMailbox(m_hostMessenger,
+            m_statsAgent.registerMailbox(m_hostMessenger,
                     m_hostMessenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID));
             for (MailboxType type : MailboxType.values()) {
                 m_mailboxMap.put(type, new LinkedList<MailboxNodeContent>());

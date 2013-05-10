@@ -44,7 +44,6 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
-import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.export.ExportManager;
@@ -118,8 +117,7 @@ public class Inits {
         m_config = rvdb.m_config;
         // determine if this is a rejoining node
         // (used for license check and later the actual rejoin)
-        if (m_config.m_startAction == START_ACTION.REJOIN ||
-                m_config.m_startAction == START_ACTION.LIVE_REJOIN) {
+        if (m_config.m_startAction.doesRejoin()) {
             m_isRejoin = true;
         } else {
             m_isRejoin = false;
@@ -637,7 +635,7 @@ public class Inits {
         public void run() {
             try {
                 final long statsAgentHSId = m_rvdb.getHostMessenger().getHSIdForLocalSite(HostMessenger.STATS_SITE_ID);
-                m_rvdb.getStatsAgent().getMailbox(
+                m_rvdb.getStatsAgent().registerMailbox(
                             VoltDB.instance().getHostMessenger(),
                             statsAgentHSId);
                 m_rvdb.getAsyncCompilerAgent().createMailbox(

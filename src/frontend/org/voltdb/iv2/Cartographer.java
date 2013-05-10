@@ -276,6 +276,13 @@ public class Cartographer extends StatsSource
         return Cartographer.getPartitions(m_zk);
     }
 
+    public int getPartitionCount()
+    {
+        // The list returned by getPartitions includes the MP PID.  Need to remove that for the
+        // true partition count.
+        return Cartographer.getPartitions(m_zk).size() - 1;
+    }
+
     /**
      * Given a partition ID, return a list of HSIDs of all the sites with copies of that partition
      */

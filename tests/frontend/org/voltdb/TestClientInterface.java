@@ -462,17 +462,15 @@ public class TestClientInterface {
         ByteBuffer msg = createMsg("@Statistics", "DR", 0);
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
-        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(m_statsAgent).collectStats(any(Connection.class), anyInt(), captor.capture());
-        assertEquals("DR", captor.getValue());
+        verify(m_statsAgent).collectStats(any(Connection.class), anyInt(), eq("DR"), any(Boolean.class));
     }
 
     @Test
-    public void testStatisticsProc() throws IOException {
+    public void testStatisticsProc() throws Exception {
         ByteBuffer msg = createMsg("@Statistics", "table", 0);
-        StoredProcedureInvocation invocation =
-                readAndCheck(msg, "@Statistics", null, false, true, false, false);
-        assertEquals("table", invocation.getParameterAtIndex(0));
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNull(resp);
+        verify(m_statsAgent).collectStats(any(Connection.class), anyInt(), eq("TABLE"), any(Boolean.class));
     }
 
     @Test

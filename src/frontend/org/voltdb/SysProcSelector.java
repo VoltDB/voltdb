@@ -28,14 +28,15 @@ public enum SysProcSelector {
     MEMORY,           // info about node's memory usage
     LIVECLIENTS,      // info about the currently connected clients
     PLANNER,          // info about planner and EE performance and cache usage
-    MANAGEMENT,       //Returns pretty much everything
-
+    MANAGEMENT,       // Returns pretty much everything
+    PROCEDUREPROFILE, // performs an aggregation of the procedure statistics
     SNAPSHOTSTATUS,
 
     /*
      * DRPARTITION and DRNODE are internal names
      * Externally the selector is just "DR"
      */
+    DR,
     DRPARTITION,
     DRNODE,
 

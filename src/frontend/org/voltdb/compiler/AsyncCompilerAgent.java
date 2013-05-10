@@ -173,7 +173,7 @@ public class AsyncCompilerAgent {
                 plannedStmtBatch.addStatement(result);
             }
             catch (Exception e) {
-                errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e.getMessage());
+                errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e);
             }
         }
         else {
@@ -185,7 +185,7 @@ public class AsyncCompilerAgent {
                     plannedStmtBatch.addStatement(result);
                 }
                 catch (Exception e) {
-                    errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e.getMessage());
+                    errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e);
                 }
             }
         }

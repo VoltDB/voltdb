@@ -33,6 +33,7 @@ public class TableCountPlanNode extends AbstractScanPlanNode {
     public TableCountPlanNode(AbstractScanPlanNode child, AggregatePlanNode apn) {
         super();
         m_outputSchema = apn.getOutputSchema().clone();
+        m_hasSignificantOutputSchema = true;
         m_estimatedOutputTupleCount = 1;
         m_targetTableAlias = child.getTargetTableAlias();
         m_targetTableName = child.getTargetTableName();

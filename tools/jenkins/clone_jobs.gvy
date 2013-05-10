@@ -9,10 +9,11 @@ import hudson.model.*
 import hudson.plugins.cloneworkspace.*
 import hudson.tasks.Mailer
 
-def str_search = "system-test-nextrelease"
+def str_search_1 = "system-test-nextrelease"
+def str_search_2 = "performance-nextrelease"
 def str_oldbranch = "master"
 def str_branch = "release-3.2.0.1"
-def workspace_name = str_search.replace("nextrelease", str_branch)
+def workspace_name = str_search_1.replace("nextrelease", str_branch)
 //whitespace separated list of email addresses
 def recipientlist = "qa@voltdb.com"
 
@@ -23,7 +24,7 @@ BuildTimeoutWrapper.ABSOLUTE;
 
 for(item in Hudson.instance.items)
 {
-  if (item.getName().contains(str_search) && !item.disabled) {
+  if ( ! item.disabled && (item.getName().contains(str_search_1) || item.getName().contains(str_search_2))) {
 
       println("processing JOB : "+item.name)
 

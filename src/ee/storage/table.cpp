@@ -497,12 +497,6 @@ void Table::addIndex(TableIndex *index) {
 
     assert(!isExistingTableIndex(m_indexes, index));
 
-    // can't yet add a unique index to a non-emtpy table
-    // the problem is that there's no way to roll back this change if it fails
-    if (index->isUniqueIndex() && activeTupleCount() > 0) {
-        throwFatalException("Adding unique indexes to non-empty tables is unsupported.");
-    }
-
     // fill the index with tuples... potentially the slow bit
     TableTuple tuple(m_schema);
     TableIterator iter = iterator();

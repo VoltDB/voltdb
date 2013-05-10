@@ -458,10 +458,14 @@ public class AsyncBenchmark {
 
         // get the partition count
         ClientResponse resp = client.callProcedure("@Statistics", "PARTITIONCOUNT", 0);
+        if (resp.getStatus() != ClientResponse.SUCCESS) {
+            log.error(_F("Get partition count failed %s\n", resp.getStatusString()));
+            throw new RuntimeException();
+        }
         VoltTable[] tpc = resp.getResults();
         nPartitions=0;
         while (tpc[0].advanceRow()) {
-            nPartitions = (int) tpc[0].getLong(0);
+            nPartitions = (int) tpc[0].getLong("PARTITION_COUNT");
         }
         log.info(_F("partition count: %d\n", nPartitions));
         if (nPartitions < 2) {
