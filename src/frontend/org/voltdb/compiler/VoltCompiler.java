@@ -116,8 +116,6 @@ public class VoltCompiler {
 
     InMemoryJarfile m_jarOutput = null;
     Catalog m_catalog = null;
-    //Cluster m_cluster = null;
-    HSQLInterface m_hsql = null;
 
     DatabaseEstimates m_estimates = new DatabaseEstimates();
 
@@ -373,7 +371,6 @@ public class VoltCompiler {
             final String jarOutputPath,
             final String[] ddlFilePaths)
     {
-        m_hsql = null;
         m_projectFileURL = projectFileURL;
         m_jarOutputPath = jarOutputPath;
 
@@ -457,7 +454,7 @@ public class VoltCompiler {
      */
     HashMap<String, byte[]> getExplainPlans(Catalog catalog) {
         HashMap<String, byte[]> retval = new HashMap<String, byte[]>();
-        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        Database db = getCatalogDatabase();
         assert(db != null);
         for (Procedure proc : db.getProcedures()) {
             for (Statement stmt : proc.getStatements()) {
@@ -541,20 +538,34 @@ public class VoltCompiler {
             project.setDatabase(new DatabaseType());
         }
 
-        try {
-            compileXMLRootNode(project, ddlFilePaths);
-        } catch (final VoltCompilerException e) {
-            compilerLog.l7dlog( Level.ERROR, LogKeys.compiler_VoltCompiler_FailedToCompileXML.name(), null);
-            return null;
+        m_catalog = new Catalog();
+        // Initialize the catalog for one cluster
+        m_catalog.execute("add / clusters cluster");
+        m_catalog.getClusters().get("cluster").setSecurityenabled(false);
+
+        DatabaseType database = project.getDatabase();
+        if (database != null) {
+            final String databaseName = database.getName();
+            // schema does not verify that the database is named "database"
+            if (databaseName.equals("database") == false) {
+                compilerLog.l7dlog(Level.ERROR,
+                                   LogKeys.compiler_VoltCompiler_FailedToCompileXML.name(),
+                                   null);
+                return null;
+            }
+            // shutdown and make a new hsqldb
+            try {
+                compileDatabaseNode(database, ddlFilePaths);
+            } catch (final VoltCompilerException e) {
+                compilerLog.l7dlog( Level.ERROR, LogKeys.compiler_VoltCompiler_FailedToCompileXML.name(), null);
+                return null;
+            }
         }
         assert(m_catalog != null);
 
         // add epoch info to catalog
         final int epoch = (int)(TransactionIdManager.getEpoch() / 1000);
         m_catalog.getClusters().get("cluster").setLocalepoch(epoch);
-
-        // done handling files
-        m_currentFilename = null;
         return m_catalog;
     }
 
@@ -568,43 +579,38 @@ public class VoltCompiler {
         return m_catalog;
     }
 
-    void compileXMLRootNode(ProjectType project, String... ddlFilePaths) throws VoltCompilerException {
-        m_catalog = new Catalog();
-        temporaryCatalogInit();
+    private Database getCatalogDatabase() {
+        return m_catalog.getClusters().get("cluster").getDatabases().get("database");
+    }
 
-        DatabaseType database = project.getDatabase();
-        if (database != null) {
-            compileDatabaseNode(database, ddlFilePaths);
-        }
+    private Database initCatalogDatabase() {
+        // create the database in the catalog
+        m_catalog.execute("add /clusters[cluster] databases database");
+        return getCatalogDatabase();
     }
 
     /**
-     * Initialize the catalog for one cluster
+     * @param hsql
+     * @param ddlFilePaths
+     * @throws VoltCompilerException
      */
-    void temporaryCatalogInit() {
+    public Catalog loadSchema(HSQLInterface hsql, String... ddlFilePaths) throws VoltCompilerException
+    {
+        m_catalog = new Catalog(); //
         m_catalog.execute("add / clusters cluster");
-        m_catalog.getClusters().get("cluster").setSecurityenabled(false);
+        Database db = initCatalogDatabase();
+        final List<String> schemas = new ArrayList<String>(Arrays.asList(ddlFilePaths));
+        final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
+        db = compileDatabase(db, hsql, voltDdlTracker, schemas);
+        compileProcedures(db, hsql, voltDdlTracker);
+        return m_catalog;
     }
 
     void compileDatabaseNode(DatabaseType database, String... ddlFilePaths) throws VoltCompilerException {
-        final ArrayList<String> programs = new ArrayList<String>();
         final List<String> schemas = new ArrayList<String>(Arrays.asList(ddlFilePaths));
-        final ArrayList<ProcedureDescriptor> procedures = new ArrayList<ProcedureDescriptor>();
-        final ArrayList<Class<?>> classDependencies = new ArrayList<Class<?>>();
         final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
 
-        final String databaseName = database.getName();
-
-        // schema does not verify that the database is named "database"
-        if (databaseName.equals("database") == false) {
-            final String msg = "VoltDB currently requires all database elements to be named "+
-                         "\"database\" (found: \"" + databaseName + "\")";
-            throw new VoltCompilerException(msg);
-        }
-
-        // create the database in the catalog
-        m_catalog.execute("add /clusters[cluster] databases " + databaseName);
-        Database db = m_catalog.getClusters().get("cluster").getDatabases().get(databaseName);
+        Database db = initCatalogDatabase();
 
         // schemas/schema
         if (database.getSchemas() != null) {
@@ -642,13 +648,6 @@ public class VoltCompiler {
             }
         }
 
-        // classdependencies/classdependency
-        if (database.getClassdependencies() != null) {
-            for (Classdependency dep : database.getClassdependencies().getClassdependency()) {
-                classDependencies.add(getClassDependency(dep));
-            }
-        }
-
         // partitions/table
         if (database.getPartitions() != null) {
             for (org.voltdb.compiler.projectfile.PartitionsType.Partition table : database.getPartitions().getPartition()) {
@@ -657,17 +656,29 @@ public class VoltCompiler {
         }
 
         // shutdown and make a new hsqldb
-        m_hsql = HSQLInterface.loadHsqldb();
+        HSQLInterface hsql = HSQLInterface.loadHsqldb();
+        db = compileDatabase(db, hsql, voltDdlTracker, schemas);
 
-        // Actually parse and handle all the programs
-        for (final String programName : programs) {
-            m_catalog.execute("add " + db.getPath() + " programs " + programName);
+        // Process and add exports and connectors to the catalog
+        // Must do this before compiling procedures to deny updates
+        // on append-only tables.
+        if (database.getExport() != null) {
+            // currently, only a single connector is allowed
+            ExportType export = database.getExport();
+            compileExport(export, db);
         }
 
+        compileProcedures(db, hsql, voltDdlTracker);
+    }
+
+    Database compileDatabase(Database db, HSQLInterface hsql,
+                         VoltDDLElementTracker voltDdlTracker, List<String> schemas)
+        throws VoltCompilerException
+    {
         // Actually parse and handle all the DDL
         // DDLCompiler also provides partition descriptors for DDL PARTITION
         // and REPLICATE statements.
-        final DDLCompiler ddlcompiler = new DDLCompiler(this, m_hsql, voltDdlTracker, db);
+        final DDLCompiler ddlcompiler = new DDLCompiler(this, hsql, voltDdlTracker);
 
         for (final String schemaPath : schemas) {
             File schemaFile = null;
@@ -699,13 +710,14 @@ public class VoltCompiler {
             // add the file object's path to the list of files for the jar
             m_ddlFilePaths.put(schemaFile.getName(), schemaFile.getPath());
 
-            ddlcompiler.loadSchema(schemaFile.getAbsolutePath());
+            ddlcompiler.loadSchema(schemaFile.getAbsolutePath(), db);
         }
-        ddlcompiler.compileToCatalog(m_catalog, db);
+
+        ddlcompiler.compileToCatalog(db);
 
         // Actually parse and handle all the partitions
         // this needs to happen before procedures are compiled
-        String msg = "In database \"" + databaseName + "\", ";
+        String msg = "In database, ";
         final CatalogMap<Table> tables = db.getTables();
         for (String tableName : voltDdlTracker.m_partitionMap.keySet()) {
             String colName = voltDdlTracker.m_partitionMap.get(tableName);
@@ -748,10 +760,12 @@ public class VoltCompiler {
                 t.setPartitioncolumn(c);
                 t.setIsreplicated(false);
 
-                // Set the destination tables of associated views non-replicated.
+                // Set the partitioning of destination tables of associated views.
                 // If a view's source table is replicated, then a full scan of the
-                // associated view is singled-sited. If the source is partitioned,
-                // a full scan of the view must be distributed.
+                // associated view is single-sited. If the source is partitioned,
+                // a full scan of the view must be distributed, unless it is filtered
+                // by the original table's partitioning key, which, to be filtered,
+                // must also be a GROUP BY key.
                 final CatalogMap<MaterializedViewInfo> views = t.getViews();
                 for (final MaterializedViewInfo mvi : views) {
                     mvi.getDest().setIsreplicated(false);
@@ -764,7 +778,7 @@ public class VoltCompiler {
         String catData = m_catalog.serialize();
         m_catalog = new Catalog();
         m_catalog.execute(catData);
-        db = m_catalog.getClusters().get("cluster").getDatabases().get(databaseName);
+        db = getCatalogDatabase();
 
         // add database estimates info
         addDatabaseEstimatesInfo(m_estimates, db);
@@ -773,24 +787,19 @@ public class VoltCompiler {
         for( String exportedTableName: voltDdlTracker.getExportedTables()) {
             addExportTableToConnector(exportedTableName, db);
         }
+        return db;
+    }
 
-        // Process and add exports and connectors to the catalog
-        // Must do this before compiling procedures to deny updates
-        // on append-only tables.
-        if (database.getExport() != null) {
-            // currently, only a single connector is allowed
-            ExportType export = database.getExport();
-            compileExport(export, db);
-        }
-
+    void compileProcedures(Database db, HSQLInterface hsql, VoltDDLElementTracker voltDdlTracker)
+            throws VoltCompilerException
+    {
         // Generate the auto-CRUD procedure descriptors. This creates
         // procedure descriptors to insert, delete, select and update
         // tables, with some caveats. (See ENG-1601).
-        List<ProcedureDescriptor> autoCrudProcedures = generateCrud(m_catalog);
-        procedures.addAll(autoCrudProcedures);
+        final List<ProcedureDescriptor> procedures = generateCrud(m_catalog);
 
-        // Add procedures read from DDL and project file
-        procedures.addAll( voltDdlTracker.getProcedureDescriptors());
+        // Add procedures read from DDL file
+        procedures.addAll(voltDdlTracker.getProcedureDescriptors());
 
         // Actually parse and handle all the Procedures
         for (final ProcedureDescriptor procedureDescriptor : procedures) {
@@ -801,14 +810,10 @@ public class VoltCompiler {
             } else {
                 m_currentFilename = procedureName;
             }
-            ProcedureCompiler.compile(this, m_hsql, m_estimates, m_catalog, db, procedureDescriptor);
+            ProcedureCompiler.compile(this, hsql, m_estimates, m_catalog, db, procedureDescriptor);
         }
-
-        // Add all the class dependencies to the output jar
-        for (final Class<?> classDependency : classDependencies) {
-            addClassToJar( classDependency, this );
-        }
-
+        // done handling files
+        m_currentFilename = null;
     }
 
     private void setGroupedTablePartitionColumn(MaterializedViewInfo mvi, Column partitionColumn)
@@ -826,7 +831,7 @@ public class VoltCompiler {
         List<Column> destColumnArray = CatalogUtil.getSortedCatalogItems(destTable.getColumns(), "index");
         String partitionColName = partitionColumn.getTypeName(); // Note getTypeName gets the column name -- go figure.
         int index = 0;
-        for (ColumnRef cref : mvi.getGroupbycols()) {
+        for (ColumnRef cref : CatalogUtil.getSortedCatalogItems(mvi.getGroupbycols(), "index")) {
             Column srcCol = cref.getColumn();
             if (srcCol.getName().equals(partitionColName)) {
                 Column destCol = destColumnArray.get(index);
@@ -875,7 +880,7 @@ public class VoltCompiler {
     List<ProcedureDescriptor> generateCrud(Catalog catalog) {
         final LinkedList<ProcedureDescriptor> crudprocs = new LinkedList<ProcedureDescriptor>();
 
-        final Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        final Database db = getCatalogDatabase();
         for (Table table : db.getTables()) {
             if (CatalogUtil.isTableExportOnly(db, table)) {
                 compilerLog.debug("Skipping creation of CRUD procedures for export-only table " +
@@ -1524,8 +1529,7 @@ public class VoltCompiler {
     public void summarizeSuccess(PrintStream outputStream, PrintStream feedbackStream) {
         if (outputStream != null) {
 
-            Database database = m_catalog.getClusters().get("cluster").
-            getDatabases().get("database");
+            Database database = getCatalogDatabase();
 
             outputStream.println("------------------------------------------");
             outputStream.println("Successfully created " + m_jarOutputPath);
