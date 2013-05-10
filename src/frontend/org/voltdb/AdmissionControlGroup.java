@@ -16,7 +16,6 @@
  */
 package org.voltdb;
 
-
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
@@ -24,6 +23,7 @@ import java.util.Map;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.dtxn.InitiatorStats;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
+import org.voltdb.dtxn.LatencyStats.LatencyInfo;
 
 import com.google.common.collect.ImmutableMap;
 
@@ -98,6 +98,11 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
      */
     private volatile ImmutableMap<String, org.voltdb.dtxn.InitiatorStats.InvocationInfo> m_connectionStats =
             ImmutableMap.<String, org.voltdb.dtxn.InitiatorStats.InvocationInfo>builder().build();
+
+    // Use the same-ish trick for the latency stats.  LatencyInfo keeps
+    // volatile ImmutableLists for the buckets and a separate volatile max.
+    // Same single-writer, unsynchronized reader pattern as initiator stats.
+    private LatencyInfo m_latencyInfo = new LatencyInfo();
 
     public AdmissionControlGroup(int maxBytes, int maxRequests)
     {
@@ -302,9 +307,14 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
             m_connectionStats = builder.build();
         }
         info.processInvocation(delta, status);
+        m_latencyInfo.addSample(delta);
     }
 
     public Iterator<Map.Entry<String, InvocationInfo>> getInitiationStatsIterator() {
         return m_connectionStats.entrySet().iterator();
+    }
+
+    public LatencyInfo getLatencyInfo() {
+        return m_latencyInfo;
     }
 }

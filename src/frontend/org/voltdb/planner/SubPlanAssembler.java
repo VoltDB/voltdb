@@ -864,15 +864,23 @@ public abstract class SubPlanAssembler {
 
         VoltType keyType = indexableExpr.getValueType();
         VoltType otherType = otherExpr.getValueType();
-        // EE index key comparator should not lose precision when casting keys to indexed type.
+        // EE index key comparator should not lose precision when casting keys to the indexed type.
         // Do not choose an index that requires such a cast.
         if ( ! keyType.canExactlyRepresentAnyValueOf(otherType)) {
-            return null;
+            // Except the EE DOES contain the necessary logic to avoid loss of SCALE
+            // when the indexed type is just a narrower integer type.
+            // This is very important, since the typing for integer constants
+            // MAY not pay that much attention to minimizing scale.
+            // This was behind issue ENG-4606 -- failure to index on constant equality.
+            // So, accept any pair of integer types.
+            if ( ! (keyType.isInteger() && otherType.isInteger()))  {
+                return null;
+            }
         }
         // Left and right operands must not be from the same table,
         // e.g. where t.a = t.b is not indexable with the current technology.
         if (isOperandDependentOnTable(otherExpr, table)) {
-           return null;
+            return null;
         }
 
         if (coveringExpr == null) {

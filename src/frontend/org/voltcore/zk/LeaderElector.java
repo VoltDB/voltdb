@@ -177,12 +177,15 @@ public class LeaderElector {
     {
         node = createParticipantNode(zk, dir, prefix, data);
         Future<?> task = es.submit(electionEventHandler);
-        //Only do the extra work for watching children if a callback is registered
-        if (cb != null) {
-            es.submit(childrenEventHandler);
-        }
         if (block) {
             task.get();
+        }
+        //Only do the extra work for watching children if a callback is registered
+        if (cb != null) {
+            task = es.submit(childrenEventHandler);
+            if (block) {
+                task.get();
+            }
         }
     }
 

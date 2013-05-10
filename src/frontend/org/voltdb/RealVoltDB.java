@@ -473,10 +473,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
                 clusterConfig = new ClusterConfig(topo);
 
-                final long statsHSId = m_messenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID);
-                m_messenger.generateMailboxId(statsHSId);
-                hostLog.info("Registering stats mailbox id " + CoreUtils.hsIdToString(statsHSId));
-
                 // Make a list of HDIds to join
                 List<Long> hsidsToRejoin = new ArrayList<Long>();
                 for (Initiator init : m_iv2Initiators) {
