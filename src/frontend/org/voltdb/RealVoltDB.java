@@ -70,6 +70,7 @@ import org.voltcore.utils.COWMap;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
+import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
@@ -909,6 +910,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_messenger.setDeadHostTimeout(m_config.m_deadHostTimeoutMS);
             } else {
                 hostLog.info("Dead host timeout set to " + m_config.m_deadHostTimeoutMS + " milliseconds");
+            }
+
+            final String elasticSetting = m_deployment.getCluster().getElastic().trim().toUpperCase();
+            if (elasticSetting.equals("ENABLED")) {
+                TheHashinator.setConfiguredHashinatorType(HashinatorType.ELASTIC);
+            } else if (!elasticSetting.equals("DISABLED")) {
+                VoltDB.crashLocalVoltDB("Error in deployment file,  elastic attribute of " +
+                                        "cluster element must be " +
+                                        "'enabled' or 'disabled' but was '" + elasticSetting + "'", false, null);
             }
 
 
