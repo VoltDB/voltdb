@@ -188,7 +188,47 @@ public class StatsAgent {
         if (request.expectedStatsResponses > 0) return;
 
         m_pendingRequests.remove(requestId);
+
+        dispatchFinalAggregations(request);
         sendStatsResponse(request);
+    }
+
+    private void dispatchFinalAggregations(PendingStatsRequest request)
+    {
+        SysProcSelector selector = SysProcSelector.valueOf(request.selector);
+        switch (selector) {
+            case PROCEDUREPROFILE:
+                request.aggregateTables =
+                    aggregateProcedureProfileStats(request.aggregateTables);
+                break;
+            default:
+        }
+    }
+
+    /**
+     * Produce PROCEDUREPROFILE aggregation of PROCEDURE selector
+     */
+    private VoltTable[] aggregateProcedureProfileStats(VoltTable[] baseStats)
+    {
+        if (baseStats == null || baseStats.length != 1) {
+           return baseStats;
+        }
+
+        StatsProcProfTable timeTable = new StatsProcProfTable();
+        baseStats[0].resetRowPosition();
+        while (baseStats[0].advanceRow()) {
+            timeTable.updateTable(
+                    baseStats[0].getString("PROCEDURE"),
+                    baseStats[0].getLong("PARTITION_ID"),
+                    baseStats[0].getLong("TIMED_INVOCATIONS"),
+                    baseStats[0].getLong("INVOCATIONS"),
+                    baseStats[0].getLong("MIN_EXECUTION_TIME"),
+                    baseStats[0].getLong("MAX_EXECUTION_TIME"),
+                    baseStats[0].getLong("AVG_EXECUTION_TIME"),
+                    baseStats[0].getLong("FAILURES"),
+                    baseStats[0].getLong("ABORTS"));
+        }
+        return new VoltTable[] { timeTable.sortByAverage("EXECUTION_TIME") };
     }
 
     /**
@@ -415,6 +455,7 @@ public class StatsAgent {
                 stats = collectIndexStats(interval);
                 break;
             case PROCEDURE:
+            case PROCEDUREPROFILE:
                 stats = collectProcedureStats(interval);
                 break;
             case STARVATION:
@@ -604,6 +645,7 @@ public class StatsAgent {
         }
         return stats;
     }
+
 
     private VoltTable[] collectStarvationStats(boolean interval)
     {
