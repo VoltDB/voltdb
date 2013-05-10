@@ -589,15 +589,18 @@ public abstract class AbstractParsedStmt {
         }
         // collect individual where/join expressions
         Collection<AbstractExpression> exprList = joinTree.getAllExpressions();
-        analyzeValueEquivalence(exprList);
+        this.valueEquivalence.putAll(analyzeValueEquivalence(exprList));
     }
 
     /**
      */
-    void analyzeValueEquivalence(Collection<AbstractExpression> exprList) {
+    HashMap<AbstractExpression, Set<AbstractExpression> > analyzeValueEquivalence(Collection<AbstractExpression> exprList) {
+        HashMap<AbstractExpression, Set<AbstractExpression> > equivalenceSet =
+                new HashMap<AbstractExpression, Set<AbstractExpression> >();
         for (AbstractExpression expr : exprList) {
-            addExprToEquivalenceSets(expr);
+            addExprToEquivalenceSets(expr, equivalenceSet);
         }
+        return equivalenceSet;
     }
 
     /**
@@ -721,6 +724,12 @@ public abstract class AbstractParsedStmt {
         classifyOuterJoinExpressions(joinList, outerTables, innerTables,  joinNode.m_joinOuterList,
                 joinNode.m_joinInnerList, joinNode.m_joinInnerOuterList);
 
+        // Apply implied transitive constant filter to join expressions
+        // outer.partkey = ? and outer.partkey = inner.partkey is equivalent to
+        // outer.partkey = ? and inner.partkey = ?
+        applyTransitiveEquivalence(joinNode.m_joinInnerList, joinNode.m_joinInnerOuterList);
+        applyTransitiveEquivalence(joinNode.m_joinOuterList, joinNode.m_joinInnerOuterList);
+
         // Classify where expressions into the following categories:
         // 1. The OUTER-only filter conditions. If any are false for a given outer tuple,
         // nothing in the join processing of that outer tuple will get it past this filter,
@@ -732,6 +741,10 @@ public abstract class AbstractParsedStmt {
         // 4. The TVE expressions where neither inner nor outer tables are involved. Same as for the join expressions
         classifyOuterJoinExpressions(whereList, outerTables, innerTables,  joinNode.m_whereOuterList,
                 joinNode.m_whereInnerList, joinNode.m_whereInnerOuterList);
+
+        // Apply implied transitive constant filter to where expressions
+        applyTransitiveEquivalence(joinNode.m_whereInnerList, joinNode.m_whereInnerOuterList);
+        applyTransitiveEquivalence(joinNode.m_whereOuterList, joinNode.m_whereInnerOuterList);
     }
 
     /**
@@ -790,6 +803,47 @@ public abstract class AbstractParsedStmt {
                 multiTableSelectionList.add(expr);
             }
         }
+    }
+
+    private void applyTransitiveEquivalence(List<AbstractExpression> singleTableExprs, List<AbstractExpression> twoTableExprs) {
+        HashMap<AbstractExpression, Set<AbstractExpression> > eqMap1 = analyzeValueEquivalence(singleTableExprs);
+
+        ArrayList<AbstractExpression> simplifiedExprs = new ArrayList<AbstractExpression>();
+        for (AbstractExpression expr : twoTableExprs) {
+            if (! isSimpleEquivalenceExpression(expr)) {
+                continue;
+            }
+            AbstractExpression leftExpr = expr.getLeft();
+            AbstractExpression rightExpr = expr.getRight();
+            assert(leftExpr instanceof TupleValueExpression && rightExpr instanceof TupleValueExpression);
+            Set<AbstractExpression> eqSet1 = eqMap1.get(leftExpr);
+            AbstractExpression singleExpr = leftExpr;
+            if (eqSet1 == null) {
+                eqSet1 = eqMap1.get(rightExpr);
+                if (eqSet1 == null) {
+                    continue;
+                }
+                singleExpr = leftExpr;
+            }
+
+            for (AbstractExpression eqExpr : eqSet1) {
+                if (eqExpr instanceof ConstantValueExpression) {
+                    if (singleExpr == leftExpr) {
+                        expr.setLeft(eqExpr);
+                    } else {
+                        expr.setRight(eqExpr);
+                    }
+                    simplifiedExprs.add(expr);
+                    // Having more than one const value for a single column doesn't make
+                    // much sense, right?
+                    break;
+                }
+            }
+
+        }
+
+        singleTableExprs.addAll(simplifiedExprs);
+        twoTableExprs.removeAll(simplifiedExprs);
     }
 
     /**
@@ -897,50 +951,59 @@ public abstract class AbstractParsedStmt {
         return paramsById.get(paramId);
     }
 
-    private void addExprToEquivalenceSets(AbstractExpression expr) {
+    boolean isSimpleEquivalenceExpression(AbstractExpression expr) {
         // Ignore expressions that are not of COMPARE_EQUAL type
         if (expr.getExpressionType() != ExpressionType.COMPARE_EQUAL) {
+            return false;
+        }
+        AbstractExpression leftExpr = expr.getLeft();
+        AbstractExpression rightExpr = expr.getRight();
+        // Can't use an expression based on a column value that is not just a simple column value.
+        if ( ( ! (leftExpr instanceof TupleValueExpression)) && leftExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
+            return false;
+        }
+        if ( ( ! (rightExpr instanceof TupleValueExpression)) && rightExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
+            return false;
+        }
+        return true;
+    }
+
+    private void addExprToEquivalenceSets(AbstractExpression expr, HashMap<AbstractExpression, Set<AbstractExpression> > equivalenceSet) {
+        if (! isSimpleEquivalenceExpression(expr)) {
             return;
         }
 
         AbstractExpression leftExpr = expr.getLeft();
         AbstractExpression rightExpr = expr.getRight();
-        // Can't use an expression based on a column value that is not just a simple column value.
-        if ( ( ! (leftExpr instanceof TupleValueExpression)) && leftExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
-            return;
-        }
-        if ( ( ! (rightExpr instanceof TupleValueExpression)) && rightExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
-            return;
-        }
 
         // Any two asserted-equal expressions need to map to the same equivalence set,
         // which must contain them and must be the only such set that contains them.
         Set<AbstractExpression> eqSet1 = null;
-        if (valueEquivalence.containsKey(leftExpr)) {
-            eqSet1 = valueEquivalence.get(leftExpr);
+        if (equivalenceSet.containsKey(leftExpr)) {
+            eqSet1 = equivalenceSet.get(leftExpr);
         }
-        if (valueEquivalence.containsKey(rightExpr)) {
-            Set<AbstractExpression> eqSet2 = valueEquivalence.get(rightExpr);
+        if (equivalenceSet.containsKey(rightExpr)) {
+            Set<AbstractExpression> eqSet2 = equivalenceSet.get(rightExpr);
             if (eqSet1 == null) {
                 // Add new leftExpr into existing rightExpr's eqSet.
-                valueEquivalence.put(leftExpr, eqSet2);
+                equivalenceSet.put(leftExpr, eqSet2);
                 eqSet2.add(leftExpr);
             } else {
                 // Merge eqSets, re-mapping all the rightExpr's equivalents into leftExpr's eqset.
                 for (AbstractExpression eqMember : eqSet2) {
                     eqSet1.add(eqMember);
-                    valueEquivalence.put(eqMember, eqSet1);
+                    equivalenceSet.put(eqMember, eqSet1);
                 }
             }
         } else {
             if (eqSet1 == null) {
                 // Both leftExpr and rightExpr are new -- add leftExpr to the new eqSet first.
                 eqSet1 = new HashSet<AbstractExpression>();
-                valueEquivalence.put(leftExpr, eqSet1);
+                equivalenceSet.put(leftExpr, eqSet1);
                 eqSet1.add(leftExpr);
             }
             // Add new rightExpr into leftExpr's eqSet.
-            valueEquivalence.put(rightExpr, eqSet1);
+            equivalenceSet.put(rightExpr, eqSet1);
             eqSet1.add(rightExpr);
         }
     }

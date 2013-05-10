@@ -269,6 +269,71 @@ public class TestPlansJoin extends TestCase {
         assertTrue(p.getExpressionType() == ExpressionType.COMPARE_GREATERTHAN);
 }
 
+    public void testTransitiveValueEquivalenceConditions() {
+        // R1.A = R2.A AND R2.A = 1 => R1.A = 1 AND R2.A = 1
+        AbstractPlanNode pn = compile("select * FROM R1 LEFT JOIN R2 ON R1.A = R2.A AND R2.A = 1 ", 0, false, null);
+        AbstractPlanNode n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof AbstractJoinPlanNode);
+        AbstractExpression p = ((AbstractJoinPlanNode) n).getJoinPredicate();
+        assert(p != null &&  p.getExpressionType().equals(ExpressionType.CONJUNCTION_AND));
+        AbstractExpression l = p.getLeft();
+        AbstractExpression r = p.getRight();
+        assert(l.getExpressionType().equals(ExpressionType.COMPARE_EQUAL));
+        assert(r.getExpressionType().equals(ExpressionType.COMPARE_EQUAL));
+        assert(l.getLeft().getExpressionType().equals(ExpressionType.VALUE_CONSTANT));
+        assert(l.getRight().getExpressionType().equals(ExpressionType.VALUE_TUPLE));
+        assert(r.getLeft().getExpressionType().equals(ExpressionType.VALUE_TUPLE));
+        assert(r.getRight().getExpressionType().equals(ExpressionType.VALUE_CONSTANT));
+
+        // R1.A = R2.A AND R2.C = 1 => R1.A = R2.A AND R2.C = 1
+        pn = compile("select * FROM R1 LEFT JOIN R2 ON R1.A = R2.A AND R2.C = 1 ", 0, false, null);
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof AbstractJoinPlanNode);
+        p = ((AbstractJoinPlanNode) n).getJoinPredicate();
+        assert(p != null &&  p.getExpressionType().equals(ExpressionType.CONJUNCTION_AND));
+        l = p.getLeft();
+        r = p.getRight();
+        assert(l.getExpressionType().equals(ExpressionType.COMPARE_EQUAL));
+        assert(r.getExpressionType().equals(ExpressionType.COMPARE_EQUAL));
+        assert(l.getLeft().getExpressionType().equals(ExpressionType.VALUE_TUPLE));
+        assert(l.getRight().getExpressionType().equals(ExpressionType.VALUE_TUPLE));
+        assert(r.getLeft().getExpressionType().equals(ExpressionType.VALUE_TUPLE));
+        assert(r.getRight().getExpressionType().equals(ExpressionType.VALUE_CONSTANT));
+
+        // R1.A = R2.A AND R2.C = 1 => R1.A = R2.A AND ABS(R2.C) = 1
+        pn = compile("select * FROM R1 LEFT JOIN R2 ON R1.A = R2.A AND ABS(R2.C) = 1 ", 0, false, null);
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof AbstractJoinPlanNode);
+        p = ((AbstractJoinPlanNode) n).getJoinPredicate();
+        assert(p != null &&  p.getExpressionType().equals(ExpressionType.CONJUNCTION_AND));
+        l = p.getLeft();
+        r = p.getRight();
+        assert(l.getExpressionType().equals(ExpressionType.COMPARE_EQUAL));
+        assert(r.getExpressionType().equals(ExpressionType.COMPARE_EQUAL));
+        assert(l.getLeft().getExpressionType().equals(ExpressionType.VALUE_TUPLE));
+        assert(l.getRight().getExpressionType().equals(ExpressionType.VALUE_TUPLE));
+        assert(r.getLeft().getExpressionType().equals(ExpressionType.FUNCTION));
+        assert(r.getRight().getExpressionType().equals(ExpressionType.VALUE_CONSTANT));
+
+        // R1.A = R3.A - NLIJ
+        pn = compile("select * FROM R1 LEFT JOIN R3 ON R1.A = R3.A", 0, false, null);
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopIndexPlanNode);
+
+        // R1.A = R3.A and R1.A = 4 =>  R3.A = 4 and R1.A = 4  -- NLI/IndexScan
+        pn = compile("select * FROM R1 LEFT JOIN R3 ON R1.A = R3.A and R1.A = 4", 0, false, null);
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        p = ((AbstractJoinPlanNode) n).getJoinPredicate();
+        // R1.A = R3.A and R3.A = 4 =>  R3.A = 4 and R1.A = 4  -- NLI/IndexScan
+        pn = compile("select * FROM R1 LEFT JOIN R3 ON R1.A = R3.A and R3.A = 4", 0, false, null);
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        p = ((AbstractJoinPlanNode) n).getJoinPredicate();
+
+
+    }
+
     public void testFunctionJoinConditions() {
         AbstractPlanNode pn = compile("select * FROM R1 JOIN R2 ON ABS(R1.A) = ABS(R2.A) ", 0, false, null);
         AbstractPlanNode n = pn.getChild(0).getChild(0);

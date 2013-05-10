@@ -650,7 +650,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         AccessPath innerAccessPath = joinNode.m_rightNode.m_currentAccessPath;
 
         AbstractJoinPlanNode retval = null;
-        if (innerPlan instanceof IndexScanPlanNode) {
+        // In case of innerPlan being an IndexScan the NLIJ will have an advantage over the NLJ only
+        // if there is at least one join expression based on both inner and outer tables
+        // If not, NLJ/IndexScan is a better choice
+        if (innerPlan instanceof IndexScanPlanNode && ! joinNode.m_joinInnerOuterList.isEmpty()) {
             NestLoopIndexPlanNode nlijNode = new NestLoopIndexPlanNode();
 
             nlijNode.setJoinType(joinNode.m_rightNode.m_joinType);

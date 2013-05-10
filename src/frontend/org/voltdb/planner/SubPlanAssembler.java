@@ -171,7 +171,7 @@ public abstract class SubPlanAssembler {
         // join expressions for an index access (they will be pushed down to the
         // IndexScanNode instead of staying at the NL level)
         // The NLIJ only makes sense if the set of Inner-Outer join expressions is not empty
-        if (canDeferSendReceivePairForNode(joinNode.m_isReplicated) && ! joinNode.m_joinInnerOuterList.isEmpty()) {
+        if (canDeferSendReceivePairForNode(joinNode.m_isReplicated)) {
             // The inner table can have multiple index access paths based on
             // inner and inner-outer join expressions plus the naive one
             return getRelevantAccessPathsForTable(innerNode.m_table, joinExprList, null);
