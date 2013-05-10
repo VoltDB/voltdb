@@ -20,7 +20,6 @@ package org.voltdb;
 import java.lang.reflect.Constructor;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.Set;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -252,11 +251,15 @@ public abstract class TheHashinator {
         throw new RuntimeException("Should not reach here");
     }
 
+    private static volatile HashinatorType configuredHashinatorType = null;
     /**
      * By default returns HashinatorType.LEGACY, but for development another hashinator
      * can be specified using the environment variable or the Java property HASHINATOR
      */
     public static HashinatorType getConfiguredHashinatorType() {
+        if (configuredHashinatorType != null) {
+            return configuredHashinatorType;
+        }
         String hashinatorType = System.getenv("HASHINATOR");
         if (hashinatorType == null) {
             hashinatorType = System.getProperty("HASHINATOR", HashinatorType.LEGACY.name());
@@ -265,6 +268,10 @@ public abstract class TheHashinator {
             hostLogger.debug("Overriding hashinator to use " + hashinatorType);
         }
         return HashinatorType.valueOf(hashinatorType.trim().toUpperCase());
+    }
+
+    public static void setConfiguredHashinatorType(HashinatorType type) {
+        configuredHashinatorType = type;
     }
 
     /**
