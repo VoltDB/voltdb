@@ -21,7 +21,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeMap;
 
+import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
+import org.voltdb.compiler.DatabaseEstimates;
+import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
@@ -201,6 +204,16 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         return true;
     }
 
+    @Override
+    public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+
+        IndexScanPlanNode indexScan =
+                (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assert(indexScan != null);
+
+        m_estimatedOutputTupleCount = indexScan.getEstimatedOutputTupleCount() + childOutputTupleCountEstimate;
+        m_estimatedProcessedTupleCount = indexScan.getEstimatedProcessedTupleCount() + childOutputTupleCountEstimate;
+    }
 
     @Override
     protected String explainPlanForNode(String indent) {

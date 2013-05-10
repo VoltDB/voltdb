@@ -24,7 +24,10 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
+import org.voltdb.compiler.DatabaseEstimates;
+import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
@@ -189,6 +192,20 @@ public class OrderByPlanNode extends AbstractPlanNode {
             int index = input_schema.getIndexOfTve(tve);
             tve.setColumnIndex(index);
         }
+    }
+
+    @Override
+    public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+        // Make the cost of order-by nodes VERY BAD.
+        // This should favor any plan that can get away with not sorting over
+        // a plan that has to sort, except perhaps in extreme circumstances.
+        //
+        // What's really interesting here is costing an index scan who has sorted
+        // output vs. a lousier index scan that outputs tuples in sort order.
+        // Given how little we know about the data, we feel our best option is to
+        // heavily favor the index scan that has order.
+        m_estimatedOutputTupleCount = childOutputTupleCountEstimate;
+        m_estimatedProcessedTupleCount = childOutputTupleCountEstimate * 100;
     }
 
     @Override

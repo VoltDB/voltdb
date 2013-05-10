@@ -35,8 +35,6 @@ import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.PlanStatistics;
-import org.voltdb.planner.StatsField;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.PlanNodeType;
@@ -294,7 +292,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
 
         // HOW WE COST INDEXES
         // unique, covering index always wins
@@ -307,7 +305,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         Table target = db.getTables().getIgnoreCase(m_targetTableName);
         assert(target != null);
         DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(target.getTypeName());
-        stats.incrementStatistic(0, StatsField.TREE_INDEX_LEVELS_TRAVERSED, (long)(Math.log(tableEstimates.maxTuples)));
 
         // get the width of the index and number of columns used
         // need doubles for math
@@ -342,16 +339,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
         // If not a unique, covering index, favor (discount) the choice with the most columns pre-filteredby the index.
         if (!m_catalogIndex.getUnique() || (colCount > keyWidth)) {
-            // Cost starts at 90% of a comparable seqscan
-            // AND gets scaled down by an additional factor of 0.1 for each fully covered indexed column.
-            // One intentional benchmark is for a single range-covered (i.e. half-covered, keyWidth == 0.5) column
-            // to have less than 1/3 the cost of a "for ordering purposes only" index scan (keyWidth == 0).
-            // This is to completely compensate for the up to 3X final cost resulting from
-            // the "order by" and non-inlined "projection" nodes that must be added later to the
-            // inconveniently ordered scan result.
-            // Using a factor of 0.1 per FULLY covered (equality-filtered) column, the effective scale factor for
-            // a single PARTIALLY covered (range-filtered) comes to SQRT(0.1) which is just under 32% FTW!
-            tuplesToRead += (int) (tableEstimates.maxTuples * 0.90 * Math.pow(0.10, keyWidth));
+            // Cost starts at 80% of a comparable seqscan
+            // AND gets scaled down by an additional factor of 80% for each fully covered indexed column.
+            tuplesToRead += (int) (tableEstimates.maxTuples * 0.80 * Math.pow(0.20, keyWidth));
 
             // With all this discounting, make sure that any non-"covering unique" index scan costs more than
             // any "covering unique" one, no matter how many indexed column filters get piled on.
@@ -367,12 +357,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             }
         }
 
-        stats.incrementStatistic(0, StatsField.TUPLES_READ, tuplesToRead);
         // This tuplesToRead value estimates the number of base table tuples fetched from the index scan.
         // It's a vague measure of the cost of the scan whose accuracy depends a lot on what kind of
         // post-filtering needs to happen.
         // The tuplesRead value is also used here to estimate the number of RESULT rows.
-        // This valus is estimated without regard to any post-filtering effect there might be
+        // This value is estimated without regard to any post-filtering effect there might be
         // -- as if all rows found in the index passed any additional post-filter conditions.
         // This ignoring of post-filter effects is at least consistent with the processing in SeqScanPlanNode.
         // In effect, it gives index scans an "unfair" advantage -- follow-on sorts (etc.) are costed lower
@@ -382,6 +371,12 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         // In any case, it's important to keep this code roughly in synch with any changes
         // to SeqScanPlanNode's costing to make sure that SeqScanPlanNode never gains an unfair advantage.
         m_estimatedOutputTupleCount = tuplesToRead;
+        m_estimatedProcessedTupleCount = tuplesToRead;
+
+        // special case a unique match for the output count
+        if (m_catalogIndex.getUnique() && (colCount == keyWidth)) {
+            m_estimatedOutputTupleCount = 1;
+        }
     }
 
     @Override
