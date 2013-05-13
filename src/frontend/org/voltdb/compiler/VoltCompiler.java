@@ -29,7 +29,6 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -331,20 +330,6 @@ public class VoltCompiler {
     }
 
     /**
-     * Compile from a set of DDL files, but no project.xml.
-     *
-     * @param jarOutputPath The location to put the finished JAR to.
-     * @param ddlFilePaths The collection of DDL files to compile (at least one is required).
-     * @return true if successful
-     */
-    public boolean compileFromDDL(
-            final String jarOutputPath,
-            final Collection<String> ddlFilePaths)
-    {
-        return compileInternal(null, jarOutputPath, ddlFilePaths.toArray(new String[ddlFilePaths.size()]));
-    }
-
-    /**
      * Compile using a project.xml file (DEPRECATED).
      *
      * @param projectFileURL URL of the project file.
@@ -590,8 +575,12 @@ public class VoltCompiler {
     }
 
     /**
-     * @param hsql
-     * @param ddlFilePaths
+     * Simplified interface for loading a ddl file with full support for VoltDB
+     * extensions (partitioning, procedures, export), but no support for "project file" input.
+     * This is, at least initially, only a back door to create a fully functional catalog for
+     * the purposes of planner unit testing.
+     * @param hsql an interface to the hsql frontend, initialized and potentially reused by the caller.
+     * @param ddlFilePaths schema file paths
      * @throws VoltCompilerException
      */
     public Catalog loadSchema(HSQLInterface hsql, String... ddlFilePaths) throws VoltCompilerException
@@ -601,11 +590,18 @@ public class VoltCompiler {
         Database db = initCatalogDatabase();
         final List<String> schemas = new ArrayList<String>(Arrays.asList(ddlFilePaths));
         final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
-        db = compileDatabase(db, hsql, voltDdlTracker, schemas);
-        compileProcedures(db, hsql, voltDdlTracker);
+        compileDatabase(db, hsql, voltDdlTracker, schemas, null);
         return m_catalog;
     }
 
+    /**
+     * Legacy interface for loading a ddl file with full support for VoltDB
+     * extensions (partitioning, procedures, export),
+     * AND full support for input via a project xml file's "database" node.
+     * @param database catalog-related info parsed from a project file
+     * @param ddlFilePaths schema file paths
+     * @throws VoltCompilerException
+     */
     void compileDatabaseNode(DatabaseType database, String... ddlFilePaths) throws VoltCompilerException {
         final List<String> schemas = new ArrayList<String>(Arrays.asList(ddlFilePaths));
         final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
@@ -657,22 +653,16 @@ public class VoltCompiler {
 
         // shutdown and make a new hsqldb
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
-        db = compileDatabase(db, hsql, voltDdlTracker, schemas);
-
-        // Process and add exports and connectors to the catalog
-        // Must do this before compiling procedures to deny updates
-        // on append-only tables.
-        if (database.getExport() != null) {
-            // currently, only a single connector is allowed
-            ExportType export = database.getExport();
-            compileExport(export, db);
-        }
-
-        compileProcedures(db, hsql, voltDdlTracker);
+        compileDatabase(db, hsql, voltDdlTracker, schemas, database.getExport());
     }
 
-    Database compileDatabase(Database db, HSQLInterface hsql,
-                         VoltDDLElementTracker voltDdlTracker, List<String> schemas)
+    /**
+     * Common code for schema loading shared by loadSchema and compileDatabaseNode
+     * @param exportType
+     */
+    private void compileDatabase(Database db, HSQLInterface hsql,
+                                 VoltDDLElementTracker voltDdlTracker, List<String> schemas,
+                                 ExportType export)
         throws VoltCompilerException
     {
         // Actually parse and handle all the DDL
@@ -787,12 +777,15 @@ public class VoltCompiler {
         for( String exportedTableName: voltDdlTracker.getExportedTables()) {
             addExportTableToConnector(exportedTableName, db);
         }
-        return db;
-    }
 
-    void compileProcedures(Database db, HSQLInterface hsql, VoltDDLElementTracker voltDdlTracker)
-            throws VoltCompilerException
-    {
+        // Process and add exports and connectors to the catalog
+        // Must do this before compiling procedures to deny updates
+        // on append-only tables.
+        if (export != null) {
+            // currently, only a single connector is allowed
+            compileExport(export, db);
+        }
+
         // Generate the auto-CRUD procedure descriptors. This creates
         // procedure descriptors to insert, delete, select and update
         // tables, with some caveats. (See ENG-1601).
@@ -877,7 +870,7 @@ public class VoltCompiler {
      * @param catalog
      * @return a list of new procedure descriptors
      */
-    List<ProcedureDescriptor> generateCrud(Catalog catalog) {
+    private List<ProcedureDescriptor> generateCrud(Catalog catalog) {
         final LinkedList<ProcedureDescriptor> crudprocs = new LinkedList<ProcedureDescriptor>();
 
         final Database db = getCatalogDatabase();
@@ -1365,7 +1358,7 @@ public class VoltCompiler {
         }
     }
 
-    void compileExport(final ExportType export, final Database catdb)
+    private void compileExport(final ExportType export, final Database catdb)
         throws VoltCompilerException
     {
         // Test the error paths before touching the catalog
