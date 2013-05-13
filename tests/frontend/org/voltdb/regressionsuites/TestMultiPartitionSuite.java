@@ -232,6 +232,7 @@ public class TestMultiPartitionSuite extends RegressionSuite {
         }
         catch (Exception e) {
             System.err.println("==========");
+            System.err.println("Following stacktrace is expected:");
             e.printStackTrace();
             System.err.println("==========");
 
@@ -247,6 +248,7 @@ public class TestMultiPartitionSuite extends RegressionSuite {
         }
         catch (Exception e) {
             System.err.println("==========");
+            System.err.println("Following stacktrace is expected:");
             e.printStackTrace();
             System.err.println("==========");
 

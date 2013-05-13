@@ -26,7 +26,6 @@ package org.voltdb_testprocs.regressionsuites.multipartitionprocs;
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
 
 @ProcInfo (
     partitionInfo = "NEW_ORDER.NO_W_ID: 0",
@@ -36,8 +35,13 @@ public class MispartitionedUpdate extends VoltProcedure {
 
     public final SQLStmt update = new SQLStmt("UPDATE NEW_ORDER SET NO_W_ID = ? WHERE NO_W_ID = ?;");
 
-    public VoltTable[] run(short partitionValue) {
-        voltQueueSQL(update, partitionValue + 1, partitionValue);
-        return voltExecuteSQL(true);
+    public long run(short partitionValue) {
+        // basically, try 1000 different partition keys and assume one of them
+        // is partitioned wrong
+        for (int i = 0; i < 1000; i++) {
+            voltQueueSQL(update, partitionValue + i, partitionValue);
+            voltExecuteSQL();
+        }
+        return 0;
     }
 }
