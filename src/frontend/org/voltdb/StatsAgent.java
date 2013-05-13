@@ -242,13 +242,13 @@ public class StatsAgent {
     }
 
     public void collectStats(final Connection c, final long clientHandle, final String selector,
-            final boolean interval) throws Exception
+            final boolean interval, final ParameterSet params) throws Exception
     {
         m_es.submit(new Runnable() {
             @Override
             public void run() {
                 try {
-                    collectStatsImpl(c, clientHandle, selector, interval);
+                    collectStatsImpl(c, clientHandle, selector, interval, params);
                 } catch (Throwable e) {
                     hostLog.warn("Exception while attempting to collect stats", e);
                 }
@@ -256,8 +256,8 @@ public class StatsAgent {
         });
     }
 
-    private void collectStatsImpl(Connection c, long clientHandle, String selector, boolean interval)
-        throws Exception
+    private void collectStatsImpl(Connection c, long clientHandle, String selector, boolean interval,
+            ParameterSet params) throws Exception
     {
         if (m_pendingRequests.size() > MAX_IN_FLIGHT_REQUESTS) {
             /*

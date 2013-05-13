@@ -1724,7 +1724,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         try {
-            VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, selector, interval);
+            VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, selector, interval,
+                    task.getParams());
             return null;
         } catch (Exception e) {
             return errorResponse( ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);
