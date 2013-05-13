@@ -99,8 +99,9 @@ public class StatsAgent {
         m_messenger = null;
     }
 
-    public void getMailbox(final HostMessenger hostMessenger, final long hsId) {
+    public void registerMailbox(final HostMessenger hostMessenger, final long hsId) {
         m_messenger = hostMessenger;
+        m_messenger.generateMailboxId(hsId);
         m_mailbox = new LocalMailbox(hostMessenger, hsId) {
             @Override
             public void deliver(final VoltMessage message) {
@@ -187,7 +188,47 @@ public class StatsAgent {
         if (request.expectedStatsResponses > 0) return;
 
         m_pendingRequests.remove(requestId);
+
+        dispatchFinalAggregations(request);
         sendStatsResponse(request);
+    }
+
+    private void dispatchFinalAggregations(PendingStatsRequest request)
+    {
+        SysProcSelector selector = SysProcSelector.valueOf(request.selector);
+        switch (selector) {
+            case PROCEDUREPROFILE:
+                request.aggregateTables =
+                    aggregateProcedureProfileStats(request.aggregateTables);
+                break;
+            default:
+        }
+    }
+
+    /**
+     * Produce PROCEDUREPROFILE aggregation of PROCEDURE selector
+     */
+    private VoltTable[] aggregateProcedureProfileStats(VoltTable[] baseStats)
+    {
+        if (baseStats == null || baseStats.length != 1) {
+           return baseStats;
+        }
+
+        StatsProcProfTable timeTable = new StatsProcProfTable();
+        baseStats[0].resetRowPosition();
+        while (baseStats[0].advanceRow()) {
+            timeTable.updateTable(
+                    baseStats[0].getString("PROCEDURE"),
+                    baseStats[0].getLong("PARTITION_ID"),
+                    baseStats[0].getLong("TIMED_INVOCATIONS"),
+                    baseStats[0].getLong("INVOCATIONS"),
+                    baseStats[0].getLong("MIN_EXECUTION_TIME"),
+                    baseStats[0].getLong("MAX_EXECUTION_TIME"),
+                    baseStats[0].getLong("AVG_EXECUTION_TIME"),
+                    baseStats[0].getLong("FAILURES"),
+                    baseStats[0].getLong("ABORTS"));
+        }
+        return new VoltTable[] { timeTable.sortByAverage("EXECUTION_TIME") };
     }
 
     /**
@@ -414,6 +455,7 @@ public class StatsAgent {
                 stats = collectIndexStats(interval);
                 break;
             case PROCEDURE:
+            case PROCEDUREPROFILE:
                 stats = collectProcedureStats(interval);
                 break;
             case STARVATION:
@@ -439,7 +481,7 @@ public class StatsAgent {
                 stats = null;
         }
 
-        // Send a response with no data since the stats is not supported
+        // Send a response with no data since the stats is not supported or not yet available
         if (stats == null) {
             ByteBuffer responseBuffer = ByteBuffer.allocate(8);
             responseBuffer.putLong(requestId);
@@ -604,6 +646,7 @@ public class StatsAgent {
         return stats;
     }
 
+
     private VoltTable[] collectStarvationStats(boolean interval)
     {
         Long now = System.currentTimeMillis();
@@ -713,15 +756,11 @@ public class StatsAgent {
     {
         assert selector != null;
         final HashMap<Long, ArrayList<StatsSource>> siteIdToStatsSources = registeredStatsSources.get(selector);
-        assert siteIdToStatsSources != null;
 
-        //Let these two be null since they are for pro features
-        if (selector == SysProcSelector.DRNODE || selector == SysProcSelector.DRPARTITION) {
-            if (siteIdToStatsSources == null || siteIdToStatsSources.isEmpty()) {
-                return null;
-            }
-        } else {
-            assert siteIdToStatsSources != null && !siteIdToStatsSources.isEmpty();
+        // There are cases early in rejoin where we can get polled before the server is ready to provide
+        // stats.  Just return null for now, which will result in no tables from this node.
+        if (siteIdToStatsSources == null || siteIdToStatsSources.isEmpty()) {
+            return null;
         }
         // Just need a random site's list to do some things
         ArrayList<StatsSource> sSources = siteIdToStatsSources.entrySet().iterator().next().getValue();

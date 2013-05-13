@@ -80,7 +80,7 @@ def run_once(name, command, statements_path, results_path, testConfigKit):
         server = subprocess.Popen(command + " backend=" + name, shell = True)
 
     client = None
-    for i in xrange(10):
+    for i in xrange(30):
         try:
             client = VoltQueryClient(host, port)
             client.set_quiet(True)
@@ -467,7 +467,7 @@ if __name__ == "__main__":
     success = True
     statistics = {}
     for config_name in configs_to_run:
-        print >> sys.stderr, "SQLCOVERAGE: STARTING ON CONFIG: %s" % config_name
+        print >> sys.stderr, "\nSQLCOVERAGE: STARTING ON CONFIG: %s\n" % config_name
         report_dir = output_dir + '/' + config_name
         config = config_list.get_config(config_name)
         if(options.hostname != None and options.hostname != defaultHost):

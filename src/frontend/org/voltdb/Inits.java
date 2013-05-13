@@ -635,7 +635,7 @@ public class Inits {
         public void run() {
             try {
                 final long statsAgentHSId = m_rvdb.getHostMessenger().getHSIdForLocalSite(HostMessenger.STATS_SITE_ID);
-                m_rvdb.getStatsAgent().getMailbox(
+                m_rvdb.getStatsAgent().registerMailbox(
                             VoltDB.instance().getHostMessenger(),
                             statsAgentHSId);
                 m_rvdb.getAsyncCompilerAgent().createMailbox(
