@@ -24,10 +24,12 @@
 package org.voltdb.planner;
 
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.NestLoopPlanNode;
+import org.voltdb.plannodes.SeqScanPlanNode;
 
 
 public class TestJoinOrder extends PlannerTestCase {
-    /*public void testBasicJoinOrder() {
+    public void testBasicJoinOrder() {
         AbstractPlanNode pn = compileWithJoinOrder("select * FROM T1, T2, T3, T4, T5, T6, T7", "T7,T6,T5,T4,T3,T2,T1");
         AbstractPlanNode n = pn.getChild(0).getChild(0);
         for (int ii = 1; ii <= 7; ii++) {
@@ -59,7 +61,7 @@ public class TestJoinOrder extends PlannerTestCase {
                 n = node.getChild(1);
             }
         }
-    }*/
+    }
 
     public void testENG4671() {
         String sql = "SELECT " +

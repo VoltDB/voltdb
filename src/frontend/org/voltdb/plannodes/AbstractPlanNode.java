@@ -266,7 +266,17 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         return getPlanNodeType() + "[" + m_id + "]";
     }
 
-    public final void computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    /**
+     * Called to compute cost estimates and statistics on a plan graph. Computing of the costs
+     * should be idempotent, but updating the PlanStatistics instance isn't, so this should
+     * be called once per finished graph, and once per PlanStatistics instance.
+     */
+    public final void computeEstimatesRecursively(PlanStatistics stats,
+                                                  Cluster cluster,
+                                                  Database db,
+                                                  DatabaseEstimates estimates,
+                                                  ScalarValueHints[] paramHints)
+    {
         assert(stats != null);
 
         m_outputColumnHints.clear();
@@ -284,7 +294,18 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         stats.incrementStatistic(0, StatsField.TUPLES_READ, m_estimatedProcessedTupleCount);
     }
 
-    protected void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    /**
+     * Given the number of tuples expected as input to this node, compute an estimate
+     * of the number of tuples read/processed and the number of tuples output.
+     * This will be called by
+     * {@see AbstractPlanNode#computeEstimatesRecursively(PlanStatistics, Cluster, Database, DatabaseEstimates, ScalarValueHints[])}.
+     */
+    protected void computeCostEstimates(long childOutputTupleCountEstimate,
+                                        Cluster cluster,
+                                        Database db,
+                                        DatabaseEstimates estimates,
+                                        ScalarValueHints[] paramHints)
+    {
         m_estimatedOutputTupleCount = childOutputTupleCountEstimate;
         m_estimatedProcessedTupleCount = childOutputTupleCountEstimate;
     }

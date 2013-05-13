@@ -339,9 +339,16 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
         // If not a unique, covering index, favor (discount) the choice with the most columns pre-filteredby the index.
         if (!m_catalogIndex.getUnique() || (colCount > keyWidth)) {
-            // Cost starts at 80% of a comparable seqscan
-            // AND gets scaled down by an additional factor of 80% for each fully covered indexed column.
-            tuplesToRead += (int) (tableEstimates.maxTuples * 0.80 * Math.pow(0.20, keyWidth));
+            // Cost starts at 90% of a comparable seqscan
+            // AND gets scaled down by an additional factor of 0.1 for each fully covered indexed column.
+            // One intentional benchmark is for a single range-covered (i.e. half-covered, keyWidth == 0.5) column
+            // to have less than 1/3 the cost of a "for ordering purposes only" index scan (keyWidth == 0).
+            // This is to completely compensate for the up to 3X final cost resulting from
+            // the "order by" and non-inlined "projection" nodes that must be added later to the
+            // inconveniently ordered scan result.
+            // Using a factor of 0.1 per FULLY covered (equality-filtered) column, the effective scale factor for
+            // a single PARTIALLY covered (range-filtered) comes to SQRT(0.1) which is just under 32% FTW!
+            tuplesToRead += (int) (tableEstimates.maxTuples * 0.90 * Math.pow(0.10, keyWidth));
 
             // With all this discounting, make sure that any non-"covering unique" index scan costs more than
             // any "covering unique" one, no matter how many indexed column filters get piled on.

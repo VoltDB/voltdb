@@ -195,17 +195,25 @@ public class OrderByPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
-        // Make the cost of order-by nodes VERY BAD.
-        // This should favor any plan that can get away with not sorting over
-        // a plan that has to sort, except perhaps in extreme circumstances.
+    public void computeCostEstimates(long childOutputTupleCountEstimate,
+                                     Cluster cluster,
+                                     Database db,
+                                     DatabaseEstimates estimates,
+                                     ScalarValueHints[] paramHints)
+    {
+        // This method doesn't do anything besides what the parent method does,
+        // but it is a nice place to put a comment. Really, sorts should be pretty
+        // expensive and they're not costed as such yet because sometimes that
+        // backfires in our simplistic model.
         //
         // What's really interesting here is costing an index scan who has sorted
-        // output vs. a lousier index scan that outputs tuples in sort order.
-        // Given how little we know about the data, we feel our best option is to
-        // heavily favor the index scan that has order.
+        // output vs. an index scan that filters out a bunch of tuples, but still
+        // requires a sort. Which is best depends on how well the filter reduces the
+        // number of tuples, and that's not possible for us to know right now.
+        // The index scanner cost has been pretty carefully set up to do what we think
+        // we want, given the lack of table stats.
         m_estimatedOutputTupleCount = childOutputTupleCountEstimate;
-        m_estimatedProcessedTupleCount = childOutputTupleCountEstimate * 100;
+        m_estimatedProcessedTupleCount = childOutputTupleCountEstimate;
     }
 
     @Override

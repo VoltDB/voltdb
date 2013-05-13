@@ -207,6 +207,11 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
     @Override
     public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
 
+        // Add the cost of the inlined index scan to the cost of processing the input tuples.
+        // This isn't really a fair representation of what's going on, as the index is scanned once
+        // per input tuple, but I think it will still cause the plan selector to pick the join
+        // order with the lowest total access cost.
+
         IndexScanPlanNode indexScan =
                 (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
         assert(indexScan != null);
