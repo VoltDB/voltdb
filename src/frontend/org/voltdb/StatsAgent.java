@@ -275,13 +275,8 @@ public class StatsAgent {
                 }
             }
             if (!foundExpiredRequest) {
-                final ClientResponseImpl errorResponse =
-                    new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
-                                         new VoltTable[0], "Too many pending stat requests", clientHandle);
-                ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-                buf.putInt(buf.capacity() - 4);
-                errorResponse.flattenToBuffer(buf).flip();
-                c.writeStream().enqueue(buf);
+                sendErrorResponse(c, ClientResponse.GRACEFUL_FAILURE, "Too many pending stat requests",
+                        clientHandle);
                 return;
             }
         }
@@ -345,17 +340,9 @@ public class StatsAgent {
         }
         hostLog.warn("Stats request " + requestId + " timed out, sending error to client");
 
-        ClientResponseImpl response =
-            new ClientResponseImpl(
-                    ClientResponse.GRACEFUL_FAILURE,
-                    ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
-                    null,
-                    new VoltTable[0], "Stats request hit sixty second timeout before all responses were received");
-        response.setClientHandle(psr.clientData);
-        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
-        buf.putInt(buf.capacity() - 4);
-        response.flattenToBuffer(buf).flip();
-        psr.c.writeStream().enqueue(buf);
+        sendErrorResponse(psr.c, ClientResponse.GRACEFUL_FAILURE,
+                "Stats request hit sixty second timeout before all responses were received",
+                psr.clientData);
     }
 
     private void sendStatsResponse(PendingStatsRequest request) throws Exception {
@@ -847,5 +834,15 @@ public class StatsAgent {
     public void shutdown() throws InterruptedException {
         m_es.shutdown();
         m_es.awaitTermination(1, TimeUnit.DAYS);
+    }
+
+    void sendErrorResponse(Connection c, byte status, String reason, long handle)
+    {
+        ClientResponseImpl errorResponse = new ClientResponseImpl(status, new VoltTable[0], reason, handle);
+        ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+        buf.putInt(buf.capacity() - 4);
+        errorResponse.flattenToBuffer(buf).flip();
+        c.writeStream().enqueue(buf);
+        return;
     }
 }
