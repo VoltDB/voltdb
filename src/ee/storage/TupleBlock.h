@@ -251,6 +251,8 @@ private:
  */
 class TupleMovementListener {
 public:
+    virtual ~TupleMovementListener() {}
+
     virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock, TableTuple &tuple) = 0;
 };
 
