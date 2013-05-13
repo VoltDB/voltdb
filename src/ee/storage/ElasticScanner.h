@@ -156,6 +156,8 @@ class ScannerStrayTupleCatcher
 
   public:
 
+    virtual ~ScannerStrayTupleCatcher() {}
+
     virtual void catchTuple(TableTuple &tuple) = 0;
 
 };
