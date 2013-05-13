@@ -26,7 +26,7 @@ namespace elastic
 /**
  * Constructor.
  */
-Scanner::Scanner(PersistentTable &table) :
+Scanner::Scanner(PersistentTable &table, ScannerStrayTupleCatcher *strayTupleCatcher) :
     m_table(table),
     m_blockMap(table.m_data),
     m_tupleSize(table.getTupleLength()),
@@ -34,31 +34,37 @@ Scanner::Scanner(PersistentTable &table) :
     m_blockEnd(m_blockMap.end()),
     m_currentBlockPtr(NULL),
     m_tuplePtr(NULL),
-    m_tupleIndex(0)
-{
-}
+    m_tupleIndex(0),
+    m_strayTupleCatcher(strayTupleCatcher),
+    m_scanComplete(false)
+{}
+
+Scanner::~Scanner()
+{}
 
 /**
  * Internal method that handles transitions between blocks and
  * returns true as long as tuples are available.
  */
 bool Scanner::continueScan() {
-    bool hasMore = true;
-    // First block or end of block?
-    if (m_currentBlockPtr == NULL || m_tupleIndex >= m_currentBlockPtr->unusedTupleBoundry()) {
-        // No more blocks?
-        hasMore = (m_blockIterator != m_blockEnd);
-        // Shift to the next block?
-        if (hasMore) {
-            m_tuplePtr = m_blockIterator.key();
-            m_currentBlockPtr = m_blockIterator.data();
-            assert(m_currentBlockPtr->address() == m_tuplePtr);
-            m_blockIterator.data() = TBPtr();
-            m_tupleIndex = 0;
-            m_blockIterator++;
+    if (!m_scanComplete) {
+        // First block or end of block?
+        if (m_currentBlockPtr == NULL || m_tupleIndex >= m_currentBlockPtr->unusedTupleBoundry()) {
+            // No more blocks?
+            m_scanComplete = (m_blockIterator == m_blockEnd);
+            if (!m_scanComplete) {
+                // Shift to the next block.
+                m_tuplePtr = m_blockIterator.key();
+                m_currentBlockPtr = m_blockIterator.data();
+                m_scannedBlocks.insert(m_currentBlockPtr);
+                assert(m_currentBlockPtr->address() == m_tuplePtr);
+                m_blockIterator.data() = TBPtr();
+                m_tupleIndex = 0;
+                m_blockIterator++;
+            }
         }
     }
-    return hasMore;
+    return !m_scanComplete;
 }
 
 /**
@@ -89,7 +95,7 @@ bool Scanner::next(TableTuple &out)
  * Block compaction hook.
  */
 void Scanner::notifyBlockWasCompactedAway(TBPtr block) {
-    if (m_blockIterator != m_blockEnd) {
+    if (!m_scanComplete && m_blockIterator != m_blockEnd) {
         TBPtr nextBlock = m_blockIterator.data();
         if (nextBlock == block) {
             // The next block was compacted away.
@@ -131,6 +137,22 @@ void Scanner::notifyTupleInsert(TableTuple &tuple) {
  */
 void Scanner::notifyTupleUpdate(TableTuple &tuple) {
     // Nothing to do for update. The caller will deal with it.
+}
+
+/**
+ * Tuple movement hook.
+ */
+void Scanner::notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock, TableTuple &tuple) {
+    if (!m_scanComplete && m_strayTupleCatcher != NULL) {
+        /*
+         * Provide out of band tuples that get moved to a block we've already
+         * processed from a block we haven't reached yet.
+         */
+        if (   m_scannedBlocks.find(targetBlock) != m_scannedBlocks.end()
+            && m_scannedBlocks.find(sourceBlock) == m_scannedBlocks.end()) {
+            m_strayTupleCatcher->catchTuple(tuple);
+        }
+    }
 }
 
 } // namespace elastic

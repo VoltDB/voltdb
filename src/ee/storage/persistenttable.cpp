@@ -84,8 +84,8 @@ TableTuple keyTuple;
 
 #define TABLE_BLOCKSIZE 2097152
 
-PersistentTable::PersistentTable(int partitionColumn) :
-    Table(TABLE_BLOCKSIZE),
+PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetSize) :
+    Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
     m_iter(this, m_data.begin()),
     m_allowNulls(),
     m_partitionColumn(partitionColumn),
@@ -257,6 +257,11 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
         target.setDirtyFalse();
     }
 
+    // Notify active elastic scanner.
+    if (m_elasticScanner != NULL && !m_elasticScanner->isScanComplete()) {
+        m_elasticScanner->notifyTupleInsert(target);
+    }
+
     if (!tryInsertOnAllIndexes(&target)) {
         deleteTupleStorage(target); // also frees object columns
         throw ConstraintFailureException(this, source, TableTuple(),
@@ -355,6 +360,11 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
 
     if (m_tableStreamer != NULL) {
         m_tableStreamer->notifyTupleUpdate(targetTupleToUpdate);
+    }
+
+    // Notify active elastic scanner.
+    if (m_elasticScanner != NULL && !m_elasticScanner->isScanComplete()) {
+        m_elasticScanner->notifyTupleUpdate(targetTupleToUpdate);
     }
 
     /**
@@ -1010,8 +1020,21 @@ void PersistentTable::notifyBlockWasCompactedAway(TBPtr block) {
         assert(m_tableStreamer.get() != NULL);
         assert(m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end());
         m_tableStreamer->notifyBlockWasCompactedAway(block);
+
+        // Notify active elastic scanner.
+        if (m_elasticScanner != NULL && !m_elasticScanner->isScanComplete()) {
+            m_elasticScanner->notifyBlockWasCompactedAway(block);
+        }
     }
 
+}
+
+// Call-back from TupleBlock::merge() for each tuple moved.
+void PersistentTable::notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock, TableTuple &tuple) {
+    // Notify active elastic scanner.
+    if (m_elasticScanner != NULL && !m_elasticScanner->isScanComplete()) {
+        m_elasticScanner->notifyTupleMovement(sourceBlock, targetBlock, tuple);
+    }
 }
 
 void PersistentTable::swapTuples(TableTuple &originalTuple,
@@ -1115,7 +1138,7 @@ bool PersistentTable::doCompactionWithinSubset(TBBucketMap *bucketMap) {
             return false;
         }
 
-        std::pair<int, int> bucketChanges = fullest->merge(this, lightest);
+        std::pair<int, int> bucketChanges = fullest->merge(this, lightest, this);
         int tempFullestBucketChange = bucketChanges.first;
         if (tempFullestBucketChange != -1) {
             fullestBucketChange = tempFullestBucketChange;
@@ -1275,4 +1298,13 @@ void PersistentTable::printBucketInfo() {
         }
     }
     std::cout << std::endl;
+}
+
+/**
+ * Initialize and get the elastic scanner.
+ */
+boost::shared_ptr<elastic::Scanner> PersistentTable::getElasticScanner(
+        elastic::ScannerStrayTupleCatcher *strayTupleCatcher) {
+    m_elasticScanner = elastic::ScannerFactory::makeScanner(*this, strayTupleCatcher);
+    return m_elasticScanner;
 }

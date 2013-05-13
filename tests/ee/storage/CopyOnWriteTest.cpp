@@ -173,7 +173,7 @@ public:
         delete m_table;
     }
 
-    void initTable(bool allowInlineStrings) {
+    void initTable(bool allowInlineStrings, int tableAllocationTargetSize = 0) {
         m_tableSchema = voltdb::TupleSchema::createTupleSchema(m_tableSchemaTypes,
                                                                m_tableSchemaColumnSizes,
                                                                m_tableSchemaAllowNull,
@@ -187,7 +187,9 @@ public:
         std::vector<voltdb::TableIndexScheme> indexes;
 
         m_table = dynamic_cast<voltdb::PersistentTable*>(
-                voltdb::TableFactory::getPersistentTable(m_tableId, "Foo", m_tableSchema, m_columnNames, 0));
+                voltdb::TableFactory::getPersistentTable(m_tableId, "Foo", m_tableSchema,
+                                                         m_columnNames, 0, false, false,
+                                                         tableAllocationTargetSize));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);
@@ -1048,7 +1050,7 @@ TEST_F(CopyOnWriteTest, BufferBoundaryCondition) {
 
 static void dumpValueSet(const std::string &tag, const T_ValueSet &set) {
     std:: cout << "::: " << tag << " :::" << std::endl;
-    if (set.size() > 20) {
+    if (set.size() >= 10) {
         std::cout << "  (" << set.size() << " items)" << std::endl;
     }
     else {
@@ -1058,131 +1060,152 @@ static void dumpValueSet(const std::string &tag, const T_ValueSet &set) {
     }
 }
 
+class TupleCatcher : public elastic::ScannerStrayTupleCatcher {
+public:
+    TupleCatcher(T_ValueSet &set) : m_set(set)
+    {}
+    virtual void catchTuple(TableTuple &tuple) {
+        m_set.insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
+    }
+    T_ValueSet &m_set;
+};
+
 // Test the elastic::Scanner.
 TEST_F(CopyOnWriteTest, ElasticScannerTest) {
 
-    initTable(true);
-
-#ifdef EXTRA_SMALL
-    const size_t NUM_INITIAL = 10;
-    const size_t NUM_CYCLES = 10;
-#else
-    const size_t NUM_INITIAL = 10000;
-    const size_t NUM_CYCLES = 10000;
-#endif
-    const size_t FREQ_INSERT = 1;       // Keep a steady flow of inserts
-    const size_t FREQ_DELETE = 3;
+    const size_t TUPLES_PER_BLOCK = 50;
+    const size_t NUM_INITIAL = 300;
+    const size_t NUM_CYCLES = 300;
+    const size_t FREQ_INSERT = 1;
+    const size_t FREQ_DELETE = 10;
     const size_t FREQ_UPDATE = 5;
     const size_t FREQ_COMPACTION = 100;
 
+    initTable(true, m_tupleWidth * (TUPLES_PER_BLOCK + sizeof(int32_t)));
+
     TableTuple tuple(m_table->schema());
 
-    for (size_t irep = 0; irep < NUM_REPETITIONS; irep++) {
+    // Value sets used for checking results.
+    T_ValueSet initial;
+    T_ValueSet inserts;
+    T_ValueSet updateSources;
+    T_ValueSet updateTargets;
+    T_ValueSet deletes;
+    T_ValueSet returns;
+    T_ValueSet shuffles;
 
-        // Value sets used for checking results.
-        T_ValueSet initial;
-        T_ValueSet inserts;
-        T_ValueSet updateSources;
-        T_ValueSet updateTargets;
-        T_ValueSet deletes;
-        T_ValueSet returns;
+    // Each repetition starts fresh.
+    m_table->deleteAllTuples(true);
 
-        // Each repetition starts fresh.
-        m_table->deleteAllTuples(true);
+    // Populate the table with initial tuples.
+    addRandomUniqueTuples(m_table, NUM_INITIAL);
+    getTableValueSet(initial);
 
-        // Populate the table with initial tuples.
-        addRandomUniqueTuples(m_table, NUM_INITIAL);
-        getTableValueSet(initial);
+    TupleCatcher catcher(shuffles);
+    boost::shared_ptr<elastic::Scanner> scanner = m_table->getElasticScanner(&catcher);
 
-        boost::shared_ptr<elastic::Scanner> scanner =
-                elastic::ScannerFactory::makeScanner(*m_table);
+    bool scanComplete = false;
 
-        // Mutate/scan loop.
-        for (size_t icycle = 0; icycle < NUM_CYCLES; icycle++) {
+    // Mutate/scan loop.
+    for (size_t icycle = 0; icycle < NUM_CYCLES; icycle++) {
 
-            if (icycle % FREQ_INSERT == 0) {
-                doRandomInsert(m_table, &inserts);
-            }
-
-            if (icycle % FREQ_DELETE == 0) {
-                doRandomDelete(m_table, &deletes);
-            }
-
-            if (icycle % FREQ_UPDATE == 0) {
-                doRandomUpdate(m_table, &updateSources, &updateTargets);
-            }
-
-            if (icycle % FREQ_COMPACTION == 0) {
-                m_table->doForcedCompaction();
-            }
-
-            bool found = scanner->next(tuple);
-            ASSERT_TRUE(found);
-            T_Value value = *reinterpret_cast<T_Value*>(tuple.address() + 1);
-            returns.insert(value);
+        if ((icycle - 1) % FREQ_INSERT == 0) {
+            doRandomInsert(m_table, &inserts);
         }
 
-        // Scan the remaining tuples that weren't encountered in the mutate/scan loop.
+        if ((icycle - 1) % FREQ_DELETE == 0) {
+            doRandomDelete(m_table, &deletes);
+        }
+
+        if ((icycle - 1) % FREQ_UPDATE == 0) {
+            doRandomUpdate(m_table, &updateSources, &updateTargets);
+        }
+
+        if ((icycle - 1) % FREQ_COMPACTION == 0) {
+            size_t churn = m_table->activeTupleCount() / 2;
+            // Delete half the tuples to create enough fragmentation for
+            // compaction to happen.
+            for (size_t i = 0; i < churn; i++) {
+                doRandomDelete(m_table, &deletes);
+            }
+            m_table->doForcedCompaction();
+            // Re-insert the same number of tuples.
+            for (size_t i = 0; i < churn; i++) {
+                doRandomInsert(m_table, &inserts);
+            }
+        }
+
+        scanComplete = !scanner->next(tuple);
+        if (scanComplete) {
+            break;
+        }
+        T_Value value = *reinterpret_cast<T_Value*>(tuple.address() + 1);
+        returns.insert(value);
+    }
+
+    // Scan the remaining tuples that weren't encountered in the mutate/scan loop.
+    if (!scanComplete) {
         while (scanner->next(tuple)) {
             T_Value value = *reinterpret_cast<T_Value*>(tuple.address() + 1);
             returns.insert(value);
         }
+    }
 
-        //=== Checks
+    //=== Checks
 
-        // Updates, inserts and deletes to tuples in blocks that were already
-        // scanned are invisible, unless compaction moves their blocks around.
-        // The checks have to be a little loose since we don't keep track of
-        // which updates or deletes should be visible or not.
+    // Updates, inserts and deletes to tuples in blocks that were already
+    // scanned are invisible, unless compaction moves their blocks around.
+    // The checks have to be a little loose since we don't keep track of
+    // which updates or deletes should be visible or not.
 
-        // 1) Should be able to account for all scan returns in the initial,
-        //    inserts or updateTargets sets.
-        T_ValueSet missing;
-        for (T_ValueSet::const_iterator iter = returns.begin(); iter != returns.end(); ++iter) {
-            T_Value value = *iter;
-            if(initial.find(value) == initial.end() &&
-               inserts.find(value) == inserts.end() &&
-               updateTargets.find(value) == updateTargets.end()) {
-                missing.insert(value);
-            }
+    // 1) Should be able to account for all scan returns in the initial,
+    //    inserts or updateTargets sets.
+    T_ValueSet missing;
+    for (T_ValueSet::const_iterator iter = returns.begin(); iter != returns.end(); ++iter) {
+        T_Value value = *iter;
+        if(initial.find(value) == initial.end() &&
+           inserts.find(value) == inserts.end() &&
+           updateTargets.find(value) == updateTargets.end()) {
+            missing.insert(value);
         }
-        if (!missing.empty()) {
-            std::cerr << std::endl << "ERROR: "
-                      << missing.size() << " scan tuple(s) received that can not be found"
-                      << " in the initial, inserts or update targets sets."
-                      << std::endl;
-            dumpValueSet("unexpected returned tuple values", missing);
-            dumpValueSet("initial tuple values", initial);
-            dumpValueSet("inserted tuple values", inserts);
-            dumpValueSet("updated tuple target values", updateTargets);
-            ASSERT_TRUE(missing.empty());
-        }
+    }
+    if (!missing.empty()) {
+        std::cerr << std::endl << "ERROR: "
+                  << missing.size() << " scan tuple(s) received that can not be found"
+                  << " in the initial, insert or update (target) sets."
+                  << std::endl;
+        dumpValueSet("unexpected returned tuple values", missing);
+        dumpValueSet("initial tuple values", initial);
+        dumpValueSet("inserted tuple values", inserts);
+        dumpValueSet("updated tuple target values", updateTargets);
+        ASSERT_TRUE(missing.empty());
+    }
 
-        // 2) Should be able to account for all initial values in the returns,
-        //    deletes or update sources sets.
-        for (T_ValueSet::const_iterator iter = initial.begin(); iter != initial.end(); ++iter) {
-            T_Value value = *iter;
-            if(returns.find(value) == returns.end() &&
-               deletes.find(value) == deletes.end() &&
-               updateSources.find(value) == updateSources.end()) {
-                missing.insert(value);
-            }
+    // 2) Should be able to account for all initial values in the returns,
+    //    deletes or update (source) sets.
+    for (T_ValueSet::const_iterator iter = initial.begin(); iter != initial.end(); ++iter) {
+        T_Value value = *iter;
+        if(returns.find(value) == returns.end() &&
+           deletes.find(value) == deletes.end() &&
+           updateSources.find(value) == updateSources.end() &&
+           shuffles.find(value) == shuffles.end()) {
+            missing.insert(value);
         }
-        if (!missing.empty()) {
-            /*
-             * All initial tuples should have been returned by the scan, unless they
-             * were deleted or updated (to have a different value).
-             */
-            std::cerr << std::endl << "ERROR: "
-                      << missing.size() << " initial tuple(s) can not be found"
-                      << " in the scanned, deleted or updated sets."
-                      << std::endl;
-            dumpValueSet("missing initial tuple values", missing);
-            dumpValueSet("returned tuple values", returns);
-            dumpValueSet("deleted tuple values", deletes);
-            dumpValueSet("updated tuple source values", updateSources);
-            ASSERT_TRUE(missing.empty());
-        }
+    }
+    if (!missing.empty()) {
+        /*
+         * All initial tuples should have been returned by the scan, unless they
+         * were deleted or updated (to have a different value).
+         */
+        std::cerr << std::endl << "ERROR: "
+                  << missing.size() << " initial tuple(s) can not be found"
+                  << " in the scan, delete, update (source), or compacted sets."
+                  << std::endl;
+        dumpValueSet("missing initial tuple values", missing);
+        dumpValueSet("returned tuple values", returns);
+        dumpValueSet("deleted tuple values", deletes);
+        dumpValueSet("updated tuple source values", updateSources);
+        ASSERT_TRUE(missing.empty());
     }
 }
 

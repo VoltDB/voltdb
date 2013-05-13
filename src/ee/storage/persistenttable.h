@@ -58,6 +58,7 @@
 #include "storage/TableStats.h"
 #include "storage/PersistentTableStats.h"
 #include "storage/ElasticStreamer.h"
+#include "storage/ElasticScanner.h"
 #include "storage/RecoveryContext.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
@@ -89,6 +90,7 @@ namespace elastic {
     class Scanner;
 }
 
+
 /**
  * Represents a non-temporary table which permanently resides in
  * storage and also registered to Catalog (see other documents for
@@ -115,7 +117,8 @@ namespace elastic {
  * policy because we expect reverting rarely occurs.
  */
 
-class PersistentTable : public Table, public UndoQuantumReleaseInterest {
+class PersistentTable : public Table, public UndoQuantumReleaseInterest,
+                        public TupleMovementListener {
     friend class CopyOnWriteContext;
     friend class CopyOnWriteIterator;
     friend class elastic::Scanner;
@@ -322,10 +325,15 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
 
     bool checkNulls(TableTuple &tuple) const;
 
-    PersistentTable(int partitionColumn);
+    // Zero allocation size uses defaults.
+    PersistentTable(int partitionColumn, int tableAllocationTargetSize = 0);
     void onSetColumns();
 
     void notifyBlockWasCompactedAway(TBPtr block);
+
+    // Call-back from TupleBlock::merge() for each tuple moved.
+    virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock, TableTuple &tuple);
+
     void swapTuples(TableTuple &sourceTupleWithNewValues, TableTuple &destinationTuple);
 
     void insertTupleForUndo(char *tuple);
@@ -349,6 +357,12 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      * to do additional processing for views and Export
      */
     virtual void processLoadedTuple(TableTuple &tuple);
+
+    /**
+     * Initialize and get the elastic scanner.
+     */
+    boost::shared_ptr<elastic::Scanner> getElasticScanner(
+             elastic::ScannerStrayTupleCatcher *strayTupleCatcher = NULL);
 
     TBPtr allocateNextBlock();
 
@@ -387,6 +401,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
 
     // Provides access to all table streaming apparati, including COW and recovery.
     boost::shared_ptr<elastic::Streamer> m_tableStreamer;
+
+    // Elastic scanners require notifications to keep track of moved tuples.
+    boost::shared_ptr<elastic::Scanner> m_elasticScanner;
 
   private:
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
