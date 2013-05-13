@@ -1689,42 +1689,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     ClientResponseImpl dispatchStatistics(Procedure sysProc, ByteBuffer buf, StoredProcedureInvocation task,
-            ClientInputHandler handler, Connection ccxn) {
-        ParameterSet params = task.getParams();
-        if ((params.toArray().length < 1) || (params.toArray().length > 2)) {
-            return errorResponse(ccxn, task.clientHandle, ClientResponse.GRACEFUL_FAILURE,
-                    "Incorrect number of arguments to @Statistics (expects 2, received " +
-                    params.toArray().length + ")", null, false);
-        }
-        Object first = params.toArray()[0];
-        if (!(first instanceof String)) {
-            return errorResponse(ccxn, task.clientHandle, ClientResponse.GRACEFUL_FAILURE,
-                    "First argument to @Statistics must be a valid STRING selector, instead was " +
-                    first, null, false);
-        }
-        String selector = (String)first;
+            ClientInputHandler handler, Connection ccxn)
+    {
         try {
-            SysProcSelector s = SysProcSelector.valueOf(selector.toUpperCase());
-            selector = s.name();
-        }
-        catch (Exception e) {
-            return errorResponse(ccxn, task.clientHandle, ClientResponse.GRACEFUL_FAILURE,
-                    "First argument to @Statistics must be a valid STRING selector, instead was " +
-                    first, null, false);
-        }
-
-        boolean interval = false;
-        try {
-            if (params.toArray().length == 2) {
-                interval = ((Number)(params.toArray()[1])).longValue() == 1L;
-            }
-        }
-        catch (Exception e) {
-            // ugh, don't care?
-        }
-
-        try {
-            VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, selector, interval,
+            VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, "STATISTICS",
                     task.getParams());
             return null;
         } catch (Exception e) {

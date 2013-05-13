@@ -462,15 +462,7 @@ public class TestClientInterface {
         ByteBuffer msg = createMsg("@Statistics", "DR", 0);
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
-        verify(m_statsAgent).collectStats(any(Connection.class), anyInt(), eq("DR"), any(Boolean.class));
-    }
-
-    @Test
-    public void testStatisticsProc() throws Exception {
-        ByteBuffer msg = createMsg("@Statistics", "table", 0);
-        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
-        assertNull(resp);
-        verify(m_statsAgent).collectStats(any(Connection.class), anyInt(), eq("TABLE"), any(Boolean.class));
+        verify(m_statsAgent).collectStats(any(Connection.class), anyInt(), eq("STATISTICS"), any(ParameterSet.class));
     }
 
     @Test

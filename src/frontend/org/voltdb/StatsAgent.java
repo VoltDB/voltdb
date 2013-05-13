@@ -72,6 +72,7 @@ public class StatsAgent {
     //
     private static class PendingStatsRequest {
         private final String selector;
+        private final String subselector;
         private final Connection c;
         private final long clientData;
         private int expectedStatsResponses = 0;
@@ -79,11 +80,13 @@ public class StatsAgent {
         private final long startTime;
         public PendingStatsRequest(
                 String selector,
+                String subselector,
                 Connection c,
                 long clientData,
                 long startTime) {
             this.startTime = startTime;
             this.selector = selector;
+            this.subselector = subselector;
             this.c = c;
             this.clientData = clientData;
         }
@@ -195,8 +198,8 @@ public class StatsAgent {
 
     private void dispatchFinalAggregations(PendingStatsRequest request)
     {
-        SysProcSelector selector = SysProcSelector.valueOf(request.selector);
-        switch (selector) {
+        SysProcSelector subselector = SysProcSelector.valueOf(request.subselector);
+        switch (subselector) {
             case PROCEDUREPROFILE:
                 request.aggregateTables =
                     aggregateProcedureProfileStats(request.aggregateTables);
@@ -242,13 +245,13 @@ public class StatsAgent {
     }
 
     public void collectStats(final Connection c, final long clientHandle, final String selector,
-            final boolean interval, final ParameterSet params) throws Exception
+            final ParameterSet params) throws Exception
     {
         m_es.submit(new Runnable() {
             @Override
             public void run() {
                 try {
-                    collectStatsImpl(c, clientHandle, selector, interval, params);
+                    collectStatsImpl(c, clientHandle, selector, params);
                 } catch (Throwable e) {
                     hostLog.warn("Exception while attempting to collect stats", e);
                 }
@@ -256,7 +259,7 @@ public class StatsAgent {
         });
     }
 
-    private void collectStatsImpl(Connection c, long clientHandle, String selector, boolean interval,
+    private void collectStatsImpl(Connection c, long clientHandle, String selector,
             ParameterSet params) throws Exception
     {
         if (m_pendingRequests.size() > MAX_IN_FLIGHT_REQUESTS) {
@@ -281,20 +284,31 @@ public class StatsAgent {
             }
         }
 
+        JSONObject obj = new JSONObject();
+        obj.put("selector", selector);
+        String err = parseParamsForStatistics(params, obj);
+        if (err != null) {
+            sendErrorResponse(c, ClientResponse.GRACEFUL_FAILURE, err, clientHandle);
+            return;
+        }
+        String subselector = obj.getString("subselector");
+
         // Some selectors can provide a single answer based on global data.
         // Intercept them and respond before doing the distributed stuff.
-        if (selector.equals("TOPO")) {
+        if (subselector.equals("TOPO")) {
             PendingStatsRequest psr = new PendingStatsRequest(
                 selector,
+                subselector,
                 c,
                 clientHandle,
                 System.currentTimeMillis());
             collectTopoStats(psr);
             return;
         }
-        else if (selector.equals("PARTITIONCOUNT")) {
+        else if (subselector.equals("PARTITIONCOUNT")) {
             PendingStatsRequest psr = new PendingStatsRequest(
                 selector,
+                subselector,
                 c,
                 clientHandle,
                 System.currentTimeMillis());
@@ -305,6 +319,7 @@ public class StatsAgent {
         PendingStatsRequest psr =
             new PendingStatsRequest(
                     selector,
+                    subselector,
                     c,
                     clientHandle,
                     System.currentTimeMillis());
@@ -319,11 +334,9 @@ public class StatsAgent {
         STATS_COLLECTION_TIMEOUT,
         TimeUnit.MILLISECONDS);
 
-        JSONObject obj = new JSONObject();
+        // selector, subselector, interval filled in by parse...
         obj.put("requestId", requestId);
         obj.put("returnAddress", m_mailbox.getHSId());
-        obj.put("selector", selector);
-        obj.put("interval", interval);
         byte payloadBytes[] = CompressionService.compressBytes(obj.toString(4).getBytes("UTF-8"));
         for (int hostId : m_messenger.getLiveHostIds()) {
             long agentHsId = CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.STATS_SITE_ID);
@@ -331,6 +344,40 @@ public class StatsAgent {
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[] {JSON_PAYLOAD}, payloadBytes);
             m_mailbox.send(agentHsId, bpm);
         }
+    }
+
+    // Parse the provided parameter set object and fill in subselector and interval into
+    // the provided JSONObject.  If there's an error, return that in the String, otherwise
+    // return null.  Yes, ugly.  Bang it out, then refactor later.
+    private String parseParamsForStatistics(ParameterSet params, JSONObject obj) throws Exception
+    {
+        if ((params.toArray().length < 1) || (params.toArray().length > 2)) {
+            return "Incorrect number of arguments to @Statistics (expects 2, received " +
+                    params.toArray().length + ")";
+        }
+        Object first = params.toArray()[0];
+        if (!(first instanceof String)) {
+            return "First argument to @Statistics must be a valid STRING selector, instead was " +
+                    first;
+        }
+        String selector = (String)first;
+        try {
+            SysProcSelector s = SysProcSelector.valueOf(selector.toUpperCase());
+            selector = s.name();
+        }
+        catch (Exception e) {
+            return "First argument to @Statistics must be a valid STRING selector, instead was " +
+                    first;
+        }
+
+        boolean interval = false;
+        if (params.toArray().length == 2) {
+            interval = ((Number)(params.toArray()[1])).longValue() == 1L;
+        }
+        obj.put("subselector", selector);
+        obj.put("interval", interval);
+
+        return null;
     }
 
     private void checkForRequestTimeout(long requestId) {
@@ -358,7 +405,7 @@ public class StatsAgent {
             responseTables = new VoltTable[0];
             statusCode = ClientResponse.GRACEFUL_FAILURE;
             statusString =
-                "Requested statistic \"" + request.selector +
+                "Requested statistic \"" + request.subselector +
                 "\" is not yet available or not supported in the current configuration.";
         }
 
@@ -423,7 +470,7 @@ public class StatsAgent {
 
         VoltTable[] stats = null;
         // dispatch to collection
-        String selectorString = obj.getString("selector");
+        String selectorString = obj.getString("subselector");
         boolean interval = obj.getBoolean("interval");
         SysProcSelector selector = SysProcSelector.valueOf(selectorString);
         switch (selector) {
