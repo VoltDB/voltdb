@@ -209,7 +209,7 @@ public class StatsAgent {
     }
 
     /**
-     * Produce PROCEDUREPROFILE aggregation of PROCEDURE selector
+     * Produce PROCEDUREPROFILE aggregation of PROCEDURE subselector
      */
     private VoltTable[] aggregateProcedureProfileStats(VoltTable[] baseStats)
     {
@@ -286,7 +286,13 @@ public class StatsAgent {
 
         JSONObject obj = new JSONObject();
         obj.put("selector", selector);
-        String err = parseParamsForStatistics(params, obj);
+        String err = null;
+        if (selector.equalsIgnoreCase("STATISTICS")) {
+            err = parseParamsForStatistics(params, obj);
+        }
+        else {
+            VoltDB.crashLocalVoltDB("SHOULDN'T BE HURR!!", false, null);
+        }
         if (err != null) {
             sendErrorResponse(c, ClientResponse.GRACEFUL_FAILURE, err, clientHandle);
             return;
@@ -295,7 +301,7 @@ public class StatsAgent {
 
         // Some selectors can provide a single answer based on global data.
         // Intercept them and respond before doing the distributed stuff.
-        if (subselector.equals("TOPO")) {
+        if (selector.equalsIgnoreCase("STATISTICS") && subselector.equalsIgnoreCase("TOPO")) {
             PendingStatsRequest psr = new PendingStatsRequest(
                 selector,
                 subselector,
@@ -305,7 +311,7 @@ public class StatsAgent {
             collectTopoStats(psr);
             return;
         }
-        else if (subselector.equals("PARTITIONCOUNT")) {
+        else if (selector.equalsIgnoreCase("STATISTICS") && subselector.equalsIgnoreCase("PARTITIONCOUNT")) {
             PendingStatsRequest psr = new PendingStatsRequest(
                 selector,
                 subselector,
@@ -360,10 +366,10 @@ public class StatsAgent {
             return "First argument to @Statistics must be a valid STRING selector, instead was " +
                     first;
         }
-        String selector = (String)first;
+        String subselector = (String)first;
         try {
-            SysProcSelector s = SysProcSelector.valueOf(selector.toUpperCase());
-            selector = s.name();
+            SysProcSelector s = SysProcSelector.valueOf(subselector.toUpperCase());
+            subselector = s.name();
         }
         catch (Exception e) {
             return "First argument to @Statistics must be a valid STRING selector, instead was " +
@@ -374,7 +380,7 @@ public class StatsAgent {
         if (params.toArray().length == 2) {
             interval = ((Number)(params.toArray()[1])).longValue() == 1L;
         }
-        obj.put("subselector", selector);
+        obj.put("subselector", subselector);
         obj.put("interval", interval);
 
         return null;
@@ -419,7 +425,51 @@ public class StatsAgent {
     }
 
     private void handleJSONMessage(JSONObject obj) throws Exception {
-        collectDistributedStats(obj);
+        long requestId = obj.getLong("requestId");
+        long returnAddress = obj.getLong("returnAddress");
+
+        VoltTable[] results = null;
+
+        String selector = obj.getString("selector");
+        if (selector.equalsIgnoreCase("STATISTICS")) {
+            results = collectDistributedStats(obj);
+        }
+        else {
+            VoltDB.crashLocalVoltDB("SHOULDN'T BE HURR!", false, null);
+        }
+
+        // Send a response with no data since the stats is not supported or not yet available
+        if (results == null) {
+            ByteBuffer responseBuffer = ByteBuffer.allocate(8);
+            responseBuffer.putLong(requestId);
+            byte responseBytes[] = CompressionService.compressBytes(responseBuffer.array());
+            BinaryPayloadMessage bpm = new BinaryPayloadMessage( new byte[] {STATS_PAYLOAD}, responseBytes);
+            m_mailbox.send(returnAddress, bpm);
+            return;
+        }
+
+        ByteBuffer[] bufs = new ByteBuffer[results.length];
+        int statbytes = 0;
+        for (int i = 0; i < results.length; i++) {
+            bufs[i] = results[i].getBuffer();
+            bufs[i].position(0);
+            statbytes += bufs[i].remaining();
+        }
+
+        ByteBuffer responseBuffer = ByteBuffer.allocate(
+                8 + // requestId
+                4 * results.length + // length prefix for each stats table
+                + statbytes);
+        responseBuffer.putLong(requestId);
+        for (int i = 0; i < bufs.length; i++) {
+            responseBuffer.putInt(bufs[i].remaining());
+            responseBuffer.put(bufs[i]);
+        }
+        byte responseBytes[] = CompressionService.compressBytes(responseBuffer.array());
+
+        BinaryPayloadMessage bpm = new BinaryPayloadMessage( new byte[] {STATS_PAYLOAD}, responseBytes);
+        m_mailbox.send(returnAddress, bpm);
+
     }
 
     private void collectTopoStats(PendingStatsRequest psr)
@@ -463,17 +513,14 @@ public class StatsAgent {
         }
     }
 
-    private void collectDistributedStats(JSONObject obj) throws Exception
+    private VoltTable[] collectDistributedStats(JSONObject obj) throws Exception
     {
-        long requestId = obj.getLong("requestId");
-        long returnAddress = obj.getLong("returnAddress");
-
         VoltTable[] stats = null;
         // dispatch to collection
-        String selectorString = obj.getString("subselector");
+        String subselectorString = obj.getString("subselector");
         boolean interval = obj.getBoolean("interval");
-        SysProcSelector selector = SysProcSelector.valueOf(selectorString);
-        switch (selector) {
+        SysProcSelector subselector = SysProcSelector.valueOf(subselectorString);
+        switch (subselector) {
             case DR:
                 stats = collectDRStats();
                 break;
@@ -521,45 +568,14 @@ public class StatsAgent {
                 stats = collectManagementStats(interval);
                 break;
             default:
-                // Should have been successfully groomed in ClientInterface.dispatchStatistics().  Log something
+                // Should have been successfully groomed in collectStatsImpl().  Log something
                 // for our information but let the null check below return harmlessly
-                hostLog.warn("Received unknown stats selector in StatsAgent: " + selector.name() +
+                hostLog.warn("Received unknown stats selector in StatsAgent: " + subselector.name() +
                         ", this should be impossible.");
                 stats = null;
         }
 
-        // Send a response with no data since the stats is not supported or not yet available
-        if (stats == null) {
-            ByteBuffer responseBuffer = ByteBuffer.allocate(8);
-            responseBuffer.putLong(requestId);
-            byte responseBytes[] = CompressionService.compressBytes(responseBuffer.array());
-            BinaryPayloadMessage bpm = new BinaryPayloadMessage( new byte[] {STATS_PAYLOAD}, responseBytes);
-            m_mailbox.send(returnAddress, bpm);
-            return;
-        }
-
-        ByteBuffer[] bufs = new ByteBuffer[stats.length];
-        int statbytes = 0;
-        for (int i = 0; i < stats.length; i++) {
-            bufs[i] = stats[i].getBuffer();
-            bufs[i].position(0);
-            statbytes += bufs[i].remaining();
-        }
-
-        ByteBuffer responseBuffer = ByteBuffer.allocate(
-                8 + // requestId
-                4 * stats.length + // length prefix for each stats table
-                + statbytes);
-        responseBuffer.putLong(requestId);
-        for (int i = 0; i < bufs.length; i++) {
-            responseBuffer.putInt(bufs[i].remaining());
-            responseBuffer.put(bufs[i]);
-        }
-        byte responseBytes[] = CompressionService.compressBytes(responseBuffer.array());
-
-        BinaryPayloadMessage bpm = new BinaryPayloadMessage( new byte[] {STATS_PAYLOAD}, responseBytes);
-        m_mailbox.send(returnAddress, bpm);
-
+        return stats;
     }
 
     private VoltTable[] collectDRStats()

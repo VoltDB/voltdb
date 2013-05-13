@@ -125,6 +125,17 @@ public class TestStatsAgent {
     }
 
     @Test
+    public void testInvalidStatisticsSubselector() throws Exception {
+        createAndRegisterStats();
+        m_mvoltdb.getStatsAgent().collectStats(m_mockConnection, 32, "STATISTICS", subselect("CRAZY", 0));
+        ClientResponseImpl response = responses.take();
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, response.getStatus());
+        assertEquals("First argument to @Statistics must be a valid STRING selector, instead was CRAZY",
+                response.getStatusString());
+        System.out.println(response.toJSONString());
+    }
+
+    @Test
     public void testCollectDRStats() throws Exception {
         createAndRegisterStats();
         m_mvoltdb.getStatsAgent().collectStats(m_mockConnection, 32, "STATISTICS", subselect("DR", 0));
