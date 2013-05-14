@@ -154,34 +154,18 @@ public class TestStatsAgent {
     }
 
     @Test
-    public void testCollectUnsupportedStats() throws Exception {
-        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DR", false);
-        ClientResponseImpl response = responses.take();
-
-        assertEquals(ClientResponse.GRACEFUL_FAILURE, response.getStatus());
-        VoltTable results[] = response.getResults();
-        assertEquals(0, results.length);
-        assertEquals(
-                "Requested statistic \"DR\" is not supported in the current configuration",
-                response.getStatusString());
-        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DRNODE", false);
-        response = responses.take();
-
-        assertEquals(ClientResponse.GRACEFUL_FAILURE, response.getStatus());
-        results = response.getResults();
-        assertEquals(0, results.length);
-        assertEquals(
-                "Requested statistic \"DRNODE\" is not supported in the current configuration",
-                response.getStatusString());
-        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DRPARTITION", false);
-        response = responses.take();
-
-        assertEquals(ClientResponse.GRACEFUL_FAILURE, response.getStatus());
-        results = response.getResults();
-        assertEquals(0, results.length);
-        assertEquals(
-                "Requested statistic \"DRPARTITION\" is not supported in the current configuration",
-                response.getStatusString());
+    public void testCollectUnavailableStats() throws Exception {
+        for (SysProcSelector selector : SysProcSelector.values()) {
+            m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, selector.name(), false);
+            ClientResponseImpl response = responses.take();
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, response.getStatus());
+            VoltTable results[] = response.getResults();
+            assertEquals(0, results.length);
+            assertEquals(
+                    "Requested statistic \"" + selector.name() + "\" is not yet available or not " +
+                    "supported in the current configuration.",
+                    response.getStatusString());
+        }
     }
 
     @Test
