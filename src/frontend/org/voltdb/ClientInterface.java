@@ -1688,8 +1688,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         sendSentinel(invocation.getOriginalTxnId(), initiatorHSId, handle, connectionId, false);
     }
 
-    ClientResponseImpl dispatchStatistics(Procedure sysProc, ByteBuffer buf, StoredProcedureInvocation task,
-            ClientInputHandler handler, Connection ccxn)
+    ClientResponseImpl dispatchStatistics(StoredProcedureInvocation task, Connection ccxn)
     {
         try {
             VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, "STATISTICS",
@@ -1837,7 +1836,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 m_snapshotDaemon.requestUserSnapshot(task, ccxn);
                 return null;
             } else if (task.procName.equals("@Statistics")) {
-                return dispatchStatistics(catProc, buf, task, handler, ccxn);
+                return dispatchStatistics(task, ccxn);
             } else if (task.procName.equals("@Promote")) {
                 return dispatchPromote(catProc, buf, task, handler, ccxn);
             } else if (task.procName.equals("@SnapshotStatus")) {
@@ -1846,8 +1845,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 Object[] params = new Object[1];
                 params[0] = "SNAPSHOTSTATUS";
                 task.setParams(params);
-                return dispatchStatistics(SystemProcedureCatalog.listing.get("@Statistics").asCatalogProcedure(),
-                        buf, task, handler, ccxn);
+                return dispatchStatistics(task, ccxn);
             }
 
             // If you're going to copy and paste something, CnP the pattern
