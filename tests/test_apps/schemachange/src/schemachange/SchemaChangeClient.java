@@ -285,38 +285,25 @@ public class SchemaChangeClient {
         // don't actually trust the call... manually verify
         if (success == true) {
             if (schemaVersionNo > 0) {
-                // a procedure call exception is expected..
-                cr = callROProcedureWithRetry("@AdHoc",
-                        String.format("select count(*) from V%d limit 1;",
-                                schemaVersionNo));
-                if (cr.getStatus() == ClientResponse.SUCCESS) {
-                    log.info(_F("Catalog update was reported to be successful but is not observable(1)."));
-                    System.exit(-1);     // fail test
+                if (isSchemaVersionObservable(schemaVersionNo)) {
+                    log.info(_F("Catalog update was reported to be successful but a a before-update object is observable."));
+                    System.exit(-1);
                 }
             }
-            cr = callROProcedureWithRetry("@AdHoc",
-                    String.format("select count(*) from V%d limit 1;",
-                            schemaVersionNo+1));
-            if (cr.getStatus() != ClientResponse.SUCCESS) {
-                log.info(_F("Catalog update was reported to be successful but is not observable(2)."));
-                System.exit(-1);     // fail test
+            if (!isSchemaVersionObservable(schemaVersionNo+1)) {
+                log.info(_F("Catalog update was reported to be successful but a after-update table is not observable."));
+                System.exit(-1);
             }
         } else {
             if (schemaVersionNo > 0) {
-                cr = callROProcedureWithRetry("@AdHoc",
-                        String.format("select count(*) from V%d limit 1;",
-                                schemaVersionNo));
-                if (cr.getStatus() != ClientResponse.SUCCESS) {
-                    log.info(_F("Catalog update was reported to be un-successful but is observable(1)."));
-                    System.exit(-1);     // fail test
+                if (!isSchemaVersionObservable(schemaVersionNo)) {
+                    log.info(_F("Catalog update was reported to be un-successful but a before-update table is not observable."));
+                    System.exit(-1);
                 }
             }
-            cr = callROProcedureWithRetry("@AdHoc",
-                    String.format("select count(*) from V%d limit 1;",
-                            schemaVersionNo+1));
-            if (cr.getStatus() == ClientResponse.SUCCESS) {
-                log.info(_F("Catalog update was reported to be un-successful but is observable(2)."));
-                System.exit(-1);     // fail test
+            if (isSchemaVersionObservable(schemaVersionNo+1)) {
+                log.info(_F("Catalog update was reported to be un-successful but a after-update table is observable."));
+                System.exit(-1);
             }
         }
 
@@ -400,6 +387,12 @@ public class SchemaChangeClient {
         }
         assert(version >= 0);
         return version;
+    }
+
+    private boolean isSchemaVersionObservable(int schemaid) {
+        ClientResponse cr = callROProcedureWithRetry("@AdHoc",
+                String.format("select count(*) from V%d limit 1;", schemaid));
+        return (cr.getStatus() == ClientResponse.SUCCESS);
     }
 
     /**
