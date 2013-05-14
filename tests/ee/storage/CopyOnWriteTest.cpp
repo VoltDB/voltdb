@@ -1073,15 +1073,15 @@ public:
 // Test the elastic::Scanner.
 TEST_F(CopyOnWriteTest, ElasticScannerTest) {
 
-    const size_t TUPLES_PER_BLOCK = 50;
-    const size_t NUM_INITIAL = 300;
-    const size_t NUM_CYCLES = 300;
-    const size_t FREQ_INSERT = 1;
-    const size_t FREQ_DELETE = 10;
-    const size_t FREQ_UPDATE = 5;
-    const size_t FREQ_COMPACTION = 100;
+    const int TUPLES_PER_BLOCK = 50;
+    const int NUM_INITIAL = 300;
+    const int NUM_CYCLES = 300;
+    const int FREQ_INSERT = 1;
+    const int FREQ_DELETE = 10;
+    const int FREQ_UPDATE = 5;
+    const int FREQ_COMPACTION = 100;
 
-    initTable(true, m_tupleWidth * (TUPLES_PER_BLOCK + sizeof(int32_t)));
+    initTable(true, static_cast<int>(m_tupleWidth * (TUPLES_PER_BLOCK + sizeof(int32_t))));
 
     TableTuple tuple(m_table->schema());
 
