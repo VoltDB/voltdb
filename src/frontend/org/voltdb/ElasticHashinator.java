@@ -348,4 +348,15 @@ public class ElasticHashinator extends TheHashinator {
 
         return ranges;
     }
+
+    @Override
+    public String toString()
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append(" Token               ").append("   Partition\n");
+        for (Map.Entry<Long, Integer> entry : tokens.entrySet()) {
+            sb.append(String.format("[%20d => %8d]\n", entry.getKey(), entry.getValue()));
+        }
+        return sb.toString();
+    }
 }
