@@ -64,6 +64,7 @@
 #include "storage/tableutil.h"
 #include "storage/temptable.h"
 #include "storage/persistenttable.h"
+#include "storage/ConstraintFailureException.h"
 
 using namespace std;
 using namespace voltdb;
@@ -196,9 +197,11 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
 
             // if it doesn't map to this site
             if (!isLocal) {
-                VOLT_ERROR("Mispartitioned tuple in single-partition plan for"
-                           " table '%s'", m_targetTable->name().c_str());
-                return false;
+                throw ConstraintFailureException(
+                         dynamic_cast<PersistentTable*>(m_targetTable),
+                         tempTuple,
+                         "An update to a partitioning column triggered a partitioning error. "
+                         "Updating a partitioning column is not supported. Try delete followed by insert.");
             }
         }
 
