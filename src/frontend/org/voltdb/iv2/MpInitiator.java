@@ -32,6 +32,7 @@ import org.voltdb.CommandLog;
 import org.voltdb.MemoryStats;
 import org.voltdb.NodeDRGateway;
 import org.voltdb.Promotable;
+import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
@@ -57,7 +58,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     new SiteTaskerQueue()),
                 "MP",
                 agent,
-                VoltDB.START_ACTION.CREATE /* never for rejoin */);
+                StartAction.CREATE /* never for rejoin */);
     }
 
     @Override
@@ -65,7 +66,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                           CatalogContext catalogContext,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          VoltDB.START_ACTION startAction,
+                          StartAction startAction,
                           StatsAgent agent,
                           MemoryStats memStats,
                           CommandLog cl,

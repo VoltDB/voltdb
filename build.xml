@@ -69,12 +69,14 @@
 <property name='src.hsqldb.dir'              location='src/hsqldb19b3' />
 <property name='src.test.dir'                location='tests/frontend' />
 <property name='src.hsqldb.test.dir'         location='tests/hsqldb' />
+<property name='src.ee.test.dir'             location='tests/ee' />
 <property name='src.studio.dir'              location='src/frontend/org/voltdb/studio' />
 <property name='build.testoutput.dir'        location='${build.dir}/testoutput' />
 <property name='build.testobjects.dir'       location='${build.dir}/testobjects' />
 <property name='lib.dir'                     location='lib' />
 <property name='vendor.lib.dir'              location='third_party/java/jars' />
 <property name='vendor.src.dir'              location='third_party/java/src'  />
+<property name='vendor.cpp.dir'              location='third_party/cpp' />
 <property name='src.ee.parent.dir'           location='src/ee' />
 <property name='src.ee.dir'                  location='src/ee' />
 <property name='src.catalog.dir'             location='src/catgen' />
@@ -92,6 +94,8 @@
 <condition property="os.mac">
     <os family="mac"/>
 </condition>
+
+
 
 <!-- emma build instrumentation location -->
 <property name='build.instr.dir'             location='${build.dir}/instr' />
@@ -199,7 +203,8 @@ PRIMARY ENTRY POINTS
         <arg value="-DVOLT_ENABLEIV2=${VOLT_ENABLEIV2}" />
     </exec>
 </target>
-<target name='check_sql'
+
+<target name="check_sql"
     depends="licensecheck, compile, voltdbipc"
     description="Run Java and C++ JNI testcases stressing sql functionality over process architecture." >
     <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
@@ -250,24 +255,9 @@ PRIMARY ENTRY POINTS
     description="Create production JAR files."
 />
 <target name="dist"
-    depends="dist_client, dist_internal, dist_voltcache, dist_voltkv, dist_tools"
+    depends="dist_client, dist_internal, dist_tools"
     description="Create VoltDB release packages with examples and documentation."
 />
-<target name="dist_voltcache"  depends="dist_internal"
-        description="Create VoltDB release package with VoltCache reference app.">
-  <refapp_macro appname="voltcache" />
-</target>
-
-<target name="dist_voltkv" depends="dist_internal"
-        description="Create VoltDB release package with VoltKV reference app.">
-  <refapp_macro appname="voltkv" />
-</target>
-
-<target name="dist_refapp" depends="dist_internal"
-        description="Create reference application release package with app supplied in ant invocation.">
-  <fail unless="appname" message="must specify an app name with -Dappname=" />
-  <refapp_macro appname="${appname}" />
-</target>
 
 <target name="bindoc" depends="buildinfo"
         description="Generate README for certain bin programs.">
@@ -612,78 +602,6 @@ DISTRIBUTION
     </exec>
 </target>
 
-<macrodef name="refapp_macro"
-        description="Build a kit that only includes a single reference app">
-  <attribute name="appname"/>
-  <sequential>
-
-    <!-- prepare release directory for new content -->
-    <delete includeemptydirs="true" failonerror='false'>
-        <fileset dir="${dist.dir}-@{appname}" includes="**/*" />
-    </delete>
-    <mkdir dir="${dist.dir}-@{appname}" />
-    <mkdir dir="${dist.dir}-@{appname}/@{appname}" />
-
-    <!-- populate the examples -->
-    <copy todir="${dist.dir}-@{appname}/@{appname}">
-        <fileset dir="${dist.dir}/examples/@{appname}" defaultexcludes="yes">
-            <include name="**/*"/>
-            <exclude name=".gitignore"/>
-        </fileset>
-    </copy>
-
-    <!-- populate the bin/lib/voltdb/etc... dirs -->
-    <copy todir="${dist.dir}-@{appname}" >
-        <fileset dir="${dist.dir}" defaultexcludes="yes">
-            <include name="README" />
-            <include name="LICENSE" />
-            <include name="README.thirdparty" />
-            <include name="voltdb/**" />
-            <include name="lib/**" />
-            <include name="bin/**" />
-        </fileset>
-    </copy>
-
-    <!-- rewrite the run.sh script's relative directories -->
-    <replace
-        file="${dist.dir}-@{appname}/@{appname}/run.sh"
-        token="../../"
-        value="../"/>
-
-    <!-- make shell scripts executable -->
-    <chmod perm="ugo+rx">
-        <fileset dir="${dist.dir}-@{appname}" defaultexcludes="yes">
-            <include name="bin/*"/>
-            <include name="@{appname}/run.sh"/>
-        </fileset>
-    </chmod>
-
-    <!-- add tools and support files -->
-    <dist_tools_macro distlabel="-@{appname}" />
-
-    <!-- create an archive for distribution -->
-    <exec executable="mv" failonerror="true">
-        <arg value="${raw.dist.dir}/dist-@{appname}"/>
-        <arg value="${raw.dist.dir}/voltdb-@{appname}-${dist.version}"/>
-    </exec>
-    <exec executable="tar" failonerror="true">
-        <arg value="-cz"/>
-        <arg value="-C"/>
-        <arg value="${raw.dist.dir}"/>
-        <arg value="-f"/>
-        <arg value="${raw.dist.dir}/voltdb-@{appname}-${dist.version}.tar.gz"/>
-        <arg value="voltdb-@{appname}-${dist.version}"/>
-    </exec>
-
-    <!-- move it back to dist directory for downstream dependencies -->
-    <exec executable="mv" failonerror="true">
-        <arg value="${raw.dist.dir}/voltdb-@{appname}-${dist.version}"/>
-        <arg value="${raw.dist.dir}/dist-@{appname}"/>
-    </exec>
-
-  </sequential>
-</macrodef>
-
 <macrodef name="dist_tools_macro"
         description="Copy tools and supporting files to a distribution staging directory">
     <attribute name="distlabel"/>
@@ -772,7 +690,7 @@ CLEANING
         <arg line="-c 'rm -f host*-*-*.txt'"/>
     </exec>
 </target>
-                        
+
 <target name='cleantmp' description="Remove all data files Volt generated in /tmp.">
   <exec dir='.' executable='/bin/sh' failonerror='false'>
     <arg line="-c 'rm -rf /tmp/myApp*.tmp *.vpt *.digest'"/>
@@ -1101,6 +1019,7 @@ NATIVE EE STUFF
     />
 </target>
 
+
 <target name='uptodate_jni_h.check' depends='jnicompile_temp'>
     <condition property='uptodate_jni_h'>
         <and>
@@ -1160,9 +1079,10 @@ NATIVE EE STUFF
     </exec>
 </target>
 
-<target name='ee' depends="catalog, jnicompile, buildinfo"
+<target name='ee' depends="ee_buildmakefile, catalog, jnicompile, buildinfo"
     description="Build C++ JNI library and copy it to production folder.">
     <exec dir='.' executable='python' failonerror='true'>
+        <env key="EESKIPBUILDMAKEFILE" value="true" />
         <arg line="build.py ${build}" />
     </exec>
     <copy todir='voltdb'>
@@ -1170,6 +1090,31 @@ NATIVE EE STUFF
             <include name="libvoltdb-${dist.version}.*"/>
         </fileset>
     </copy>
+</target>
+
+<target name='ee_makefile.uptodate'>
+  <condition property="makefile.uptodate">
+    <and>
+    <!--set if makefile up to date and makefile non-zero length
+            Eliminates timeconsuming build.py in ee -->
+    <uptodate>
+      <srcfiles dir='${src.ee.dir}' includes='**/*' />
+      <srcfiles dir='${vendor.cpp.dir}'  includes='**/*' />
+      <srcfiles dir='${src.ee.test.dir}'  includes='**/*' />
+      <mapper type="merge" to="${build.dir}/makefile"/>
+    </uptodate>
+    <length file="${build.dir}/makefile" when="greater" length="0" />
+    </and>
+  </condition>
+</target>
+
+<target name='ee_buildmakefile' depends="catalog, jnicompile, buildinfo, ee_makefile.uptodate"
+    unless="makefile.uptodate"
+    description="Just make the makefile for the C++ JNI library.">
+    <exec dir='.' executable='python' failonerror='true'>
+        <env key="EEONLYBUILDMAKEFILE" value="true"/>
+        <arg line="build.py ${build}" />
+    </exec>
 </target>
 
 <target name='recompile_ee_nodepends'
@@ -1389,8 +1334,8 @@ TEST CASES
     </run_junit>
 </target>
 
-<target name='junit_sql'
-    description="Execute JUnit test suites.">
+<target name="junit_sql"
+    description="Execute JUnit test suites stressing sql functionality vs. process architecture.">
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>

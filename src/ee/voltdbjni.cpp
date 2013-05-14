@@ -313,7 +313,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadC
     jlong engine_ptr, jlong timestamp, jbyteArray serialized_catalog) {
     VOLT_DEBUG("nativeLoadCatalog() start");
     VoltDBEngine *engine = castToEngine(engine_ptr);
-    static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     if (engine == NULL) {
         VOLT_ERROR("engine_ptr was NULL or invalid pointer");
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
@@ -338,6 +338,10 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadC
     } catch (const SerializableEEException &e) {
         engine->resetReusedResultOutputBuffer();
         e.serialize(engine->getExceptionOutputSerializer());
+    } catch (const FatalException &fe) {
+        if (topend != NULL) {
+            topend->crashVoltDB(fe);
+        }
     }
 
     VOLT_ERROR("loadCatalog failed");
@@ -357,7 +361,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
     jlong engine_ptr, jlong timestamp, jbyteArray catalog_diffs) {
     VOLT_DEBUG("nativeUpdateCatalog() start");
     VoltDBEngine *engine = castToEngine(engine_ptr);
-    static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     if (engine == NULL) {
         VOLT_ERROR("engine_ptr was NULL or invalid pointer");
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
@@ -382,6 +386,10 @@ Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
     } catch (const SerializableEEException &e) {
         engine->resetReusedResultOutputBuffer();
         e.serialize(engine->getExceptionOutputSerializer());
+    } catch (const FatalException &fe) {
+        if (topend != NULL) {
+            topend->crashVoltDB(fe);
+        }
     }
 
     VOLT_ERROR("updateCatalog failed");

@@ -58,6 +58,7 @@
 #include "storage/tableiterator.h"
 #include "storage/tableutil.h"
 #include "storage/temptable.h"
+#include "storage/ConstraintFailureException.h"
 
 #include <vector>
 
@@ -151,8 +152,10 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
             // if it doesn't map to this site
             if (!isLocal) {
                 if (!m_multiPartition) {
-                    VOLT_ERROR("Mispartitioned Tuple in single-partition plan.");
-                    return false;
+                    throw ConstraintFailureException(
+                            dynamic_cast<PersistentTable*>(m_targetTable),
+                            m_tuple,
+                            "Mispartitioned tuple in single-partition insert statement.");
                 }
 
                 // don't insert

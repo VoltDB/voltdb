@@ -46,7 +46,7 @@ CTX.CPPFLAGS += """-Wall -Wextra -Werror -Woverloaded-virtual
             -pthread
             -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK
             -fno-omit-frame-pointer
-            -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS"""
+            -fvisibility=default -DBOOST_SP_DISABLE_THREADS"""
 
 if gcc_major == 4 and gcc_minor >= 3:
     CTX.CPPFLAGS += " -Wno-ignored-qualifiers -fno-strict-aliasing"
@@ -434,7 +434,12 @@ if whichtests in ("${eetestsuite}", "plannodes"):
 
 # this function (in buildtools.py) generates the makefile
 # it's currently a bit ugly but it'll get cleaned up soon
-buildMakefile(CTX)
+if not os.environ.get('EESKIPBUILDMAKEFILE'):
+    print "build.py: Making the makefile"
+    buildMakefile(CTX)
+
+if os.environ.get('EEONLYBUILDMAKEFILE'):
+    sys.exit()
 
 ###############################################################################
 # RUN THE MAKEFILE

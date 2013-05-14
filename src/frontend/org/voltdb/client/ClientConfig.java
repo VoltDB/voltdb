@@ -27,6 +27,7 @@ public class ClientConfig {
 
     final String m_username;
     final String m_password;
+    final boolean m_cleartext;
     final ClientStatusListenerExt m_listener;
     boolean m_heavyweight = false;
     int m_maxOutstandingTxns = 3000;
@@ -45,6 +46,7 @@ public class ClientConfig {
         m_username = "";
         m_password = "";
         m_listener = null;
+        m_cleartext = true;
     }
 
     /**
@@ -54,7 +56,7 @@ public class ClientConfig {
      * @param password
      */
     public ClientConfig(String username, String password) {
-        this(username, password, (ClientStatusListenerExt) null);
+        this(username, password, true, (ClientStatusListenerExt) null);
     }
 
     /**
@@ -66,7 +68,7 @@ public class ClientConfig {
      */
     @Deprecated
     public ClientConfig(String username, String password, ClientStatusListener listener) {
-        this(username, password, new ClientStatusListenerWrapper(listener));
+        this(username, password, true, new ClientStatusListenerWrapper(listener));
     }
 
     /**
@@ -77,6 +79,18 @@ public class ClientConfig {
      * @param listener
      */
     public ClientConfig(String username, String password, ClientStatusListenerExt listener) {
+        this(username,password,true,listener);
+    }
+
+    /**
+     * Configuration for a client that specifies authentication credentials. The username and
+     * password can be null or the empty string. Also specifies a status listener.
+     * @param username
+     * @param password
+     * @param listener
+     * @param cleartext
+     */
+    public ClientConfig(String username, String password, boolean cleartext, ClientStatusListenerExt listener) {
         if (username == null) {
             m_username = "";
         } else {
@@ -88,6 +102,7 @@ public class ClientConfig {
             m_password = password;
         }
         m_listener = listener;
+        m_cleartext = cleartext;
     }
 
     /**

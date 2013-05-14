@@ -119,7 +119,7 @@ public class TestStatsAgent {
     @Test
     public void testCollectDRStats() throws Exception {
         createAndRegisterStats();
-        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DR");
+        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DR", false);
         ClientResponseImpl response = responses.take();
 
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
@@ -132,7 +132,7 @@ public class TestStatsAgent {
     @Test
     public void testCollectSnapshotStatusStats() throws Exception {
         createAndRegisterStats();
-        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "SNAPSHOTSTATUS");
+        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "SNAPSHOTSTATUS", false);
         ClientResponseImpl response = responses.take();
 
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
@@ -154,16 +154,18 @@ public class TestStatsAgent {
     }
 
     @Test
-    public void testCollectUnsupportedStats() throws Exception {
-        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DR");
-        ClientResponseImpl response = responses.take();
-
-        assertEquals(ClientResponse.GRACEFUL_FAILURE, response.getStatus());
-        VoltTable results[] = response.getResults();
-        assertEquals(0, results.length);
-        assertTrue(
-                "Requested statistic \"DR\" is not supported in the current configuration".equals(
-                response.getStatusString()));
+    public void testCollectUnavailableStats() throws Exception {
+        for (SysProcSelector selector : SysProcSelector.values()) {
+            m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, selector.name(), false);
+            ClientResponseImpl response = responses.take();
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, response.getStatus());
+            VoltTable results[] = response.getResults();
+            assertEquals(0, results.length);
+            assertEquals(
+                    "Requested statistic \"" + selector.name() + "\" is not yet available or not " +
+                    "supported in the current configuration.",
+                    response.getStatusString());
+        }
     }
 
     @Test
@@ -171,7 +173,7 @@ public class TestStatsAgent {
         createAndRegisterStats();
         StatsAgent.STATS_COLLECTION_TIMEOUT = 300;
         MockStatsSource.delay = 200;
-        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DR");
+        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DR", false);
         ClientResponseImpl response = responses.take();
 
         assertEquals(ClientResponse.GRACEFUL_FAILURE, response.getStatus());
@@ -192,7 +194,7 @@ public class TestStatsAgent {
          * Generate a bunch of requests, should get backpressure on some of them
          */
         for (int ii = 0; ii < 12; ii++) {
-            m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DR");
+            m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DR", false);
         }
 
         boolean hadBackpressure = false;
@@ -211,7 +213,7 @@ public class TestStatsAgent {
         /*
          * Now having recieved all responses, it should be possible to collect the stats
          */
-        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DR");
+        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DR", false);
         ClientResponseImpl response = responses.take();
         verifyResults(response);
     }
