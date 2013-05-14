@@ -1826,8 +1826,9 @@ TEST CASES
   </findbugs>
 </target>
 
-<property name="ptdefaultconfigs" value="json,voter,voltkv,voltcache,cust-report-2012-11-28,ENG-2549"
-  description = "default hard-coded set of plannertester configs to run or refresh" />
+<property name="ptdefaultconfigs"
+         value="json,voter,voltkv,voltcache,cust-report-2012-11-28,ENG-2549,joins"
+   description="default hard-coded set of plannertester configs to run or refresh" />
 
 <target name="plannertester" description="Run plannertester">
     <property name="plannertester.dir" value="tests/scripts/plannertester"/>
