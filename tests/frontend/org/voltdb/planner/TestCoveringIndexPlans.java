@@ -33,7 +33,6 @@ public class TestCoveringIndexPlans extends PlannerTestCase {
         final boolean planForSinglePartition = true;
         setupSchema(TestCoveringIndexPlans.class.getResource("testplans-indexvshash-ddl.sql"),
                     "testindexvshashplans", planForSinglePartition);
-        forceHackPartitioning();
     }
 
     @Override

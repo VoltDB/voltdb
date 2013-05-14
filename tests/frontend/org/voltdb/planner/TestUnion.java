@@ -28,7 +28,6 @@ import java.util.List;
 import junit.framework.TestCase;
 
 import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
@@ -305,8 +304,7 @@ public class TestUnion  extends TestCase {
         // Set partitioning for some tables.
         // TODO: Enable PARTITION statements in the ddl -- PlannerTestAideDeCamp ignores them
         // -- not sure why/how -- consider fixing or abandoning PlannerTestAideDeCamp.
-        Cluster cluster = aide.getCatalog().getClusters().get("cluster");
-        CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
+        CatalogMap<Table> tmap = aide.getDatabase().getTables();
         for (Table t : tmap) {
             String name = t.getTypeName();
             if ("T1".equalsIgnoreCase(name)) {

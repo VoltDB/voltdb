@@ -43,6 +43,7 @@ import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.compiler.VoltCompiler;
+import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.plannodes.SchemaColumn;
@@ -72,16 +73,13 @@ public class PlannerTestAideDeCamp {
         String schemaPath = URLDecoder.decode(ddlurl.getPath(), "UTF-8");
         VoltCompiler compiler = new VoltCompiler();
         hsql = HSQLInterface.loadHsqldb();
-        catalog = compiler.loadSchema(hsql, schemaPath);
-        db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        VoltCompiler.DdlProceduresToLoad no_procs = DdlProceduresToLoad.NoDdlProcedures;
+        catalog = compiler.loadSchema(hsql, no_procs, schemaPath);
+        db = compiler.getCatalogDatabase();
         proc = db.getProcedures().add(basename);
     }
 
     public void tearDown() {
-    }
-
-    public Catalog getCatalog() {
-        return catalog;
     }
 
     public Database getDatabase() {
@@ -107,11 +105,6 @@ public class PlannerTestAideDeCamp {
     {
         compile(sql, 0, null, null, true, false, detMode);
         return m_currentPlan;
-    }
-
-    public List<AbstractPlanNode> compile(String sql, int paramCount)
-    {
-        return compile(sql, paramCount, false, null);
     }
 
     public List<AbstractPlanNode> compile(String sql, int paramCount, boolean singlePartition) {
