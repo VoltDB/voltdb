@@ -42,7 +42,7 @@ import org.voltdb.utils.VoltFile;
  * must be thread-safe. They use m_lock to do this. DO NOT hold m_lock
  * when leaving this class.
  */
-public class SequentialRejoinCoordinator extends RejoinCoordinator {
+public class SequentialRejoinCoordinator extends JoinCoordinator {
     private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
 
     // This lock synchronizes all data structure access. Do not hold this

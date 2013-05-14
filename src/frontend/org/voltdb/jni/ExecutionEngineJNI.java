@@ -20,6 +20,7 @@ package org.voltdb.jni;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
+import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -36,6 +37,8 @@ import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FastSerializer.BufferGrowCallback;
+import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 /**
  * Wrapper for native Execution Engine library.
@@ -433,13 +436,45 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateTableStream(int tableId, TableStreamType streamType) {
-        return nativeActivateTableStream( pointer, tableId, streamType.ordinal());
+    public boolean activateTableStream(int tableId, TableStreamType streamType, SnapshotPredicates predicates) {
+        return nativeActivateTableStream(pointer, tableId, streamType.ordinal(), predicates.toBytes());
     }
 
     @Override
-    public int tableStreamSerializeMore(BBContainer c, int tableId, TableStreamType streamType) {
-        return nativeTableStreamSerializeMore(pointer, c.address, c.b.position(), c.b.remaining(), tableId, streamType.ordinal());
+    public int[] tableStreamSerializeMore(int tableId,
+                                          TableStreamType streamType,
+                                          List<BBContainer> outputBuffers) {
+        long remaining = nativeTableStreamSerializeMore(pointer,
+                                                        tableId,
+                                                        streamType.ordinal(),
+                                                        SnapshotUtil.OutputBuffersToBytes(outputBuffers));
+        int[] positions = null;
+        // -1 is end of stream.
+        if (remaining == -1) {
+            return new int[] {0};
+        }
+        // -2 is an error.
+        if (remaining == -2) {
+            return new int[] {-1};
+        }
+        assert(deserializer != null);
+        deserializer.clear();
+        int count;
+        try {
+            count = deserializer.readInt();
+            if (count > 0) {
+                positions = new int[count];
+                for (int i = 0; i < count; i++) {
+                    positions[i] = deserializer.readInt();
+                }
+                return positions;
+            }
+        } catch (final IOException ex) {
+            LOG.error("Failed to deserialize position array" + ex);
+            throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
+        }
+
+        return new int[] {0};
     }
 
     /**

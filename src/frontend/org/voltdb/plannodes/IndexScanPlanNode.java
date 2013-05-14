@@ -224,16 +224,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             // PlanNodes all need private deep copies of expressions
             // so that the resolveColumnIndexes results
             // don't get bashed by other nodes or subsequent planner runs
-            try
-            {
-                m_endExpression = (AbstractExpression) endExpression.clone();
-            }
-            catch (CloneNotSupportedException e)
-            {
-                // This shouldn't ever happen
-                e.printStackTrace();
-                throw new RuntimeException(e.getMessage());
-            }
+            m_endExpression = (AbstractExpression) endExpression.clone();
         }
     }
 
@@ -244,16 +235,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             // PlanNodes all need private deep copies of expressions
             // so that the resolveColumnIndexes results
             // don't get bashed by other nodes or subsequent planner runs
-            try
-            {
-                m_searchkeyExpressions.add((AbstractExpression) expr.clone());
-            }
-            catch (CloneNotSupportedException e)
-            {
-                // This shouldn't ever happen
-                e.printStackTrace();
-                throw new RuntimeException(e.getMessage());
-            }
+            m_searchkeyExpressions.add((AbstractExpression) expr.clone());
         }
     }
 

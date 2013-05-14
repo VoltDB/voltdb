@@ -69,15 +69,12 @@ import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientInterfaceHandleManager.Iv2InFlight;
-
-import org.voltdb.dtxn.LatencyStats.LatencyInfo;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
-import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.compiler.AdHocPlannedStatement;
@@ -88,6 +85,7 @@ import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
+import org.voltdb.dtxn.LatencyStats.LatencyInfo;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
@@ -101,7 +99,6 @@ import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.plannodes.SendPlanNode;
-import org.voltdb.sysprocs.LoadSinglepartitionTable;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
@@ -896,6 +893,122 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     /**
+     * Runs on the network thread to prepare client response. If a transaction needs to be
+     * restarted, it will get restarted here.
+     */
+    private class ClientResponseWork implements DeferredSerialization {
+        private final ClientInterfaceHandleManager cihm;
+        private final InitiateResponseMessage response;
+        private final StoredProcedureInvocation invocation;
+        private final Procedure catProc;
+        private ClientResponseImpl clientResponse;
+
+        private ClientResponseWork(InitiateResponseMessage response,
+                                   ClientInterfaceHandleManager cihm,
+                                   Procedure catProc)
+        {
+            this.response = response;
+            this.clientResponse = response.getClientResponseData();
+            this.invocation = response.getInvocation();
+            this.cihm = cihm;
+            this.catProc = catProc;
+        }
+
+        @Override
+        public ByteBuffer[] serialize() throws IOException
+        {
+            // HACK-O-RIFFIC
+            // For now, figure out if this is a transaction that was ignored
+            // by the ReplaySequencer and just remove the handle from the CIHM
+            // without removing any handles before it which we haven't seen yet.
+            ClientInterfaceHandleManager.Iv2InFlight clientData;
+            if (clientResponse != null &&
+                    clientResponse.getStatusString() != null &&
+                    clientResponse.getStatusString().equals(ClientResponseImpl.IGNORED_TRANSACTION)) {
+                clientData = cihm.removeHandle(response.getClientInterfaceHandle());
+            }
+            else {
+                clientData = cihm.findHandle(response.getClientInterfaceHandle());
+            }
+            if (clientData == null) {
+                return new ByteBuffer[] {};
+            }
+            final long now = System.currentTimeMillis();
+            final int delta = (int)(now - clientData.m_creationTime);
+
+            // Reuse the creation time of the original invocation to have accurate internal latency
+            if (restartTransaction(clientData.m_messageSize, clientData.m_creationTime)) {
+                // If the transaction is successfully restarted, don't send a response to the
+                // client yet.
+                return new ByteBuffer[] {};
+            }
+
+            /*
+             * Log initiator stats
+             */
+            cihm.m_acg.logTransactionCompleted(
+                    cihm.connection.connectionId(),
+                    cihm.connection.getHostnameOrIP(),
+                    clientData.m_procName,
+                    delta,
+                    clientResponse.getStatus());
+
+            clientResponse.setClientHandle(clientData.m_clientHandle);
+            clientResponse.setClusterRoundtrip(delta);
+            clientResponse.setHash(null); // not part of wire protocol
+
+            ByteBuffer results = ByteBuffer.allocate(clientResponse.getSerializedSize() + 4);
+            results.putInt(results.capacity() - 4);
+            clientResponse.flattenToBuffer(results);
+            return new ByteBuffer[] { results };
+        }
+
+        @Override
+        public void cancel() {
+        }
+
+        /**
+         * Checks if the transaction needs to be restarted, if so, restart it.
+         * @param messageSize the original message size when the invocation first came in
+         * @param now the current timestamp
+         * @return true if the transaction is restarted successfully, false otherwise.
+         */
+        private boolean restartTransaction(int messageSize, long now)
+        {
+            if (response.isMispartitioned()) {
+                // Restart a mis-partitioned transaction
+                assert(invocation != null);
+                assert(catProc != null);
+                int partitionParamIndex = catProc.getPartitionparameter();
+                int partitionParamType = catProc.getPartitioncolumn().getType();
+                boolean isReadonly = catProc.getReadonly();
+
+                try {
+                    int partition = getPartitionForProcedure(partitionParamIndex,
+                            partitionParamType, invocation);
+                    createTransaction(cihm.connection.connectionId(),
+                            null, false, invocation,
+                            isReadonly,
+                            true, // Only SP could be mis-partitioned
+                            false, // Only SP could be mis-partitioned
+                            new int[] {partition},
+                            cihm.connection,
+                            messageSize,
+                            now);
+                    return true;
+                } catch (Exception e) {
+                    assert(clientResponse == null);
+                    clientResponse = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
+                            new VoltTable[]{},
+                            "Fail to get the partition for a restarted transaction" + e.getMessage());
+                }
+            }
+
+            return false;
+        }
+    }
+
+    /**
      * Invoked when DTXN backpressure starts
      *
      */
@@ -1100,66 +1213,28 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             public void deliver(final VoltMessage message) {
                 if (m_isIV2Enabled) {
                     if (message instanceof InitiateResponseMessage) {
+                        final CatalogContext catalogContext = m_catalogContext.get();
                         // forward response; copy is annoying. want slice of response.
-                        final InitiateResponseMessage response = (InitiateResponseMessage)message;
+                        InitiateResponseMessage response = (InitiateResponseMessage)message;
+                        StoredProcedureInvocation invocation = response.getInvocation();
                         Iv2Trace.logFinishTransaction(response, m_mailbox.getHSId());
-                        final ClientInterfaceHandleManager cihm = m_cihm.get(response.getClientConnectionId());
+                        ClientInterfaceHandleManager cihm = m_cihm.get(response.getClientConnectionId());
+                        Procedure procedure = null;
+
+                        if (invocation != null) {
+                            procedure = catalogContext.procedures.get(invocation.getProcName());
+                            if (procedure == null) {
+                                procedure = SystemProcedureCatalog.listing.get(invocation.getProcName())
+                                        .asCatalogProcedure();
+                            }
+                        }
+
                         //Can be null on hangup
                         if (cihm != null) {
                             //Pass it to the network thread like a ninja
                             //Only the network can use the CIHM
                             cihm.connection.writeStream().enqueue(
-                                    new DeferredSerialization() {
-
-                                        @Override
-                                        public ByteBuffer[] serialize()
-                                                throws IOException {
-                                            ClientResponseImpl clientResponse = response.getClientResponseData();
-                                            // HACK-O-RIFFIC
-                                            // For now, figure out if this is a transaction that was ignored
-                                            // by the ReplaySequencer and just remove the handle from the CIHM
-                                            // without removing any handles before it which we haven't seen yet.
-                                            ClientInterfaceHandleManager.Iv2InFlight clientData;
-                                            if (clientResponse.getStatusString() != null &&
-                                                clientResponse.getStatusString().equals(ClientResponseImpl.IGNORED_TRANSACTION)) {
-                                                clientData = cihm.removeHandle(response.getClientInterfaceHandle());
-                                            }
-                                            else {
-                                                clientData = cihm.findHandle(response.getClientInterfaceHandle());
-                                            }
-                                            if (clientData == null) {
-                                                return new ByteBuffer[] {};
-                                            }
-                                            final long now = System.currentTimeMillis();
-                                            final int delta = (int)(now - clientData.m_creationTime);
-
-                                            /*
-                                             * Log initiator stats
-                                             */
-                                            cihm.m_acg.logTransactionCompleted(
-                                                    cihm.connection.connectionId(),
-                                                    cihm.connection.getHostnameOrIP(),
-                                                    clientData.m_procName,
-                                                    delta,
-                                                    clientResponse.getStatus());
-
-                                            clientResponse.setClientHandle(clientData.m_clientHandle);
-                                            clientResponse.setClusterRoundtrip(delta);
-                                            clientResponse.setHash(null); // not part of wire protocol
-
-                                            ByteBuffer results =
-                                                    ByteBuffer.allocate(
-                                                            clientResponse.getSerializedSize() + 4);
-                                            results.putInt(results.capacity() - 4);
-                                            clientResponse.flattenToBuffer(results);
-                                            return new ByteBuffer[] { results };
-                                        }
-
-                                        @Override
-                                        public void cancel() {
-                                        }
-
-                            });
+                                    new ClientResponseWork(response, cihm, procedure));
                         }
                     } else if (message instanceof BinaryPayloadMessage) {
                         handlePartitionFailOver((BinaryPayloadMessage)message);
@@ -1269,19 +1344,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     private ClientResponseImpl checkPolicies(String name, AuthSystem.AuthUser user,
                                   final StoredProcedureInvocation task,
-                                  final Procedure catProc, Config sysProc) {
+                                  final Procedure catProc) {
         List<InvocationAcceptancePolicy> policies = m_policies.get(name);
         ClientResponseImpl error = null;
         if (policies != null) {
             for (InvocationAcceptancePolicy policy : policies) {
-                if (catProc != null) {
-                    if ((error = policy.shouldAccept(user, task, catProc)) != null) {
-                        return error;
-                    }
-                } else {
-                    if ((error = policy.shouldAccept(user, task, sysProc)) != null) {
-                        return error;
-                    }
+                if ((error = policy.shouldAccept(user, task, catProc)) != null) {
+                    return error;
                 }
             }
         }
@@ -1574,39 +1643,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return null;
     }
 
-    ClientResponseImpl dispatchLoadSinglepartitionTable(ByteBuffer buf,
-            StoredProcedureInvocation task, ClientInputHandler handler, Connection ccxn)
-    {
-        int[] involvedPartitions = null;
-        // break out the Hashinator and calculate the appropriate partition
-        try {
-            CatalogMap<Table> tables = m_catalogContext.get().database.getTables();
-            Object valueToHash =
-                LoadSinglepartitionTable.
-                    partitionValueFromInvocation(tables, task);
-            involvedPartitions =
-                new int[] { TheHashinator.hashToPartition(valueToHash) };
-        }
-        catch (Exception e) {
-            authLog.warn(e.getMessage());
-            return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                    new VoltTable[0], e.getMessage(), task.clientHandle);
-        }
-        assert(involvedPartitions != null);
-        // XXX-ZOMG This really should pass in the SystemProcedureCatalog.Config object
-        // and read these settings out of it rather than hardwiring them here.
-        createTransaction(handler.connectionId(), handler.m_hostname,
-                handler.isAdmin(),
-                task,
-                false,      // read only
-                true,       // single partition
-                false,      // every site
-                involvedPartitions,
-                ccxn, buf.capacity(),
-                System.currentTimeMillis());
-        return null;
-    }
-
     /**
      * Send a multipart sentinel to all partitions. This is only used when the
      * multipart didn't generate any sentinels for partitions, e.g. DR
@@ -1652,9 +1688,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         sendSentinel(invocation.getOriginalTxnId(), initiatorHSId, handle, connectionId, false);
     }
 
-    ClientResponseImpl dispatchStatistics(Config sysProc, ByteBuffer buf, StoredProcedureInvocation task,
-            ClientInputHandler handler, Connection ccxn)
-    {
+    ClientResponseImpl dispatchStatistics(Procedure sysProc, ByteBuffer buf, StoredProcedureInvocation task,
+            ClientInputHandler handler, Connection ccxn) {
         ParameterSet params = task.getParams();
         if ((params.toArray().length < 1) || (params.toArray().length > 2)) {
             return errorResponse(ccxn, task.clientHandle, ClientResponse.GRACEFUL_FAILURE,
@@ -1696,7 +1731,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
     }
 
-    ClientResponseImpl dispatchPromote(Config sysProc,
+    ClientResponseImpl dispatchPromote(Procedure sysProc,
                                        ByteBuffer buf,
                                        StoredProcedureInvocation task,
                                        ClientInputHandler handler,
@@ -1756,17 +1791,23 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // Deserialize the client's request and map to a catalog stored procedure
         final CatalogContext catalogContext = m_catalogContext.get();
         AuthSystem.AuthUser user = catalogContext.authSystem.getUser(handler.m_username);
-        final Procedure catProc = catalogContext.procedures.get(task.procName);
-        Config sysProc = SystemProcedureCatalog.listing.get(task.procName);
+        Procedure catProc = catalogContext.procedures.get(task.procName);
 
-        if (sysProc == null ) {
+        if (catProc == null) {
+            Config sysProc = SystemProcedureCatalog.listing.get(task.procName);
+            if (sysProc != null) {
+                catProc = sysProc.asCatalogProcedure();
+            }
+        }
+
+        if (catProc == null) {
             if( task.procName.equals("@AdHoc") ){
                 // Map @AdHoc... to @AdHoc_RW_MP for validation. In the future if security is
                 // configured differently for @AdHoc... variants this code will have to
                 // change in order to use the proper variant based on whether the work
                 // is single or multi partition and read-only or read-write.
-                sysProc = SystemProcedureCatalog.listing.get("@AdHoc_RW_MP");
-                assert(sysProc != null);
+                catProc = SystemProcedureCatalog.listing.get("@AdHoc_RW_MP").asCatalogProcedure();
+                assert(catProc != null);
             }
             else if( task.procName.equals("@Explain") ){
                 return dispatchAdHoc(task, handler, ccxn, true );
@@ -1788,7 +1829,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     task.clientHandle);
         }
 
-        if (catProc == null && sysProc == null) {
+        if (catProc == null) {
             String errorMessage = "Procedure " + task.procName + " was not found";
             authLog.l7dlog( Level.WARN, LogKeys.auth_ClientInterface_ProcedureNotFound.name(), new Object[] { task.procName }, null);
             return new ClientResponseImpl(
@@ -1797,24 +1838,22 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         // Check procedure policies
-        error = checkPolicies(null, user, task, catProc, sysProc);
+        error = checkPolicies(null, user, task, catProc);
         if (error != null) {
             return error;
         }
 
-        error = checkPolicies(task.procName, user, task, catProc, sysProc);
+        error = checkPolicies(task.procName, user, task, catProc);
         if (error != null) {
             return error;
         }
 
-        if (sysProc != null) {
+        if (catProc.getSystemproc()) {
             // these have helpers that do all the work...
             if (task.procName.equals("@AdHoc")) {
                 return dispatchAdHoc(task, handler, ccxn, false);
             } else if (task.procName.equals("@UpdateApplicationCatalog")) {
                 return dispatchUpdateApplicationCatalog(task, handler, ccxn);
-            } else if (task.procName.equals("@LoadSinglepartitionTable")) {
-                return dispatchLoadSinglepartitionTable(buf, task, handler, ccxn);
             } else if (task.procName.equals("@LoadMultipartitionTable")) {
                 /*
                  * For IV2 DR: This will generate a sentinel for each partition,
@@ -1829,16 +1868,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 m_snapshotDaemon.requestUserSnapshot(task, ccxn);
                 return null;
             } else if (task.procName.equals("@Statistics")) {
-                return dispatchStatistics(sysProc, buf, task, handler, ccxn);
+                return dispatchStatistics(catProc, buf, task, handler, ccxn);
             } else if (task.procName.equals("@Promote")) {
-                return dispatchPromote(sysProc, buf, task, handler, ccxn);
+                return dispatchPromote(catProc, buf, task, handler, ccxn);
             } else if (task.procName.equals("@SnapshotStatus")) {
                 // SnapshotStatus is really through @Statistics now, but preserve the
                 // legacy calling mechanism
                 Object[] params = new Object[1];
                 params[0] = "SNAPSHOTSTATUS";
                 task.setParams(params);
-                return dispatchStatistics(SystemProcedureCatalog.listing.get("@Statistics"),
+                return dispatchStatistics(SystemProcedureCatalog.listing.get("@Statistics").asCatalogProcedure(),
                         buf, task, handler, ccxn);
             }
 
@@ -1863,64 +1902,41 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     task.setParams("OVERVIEW");
                 }
             }
-
-            // the shared dispatch for sysprocs
-            int[] involvedPartitions = m_allPartitions;
-            if (sysProc.getSinglepartition()) {
-                //Fix a bug where SystemCatalog was sent to all partitions
-                //and catalog changes caused result mismatches
-                //Pick a random partition to be the source of the catalog info
-                involvedPartitions = new int[] { new java.util.Random().nextInt(involvedPartitions.length) };
-            }
-
-            createTransaction(handler.connectionId(), handler.m_hostname,
-                    handler.isAdmin(),
-                    task,
-                    sysProc.getReadonly(),
-                    sysProc.getSinglepartition(),
-                    sysProc.getEverysite(),
-                    involvedPartitions,
-                    ccxn, buf.capacity(),
-                    now);
-
         }
 
-        // dispatch a user procedure
-        if (catProc != null) {
-            int[] involvedPartitions = null;
-            if (catProc.getSinglepartition() == false) {
-                involvedPartitions = m_allPartitions;
+        int[] involvedPartitions;
+        if (catProc.getSinglepartition() == false) {
+            involvedPartitions = m_allPartitions;
+        }
+        else {
+            // break out the Hashinator and calculate the appropriate partition
+            try {
+                involvedPartitions = new int[] {
+                        getPartitionForProcedure(
+                                catProc.getPartitionparameter(),
+                                catProc.getPartitioncolumn().getType(),
+                                task)
+                };
             }
-            else {
-                // break out the Hashinator and calculate the appropriate partition
-                try {
-                    involvedPartitions = new int[] {
-                                getPartitionForProcedure(
-                                        catProc.getPartitionparameter(),
-                                        catProc.getPartitioncolumn().getType(),
-                                        task)
-                            };
-                }
-                catch (RuntimeException e) {
-                    // unable to hash to a site, return an error
-                    String errorMessage = "Error sending procedure "
+            catch (RuntimeException e) {
+                // unable to hash to a site, return an error
+                String errorMessage = "Error sending procedure "
                         + task.procName + " to the correct partition. Make sure parameter values are correct.";
-                    authLog.l7dlog( Level.WARN,
-                            LogKeys.host_ClientInterface_unableToRouteSinglePartitionInvocation.name(),
-                            new Object[] { task.procName }, null);
-                    return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                            new VoltTable[0], errorMessage, task.clientHandle);
-                }
-                catch (Exception e) {
-                    authLog.l7dlog( Level.WARN,
-                            LogKeys.host_ClientInterface_unableToRouteSinglePartitionInvocation.name(),
-                            new Object[] { task.procName }, null);
-                    return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                            new VoltTable[0], e.getMessage(), task.clientHandle);
-                }
+                authLog.l7dlog( Level.WARN,
+                        LogKeys.host_ClientInterface_unableToRouteSinglePartitionInvocation.name(),
+                        new Object[] { task.procName }, null);
+                return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                        new VoltTable[0], errorMessage, task.clientHandle);
             }
-            boolean allowMismatchedResults = catProc.getReadonly() && isProcedureNonDeterministic(catProc);
-            boolean success =
+            catch (Exception e) {
+                authLog.l7dlog( Level.WARN,
+                        LogKeys.host_ClientInterface_unableToRouteSinglePartitionInvocation.name(),
+                        new Object[] { task.procName }, null);
+                return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                        new VoltTable[0], e.getMessage(), task.clientHandle);
+            }
+        }
+        boolean success =
                 createTransaction(handler.connectionId(), handler.m_hostname,
                         handler.isAdmin(),
                         task,
@@ -1930,16 +1946,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         involvedPartitions,
                         ccxn, buf.capacity(),
                         now);
-            if (!success) {
-                // HACK: this return is for the DR agent so that it
-                // will move along on duplicate replicated transactions
-                // reported by the slave cluster.  We report "SUCCESS"
-                // to keep the agent from choking.  ENG-2334
-                return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                        new VoltTable[0],
-                        ClientResponseImpl.IGNORED_TRANSACTION,
-                        task.clientHandle);
-            }
+        if (!success) {
+            // HACK: this return is for the DR agent so that it
+            // will move along on duplicate replicated transactions
+            // reported by the slave cluster.  We report "SUCCESS"
+            // to keep the agent from choking.  ENG-2334
+            return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                    new VoltTable[0],
+                    ClientResponseImpl.IGNORED_TRANSACTION,
+                    task.clientHandle);
         }
         return null;
     }
@@ -2004,7 +2019,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
         assert(buf.hasArray());
-        task.setParams(buf.array());
+        if (isSinglePartition) {
+            byte[] param = null;
+            // replicated table read is single-part without a partitioning param
+            if (plannedStmtBatch.partitionParam != null) {
+                param = TheHashinator.valueToBytes(plannedStmtBatch.partitionParam);
+            }
+
+            // Send the partitioning parameter and its type along so that the site can check if
+            // it's mis-partitioned.
+            task.setParams(param, buf.array());
+        } else {
+            task.setParams(buf.array());
+        }
         task.clientHandle = plannedStmtBatch.clientHandle;
 
         /*
@@ -2319,27 +2346,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @return The partition best set up to execute the procedure.
      * @throws Exception
      */
-    int getPartitionForProcedure(int partitionIndex, int partitionType,
-            StoredProcedureInvocation task)
-    throws Exception
+    static int getPartitionForProcedure(int partitionIndex, int partitionType,
+                                        StoredProcedureInvocation task)
+            throws Exception
     {
         Object invocationParameter = task.getParameterAtIndex(partitionIndex);
-        final VoltType partitionParamType = VoltType.get((byte)partitionType);
-
-        // Special case: if the user supplied a string for a number column,
-        // try to do the conversion. This makes it substantially easier to
-        // load CSV data or other untyped inputs that match DDL without
-        // requiring the loader to know precise the schema.
-        if ((invocationParameter != null) &&
-            (invocationParameter.getClass() == String.class) &&
-            (partitionParamType.isNumber()))
-        {
-            invocationParameter = ParameterConverter.stringToLong(
-                    invocationParameter,
-                    partitionParamType.classFromType());
-        }
-
-        return TheHashinator.hashToPartition(invocationParameter);
+        return TheHashinator.getPartitionForParameter(partitionType, invocationParameter);
     }
 
     @Override

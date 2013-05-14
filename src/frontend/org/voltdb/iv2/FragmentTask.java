@@ -36,6 +36,7 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.VoltTableUtil;
 
 public class FragmentTask extends TransactionTask
 {
@@ -109,14 +110,17 @@ public class FragmentTask extends TransactionTask
         taskLog.logTask(m_fragmentMsg);
         final FragmentResponseMessage response =
             new FragmentResponseMessage(m_fragmentMsg, m_initiator.getHSId());
+        response.m_sourceHSId = m_initiator.getHSId();
         response.setRecovering(true);
         response.setStatus(FragmentResponseMessage.SUCCESS, null);
 
         // Set the dependencies even if this is a dummy response. This site could be the master
         // on elastic join, so the fragment response message is actually going to the MPI.
+        VoltTable depTable = new VoltTable(new ColumnInfo("STATUS", VoltType.TINYINT));
+        depTable.setStatusCode(VoltTableUtil.NULL_DEPENDENCY_STATUS);
         for (int frag = 0; frag < m_fragmentMsg.getFragmentCount(); frag++) {
             final int outputDepId = m_fragmentMsg.getOutputDepId(frag);
-            response.addDependency(outputDepId, null);
+            response.addDependency(outputDepId, depTable);
         }
 
         m_initiator.deliver(response);

@@ -45,6 +45,7 @@ import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.utils.VoltTableUtil;
 
 public class MpTransactionState extends TransactionState
 {
@@ -332,7 +333,10 @@ public class MpTransactionState extends TransactionState
                 tables = new ArrayList<VoltTable>();
                 m_remoteDepTables.put(depId, tables);
             }
-            tables.add(table);
+            // null dependency table is from a joining node, has no content, drop it
+            if (table.getStatusCode() != VoltTableUtil.NULL_DEPENDENCY_STATUS) {
+                tables.add(table);
+            }
         }
         else {
             System.out.println("No remote dep for local site: " + hsid);

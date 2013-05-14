@@ -46,6 +46,9 @@ public class TestEmptySchema extends RegressionSuite
 
     public void testEmptySchema() throws Exception {
         final Client client = getClient();
+        // sleep a little so that we have time for the IPC backend to actually be running
+        // so it can screw us on empty results
+        Thread.sleep(1000);
 
         // Even running should be an improvement (ENG-4645), but do something just to be sure
         VoltTable[] results = client.callProcedure("@Statistics", "TABLE", 0).getResults();

@@ -169,18 +169,18 @@ public class TestReplicatedInvocation {
                 e.getKey().equalsIgnoreCase("@LoadSinglePartitionTable") ||
                 e.getKey().equalsIgnoreCase("@UpdateTopology")) {
                 // Rejected
-                assertTrue(policy.shouldAccept(null, invocation, e.getValue()) != null);
+                assertTrue(policy.shouldAccept(null, invocation, e.getValue().asCatalogProcedure()) != null);
             } else if (e.getKey().equalsIgnoreCase("@AdHoc")) {
                 // Accepted
                 invocation.setParams("select * from A");
-                assertTrue(policy.shouldAccept(null, invocation, e.getValue()) == null);
+                assertTrue(policy.shouldAccept(null, invocation, e.getValue().asCatalogProcedure()) == null);
 
                 // Rejected
                 invocation.setParams("insert into A values (1, 2, 3)");
-                assertTrue(policy.shouldAccept(null, invocation, e.getValue()) != null);
+                assertTrue(policy.shouldAccept(null, invocation, e.getValue().asCatalogProcedure()) != null);
             } else {
                 // Accepted
-                assertTrue(policy.shouldAccept(null, invocation, e.getValue()) == null);
+                assertTrue(policy.shouldAccept(null, invocation, e.getValue().asCatalogProcedure()) == null);
             }
         }
     }

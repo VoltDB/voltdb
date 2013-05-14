@@ -32,7 +32,7 @@ import org.voltdb.export.ExportManager;
  * will be responsible for leading various cluster-wide services, particularly those which must
  * run on the same node.
  */
-class GlobalServiceElector extends LeaderNoticeHandler
+class GlobalServiceElector implements LeaderNoticeHandler
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private final LeaderElector m_leaderElector;

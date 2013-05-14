@@ -110,13 +110,16 @@ public class TestVoltTableUtil {
         VoltTable.ColumnInfo[] columns =
                 new VoltTable.ColumnInfo[] {new VoltTable.ColumnInfo("ID", VoltType.BIGINT)};
         VoltTable table1 = new VoltTable(columns);
+        table1.setStatusCode((byte) -1);
         table1.addRow(1);
         VoltTable table2 = new VoltTable(columns);
+        table2.setStatusCode((byte) -1);
         table2.addRow(2);
 
         VoltTable result = VoltTableUtil.unionTables(Arrays.asList(null, table1,
                 null, table2));
         assertNotNull(result);
+        assertEquals(-1, result.getStatusCode());
 
         Set<Long> numbers = new HashSet<Long>();
         result.resetRowPosition();

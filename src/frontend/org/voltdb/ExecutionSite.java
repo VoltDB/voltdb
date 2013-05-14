@@ -613,7 +613,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         }
 
         // do other periodic work
-        m_snapshotter.doSnapshotWork(ee, false);
     }
 
     /**
@@ -686,6 +685,12 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation)
         {
             return ExecutionSite.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation);
+        }
+
+        @Override
+        public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config)
+        {
+            //To change body of implemented methods use File | Settings | File Templates.
         }
     }
 
@@ -789,13 +794,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             snapshotPriority = m_context.cluster.getDeployment().get("deployment").
                 getSystemsettings().get("systemsettings").getSnapshotpriority();
         }
-        m_snapshotter = new SnapshotSiteProcessor(new Runnable() {
-            @Override
-            public void run() {
-                m_mailbox.deliver(new PotentialSnapshotWorkMessage());
-            }
-        },
-         snapshotPriority);
+        m_snapshotter = null;
     }
 
     private ExecutionEngine
@@ -853,7 +852,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                     if (message == null) {
                         //Will return null if there is no work, safe to block on the mailbox if there is no work
                         boolean hadWork =
-                            (m_snapshotter.doSnapshotWork(
+                            (m_snapshotter.doSnapshotWork(m_systemProcedureContext,
                                     ee,
                                     EstTime.currentTimeMillis() - lastCommittedTxnTime > 5) != null);
 
@@ -880,7 +879,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                         handleMailboxMessage(message);
                     } else {
                         //idle, do snapshot work
-                        m_snapshotter.doSnapshotWork(ee, EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
+                        m_snapshotter.doSnapshotWork(m_systemProcedureContext, ee, EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
                         // do some rejoin work
                         doRejoinWork();
                     }
@@ -1290,14 +1289,14 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                                 exportm.m_m.getPartitionId(),
                                 exportm.m_m.getSignature());
         } else if (message instanceof PotentialSnapshotWorkMessage) {
-            m_snapshotter.doSnapshotWork(ee, false);
+            m_snapshotter.doSnapshotWork(m_systemProcedureContext, ee, false);
         }
         else if (message instanceof ExecutionSiteLocalSnapshotMessage) {
             hostLog.info("Executing local snapshot. Completing any on-going snapshots.");
 
             // first finish any on-going snapshot
             try {
-                HashSet<Exception> completeSnapshotWork = m_snapshotter.completeSnapshotWork(ee);
+                HashSet<Exception> completeSnapshotWork = m_snapshotter.completeSnapshotWork(m_systemProcedureContext, ee);
                 if (completeSnapshotWork != null && !completeSnapshotWork.isEmpty()) {
                     for (Exception e : completeSnapshotWork) {
                         hostLog.error("Error completing in progress snapshot.", e);
@@ -1780,7 +1779,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
      */
     @Override
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException {
-        return m_snapshotter.completeSnapshotWork(ee);
+        return m_snapshotter.completeSnapshotWork(m_systemProcedureContext, ee);
     }
 
 
@@ -2009,11 +2008,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
     public PartitionDRGateway getPartitionDRGateway() {
         return m_partitionDRGateway;
-    }
-
-    @Override
-    public long getReplicatedDMLDivisor() {
-        return m_tracker.m_numberOfPartitions;
     }
 
     public void notifySitesAdded(final SiteTracker st) {

@@ -24,6 +24,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -44,6 +45,8 @@ import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 
 import com.google.common.base.Charsets;
+import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 /* Serializes data over a connection that presumably is being read
  * by a voltdb execution engine. The serialization is currently a
@@ -139,30 +142,42 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         private Socket m_socket = null;
         private SocketChannel m_socketChannel = null;
         Connection(BackendTarget target, int port) {
-            if (target == BackendTarget.NATIVE_EE_IPC) {
-                System.out.printf("Ready to connect to voltdbipc process on port %d\n", port);
-                System.out
-                        .println("Press enter after you have started the EE process to initiate the connection to the EE");
+            boolean connected = false;
+            int retries = 0;
+            while (!connected) {
                 try {
-                    System.in.read();
-                } catch (final IOException e1) {
-                    e1.printStackTrace();
+                    System.out.println("Connecting to localhost:" + port);
+                    m_socketChannel = SocketChannel.open(new InetSocketAddress(
+                            "localhost", port));
+                    m_socketChannel.configureBlocking(true);
+                    m_socket = m_socketChannel.socket();
+                    m_socket.setTcpNoDelay(true);
+                    connected = true;
+                } catch (final Exception e) {
+                    System.out.println(e.getMessage());
+                    if (retries++ <= 10) {
+                        if (retries > 1) {
+                            System.out.printf("Failed to connect to IPC EE on port %d. Retry #%d of 10\n", port, retries-1);
+                            try {
+                                Thread.sleep(10000);
+                            }
+                            catch (InterruptedException e1) {}
+                        }
+                    }
+                    else {
+                        System.out.printf("Failed to initialize IPC EE connection on port %d. Quitting.\n", port);
+                        System.exit(-1);
+                    }
                 }
-            }
-            try {
-                System.out.println("Connecting to localhost:" + port);
-                m_socketChannel = SocketChannel.open(new InetSocketAddress(
-                        "localhost", port));
-                m_socketChannel.configureBlocking(true);
-                m_socket = m_socketChannel.socket();
-                m_socket.setTcpNoDelay(true);
-            } catch (final Exception e) {
-                System.out.println(e.getMessage());
-                System.out
-                        .println("Failed to initialize IPC EE connection. Quitting.");
-                while (true) {}
-
-                //System.exit(-1);
+                if (!connected && retries == 1 && target == BackendTarget.NATIVE_EE_IPC) {
+                    System.out.printf("Ready to connect to voltdbipc process on port %d\n", port);
+                    System.out.println("Press Enter after you have started the EE process to initiate the connection to the EE");
+                    try {
+                        System.in.read();
+                    } catch (final IOException e1) {
+                        e1.printStackTrace();
+                    }
+                }
             }
             System.out.println("Created IPC connection for site.");
         }
@@ -906,7 +921,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     }
                 }
                 messageLengthBuffer.rewind();
-                final ByteBuffer messageBuffer = ByteBuffer.allocate(messageLengthBuffer.getInt());
+                int length = messageLengthBuffer.getInt();
+                if (length == 0) {
+                    return null;
+                }
+                final ByteBuffer messageBuffer = ByteBuffer.allocate(length);
                 while (messageBuffer.hasRemaining()) {
                     int read = m_connection.m_socketChannel.read(messageBuffer);
                     if (read == -1) {
@@ -1045,11 +1064,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateTableStream(int tableId, TableStreamType streamType) {
+    public boolean activateTableStream(int tableId, TableStreamType streamType, SnapshotPredicates predicates) {
         m_data.clear();
         m_data.putInt(Commands.ActivateTableStream.m_id);
         m_data.putInt(tableId);
         m_data.putInt(streamType.ordinal());
+        m_data.put(predicates.toBytes()); // predicates
 
         try {
             m_data.flip();
@@ -1074,47 +1094,74 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public int tableStreamSerializeMore(BBContainer c, int tableId, TableStreamType streamType) {
-        int bytesReturned = -1;
-        ByteBuffer view = c.b.duplicate();
+    public int[] tableStreamSerializeMore(int tableId, TableStreamType streamType,
+                                          List<BBContainer> outputBuffers) {
         try {
             m_data.clear();
             m_data.putInt(Commands.TableStreamSerializeMore.m_id);
             m_data.putInt(tableId);
             m_data.putInt(streamType.ordinal());
-            m_data.putInt(c.b.remaining());
+            m_data.put(SnapshotUtil.OutputBuffersToBytes(outputBuffers));
 
             m_data.flip();
             m_connection.write();
 
             m_connection.readStatusByte();
 
-            ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
-            while (lengthBuffer.hasRemaining()) {
-                int read = m_connection.m_socketChannel.read(lengthBuffer);
+            // Get the count.
+            ByteBuffer countBuffer = ByteBuffer.allocate(4);
+            while (countBuffer.hasRemaining()) {
+                int read = m_connection.m_socketChannel.read(countBuffer);
                 if (read == -1) {
                     throw new EOFException();
                 }
             }
-            lengthBuffer.flip();
-            final int length = lengthBuffer.getInt();
-            bytesReturned = length;
+            countBuffer.flip();
+            final int count = countBuffer.getInt();
+            assert count == outputBuffers.size();
+
+            // Get the remaining tuple count.
+            ByteBuffer remainingBuffer = ByteBuffer.allocate(8);
+            while (remainingBuffer.hasRemaining()) {
+                int read = m_connection.m_socketChannel.read(remainingBuffer);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            remainingBuffer.flip();
+            final long remaining = remainingBuffer.getLong();
+
             /*
              * Error or no more tuple data for this table.
              */
-            if (length == -1 || length == 0) {
-                return length;
+            if (remaining == -1 || remaining == -2) {
+                return new int[] {(int) remaining};
             }
-            view.limit(view.position() + length);
-            while (view.hasRemaining()) {
-                m_connection.m_socketChannel.read(view);
+
+            final int[] serialized = new int[count];
+            for (int i = 0; i < count; i++) {
+                ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
+                while (lengthBuffer.hasRemaining()) {
+                    int read = m_connection.m_socketChannel.read(lengthBuffer);
+                    if (read == -1) {
+                        throw new EOFException();
+                    }
+                }
+                lengthBuffer.flip();
+                serialized[i] = lengthBuffer.getInt();
+
+                ByteBuffer view = outputBuffers.get(i).b.duplicate();
+                view.limit(view.position() + serialized[i]);
+                while (view.hasRemaining()) {
+                    m_connection.m_socketChannel.read(view);
+                }
             }
+
+            return serialized;
         } catch (final IOException e) {
             System.out.println("Exception: " + e.getMessage());
             throw new RuntimeException(e);
         }
-
-        return bytesReturned;
     }
 
     @Override

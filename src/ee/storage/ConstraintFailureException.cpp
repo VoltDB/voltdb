@@ -20,12 +20,7 @@
 #include <cassert>
 
 namespace voltdb {
-/*
- * @param table Table that the update or insert was performed on
- * @param tuple Tuple that was being inserted or updated
- * @param otherTuple updated tuple values or null.
- * @param type Type of constraint that was violated
- */
+
 ConstraintFailureException::ConstraintFailureException(
         PersistentTable *table,
         TableTuple tuple,
@@ -35,9 +30,30 @@ ConstraintFailureException::ConstraintFailureException(
                     SQLException::integrity_constraint_violation,
                     "Attempted violation of constraint",
                     voltdb::VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION),
-            m_table(table), m_tuple(tuple), m_otherTuple(otherTuple), m_type(type) {
+            m_table(table),
+            m_tuple(tuple),
+            m_otherTuple(otherTuple),
+            m_type(type)
+{
         assert(table);
         assert(!tuple.isNullTuple());
+}
+
+ConstraintFailureException::ConstraintFailureException(
+        PersistentTable *table,
+        TableTuple tuple,
+        std::string message) :
+            SQLException(
+                    SQLException::integrity_constraint_violation,
+                    message,
+                    voltdb::VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION),
+            m_table(table),
+            m_tuple(tuple),
+            m_otherTuple(TableTuple()),
+            m_type(CONSTRAINT_TYPE_PARTITIONING)
+{
+    assert(table);
+    assert(!tuple.isNullTuple());
 }
 
 void ConstraintFailureException::p_serialize(ReferenceSerializeOutput *output) const {
