@@ -323,21 +323,17 @@ public class ElasticHashinator extends TheHashinator {
                 first = token;
             }
 
+            // if start is not null, there's an open range, now is
+            // the time to close it.
+            // else there is no open range, keep on going.
+            if (start != null) {
+                ranges.put(start, token);
+                start = null;
+            }
+
             if (pid == partition) {
                 // if start is null, there's no open range, start one.
-                // else there is already an open range, leave it open.
-                if (start == null) {
-                    start = token;
-                }
-            } else {
-                // hit a token that belongs to a different partition.
-                // if start is not null, there's an open range, now is
-                // the time to close it.
-                // else there is no open range, keep on going.
-                if (start != null) {
-                    ranges.put(start, token);
-                    start = null;
-                }
+                start = token;
             }
         }
 
