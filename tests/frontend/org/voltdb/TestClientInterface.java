@@ -446,11 +446,12 @@ public class TestClientInterface {
     }
 
     @Test
-    public void testSystemInformation() throws IOException {
+    public void testSystemInformation() throws Exception {
         ByteBuffer msg = createMsg("@SystemInformation");
-        StoredProcedureInvocation invocation =
-                readAndCheck(msg, "@SystemInformation", 1, false, true, false, false);
-        assertEquals("OVERVIEW", invocation.getParams().toArray()[0]);
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNull(resp);
+        verify(m_statsAgent).collectStats(any(Connection.class), anyInt(), eq("SYSTEMINFORMATION"),
+                any(ParameterSet.class));
     }
 
     /**

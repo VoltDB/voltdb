@@ -1849,6 +1849,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             } else if (task.procName.equals("@SystemCatalog")) {
                 return dispatchStatistics("SYSTEMCATALOG", task, ccxn);
             }
+            else if (task.procName.equals("@SystemInformation")) {
+                return dispatchStatistics("SYSTEMINFORMATION", task, ccxn);
+            }
 
             // If you're going to copy and paste something, CnP the pattern
             // up above.  -rtb.
@@ -1861,14 +1864,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             new VoltTable[0],
                             "" + task.procName + " is not available to this client",
                             task.clientHandle);
-                }
-            }
-            else if (task.procName.equals("@SystemInformation")) {
-                ParameterSet params = task.getParams();
-                // hacky: support old @SystemInformation behavior by
-                // filling in a missing selector to get the overview key/value info
-                if (params.toArray().length == 0) {
-                    task.setParams("OVERVIEW");
                 }
             }
         }

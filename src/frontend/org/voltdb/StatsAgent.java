@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
@@ -35,6 +36,8 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+
+import org.voltdb.sysprocs.SystemInformation;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.LocalMailbox;
@@ -44,6 +47,18 @@ import org.voltdb.utils.CompressionService;
  * Agent responsible for collecting stats on this host.
  *
  */
+// Izzy's ugh list:
+// 1. Handle exceptions better, don't catch Throwable, etc
+// 2. Need to refactor/split this along selector and have all of the
+// per-selector processing done in their own objects.  StatsAgent should just
+// be the processor for stats.  Stages:
+// - First, add well-known mailboxes for SystemCatalog and SystemInformation,
+// then split those pieces out.  Should be able to use a common subclass to
+// keep a lot of the message distribution/aggregation, I think.
+// - Next, maybe add a higher-level dispatcher that can get the cluster nodes
+// to create mailboxes for selectors and make them queryable, to avoid having
+// to keep adding well-known IDs for new services.
+// 3. Handling of null/empty cases is bad.
 public class StatsAgent {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -198,13 +213,16 @@ public class StatsAgent {
 
     private void dispatchFinalAggregations(PendingStatsRequest request)
     {
-        SysProcSelector subselector = SysProcSelector.valueOf(request.subselector);
-        switch (subselector) {
-            case PROCEDUREPROFILE:
-                request.aggregateTables =
-                    aggregateProcedureProfileStats(request.aggregateTables);
-                break;
-            default:
+        // Only applies to STATISTICS for now
+        if (request.selector.equalsIgnoreCase("STATISTICS")) {
+            SysProcSelector subselector = SysProcSelector.valueOf(request.subselector);
+            switch (subselector) {
+                case PROCEDUREPROFILE:
+                    request.aggregateTables =
+                        aggregateProcedureProfileStats(request.aggregateTables);
+                    break;
+                default:
+            }
         }
     }
 
@@ -293,8 +311,11 @@ public class StatsAgent {
         else if (selector.equalsIgnoreCase("SYSTEMCATALOG")) {
             err = parseParamsForSystemCatalog(params, obj);
         }
+        else if (selector.equalsIgnoreCase("SYSTEMINFORMATION")) {
+            err = parseParamsForSystemInformation(params, obj);
+        }
         else {
-            VoltDB.crashLocalVoltDB("SHOULDN'T BE HURR!!", false, null);
+            err = "Unknown OPS selector: " + selector;
         }
         if (err != null) {
             sendErrorResponse(c, ClientResponse.GRACEFUL_FAILURE, err, clientHandle);
@@ -324,6 +345,7 @@ public class StatsAgent {
             collectPartitionCount(psr);
             return;
         }
+        // All system catalog selectors are currently local, can all get serviced here
         else if (selector.equalsIgnoreCase("SYSTEMCATALOG")) {
             PendingStatsRequest psr = new PendingStatsRequest(
                 selector,
@@ -332,6 +354,16 @@ public class StatsAgent {
                 clientHandle,
                 System.currentTimeMillis());
             collectSystemCatalog(psr);
+            return;
+        }
+        else if (selector.equalsIgnoreCase("SYSTEMINFORMATION") && subselector.equalsIgnoreCase("DEPLOYMENT")) {
+            PendingStatsRequest psr = new PendingStatsRequest(
+                selector,
+                subselector,
+                c,
+                clientHandle,
+                System.currentTimeMillis());
+            collectSystemInformationDeployment(psr);
             return;
         }
 
@@ -418,6 +450,32 @@ public class StatsAgent {
         return null;
     }
 
+    private String parseParamsForSystemInformation(ParameterSet params, JSONObject obj) throws Exception
+    {
+        // Default with no args is OVERVIEW
+        String subselector = "OVERVIEW";
+        if (params.toArray().length > 1) {
+            return "Incorrect number of arguments to @SystemInformation (expects 1, received " +
+                    params.toArray().length + ")";
+        }
+        if (params.toArray().length == 1) {
+            Object first = params.toArray()[0];
+            if (!(first instanceof String)) {
+                return "First argument to @SystemInformation must be a valid STRING selector, instead was " +
+                    first;
+            }
+            subselector = (String)first;
+            if (!(subselector.equalsIgnoreCase("OVERVIEW") || subselector.equalsIgnoreCase("DEPLOYMENT"))) {
+                return "Invalid @SystemInformation selector " + subselector;
+            }
+        }
+        // Would be nice to have subselector validation here, maybe.  Maybe later.
+        obj.put("subselector", subselector);
+        obj.put("interval", false);
+
+        return null;
+    }
+
     private void checkForRequestTimeout(long requestId) {
         PendingStatsRequest psr = m_pendingRequests.remove(requestId);
         if (psr == null) {
@@ -466,8 +524,11 @@ public class StatsAgent {
         if (selector.equalsIgnoreCase("STATISTICS")) {
             results = collectDistributedStats(obj);
         }
+        else if (selector.equalsIgnoreCase("SYSTEMINFORMATION")) {
+            results = collectSystemInformation(obj);
+        }
         else {
-            VoltDB.crashLocalVoltDB("SHOULDN'T BE HURR!", false, null);
+            hostLog.warn("Unknown selector provided to OPS path: " + selector);
         }
 
         // Send a response with no data since the stats is not supported or not yet available
@@ -844,6 +905,43 @@ public class StatsAgent {
         stats[6] = sStats[0];
 
         return stats;
+    }
+
+    private VoltTable[] collectSystemInformation(JSONObject obj) throws JSONException
+    {
+        String subselector = obj.getString("subselector");
+        VoltTable[] tables = null;
+        VoltTable result = null;
+        if (subselector.toUpperCase().equals("OVERVIEW"))
+        {
+            result = SystemInformation.populateOverviewTable();
+        }
+
+        if (result != null)
+        {
+            tables = new VoltTable[1];
+            tables[0] = result;
+        }
+        return tables;
+    }
+
+    private void collectSystemInformationDeployment(PendingStatsRequest psr)
+    {
+        VoltTable result =
+                SystemInformation.populateDeploymentProperties(VoltDB.instance().getCatalogContext().cluster,
+                        VoltDB.instance().getCatalogContext().database);
+        if (result == null) {
+            sendErrorResponse(psr.c, ClientResponse.GRACEFUL_FAILURE,
+                    "Unable to collect DEPLOYMENT information for @SystemInformation", psr.clientData);
+            return;
+        }
+        psr.aggregateTables = new VoltTable[1];
+        psr.aggregateTables[0] = result;
+        try {
+            sendStatsResponse(psr);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to return PARTITIONCOUNT to client", true, e);
+        }
     }
 
     public synchronized void registerStatsSource(SysProcSelector selector, long siteId, StatsSource source) {
