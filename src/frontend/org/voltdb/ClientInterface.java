@@ -1688,10 +1688,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         sendSentinel(invocation.getOriginalTxnId(), initiatorHSId, handle, connectionId, false);
     }
 
-    ClientResponseImpl dispatchStatistics(StoredProcedureInvocation task, Connection ccxn)
+    ClientResponseImpl dispatchStatistics(String selector, StoredProcedureInvocation task, Connection ccxn)
     {
         try {
-            VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, "STATISTICS",
+            VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, selector,
                     task.getParams());
             return null;
         } catch (Exception e) {
@@ -1836,7 +1836,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 m_snapshotDaemon.requestUserSnapshot(task, ccxn);
                 return null;
             } else if (task.procName.equals("@Statistics")) {
-                return dispatchStatistics(task, ccxn);
+                return dispatchStatistics("STATISTICS", task, ccxn);
             } else if (task.procName.equals("@Promote")) {
                 return dispatchPromote(catProc, buf, task, handler, ccxn);
             } else if (task.procName.equals("@SnapshotStatus")) {
@@ -1845,7 +1845,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 Object[] params = new Object[1];
                 params[0] = "SNAPSHOTSTATUS";
                 task.setParams(params);
-                return dispatchStatistics(task, ccxn);
+                return dispatchStatistics("STATISTICS", task, ccxn);
+            } else if (task.procName.equals("@SystemCatalog")) {
+                return dispatchStatistics("SYSTEMCATALOG", task, ccxn);
             }
 
             // If you're going to copy and paste something, CnP the pattern

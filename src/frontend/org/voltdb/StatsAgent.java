@@ -290,6 +290,9 @@ public class StatsAgent {
         if (selector.equalsIgnoreCase("STATISTICS")) {
             err = parseParamsForStatistics(params, obj);
         }
+        else if (selector.equalsIgnoreCase("SYSTEMCATALOG")) {
+            err = parseParamsForSystemCatalog(params, obj);
+        }
         else {
             VoltDB.crashLocalVoltDB("SHOULDN'T BE HURR!!", false, null);
         }
@@ -319,6 +322,16 @@ public class StatsAgent {
                 clientHandle,
                 System.currentTimeMillis());
             collectPartitionCount(psr);
+            return;
+        }
+        else if (selector.equalsIgnoreCase("SYSTEMCATALOG")) {
+            PendingStatsRequest psr = new PendingStatsRequest(
+                selector,
+                subselector,
+                c,
+                clientHandle,
+                System.currentTimeMillis());
+            collectSystemCatalog(psr);
             return;
         }
 
@@ -382,6 +395,25 @@ public class StatsAgent {
         }
         obj.put("subselector", subselector);
         obj.put("interval", interval);
+
+        return null;
+    }
+
+    private String parseParamsForSystemCatalog(ParameterSet params, JSONObject obj) throws Exception
+    {
+        if (params.toArray().length != 1) {
+            return "Incorrect number of arguments to @SystemCatalog (expects 1, received " +
+                    params.toArray().length + ")";
+        }
+        Object first = params.toArray()[0];
+        if (!(first instanceof String)) {
+            return "First argument to @SystemCatalog must be a valid STRING selector, instead was " +
+                    first;
+        }
+        // Would be nice to have subselector validation here, maybe.  Maybe later.
+        String subselector = (String)first;
+        obj.put("subselector", subselector);
+        obj.put("interval", false);
 
         return null;
     }
@@ -506,6 +538,23 @@ public class StatsAgent {
         }
         psr.aggregateTables = tables;
 
+        try {
+            sendStatsResponse(psr);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to return PARTITIONCOUNT to client", true, e);
+        }
+    }
+
+    private void collectSystemCatalog(PendingStatsRequest psr)
+    {
+        VoltTable results = VoltDB.instance().getCatalogContext().m_jdbc.getMetaData(psr.subselector);
+        if (results == null) {
+            sendErrorResponse(psr.c, ClientResponse.GRACEFUL_FAILURE,
+                    "Invalid @SystemCatalog selector: " + psr.subselector, psr.clientData);
+            return;
+        }
+        psr.aggregateTables = new VoltTable[1];
+        psr.aggregateTables[0] = results;
         try {
             sendStatsResponse(psr);
         } catch (Exception e) {
