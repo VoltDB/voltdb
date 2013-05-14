@@ -153,13 +153,16 @@ public class SchemaChangeClient {
                     try { Thread.sleep(30 * 1000); } catch (Exception e) {}
                     break;
                 case ClientResponse.GRACEFUL_FAILURE:
+                    log.error(_F("GRACEFUL_FAILURE response in procedure call for: %s", procName));
+                    // caller should check status as needed.
+                    return cr;
                 case ClientResponse.UNEXPECTED_FAILURE:
                 case ClientResponse.USER_ABORT:
-                    log.warn(_F("USER ABORT response in procedure call for: %s", procName));
-                    log.warn(((ClientResponseImpl)cr).toJSONString());
+                    log.error(_F("Error in procedure call for: %s", procName));
+                    log.error(((ClientResponseImpl)cr).toJSONString());
                     // for starters, I'm assuming these errors can't happen for reads in a sound system
-                    // but this is not a retry-able case, caller should check for errors
-                    return cr;
+                    assert(false);
+                    System.exit(-1);
                 }
             }
 
