@@ -31,7 +31,6 @@ public class TestFunctions extends PlannerTestCase {
         final boolean planForSinglePartitionFalse = false;
         setupSchema(TestFunctions.class.getResource("testplans-functions-ddl.sql"), "testfunctions",
                                                     planForSinglePartitionFalse);
-        forceReplication();
     }
 
     @Override
