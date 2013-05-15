@@ -51,7 +51,7 @@ public class SystemCatalogAgent extends OpsAgent
         String subselector = obj.getString("subselector");
 
         // All system catalog selectors are currently local, can all get serviced here
-        PendingStatsRequest psr = new PendingStatsRequest(
+        PendingOpsRequest psr = new PendingOpsRequest(
                 selector,
                 subselector,
                 c,
@@ -91,7 +91,7 @@ public class SystemCatalogAgent extends OpsAgent
         sendOpsResponse(results, obj);
     }
 
-    private void collectSystemCatalog(PendingStatsRequest psr)
+    private void collectSystemCatalog(PendingOpsRequest psr)
     {
         VoltTable results = VoltDB.instance().getCatalogContext().m_jdbc.getMetaData(psr.subselector);
         if (results == null) {
@@ -102,7 +102,7 @@ public class SystemCatalogAgent extends OpsAgent
         psr.aggregateTables = new VoltTable[1];
         psr.aggregateTables[0] = results;
         try {
-            sendStatsResponse(psr);
+            sendClientResponse(psr);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to return PARTITIONCOUNT to client", true, e);
         }

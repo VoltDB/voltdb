@@ -44,7 +44,7 @@ public class StatsAgent extends OpsAgent
     }
 
     @Override
-    protected void dispatchFinalAggregations(PendingStatsRequest request)
+    protected void dispatchFinalAggregations(PendingOpsRequest request)
     {
         StatsSelector subselector = StatsSelector.valueOf(request.subselector);
         switch (subselector) {
@@ -114,7 +114,7 @@ public class StatsAgent extends OpsAgent
         // Some selectors can provide a single answer based on global data.
         // Intercept them and respond before doing the distributed stuff.
         if (subselector.equalsIgnoreCase("TOPO")) {
-            PendingStatsRequest psr = new PendingStatsRequest(
+            PendingOpsRequest psr = new PendingOpsRequest(
                 selector,
                 subselector,
                 c,
@@ -124,7 +124,7 @@ public class StatsAgent extends OpsAgent
             return;
         }
         else if (subselector.equalsIgnoreCase("PARTITIONCOUNT")) {
-            PendingStatsRequest psr = new PendingStatsRequest(
+            PendingOpsRequest psr = new PendingOpsRequest(
                 selector,
                 subselector,
                 c,
@@ -134,14 +134,14 @@ public class StatsAgent extends OpsAgent
             return;
         }
 
-        PendingStatsRequest psr =
-            new PendingStatsRequest(
+        PendingOpsRequest psr =
+            new PendingOpsRequest(
                     selector,
                     subselector,
                     c,
                     clientHandle,
                     System.currentTimeMillis());
-        distributeWork(psr, obj);
+        distributeOpsWork(psr, obj);
     }
 
     // Parse the provided parameter set object and fill in subselector and interval into
@@ -193,7 +193,7 @@ public class StatsAgent extends OpsAgent
         sendOpsResponse(results, obj);
     }
 
-    private void collectTopoStats(PendingStatsRequest psr)
+    private void collectTopoStats(PendingOpsRequest psr)
     {
         VoltTable[] tables = null;
         VoltTable topoStats = getStatsAggregate(StatsSelector.TOPO, false, psr.startTime);
@@ -211,13 +211,13 @@ public class StatsAgent extends OpsAgent
         psr.aggregateTables = tables;
 
         try {
-            sendStatsResponse(psr);
+            sendClientResponse(psr);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to return TOPO results to client.", true, e);
         }
     }
 
-    private void collectPartitionCount(PendingStatsRequest psr)
+    private void collectPartitionCount(PendingOpsRequest psr)
     {
         VoltTable[] tables = null;
         VoltTable pcStats = getStatsAggregate(StatsSelector.PARTITIONCOUNT, false, psr.startTime);
@@ -228,7 +228,7 @@ public class StatsAgent extends OpsAgent
         psr.aggregateTables = tables;
 
         try {
-            sendStatsResponse(psr);
+            sendClientResponse(psr);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to return PARTITIONCOUNT to client", true, e);
         }

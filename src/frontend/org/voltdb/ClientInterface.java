@@ -1692,15 +1692,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     {
         try {
             if (selector == OpsSelector.STATISTICS) {
-                VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, selector,
+                VoltDB.instance().getStatsAgent().performOpsAction(ccxn, task.clientHandle, selector,
                         task.getParams());
             }
             else if (selector == OpsSelector.SYSTEMCATALOG) {
-                VoltDB.instance().getSystemCatalogAgent().collectStats(ccxn, task.clientHandle, selector,
+                VoltDB.instance().getSystemCatalogAgent().performOpsAction(ccxn, task.clientHandle, selector,
                         task.getParams());
             }
             else if (selector == OpsSelector.SYSTEMINFORMATION) {
-                VoltDB.instance().getSystemInformationAgent().collectStats(ccxn, task.clientHandle, selector,
+                VoltDB.instance().getSystemInformationAgent().performOpsAction(ccxn, task.clientHandle, selector,
                         task.getParams());
             }
             else {

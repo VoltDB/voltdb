@@ -40,28 +40,25 @@ import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.utils.CompressionService;
 
 /**
- * Agent responsible for collecting stats on this host.
- *
+ * OpsAgent is a base class for providing non-blocking, non-transactional,
+ * potentially cluster-wide behavior, such as gathering statistics or other
+ * system information.
  */
 // Izzy's ugh list:
 // 1. Handle exceptions better, don't catch Throwable, etc
-// 2. Need to refactor/split this along selector and have all of the
-// per-selector processing done in their own objects.  OpsAgent should just
-// be the processor for stats.  Stages:
-// - First, add well-known mailboxes for SystemCatalog and SystemInformation,
-// then split those pieces out.  Should be able to use a common subclass to
-// keep a lot of the message distribution/aggregation, I think.
-// - Next, maybe add a higher-level dispatcher that can get the cluster nodes
-// to create mailboxes for selectors and make them queryable, to avoid having
-// to keep adding well-known IDs for new services.
+// 2. The well-known mailbox thing kinda sucks. Maybe add a higher-level
+// dispatcher that can get the cluster nodes to create mailboxes for selectors
+// and make them queryable by selector, to avoid having to keep adding
+// well-known IDs for new services.
 // 3. Handling of null/empty cases is bad.
-public abstract class OpsAgent {
 
+public abstract class OpsAgent
+{
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final byte JSON_PAYLOAD = 0;
-    private static final byte STATS_PAYLOAD = 1;
+    private static final byte OPS_PAYLOAD = 1;
     private static final int MAX_IN_FLIGHT_REQUESTS = 5;
-    static int STATS_COLLECTION_TIMEOUT = 60 * 1000;
+    static int OPS_COLLECTION_TIMEOUT = 60 * 1000;
 
     private long m_nextRequestId = 0;
     private Mailbox m_mailbox;
@@ -78,15 +75,15 @@ public abstract class OpsAgent {
     // if the selector mapped to something that specified the number of
     // results, the call to get the stats, etc.
     //
-    protected static class PendingStatsRequest {
+    protected static class PendingOpsRequest {
         //private final OpsSelector selector;
         protected final String subselector;
         protected final Connection c;
         protected final long clientData;
-        private int expectedStatsResponses = 0;
+        private int expectedOpsResponses = 0;
         protected VoltTable[] aggregateTables = null;
         protected final long startTime;
-        public PendingStatsRequest(
+        public PendingOpsRequest(
                 OpsSelector selector,
                 String subselector,
                 Connection c,
@@ -100,23 +97,41 @@ public abstract class OpsAgent {
         }
     }
 
-    private final Map<Long, PendingStatsRequest> m_pendingRequests = new HashMap<Long, PendingStatsRequest>();
+    private final Map<Long, PendingOpsRequest> m_pendingRequests = new HashMap<Long, PendingOpsRequest>();
 
     public OpsAgent(String name) {
         m_name = name;
         m_es =
-            org.voltcore.utils.CoreUtils.getScheduledThreadPoolExecutor(m_name, 1,
-                    CoreUtils.SMALL_STACK_SIZE);
+            org.voltcore.utils.CoreUtils.getScheduledThreadPoolExecutor(m_name, 1, CoreUtils.SMALL_STACK_SIZE);
         m_messenger = null;
     }
 
+    /**
+     * Do the initial work associated with the OPS action.  Subclasses will
+     * implement this bad boy and do whatever needs to be done.  If distributed
+     * work is ultimately required, call distributeOpsWork() and return.
+     */
     abstract protected void collectStatsImpl(Connection c, long clientHandle, OpsSelector selector,
             ParameterSet params) throws Exception;
 
+    /**
+     * For OPS actions which require distributed work, subclasses should
+     * override this method to perform whatever actions must be taken and
+     * return VoltTables suitable for aggregation at the initiating agent.
+     * Right now, the requirement is that the tables returned must be the
+     * identical count, be in identical order from all nodes, and have
+     * identical schema.
+     */
     abstract protected void handleJSONMessage(JSONObject obj) throws Exception;
 
-    // Subclasses (like StatsAgent) which need this must override
-    protected void dispatchFinalAggregations(PendingStatsRequest request)
+    /**
+     * Awkward interface.  For OPS actions which may want to perform some final
+     * post-processing on the aggregated tables before the response is sent to
+     * the client, this will be called immediately before that send.
+     * Subclasses may make whatever changes they want to the response tables
+     * stored in the PendingOpsRequest at this time.
+     */
+    protected void dispatchFinalAggregations(PendingOpsRequest request)
     {
     }
 
@@ -149,8 +164,8 @@ public abstract class OpsAgent {
                     String jsonString = new String(payload, "UTF-8");
                     JSONObject obj = new JSONObject(jsonString);
                     handleJSONMessage(obj);
-                } else if (bpm.m_metadata[0] == STATS_PAYLOAD) {
-                    handleStatsResponse(payload);
+                } else if (bpm.m_metadata[0] == OPS_PAYLOAD) {
+                    handleOpsResponse(payload);
                 }
             }
         } catch (Exception e) {
@@ -159,13 +174,13 @@ public abstract class OpsAgent {
 
     }
 
-    private void handleStatsResponse(byte[] payload) {
+    private void handleOpsResponse(byte[] payload) {
         ByteBuffer buf = ByteBuffer.wrap(payload);
         Long requestId = buf.getLong();
 
-        PendingStatsRequest request = m_pendingRequests.get(requestId);
+        PendingOpsRequest request = m_pendingRequests.get(requestId);
         if (request == null) {
-            hostLog.warn("Received a stats response for stats request " + requestId + " that no longer exists");
+            hostLog.warn("Received an OPS response for OPS request " + requestId + " that no longer exists");
             return;
         }
 
@@ -205,16 +220,20 @@ public abstract class OpsAgent {
             }
         }
 
-        request.expectedStatsResponses--;
-        if (request.expectedStatsResponses > 0) return;
+        request.expectedOpsResponses--;
+        if (request.expectedOpsResponses > 0) return;
 
         m_pendingRequests.remove(requestId);
 
         dispatchFinalAggregations(request);
-        sendStatsResponse(request);
+        sendClientResponse(request);
     }
 
-    public void collectStats(final Connection c, final long clientHandle, final OpsSelector selector,
+    /**
+     * Perform the action associated with this agent, using the provided ParameterSet.  This is the
+     * entry point to the OPS system.
+     */
+    public void performOpsAction(final Connection c, final long clientHandle, final OpsSelector selector,
             final ParameterSet params) throws Exception
     {
         m_es.submit(new Runnable() {
@@ -229,7 +248,13 @@ public abstract class OpsAgent {
         });
     }
 
-    protected void distributeWork(PendingStatsRequest newRequest, JSONObject obj)
+    /**
+     * For OPS actions which run on every node, this method will distribute the
+     * necessary parameters to its peers on the other cluster nodes.  Additionally, it will
+     * pre-check for excessive outstanding requests, and initialize the tracking and timeout of
+     * the new request.  Subclasses of OpsAgent should use this when they need this service.
+     */
+    protected void distributeOpsWork(PendingOpsRequest newRequest, JSONObject obj)
         throws Exception
     {
         if (m_pendingRequests.size() > MAX_IN_FLIGHT_REQUESTS) {
@@ -237,12 +262,12 @@ public abstract class OpsAgent {
              * Defensively check for an expired request not caught
              * by timeout check. Should never happen.
              */
-            Iterator<PendingStatsRequest> iter = m_pendingRequests.values().iterator();
+            Iterator<PendingOpsRequest> iter = m_pendingRequests.values().iterator();
             final long now = System.currentTimeMillis();
             boolean foundExpiredRequest = false;
             while (iter.hasNext()) {
-                PendingStatsRequest psr = iter.next();
-                if (now - psr.startTime > STATS_COLLECTION_TIMEOUT * 2) {
+                PendingOpsRequest por = iter.next();
+                if (now - por.startTime > OPS_COLLECTION_TIMEOUT * 2) {
                     iter.remove();
                     foundExpiredRequest = true;
                 }
@@ -262,7 +287,7 @@ public abstract class OpsAgent {
                 checkForRequestTimeout(requestId);
             }
         },
-        STATS_COLLECTION_TIMEOUT,
+        OPS_COLLECTION_TIMEOUT,
         TimeUnit.MILLISECONDS);
 
         // selector, subselector, interval filled in by parse...
@@ -272,25 +297,30 @@ public abstract class OpsAgent {
         byte payloadBytes[] = CompressionService.compressBytes(obj.toString(4).getBytes("UTF-8"));
         for (int hostId : m_messenger.getLiveHostIds()) {
             long agentHsId = CoreUtils.getHSIdFromHostAndSite(hostId, siteId);
-            newRequest.expectedStatsResponses++;
+            newRequest.expectedOpsResponses++;
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[] {JSON_PAYLOAD}, payloadBytes);
             m_mailbox.send(agentHsId, bpm);
         }
     }
 
     private void checkForRequestTimeout(long requestId) {
-        PendingStatsRequest psr = m_pendingRequests.remove(requestId);
-        if (psr == null) {
+        PendingOpsRequest por = m_pendingRequests.remove(requestId);
+        if (por == null) {
             return;
         }
         hostLog.warn("OPS request for " + m_name + ", " + requestId + " timed out, sending error to client");
 
-        sendErrorResponse(psr.c, ClientResponse.GRACEFUL_FAILURE,
+        sendErrorResponse(por.c, ClientResponse.GRACEFUL_FAILURE,
                 "OPS request hit sixty second timeout before all responses were received",
-                psr.clientData);
+                por.clientData);
     }
 
-    protected void sendStatsResponse(PendingStatsRequest request) {
+    /**
+     * Send the final response stored in the PendingOpsRequest to the client which initiated the
+     * action.  Will be called automagically after aggregating cluster-wide responses, but may
+     * be called directly by subclasses if necessary.
+     */
+    protected void sendClientResponse(PendingOpsRequest request) {
         byte statusCode = ClientResponse.SUCCESS;
         String statusString = null;
         /*
@@ -317,6 +347,10 @@ public abstract class OpsAgent {
         request.c.writeStream().enqueue(buf);
     }
 
+    /**
+     * Return the results of distributed work to the original requesting agent.
+     * Used by subclasses to respond after they've done their local work.
+     */
     protected void sendOpsResponse(VoltTable[] results, JSONObject obj) throws Exception
     {
         long requestId = obj.getLong("requestId");
@@ -326,7 +360,7 @@ public abstract class OpsAgent {
             ByteBuffer responseBuffer = ByteBuffer.allocate(8);
             responseBuffer.putLong(requestId);
             byte responseBytes[] = CompressionService.compressBytes(responseBuffer.array());
-            BinaryPayloadMessage bpm = new BinaryPayloadMessage( new byte[] {STATS_PAYLOAD}, responseBytes);
+            BinaryPayloadMessage bpm = new BinaryPayloadMessage( new byte[] {OPS_PAYLOAD}, responseBytes);
             m_mailbox.send(returnAddress, bpm);
             return;
         }
@@ -350,7 +384,7 @@ public abstract class OpsAgent {
         }
         byte responseBytes[] = CompressionService.compressBytes(responseBuffer.array());
 
-        BinaryPayloadMessage bpm = new BinaryPayloadMessage( new byte[] {STATS_PAYLOAD}, responseBytes);
+        BinaryPayloadMessage bpm = new BinaryPayloadMessage( new byte[] {OPS_PAYLOAD}, responseBytes);
         m_mailbox.send(returnAddress, bpm);
     }
 

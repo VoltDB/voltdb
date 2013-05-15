@@ -55,7 +55,7 @@ public class SystemInformationAgent extends OpsAgent
         // Some selectors can provide a single answer based on global data.
         // Intercept them and respond before doing the distributed stuff.
         if (subselector.equalsIgnoreCase("DEPLOYMENT")) {
-            PendingStatsRequest psr = new PendingStatsRequest(
+            PendingOpsRequest psr = new PendingOpsRequest(
                 selector,
                 subselector,
                 c,
@@ -65,14 +65,14 @@ public class SystemInformationAgent extends OpsAgent
             return;
         }
 
-        PendingStatsRequest psr =
-            new PendingStatsRequest(
+        PendingOpsRequest psr =
+            new PendingOpsRequest(
                     selector,
                     subselector,
                     c,
                     clientHandle,
                     System.currentTimeMillis());
-        distributeWork(psr, obj);
+        distributeOpsWork(psr, obj);
     }
 
     // Parse the provided parameter set object and fill in subselector and interval into
@@ -136,7 +136,7 @@ public class SystemInformationAgent extends OpsAgent
         return tables;
     }
 
-    private void collectSystemInformationDeployment(PendingStatsRequest psr)
+    private void collectSystemInformationDeployment(PendingOpsRequest psr)
     {
         VoltTable result =
                 SystemInformation.populateDeploymentProperties(VoltDB.instance().getCatalogContext().cluster,
@@ -149,7 +149,7 @@ public class SystemInformationAgent extends OpsAgent
         psr.aggregateTables = new VoltTable[1];
         psr.aggregateTables[0] = result;
         try {
-            sendStatsResponse(psr);
+            sendClientResponse(psr);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to return PARTITIONCOUNT to client", true, e);
         }
