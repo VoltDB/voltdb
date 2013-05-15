@@ -79,10 +79,10 @@ public abstract class OpsAgent {
     // results, the call to get the stats, etc.
     //
     protected static class PendingStatsRequest {
-        private final OpsSelector selector;
+        //private final OpsSelector selector;
         protected final String subselector;
-        private final Connection c;
-        private final long clientData;
+        protected final Connection c;
+        protected final long clientData;
         private int expectedStatsResponses = 0;
         protected VoltTable[] aggregateTables = null;
         protected final long startTime;
@@ -93,7 +93,7 @@ public abstract class OpsAgent {
                 long clientData,
                 long startTime) {
             this.startTime = startTime;
-            this.selector = selector;
+            //this.selector = selector;
             this.subselector = subselector;
             this.c = c;
             this.clientData = clientData;
@@ -110,12 +110,15 @@ public abstract class OpsAgent {
         m_messenger = null;
     }
 
-    abstract protected void dispatchFinalAggregations(PendingStatsRequest request);
-
     abstract protected void collectStatsImpl(Connection c, long clientHandle, OpsSelector selector,
             ParameterSet params) throws Exception;
 
     abstract protected void handleJSONMessage(JSONObject obj) throws Exception;
+
+    // Subclasses (like StatsAgent) which need this must override
+    protected void dispatchFinalAggregations(PendingStatsRequest request)
+    {
+    }
 
     public void registerMailbox(final HostMessenger hostMessenger, final long hsId) {
         m_messenger = hostMessenger;
