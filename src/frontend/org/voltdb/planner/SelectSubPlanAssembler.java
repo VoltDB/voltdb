@@ -385,34 +385,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @param joinOrder An array of tables in the join order.
      */
     private void generateMorePlansForJoinOrder(JoinTree joinTree) {
-        // In a multi-fragment plan that contains a join,
-        // is it better to send partitioned tuples and join them on the coordinator
-        // or is it better to join them before sending?
-        // On the assumption that joined rows are wider (taking more bandwidth per row),
-        // we would want to send and then join if joined rows were one-to-one, but if
-        // There is a special case -- a join of more than one partitioned table on their partition keys,
-        // when that join must happen first -- the send/receive protocol only allows sending a single
-        // intermediate result table per statement.
-        // In a join of multiple partitioned tables and one or more replicated tables, it is theoretically
-        // possible to do the partitioned table join, and then the send/receive, and then the replicated
-        // table join.
-        // Deciding whether to defer the send/receive to after a join in other cases requires a complex
-        // trade-off involving the following considerations:
-        //  - Deferring send/recieve typically involves transmitting wider rows (more bandwidth per row).
-        //  - Deferring send/recieve may either increase or decrease bandwidth requirements depending on whether
-        //    the join has a net filtering effect on rows (in a one-to-"averages-fewer-than-one" relationship)
-        //    or a net multiplication effect (in a one-to-many relationship).
-        //  - Deferring send/recieve increases shared processing across nodes
-        //    -- less single-threaded post-processing on the single aggregator.
-        // For now, for simplicity, we only defer the send/receive when required, but when required, we
-        // go all the way and defer to after even the replicated joins.
-
-        boolean deferSendReceivePair = m_partitioning.getCountOfPartitionedTables() > 1;
-
         if (m_parsedStmt.joinTree.m_hasOuterJoin == false) {
-            generateMorePlansForInnerJoinOrder(joinTree, deferSendReceivePair);
+            generateMorePlansForInnerJoinOrder(joinTree);
         } else {
-            generateMorePlansForOuterJoinOrder(joinTree, deferSendReceivePair);
+            generateMorePlansForOuterJoinOrder(joinTree);
         }
     }
 
@@ -421,7 +397,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      *
      * @param joinTree A join tree.
      */
-    private void generateMorePlansForOuterJoinOrder(JoinTree joinTree, boolean deferSendReceivePair) {
+    private void generateMorePlansForOuterJoinOrder(JoinTree joinTree) {
         JoinNode joinNode = joinTree.m_root;
         assert(joinNode != null);
 
@@ -429,7 +405,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         generateAccessPaths(null, joinTree.m_root);
 
         List<JoinNode> nodes = joinNode.generateJoinOrder();
-        generateSubPlanForJoinNodeRecursively(joinNode, nodes, deferSendReceivePair);
+        generateSubPlanForJoinNodeRecursively(joinNode, nodes);
     }
 
     /**
@@ -462,33 +438,15 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 // This is the outer table which can have the naive access path and possible index path(s)
                 // Optimizations - outer-table-only where expressions can be pushed down to the child node
                 // to pre-qualify the outer tuples before they enter the join.
-                childNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(childNode.m_table, null,parentNode.m_whereOuterList));
+                if (childNode.m_table != null) {
+                    childNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(childNode.m_table, null,parentNode.m_whereOuterList));
+                } else {
+                    childNode.m_accessPaths.add(getRelevantNaivePathForTable(null, parentNode.m_whereOuterList));
+                }
             } else {
                 assert(parentNode.m_rightNode == childNode);
                 // This is the inner node
-                // Inner and Inner-Outer join expressions are associated with the inner node access path
-                ArrayList<AbstractExpression> joinExprList = new ArrayList<AbstractExpression>();
-                joinExprList.addAll(parentNode.m_joinInnerList);
-                joinExprList.addAll(parentNode.m_joinInnerOuterList);
-                // If inner table is non-replicated the join node will be the NLJ and not the NLIJ unless
-                // the left child is also non-replicated. If the join is not going to be a NLIJ,
-                // the inner node won't be inlined which means that we can't use join expressions
-                // for index access (they will be pushed down to the
-                // IndexScanNode instead of staying at the NL level)
-                boolean canNLIJ = false;
-                if (childNode.m_table != null) {
-                        if (childNode.m_table.getIsreplicated() || (parentNode.m_leftNode.m_table != null &&
-                                !parentNode.m_leftNode.m_table.getIsreplicated())) {
-                            canNLIJ = true;
-                        }
-                }
-                if (canNLIJ) {
-                    // The inner table can have multiple index access paths plus the naive one
-                    childNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(childNode.m_table, joinExprList, null));
-                } else {
-                    // The inner node can have only a naive path
-                    childNode.m_accessPaths.add(getRelevantNaivePathForTable(joinExprList, null));
-                }
+                childNode.m_accessPaths.addAll(getRelevantAccessPathsForInnerNode(parentNode, childNode));
             }
         } else {
             childNode.m_accessPaths.add(getRelevantNaivePathForTable(null, null));
@@ -500,21 +458,28 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      *
      * @param rootNode The root node for the whole join tree.
      * @param nodes The node list to iterate over.
-     * @param deferSendReceivePair
      */
-    private void generateSubPlanForJoinNodeRecursively(JoinNode rootNode, List<JoinNode> nodes, boolean deferSendReceivePair) {
+    private void generateSubPlanForJoinNodeRecursively(JoinNode rootNode, List<JoinNode> nodes) {
         assert(nodes.size() > 0);
         JoinNode joinNode = nodes.get(0);
         if (nodes.size() == 1) {
             for (AccessPath path : joinNode.m_accessPaths) {
                 joinNode.m_currentAccessPath = path;
-                AbstractPlanNode plan = getSelectSubPlanForJoinNode(rootNode, deferSendReceivePair);
+                AbstractPlanNode plan = getSelectSubPlanForJoinNode(rootNode);
+                /*
+                 * If the access plan for the table in the join order was for a
+                 * distributed table scan there will be a send/receive pair at the top.
+                 */
+                if (m_partitioning.getCountOfPartitionedTables() > 1 && m_partitioning.requiresTwoFragments()) {
+                    plan = addSendReceivePair(plan);
+                }
+
                 m_plans.add(plan);
             }
         } else {
             for (AccessPath path : joinNode.m_accessPaths) {
                 joinNode.m_currentAccessPath = path;
-                generateSubPlanForJoinNodeRecursively(rootNode, nodes.subList(1, nodes.size()), deferSendReceivePair);
+                generateSubPlanForJoinNodeRecursively(rootNode, nodes.subList(1, nodes.size()));
             }
         }
     }
@@ -524,7 +489,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      *
      * @param joinOrder An array of tables in the join order.
      */
-    private void generateMorePlansForInnerJoinOrder(JoinTree joinTree, boolean deferSendReceivePair) {
+    private void generateMorePlansForInnerJoinOrder(JoinTree joinTree) {
         assert(joinTree.m_joinOrder != null);
         assert(m_plans.size() == 0);
 
@@ -536,7 +501,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         // for each access path
         for (AccessPath[] accessPath : listOfAccessPathCombos) {
             // get a plan
-            AbstractPlanNode scanPlan = getSelectSubPlanForAccessPath(joinTree.m_joinOrder, accessPath, deferSendReceivePair);
+            AbstractPlanNode scanPlan = getSelectSubPlanForAccessPath(joinTree.m_joinOrder, accessPath);
             m_plans.add(scanPlan);
         }
     }
@@ -548,18 +513,17 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      *
      * @param joinOrder An array of tables in a specific join order.
      * @param accessPath An array of access paths that match with the input tables.
-     * @param suppressSendReceivePair A flag preventing the usual injection of Receive and Send nodes above scans of non-replicated tables.
      * @return A completed plan-sub-graph that should match the correct tuples from the
      * correct tables.
      */
-    private AbstractPlanNode getSelectSubPlanForAccessPath(Table[] joinOrder, AccessPath[] accessPath, boolean deferSendReceivePair) {
+    private AbstractPlanNode getSelectSubPlanForAccessPath(Table[] joinOrder, AccessPath[] accessPath) {
 
         // do the actual work
-        AbstractPlanNode retv = getSelectSubPlanForAccessPathsIterative(joinOrder, accessPath, deferSendReceivePair);
+        AbstractPlanNode retv = getSelectSubPlanForAccessPathsIterative(joinOrder, accessPath);
         // If there is a multi-partition statement on one or more partitioned Tables
         // and the pre-join Send/Receive nodes were suppressed,
         // they need to come into play "post-join".
-        if (deferSendReceivePair && m_partitioning.requiresTwoFragments()) {
+        if (m_partitioning.getCountOfPartitionedTables() > 1 && m_partitioning.requiresTwoFragments()) {
             retv = addSendReceivePair(retv);
         }
         return retv;
@@ -570,11 +534,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * that gives the right tuples.
      *
      * @param joinNode The join node to build the plan for.
-     * @param deferSendReceivePair A flag preventing the usual injection of Receive and Send nodes above scans of non-replicated tables.
      * @return A completed plan-sub-graph that should match the correct tuples from the
      * correct tables.
      */
-    private AbstractPlanNode getSelectSubPlanForJoinNode(JoinNode joinNode, boolean deferSendReceivePair) {
+    private AbstractPlanNode getSelectSubPlanForJoinNode(JoinNode joinNode) {
         assert(joinNode != null);
         if (joinNode.m_table != null) {
             // End of recursion
@@ -582,25 +545,17 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             AccessPath accessPath[] = new AccessPath[1];
             joinOrder[0] = joinNode.m_table;
             accessPath[0] = joinNode.m_currentAccessPath;
-            return getSelectSubPlanForAccessPathsIterative(joinOrder, accessPath, deferSendReceivePair);
+            return getSelectSubPlanForAccessPathsIterative(joinOrder, accessPath);
         } else {
             assert(joinNode.m_leftNode != null && joinNode.m_rightNode != null);
             // Outer node
-            AbstractPlanNode outerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_leftNode, deferSendReceivePair);
+            AbstractPlanNode outerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_leftNode);
 
             // Inner Node
-            AbstractPlanNode innerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_rightNode, deferSendReceivePair);
+            AbstractPlanNode innerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_rightNode);
 
             // Join Node
-            AbstractPlanNode resultPlan = getSelectSubPlanForOuterAccessPathStep(joinNode, outerScanPlan, innerScanPlan);
-            /*
-             * If the access plan for the table in the join order was for a
-             * distributed table scan there will be a send/receive pair at the top.
-             */
-            if (deferSendReceivePair && m_partitioning.requiresTwoFragments()) {
-                resultPlan = addSendReceivePair(resultPlan);
-            }
-            return resultPlan;
+            return getSelectSubPlanForOuterAccessPathStep(joinNode, outerScanPlan, innerScanPlan);
         }
     }
 
@@ -614,11 +569,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      *
      * @param joinOrder An array of tables in a specific join order.
      * @param accessPath An array of access paths that match with the input tables.
-     * @param supressSendReceivePair indicator whether to suppress intermediate Send/Receive pairs or not
      * @return A completed plan-sub-graph that should match the correct tuples from the
      * correct tables.
      */
-    protected AbstractPlanNode getSelectSubPlanForAccessPathsIterative(Table[] joinOrder, AccessPath[] accessPath, boolean deferSendReceivePair) {
+    protected AbstractPlanNode getSelectSubPlanForAccessPathsIterative(Table[] joinOrder, AccessPath[] accessPath) {
         AbstractPlanNode resultPlan = null;
         for (int at = joinOrder.length-1; at >= 0; --at) {
             AbstractPlanNode scanPlan = getAccessPlanForTable(joinOrder[at], accessPath[at]);
@@ -636,7 +590,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
              * If the access plan for the table in the join order was for a
              * distributed table scan there will be a send/receive pair at the top.
              */
-            if (deferSendReceivePair || !m_partitioning.requiresTwoFragments() || joinOrder[at].getIsreplicated()) {
+            if (canDeferSendReceivePairForNode(joinOrder[at].getIsreplicated())) {
                 continue;
             }
             resultPlan = addSendReceivePair(resultPlan);
@@ -695,7 +649,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         AccessPath innerAccessPath = joinNode.m_rightNode.m_currentAccessPath;
 
         AbstractJoinPlanNode retval = null;
-        if (innerPlan instanceof IndexScanPlanNode) {
+        // In case of innerPlan being an IndexScan the NLIJ will have an advantage over the NLJ only
+        // if there is at least one join expression based on both inner and outer tables
+        // If not, NLJ/IndexScan is a better choice
+        if (innerPlan instanceof IndexScanPlanNode && ! joinNode.m_joinInnerOuterList.isEmpty()) {
             NestLoopIndexPlanNode nlijNode = new NestLoopIndexPlanNode();
 
             nlijNode.setJoinType(joinNode.m_rightNode.m_joinType);

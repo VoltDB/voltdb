@@ -33,6 +33,7 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.JoinTree.JoinNode;
 import org.voltdb.planner.JoinTree.TablePair;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -155,6 +156,58 @@ public abstract class SubPlanAssembler {
         }
 
         return paths;
+    }
+
+    /**
+     * Generate all possible access paths for an inner node in an outer join.
+     * The set of potential index expressions depends whether the inner node can be inlined
+     * with the NLIJ or not. In the former case, inner and inner-outer join expressions can
+     * be considered for the index access. In the latter, only inner join expressions qualifies.
+     *
+     * @param joinNode the join node
+     * @param innerNode the inner node
+     * @return List of valid access paths
+     */
+    protected List<AccessPath> getRelevantAccessPathsForInnerNode(JoinNode joinNode, JoinNode innerNode) {
+        ArrayList<AbstractExpression> joinExprList = new ArrayList<AbstractExpression>();
+        joinExprList.addAll(joinNode.m_joinInnerList);
+        joinExprList.addAll(joinNode.m_joinInnerOuterList);
+
+        if (innerNode.m_table == null) {
+            // The inner node is a join node itself. Only naive access path is possible
+            ArrayList<AccessPath> accessPaths = new ArrayList<AccessPath>();
+            accessPaths.add(getRelevantNaivePathForTable(joinExprList, null));
+            return accessPaths;
+        }
+
+        // If inner table is non-replicated the join node will be the NLJ and not the NLIJ unless
+        // the outer node is also non-replicated. If the join is not going to be a NLIJ,
+        // the inner node won't be inlined which means that we can't use inner-outer
+        // join expressions for an index access (they will be pushed down to the
+        // IndexScanNode instead of staying at the NL level)
+        // The NLIJ only makes sense if the set of Inner-Outer join expressions is not empty
+        if (canDeferSendReceivePairForNode(joinNode.m_isReplicated)) {
+            // The inner table can have multiple index access paths based on
+            // inner and inner-outer join expressions plus the naive one
+            return getRelevantAccessPathsForTable(innerNode.m_table, joinExprList, null);
+        } else {
+            // The inner table can have multiple index access paths based on
+            // inner join expressions plus the naive one. The inner-outer expressions must
+            // stay at the NLJ node - accessPath.joinExprs
+            ArrayList<AccessPath> accessPaths = new ArrayList<AccessPath>();
+            accessPaths.add(getRelevantNaivePathForTable(joinExprList, null));
+            // It can also have index access but based only on the inner only expressions
+            CatalogMap<Index> indexes = innerNode.m_table.getIndexes();
+
+            for (Index index : indexes) {
+                AccessPath path = getRelevantAccessPathForIndex(innerNode.m_table, joinNode.m_joinInnerList, index);
+                if (path != null) {
+                    path.joinExprs.addAll(joinNode.m_joinInnerOuterList);
+                    accessPaths.add(path);
+                }
+            }
+            return accessPaths;
+        }
     }
 
     /**
@@ -1051,4 +1104,35 @@ public abstract class SubPlanAssembler {
         scanNode.setTargetIndexName(index.getTypeName());
         return scanNode;
     }
+
+    /**
+     * For a multi-fragment plan that contains a join,
+     * is it better to send partitioned tuples and join them on the coordinator
+     * or is it better to join them before sending?
+     * On the assumption that joined rows are wider (taking more bandwidth per row),
+     * we would want to send and then join if joined rows were one-to-one, but if
+     * There is a special case -- a join of more than one partitioned table on their partition keys,
+     * when that join must happen first -- the send/receive protocol only allows sending a single
+     * intermediate result table per statement.
+     * In a join of multiple partitioned tables and one or more replicated tables, it is theoretically
+     * possible to do the partitioned table join, and then the send/receive, and then the replicated
+     * table join.
+     * Deciding whether to defer the send/receive to after a join in other cases requires a complex
+     * trade-off involving the following considerations:
+     *  - Deferring send/recieve typically involves transmitting wider rows (more bandwidth per row).
+     *  - Deferring send/recieve may either increase or decrease bandwidth requirements depending on whether
+     *    the join has a net filtering effect on rows (in a one-to-"averages-fewer-than-one" relationship)
+     *    or a net multiplication effect (in a one-to-many relationship).
+     *  - Deferring send/recieve increases shared processing across nodes
+     *    -- less single-threaded post-processing on the single aggregator.
+     * For now, for simplicity, we only defer the send/receive when required, but when required, we
+     * go all the way and defer to after even the replicated joins.
+     *
+     * @param isReplicated Is table replicated or not.
+     * @return true is send/receive pair can be deferred (join before sending)
+     */
+    protected boolean canDeferSendReceivePairForNode(boolean isReplicated) {
+        return m_partitioning.getCountOfPartitionedTables() > 1 || !m_partitioning.requiresTwoFragments() || isReplicated;
+    }
+
 }
