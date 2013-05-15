@@ -290,6 +290,14 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             childOutputTupleCountEstimate += child.m_estimatedOutputTupleCount;
         }
 
+        // make sure any inlined scans (for NLIJ mostly) are costed as well
+        for (Entry<PlanNodeType, AbstractPlanNode> entry : m_inlineNodes.entrySet()) {
+            AbstractPlanNode inlineNode = entry.getValue();
+            if (inlineNode instanceof AbstractScanPlanNode) {
+                inlineNode.computeCostEstimates(0, cluster, db, estimates, paramHints);
+            }
+        }
+
         computeCostEstimates(childOutputTupleCountEstimate, cluster, db, estimates, paramHints);
         stats.incrementStatistic(0, StatsField.TUPLES_READ, m_estimatedProcessedTupleCount);
     }
