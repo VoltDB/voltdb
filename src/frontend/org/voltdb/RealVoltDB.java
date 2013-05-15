@@ -538,18 +538,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // Initialize stats
             m_ioStats = new IOStats();
-            m_statsAgent.registerStatsSource(SysProcSelector.IOSTATS,
+            m_statsAgent.registerStatsSource(StatsSelector.IOSTATS,
                     0, m_ioStats);
             m_memoryStats = new MemoryStats();
-            m_statsAgent.registerStatsSource(SysProcSelector.MEMORY,
+            m_statsAgent.registerStatsSource(StatsSelector.MEMORY,
                     0, m_memoryStats);
-            m_statsAgent.registerStatsSource(SysProcSelector.TOPO, 0, m_cartographer);
+            m_statsAgent.registerStatsSource(StatsSelector.TOPO, 0, m_cartographer);
             m_partitionCountStats = new PartitionCountStats(m_cartographer);
-            m_statsAgent.registerStatsSource(SysProcSelector.PARTITIONCOUNT,
+            m_statsAgent.registerStatsSource(StatsSelector.PARTITIONCOUNT,
                     0, m_partitionCountStats);
             m_initiatorStats = new InitiatorStats(m_myHostId);
             m_liveClientsStats = new LiveClientsStats();
-            m_statsAgent.registerStatsSource(SysProcSelector.LIVECLIENTS, 0, m_liveClientsStats);
+            m_statsAgent.registerStatsSource(StatsSelector.LIVECLIENTS, 0, m_liveClientsStats);
             m_latencyStats = new LatencyStats(m_myHostId);
 
             /*

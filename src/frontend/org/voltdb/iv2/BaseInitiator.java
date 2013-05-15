@@ -34,7 +34,7 @@ import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.StartAction;
 import org.voltdb.StarvationTracker;
 import org.voltdb.StatsAgent;
-import org.voltdb.SysProcSelector;
+import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.rejoin.TaskLog;
 
@@ -104,7 +104,7 @@ public abstract class BaseInitiator implements Initiator
         StarvationTracker st = new StarvationTracker(getInitiatorHSId());
         m_scheduler.setStarvationTracker(st);
         m_scheduler.setLock(m_initiatorMailbox);
-        agent.registerStatsSource(SysProcSelector.STARVATION,
+        agent.registerStatsSource(StatsSelector.STARVATION,
                                   getInitiatorHSId(),
                                   st);
 

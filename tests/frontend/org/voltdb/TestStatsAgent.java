@@ -91,7 +91,7 @@ public class TestStatsAgent {
                 { 42, "42" },
                 { 43, "43" }
         });
-        m_mvoltdb.getStatsAgent().registerStatsSource(SysProcSelector.DRPARTITION, 0, partitionSource);
+        m_mvoltdb.getStatsAgent().registerStatsSource(StatsSelector.DRPARTITION, 0, partitionSource);
 
         List<VoltTable.ColumnInfo> nodeColumns = Arrays.asList(new VoltTable.ColumnInfo[] {
                 new VoltTable.ColumnInfo( "c1", VoltType.STRING),
@@ -102,7 +102,7 @@ public class TestStatsAgent {
                 { "43", 43 },
                 { "42", 43 }
         });
-        m_mvoltdb.getStatsAgent().registerStatsSource(SysProcSelector.DRNODE, 0, nodeSource);
+        m_mvoltdb.getStatsAgent().registerStatsSource(StatsSelector.DRNODE, 0, nodeSource);
 
         List<VoltTable.ColumnInfo> snapshotStatusColumns = Arrays.asList(new VoltTable.ColumnInfo[] {
             new VoltTable.ColumnInfo("c1", VoltType.STRING),
@@ -113,7 +113,7 @@ public class TestStatsAgent {
             {"RYANLOVES", "THEYANKEES"},
             {"NOREALLY", "ASKHIM"}
         });
-        m_mvoltdb.getStatsAgent().registerStatsSource(SysProcSelector.SNAPSHOTSTATUS, 0, snapshotSource);
+        m_mvoltdb.getStatsAgent().registerStatsSource(StatsSelector.SNAPSHOTSTATUS, 0, snapshotSource);
     }
 
     private ParameterSet subselect(String subselector, int interval)
@@ -175,7 +175,7 @@ public class TestStatsAgent {
 
     @Test
     public void testCollectUnavailableStats() throws Exception {
-        for (SysProcSelector selector : SysProcSelector.values()) {
+        for (StatsSelector selector : StatsSelector.values()) {
             m_mvoltdb.getStatsAgent().collectStats(m_mockConnection, 32, "STATISTICS",
                     subselect(selector.name(), 0));
             ClientResponseImpl response = responses.take();

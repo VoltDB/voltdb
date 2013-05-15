@@ -72,8 +72,8 @@ public class StatsAgent {
     private final ScheduledThreadPoolExecutor m_es =
         org.voltcore.utils.CoreUtils.getScheduledThreadPoolExecutor("StatsAgent", 1, CoreUtils.SMALL_STACK_SIZE);
 
-    private final HashMap<SysProcSelector, HashMap<Long, ArrayList<StatsSource>>> registeredStatsSources =
-        new HashMap<SysProcSelector, HashMap<Long, ArrayList<StatsSource>>>();
+    private final HashMap<StatsSelector, HashMap<Long, ArrayList<StatsSource>>> registeredStatsSources =
+        new HashMap<StatsSelector, HashMap<Long, ArrayList<StatsSource>>>();
 
     private HostMessenger m_messenger;
 
@@ -110,7 +110,7 @@ public class StatsAgent {
     private final Map<Long, PendingStatsRequest> m_pendingRequests = new HashMap<Long, PendingStatsRequest>();
 
     public StatsAgent() {
-        SysProcSelector selectors[] = SysProcSelector.values();
+        StatsSelector selectors[] = StatsSelector.values();
         for (int ii = 0; ii < selectors.length; ii++) {
             registeredStatsSources.put(selectors[ii], new HashMap<Long, ArrayList<StatsSource>>());
         }
@@ -215,7 +215,7 @@ public class StatsAgent {
     {
         // Only applies to STATISTICS for now
         if (request.selector.equalsIgnoreCase("STATISTICS")) {
-            SysProcSelector subselector = SysProcSelector.valueOf(request.subselector);
+            StatsSelector subselector = StatsSelector.valueOf(request.subselector);
             switch (subselector) {
                 case PROCEDUREPROFILE:
                     request.aggregateTables =
@@ -258,7 +258,7 @@ public class StatsAgent {
      */
     public synchronized void notifyOfCatalogUpdate() {
         final HashMap<Long, ArrayList<StatsSource>> siteIdToStatsSources =
-            registeredStatsSources.get(SysProcSelector.PROCEDURE);
+            registeredStatsSources.get(StatsSelector.PROCEDURE);
         siteIdToStatsSources.clear();
     }
 
@@ -413,7 +413,7 @@ public class StatsAgent {
         }
         String subselector = (String)first;
         try {
-            SysProcSelector s = SysProcSelector.valueOf(subselector.toUpperCase());
+            StatsSelector s = StatsSelector.valueOf(subselector.toUpperCase());
             subselector = s.name();
         }
         catch (Exception e) {
@@ -568,7 +568,7 @@ public class StatsAgent {
     private void collectTopoStats(PendingStatsRequest psr)
     {
         VoltTable[] tables = null;
-        VoltTable topoStats = getStatsAggregate(SysProcSelector.TOPO, false, psr.startTime);
+        VoltTable topoStats = getStatsAggregate(StatsSelector.TOPO, false, psr.startTime);
         if (topoStats != null) {
             tables = new VoltTable[2];
             tables[0] = topoStats;
@@ -592,7 +592,7 @@ public class StatsAgent {
     private void collectPartitionCount(PendingStatsRequest psr)
     {
         VoltTable[] tables = null;
-        VoltTable pcStats = getStatsAggregate(SysProcSelector.PARTITIONCOUNT, false, psr.startTime);
+        VoltTable pcStats = getStatsAggregate(StatsSelector.PARTITIONCOUNT, false, psr.startTime);
         if (pcStats != null) {
             tables = new VoltTable[1];
             tables[0] = pcStats;
@@ -629,7 +629,7 @@ public class StatsAgent {
         // dispatch to collection
         String subselectorString = obj.getString("subselector");
         boolean interval = obj.getBoolean("interval");
-        SysProcSelector subselector = SysProcSelector.valueOf(subselectorString);
+        StatsSelector subselector = StatsSelector.valueOf(subselectorString);
         switch (subselector) {
             case DR:
                 stats = collectDRStats();
@@ -707,7 +707,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable nodeStats = getStatsAggregate(SysProcSelector.DRNODE, false, now);
+        VoltTable nodeStats = getStatsAggregate(StatsSelector.DRNODE, false, now);
         if (nodeStats != null) {
             stats = new VoltTable[1];
             stats[0] = nodeStats;
@@ -720,7 +720,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable partitionStats = getStatsAggregate(SysProcSelector.DRPARTITION, false, now);
+        VoltTable partitionStats = getStatsAggregate(StatsSelector.DRPARTITION, false, now);
         if (partitionStats != null) {
             stats = new VoltTable[1];
             stats[0] = partitionStats;
@@ -733,7 +733,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable ssStats = getStatsAggregate(SysProcSelector.SNAPSHOTSTATUS, false, now);
+        VoltTable ssStats = getStatsAggregate(StatsSelector.SNAPSHOTSTATUS, false, now);
         if (ssStats != null) {
             stats = new VoltTable[1];
             stats[0] = ssStats;
@@ -746,7 +746,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable mStats = getStatsAggregate(SysProcSelector.MEMORY, interval, now);
+        VoltTable mStats = getStatsAggregate(StatsSelector.MEMORY, interval, now);
         if (mStats != null) {
             stats = new VoltTable[1];
             stats[0] = mStats;
@@ -759,7 +759,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable iStats = getStatsAggregate(SysProcSelector.IOSTATS, interval, now);
+        VoltTable iStats = getStatsAggregate(StatsSelector.IOSTATS, interval, now);
         if (iStats != null) {
             stats = new VoltTable[1];
             stats[0] = iStats;
@@ -772,7 +772,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable iStats = getStatsAggregate(SysProcSelector.INITIATOR, interval, now);
+        VoltTable iStats = getStatsAggregate(StatsSelector.INITIATOR, interval, now);
         if (iStats != null) {
             stats = new VoltTable[1];
             stats[0] = iStats;
@@ -785,7 +785,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable tStats = getStatsAggregate(SysProcSelector.TABLE, interval, now);
+        VoltTable tStats = getStatsAggregate(StatsSelector.TABLE, interval, now);
         if (tStats != null) {
             stats = new VoltTable[1];
             stats[0] = tStats;
@@ -798,7 +798,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable tStats = getStatsAggregate(SysProcSelector.INDEX, interval, now);
+        VoltTable tStats = getStatsAggregate(StatsSelector.INDEX, interval, now);
         if (tStats != null) {
             stats = new VoltTable[1];
             stats[0] = tStats;
@@ -811,7 +811,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable pStats = getStatsAggregate(SysProcSelector.PROCEDURE, interval, now);
+        VoltTable pStats = getStatsAggregate(StatsSelector.PROCEDURE, interval, now);
         if (pStats != null) {
             stats = new VoltTable[1];
             stats[0] = pStats;
@@ -825,7 +825,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable sStats = getStatsAggregate(SysProcSelector.STARVATION, interval, now);
+        VoltTable sStats = getStatsAggregate(StatsSelector.STARVATION, interval, now);
         if (sStats != null) {
             stats = new VoltTable[1];
             stats[0] = sStats;
@@ -838,7 +838,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable pStats = getStatsAggregate(SysProcSelector.PLANNER, interval, now);
+        VoltTable pStats = getStatsAggregate(StatsSelector.PLANNER, interval, now);
         if (pStats != null) {
             stats = new VoltTable[1];
             stats[0] = pStats;
@@ -851,7 +851,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable lStats = getStatsAggregate(SysProcSelector.LIVECLIENTS, interval, now);
+        VoltTable lStats = getStatsAggregate(StatsSelector.LIVECLIENTS, interval, now);
         if (lStats != null) {
             stats = new VoltTable[1];
             stats[0] = lStats;
@@ -867,7 +867,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable lStats = getStatsAggregate(SysProcSelector.LATENCY, interval, now);
+        VoltTable lStats = getStatsAggregate(StatsSelector.LATENCY, interval, now);
         if (lStats != null) {
             stats = new VoltTable[1];
             stats[0] = lStats;
@@ -944,7 +944,7 @@ public class StatsAgent {
         }
     }
 
-    public synchronized void registerStatsSource(SysProcSelector selector, long siteId, StatsSource source) {
+    public synchronized void registerStatsSource(StatsSelector selector, long siteId, StatsSource source) {
         assert selector != null;
         assert source != null;
         final HashMap<Long, ArrayList<StatsSource>> siteIdToStatsSources = registeredStatsSources.get(selector);
@@ -969,14 +969,14 @@ public class StatsAgent {
      * @return  statistics VoltTable results
      */
     public synchronized VoltTable getStatsAggregate(
-            final SysProcSelector selector,
+            final StatsSelector selector,
             final boolean interval,
             final Long now) {
         return getStatsAggregateInternal(selector, interval, now, null);
     }
 
     private synchronized VoltTable getStatsAggregateInternal(
-            final SysProcSelector selector,
+            final StatsSelector selector,
             final boolean interval,
             final Long now,
             VoltTable prevResults)
