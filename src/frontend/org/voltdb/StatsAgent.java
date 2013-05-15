@@ -188,7 +188,47 @@ public class StatsAgent {
         if (request.expectedStatsResponses > 0) return;
 
         m_pendingRequests.remove(requestId);
+
+        dispatchFinalAggregations(request);
         sendStatsResponse(request);
+    }
+
+    private void dispatchFinalAggregations(PendingStatsRequest request)
+    {
+        SysProcSelector selector = SysProcSelector.valueOf(request.selector);
+        switch (selector) {
+            case PROCEDUREPROFILE:
+                request.aggregateTables =
+                    aggregateProcedureProfileStats(request.aggregateTables);
+                break;
+            default:
+        }
+    }
+
+    /**
+     * Produce PROCEDUREPROFILE aggregation of PROCEDURE selector
+     */
+    private VoltTable[] aggregateProcedureProfileStats(VoltTable[] baseStats)
+    {
+        if (baseStats == null || baseStats.length != 1) {
+           return baseStats;
+        }
+
+        StatsProcProfTable timeTable = new StatsProcProfTable();
+        baseStats[0].resetRowPosition();
+        while (baseStats[0].advanceRow()) {
+            timeTable.updateTable(
+                    baseStats[0].getString("PROCEDURE"),
+                    baseStats[0].getLong("PARTITION_ID"),
+                    baseStats[0].getLong("TIMED_INVOCATIONS"),
+                    baseStats[0].getLong("INVOCATIONS"),
+                    baseStats[0].getLong("MIN_EXECUTION_TIME"),
+                    baseStats[0].getLong("MAX_EXECUTION_TIME"),
+                    baseStats[0].getLong("AVG_EXECUTION_TIME"),
+                    baseStats[0].getLong("FAILURES"),
+                    baseStats[0].getLong("ABORTS"));
+        }
+        return new VoltTable[] { timeTable.sortByAverage("EXECUTION_TIME") };
     }
 
     /**
@@ -324,13 +364,15 @@ public class StatsAgent {
         /*
          * It is possible not to receive a table response if a feature is not enabled
          */
+        // All of the null/empty table handling/detecting/generation sucks.  Just making it
+        // work for now, not making it pretty. --izzy
         VoltTable responseTables[] = request.aggregateTables;
         if (responseTables == null || responseTables.length == 0) {
             responseTables = new VoltTable[0];
             statusCode = ClientResponse.GRACEFUL_FAILURE;
             statusString =
                 "Requested statistic \"" + request.selector +
-                "\" is not supported in the current configuration";
+                "\" is not yet available or not supported in the current configuration.";
         }
 
         ClientResponseImpl response =
@@ -348,15 +390,21 @@ public class StatsAgent {
 
     private void collectTopoStats(PendingStatsRequest psr)
     {
-        psr.aggregateTables = new VoltTable[2];
-        psr.aggregateTables[0] = getStatsAggregate(SysProcSelector.TOPO, false, psr.startTime);
-        VoltTable vt =
+        VoltTable[] tables = null;
+        VoltTable topoStats = getStatsAggregate(SysProcSelector.TOPO, false, psr.startTime);
+        if (topoStats != null) {
+            tables = new VoltTable[2];
+            tables[0] = topoStats;
+            VoltTable vt =
                 new VoltTable(
-                new VoltTable.ColumnInfo("HASHTYPE", VoltType.STRING),
-                new VoltTable.ColumnInfo("HASHCONFIG", VoltType.VARBINARY));
-        psr.aggregateTables[1] = vt;
-        Pair<HashinatorType, byte[]> hashConfig = TheHashinator.getCurrentConfig();
-        vt.addRow(hashConfig.getFirst().toString(), hashConfig.getSecond());
+                        new VoltTable.ColumnInfo("HASHTYPE", VoltType.STRING),
+                        new VoltTable.ColumnInfo("HASHCONFIG", VoltType.VARBINARY));
+            tables[1] = vt;
+            Pair<HashinatorType, byte[]> hashConfig = TheHashinator.getCurrentConfig();
+            vt.addRow(hashConfig.getFirst().toString(), hashConfig.getSecond());
+        }
+        psr.aggregateTables = tables;
+
         try {
             sendStatsResponse(psr);
         } catch (Exception e) {
@@ -366,8 +414,13 @@ public class StatsAgent {
 
     private void collectPartitionCount(PendingStatsRequest psr)
     {
-        psr.aggregateTables = new VoltTable[1];
-        psr.aggregateTables[0] = getStatsAggregate(SysProcSelector.PARTITIONCOUNT, false, psr.startTime);
+        VoltTable[] tables = null;
+        VoltTable pcStats = getStatsAggregate(SysProcSelector.PARTITIONCOUNT, false, psr.startTime);
+        if (pcStats != null) {
+            tables = new VoltTable[1];
+            tables[0] = pcStats;
+        }
+        psr.aggregateTables = tables;
 
         try {
             sendStatsResponse(psr);
@@ -415,6 +468,7 @@ public class StatsAgent {
                 stats = collectIndexStats(interval);
                 break;
             case PROCEDURE:
+            case PROCEDUREPROFILE:
                 stats = collectProcedureStats(interval);
                 break;
             case STARVATION:
@@ -605,6 +659,7 @@ public class StatsAgent {
         return stats;
     }
 
+
     private VoltTable[] collectStarvationStats(boolean interval)
     {
         Long now = System.currentTimeMillis();
@@ -664,14 +719,31 @@ public class StatsAgent {
     // STARVATION
     private VoltTable[] collectManagementStats(boolean interval)
     {
+        VoltTable[] mStats = collectMemoryStats(interval);
+        VoltTable[] iStats = collectInitiatorStats(interval);
+        VoltTable[] pStats = collectProcedureStats(interval);
+        VoltTable[] ioStats = collectIOStats(interval);
+        VoltTable[] tStats = collectTableStats(interval);
+        VoltTable[] indStats = collectIndexStats(interval);
+        VoltTable[] sStats = collectStarvationStats(interval);
+        // Ugh, this is ugly.  Currently need to return null if
+        // we're missing any of the tables so that we
+        // don't screw up the aggregation in handleStatsMessage (see my rant there)
+        if (mStats == null || iStats == null || pStats == null ||
+            ioStats == null || tStats == null || indStats == null ||
+            sStats == null)
+        {
+            return null;
+        }
         VoltTable[] stats = new VoltTable[7];
-        stats[0] = collectMemoryStats(interval)[0];
-        stats[1] = collectInitiatorStats(interval)[0];
-        stats[2] = collectProcedureStats(interval)[0];
-        stats[3] = collectIOStats(interval)[0];
-        stats[4] = collectTableStats(interval)[0];
-        stats[5] = collectIndexStats(interval)[0];
-        stats[6] = collectStarvationStats(interval)[0];
+        stats[0] = mStats[0];
+        stats[1] = iStats[0];
+        stats[2] = pStats[0];
+        stats[3] = ioStats[0];
+        stats[4] = tStats[0];
+        stats[5] = indStats[0];
+        stats[6] = sStats[0];
+
         return stats;
     }
 

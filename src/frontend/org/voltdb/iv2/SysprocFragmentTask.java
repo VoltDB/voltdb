@@ -31,6 +31,7 @@ import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -39,6 +40,7 @@ import org.voltdb.rejoin.TaskLog;
 import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.VoltTableUtil;
 
 public class SysprocFragmentTask extends TransactionTask
 {
@@ -62,6 +64,29 @@ public class SysprocFragmentTask extends TransactionTask
         assert(m_fragmentMsg.isSysProcTask());
     }
 
+    /**
+     * Respond with a dummy fragment response.
+     */
+    private void respondWithDummy()
+    {
+        final FragmentResponseMessage response =
+            new FragmentResponseMessage(m_fragmentMsg, m_initiator.getHSId());
+        response.m_sourceHSId = m_initiator.getHSId();
+        response.setRecovering(true);
+        response.setStatus(FragmentResponseMessage.SUCCESS, null);
+
+        // Set the dependencies even if this is a dummy response. This site could be the master
+        // on elastic join, so the fragment response message is actually going to the MPI.
+        VoltTable depTable = new VoltTable(new VoltTable.ColumnInfo("STATUS", VoltType.TINYINT));
+        depTable.setStatusCode(VoltTableUtil.NULL_DEPENDENCY_STATUS);
+        for (int frag = 0; frag < m_fragmentMsg.getFragmentCount(); frag++) {
+            final int outputDepId = m_fragmentMsg.getOutputDepId(frag);
+            response.addDependency(outputDepId, depTable);
+        }
+
+        m_initiator.deliver(response);
+    }
+
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
@@ -82,11 +107,7 @@ public class SysprocFragmentTask extends TransactionTask
         if (m_fragmentMsg.isSysProcTask() &&
             SysProcFragmentId.isSnapshotSaveFragment(m_fragmentMsg.getPlanHash(0)) &&
             VoltDB.instance().rejoinDataPending()) {
-            final FragmentResponseMessage response =
-                new FragmentResponseMessage(m_fragmentMsg, m_initiator.getHSId());
-            response.setRecovering(true);
-            response.setStatus(FragmentResponseMessage.SUCCESS, null);
-            m_initiator.deliver(response);
+            respondWithDummy();
             return;
         }
 
@@ -110,19 +131,7 @@ public class SysprocFragmentTask extends TransactionTask
 
         taskLog.logTask(m_fragmentMsg);
 
-        final FragmentResponseMessage response =
-            new FragmentResponseMessage(m_fragmentMsg, m_initiator.getHSId());
-        response.setRecovering(true);
-        response.setStatus(FragmentResponseMessage.SUCCESS, null);
-
-        // Set the dependencies even if this is a dummy response. This site could be the master
-        // on elastic join, so the fragment response message is actually going to the MPI.
-        for (int frag = 0; frag < m_fragmentMsg.getFragmentCount(); frag++) {
-            final int outputDepId = m_fragmentMsg.getOutputDepId(frag);
-            response.addDependency(outputDepId, null);
-        }
-
-        m_initiator.deliver(response);
+        respondWithDummy();
     }
 
     @Override

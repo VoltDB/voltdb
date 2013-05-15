@@ -91,6 +91,17 @@ public class DuplicateCounter
             }
             m_lastResponse = message;
         }
+
+        /*
+         * Set m_lastResponse to a response once at least. It's possible
+         * that all responses are dummy responses in the case of elastic
+         * join. So only setting m_lastResponse when the message is not
+         * a dummy will leave the variable as null.
+         */
+        if (m_lastResponse == null) {
+            m_lastResponse = message;
+        }
+
         m_expectedHSIds.remove(message.m_sourceHSId);
         if (m_expectedHSIds.size() == 0) {
             return DONE;
@@ -105,9 +116,12 @@ public class DuplicateCounter
         ClientResponseImpl r = message.getClientResponseData();
         // get the hash of sql run
         long hash = 0;
-        Integer sqlHash = r.getHash();
-        if (sqlHash != null) {
-            hash = sqlHash.intValue();
+        // A mispartitioned transaction has no response in the message
+        if (r != null) {
+            Integer sqlHash = r.getHash();
+            if (sqlHash != null) {
+                hash = sqlHash.intValue();
+            }
         }
         return checkCommon(hash, message.isRecovering(), message);
     }

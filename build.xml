@@ -97,14 +97,6 @@
 
 
 
-<!--set if makefile up to date. Eliminates timeconsuming build.py in ee -->
-<uptodate property="makefile.uptodate">
-  <srcfiles dir='${src.ee.dir}' includes='**/*' />
-  <srcfiles dir='${vendor.cpp.dir}'  includes='**/*' />
-  <srcfiles dir='${src.ee.test.dir}'  includes='**/*' />
-  <mapper type="merge" to="${build.dir}/makefile"/>
-</uptodate>
-
 <!-- emma build instrumentation location -->
 <property name='build.instr.dir'             location='${build.dir}/instr' />
 
@@ -1027,6 +1019,7 @@ NATIVE EE STUFF
     />
 </target>
 
+
 <target name='uptodate_jni_h.check' depends='jnicompile_temp'>
     <condition property='uptodate_jni_h'>
         <and>
@@ -1099,7 +1092,23 @@ NATIVE EE STUFF
     </copy>
 </target>
 
-<target name='ee_buildmakefile' depends="catalog, jnicompile, buildinfo"
+<target name='ee_makefile.uptodate'>
+  <condition property="makefile.uptodate">
+    <and>
+    <!--set if makefile up to date and makefile non-zero length
+            Eliminates timeconsuming build.py in ee -->
+    <uptodate>
+      <srcfiles dir='${src.ee.dir}' includes='**/*' />
+      <srcfiles dir='${vendor.cpp.dir}'  includes='**/*' />
+      <srcfiles dir='${src.ee.test.dir}'  includes='**/*' />
+      <mapper type="merge" to="${build.dir}/makefile"/>
+    </uptodate>
+    <length file="${build.dir}/makefile" when="greater" length="0" />
+    </and>
+  </condition>
+</target>
+
+<target name='ee_buildmakefile' depends="catalog, jnicompile, buildinfo, ee_makefile.uptodate"
     unless="makefile.uptodate"
     description="Just make the makefile for the C++ JNI library.">
     <exec dir='.' executable='python' failonerror='true'>

@@ -139,7 +139,8 @@ enum ConstraintType {
     CONSTRAINT_TYPE_UNIQUE         = 2,
     CONSTRAINT_TYPE_CHECK          = 3,
     CONSTRAINT_TYPE_PRIMARY_KEY    = 4,
-    CONSTRAINT_TYPE_NOT_NULL       = 5
+    CONSTRAINT_TYPE_NOT_NULL       = 5,
+    CONSTRAINT_TYPE_PARTITIONING   = 6,
 };
 
 // ------------------------------------------------------------------
@@ -298,6 +299,11 @@ enum ExpressionType {
     // Functions
     // -----------------------------
     EXPRESSION_TYPE_FUNCTION                        = 100,
+
+    // -----------------------------
+    // Internals added for Elastic
+    // -----------------------------
+    EXPRESSION_TYPE_HASH_RANGE                      = 200,
 
 };
 

@@ -87,17 +87,14 @@ public class ReplicaInvocationAcceptancePolicy extends InvocationAcceptancePolic
                                 Procedure proc) {
         if (invocation == null || proc == null) {
             return null;
+        } else if (invocation.getType() == ProcedureInvocationType.ORIGINAL &&
+                !invocation.procName.equalsIgnoreCase("@AdHoc")) {
+            Config sysProc = SystemProcedureCatalog.listing.get(invocation.getProcName());
+            if (sysProc != null && sysProc.allowedInReplica) {
+                // white-listed sysprocs, adhoc is a special case
+                return null;
+            }
         }
         return shouldAcceptHelper(user, invocation, proc.getReadonly());
-    }
-
-    @Override
-    public ClientResponseImpl shouldAccept(AuthUser user, StoredProcedureInvocation invocation, Config sysProc) {
-        if (invocation.getType() == ProcedureInvocationType.ORIGINAL && sysProc.allowedInReplica &&
-            !invocation.procName.equalsIgnoreCase("@AdHoc")) {
-            // white-listed sysprocs, adhoc is a special case
-            return null;
-        }
-        return shouldAcceptHelper(user, invocation, sysProc.readOnly);
     }
 }

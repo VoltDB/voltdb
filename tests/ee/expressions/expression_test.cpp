@@ -51,7 +51,10 @@
 
 #include <iostream>
 #include <sstream>
+#include <stdlib.h>
+#include <time.h>
 #include <queue>
+#include <boost/scoped_array.hpp>
 
 #include "harness.h"
 #include "json_spirit/json_spirit.h"
@@ -62,8 +65,10 @@
 #include "common/ValuePeeker.hpp"
 #include "common/PlannerDomValue.h"
 
+
 using namespace std;
 using namespace voltdb;
+//using namespace boost;
 
 
 /*
@@ -220,6 +225,37 @@ class TV  : public AE {
 };
 
 /*
+ * Hash range expression mock object
+ */
+class HR : public AE {
+public:
+    HR(int hashColumn, int64_t ranges[][2], int numRanges) :
+        AE(EXPRESSION_TYPE_HASH_RANGE, VALUE_TYPE_BIGINT, 8),
+        m_hashColumn(hashColumn),
+        m_ranges(ranges),
+        m_numRanges(numRanges) {
+
+    }
+
+    virtual void serialize(json_spirit::Object &json) {
+        AE::serialize(json);
+        json.push_back(json_spirit::Pair("HASH_COLUMN", json_spirit::Value(m_hashColumn)));
+        json_spirit::Array array;
+        for (int ii = 0; ii < m_numRanges; ii++) {
+            json_spirit::Object range;
+            range.push_back(json_spirit::Pair("RANGE_START", m_ranges[ii][0]));
+            range.push_back(json_spirit::Pair("RANGE_END", m_ranges[ii][1]));
+            array.push_back(range);
+        }
+        json.push_back(json_spirit::Pair("RANGES", array));
+    }
+
+    const int m_hashColumn;
+    const int64_t (*m_ranges)[2];
+    const int m_numRanges;
+};
+
+/*
    helpers to build trivial left-associative trees
    that is (a, *, b, +, c) returns (a * b) + c
    and (a, +, b, * c) returns (a + b) * c
@@ -319,6 +355,77 @@ TEST_F(ExpressionTest, SimpleMultiplication) {
     auto_ptr<AbstractExpression> e2(convertToExpression(e));
     NValue r2 = e2->eval(&junk,NULL);
     ASSERT_EQ(ValuePeeker::peekAsBigInt(r2), 13LL);
+}
+
+/*
+ * Show that the hash range expression correctly selects (or doesn't) rows in ranges
+ */
+TEST_F(ExpressionTest, HashRange) {
+    queue<AE*> e;
+
+    const int64_t range1Max = -(numeric_limits<int64_t>::max() / 2);
+    const int64_t range1Min = numeric_limits<int64_t>::min() - (range1Max / 2);
+    const int64_t range2Min = 0;
+    const int64_t range2Max = numeric_limits<int64_t>::max() / 2;
+    const int64_t range3Min = range2Max + (range2Max / 2);
+    const int64_t range3Max = range1Min - 1;
+
+    int64_t ranges[][2] = {
+            { range1Min, range1Max},
+            { range2Min, range2Max},
+            { range3Min, range3Max}
+    };
+
+    auto_ptr<AE> ae(new HR(1, ranges, 3));
+    json_spirit::Object json = ae->serializeValue();
+    std::string jsonText = json_spirit::write(json);
+    PlannerDomRoot domRoot(jsonText.c_str());
+    auto_ptr<AbstractExpression> e1(AbstractExpression::buildExpressionTree(domRoot.rootObject()));
+
+    vector<std::string> columnNames;
+    columnNames.push_back("foo");
+    columnNames.push_back("bar");
+
+    vector<int32_t> columnSizes;
+    columnSizes.push_back(8);
+    columnSizes.push_back(4);
+
+    vector<bool> allowNull;
+    allowNull.push_back(true);
+    allowNull.push_back(false);
+
+    vector<voltdb::ValueType> types;
+    types.push_back(voltdb::VALUE_TYPE_BIGINT);
+    types.push_back(voltdb::VALUE_TYPE_INTEGER);
+
+    TupleSchema *schema = TupleSchema::createTupleSchema(types,
+                                                               columnSizes,
+                                                               allowNull,
+                                                               true);
+
+    boost::scoped_array<char> tupleStorage(new char[schema->tupleLength() + TUPLE_HEADER_SIZE]);
+
+    TableTuple t(tupleStorage.get(), schema);
+    const time_t seed = time(NULL);
+    std::cout << "Seed " << seed << std::endl;
+    srand(static_cast<unsigned int>(seed));
+
+    for (int ii = 0; ii < 100000; ii++) {
+        NValue val = ValueFactory::getIntegerValue(rand());
+        int64_t out[2];
+        val.murmurHash3(out);
+        t.setNValue(1, val);
+        NValue inrange = e1->eval( &t );
+        const int64_t hash = out[0];
+        if ((hash >= range1Min && hash < range1Max) ||
+             (hash >= range2Min && hash < range2Max) ||
+             (hash >= range3Min || hash < range3Max)) {
+            ASSERT_TRUE(inrange.isTrue());
+        } else {
+            ASSERT_FALSE(inrange.isTrue());
+        }
+    }
+    TupleSchema::freeTupleSchema(schema);
 }
 
 int main() {

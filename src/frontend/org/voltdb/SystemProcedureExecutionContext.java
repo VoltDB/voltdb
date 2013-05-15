@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.dtxn.SiteTracker;
@@ -68,4 +69,9 @@ public interface SystemProcedureExecutionContext {
 
     public boolean updateCatalog(String catalogDiffCommands, CatalogContext context,
             CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation);
+
+    /**
+     * Update the EE hashinator with the given configuration.
+     */
+    public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config);
 }

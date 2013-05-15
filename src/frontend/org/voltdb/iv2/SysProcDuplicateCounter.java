@@ -50,24 +50,57 @@ public class SysProcDuplicateCounter extends DuplicateCounter
         super(destinationHSId, realTxnId, expectedHSIds);
     }
 
+    /**
+     * It is possible that duplicate counter will get mixed dummy responses and
+     * real responses from replicas, think elastic join and rejoin. The
+     * requirement here is that the duplicate counter should never mix these two
+     * types of responses together in the list of tables for a given
+     * dependency. Mixing them will cause problems for union later. In case of
+     * mixed responses, real responses are always preferred. As long as there
+     * are real responses for a dependency, dummy responses will be dropped for
+     * that dependency.
+     */
     @Override
     int offer(FragmentResponseMessage message)
     {
         long hash = 0;
-        if (!message.isRecovering()) {
-            for (int i = 0; i < message.getTableCount(); i++) {
-                hash ^= MiscUtils.cheesyBufferCheckSum(message.getTableAtIndex(i).getBuffer());
-                int depId = message.getTableDependencyIdAtIndex(i);
-                VoltTable dep = message.getTableAtIndex(i);
-                List<VoltTable> tables = m_alldeps.get(depId);
-                if (tables == null)
-                {
-                    tables = new ArrayList<VoltTable>();
-                    m_alldeps.put(depId, tables);
-                }
-                tables.add(dep);
+        for (int i = 0; i < message.getTableCount(); i++) {
+            int depId = message.getTableDependencyIdAtIndex(i);
+            VoltTable dep = message.getTableAtIndex(i);
+            List<VoltTable> tables = m_alldeps.get(depId);
+            if (tables == null)
+            {
+                tables = new ArrayList<VoltTable>();
+                m_alldeps.put(depId, tables);
             }
+
+            if (!message.isRecovering()) {
+                /*
+                 * If the current table is a real response, check if
+                 * any previous responses were dummy, if so, replace
+                 * the dummy ones with this legit response.
+                 */
+                if (!tables.isEmpty() && tables.get(0).getStatusCode() == VoltTableUtil.NULL_DEPENDENCY_STATUS) {
+                    tables.clear();
+                }
+
+                // Only update the hash with non-dummy responses
+                hash ^= MiscUtils.cheesyBufferCheckSum(dep.getBuffer());
+            } else {
+                /* If it's a dummy response, record it if and only if
+                 * it's the first response. If the previous response
+                 * is a real response, we don't want the dummy response.
+                 * If the previous one is also a dummy, one should be
+                 * enough.
+                 */
+                if (!tables.isEmpty()) {
+                    continue;
+                }
+            }
+
+            tables.add(dep);
         }
+
         return checkCommon(hash, message.isRecovering(), message);
     }
 

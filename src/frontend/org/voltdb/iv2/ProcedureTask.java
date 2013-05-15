@@ -96,18 +96,25 @@ abstract public class ProcedureTask extends TransactionTask
                                 error));
                     return response;
                 }
-                runner.setupTransaction(m_txnState);
-                cr = runner.call(task.getParameters());
 
-                m_txnState.setHash(cr.getHash());
+                // Check partitioning of the invocation
+                if (runner.checkPartition(m_txnState)) {
+                    runner.setupTransaction(m_txnState);
+                    cr = runner.call(task.getParameters());
 
-                response.setResults(cr);
-                // record the results of write transactions to the transaction state
-                // this may be used to verify the DR replica cluster gets the same value
-                // skip for multi-partition txns because only 1 of k+1 partitions will
-                //  have the real results
-                if ((!task.isReadOnly()) && task.isSinglePartition()) {
-                    m_txnState.storeResults(cr);
+                    m_txnState.setHash(cr.getHash());
+
+                    response.setResults(cr);
+                    // record the results of write transactions to the transaction state
+                    // this may be used to verify the DR replica cluster gets the same value
+                    // skip for multi-partition txns because only 1 of k+1 partitions will
+                    //  have the real results
+                    if ((!task.isReadOnly()) && task.isSinglePartition()) {
+                        m_txnState.storeResults(cr);
+                    }
+                } else {
+                    // mis-partitioned invocation, reject it and let the ClientInterface restart it
+                    response.setMispartitioned(true, task.getStoredProcedureInvocation());
                 }
             }
         }

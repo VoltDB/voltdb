@@ -107,7 +107,7 @@ var IVoltDB = (function(){
             var CriticalErrorResponse = {"status":-1,"statusstring":"Query timeout.","results":[]};
             var UserCallback = userCallback;
             var TimeoutOccurred = 0;
-            var Timeout = setTimeout(function() {TimeoutOccurred=1;UserCallback(CriticalErrorResponse);}, 5000);
+            var Timeout = setTimeout(function() {TimeoutOccurred=1;UserCallback(CriticalErrorResponse);}, 20000);
             this.Callback = function(response) { clearTimeout(Timeout); if (TimeoutOccurred == 0) UserCallback(response); }
             return this;
         }

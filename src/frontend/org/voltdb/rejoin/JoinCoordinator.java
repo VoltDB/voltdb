@@ -19,6 +19,7 @@ package org.voltdb.rejoin;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.ClientInterface;
@@ -29,22 +30,26 @@ import org.voltdb.catalog.Database;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.messaging.LocalMailbox;
+import org.voltdb.sysprocs.saverestore.SnapshotRequestConfig;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.utils.VoltFile;
 
-import java.util.Collection;
+import java.io.File;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Coordinates the sites to perform rejoin
  */
-public abstract class RejoinCoordinator extends LocalMailbox {
+public abstract class JoinCoordinator extends LocalMailbox {
     protected final HostMessenger m_messenger;
 
     /*
      * m_handler is called when a SnapshotUtil.requestSnapshot response occurs.
      * This callback runs on the snapshot daemon thread.
      */
-    protected SnapshotUtil.SnapshotResponseHandler m_handler =
+    protected static final SnapshotUtil.SnapshotResponseHandler m_handler =
             new SnapshotUtil.SnapshotResponseHandler() {
         @Override
         public void handleResponse(ClientResponse resp)
@@ -54,7 +59,7 @@ public abstract class RejoinCoordinator extends LocalMailbox {
                         false, null);
             } else if (resp.getStatus() != ClientResponseImpl.SUCCESS) {
                 VoltDB.crashLocalVoltDB("Failed to initiate rejoin snapshot: "
-                        + resp.getStatusString(), false, null);
+                        + resp.getStatusString(), true, resp.getException());
             }
 
             VoltTable[] results = resp.getResults();
@@ -69,18 +74,28 @@ public abstract class RejoinCoordinator extends LocalMailbox {
                     return;
                 }
             } else {
-                VoltDB.crashLocalVoltDB("Snapshot request for rejoin failed",
+                VoltDB.crashLocalVoltDB("Snapshot request for rejoin failed: " + results[0].toJSONString(),
                         false, null);
             }
         }
     };
 
-    public RejoinCoordinator(HostMessenger hostMessenger) {
+    public JoinCoordinator(HostMessenger hostMessenger) {
         super(hostMessenger, hostMessenger.generateMailboxId(null));
         m_messenger = hostMessenger;
     }
 
+    public void initialize(int kfactor)
+        throws JSONException, KeeperException, InterruptedException, ExecutionException {}
     public void setClientInterface(ClientInterface ci) {}
+    public void setPartitionsToHSIds(Map<Integer, Long> partsToHSIds) {}
+    public List<Integer> getPartitionsToAdd() {
+        throw new UnsupportedOperationException("getPartitionsToAdd is only supported for " +
+                "elastic join");
+    }
+    public JSONObject getTopology() {
+        throw new UnsupportedOperationException("getTopology is only supported for elastic join");
+    }
 
     /**
      * Starts the rejoin process.
@@ -95,34 +110,30 @@ public abstract class RejoinCoordinator extends LocalMailbox {
         m_messenger.removeMailbox(getHSId());
     }
 
-    protected String makeSnapshotNonce(String type, long HSId)
+    protected static void clearOverflowDir(String voltroot)
+    {
+        // clear overflow dir in case there are files left from previous runs
+        try {
+            File overflowDir = new File(voltroot, "join_overflow");
+            if (overflowDir.exists()) {
+                VoltFile.recursivelyDelete(overflowDir);
+            }
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Fail to clear join overflow directory", false, e);
+        }
+    }
+
+    public static String makeSnapshotNonce(String type, long HSId)
     {
         return type + "_" + HSId + "_" + System.currentTimeMillis();
     }
 
-    protected String makeSnapshotRequest(Map<Long, Long> sourceToDests,
-                                         Collection<Integer> tableIds)
+    public static String makeSnapshotRequest(SnapshotRequestConfig config)
     {
         try {
             JSONStringer jsStringer = new JSONStringer();
             jsStringer.object();
-
-            jsStringer.key("streamPairs");
-            jsStringer.object();
-            for (Map.Entry<Long, Long> entry : sourceToDests.entrySet()) {
-                jsStringer.key(Long.toString(entry.getKey())).value(Long.toString(entry.getValue()));
-            }
-            jsStringer.endObject();
-
-            jsStringer.key("tableIds");
-            jsStringer.array();
-            if (tableIds != null) {
-                for (int id : tableIds) {
-                    jsStringer.value(id);
-                }
-            }
-            jsStringer.endArray();
-
+            config.toJSONString(jsStringer);
             jsStringer.endObject();
             return jsStringer.toString();
         } catch (Exception e) {

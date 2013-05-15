@@ -53,6 +53,9 @@ public interface Initiator
     /** Shutdown an Initiator and its sub-components. */
     public void shutdown();
 
+    /** Ask for the partition ID this initiator is assigned to */
+    public int getPartitionId();
+
     /** Ask for the HSId used to address this Initiator. */
     public long getInitiatorHSId();
 

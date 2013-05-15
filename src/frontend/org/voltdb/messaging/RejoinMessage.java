@@ -19,13 +19,16 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.Set;
+
+import com.google.common.collect.ImmutableSet;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 
 /**
- * Rejoin message used to drive the whole rejoin process. It could be sent from
- * the rejoin coordinator to a local site, or it could be sent from a rejoining
- * site to an existing site.
+ * Rejoin message used to drive the whole rejoin process. It is only sent between
+ * the rejoin coordinator and local sites.
  */
 public class RejoinMessage extends VoltMessage {
     public static enum Type {
@@ -39,18 +42,22 @@ public class RejoinMessage extends VoltMessage {
         SNAPSHOT_FINISHED, // sent from a local site to the coordinator
         REPLAY_FINISHED, // sent from a local site to the coordinator
 
-        // Join specific message types
+        // Elastic join specific message types
+        PARTITION_SNAPSHOT_INITIATION, // sent from the coordinator to local sites
         SNAPSHOT_DATA, // sent from the coordinator to local sites
         FIRST_FRAGMENT_RECEIVED, // sent from a local site to the coordinator
     }
 
     private Type m_type;
     private long m_snapshotTxnId = -1; // snapshot txnId
-    private long m_snapshotSinkHSId = -1;
     private long m_masterHSId = -1;
     private String m_snapshotNonce = null;
+    // number of sinks to create on the site, default is 1, elastic join may use more
+    private int m_snapshotSinkCount = 1;
+    private Set<Long> m_snapshotSinkHSIds = null;
     private int m_tableId = -1;
     private ByteBuffer m_tableBlock = null;
+    private boolean m_shouldWaitForSnapshotCompletion = true;
 
     /** Empty constructor for de-serialization */
     public RejoinMessage() {
@@ -70,14 +77,23 @@ public class RejoinMessage extends VoltMessage {
     }
 
     /**
-     * For IV2, INITIATION and INITIATION_COMMUNITY pass the nonce used by the
-     * Iv2RejoinCoordinator to the site.
+     * INITIATION, INITIATION_COMMUNITY and PARTITION_SNAPSHOT_INITIATION pass the
+     * nonce used by the coordinator to the site.
      */
     public RejoinMessage(long sourceHSId, Type type, String snapshotNonce)
     {
         this(sourceHSId, type);
-        assert(type == Type.INITIATION || type == Type.INITIATION_COMMUNITY);
+        assert(type == Type.INITIATION || type == Type.INITIATION_COMMUNITY || type == Type.PARTITION_SNAPSHOT_INITIATION);
         m_snapshotNonce = snapshotNonce;
+    }
+
+    /**
+     * For elastic join, the coordinator tells the producer how many snapshot sinks to create.
+     */
+    public RejoinMessage(long sourceHSId, Type type, String snapshotNonce, int sinkCount)
+    {
+        this(sourceHSId, type, snapshotNonce);
+        m_snapshotSinkCount = sinkCount;
     }
 
     /**
@@ -88,7 +104,16 @@ public class RejoinMessage extends VoltMessage {
     {
         this(sourceHSId, Type.INITIATION_RESPONSE);
         m_masterHSId = masterHSId;
-        m_snapshotSinkHSId = sinkHSId;
+        m_snapshotSinkHSIds = ImmutableSet.copyOf(Arrays.asList(sinkHSId));
+    }
+
+    /**
+     * For elastic join, the producer may have multiple sinks.
+     */
+    public RejoinMessage(long sourceHSId, Set<Long> sinkHSIds)
+    {
+        this(sourceHSId, Type.INITIATION_RESPONSE);
+        m_snapshotSinkHSIds = ImmutableSet.copyOf(sinkHSIds);
     }
 
     /**
@@ -117,8 +142,23 @@ public class RejoinMessage extends VoltMessage {
         return m_masterHSId;
     }
 
+    public int getSnapshotSinkCount() {
+        return m_snapshotSinkCount;
+    }
+
+    /**
+     * Get the only snapshot sink HSID specified in the message. This can only be called if
+     * there is only one sink HSID. Rejoin uses one snapshot sink for a single site, elastic
+     * join could use multiple sinks for a site. For elastic join, call
+     * {@link #getSnapshotSinkHSIds()}.
+     */
     public long getSnapshotSinkHSId() {
-        return m_snapshotSinkHSId;
+        assert m_snapshotSinkHSIds.size() == 1;
+        return m_snapshotSinkHSIds.iterator().next();
+    }
+
+    public Set<Long> getSnapshotSinkHSIds() {
+        return m_snapshotSinkHSIds;
     }
 
     public int getTableId() {
@@ -127,6 +167,14 @@ public class RejoinMessage extends VoltMessage {
 
     public ByteBuffer getTableBlock() {
         return m_tableBlock.duplicate();
+    }
+
+    public boolean shouldWaitForSnapshotCompletion() {
+        return m_shouldWaitForSnapshotCompletion;
+    }
+
+    public void setShouldWaitForSnapshotCompletion(boolean shouldWait) {
+        m_shouldWaitForSnapshotCompletion = shouldWait;
     }
 
     @Override

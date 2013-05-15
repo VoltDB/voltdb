@@ -1378,17 +1378,23 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         System.out.println("@Statistics after restore:");
         System.out.println(results[0]);
 
+        boolean ok = false;
         int foundItem = 0;
-        while (foundItem != 3) {
+        while (!ok) {
+            ok = true;
+            foundItem = 0;
+            results = client.callProcedure("@Statistics", "table", 0).getResults();
             while (results[0].advanceRow())
             {
                 if (results[0].getString("TABLE_NAME").equals("REPLICATED_TESTER"))
                 {
+                    long tupleCount = results[0].getLong("TUPLE_COUNT");
+                    ok = (ok & (tupleCount == (num_replicated_items_per_chunk * num_replicated_chunks)));
                     ++foundItem;
                 }
             }
+            ok = ok & (foundItem == 3);
         }
-        assertEquals(3, foundItem);
 
         results = client.callProcedure("@Statistics", "table", 0).getResults();
         while (results[0].advanceRow())
@@ -1513,17 +1519,22 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         checkTable(client, "PARTITION_TESTER", "PT_ID",
                    num_partitioned_items_per_chunk * num_partitioned_chunks);
 
+        boolean ok = false;
         int foundItem = 0;
-        while (foundItem != 3) {
+        while (!ok) {
+            ok = true;
             foundItem = 0;
             results = client.callProcedure("@Statistics", "table", 0).getResults();
             while (results[0].advanceRow())
             {
                 if (results[0].getString("TABLE_NAME").equals("PARTITION_TESTER"))
                 {
+                    long tupleCount = results[0].getLong("TUPLE_COUNT");
+                    ok = (ok & (tupleCount == ((num_partitioned_items_per_chunk * num_partitioned_chunks) / 3)));
                     ++foundItem;
                 }
             }
+            ok = ok & (foundItem == 3);
         }
 
         results = client.callProcedure("@Statistics", "table", 0).getResults();
@@ -1612,17 +1623,25 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         results = client.callProcedure("@Statistics", "table", 0).getResults();
 
+        ok = false;
         foundItem = 0;
-        while (foundItem != 3) {
+        while (!ok) {
+            ok = true;
+            foundItem = 0;
+            results = client.callProcedure("@Statistics", "table", 0).getResults();
             while (results[0].advanceRow())
             {
                 if (results[0].getString("TABLE_NAME").equals("PARTITION_TESTER"))
                 {
+                    long tupleCount = results[0].getLong("TUPLE_COUNT");
+                    ok = (ok & (tupleCount == ((num_partitioned_items_per_chunk * num_partitioned_chunks) / 3)));
                     ++foundItem;
                 }
             }
+            ok = ok & (foundItem == 3);
         }
         assertEquals(3, foundItem);
+
         results = client.callProcedure("@Statistics", "table", 0).getResults();
         while (results[0].advanceRow())
         {
@@ -1900,16 +1919,22 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                    num_replicated_items_per_chunk * num_replicated_chunks);
 
         // Spin until the stats look complete
+        boolean ok = false;
         int foundItem = 0;
-        while (foundItem != 4) {
+        while (!ok) {
+            ok = true;
             foundItem = 0;
             results = client.callProcedure("@Statistics", "table", 0).getResults();
-            while (results[0].advanceRow()) {
+            while (results[0].advanceRow())
+            {
                 if (results[0].getString("TABLE_NAME").equals("PARTITION_TESTER"))
                 {
+                    long tupleCount = results[0].getLong("TUPLE_COUNT");
+                    ok = (ok & (tupleCount == ((num_partitioned_items_per_chunk * num_partitioned_chunks) / 4)));
                     ++foundItem;
                 }
             }
+            ok = ok & (foundItem == 4);
         }
 
         while (results[0].advanceRow())
