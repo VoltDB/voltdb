@@ -74,6 +74,9 @@ public interface VoltDBInterface
     public ArrayList<ClientInterface> getClientInterfaces();
     public Map<Long, ExecutionSite> getLocalSites();
     public StatsAgent getStatsAgent();
+    // TODO: CLEAN ME UP
+    public SystemCatalogAgent getSystemCatalogAgent();
+    public SystemInformationAgent getSystemInformationAgent();
     public MemoryStats getMemoryStatsSource();
     public FaultDistributorInterface getFaultDistributor();
     public BackendTarget getBackendTargetType();

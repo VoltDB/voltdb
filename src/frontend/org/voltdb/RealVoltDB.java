@@ -153,6 +153,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private ArrayList<ExecutionSiteRunner> m_runners;
     private ExecutionSite m_currentThreadSite;
     private StatsAgent m_statsAgent = new StatsAgent();
+    // TODO: CLEAN ME UP
+    private SystemCatalogAgent m_catalogAgent = new SystemCatalogAgent();
+    private SystemInformationAgent m_sysInfoAgent = new SystemInformationAgent();
+
     private AsyncCompilerAgent m_asyncCompilerAgent = new AsyncCompilerAgent();
     public AsyncCompilerAgent getAsyncCompilerAgent() { return m_asyncCompilerAgent; }
     FaultDistributor m_faultManager;
@@ -318,6 +322,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_messenger = null;
             m_startMode = null;
             m_statsAgent = new StatsAgent();
+            m_catalogAgent = new SystemCatalogAgent();
+            m_sysInfoAgent = new SystemInformationAgent();
             m_asyncCompilerAgent = new AsyncCompilerAgent();
             m_faultManager = null;
             m_snapshotCompletionMonitor = null;
@@ -1474,9 +1480,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_messenger = null;
 
                 //Also for test code that expects a fresh stats agent
+                // TODO: CLEAN ME UP
                 if (m_statsAgent != null) {
                     m_statsAgent.shutdown();
                     m_statsAgent = null;
+                }
+                if (m_catalogAgent != null) {
+                    m_catalogAgent.shutdown();
+                    m_catalogAgent = null;
+                }
+                if (m_sysInfoAgent != null) {
+                    m_sysInfoAgent.shutdown();
+                    m_sysInfoAgent = null;
                 }
 
                 if (m_asyncCompilerAgent != null) {
@@ -1694,6 +1709,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public StatsAgent getStatsAgent() {
         return m_statsAgent;
+    }
+
+    // TODO: CLEAN ME UP
+    @Override
+    public SystemCatalogAgent getSystemCatalogAgent() {
+        return m_catalogAgent;
+    }
+    // TODO: CLEAN ME UP
+    @Override
+    public SystemInformationAgent getSystemInformationAgent() {
+        return m_sysInfoAgent;
     }
 
     @Override
