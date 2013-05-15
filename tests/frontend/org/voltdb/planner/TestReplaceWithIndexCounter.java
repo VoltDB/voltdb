@@ -36,8 +36,6 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
     protected void setUp() throws Exception {
         setupSchema(getClass().getResource("testplans-indexcounter-ddl.sql"),
                     "testindexcounter", false);
-        // Set all tables except for P1 to replicated.
-        forceReplicationExceptForOneTable("p1", "ID");
     }
 
     @Override
@@ -81,7 +79,7 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
     }
 
     public void testCountStar02() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID >= P2.P2_ID order by P1.ID, P2.P2_ID limit 10");
+        List<AbstractPlanNode> pn = compileToFragments("SELECT P1.ID, T3.T3_ID from P1, T3 where P1.ID >= T3.T3_ID order by P1.ID, T3.T3_ID limit 10");
         checkIndexCounter(pn, false);
     }
 

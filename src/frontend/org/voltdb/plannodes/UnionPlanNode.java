@@ -24,6 +24,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.planner.ParsedUnionStmt;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.PlanNodeType;
 
 public class UnionPlanNode extends AbstractPlanNode {
@@ -87,7 +88,7 @@ public class UnionPlanNode extends AbstractPlanNode {
             }
             for (int j = 0; j < outputColumns.size(); ++j) {
                 if (outputColumns.get(j).getType() != columns.get(j).getType()) {
-                    throw new RuntimeException("Incompatible data types in UNION");
+                    throw new PlanningErrorException("Incompatible data types in UNION");
                 }
             }
         }

@@ -38,7 +38,6 @@ public class TestPushDownAggregates extends PlannerTestCase {
     protected void setUp() throws Exception {
         setupSchema(getClass().getResource("testplans-groupby-ddl.sql"),
                     "testpushdownaggregates", false);
-        forceReplicationExceptForOneTable("t1", "PKEY");
     }
 
     @Override
