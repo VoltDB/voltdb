@@ -19,7 +19,9 @@ package org.voltdb.sysprocs.saverestore;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSortedMap;
+import com.google.common.collect.Multimap;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -35,7 +37,7 @@ import java.util.SortedMap;
 
 public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
     // src -> (dest1, dest2,...)
-    public final Map<Long, Collection<Long>> streamPairs;
+    public final Multimap<Long, Long> streamPairs;
     // partitions with the ranges each partition has
     public final Map<Integer, SortedMap<Long, Long>> partitionsToAdd;
 
@@ -45,12 +47,12 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
      * @param partitionsToAdd
      */
     public StreamSnapshotRequestConfig(List<Table> tables,
-                                       Map<Long, Collection<Long>> streamPairs,
+                                       Multimap<Long, Long> streamPairs,
                                        Map<Integer, Map<Long, Long>> partitionsToAdd)
     {
         super(tables);
 
-        this.streamPairs = ImmutableMap.copyOf(streamPairs);
+        this.streamPairs = ImmutableMultimap.copyOf(streamPairs);
 
         if (partitionsToAdd == null) {
             this.partitionsToAdd = null;
@@ -69,7 +71,7 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
     {
         super(jsData, catalogDatabase);
 
-        streamPairs = ImmutableMap.copyOf(parseStreamPairs(jsData, localHSIds));
+        streamPairs = ImmutableMultimap.copyOf(parseStreamPairs(jsData, localHSIds));
         partitionsToAdd = parsePostSnapshotTasks(jsData);
     }
 
@@ -117,8 +119,8 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
         return partitionBuilder.build();
     }
 
-    private static Map<Long, Collection<Long>> parseStreamPairs(JSONObject jsData,
-                                                                Collection<Long> localHSIds)
+    private static Multimap<Long, Long> parseStreamPairs(JSONObject jsData,
+                                                         Collection<Long> localHSIds)
     {
         ArrayListMultimap<Long, Long> streamPairs = ArrayListMultimap.create();
 
@@ -145,7 +147,7 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
             }
         }
 
-        return streamPairs.asMap();
+        return streamPairs;
     }
 
     @Override
@@ -154,7 +156,7 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
         super.toJSONString(stringer);
 
         stringer.key("streamPairs").object();
-        for (Map.Entry<Long, Collection<Long>> entry : streamPairs.entrySet()) {
+        for (Map.Entry<Long, Collection<Long>> entry : streamPairs.asMap().entrySet()) {
             stringer.key(Long.toString(entry.getKey())).array();
             for (long destHSId : entry.getValue()) {
                 stringer.value(destHSId);

@@ -28,6 +28,7 @@ import java.util.Queue;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
@@ -133,7 +134,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         }
     }
 
-    private String makeSnapshotRequest(Map<Long, Collection<Long>> sourceToDests)
+    private String makeSnapshotRequest(Multimap<Long, Long> sourceToDests)
     {
         StreamSnapshotRequestConfig config =
             new StreamSnapshotRequestConfig(null, sourceToDests, null);
@@ -230,7 +231,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             m_rejoiningSites.add(HSId);
             nonce = m_nonces.get(HSId);
             if (m_snapshotSites.isEmpty()) {
-                data = makeSnapshotRequest(m_destToSource.asMap());
+                data = makeSnapshotRequest(m_destToSource);
                 m_destToSource.clear();
             }
         }

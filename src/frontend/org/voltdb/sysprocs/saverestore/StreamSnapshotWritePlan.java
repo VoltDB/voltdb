@@ -114,7 +114,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         if (config.streamPairs.size() > 0) {
             SNAP_LOG.debug("Sites to stream from: " +
                     CoreUtils.hsIdCollectionToString(config.streamPairs.keySet()));
-            for (Entry<Long, Collection<Long>> entry : config.streamPairs.entrySet()) {
+            for (Entry<Long, Collection<Long>> entry : config.streamPairs.asMap().entrySet()) {
                 long srcHSId = entry.getKey();
                 Collection<Long> destHSIds = entry.getValue();
 
