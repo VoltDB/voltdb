@@ -156,7 +156,7 @@ public class StatsAgent {
 
     }
 
-    private void handleStatsResponse(byte[] payload) throws Exception {
+    private void handleStatsResponse(byte[] payload) {
         ByteBuffer buf = ByteBuffer.wrap(payload);
         Long requestId = buf.getLong();
 
@@ -488,7 +488,7 @@ public class StatsAgent {
                 psr.clientData);
     }
 
-    private void sendStatsResponse(PendingStatsRequest request) throws Exception {
+    private void sendStatsResponse(PendingStatsRequest request) {
         byte statusCode = ClientResponse.SUCCESS;
         String statusString = null;
         /*
@@ -888,7 +888,7 @@ public class StatsAgent {
         VoltTable[] sStats = collectStarvationStats(interval);
         // Ugh, this is ugly.  Currently need to return null if
         // we're missing any of the tables so that we
-        // don't screw up the aggregation in handleStatsMessage (see my rant there)
+        // don't screw up the aggregation in handleStatsResponse (see my rant there)
         if (mStats == null || iStats == null || pStats == null ||
             ioStats == null || tStats == null || indStats == null ||
             sStats == null)
