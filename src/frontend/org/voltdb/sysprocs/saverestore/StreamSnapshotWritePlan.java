@@ -24,8 +24,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Set;
-import java.util.SortedMap;
-import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -37,6 +35,8 @@ import java.util.Map.Entry;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
 import com.google.common.primitives.Longs;
 import org.json_voltpatches.JSONObject;
 
@@ -87,12 +87,14 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         final StreamSnapshotRequestConfig config =
             new StreamSnapshotRequestConfig(jsData, context.getDatabase(), localHSIds);
 
+        // Create post snapshot update hashinator work
         List<Integer> localPartitions = tracker.getPartitionsForHost(context.getHostId());
-        if (!config.partitionsToAdd.isEmpty()) {
-            Map<Long, Integer> tokensToAdd = createTokensToAdd(config.partitionsToAdd);
+        Map<Long, Integer> tokensToAdd = createTokensToAdd(config);
+        if (!tokensToAdd.isEmpty()) {
             createUpdateHashinatorTasksForSites(localPartitions, tokensToAdd, txnId);
         }
 
+        // Mark snapshot start in registry
         final AtomicInteger numTables = new AtomicInteger(config.tables.length);
         final SnapshotRegistry.Snapshot snapshotRecord =
             SnapshotRegistry.startSnapshot(
@@ -110,27 +112,27 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             schemas.put(table.getRelativeIndex(), schemaTable.getSchemaBytes());
         }
 
-        ArrayListMultimap<Long, SnapshotDataTarget> sdts = ArrayListMultimap.create();
-        if (config.streamPairs.size() > 0) {
+        // Create data target for each source HSID in each stream
+        List<DataTargetInfo> sdts = Lists.newArrayList();
+        for (StreamSnapshotRequestConfig.Stream stream : config.streams) {
             SNAP_LOG.debug("Sites to stream from: " +
-                    CoreUtils.hsIdCollectionToString(config.streamPairs.keySet()));
-            for (Entry<Long, Collection<Long>> entry : config.streamPairs.asMap().entrySet()) {
+                           CoreUtils.hsIdCollectionToString(stream.streamPairs.keySet()));
+            for (Entry<Long, Long> entry : stream.streamPairs.entries()) {
                 long srcHSId = entry.getKey();
-                Collection<Long> destHSIds = entry.getValue();
+                long destHSId = entry.getValue();
 
-                for (long destHSId : destHSIds) {
-                    sdts.put(srcHSId, new StreamSnapshotDataTarget(destHSId, schemas));
-                }
+                sdts.add(new DataTargetInfo(stream,
+                                            srcHSId,
+                                            new StreamSnapshotDataTarget(destHSId, schemas)));
             }
-        } else {
-            // There's no work to do on this host, just claim success, return an empty plan, and things
-            // will sort themselves out properly
-            return false;
         }
+
+        // If there's no work to do on this host, just claim success, return an empty plan,
+        // and things will sort themselves out properly
 
         // For each table, create tasks where each task has a data target.
         for (final Table table : config.tables) {
-            createTasksForTable(table, sdts.asMap(), config, numTables, snapshotRecord);
+            createTasksForTable(table, sdts, config, numTables, snapshotRecord);
             result.addRow(context.getHostId(), hostname, table.getTypeName(), "SUCCESS", "");
         }
 
@@ -141,90 +143,87 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
      * For each site, generate a task for each target it has for this table.
      */
     private void createTasksForTable(Table table,
-                                     Map<Long, Collection<SnapshotDataTarget>> dataTargets,
+                                     List<DataTargetInfo> dataTargets,
                                      StreamSnapshotRequestConfig config,
                                      AtomicInteger numTables,
                                      SnapshotRegistry.Snapshot snapshotRecord)
     {
-        // Predicate for the table is the same for all targets now, so create it here
-        AbstractExpression predicate = null;
-        boolean deleteTuples = false;
-        if (!table.getIsreplicated()) {
-            predicate = createPredicateForTable(table, config);
-            // Only delete tuples if there is a predicate, e.g. elastic join
-            if (predicate != null) {
-                deleteTuples = true;
+        // srcHSId -> tasks
+        Multimap<Long, SnapshotTableTask> tasks = ArrayListMultimap.create();
+        for (DataTargetInfo targetInfo : dataTargets) {
+            // Create a predicate for the table task
+            AbstractExpression predicate = null;
+            boolean deleteTuples = false;
+            if (!table.getIsreplicated()) {
+                predicate = createPredicateForTableStream(table, targetInfo.stream);
+                // Only delete tuples if there is a predicate, e.g. elastic join
+                if (predicate != null) {
+                    deleteTuples = true;
+                }
             }
+
+            final Runnable onClose = new TargetStatsClosure(targetInfo.dataTarget,
+                                                            table.getTypeName(),
+                                                            numTables,
+                                                            snapshotRecord);
+            targetInfo.dataTarget.setOnCloseHandler(onClose);
+
+            final SnapshotTableTask task =
+                new SnapshotTableTask(table,
+                                      targetInfo.dataTarget,
+                                      new SnapshotDataFilter[0], // This task no longer needs partition filtering
+                                      predicate,
+                                      deleteTuples);
+
+            tasks.put(targetInfo.srcHSId, task);
+            m_targets.add(targetInfo.dataTarget);
         }
 
-        for (Entry<Long, Collection<SnapshotDataTarget>> siteTargets : dataTargets.entrySet()) {
-            long hsId = siteTargets.getKey();
-            Collection<SnapshotDataTarget> targets = siteTargets.getValue();
+        placeTasksForTable(table, tasks);
+    }
 
-            m_targets.addAll(targets);
-
-            final List<SnapshotTableTask> tasksForThisTable = new ArrayList<SnapshotTableTask>();
-
-            /*
-             * There can be multiple data targets for a single site. Iterate through all data
-             * targets and create a task for each one.
-             */
-            for (SnapshotDataTarget target : targets) {
-                final Runnable onClose = new TargetStatsClosure(target, table.getTypeName(),
-                                                                numTables, snapshotRecord);
-                target.setOnCloseHandler(onClose);
-
-                final SnapshotTableTask task =
-                    new SnapshotTableTask(table,
-                                          target,
-                                          new SnapshotDataFilter[0], // This task no longer needs partition filtering
-                                          predicate,
-                                          deleteTuples);
-
-                tasksForThisTable.add(task);
-            }
-
+    private void placeTasksForTable(Table table, Multimap<Long, SnapshotTableTask> tasks)
+    {
+        for (Entry<Long, Collection<SnapshotTableTask>> tasksEntry : tasks.asMap().entrySet()) {
             // Stream snapshots need to write all partitioned tables to all selected partitions
             // and all replicated tables to all selected partitions
             if (table.getIsreplicated()) {
-                placeReplicatedTasks(tasksForThisTable, Arrays.asList(hsId));
+                placeReplicatedTasks(tasksEntry.getValue(), Arrays.asList(tasksEntry.getKey()));
             } else {
-                placePartitionedTasks(tasksForThisTable, Arrays.asList(hsId));
+                placePartitionedTasks(tasksEntry.getValue(), Arrays.asList(tasksEntry.getKey()));
             }
         }
     }
 
-    private static AbstractExpression createPredicateForTable(Table table,
-                                                              StreamSnapshotRequestConfig config)
+    private static AbstractExpression
+    createPredicateForTableStream(Table table, StreamSnapshotRequestConfig.Stream stream)
     {
         HashRangeExpression predicate = null;
 
-        if (!config.partitionsToAdd.isEmpty()) {
-            Map<Long, Long> ranges = new TreeMap<Long, Long>();
-            for (Entry<Integer, SortedMap<Long, Long>> entry : config.partitionsToAdd.entrySet()) {
-                int partition = entry.getKey();
-                SortedMap<Long, Long> pRanges = entry.getValue();
-                if (SNAP_LOG.isTraceEnabled()) {
-                    SNAP_LOG.trace("Partition " + partition + " has ranges " + pRanges);
-                }
-                ranges.putAll(pRanges);
+        if (stream.partition != null) {
+            if (SNAP_LOG.isTraceEnabled()) {
+                SNAP_LOG.trace("Partition " + stream.partition + " has ranges " + stream.ranges);
             }
             predicate = new HashRangeExpression();
-            predicate.setRanges(ranges);
+            predicate.setRanges(stream.ranges);
             predicate.setHashColumnIndex(table.getPartitioncolumn().getIndex());
         }
 
         return predicate;
     }
 
-    private static Map<Long, Integer> createTokensToAdd(Map<Integer, SortedMap<Long, Long>> newPartitions)
+    /**
+     * Look at all streams and consolidate the ranges of all streams.
+     * @return A map of tokens to partition IDs
+     */
+    private static Map<Long, Integer> createTokensToAdd(StreamSnapshotRequestConfig config)
     {
         ImmutableMap.Builder<Long, Integer> tokenBuilder = ImmutableMap.builder();
-        for (Entry<Integer, SortedMap<Long, Long>> entry : newPartitions.entrySet()) {
-            int partition = entry.getKey();
-            SortedMap<Long, Long> ranges = entry.getValue();
-            for (long token : ranges.keySet()) {
-                tokenBuilder.put(token, partition);
+        for (StreamSnapshotRequestConfig.Stream stream : config.streams) {
+            if (stream.partition != null && stream.ranges != null) {
+                for (long token : stream.ranges.keySet()) {
+                    tokenBuilder.put(token, stream.partition);
+                }
             }
         }
         return tokenBuilder.build();
@@ -283,6 +282,25 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             // Update EE hashinator
             Pair<TheHashinator.HashinatorType, byte[]> currentConfig = TheHashinator.getCurrentConfig();
             context.updateHashinator(currentConfig);
+        }
+    }
+
+    /**
+     * Encapsulates the information about a data target so that when we generate task for this
+     * table target, we can create the predicate associated with it.
+     */
+    private static class DataTargetInfo {
+        public final StreamSnapshotRequestConfig.Stream stream;
+        public final long srcHSId;
+        public final StreamSnapshotDataTarget dataTarget;
+
+        public DataTargetInfo(StreamSnapshotRequestConfig.Stream stream,
+                              long srcHSId,
+                              StreamSnapshotDataTarget dataTarget)
+        {
+            this.stream = stream;
+            this.srcHSId = srcHSId;
+            this.dataTarget = dataTarget;
         }
     }
 }
