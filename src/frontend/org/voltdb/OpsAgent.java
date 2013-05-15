@@ -34,9 +34,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
 
-import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.utils.CompressionService;
@@ -57,9 +55,9 @@ import org.voltdb.utils.CompressionService;
 // to create mailboxes for selectors and make them queryable, to avoid having
 // to keep adding well-known IDs for new services.
 // 3. Handling of null/empty cases is bad.
-public class OpsAgent {
+public abstract class OpsAgent {
 
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
+    protected static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final byte JSON_PAYLOAD = 0;
     private static final byte STATS_PAYLOAD = 1;
     private static final int MAX_IN_FLIGHT_REQUESTS = 5;
@@ -67,8 +65,8 @@ public class OpsAgent {
 
     private long m_nextRequestId = 0;
     private Mailbox m_mailbox;
-    private final ScheduledThreadPoolExecutor m_es =
-        org.voltcore.utils.CoreUtils.getScheduledThreadPoolExecutor("OpsAgent", 1, CoreUtils.SMALL_STACK_SIZE);
+    protected final String m_name;
+    private final ScheduledThreadPoolExecutor m_es;
 
     private HostMessenger m_messenger;
 
@@ -80,14 +78,14 @@ public class OpsAgent {
     // if the selector mapped to something that specified the number of
     // results, the call to get the stats, etc.
     //
-    private static class PendingStatsRequest {
+    protected static class PendingStatsRequest {
         private final OpsSelector selector;
-        private final String subselector;
+        protected final String subselector;
         private final Connection c;
         private final long clientData;
         private int expectedStatsResponses = 0;
-        private VoltTable[] aggregateTables = null;
-        private final long startTime;
+        protected VoltTable[] aggregateTables = null;
+        protected final long startTime;
         public PendingStatsRequest(
                 OpsSelector selector,
                 String subselector,
@@ -104,9 +102,20 @@ public class OpsAgent {
 
     private final Map<Long, PendingStatsRequest> m_pendingRequests = new HashMap<Long, PendingStatsRequest>();
 
-    public OpsAgent() {
+    public OpsAgent(String name) {
+        m_name = name;
+        m_es =
+            org.voltcore.utils.CoreUtils.getScheduledThreadPoolExecutor(m_name, 1,
+                    CoreUtils.SMALL_STACK_SIZE);
         m_messenger = null;
     }
+
+    abstract protected void dispatchFinalAggregations(PendingStatsRequest request);
+
+    abstract protected void collectStatsImpl(Connection c, long clientHandle, OpsSelector selector,
+            ParameterSet params) throws Exception;
+
+    abstract protected void handleJSONMessage(JSONObject obj) throws Exception;
 
     public void registerMailbox(final HostMessenger hostMessenger, final long hsId) {
         m_messenger = hostMessenger;
@@ -142,7 +151,7 @@ public class OpsAgent {
                 }
             }
         } catch (Exception e) {
-            hostLog.error("Exception processing message in stats agent " + message, e);
+            hostLog.error("Exception processing message in OpsAgent for " + m_name + ": " + message, e);
         }
 
     }
@@ -202,19 +211,6 @@ public class OpsAgent {
         sendStatsResponse(request);
     }
 
-    // Gets overridden in subclass
-    private void dispatchFinalAggregations(PendingStatsRequest request)
-    {
-    }
-
-    /**
-     * Need to release references to catalog related stats sources
-     * to avoid hoarding references to the catalog.
-     */
-    // Gets overridden in subclass
-    public synchronized void notifyOfCatalogUpdate() {
-    }
-
     public void collectStats(final Connection c, final long clientHandle, final OpsSelector selector,
             final ParameterSet params) throws Exception
     {
@@ -230,8 +226,8 @@ public class OpsAgent {
         });
     }
 
-    private void collectStatsImpl(Connection c, long clientHandle, OpsSelector selector,
-            ParameterSet params) throws Exception
+    protected void distributeWork(PendingStatsRequest newRequest, JSONObject obj)
+        throws Exception
     {
         if (m_pendingRequests.size() > MAX_IN_FLIGHT_REQUESTS) {
             /*
@@ -249,45 +245,14 @@ public class OpsAgent {
                 }
             }
             if (!foundExpiredRequest) {
-                sendErrorResponse(c, ClientResponse.GRACEFUL_FAILURE, "Too many pending stat requests",
-                        clientHandle);
+                sendErrorResponse(newRequest.c, ClientResponse.GRACEFUL_FAILURE,
+                        "Too many pending stat requests", newRequest.clientData);
                 return;
             }
         }
 
-        // ORIGINAL AGENT'S ORDER OF OPS:
-        // 1) PARSE PARAMS
-        // 1a) SEND ERROR RESPONSE IF THEY SUCK
-        // 2) CHECK TO SEE IF THE WORK IS LOCAL.  IF SO, DOIT AND RETURN
-        // 3) OTHERWISE, DISTRIBUTE STUFF TO OUR MINIONS AND THEN WAIT
-        // MAYBE THIS WHOLE BLOCK BETWEEN HERE AND BUILDING THE PSR
-        // GETS DISPATCHED TO THE SUBCLASS
-
-        // Or, implement the parse, implement some "checkLocal", otherwise go distributed
-
-        JSONObject obj = new JSONObject();
-        obj.put("selector", selector.name());
-        String err = parseParams(params, obj);
-        if (err != null) {
-            sendErrorResponse(c, ClientResponse.GRACEFUL_FAILURE, err, clientHandle);
-            return;
-        }
-        String subselector = obj.getString("subselector");
-
-        // if checkLocal(ARGS) {
-        //    doLocal(ARGS);
-        //    return;
-        // }
-
-        PendingStatsRequest psr =
-            new PendingStatsRequest(
-                    selector,
-                    subselector,
-                    c,
-                    clientHandle,
-                    System.currentTimeMillis());
         final long requestId = m_nextRequestId++;
-        m_pendingRequests.put(requestId, psr);
+        m_pendingRequests.put(requestId, newRequest);
         m_es.schedule(new Runnable() {
             @Override
             public void run() {
@@ -300,21 +265,14 @@ public class OpsAgent {
         // selector, subselector, interval filled in by parse...
         obj.put("requestId", requestId);
         obj.put("returnAddress", m_mailbox.getHSId());
+        int siteId = CoreUtils.getSiteIdFromHSId(m_mailbox.getHSId());
         byte payloadBytes[] = CompressionService.compressBytes(obj.toString(4).getBytes("UTF-8"));
         for (int hostId : m_messenger.getLiveHostIds()) {
-            long agentHsId = CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.STATS_SITE_ID);
-            psr.expectedStatsResponses++;
+            long agentHsId = CoreUtils.getHSIdFromHostAndSite(hostId, siteId);
+            newRequest.expectedStatsResponses++;
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[] {JSON_PAYLOAD}, payloadBytes);
             m_mailbox.send(agentHsId, bpm);
         }
-    }
-
-    // Parse the provided parameter set object and fill in subselector and interval into
-    // the provided JSONObject.  If there's an error, return that in the String, otherwise
-    // return null.  Yes, ugly.  Bang it out, then refactor later.
-    private String parseParams(ParameterSet params, JSONObject obj) throws Exception
-    {
-        return null;
     }
 
     private void checkForRequestTimeout(long requestId) {
@@ -322,14 +280,14 @@ public class OpsAgent {
         if (psr == null) {
             return;
         }
-        hostLog.warn("Stats request " + requestId + " timed out, sending error to client");
+        hostLog.warn("OPS request for " + m_name + ", " + requestId + " timed out, sending error to client");
 
         sendErrorResponse(psr.c, ClientResponse.GRACEFUL_FAILURE,
-                "Stats request hit sixty second timeout before all responses were received",
+                "OPS request hit sixty second timeout before all responses were received",
                 psr.clientData);
     }
 
-    private void sendStatsResponse(PendingStatsRequest request) {
+    protected void sendStatsResponse(PendingStatsRequest request) {
         byte statusCode = ClientResponse.SUCCESS;
         String statusString = null;
         /*
@@ -342,12 +300,13 @@ public class OpsAgent {
             responseTables = new VoltTable[0];
             statusCode = ClientResponse.GRACEFUL_FAILURE;
             statusString =
-                "Requested statistic \"" + request.subselector +
+                "Requested info \"" + request.subselector +
                 "\" is not yet available or not supported in the current configuration.";
         }
 
         ClientResponseImpl response =
-            new ClientResponseImpl(statusCode, ClientResponse.UNINITIALIZED_APP_STATUS_CODE, null, responseTables, statusString);
+            new ClientResponseImpl(statusCode, ClientResponse.UNINITIALIZED_APP_STATUS_CODE, null,
+                    responseTables, statusString);
         response.setClientHandle(request.clientData);
         ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
         buf.putInt(buf.capacity() - 4);
@@ -355,19 +314,10 @@ public class OpsAgent {
         request.c.writeStream().enqueue(buf);
     }
 
-    // Becomes overridden in subclass
-    private VoltTable[] collectStuff(JSONObject obj) {
-        return null;
-    }
-
-    private void handleJSONMessage(JSONObject obj) throws Exception {
+    protected void sendOpsResponse(VoltTable[] results, JSONObject obj) throws Exception
+    {
         long requestId = obj.getLong("requestId");
         long returnAddress = obj.getLong("returnAddress");
-
-        VoltTable[] results = null;
-
-        results = collectStuff(obj);  // override in subclass
-
         // Send a response with no data since the stats is not supported or not yet available
         if (results == null) {
             ByteBuffer responseBuffer = ByteBuffer.allocate(8);
@@ -399,10 +349,6 @@ public class OpsAgent {
 
         BinaryPayloadMessage bpm = new BinaryPayloadMessage( new byte[] {STATS_PAYLOAD}, responseBytes);
         m_mailbox.send(returnAddress, bpm);
-
-    }
-
-    public synchronized void registerStatsSource(StatsSelector selector, long siteId, StatsSource source) {
     }
 
     public void shutdown() throws InterruptedException {
@@ -410,7 +356,7 @@ public class OpsAgent {
         m_es.awaitTermination(1, TimeUnit.DAYS);
     }
 
-    void sendErrorResponse(Connection c, byte status, String reason, long handle)
+    protected void sendErrorResponse(Connection c, byte status, String reason, long handle)
     {
         ClientResponseImpl errorResponse = new ClientResponseImpl(status, new VoltTable[0], reason, handle);
         ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
