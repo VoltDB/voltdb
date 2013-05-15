@@ -150,7 +150,7 @@ public class StatsAgent {
                     handleStatsResponse(payload);
                 }
             }
-        } catch (Throwable e) {
+        } catch (Exception e) {
             hostLog.error("Exception processing message in stats agent " + message, e);
         }
 
@@ -270,7 +270,7 @@ public class StatsAgent {
             public void run() {
                 try {
                     collectStatsImpl(c, clientHandle, selector, params);
-                } catch (Throwable e) {
+                } catch (Exception e) {
                     hostLog.warn("Exception while attempting to collect stats", e);
                 }
             }
