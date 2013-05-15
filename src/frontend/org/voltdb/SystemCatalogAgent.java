@@ -230,28 +230,6 @@ public class SystemCatalogAgent {
     private void collectStatsImpl(Connection c, long clientHandle, OpsSelector selector,
             ParameterSet params) throws Exception
     {
-        if (m_pendingRequests.size() > MAX_IN_FLIGHT_REQUESTS) {
-            /*
-             * Defensively check for an expired request not caught
-             * by timeout check. Should never happen.
-             */
-            Iterator<PendingStatsRequest> iter = m_pendingRequests.values().iterator();
-            final long now = System.currentTimeMillis();
-            boolean foundExpiredRequest = false;
-            while (iter.hasNext()) {
-                PendingStatsRequest psr = iter.next();
-                if (now - psr.startTime > STATS_COLLECTION_TIMEOUT * 2) {
-                    iter.remove();
-                    foundExpiredRequest = true;
-                }
-            }
-            if (!foundExpiredRequest) {
-                sendErrorResponse(c, ClientResponse.GRACEFUL_FAILURE, "Too many pending stat requests",
-                        clientHandle);
-                return;
-            }
-        }
-
         JSONObject obj = new JSONObject();
         obj.put("selector", selector.name());
         String err = null;
@@ -281,6 +259,27 @@ public class SystemCatalogAgent {
             return;
         }
 
+        if (m_pendingRequests.size() > MAX_IN_FLIGHT_REQUESTS) {
+            /*
+             * Defensively check for an expired request not caught
+             * by timeout check. Should never happen.
+             */
+            Iterator<PendingStatsRequest> iter = m_pendingRequests.values().iterator();
+            final long now = System.currentTimeMillis();
+            boolean foundExpiredRequest = false;
+            while (iter.hasNext()) {
+                PendingStatsRequest psr = iter.next();
+                if (now - psr.startTime > STATS_COLLECTION_TIMEOUT * 2) {
+                    iter.remove();
+                    foundExpiredRequest = true;
+                }
+            }
+            if (!foundExpiredRequest) {
+                sendErrorResponse(c, ClientResponse.GRACEFUL_FAILURE, "Too many pending stat requests",
+                        clientHandle);
+                return;
+            }
+        }
         // Nothing below here is actually reached for SYSTEMCATALOG, keeping it for
         // refactor reference later
         PendingStatsRequest psr =
