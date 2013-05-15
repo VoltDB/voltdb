@@ -1,0 +1,10 @@
+DDL:
+./joins/ddl.sql
+
+SQL:
+SELECT c1.name2, c1.name1, c2.ts, count(*), sum(c2.value * c3.factor) FROM c2, c4, c5, c1, c3 WHERE c3.b = ? AND c2.ts BETWEEN ? AND ? AND c1.y = ? AND c4.f = ? AND c4.partitionkey = c5.partitionkey AND c2.partitionkey = c5.partitionkey AND c2.e = c1.e AND c2.a = c3.a AND c3.ts = c2.ts AND c3.g = c5.g GROUP BY c1.name2, c1.name1, c2.ts;
+SELECT * FROM c4, c5 WHERE c4.partitionkey = c5.partitionkey AND c4.f = ? AND c5.g = 7;
+SELECT * FROM c1, c5 WHERE c1.y = c5.partitionkey AND c1.e = ? AND c5.g = 7;
+SELECT * FROM c1, c4, c5 WHERE c1.y = c5.partitionkey AND c4.partitionkey = c5.partitionkey AND c4.f = ? AND c1.e = ? AND c5.g = 7;
+SELECT * FROM c1, c4, c5 WHERE c4.partitionkey = c5.partitionkey AND c4.f = ? AND c1.e = ? AND c5.g = 7;
+
