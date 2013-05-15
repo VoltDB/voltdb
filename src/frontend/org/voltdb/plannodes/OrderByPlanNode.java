@@ -24,7 +24,10 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
+import org.voltdb.compiler.DatabaseEstimates;
+import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
@@ -180,6 +183,28 @@ public class OrderByPlanNode extends AbstractPlanNode {
             int index = input_schema.getIndexOfTve(tve);
             tve.setColumnIndex(index);
         }
+    }
+
+    @Override
+    public void computeCostEstimates(long childOutputTupleCountEstimate,
+                                     Cluster cluster,
+                                     Database db,
+                                     DatabaseEstimates estimates,
+                                     ScalarValueHints[] paramHints)
+    {
+        // This method doesn't do anything besides what the parent method does,
+        // but it is a nice place to put a comment. Really, sorts should be pretty
+        // expensive and they're not costed as such yet because sometimes that
+        // backfires in our simplistic model.
+        //
+        // What's really interesting here is costing an index scan who has sorted
+        // output vs. an index scan that filters out a bunch of tuples, but still
+        // requires a sort. Which is best depends on how well the filter reduces the
+        // number of tuples, and that's not possible for us to know right now.
+        // The index scanner cost has been pretty carefully set up to do what we think
+        // we want, given the lack of table stats.
+        m_estimatedOutputTupleCount = childOutputTupleCountEstimate;
+        m_estimatedProcessedTupleCount = childOutputTupleCountEstimate;
     }
 
     @Override
