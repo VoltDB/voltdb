@@ -82,6 +82,7 @@ public class TestClientInterface {
     // mocked objects that CI requires
     private VoltDBInterface m_volt;
     private StatsAgent m_statsAgent;
+    private SystemInformationAgent m_sysinfoAgent;
     private HostMessenger m_messenger;
     private ClientInputHandler m_handler;
     private Cartographer m_cartographer;
@@ -109,6 +110,7 @@ public class TestClientInterface {
         // Set up CI with the mock objects.
         m_volt = mock(VoltDBInterface.class);
         m_statsAgent = mock(StatsAgent.class);
+        m_sysinfoAgent = mock(SystemInformationAgent.class);
         m_messenger = mock(HostMessenger.class);
         m_handler = mock(ClientInputHandler.class);
         m_cartographer = mock(Cartographer.class);
@@ -122,6 +124,7 @@ public class TestClientInterface {
          */
         VoltDB.replaceVoltDBInstanceForTest(m_volt);
         doReturn(m_statsAgent).when(m_volt).getStatsAgent();
+        doReturn(m_sysinfoAgent).when(m_volt).getSystemInformationAgent();
         doReturn(mock(SnapshotCompletionMonitor.class)).when(m_volt).getSnapshotCompletionMonitor();
         doReturn(m_messenger).when(m_volt).getHostMessenger();
         doReturn(mock(VoltNetworkPool.class)).when(m_messenger).getNetwork();
@@ -450,7 +453,7 @@ public class TestClientInterface {
         ByteBuffer msg = createMsg("@SystemInformation");
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
-        verify(m_statsAgent).collectStats(any(Connection.class), anyInt(), eq(OpsSelector.SYSTEMINFORMATION),
+        verify(m_sysinfoAgent).collectStats(any(Connection.class), anyInt(), eq(OpsSelector.SYSTEMINFORMATION),
                 any(ParameterSet.class));
     }
 

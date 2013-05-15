@@ -184,7 +184,7 @@ public class TestStatsAgent {
             VoltTable results[] = response.getResults();
             assertEquals(0, results.length);
             assertEquals(
-                    "Requested statistic \"" + selector.name() + "\" is not yet available or not " +
+                    "Requested info \"" + selector.name() + "\" is not yet available or not " +
                     "supported in the current configuration.",
                     response.getStatusString());
         }
@@ -202,9 +202,8 @@ public class TestStatsAgent {
         VoltTable results[] = response.getResults();
         assertEquals(0, results.length);
         System.out.println(response.getStatusString());
-        assertTrue(
-                "Stats request hit sixty second timeout before all responses were received".equals(
-                response.getStatusString()));
+        assertEquals("OPS request hit sixty second timeout before all responses were received",
+                response.getStatusString());
     }
 
     @Test
