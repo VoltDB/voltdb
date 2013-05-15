@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
@@ -37,7 +36,6 @@ import org.voltcore.network.Connection;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 
-import org.voltdb.sysprocs.SystemInformation;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.LocalMailbox;
@@ -213,16 +211,13 @@ public class StatsAgent {
 
     private void dispatchFinalAggregations(PendingStatsRequest request)
     {
-        // Only applies to STATISTICS for now
-        if (request.selector == OpsSelector.STATISTICS) {
-            StatsSelector subselector = StatsSelector.valueOf(request.subselector);
-            switch (subselector) {
-                case PROCEDUREPROFILE:
-                    request.aggregateTables =
-                        aggregateProcedureProfileStats(request.aggregateTables);
-                    break;
-                default:
-            }
+        StatsSelector subselector = StatsSelector.valueOf(request.subselector);
+        switch (subselector) {
+            case PROCEDUREPROFILE:
+                request.aggregateTables =
+                    aggregateProcedureProfileStats(request.aggregateTables);
+                break;
+            default:
         }
     }
 
@@ -303,19 +298,13 @@ public class StatsAgent {
         }
 
         JSONObject obj = new JSONObject();
-        obj.put("selector", selector.name());
+        obj.put("selector", "STATISTICS");
         String err = null;
         if (selector == OpsSelector.STATISTICS) {
             err = parseParamsForStatistics(params, obj);
         }
-        else if (selector == OpsSelector.SYSTEMCATALOG) {
-            err = parseParamsForSystemCatalog(params, obj);
-        }
-        else if (selector == OpsSelector.SYSTEMINFORMATION) {
-            err = parseParamsForSystemInformation(params, obj);
-        }
         else {
-            err = "Unknown OPS selector: " + selector.name();
+            err = "StatsAgent received non-STATISTICS selector: " + selector.name();
         }
         if (err != null) {
             sendErrorResponse(c, ClientResponse.GRACEFUL_FAILURE, err, clientHandle);
@@ -343,27 +332,6 @@ public class StatsAgent {
                 clientHandle,
                 System.currentTimeMillis());
             collectPartitionCount(psr);
-            return;
-        }
-        // All system catalog selectors are currently local, can all get serviced here
-        else if (selector == OpsSelector.SYSTEMCATALOG) {
-            PendingStatsRequest psr = new PendingStatsRequest(
-                selector,
-                subselector,
-                c,
-                clientHandle,
-                System.currentTimeMillis());
-            collectSystemCatalog(psr);
-            return;
-        }
-        else if (selector == OpsSelector.SYSTEMINFORMATION && subselector.equalsIgnoreCase("DEPLOYMENT")) {
-            PendingStatsRequest psr = new PendingStatsRequest(
-                selector,
-                subselector,
-                c,
-                clientHandle,
-                System.currentTimeMillis());
-            collectSystemInformationDeployment(psr);
             return;
         }
 
@@ -431,51 +399,6 @@ public class StatsAgent {
         return null;
     }
 
-    private String parseParamsForSystemCatalog(ParameterSet params, JSONObject obj) throws Exception
-    {
-        if (params.toArray().length != 1) {
-            return "Incorrect number of arguments to @SystemCatalog (expects 1, received " +
-                    params.toArray().length + ")";
-        }
-        Object first = params.toArray()[0];
-        if (!(first instanceof String)) {
-            return "First argument to @SystemCatalog must be a valid STRING selector, instead was " +
-                    first;
-        }
-        // Would be nice to have subselector validation here, maybe.  Maybe later.
-        String subselector = (String)first;
-        obj.put("subselector", subselector);
-        obj.put("interval", false);
-
-        return null;
-    }
-
-    private String parseParamsForSystemInformation(ParameterSet params, JSONObject obj) throws Exception
-    {
-        // Default with no args is OVERVIEW
-        String subselector = "OVERVIEW";
-        if (params.toArray().length > 1) {
-            return "Incorrect number of arguments to @SystemInformation (expects 1, received " +
-                    params.toArray().length + ")";
-        }
-        if (params.toArray().length == 1) {
-            Object first = params.toArray()[0];
-            if (!(first instanceof String)) {
-                return "First argument to @SystemInformation must be a valid STRING selector, instead was " +
-                    first;
-            }
-            subselector = (String)first;
-            if (!(subselector.equalsIgnoreCase("OVERVIEW") || subselector.equalsIgnoreCase("DEPLOYMENT"))) {
-                return "Invalid @SystemInformation selector " + subselector;
-            }
-        }
-        // Would be nice to have subselector validation here, maybe.  Maybe later.
-        obj.put("subselector", subselector);
-        obj.put("interval", false);
-
-        return null;
-    }
-
     private void checkForRequestTimeout(long requestId) {
         PendingStatsRequest psr = m_pendingRequests.remove(requestId);
         if (psr == null) {
@@ -524,11 +447,8 @@ public class StatsAgent {
         if (selector == OpsSelector.STATISTICS) {
             results = collectDistributedStats(obj);
         }
-        else if (selector == OpsSelector.SYSTEMINFORMATION) {
-            results = collectSystemInformation(obj);
-        }
         else {
-            hostLog.warn("Unknown selector provided to OPS path: " + selector);
+            hostLog.warn("StatsAgent received a non-STATISTICS OPS selector: " + selector);
         }
 
         // Send a response with no data since the stats is not supported or not yet available
@@ -599,23 +519,6 @@ public class StatsAgent {
         }
         psr.aggregateTables = tables;
 
-        try {
-            sendStatsResponse(psr);
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Unable to return PARTITIONCOUNT to client", true, e);
-        }
-    }
-
-    private void collectSystemCatalog(PendingStatsRequest psr)
-    {
-        VoltTable results = VoltDB.instance().getCatalogContext().m_jdbc.getMetaData(psr.subselector);
-        if (results == null) {
-            sendErrorResponse(psr.c, ClientResponse.GRACEFUL_FAILURE,
-                    "Invalid @SystemCatalog selector: " + psr.subselector, psr.clientData);
-            return;
-        }
-        psr.aggregateTables = new VoltTable[1];
-        psr.aggregateTables[0] = results;
         try {
             sendStatsResponse(psr);
         } catch (Exception e) {
@@ -905,43 +808,6 @@ public class StatsAgent {
         stats[6] = sStats[0];
 
         return stats;
-    }
-
-    private VoltTable[] collectSystemInformation(JSONObject obj) throws JSONException
-    {
-        String subselector = obj.getString("subselector");
-        VoltTable[] tables = null;
-        VoltTable result = null;
-        if (subselector.toUpperCase().equals("OVERVIEW"))
-        {
-            result = SystemInformation.populateOverviewTable();
-        }
-
-        if (result != null)
-        {
-            tables = new VoltTable[1];
-            tables[0] = result;
-        }
-        return tables;
-    }
-
-    private void collectSystemInformationDeployment(PendingStatsRequest psr)
-    {
-        VoltTable result =
-                SystemInformation.populateDeploymentProperties(VoltDB.instance().getCatalogContext().cluster,
-                        VoltDB.instance().getCatalogContext().database);
-        if (result == null) {
-            sendErrorResponse(psr.c, ClientResponse.GRACEFUL_FAILURE,
-                    "Unable to collect DEPLOYMENT information for @SystemInformation", psr.clientData);
-            return;
-        }
-        psr.aggregateTables = new VoltTable[1];
-        psr.aggregateTables[0] = result;
-        try {
-            sendStatsResponse(psr);
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Unable to return PARTITIONCOUNT to client", true, e);
-        }
     }
 
     public synchronized void registerStatsSource(StatsSelector selector, long siteId, StatsSource source) {
