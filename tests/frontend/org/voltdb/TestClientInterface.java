@@ -450,7 +450,7 @@ public class TestClientInterface {
         ByteBuffer msg = createMsg("@SystemInformation");
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
-        verify(m_statsAgent).collectStats(any(Connection.class), anyInt(), eq("SYSTEMINFORMATION"),
+        verify(m_statsAgent).collectStats(any(Connection.class), anyInt(), eq(OpsSelector.SYSTEMINFORMATION),
                 any(ParameterSet.class));
     }
 
@@ -463,7 +463,8 @@ public class TestClientInterface {
         ByteBuffer msg = createMsg("@Statistics", "DR", 0);
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
-        verify(m_statsAgent).collectStats(any(Connection.class), anyInt(), eq("STATISTICS"), any(ParameterSet.class));
+        verify(m_statsAgent).collectStats(any(Connection.class), anyInt(), eq(OpsSelector.STATISTICS),
+                any(ParameterSet.class));
     }
 
     @Test

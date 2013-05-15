@@ -86,7 +86,7 @@ public class StatsAgent {
     // results, the call to get the stats, etc.
     //
     private static class PendingStatsRequest {
-        private final String selector;
+        private final OpsSelector selector;
         private final String subselector;
         private final Connection c;
         private final long clientData;
@@ -94,7 +94,7 @@ public class StatsAgent {
         private VoltTable[] aggregateTables = null;
         private final long startTime;
         public PendingStatsRequest(
-                String selector,
+                OpsSelector selector,
                 String subselector,
                 Connection c,
                 long clientData,
@@ -214,7 +214,7 @@ public class StatsAgent {
     private void dispatchFinalAggregations(PendingStatsRequest request)
     {
         // Only applies to STATISTICS for now
-        if (request.selector.equalsIgnoreCase("STATISTICS")) {
+        if (request.selector == OpsSelector.STATISTICS) {
             StatsSelector subselector = StatsSelector.valueOf(request.subselector);
             switch (subselector) {
                 case PROCEDUREPROFILE:
@@ -262,7 +262,7 @@ public class StatsAgent {
         siteIdToStatsSources.clear();
     }
 
-    public void collectStats(final Connection c, final long clientHandle, final String selector,
+    public void collectStats(final Connection c, final long clientHandle, final OpsSelector selector,
             final ParameterSet params) throws Exception
     {
         m_es.submit(new Runnable() {
@@ -277,7 +277,7 @@ public class StatsAgent {
         });
     }
 
-    private void collectStatsImpl(Connection c, long clientHandle, String selector,
+    private void collectStatsImpl(Connection c, long clientHandle, OpsSelector selector,
             ParameterSet params) throws Exception
     {
         if (m_pendingRequests.size() > MAX_IN_FLIGHT_REQUESTS) {
@@ -303,19 +303,19 @@ public class StatsAgent {
         }
 
         JSONObject obj = new JSONObject();
-        obj.put("selector", selector);
+        obj.put("selector", selector.name());
         String err = null;
-        if (selector.equalsIgnoreCase("STATISTICS")) {
+        if (selector == OpsSelector.STATISTICS) {
             err = parseParamsForStatistics(params, obj);
         }
-        else if (selector.equalsIgnoreCase("SYSTEMCATALOG")) {
+        else if (selector == OpsSelector.SYSTEMCATALOG) {
             err = parseParamsForSystemCatalog(params, obj);
         }
-        else if (selector.equalsIgnoreCase("SYSTEMINFORMATION")) {
+        else if (selector == OpsSelector.SYSTEMINFORMATION) {
             err = parseParamsForSystemInformation(params, obj);
         }
         else {
-            err = "Unknown OPS selector: " + selector;
+            err = "Unknown OPS selector: " + selector.name();
         }
         if (err != null) {
             sendErrorResponse(c, ClientResponse.GRACEFUL_FAILURE, err, clientHandle);
@@ -325,7 +325,7 @@ public class StatsAgent {
 
         // Some selectors can provide a single answer based on global data.
         // Intercept them and respond before doing the distributed stuff.
-        if (selector.equalsIgnoreCase("STATISTICS") && subselector.equalsIgnoreCase("TOPO")) {
+        if (selector == OpsSelector.STATISTICS && subselector.equalsIgnoreCase("TOPO")) {
             PendingStatsRequest psr = new PendingStatsRequest(
                 selector,
                 subselector,
@@ -335,7 +335,7 @@ public class StatsAgent {
             collectTopoStats(psr);
             return;
         }
-        else if (selector.equalsIgnoreCase("STATISTICS") && subselector.equalsIgnoreCase("PARTITIONCOUNT")) {
+        else if (selector == OpsSelector.STATISTICS && subselector.equalsIgnoreCase("PARTITIONCOUNT")) {
             PendingStatsRequest psr = new PendingStatsRequest(
                 selector,
                 subselector,
@@ -346,7 +346,7 @@ public class StatsAgent {
             return;
         }
         // All system catalog selectors are currently local, can all get serviced here
-        else if (selector.equalsIgnoreCase("SYSTEMCATALOG")) {
+        else if (selector == OpsSelector.SYSTEMCATALOG) {
             PendingStatsRequest psr = new PendingStatsRequest(
                 selector,
                 subselector,
@@ -356,7 +356,7 @@ public class StatsAgent {
             collectSystemCatalog(psr);
             return;
         }
-        else if (selector.equalsIgnoreCase("SYSTEMINFORMATION") && subselector.equalsIgnoreCase("DEPLOYMENT")) {
+        else if (selector == OpsSelector.SYSTEMINFORMATION && subselector.equalsIgnoreCase("DEPLOYMENT")) {
             PendingStatsRequest psr = new PendingStatsRequest(
                 selector,
                 subselector,
@@ -520,11 +520,11 @@ public class StatsAgent {
 
         VoltTable[] results = null;
 
-        String selector = obj.getString("selector");
-        if (selector.equalsIgnoreCase("STATISTICS")) {
+        OpsSelector selector = OpsSelector.valueOf(obj.getString("selector").toUpperCase());
+        if (selector == OpsSelector.STATISTICS) {
             results = collectDistributedStats(obj);
         }
-        else if (selector.equalsIgnoreCase("SYSTEMINFORMATION")) {
+        else if (selector == OpsSelector.SYSTEMINFORMATION) {
             results = collectSystemInformation(obj);
         }
         else {
