@@ -35,8 +35,6 @@ import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.PlanStatistics;
-import org.voltdb.planner.StatsField;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.PlanNodeType;
@@ -276,7 +274,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
 
         // HOW WE COST INDEXES
         // unique, covering index always wins
@@ -289,7 +287,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         Table target = db.getTables().getIgnoreCase(m_targetTableName);
         assert(target != null);
         DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(target.getTypeName());
-        stats.incrementStatistic(0, StatsField.TREE_INDEX_LEVELS_TRAVERSED, (long)(Math.log(tableEstimates.maxTuples)));
 
         // get the width of the index and number of columns used
         // need doubles for math
@@ -349,12 +346,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             }
         }
 
-        stats.incrementStatistic(0, StatsField.TUPLES_READ, tuplesToRead);
         // This tuplesToRead value estimates the number of base table tuples fetched from the index scan.
         // It's a vague measure of the cost of the scan whose accuracy depends a lot on what kind of
         // post-filtering needs to happen.
         // The tuplesRead value is also used here to estimate the number of RESULT rows.
-        // This valus is estimated without regard to any post-filtering effect there might be
+        // This value is estimated without regard to any post-filtering effect there might be
         // -- as if all rows found in the index passed any additional post-filter conditions.
         // This ignoring of post-filter effects is at least consistent with the processing in SeqScanPlanNode.
         // In effect, it gives index scans an "unfair" advantage -- follow-on sorts (etc.) are costed lower
@@ -364,6 +360,12 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         // In any case, it's important to keep this code roughly in synch with any changes
         // to SeqScanPlanNode's costing to make sure that SeqScanPlanNode never gains an unfair advantage.
         m_estimatedOutputTupleCount = tuplesToRead;
+        m_estimatedProcessedTupleCount = tuplesToRead;
+
+        // special case a unique match for the output count
+        if (m_catalogIndex.getUnique() && (colCount == keyWidth)) {
+            m_estimatedOutputTupleCount = 1;
+        }
     }
 
     @Override
