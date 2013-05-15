@@ -1691,8 +1691,23 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     ClientResponseImpl dispatchStatistics(OpsSelector selector, StoredProcedureInvocation task, Connection ccxn)
     {
         try {
-            VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, selector,
-                    task.getParams());
+            if (selector == OpsSelector.STATISTICS) {
+                VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, selector,
+                        task.getParams());
+            }
+            else if (selector == OpsSelector.SYSTEMCATALOG) {
+                VoltDB.instance().getSystemCatalogAgent().collectStats(ccxn, task.clientHandle, selector,
+                        task.getParams());
+            }
+            else if (selector == OpsSelector.SYSTEMINFORMATION) {
+                VoltDB.instance().getSystemInformationAgent().collectStats(ccxn, task.clientHandle, selector,
+                        task.getParams());
+            }
+            else {
+                return errorResponse(ccxn, task.clientHandle, ClientResponse.GRACEFUL_FAILURE,
+                        "Unknown OPS selector", null, true);
+            }
+
             return null;
         } catch (Exception e) {
             return errorResponse( ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);

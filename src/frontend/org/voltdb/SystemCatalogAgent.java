@@ -390,7 +390,7 @@ public class SystemCatalogAgent {
         obj.put("returnAddress", m_mailbox.getHSId());
         byte payloadBytes[] = CompressionService.compressBytes(obj.toString(4).getBytes("UTF-8"));
         for (int hostId : m_messenger.getLiveHostIds()) {
-            long agentHsId = CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.STATS_SITE_ID);
+            long agentHsId = CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.SYSCATALOG_SITE_ID);
             psr.expectedStatsResponses++;
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[] {JSON_PAYLOAD}, payloadBytes);
             m_mailbox.send(agentHsId, bpm);
