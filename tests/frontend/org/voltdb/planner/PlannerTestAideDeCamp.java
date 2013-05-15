@@ -73,7 +73,7 @@ public class PlannerTestAideDeCamp {
         String schemaPath = URLDecoder.decode(ddlurl.getPath(), "UTF-8");
         VoltCompiler compiler = new VoltCompiler();
         hsql = HSQLInterface.loadHsqldb();
-        VoltCompiler.DdlProceduresToLoad no_procs = DdlProceduresToLoad.NoDdlProcedures;
+        VoltCompiler.DdlProceduresToLoad no_procs = DdlProceduresToLoad.NO_DDL_PROCEDURES;
         catalog = compiler.loadSchema(hsql, no_procs, schemaPath);
         db = compiler.getCatalogDatabase();
         proc = db.getProcedures().add(basename);

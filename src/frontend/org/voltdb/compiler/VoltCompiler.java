@@ -577,7 +577,7 @@ public class VoltCompiler {
 
     public static enum DdlProceduresToLoad
     {
-        NoDdlProcedures, OnlySingleStatementDdlProcedures, AllDdlProcedures
+        NO_DDL_PROCEDURES, ONLY_SINGLE_STATEMENT_PROCEDURES, ALL_DDL_PROCEDURES
     }
 
 
@@ -655,8 +655,7 @@ public class VoltCompiler {
             }
         }
 
-        //TODO: Is this class dependency feature really used?
-        // -- Paul couldn't quite trace back to a source for these entries.
+        // classdependencies/classdependency
         if (database.getClassdependencies() != null) {
             for (Classdependency dep : database.getClassdependencies().getClassdependency()) {
                 classDependencies.add(getClassDependency(dep));
@@ -673,7 +672,7 @@ public class VoltCompiler {
         // shutdown and make a new hsqldb
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
         compileDatabase(db, hsql, voltDdlTracker, schemas, database.getExport(), classDependencies,
-                        DdlProceduresToLoad.AllDdlProcedures);
+                        DdlProceduresToLoad.ALL_DDL_PROCEDURES);
     }
 
     /**
@@ -813,7 +812,7 @@ public class VoltCompiler {
             compileExport(export, db);
         }
 
-        if (whichProcs != DdlProceduresToLoad.NoDdlProcedures) {
+        if (whichProcs != DdlProceduresToLoad.NO_DDL_PROCEDURES) {
             Collection<ProcedureDescriptor> allProcs = voltDdlTracker.getProcedureDescriptors();
             compileProcedures(db, hsql, allProcs, classDependencies, whichProcs);
         }
@@ -841,7 +840,7 @@ public class VoltCompiler {
         // (non-stored-procedure) class loading into the catalog jar,
         // planner-only testing would find it convenient to ignore those
         // dependencies for its "dry run" on an unchanged application ddl file.
-        if (whichProcs == DdlProceduresToLoad.AllDdlProcedures) {
+        if (whichProcs == DdlProceduresToLoad.ALL_DDL_PROCEDURES) {
             // Add all the class dependencies to the output jar
             for (final Class<?> classDependency : classDependencies) {
                 addClassToJar(classDependency);
@@ -861,7 +860,7 @@ public class VoltCompiler {
                 m_currentFilename = procedureName.substring(procedureName.lastIndexOf('.') + 1);
                 m_currentFilename += ".class";
             }
-            else if (whichProcs == DdlProceduresToLoad.OnlySingleStatementDdlProcedures) {
+            else if (whichProcs == DdlProceduresToLoad.ONLY_SINGLE_STATEMENT_PROCEDURES) {
                 // In planner test mode, especially within the plannerTester framework,
                 // ignore any java procedures referenced in ddl CREATE PROCEDURE statements to allow
                 // re-use of actual application ddl files without introducing class dependencies.
