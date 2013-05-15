@@ -70,6 +70,7 @@ import org.voltcore.utils.COWMap;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
+import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
@@ -97,7 +98,7 @@ import org.voltdb.iv2.TxnEgo;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.rejoin.Iv2RejoinCoordinator;
-import org.voltdb.rejoin.RejoinCoordinator;
+import org.voltdb.rejoin.JoinCoordinator;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.HTTPAdminListener;
@@ -209,7 +210,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private long m_executionSiteRecoveryTransferred;
 
     // Rejoin coordinator
-    private RejoinCoordinator m_rejoinCoordinator = null;
+    private JoinCoordinator m_joinCoordinator = null;
 
     // id of the leader, or the host restore planner says has the catalog
     int m_hostIdWithStartupCatalog;
@@ -348,7 +349,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 isRejoin = true;
             }
             m_rejoining = isRejoin;
-            m_rejoinDataPending = isRejoin;
+            m_rejoinDataPending = isRejoin || config.m_startAction == StartAction.JOIN;
 
             m_joining = config.m_startAction == StartAction.JOIN;
 
@@ -402,16 +403,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // when we construct it below
             m_globalServiceElector = new GlobalServiceElector(m_messenger.getZK(), m_messenger.getHostId());
 
-            Joiner joinCoordinator = null;
             if (m_joining) {
-                Class<?> joinerClass = MiscUtils.loadProClass("org.voltdb.JoinerImpl", "Elastic", false);
+                Class<?> elasticJoinCoordClass =
+                        MiscUtils.loadProClass("org.voltdb.join.ElasticJoinCoordinator", "Elastic", false);
                 try {
-                    Constructor<?> constructor = joinerClass.getConstructor(HostMessenger.class);
-                    joinCoordinator = (Joiner) constructor.newInstance(m_messenger);
-                    m_rejoinCoordinator = joinCoordinator;
-                    m_messenger.registerMailbox(m_rejoinCoordinator);
+                    Constructor<?> constructor = elasticJoinCoordClass.getConstructor(HostMessenger.class);
+                    m_joinCoordinator = (JoinCoordinator) constructor.newInstance(m_messenger);
+                    m_messenger.registerMailbox(m_joinCoordinator);
+                    m_joinCoordinator.initialize(m_deployment.getCluster().getKfactor());
                 } catch (Exception e) {
-                    VoltDB.crashLocalVoltDB("Failed to instantiate joiner", true, e);
+                    VoltDB.crashLocalVoltDB("Failed to instantiate join coordinator", true, e);
                 }
             }
 
@@ -428,7 +429,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
              * Then it does a compare and set of the topology.
              */
             ClusterConfig clusterConfig = null;
-            JSONObject topo = getTopology(config.m_startAction, joinCoordinator);
+            JSONObject topo = getTopology(config.m_startAction, m_joinCoordinator);
             m_partitionsToSitesAtStartupForExportInit = new ArrayList<Pair<Integer, Long>>();
             try {
                 clusterConfig = new ClusterConfig(topo);
@@ -449,7 +450,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     }
                     else if (m_joining) {
                         // Ask the joiner for the new partitions to create on this node.
-                        partitions = joinCoordinator.getPartitionsToAdd();
+                        partitions = m_joinCoordinator.getPartitionsToAdd();
                     }
                     else {
                         partitions = ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
@@ -474,21 +475,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 clusterConfig = new ClusterConfig(topo);
 
                 // Make a list of HDIds to join
-                List<Long> hsidsToRejoin = new ArrayList<Long>();
+                Map<Integer, Long> partsToHSIdsToRejoin = new HashMap<Integer, Long>();
                 for (Initiator init : m_iv2Initiators) {
                     if (init.isRejoinable()) {
-                        hsidsToRejoin.add(init.getInitiatorHSId());
+                        partsToHSIdsToRejoin.put(init.getPartitionId(), init.getInitiatorHSId());
                     }
                 }
 
                 if (isRejoin && isIV2Enabled()) {
-                    SnapshotSaveAPI.recoveringSiteCount.set(hsidsToRejoin.size());
-                    hostLog.info("Set recovering site count to " + hsidsToRejoin.size());
+                    SnapshotSaveAPI.recoveringSiteCount.set(partsToHSIdsToRejoin.size());
+                    hostLog.info("Set recovering site count to " + partsToHSIdsToRejoin.size());
 
-                    m_rejoinCoordinator = new Iv2RejoinCoordinator(m_messenger, hsidsToRejoin,
+                    m_joinCoordinator = new Iv2RejoinCoordinator(m_messenger, partsToHSIdsToRejoin.values(),
                             m_catalogContext.cluster.getVoltroot(),
                             m_config.m_startAction == StartAction.LIVE_REJOIN);
-                    m_messenger.registerMailbox(m_rejoinCoordinator);
+                    m_messenger.registerMailbox(m_joinCoordinator);
                     if (m_config.m_startAction == StartAction.LIVE_REJOIN) {
                         hostLog.info("Using live rejoin.");
                     }
@@ -496,7 +497,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         hostLog.info("Using blocking rejoin.");
                     }
                 } else if (m_joining) {
-                    joinCoordinator.setSites(hsidsToRejoin);
+                    m_joinCoordinator.setPartitionsToHSIds(partsToHSIdsToRejoin);
                 }
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
@@ -738,7 +739,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     // Get topology information.  If rejoining, get it directly from
     // ZK.  Otherwise, try to do the write/read race to ZK on startup.
-    private JSONObject getTopology(StartAction startAction, Joiner joinCoordinator)
+    private JSONObject getTopology(StartAction startAction, JoinCoordinator joinCoordinator)
     {
         JSONObject topo = null;
         if (startAction == StartAction.JOIN) {
@@ -909,6 +910,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_messenger.setDeadHostTimeout(m_config.m_deadHostTimeoutMS);
             } else {
                 hostLog.info("Dead host timeout set to " + m_config.m_deadHostTimeoutMS + " milliseconds");
+            }
+
+            final String elasticSetting = m_deployment.getCluster().getElastic().trim().toUpperCase();
+            if (elasticSetting.equals("ENABLED")) {
+                TheHashinator.setConfiguredHashinatorType(HashinatorType.ELASTIC);
+            } else if (!elasticSetting.equals("DISABLED")) {
+                VoltDB.crashLocalVoltDB("Error in deployment file,  elastic attribute of " +
+                                        "cluster element must be " +
+                                        "'enabled' or 'disabled' but was '" + elasticSetting + "'", false, null);
             }
 
 
@@ -1314,11 +1324,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         }
 
         // Start the rejoin coordinator
-        if (m_rejoinCoordinator != null) {
+        if (m_joinCoordinator != null) {
             try {
-                m_rejoinCoordinator.setClientInterface(m_clientInterfaces.get(0));
+                m_joinCoordinator.setClientInterface(m_clientInterfaces.get(0));
 
-                if (!m_rejoinCoordinator.startJoin(m_catalogContext.database, m_cartographer)) {
+                if (!m_joinCoordinator.startJoin(m_catalogContext.database, m_cartographer)) {
                     VoltDB.crashLocalVoltDB("Failed to join the cluster", true, null);
                 }
             } catch (Exception e) {
@@ -1750,10 +1760,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     private void onRejoinCompletion() {
         // null out the rejoin coordinator
-        if (m_rejoinCoordinator != null) {
-            m_rejoinCoordinator.close();
+        if (m_joinCoordinator != null) {
+            m_joinCoordinator.close();
         }
-        m_rejoinCoordinator = null;
+        m_joinCoordinator = null;
         // Mark the data transfer as done so CL can make the right decision when a truncation snapshot completes
         m_rejoinDataPending = false;
 

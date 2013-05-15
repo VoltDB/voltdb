@@ -603,8 +603,8 @@ public class PlanAssembler {
 
         // Send the local result counts to the coordinator.
         AbstractPlanNode recvNode = subAssembler.addSendReceivePair(deleteNode);
-        // add a sum and send on top of the union
-        return addSumAndSendToDMLNode(recvNode);
+        // add a sum or a limit and send on top of the union
+        return addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
     }
 
     private AbstractPlanNode getNextUpdatePlan() {
@@ -687,8 +687,8 @@ public class PlanAssembler {
 
         // Send the local result counts to the coordinator.
         AbstractPlanNode recvNode = subAssembler.addSendReceivePair(updateNode);
-        // add a sum and send on top of the union
-        return addSumAndSendToDMLNode(recvNode);
+        // add a sum or a limit and send on top of the union
+        return addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
     }
 
     /**
@@ -799,54 +799,73 @@ public class PlanAssembler {
         recvNode.addAndLinkChild(sendNode);
         recvNode.generateOutputSchema(m_catalogDb);
 
-        // add a count and send on top of the union
-        return addSumAndSendToDMLNode(recvNode);
+        // add a count or a limit and send on top of the union
+        return addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
     }
 
-    AbstractPlanNode addSumAndSendToDMLNode(AbstractPlanNode dmlRoot)
+    /**
+     * Adds a sum or limit node followed by a send node to the given DML node. If the DML target
+     * is a replicated table, it will add a limit node, otherwise it adds a sum node.
+     *
+     * @param dmlRoot
+     * @param isReplicated Whether or not the target table is a replicated table.
+     * @return
+     */
+    AbstractPlanNode addSumOrLimitAndSendToDMLNode(AbstractPlanNode dmlRoot, boolean isReplicated)
     {
-        // create the nodes being pushed on top of dmlRoot.
-        AggregatePlanNode countNode = new AggregatePlanNode();
+        AbstractPlanNode sumOrLimitNode;
         SendPlanNode sendNode = new SendPlanNode();
 
-        // configure the count aggregate (sum) node to produce a single
-        // output column containing the result of the sum.
-        // Create a TVE that should match the tuple count input column
-        // This TVE is magic.
-        // really really need to make this less hard-wired
-        TupleValueExpression count_tve = new TupleValueExpression();
-        count_tve.setValueType(VoltType.BIGINT);
-        count_tve.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
-        count_tve.setColumnIndex(0);
-        count_tve.setColumnName("modified_tuples");
-        count_tve.setColumnAlias("modified_tuples");
-        count_tve.setTableName("VOLT_TEMP_TABLE");
-        countNode.addAggregate(ExpressionType.AGGREGATE_SUM, false, 0, count_tve);
+        if (isReplicated) {
+            // Replicated table DML result doesn't need to be summed. All partitions should
+            // modify the same number of tuples in replicated table, so just pick the result from
+            // any partition.
+            LimitPlanNode limitNode = new LimitPlanNode();
+            sumOrLimitNode = limitNode;
+            limitNode.setLimit(1);
+        } else {
+            // create the nodes being pushed on top of dmlRoot.
+            AggregatePlanNode countNode = new AggregatePlanNode();
+            sumOrLimitNode = countNode;
 
-        // The output column. Not really based on a TVE (it is really the
-        // count expression represented by the count configured above). But
-        // this is sufficient for now.  This looks identical to the above
-        // TVE but it's logically different so we'll create a fresh one.
-        // And yes, oh, oh, it's magic</elo>
-        TupleValueExpression tve = new TupleValueExpression();
-        tve.setValueType(VoltType.BIGINT);
-        tve.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
-        tve.setColumnIndex(0);
-        tve.setColumnName("modified_tuples");
-        tve.setColumnAlias("modified_tuples");
-        tve.setTableName("VOLT_TEMP_TABLE");
-        NodeSchema count_schema = new NodeSchema();
-        SchemaColumn col = new SchemaColumn("VOLT_TEMP_TABLE",
-                                            "modified_tuples",
-                                            "modified_tuples",
-                                            tve);
-        count_schema.addColumn(col);
-        countNode.setOutputSchema(count_schema);
+            // configure the count aggregate (sum) node to produce a single
+            // output column containing the result of the sum.
+            // Create a TVE that should match the tuple count input column
+            // This TVE is magic.
+            // really really need to make this less hard-wired
+            TupleValueExpression count_tve = new TupleValueExpression();
+            count_tve.setValueType(VoltType.BIGINT);
+            count_tve.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
+            count_tve.setColumnIndex(0);
+            count_tve.setColumnName("modified_tuples");
+            count_tve.setColumnAlias("modified_tuples");
+            count_tve.setTableName("VOLT_TEMP_TABLE");
+            countNode.addAggregate(ExpressionType.AGGREGATE_SUM, false, 0, count_tve);
+
+            // The output column. Not really based on a TVE (it is really the
+            // count expression represented by the count configured above). But
+            // this is sufficient for now.  This looks identical to the above
+            // TVE but it's logically different so we'll create a fresh one.
+            TupleValueExpression tve = new TupleValueExpression();
+            tve.setValueType(VoltType.BIGINT);
+            tve.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
+            tve.setColumnIndex(0);
+            tve.setColumnName("modified_tuples");
+            tve.setColumnAlias("modified_tuples");
+            tve.setTableName("VOLT_TEMP_TABLE");
+            NodeSchema count_schema = new NodeSchema();
+            SchemaColumn col = new SchemaColumn("VOLT_TEMP_TABLE",
+                    "modified_tuples",
+                    "modified_tuples",
+                    tve);
+            count_schema.addColumn(col);
+            countNode.setOutputSchema(count_schema);
+        }
 
         // connect the nodes to build the graph
-        countNode.addAndLinkChild(dmlRoot);
-        countNode.generateOutputSchema(m_catalogDb);
-        sendNode.addAndLinkChild(countNode);
+        sumOrLimitNode.addAndLinkChild(dmlRoot);
+        sumOrLimitNode.generateOutputSchema(m_catalogDb);
+        sendNode.addAndLinkChild(sumOrLimitNode);
         sendNode.generateOutputSchema(m_catalogDb);
 
         return sendNode;

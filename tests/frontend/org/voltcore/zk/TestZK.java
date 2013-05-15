@@ -273,6 +273,9 @@ public class TestZK extends ZKTestBase {
             public void becomeLeader() {
                 sem2.release();
             }
+
+            @Override
+            public void noticedTopologyChange() {}
         };
         final Semaphore sem3 = new Semaphore(0);
         LeaderNoticeHandler r3 = new LeaderNoticeHandler() {
@@ -280,6 +283,9 @@ public class TestZK extends ZKTestBase {
             public void becomeLeader() {
                 sem3.release();
             }
+
+            @Override
+            public void noticedTopologyChange() {}
         };
 
         LeaderElector elector1 = new LeaderElector(zk, "/election", "node", new byte[0], null);
@@ -323,6 +329,9 @@ public class TestZK extends ZKTestBase {
             public void becomeLeader() {
                 sem2.release();
             }
+
+            @Override
+            public void noticedTopologyChange() {}
         };
         final Semaphore sem3 = new Semaphore(0);
         LeaderNoticeHandler r3 = new LeaderNoticeHandler() {
@@ -330,6 +339,9 @@ public class TestZK extends ZKTestBase {
             public void becomeLeader() {
                 sem3.release();
             }
+
+            @Override
+            public void noticedTopologyChange() {}
         };
         final Semaphore sem4 = new Semaphore(0);
         LeaderNoticeHandler r4 = new LeaderNoticeHandler() {
@@ -337,6 +349,9 @@ public class TestZK extends ZKTestBase {
             public void becomeLeader() {
                 sem4.release();
             }
+
+            @Override
+            public void noticedTopologyChange() {}
         };
 
         LeaderElector elector1 = new LeaderElector(zk, "/election", "node", new byte[0], null);
@@ -382,6 +397,9 @@ public class TestZK extends ZKTestBase {
             public void becomeLeader() {
                 sem3.release();
             }
+
+            @Override
+            public void noticedTopologyChange() {}
         };
 
         LeaderElector elector1 = new LeaderElector(zk, "/election", "node", new byte[0], null);

@@ -17,19 +17,10 @@
 
 package org.voltdb;
 
-import org.json_voltpatches.JSONObject;
-import org.voltcore.messaging.HostMessenger;
-import org.voltdb.rejoin.RejoinCoordinator;
-
-import java.util.List;
-
-public abstract class Joiner extends RejoinCoordinator {
-    public Joiner(HostMessenger hostMessenger)
-    {
-        super(hostMessenger);
-    }
-
-    public abstract List<Integer> getPartitionsToAdd();
-    public abstract JSONObject getTopology();
-    public abstract void setSites(List<Long> sites);
+/**
+ * A task that is run after the snapshot tasks are done on a site.
+ * Tasks will be run on the site threads.
+ */
+public interface PostSnapshotTask {
+    public void run(SystemProcedureExecutionContext context);
 }

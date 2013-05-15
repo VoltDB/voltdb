@@ -27,7 +27,11 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.rejoin.TaskLog;
+import org.voltdb.utils.MiscUtils;
 
+import java.io.File;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -39,10 +43,9 @@ public abstract class JoinProducerBase extends SiteTasker {
     protected final String m_whoami;
     protected final SiteTaskerQueue m_taskQueue;
     protected InitiatorMailbox m_mailbox = null;
-    protected long m_coordinatorHsId;
-    protected final SettableFuture<SnapshotCompletionInterest.SnapshotCompletionEvent>
-            m_completionMonitorAwait = SettableFuture.create();
+    protected long m_coordinatorHsId = Long.MIN_VALUE;
     protected JoinCompletionAction m_completionAction = null;
+    protected TaskLog m_taskLog;
 
     /**
      * SnapshotCompletionAction waits for the completion
@@ -54,10 +57,12 @@ public abstract class JoinProducerBase extends SiteTasker {
     protected class SnapshotCompletionAction implements SnapshotCompletionInterest
     {
         private final String m_snapshotNonce;
+        private final SettableFuture<SnapshotCompletionEvent> m_future;
 
-        protected SnapshotCompletionAction(String nonce)
+        protected SnapshotCompletionAction(String nonce, SettableFuture<SnapshotCompletionEvent> future)
         {
             m_snapshotNonce = nonce;
+            m_future = future;
         }
 
         protected void register()
@@ -78,10 +83,9 @@ public abstract class JoinProducerBase extends SiteTasker {
             if (event.nonce.equals(m_snapshotNonce)) {
                 JOINLOG.debug(m_whoami + "counting down snapshot monitor completion. "
                         + "Snapshot txnId is: " + event.multipartTxnId);
-                m_completionAction.setSnapshotTxnId(event.multipartTxnId);
                 deregister();
                 kickWatchdog(true);
-                m_completionMonitorAwait.set(event);
+                m_future.set(event);
             } else {
                 JOINLOG.debug(m_whoami
                         + " observed completion of irrelevant snapshot nonce: "
@@ -95,12 +99,12 @@ public abstract class JoinProducerBase extends SiteTasker {
     {
         protected long m_snapshotTxnId = Long.MIN_VALUE;
 
-        private void setSnapshotTxnId(long txnId)
+        protected void setSnapshotTxnId(long txnId)
         {
             m_snapshotTxnId = txnId;
         }
 
-        protected long getSnapshotTxnId()
+        public long getSnapshotTxnId()
         {
             return m_snapshotTxnId;
         }
@@ -118,8 +122,29 @@ public abstract class JoinProducerBase extends SiteTasker {
         m_mailbox = mailbox;
     }
 
+    // Load the pro task log
+    protected static TaskLog initializeTaskLog(String voltroot, int pid)
+    {
+        // Construct task log and start logging task messages
+        File overflowDir = new File(voltroot, "join_overflow");
+        Class<?> taskLogKlass =
+                MiscUtils.loadProClass("org.voltdb.rejoin.TaskLogImpl", "Join", false);
+        if (taskLogKlass != null) {
+            Constructor<?> taskLogConstructor;
+            try {
+                taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class, boolean.class);
+                return (TaskLog) taskLogConstructor.newInstance(pid, overflowDir, true);
+            } catch (InvocationTargetException e) {
+                VoltDB.crashLocalVoltDB("Unable to construct join task log", true, e.getCause());
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unable to construct join task log", true, e);
+            }
+        }
+        return null;
+    }
+
     // Received a datablock. Reset the watchdog timer and hand the block to the Site.
-    void restoreBlock(Pair<Integer, ByteBuffer> rejoinWork,
+    protected void restoreBlock(Pair<Integer, ByteBuffer> rejoinWork,
                       SiteProcedureConnection siteConnection)
     {
         kickWatchdog(true);

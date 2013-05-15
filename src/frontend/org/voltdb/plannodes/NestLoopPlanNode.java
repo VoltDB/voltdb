@@ -17,6 +17,10 @@
 
 package org.voltdb.plannodes;
 
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Database;
+import org.voltdb.compiler.DatabaseEstimates;
+import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.types.PlanNodeType;
 
 public class NestLoopPlanNode extends AbstractJoinPlanNode {
@@ -28,6 +32,22 @@ public class NestLoopPlanNode extends AbstractJoinPlanNode {
     @Override
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.NESTLOOP;
+    }
+
+    @Override
+    public void computeCostEstimates(long childOutputTupleCountEstimate,
+                                     Cluster cluster,
+                                     Database db,
+                                     DatabaseEstimates estimates,
+                                     ScalarValueHints[] paramHints)
+    {
+        // This method doesn't do anything besides what the parent method does,
+        // but it is a nice place to put a comment.
+        // Since both children's' cost get included in the costing, this
+        // already mirrors the kind of estimating we do in a nestloopjoin.
+
+        m_estimatedOutputTupleCount = childOutputTupleCountEstimate;
+        m_estimatedProcessedTupleCount = childOutputTupleCountEstimate;
     }
 
     @Override

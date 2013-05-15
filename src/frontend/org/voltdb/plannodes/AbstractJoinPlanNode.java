@@ -103,7 +103,9 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
      */
     public void setWherePredicate(AbstractExpression predicate)
     {
-        m_wherePredicate = clonePredicate(predicate);
+        if (predicate != null) {
+            m_wherePredicate = clonePredicate(predicate);
+        }
     }
 
     /**
@@ -111,7 +113,9 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
      */
     public void setPreJoinPredicate(AbstractExpression predicate)
     {
-        m_preJoinPredicate = clonePredicate(predicate);
+        if (predicate != null) {
+            m_preJoinPredicate = clonePredicate(predicate);
+        }
     }
 
     /**
@@ -119,7 +123,9 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
      */
     public void setJoinPredicate(AbstractExpression predicate)
     {
-        m_joinPredicate = clonePredicate(predicate);
+        if (predicate != null) {
+            m_joinPredicate = clonePredicate(predicate);
+        }
     }
 
     @Override

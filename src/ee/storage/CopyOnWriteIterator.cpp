@@ -76,4 +76,33 @@ bool CopyOnWriteIterator::next(TableTuple &out) {
     }
     return false;
 }
+
+int64_t CopyOnWriteIterator::countRemaining() const {
+    TableTuple out(m_table->schema());
+    uint32_t blockOffset = m_blockOffset;
+    char *location = m_location;
+    TupleBlock *pcurrentBlock = m_currentBlock.get();
+    TBPtr currentBlock(pcurrentBlock);
+    TBMapI blockIterator = m_blockIterator;
+    int64_t count = 0;
+    while (true) {
+        if (blockOffset >= currentBlock->unusedTupleBoundry()) {
+            if (blockIterator == m_end) {
+                break;
+            }
+            location = blockIterator.key();
+            currentBlock = blockIterator.data();
+            assert(currentBlock->address() == location);
+            blockOffset = 0;
+            blockIterator++;
+        }
+        blockOffset++;
+        out.move(location);
+        location += m_tupleLength;
+        if (out.isActive() && !out.isDirty()) {
+            count++;
+        }
+    }
+    return count;
+}
 }

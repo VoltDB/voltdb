@@ -22,8 +22,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
-import org.voltdb.planner.PlanStatistics;
-import org.voltdb.planner.StatsField;
 import org.voltdb.types.PlanNodeType;
 
 public class SeqScanPlanNode extends AbstractScanPlanNode {
@@ -48,11 +46,10 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
         Table target = db.getTables().getIgnoreCase(m_targetTableName);
         assert(target != null);
         DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(target.getTypeName());
-        stats.incrementStatistic(0, StatsField.TUPLES_READ, tableEstimates.maxTuples);
         // This maxTuples value estimates the number of tuples fetched from the sequential scan.
         // It's a vague measure of the cost of the scan.
         // Its accuracy depends a lot on what kind of post-filtering or projection needs to happen, if any.
@@ -65,6 +62,7 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
         // though that's nonsense.
         // In any case, it's important to keep an eye on any changes (discounts) to SeqScanPlanNode's costing
         // here to make sure that SeqScanPlanNode never gains an unfair advantage over IndexScanPlanNode.
+        m_estimatedProcessedTupleCount = tableEstimates.maxTuples;
         m_estimatedOutputTupleCount = tableEstimates.maxTuples;
     }
 

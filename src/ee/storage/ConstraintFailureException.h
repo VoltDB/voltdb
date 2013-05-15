@@ -32,14 +32,25 @@ class VoltDBEngine;
  */
 class ConstraintFailureException: public SQLException {
 public:
-    /*
+    /**
+     * General constructor for for CFE
+     *
      * @param table Table that the update or insert was performed on
-     * @param tableId CatalogId of the table that the update or insert failed on
      * @param tuple Tuple that was being inserted or updated
      * @param otherTuple updated tuple values or a null tuple.
      * @param type Type of constraint that was violated
      */
     ConstraintFailureException(PersistentTable *table, TableTuple tuple, TableTuple otherTuple, ConstraintType type);
+
+    /**
+     * Special constructor for partitioning error CFEs only
+     *
+     * @param table Table that the update or insert was performed on
+     * @param tuple Tuple that was being inserted or updated
+     * @param message Description of the partitioning failure.
+     */
+    ConstraintFailureException(PersistentTable *table, TableTuple tuple, std::string message);
+
     virtual ~ConstraintFailureException();
 protected:
     void p_serialize(ReferenceSerializeOutput *output) const;

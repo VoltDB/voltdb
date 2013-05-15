@@ -58,6 +58,7 @@
 #include "common/FatalException.hpp"
 #include "common/types.h"
 #include "common/RecoveryProtoMessage.h"
+#include "common/StreamPredicateList.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
 #include "logging/LogManager.h"
@@ -89,7 +90,6 @@ PersistentTable::PersistentTable(int partitionColumn) :
     m_allowNulls(),
     m_partitionColumn(partitionColumn),
     stats_(this),
-    m_COWContext(NULL),
     m_failedCompactionCount(0),
     m_tuplesPendingDeleteCount(0)
 {
@@ -253,9 +253,7 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
      * is on have it decide. COW should always set the dirty to false unless the
      * tuple is in a to be scanned area.
      */
-    if (m_COWContext) {
-        m_COWContext->markTupleDirty(target, true);
-    } else {
+    if (m_tableStreamer == NULL || !m_tableStreamer->notifyTupleInsert(target)) {
         target.setDirtyFalse();
     }
 
@@ -355,8 +353,8 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         }
     }
 
-    if (m_COWContext) {
-        m_COWContext->markTupleDirty(targetTupleToUpdate, false);
+    if (m_tableStreamer != NULL) {
+        m_tableStreamer->notifyTupleUpdate(targetTupleToUpdate);
     }
 
     /**
@@ -567,7 +565,9 @@ void PersistentTable::deleteTupleRelease(char* tupleData)
 void PersistentTable::deleteTupleFinalize(TableTuple &target)
 {
     // A snapshot (background scan) in progress can still cause a hold-up.
-    if (m_COWContext && ! m_COWContext->canSafelyFreeTuple(target)) {
+    if (   m_tableStreamer != NULL
+        && m_tableStreamer->isCopyOnWriteActive()
+        && ! m_tableStreamer->canSafelyFreeTuple(target)) {
         // Mark it pending delete and let the snapshot land the finishing blow.
 
         // This "already pending delete" guard prevents any
@@ -611,19 +611,25 @@ void PersistentTable::deleteTupleForSchemaChange(TableTuple &target) {
  * the COWContext. The COWContext set the tuple to have the
  * correct dirty setting when the tuple was originally inserted.
  * TODO remove duplication with regular delete. Also no view updates.
+ *
+ * NB: This is also used as a generic delete for Elastic rebalance.
+ *     skipLookup will be true in this case because the passed tuple
+ *     can be used directly.
  */
-void PersistentTable::deleteTupleForUndo(char* tupleData) {
+void PersistentTable::deleteTupleForUndo(char* tupleData, bool skipLookup) {
     TableTuple target(tupleData, m_schema);
-    // The UndoInsertAction got a pooled copy of the tupleData.
-    // Relocate the original tuple actually in the table.
-    target = lookupTuple(target);
+    if (!skipLookup) {
+        // The UndoInsertAction got a pooled copy of the tupleData.
+        // Relocate the original tuple actually in the table.
+        target = lookupTuple(target);
+    }
     if (target.isNullTuple()) {
         throwFatalException("Failed to delete tuple from table %s:"
                             " tuple does not exist\n%s\n", m_name.c_str(),
                             target.debugNoHeader().c_str());
     }
 
-    // Ensure against trying to delete the same tuple twice.
+    // Make sure that they are not trying to delete the same tuple twice
     assert(target.isActive());
 
     deleteFromAllIndexes(&target);
@@ -887,71 +893,70 @@ TableStats* PersistentTable::getTableStats() {
     return &stats_;
 }
 
-/**
- * Switch the table to copy on write mode. Returns true if the table was already in copy on write mode.
- */
-bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId) {
-    if (m_COWContext != NULL) {
+/** Prepare table for streaming from serialized data. */
+bool PersistentTable::activateStream(
+    TupleSerializer &tupleSerializer,
+    TableStreamType streamType,
+    int32_t partitionId,
+    CatalogId tableId,
+    ReferenceSerializeInput &serializeIn) {
+
+    // Expect m_tableStreamer to be null. Only make it fatal in debug builds.
+    assert(m_tableStreamer.get() == NULL);
+
+    if (m_tableStreamer.get() == NULL) {
+        // Prepare a TableStreamer.
+        m_tableStreamer.reset(
+            new TableStreamer(tupleSerializer, streamType, partitionId, serializeIn));
+    }
+
+    return activateStream(tableId);
+}
+
+/** Prepare table for streaming. */
+bool PersistentTable::activateStream(CatalogId tableId) {
+
+    if (m_tableStreamer->isAlreadyActive()) {
+        // true => COW or recovery context is already active.
         return true;
     }
+
     if (m_tupleCount == 0) {
         return false;
     }
 
-    //All blocks are now pending snapshot
-    m_blocksPendingSnapshot.swap(m_blocksNotPendingSnapshot);
-    m_blocksPendingSnapshotLoad.swap(m_blocksNotPendingSnapshotLoad);
-    assert(m_blocksNotPendingSnapshot.empty());
-    for (int ii = 0; ii < m_blocksNotPendingSnapshotLoad.size(); ii++) {
-        assert(m_blocksNotPendingSnapshotLoad[ii]->empty());
+    if (m_tableStreamer->getStreamType() == TABLE_STREAM_SNAPSHOT) {
+        //All blocks are now pending snapshot
+        m_blocksPendingSnapshot.swap(m_blocksNotPendingSnapshot);
+        m_blocksPendingSnapshotLoad.swap(m_blocksNotPendingSnapshotLoad);
+        assert(m_blocksNotPendingSnapshot.empty());
+        for (int ii = 0; ii < m_blocksNotPendingSnapshotLoad.size(); ii++) {
+            assert(m_blocksNotPendingSnapshotLoad[ii]->empty());
+        }
     }
 
-    m_COWContext.reset(new CopyOnWriteContext( this, serializer, partitionId));
-    return false;
-}
-
-/**
- * Attempt to serialize more tuples from the table to the provided output stream.
- * Returns true if there are more tuples and false if there are no more tuples waiting to be
- * serialized.
- */
-bool PersistentTable::serializeMore(ReferenceSerializeOutput *out) {
-    if (m_COWContext == NULL) {
+    if (m_tableStreamer->activateStream(*this, tableId)) {
         return false;
     }
 
-    const bool hasMore = m_COWContext->serializeMore(out);
-    if (!hasMore) {
-        m_COWContext.reset(NULL);
-    }
-
-    return hasMore;
+    return true;
 }
 
 /**
- * Create a recovery stream for this table. Returns true if the table already has an active recovery stream
+ * Attempt to serialize more tuples from the table to the provided output streams.
+ * Return remaining tuple count, 0 if done, or -1 on error.
  */
-bool PersistentTable::activateRecoveryStream(int32_t tableId) {
-    if (m_recoveryContext != NULL) {
-        return true;
+int64_t PersistentTable::streamMore(TupleOutputStreamProcessor &outputStreams,
+                                    std::vector<int> &retPositions) {
+    if (m_tableStreamer.get() == NULL) {
+        return -1;
     }
-    m_recoveryContext.reset(new RecoveryContext( this, tableId ));
-    return false;
-}
-
-/**
- * Serialize the next message in the stream of recovery messages. Returns true if there are
- * more messages and false otherwise.
- */
-void PersistentTable::nextRecoveryMessage(ReferenceSerializeOutput *out) {
-    if (m_recoveryContext == NULL) {
-        return;
+    int64_t remaining = m_tableStreamer->streamMore(outputStreams, retPositions);
+    if (remaining <= 0) {
+        // clang needs the cast for some reason.
+        m_tableStreamer.reset((TableStreamer*)NULL);
     }
-
-    const bool hasMore = m_recoveryContext->nextMessage(out);
-    if (!hasMore) {
-        m_recoveryContext.reset(NULL);
-    }
+    return remaining;
 }
 
 /**
@@ -1003,9 +1008,9 @@ void PersistentTable::notifyBlockWasCompactedAway(TBPtr block) {
     if (m_blocksNotPendingSnapshot.find(block) != m_blocksNotPendingSnapshot.end()) {
         assert(m_blocksPendingSnapshot.find(block) == m_blocksPendingSnapshot.end());
     } else {
-        assert(m_COWContext);
+        assert(m_tableStreamer.get() != NULL);
         assert(m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end());
-        m_COWContext->notifyBlockWasCompactedAway(block);
+        m_tableStreamer->notifyBlockWasCompactedAway(block);
     }
 
 }
@@ -1151,8 +1156,7 @@ void PersistentTable::doIdleCompaction() {
 }
 
 void PersistentTable::doForcedCompaction() {
-    if (m_recoveryContext != NULL)
-    {
+    if (m_tableStreamer.get() != NULL && m_tableStreamer->isRecoveryActive()) {
         LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO,
             "Deferring compaction until recovery is complete.");
         return;

@@ -465,7 +465,7 @@ public class AsyncBenchmark {
         VoltTable[] tpc = resp.getResults();
         nPartitions=0;
         while (tpc[0].advanceRow()) {
-            nPartitions = (int) tpc[0].getLong(0);
+            nPartitions = (int) tpc[0].getLong("PARTITION_COUNT");
         }
         log.info(_F("partition count: %d\n", nPartitions));
         if (nPartitions < 2) {
