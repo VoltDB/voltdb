@@ -5,7 +5,7 @@ var QueryUI = (function(queryTab){
         var ISQLParser = (function()
         {
 			var SingleLineComments = /^\s*(\/\/|--).*$/gm;
-			var Extract = new RegExp(/'[^']*'/gm);
+			var Extract = new RegExp(/'[^']*'/m);
 			var AutoSplit = /\s(select|insert|update|delete|exec|execute|explain|explainproc)\s/gim;
 			var AutoSplitParameters = /[\s,]+/gm;
                         var ParserStringKeywords = /\s*(exec|execute|explain|explainproc)\s+(select|insert|update|delete)\s+/gim;
