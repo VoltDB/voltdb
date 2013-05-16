@@ -87,6 +87,13 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         final StreamSnapshotRequestConfig config =
             new StreamSnapshotRequestConfig(jsData, context.getDatabase(), localHSIds);
 
+        // Coalesce a truncation snapshot if shouldTruncate is true
+        if (config.shouldTruncate) {
+            coalesceTruncationSnapshotPlan(file_path, file_nonce, txnId, partitionTransactionIds,
+                                           jsData, context, hostname, result,
+                                           exportSequenceNumbers, tracker, timestamp);
+        }
+
         // Create post snapshot update hashinator work
         List<Integer> localPartitions = tracker.getPartitionsForHost(context.getHostId());
         Map<Long, Integer> tokensToAdd = createTokensToAdd(config);
@@ -137,6 +144,23 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         }
 
         return false;
+    }
+
+    private void coalesceTruncationSnapshotPlan(String file_path, String file_nonce, long txnId,
+                                                Map<Integer, Long> partitionTransactionIds,
+                                                JSONObject jsData,
+                                                SystemProcedureExecutionContext context,
+                                                String hostname, VoltTable result,
+                                                Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+                                                SiteTracker tracker, long timestamp)
+        throws IOException
+    {
+        NativeSnapshotWritePlan plan = new NativeSnapshotWritePlan();
+        plan.createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds,
+                                 jsData, context, hostname, result, exportSequenceNumbers,
+                                 tracker, timestamp);
+        m_targets.addAll(plan.m_targets);
+        m_taskListsForHSIds.putAll(plan.m_taskListsForHSIds);
     }
 
     /**
