@@ -19,8 +19,6 @@ package org.voltdb.sysprocs.saverestore;
 
 import java.io.IOException;
 
-import java.util.ArrayList;
-
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Set;
@@ -54,7 +52,6 @@ import org.voltdb.expressions.HashRangeExpression;
 import org.voltdb.rejoin.StreamSnapshotDataTarget;
 
 import org.voltdb.SnapshotDataFilter;
-import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;

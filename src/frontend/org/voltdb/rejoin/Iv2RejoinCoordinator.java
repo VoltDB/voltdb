@@ -145,7 +145,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     }
 
     @Override
-    public boolean startJoin(Database catalog, Cartographer cartographer) {
+    public boolean startJoin(Database catalog, Cartographer cartographer, String clSnapshotPath) {
         m_startTime = System.currentTimeMillis();
         if (m_liveRejoin) {
             long firstSite;
