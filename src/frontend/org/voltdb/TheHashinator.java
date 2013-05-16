@@ -252,6 +252,7 @@ public abstract class TheHashinator {
     }
 
     private static volatile HashinatorType configuredHashinatorType = null;
+
     /**
      * By default returns HashinatorType.LEGACY, but for development another hashinator
      * can be specified using the environment variable or the Java property HASHINATOR
@@ -267,7 +268,8 @@ public abstract class TheHashinator {
         if (hostLogger.isDebugEnabled()) {
             hostLogger.debug("Overriding hashinator to use " + hashinatorType);
         }
-        return HashinatorType.valueOf(hashinatorType.trim().toUpperCase());
+        configuredHashinatorType = HashinatorType.valueOf(hashinatorType.trim().toUpperCase());
+        return configuredHashinatorType;
     }
 
     public static void setConfiguredHashinatorType(HashinatorType type) {
