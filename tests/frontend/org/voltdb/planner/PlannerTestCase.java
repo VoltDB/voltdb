@@ -78,8 +78,25 @@ public class PlannerTestCase extends TestCase {
         return cp;
     }
 
+    final int paramCount = 0;
+    final boolean planForSinglePartition = true;
+    String noJoinOrder = null;
+    /** A helper here where the junit test can assert success */
+    protected List<AbstractPlanNode> compileSinglePartitionToFragments(String sql)
+    {
+        boolean planForSinglePartitionTrue = true;
+        return compileToFragments(sql, planForSinglePartitionTrue);
+    }
+
     /** A helper here where the junit test can assert success */
     protected List<AbstractPlanNode> compileToFragments(String sql)
+    {
+        boolean planForSinglePartitionFalse = false;
+        return compileToFragments(sql, planForSinglePartitionFalse);
+    }
+
+        /** A helper here where the junit test can assert success */
+    private List<AbstractPlanNode> compileToFragments(String sql, boolean planForSinglePartitionFalse)
     {
         int paramCount = 0;
         for (int ii = 0; ii < sql.length(); ii++) {
@@ -88,21 +105,15 @@ public class PlannerTestCase extends TestCase {
                 paramCount++;
             }
         }
-        boolean planForSinglePartitionFalse = false;
         return compileWithJoinOrderToFragments(sql, paramCount, planForSinglePartitionFalse, null);
     }
 
     /** A helper here where the junit test can assert success */
-    protected List<AbstractPlanNode> compileWithJoinOrderToFragments(String sql, int paramCount, boolean planForSinglePartition, String joinOrder)
+    protected List<AbstractPlanNode> compileWithJoinOrderToFragments(String sql, int paramCount,
+                                                                     boolean planForSinglePartition,
+                                                                     String joinOrder)
     {
-        List<AbstractPlanNode> pn = null;
-        try {
-            pn = m_aide.compile(sql, paramCount, planForSinglePartition, joinOrder);
-        }
-        catch (Exception ex) {
-            ex.printStackTrace();
-            fail();
-        }
+        List<AbstractPlanNode> pn = m_aide.compile(sql, paramCount, planForSinglePartition, joinOrder);
         assertTrue(pn != null);
         assertFalse(pn.isEmpty());
         if (planForSinglePartition) {
@@ -112,6 +123,24 @@ public class PlannerTestCase extends TestCase {
     }
 
     protected AbstractPlanNode compileWithJoinOrder(String sql, String joinOrder)
+    {
+        try {
+            return compileWithCountedParamsAndJoinOrder(sql, joinOrder);
+        }
+        catch (Exception ex) {
+            ex.printStackTrace();
+            fail();
+            return null;
+        }
+    }
+
+    protected AbstractPlanNode compileWithInvalidJoinOrder(String sql, String joinOrder) throws Exception
+    {
+        return compileWithCountedParamsAndJoinOrder(sql, joinOrder);
+    }
+
+
+    private AbstractPlanNode compileWithCountedParamsAndJoinOrder(String sql, String joinOrder) throws Exception
     {
         int paramCount = 0;
         for (int ii = 0; ii < sql.length(); ii++) {
@@ -123,18 +152,11 @@ public class PlannerTestCase extends TestCase {
         return compileWithJoinOrder(sql, paramCount, joinOrder);
     }
 
-
     /** A helper here where the junit test can assert success */
-    protected AbstractPlanNode compileWithJoinOrder(String sql, int paramCount, String joinOrder)
+    private AbstractPlanNode compileWithJoinOrder(String sql, int paramCount, String joinOrder) throws Exception
     {
-        List<AbstractPlanNode> pn = null;
-        try {
-            pn = compileWithJoinOrderToFragments(sql, paramCount, m_byDefaultPlanForSinglePartition, joinOrder);
-        }
-        catch (Exception ex) {
-            ex.printStackTrace();
-            fail();
-        }
+        List<AbstractPlanNode> pn = compileWithJoinOrderToFragments(sql, paramCount,
+                                                                    m_byDefaultPlanForSinglePartition, joinOrder);
         assertTrue(pn != null);
         assertFalse(pn.isEmpty());
         assertTrue(pn.get(0) != null);

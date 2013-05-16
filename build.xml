@@ -1827,7 +1827,7 @@ TEST CASES
 </target>
 
 <property name="ptdefaultconfigs"
-         value="json,voter,voltkv,voltcache,cust-report-2012-11-28,ENG-2549,joins"
+         value="json,voter,voltkv,voltcache,cust-report-2012-11-28,ENG-2549,joins,testplans-join,testjoins,aggs"
    description="default hard-coded set of plannertester configs to run or refresh" />
 
 <target name="plannertester" description="Run plannertester">
@@ -1858,7 +1858,6 @@ TEST CASES
 
 <target name="plannertestrefresh" description="Run plannertester baseline refresh">
     <property name="plannertester.dir" value="tests/scripts/plannertester"/>
-    <fileset id="plannertester.configs" dir="${plannertester.dir}/config" includes="**"/>
     <echo message="Running from ${plannertester.dir}"/>
 
     <condition property="user" value="${env.USER}" else="anonymous">

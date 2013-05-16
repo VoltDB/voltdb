@@ -67,6 +67,7 @@
 package org.hsqldb_voltpatches;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Vector;
@@ -1447,7 +1448,7 @@ public class Expression {
     static {
         prototypes.put(OpTypes.VALUE,         new VoltXMLElement("value")); // constant value
         prototypes.put(OpTypes.COLUMN,        new VoltXMLElement("columnref")); // reference
-        prototypes.put(OpTypes.COALESCE,      null); // MAY require ExpressionColumn state
+        prototypes.put(OpTypes.COALESCE,      new VoltXMLElement("columnref")); // for now, another reference form?
         prototypes.put(OpTypes.DEFAULT,       new VoltXMLElement("columnref")); // uninteresting!? ExpressionColumn
         prototypes.put(OpTypes.SIMPLE_COLUMN, (new VoltXMLElement("simplecolumn")));
 
@@ -1654,6 +1655,7 @@ public class Expression {
             return exp;
 
         case OpTypes.COLUMN:
+        case OpTypes.COALESCE:
             ExpressionColumn ec = (ExpressionColumn)this;
             return ec.voltAnnotateColumnXML(exp);
 
@@ -1720,8 +1722,8 @@ public class Expression {
     {
         String opAsString;
         switch (exprOp) {
-        case OpTypes.COALESCE:
-            opAsString = "the COALESCE operator. Consider using DECODE."; break; //MAY require ExpressionColumn state
+        //case OpTypes.COALESCE:
+        //    opAsString = "the COALESCE operator. Consider using DECODE."; break; //MAY require ExpressionColumn state
 
         case OpTypes.VARIABLE:
             opAsString = "HSQL session variables"; break; // Some kind of HSQL session parameter? --paul
@@ -1775,6 +1777,44 @@ public class Expression {
             opAsString = " the unknown operator with numeric code (" + String.valueOf(exprOp) + ")";
         }
         throw new HSQLParseException("VoltDB does not support " + opAsString);
+    }
+
+    /**
+     * VoltDB added method to simplify an expression by eliminating identical subexpressions (same id)
+     * The original expression must be a logical conjunction of form e1 AND e2 AND e3 AND e4.
+     * If subexpression e1 is identical to the subexpression e2 the simplified expression would be
+     * e1 AND e3 AND e4.
+     * @param session The current Session object may be needed to resolve
+     * some names.
+     * @return simplified expression.
+     * @throws HSQLParseException
+     */
+    public Expression eliminateDuplicates(final Session session) {
+        // First build the map of child expressions joined by the logical AND
+        // The key is the expression id and the value is the expression itself
+        Map<String, Expression> subExprMap = new HashMap<String, Expression>();
+        extractAndSubExpressions(session, this, subExprMap);
+        // Reconstruct the expression
+        if (!subExprMap.isEmpty()) {
+            Iterator<Map.Entry<String, Expression>> itExpr = subExprMap.entrySet().iterator();
+            Expression finalExpr = itExpr.next().getValue();
+            while (itExpr.hasNext()) {
+                finalExpr = new ExpressionLogical(OpTypes.AND, finalExpr, itExpr.next().getValue());
+            }
+            return finalExpr;
+        }
+        return this;
+    }
+
+    protected void extractAndSubExpressions(final Session session, Expression expr, Map<String, Expression> subExprMap) {
+        // If it is a logical expression AND then traverse down the tree
+        if (expr instanceof ExpressionLogical && ((ExpressionLogical) expr).opType == OpTypes.AND) {
+            extractAndSubExpressions(session, expr.nodes[LEFT], subExprMap);
+            extractAndSubExpressions(session, expr.nodes[RIGHT], subExprMap);
+        } else {
+            String id = expr.getUniqueId(session);
+            subExprMap.put(id, expr);
+       }
     }
 
     protected String cached_id = null;

@@ -69,15 +69,18 @@ namespace voltdb {
 #define PENDING_DELETE_ON_UNDO_RELEASE_MASK 8
 
 class TableColumn;
+class StandAloneTupleStorage;
 
 class TableTuple {
-    // friend access is intended to allow write access to the tuple flags -- try not to abuse it.
+    // friend access is intended to allow write access to the tuple flags -- try not to abuse it...
     friend class Table;
     friend class TempTable;
     friend class PersistentTable;
+    friend class PoolBackedTupleStorage;
     friend class CopyOnWriteIterator;
     friend class CopyOnWriteContext;
     friend class ::CopyOnWriteTest_TestTableTupleFlags;
+    friend class StandAloneTupleStorage; // ... OK, this friend can also update m_schema.
 
 public:
     /** Initialize a tuple unassociated with a table (bad idea... dangerous) */
@@ -205,6 +208,10 @@ public:
     }
 
     void setNValue(const int idx, voltdb::NValue value);
+    /*
+     * Copies range of NValues from one tuple to another.
+     */
+    void setNValues(int beginIdx, TableTuple lhs, int begin, int end);
 
     /*
      * Version of setNValue that will allocate space to copy
@@ -303,7 +310,7 @@ public:
     void freeObjectColumns();
     size_t hashCode(size_t seed) const;
     size_t hashCode() const;
-protected:
+private:
     inline void setActiveTrue() {
         // treat the first "value" as a boolean flag
         *(reinterpret_cast<char*> (m_data)) |= static_cast<char>(ACTIVE_MASK);
@@ -348,7 +355,7 @@ protected:
      * representing whether the tuple is active or deleted
      */
     char *m_data;
-private:
+
     inline char* getDataPtr(const int idx) {
         assert(m_schema);
         assert(m_data);
@@ -368,18 +375,76 @@ private:
  * The tuples can be used like normal tuples except for allocation/reallocation.
  * The caller takes responsibility for consistently using the specialized methods below for that.
  */
-class PoolBackedTempTuple : public TableTuple {
+class PoolBackedTupleStorage {
 public:
-    PoolBackedTempTuple(const TupleSchema* schema, Pool* pool) : TableTuple(schema), m_pool(pool) { }
+    PoolBackedTupleStorage(const TupleSchema* schema, Pool* pool) : m_tuple(schema), m_pool(pool) { }
 
     void allocateActiveTuple()
     {
-        char* storage = reinterpret_cast<char*>(m_pool->allocateZeroes(m_schema->tupleLength() + TUPLE_HEADER_SIZE));
-        move(storage);
-        setActiveTrue();
+        char* storage = reinterpret_cast<char*>(m_pool->allocateZeroes(m_tuple.getSchema()->tupleLength() + TUPLE_HEADER_SIZE));
+        m_tuple.move(storage);
+        m_tuple.setActiveTrue();
     }
+
+    /** Operator conversion to get an access to the underline tuple.
+     * To prevent clients from repointing the tuple to some other backing
+     * storage via move()or address() calls the tuple is returned by value
+     */
+    operator TableTuple& () {
+        return m_tuple;
+    }
+
 private:
+    TableTuple m_tuple;
     Pool* m_pool;
+};
+
+// A small class to hold together a standalone tuple (not backed by any table)
+// and the associated tuple storage memory to keep the actual data.
+class StandAloneTupleStorage {
+    public:
+        /** Creates an uninitialized tuple */
+        StandAloneTupleStorage() :
+            m_tupleStorage(),m_tuple() {
+        }
+
+        /** Allocates enough memory for a given schema
+         * and initialies tuple to point to this memory
+         */
+        explicit StandAloneTupleStorage(const TupleSchema* schema) :
+            m_tupleStorage(), m_tuple() {
+            init(schema);
+        }
+
+        /** Allocates enough memory for a given schema
+         * and initialies tuple to point to this memory
+         */
+        void init(const TupleSchema* schema) {
+            assert(schema != NULL);
+            m_tupleStorage.reset(new char[schema->tupleLength() + TUPLE_HEADER_SIZE]);
+            m_tuple.m_schema = schema;
+            m_tuple.move(m_tupleStorage.get());
+            m_tuple.setAllNulls();
+            m_tuple.setActiveTrue();
+        }
+
+        /** Operator conversion to get an access to the underline tuple.
+         * To prevent clients from repointing the tuple to some other backing
+         * storage via move()or address() calls the tuple is returned by value
+         */
+        operator TableTuple () {
+            return m_tuple;
+        }
+
+        operator TableTuple () const {
+            return m_tuple;
+        }
+
+    private:
+
+        boost::scoped_array<char> m_tupleStorage;
+        TableTuple m_tuple;
+
 };
 
 inline TableTuple::TableTuple() :
@@ -420,6 +485,17 @@ inline void TableTuple::setNValue(const int idx, voltdb::NValue value) {
     char *dataPtr = getDataPtr(idx);
     const int32_t columnLength = m_schema->columnLength(idx);
     value.serializeToTupleStorage(dataPtr, isInlined, columnLength);
+}
+
+/** Multi column version. */
+inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int end) {
+    assert(m_schema);
+    assert(lhs.getSchema());
+    assert(beginIdx + end - begin <= sizeInValues());
+    while (begin != end) {
+        assert(m_schema->columnType(beginIdx) == lhs.getSchema()->columnType(begin));
+        setNValue(beginIdx++, lhs.getNValue(begin++));
+    }
 }
 
 /* Copy strictly by value from slimvalue into this tuple */
