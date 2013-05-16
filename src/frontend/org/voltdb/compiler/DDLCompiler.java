@@ -1426,11 +1426,12 @@ public class DDLCompiler {
             Table srcTable = stmt.tableList.get(0);
             MaterializedViewInfo matviewinfo = srcTable.getViews().add(destTable.getTypeName());
             matviewinfo.setDest(destTable);
-            if (stmt.where == null)
-                matviewinfo.setPredicate("");
-            else {
-                String hex = Encoder.hexEncode(stmt.where.toJSONString());
+            AbstractExpression where = stmt.getCombinedFilterExpression();
+            if (where != null) {
+                String hex = Encoder.hexEncode(where.toJSONString());
                 matviewinfo.setPredicate(hex);
+            } else {
+                matviewinfo.setPredicate("");
             }
             destTable.setMaterializer(srcTable);
 

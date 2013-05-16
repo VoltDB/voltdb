@@ -94,8 +94,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         for (VoltXMLElement child : stmtNode.children) {
             if (child.name.equalsIgnoreCase("columns"))
                 parseDisplayColumns(child);
-            else if (child.name.equalsIgnoreCase("querycondition"))
-                parseCondition(child);
             else if (child.name.equalsIgnoreCase("ordercolumns"))
                 parseOrderColumns(child);
             else if (child.name.equalsIgnoreCase("groupcolumns")) {

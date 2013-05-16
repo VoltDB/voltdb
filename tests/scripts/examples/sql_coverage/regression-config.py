@@ -64,6 +64,11 @@
               "template": "basic.sql",
               "normalizer": "normalizer.py"},
 # THESE ALL SUCCEED, USE THE TEMPLATE INPUT
+     "basic-joins": {"schema": "schema.py",
+                    "ddl": "DDL.sql",
+                     "template": "basic-joins.sql",
+                     "normalizer": "normalizer.py"},
+# THESE ALL SUCCEED, USE THE TEMPLATE INPUT
     "basic-unions": {"schema": "union-schema.py",
               "ddl": "union-DDL.sql",
               "template": "basic-unions.sql",
