@@ -19,6 +19,9 @@ package org.voltdb;
 
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ComparisonExpression;
+import org.voltdb.expressions.ConstantValueExpression;
+import org.voltdb.types.ExpressionType;
 
 /**
  * A class identifying a table that should be snapshotted as well as the destination
@@ -42,8 +45,14 @@ public class SnapshotTableTask
         m_table = table;
         m_target = target;
         m_filters = filters;
-        m_predicate = predicate;
         m_deleteTuples = deleteTuples;
+
+        if (predicate == null) {
+            // EE doesn't like null predicate, so create a dummy one that always returns true
+            m_predicate = createAcceptAllPredicate();
+        } else {
+            m_predicate = predicate;
+        }
     }
 
     public int getTableId()
@@ -57,6 +66,15 @@ public class SnapshotTableTask
         return ("SnapshotTableTask for " + m_table.getTypeName() +
                 " replicated " + m_table.getIsreplicated() +
                 ", delete " + m_deleteTuples);
+    }
+
+    private static AbstractExpression createAcceptAllPredicate()
+    {
+        ConstantValueExpression constant = new ConstantValueExpression();
+        constant.setValueType(VoltType.TINYINT);
+        constant.setValueSize(VoltType.TINYINT.getLengthInBytesForFixedTypes());
+        constant.setValue("1");
+        return new ComparisonExpression(ExpressionType.COMPARE_EQUAL, constant, constant);
     }
 }
 
