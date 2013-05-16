@@ -427,12 +427,31 @@ public abstract class ExpressionUtil {
             } else if (expr.m_left.getExpressionType() == ExpressionType.CONJUNCTION_AND ||
                     expr.m_left.getExpressionType() == ExpressionType.CONJUNCTION_OR) {
                 assert(expr.m_left.m_left != null && expr.m_left.m_right != null);
-                AbstractExpression tempLeft = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr.m_left.m_left, null);
-                AbstractExpression tempRight = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr.m_left.m_right, null);
+                // Need to test for an existing child NOT and skip it.
+                // e.g. NOT (P AND NOT Q) --> (NOT P) OR NOT NOT Q --> (NOT P) OR Q
+                AbstractExpression tempLeft = null;
+                if (expr.m_left.m_left.getExpressionType() != ExpressionType.OPERATOR_NOT) {
+                    tempLeft = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr.m_left.m_left, null);
+                } else {
+                    assert(expr.m_left.m_left.m_left != null);
+                    tempLeft = expr.m_left.m_left.m_left;
+                }
+                AbstractExpression tempRight = null;
+                if (expr.m_left.m_right.getExpressionType() != ExpressionType.OPERATOR_NOT) {
+                    tempRight = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr.m_left.m_right, null);
+                } else {
+                    assert(expr.m_left.m_right.m_left != null);
+                    tempRight = expr.m_left.m_right.m_left;
+                }
                 ExpressionType type = (expr.m_left.getExpressionType() == ExpressionType.CONJUNCTION_AND) ?
                         ExpressionType.CONJUNCTION_OR : ExpressionType.CONJUNCTION_AND;
                 AbstractExpression tempExpr = new OperatorExpression(type, tempLeft, tempRight);
                 return isNullRejectingExpression(tempExpr, tableName);
+            } else if (expr.m_left.getExpressionType() == ExpressionType.OPERATOR_NOT) {
+                // It's probably safe to assume that HSQL will have stripped out other double negatives,
+                // (like "NOT T.c IS NOT NULL"). Yet, we could also handle them here
+                assert(expr.m_left.m_left != null);
+                return isNullRejectingExpression(expr.m_left.m_left, tableName);
             } else {
                 return isNullRejectingExpression(expr.m_left, tableName);
             }

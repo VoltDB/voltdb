@@ -32,7 +32,6 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.JoinTree.JoinNode;
 import org.voltdb.planner.JoinTree.TablePair;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -105,7 +104,7 @@ public abstract class SubPlanAssembler {
             }
         }
         // do the actual work
-        return getRelevantAccessPathsForTable(table, joinExprs, filterExprs);
+        return getRelevantAccessPathsForTable(table, joinExprs, filterExprs, null);
     }
 
     /**
@@ -115,84 +114,44 @@ public abstract class SubPlanAssembler {
      * @param table Table to generate access pass for
      * @param joinExprs join expressions this table is part of
      * @param filterExprs filter expressions this table is part of
+     * @param postExprs post expressions this table is part of
      * @return List of valid access paths
      */
-    protected ArrayList<AccessPath> getRelevantAccessPathsForTable(Table table, List<AbstractExpression> joinExprs, List<AbstractExpression> filterExprs) {
+    protected ArrayList<AccessPath> getRelevantAccessPathsForTable(Table table,
+                                                                   List<AbstractExpression> joinExprs,
+                                                                   List<AbstractExpression> filterExprs,
+                                                                   List<AbstractExpression> postExprs) {
         ArrayList<AccessPath> paths = new ArrayList<AccessPath>();
-        // add the empty seq-scan access path
-        AccessPath naivePath = getRelevantNaivePathForTable(joinExprs, filterExprs);
-        paths.add(naivePath);
-
+        List<AbstractExpression> allJoinExprs = new ArrayList<AbstractExpression>();
         List<AbstractExpression> allExprs = new ArrayList<AbstractExpression>();
+        // add the empty seq-scan access path
+        if (joinExprs != null) {
+            allExprs.addAll(joinExprs);
+            allJoinExprs.addAll(joinExprs);
+        }
+        if (postExprs != null) {
+            allJoinExprs.addAll(postExprs);
+        }
         if (filterExprs != null) {
             allExprs.addAll(filterExprs);
         }
-        if (joinExprs != null) {
-            allExprs.addAll(joinExprs);
-        }
+
+        AccessPath naivePath = getRelevantNaivePathForTable(allJoinExprs, filterExprs);
+        paths.add(naivePath);
 
         CatalogMap<Index> indexes = table.getIndexes();
 
         for (Index index : indexes) {
             AccessPath path = getRelevantAccessPathForIndex(table, allExprs, index);
             if (path != null) {
+                if (postExprs != null) {
+                    path.joinExprs.addAll(postExprs);
+                }
                 paths.add(path);
             }
         }
 
         return paths;
-    }
-
-    /**
-     * Generate all possible access paths for an inner node in an outer join.
-     * The set of potential index expressions depends whether the inner node can be inlined
-     * with the NLIJ or not. In the former case, inner and inner-outer join expressions can
-     * be considered for the index access. In the latter, only inner join expressions qualifies.
-     *
-     * @param joinNode the join node
-     * @param innerNode the inner node
-     * @return List of valid access paths
-     */
-    protected List<AccessPath> getRelevantAccessPathsForInnerNode(JoinNode joinNode, JoinNode innerNode) {
-        ArrayList<AbstractExpression> joinExprList = new ArrayList<AbstractExpression>();
-        joinExprList.addAll(joinNode.m_joinInnerList);
-        joinExprList.addAll(joinNode.m_joinInnerOuterList);
-
-        if (innerNode.m_table == null) {
-            // The inner node is a join node itself. Only naive access path is possible
-            ArrayList<AccessPath> accessPaths = new ArrayList<AccessPath>();
-            accessPaths.add(getRelevantNaivePathForTable(joinExprList, null));
-            return accessPaths;
-        }
-
-        // If inner table is non-replicated the join node will be the NLJ and not the NLIJ unless
-        // the outer node is also non-replicated. If the join is not going to be a NLIJ,
-        // the inner node won't be inlined which means that we can't use inner-outer
-        // join expressions for an index access (they will be pushed down to the
-        // IndexScanNode instead of staying at the NL level)
-        // The NLIJ only makes sense if the set of Inner-Outer join expressions is not empty
-        if (canDeferSendReceivePairForNode(joinNode.m_isReplicated)) {
-            // The inner table can have multiple index access paths based on
-            // inner and inner-outer join expressions plus the naive one
-            return getRelevantAccessPathsForTable(innerNode.m_table, joinExprList, null);
-        } else {
-            // The inner table can have multiple index access paths based on
-            // inner join expressions plus the naive one. The inner-outer expressions must
-            // stay at the NLJ node - accessPath.joinExprs
-            ArrayList<AccessPath> accessPaths = new ArrayList<AccessPath>();
-            accessPaths.add(getRelevantNaivePathForTable(joinExprList, null));
-            // It can also have index access but based only on the inner only expressions
-            CatalogMap<Index> indexes = innerNode.m_table.getIndexes();
-
-            for (Index index : indexes) {
-                AccessPath path = getRelevantAccessPathForIndex(innerNode.m_table, joinNode.m_joinInnerList, index);
-                if (path != null) {
-                    path.joinExprs.addAll(joinNode.m_joinInnerOuterList);
-                    accessPaths.add(path);
-                }
-            }
-            return accessPaths;
-        }
     }
 
     /**
@@ -224,18 +183,24 @@ public abstract class SubPlanAssembler {
      */
     private static class IndexableExpression
     {
-        // The matched expression, normalized so that its LHS is the part that matched the indexed expression.
+        // The matched expression, in its original form and
+        // normalized so that its LHS is the part that matched the indexed expression.
+        private final AbstractExpression m_originalFilter;
         private final ComparisonExpression m_filter;
-        // The parameters, if any, that must be bound to enable use of the index -- these have no effect on the current query,
+        // The parameters, if any, that must be bound to enable use of the index
+        // -- these have no effect on the current query,
         // but they effect the applicability of the resulting cached plan to other queries.
         private final List<AbstractExpression> m_bindings;
 
-        public IndexableExpression(ComparisonExpression normalizedExpr, List<AbstractExpression> bindings)
+        public IndexableExpression(AbstractExpression originalExpr, ComparisonExpression normalizedExpr,
+                                   List<AbstractExpression> bindings)
         {
+            m_originalFilter = originalExpr;
             m_filter = normalizedExpr;
             m_bindings = bindings;
         }
 
+        public AbstractExpression getOriginalFilter() { return m_originalFilter; }
         public AbstractExpression getFilter() { return m_filter; }
         public List<AbstractExpression> getBindings() { return m_bindings; }
     };
@@ -490,7 +455,9 @@ public abstract class SubPlanAssembler {
                 //  - adding the GT condition as a special "initialExpr" post-condition
                 //    that disables itself as soon as it evaluates to true for any row
                 //    -- it would be expected to always evaluate to true after that.
-                AbstractExpression comparator = startingBoundExpr.getFilter();
+                // Restoring the original form of the filter to otherExprs simplifies later
+                // coverage checks that influence the form of parent joins (NLJ vs. NLIJ).
+                AbstractExpression comparator = startingBoundExpr.getOriginalFilter();
                 retval.otherExprs.add(comparator);
             }
         }
@@ -537,6 +504,7 @@ public abstract class SubPlanAssembler {
         AbstractExpression indexableExpr = null;
         AbstractExpression otherExpr = null;
         ComparisonExpression normalizedExpr = null;
+        AbstractExpression originalFilter = null;
         for (AbstractExpression filter : filtersToCover) {
             // Expression type must be resolvable by an index scan
             if ((filter.getExpressionType() == targetComparator) ||
@@ -546,6 +514,7 @@ public abstract class SubPlanAssembler {
                 otherExpr = filter.getRight();
                 binding = bindingForIndexedFilterOperand(table, indexableExpr, otherExpr, coveringExpr, coveringColId);
                 if (binding != null) {
+                    originalFilter = filter;
                     filtersToCover.remove(filter);
                     break;
                 }
@@ -558,6 +527,7 @@ public abstract class SubPlanAssembler {
                 otherExpr = filter.getLeft();
                 binding = bindingForIndexedFilterOperand(table, indexableExpr, otherExpr, coveringExpr, coveringColId);
                 if (binding != null) {
+                    originalFilter = filter;
                     filtersToCover.remove(filter);
                     break;
                 }
@@ -568,7 +538,7 @@ public abstract class SubPlanAssembler {
             // ran out of candidate filters.
             return null;
         }
-        return new IndexableExpression(normalizedExpr, binding);
+        return new IndexableExpression(originalFilter, normalizedExpr, binding);
     }
 
     private boolean isOperandDependentOnTable(AbstractExpression expr, Table table) {
@@ -742,30 +712,78 @@ public abstract class SubPlanAssembler {
      * For a multi-fragment plan that contains a join,
      * is it better to send partitioned tuples and join them on the coordinator
      * or is it better to join them before sending?
-     * On the assumption that joined rows are wider (taking more bandwidth per row),
-     * we would want to send and then join if joined rows were one-to-one, but if
-     * There is a special case -- a join of more than one partitioned table on their partition keys,
-     * when that join must happen first -- the send/receive protocol only allows sending a single
-     * intermediate result table per statement.
-     * In a join of multiple partitioned tables and one or more replicated tables, it is theoretically
-     * possible to do the partitioned table join, and then the send/receive, and then the replicated
-     * table join.
-     * Deciding whether to defer the send/receive to after a join in other cases requires a complex
-     * trade-off involving the following considerations:
-     *  - Deferring send/recieve typically involves transmitting wider rows (more bandwidth per row).
-     *  - Deferring send/recieve may either increase or decrease bandwidth requirements depending on whether
-     *    the join has a net filtering effect on rows (in a one-to-"averages-fewer-than-one" relationship)
-     *    or a net multiplication effect (in a one-to-many relationship).
-     *  - Deferring send/recieve increases shared processing across nodes
-     *    -- less single-threaded post-processing on the single aggregator.
-     * For now, for simplicity, we only defer the send/receive when required, but when required, we
-     * go all the way and defer to after even the replicated joins.
+     * If bandwidth (or capacity of the receiving temp table) were the primary concern,
+     * a decision could be based on
+     * A) how much wider the joined rows are than the pre-joined rows.
+     * B) the expected yield of the join filtering -- does each pre-joined row typically
+     * match and get joined with multiple partner rows or does it typically fail to match
+     * any row.
+     * The statistics required to determine "B" are not generally available.
+     * In any case, there are two over-arching concerns.
+     * One is the correct handling of a special case
+     * -- a join of more than one partitioned table on their partition keys.
+     * In this case, the join MUST happen on each partition prior to sending any tuples.
+     * This restriction stems directly from the way fragments always produce a single
+     * (intermediate or final) result table and there can only be two fragments in a plan,
+     * including the "coordinator" that receives (one) intermediate result table and produces
+     * the final result table.
+     * The second over-arching consideration is that there is an optimization available to the
+     * transaction processer for the special case in which a coordinator fragment operates
+     * without accessing any persistent local data (I learned this second hand from Izzy. --paul).
+     * This provides further motivation to do all scanning and joining in the other fragment
+     * prior to sending tuples.
      *
-     * @param isReplicated Is table replicated or not.
-     * @return true is send/receive pair can be deferred (join before sending)
+     * TODO: It has been proposed that these two considerations SHOULD override all others,
+     * so that all multi-partition plans only "send after all joins", regardless of bandwidth/capacity
+     * considerations, but there remain some edge cases in which the current simple legacy
+     * implementation decides otherwise. That's where the following function comes into play.
+     *
+     * TODO: Weighing in on the other side, motivating multi-partition plans that
+     * "send before (some?) joins" are some OUTER JOINS between partitioned and replicated tables.
+     * Of particular concern are cases in which a partitioned table is on the INNER side of a join,
+     * e.g. the right operand of a LEFT OUTER JOIN,
+     *
+     * SELECT * FROM replicated R LEFT JOIN partitioned P
+     * ON R.key == P.non_partition_key;
+     *
+     * The usual approach of calculating a local (partial) join result on each partition,
+     * then sending and merging them with other partial results does not ensure correct answers
+     * for such queries. They require a "global view" of that partitioned working set.
+     * Many such queries impractically require redistribution and caching of a considerable
+     * subset of a partitioned table in preparation for a "coordinated" join.
+     * Yet, there may be useful cases with sufficient constant-based partitioned table filtering
+     * in the "ON clause" to keep the distributed working set size under control.
+     * SELECT * FROM replicated R LEFT JOIN partitioned P
+     * ON R.key == P.non_partition_key AND P.non_partition_key BETWEEN ? and ?;
+     *
+     * These OUTER JOIN queries need to be prohibited by the planner if it can not guarantee the
+     * correct results that require a "send before join" plan
+     * -- in direct contrast to the general trend suggested by the above "TODO".
+     *
+     * This function enables the legacy feature (pre-dating OUTER JOINs) of enabling mid-plan
+     * "send" nodes potentially resulting in "send before join" plans whenever it returns false.
+     * Its sole purpose is to maintain a "status quo", to continue to support "send before join"
+     * in certain edge cases where it has historically been supported -- perhaps with no good reason.
+     *
+     * This function is called very selectively -- the caller does most of the work of weeding out
+     * cases in which a "send" is most assuredly NOT required. Its role in these "questionable" cases
+     * is to determine whether the query taken as a whole dictates that a "send" is NEVER required
+     * except perhaps after all joins.
+     * That is, all multi-partition plans get an additional opportunity to "send after all joins"
+     * which does NOT consult this function but rather complements its effects
+     * -- to finally implement the "send" that this function may have "defered".
+     * This function would have no place in a pure "send after all joins" scheme.
+     * Yet, it may (in some form) still have some limited use if called even more selectively,
+     * specifically in support of the OUTER JOIN edge case described above.
+     *
+     * @return true if the plan is single-partition OR has more than one partitoned table
+     * that must be joined prior to sending tuples to the coordinator
+     * both for efficiency and to satisfy the two-fragment limitation.
+     * false otherwise
      */
-    protected boolean canDeferSendReceivePairForNode(boolean isReplicated) {
-        return m_partitioning.getCountOfPartitionedTables() > 1 || !m_partitioning.requiresTwoFragments() || isReplicated;
+    protected boolean canDeferSendReceivePairForNode() {
+        return m_partitioning.getCountOfPartitionedTables() > 1 || !m_partitioning.requiresTwoFragments();
     }
+
 
 }

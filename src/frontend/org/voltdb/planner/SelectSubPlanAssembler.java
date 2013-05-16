@@ -440,7 +440,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 // Optimizations - outer-table-only where expressions can be pushed down to the child node
                 // to pre-qualify the outer tuples before they enter the join.
                 if (childNode.m_table != null) {
-                    childNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(childNode.m_table, null,parentNode.m_whereOuterList));
+                    childNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(childNode.m_table,
+                                                                                  null,
+                                                                                  parentNode.m_whereOuterList,
+                                                                                  null));
                 } else {
                     childNode.m_accessPaths.add(getRelevantNaivePathForTable(null, parentNode.m_whereOuterList));
                 }
@@ -453,7 +456,51 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             childNode.m_accessPaths.add(getRelevantNaivePathForTable(null, null));
         }
         assert(childNode.m_accessPaths.size() > 0);
-   }
+    }
+
+    /**
+     * Generate all possible access paths for an inner node in an outer join.
+     * The set of potential index expressions depends whether the inner node can be inlined
+     * with the NLIJ or not. In the former case, inner and inner-outer join expressions can
+     * be considered for the index access. In the latter, only inner join expressions qualifies.
+     *
+     * @param joinNode the join node
+     * @param innerNode the inner node
+     * @return List of valid access paths
+     */
+    protected List<AccessPath> getRelevantAccessPathsForInnerNode(JoinNode joinNode, JoinNode innerNode) {
+        if (innerNode.m_table == null) {
+            // The inner node is a join node itself. Only naive access path is possible
+            ArrayList<AccessPath> accessPaths = new ArrayList<AccessPath>();
+            accessPaths.add(getRelevantNaivePathForTable(joinNode.m_joinInnerOuterList, joinNode.m_joinInnerList));
+            return accessPaths;
+        }
+
+        // The inner table can have multiple index access paths based on
+        // inner and inner-outer join expressions plus the naive one.
+
+        // If the inner table is partitioned and the outer node is replicated,
+        // the join node will be NLJ and not NLIJ, even for an index access path.
+        if (joinNode.m_isReplicated || canDeferSendReceivePairForNode()) {
+            // This case can support either NLIJ -- assuming joinNode.m_joinInnerOuterList
+            // is non-empty AND at least ONE of its clauses can be leveraged in the IndexScan
+            // -- or NLJ, otherwise.
+            return getRelevantAccessPathsForTable(innerNode.m_table,
+                                                  joinNode.m_joinInnerOuterList,
+                                                  joinNode.m_joinInnerList,
+                                                  null);
+        }
+
+        // Only NLJ is supported in this case.
+        // If the join is NLJ, the inner node won't be inlined
+        // which means that it can't use inner-outer join expressions
+        // -- they must be set aside to be processed within the NLJ.
+        return getRelevantAccessPathsForTable(innerNode.m_table,
+                                              null,
+                                              joinNode.m_joinInnerList,
+                                              joinNode.m_joinInnerOuterList);
+    }
+
     /**
      * generate all possible plans for the tree.
      *
@@ -591,7 +638,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
              * If the access plan for the table in the join order was for a
              * distributed table scan there will be a send/receive pair at the top.
              */
-            if (canDeferSendReceivePairForNode(joinOrder[at].getIsreplicated())) {
+            if (joinOrder[at].getIsreplicated() || canDeferSendReceivePairForNode()) {
                 continue;
             }
             resultPlan = addSendReceivePair(resultPlan);
@@ -650,10 +697,14 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         AccessPath innerAccessPath = joinNode.m_rightNode.m_currentAccessPath;
 
         AbstractJoinPlanNode retval = null;
-        // In case of innerPlan being an IndexScan the NLIJ will have an advantage over the NLJ only
-        // if there is at least one join expression based on both inner and outer tables
-        // If not, NLJ/IndexScan is a better choice
-        if (innerPlan instanceof IndexScanPlanNode && ! joinNode.m_joinInnerOuterList.isEmpty()) {
+        // In case of innerPlan being an IndexScan the NLIJ will have an advantage
+        // over the NLJ/IndexScan only if there is at least one inner-outer join expression
+        // that is used for the index access. If this is the case then this expression
+        // will be missing from the otherExprs list but is in the original joinNode.m_joinInnerOuterList
+        //
+        //If not, NLJ/IndexScan is a better choice
+        if (innerPlan instanceof IndexScanPlanNode &&
+                hasInnerOuterIndexExpression(joinNode.m_joinInnerOuterList, innerAccessPath.otherExprs)) {
             NestLoopIndexPlanNode nlijNode = new NestLoopIndexPlanNode();
 
             nlijNode.setJoinType(joinNode.m_rightNode.m_joinType);
@@ -697,6 +748,22 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             retval.setWherePredicate(ExpressionUtil.combine(whereClauses));
         }
         return retval;
+    }
+
+    /**
+     * For a join node determines whether any of the inner-outer expressions were used
+     * for an index access.
+     *
+     * @param originalInnerOuterExprs The initial list of inner-outer join expressions.
+     * @param nonIndexInnerOuterList The list of inner-outer join expressions which are not
+     *        used for an index access
+     * @return true if at least one of the original expressions is used for index access.
+     */
+    private boolean hasInnerOuterIndexExpression(List<AbstractExpression> originalInnerOuterExprs,
+            List<AbstractExpression> nonIndexInnerOuterList) {
+        HashSet<AbstractExpression> otherSet = new HashSet<AbstractExpression>();
+        otherSet.addAll(nonIndexInnerOuterList);
+        return !otherSet.containsAll(originalInnerOuterExprs);
     }
 
     /**

@@ -955,6 +955,32 @@ public class TestExpressionUtil extends TestCase {
         assertTrue(ExpressionUtil.isNullRejectingExpression(expr13, "T2"));
         // Wrong table
         assertTrue(!ExpressionUtil.isNullRejectingExpression(expr13, "T"));
+    }
+
+    {
+        // Test double negation "NOT T.C IS NOT NULL"
+        TupleValueExpression tve = new TupleValueExpression();
+        tve.setTableName("T");
+        tve.setColumnName("C");
+        OperatorExpression expr1 = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, tve, null);
+        OperatorExpression expr2 = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr1, null);
+        OperatorExpression expr3 = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr2, null);
+        assertTrue(!ExpressionUtil.isNullRejectingExpression(expr3, "T"));
+
+        // NOT (P AND NOT Q) --> (NOT P) OR NOT NOT Q --> (NOT P) OR Q
+        // NOT (T.C IS NULL AND NOT T.C > T.A) --> ( NOT T.C IS NULL) OR  T.C > T.A
+        TupleValueExpression tve1 = new TupleValueExpression();
+        tve.setTableName("T");
+        tve.setColumnName("A");
+        OperatorExpression expr4 = new OperatorExpression(ExpressionType.COMPARE_GREATERTHAN, tve, tve1);
+        OperatorExpression expr5 = new OperatorExpression(ExpressionType.CONJUNCTION_AND, expr1, expr4);
+        OperatorExpression expr6 = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr5, null);
+        assertTrue(ExpressionUtil.isNullRejectingExpression(expr6, "T"));
+
+        // NOT (T.C IS NOT NULL AND T.C > T.A) --> T.C IS NULL OR  NOT( T.C > T.A)
+        OperatorExpression expr7 = new OperatorExpression(ExpressionType.CONJUNCTION_AND, expr2, expr4);
+        OperatorExpression expr8 = new OperatorExpression(ExpressionType.OPERATOR_NOT, expr7, null);
+        assertFalse(ExpressionUtil.isNullRejectingExpression(expr8, "T"));
 
     }
 
