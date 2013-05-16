@@ -8,7 +8,3 @@ SELECT * FROM c1, c5 WHERE c1.y = c5.partitionkey AND c1.e = ? AND c5.g = 7;
 SELECT * FROM c1, c4, c5 WHERE c1.y = c5.partitionkey AND c4.partitionkey = c5.partitionkey AND c4.f = ? AND c1.e = ? AND c5.g = 7;
 SELECT * FROM c1, c4, c5 WHERE c4.partitionkey = c5.partitionkey AND c4.f = ? AND c1.e = ? AND c5.g = 7;
 
-Partition Columns:
-c5.partitionkey
-c4.partitionkey
-c2.partitionkey

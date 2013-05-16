@@ -28,10 +28,7 @@ import java.util.List;
 
 import junit.framework.TestCase;
 
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.plannodes.AbstractPlanNode;
 
@@ -200,44 +197,6 @@ public class PlannerTestCase extends TestCase {
     {
         m_aide = new PlannerTestAideDeCamp(ddlURL, basename);
         m_byDefaultPlanForSinglePartition = planForSinglePartition;
-    }
-
-    protected void forceReplication()
-    {
-        // Set all tables to non-replicated.
-        Cluster cluster = m_aide.getCatalog().getClusters().get("cluster");
-        CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
-        for (Table t : tmap) {
-            // t.setIsreplicated(true);
-            assertTrue(t.getIsreplicated());
-        }
-    }
-
-    protected void forceReplicationExceptForOneTable(String table, String column)
-    {
-        // Set all tables to non-replicated.
-        Cluster cluster = m_aide.getCatalog().getClusters().get("cluster");
-        CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
-        for (Table t : tmap) {
-            assertTrue(t.getIsreplicated());
-            if (t.getTypeName().equalsIgnoreCase(table)) {
-                t.setIsreplicated(false);
-                t.setPartitioncolumn(t.getColumns().get(column));
-            }
-        }
-    }
-
-    // TODO: Phase out this functionality, possibly by phasing out PlannerTestAideDeCamp in favor
-    // of some other utility class -- one that supports inline PARTITION statements in the DDL.
-    // It really is a hack because it creates an otherwise unlikely condition of
-    // partitioned tables with no identified partitioning column.
-    protected void forceHackPartitioning() {
-        // Set all tables to non-replicated.
-        Cluster cluster = m_aide.getCatalog().getClusters().get("cluster");
-        CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
-        for (Table t : tmap) {
-            t.setIsreplicated(false);
-        }
     }
 
     Database getDatabase() {

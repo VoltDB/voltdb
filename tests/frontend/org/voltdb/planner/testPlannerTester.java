@@ -44,16 +44,11 @@ public class testPlannerTester extends PlannerTestCase {
     protected void setUp() throws Exception {
         setupSchema(testPlannerTester.class.getResource("testplans-plannerTester-ddl.sql"),
                     "testplans-plannerTester-ddl", true);
-        forceHackPartitioning();
         m_currentDir = new File(".").getCanonicalPath();
         m_homeDir = System.getProperty("user.home");
     }
 
-    @Override
-    protected void tearDown() throws Exception {
-        super.tearDown();
-    }
-
+    /// Unit test some of the techniques used by plannerTester
     public void testGetScanNodeList() {
         AbstractPlanNode pn = null;
         pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;");
@@ -78,8 +73,8 @@ public class testPlannerTester extends PlannerTestCase {
     public void testReAttachFragments() {
         try {
             plannerTester.setUpForTest(m_currentDir+"/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
-                    "testplans-plannerTester-ddl", "L", "a");
-            List<AbstractPlanNode> pnList = plannerTester.compile("select * from l, t where t.a=l.a limit ?;");
+                    "testplans-plannerTester-ddl");
+            List<AbstractPlanNode> pnList = plannerTester.testCompile("select * from l, t where t.a=l.a limit ?;");
             System.out.println( pnList.size() );
             System.out.println( pnList.get(0).toExplainPlanString() );
 
@@ -99,8 +94,8 @@ public class testPlannerTester extends PlannerTestCase {
         AbstractPlanNode pn = null;
         String path = m_homeDir+"/";
         plannerTester.setUpForTest(m_currentDir+"/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
-                "testplans-plannerTester-ddl", "L", "a");
-        List<AbstractPlanNode> pnList = plannerTester.compile("select * from l, t where t.a=l.a limit ?;");
+                "testplans-plannerTester-ddl");
+        List<AbstractPlanNode> pnList = plannerTester.testCompile("select * from l, t where t.a=l.a limit ?;");
 
         System.out.println( pnList.size() );
 
@@ -133,7 +128,7 @@ public class testPlannerTester extends PlannerTestCase {
 
         String path = m_homeDir+"/";
         plannerTester.setUpForTest(m_currentDir+"/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
-                "testplans-plannerTester-ddl", "L", "a");
+                "testplans-plannerTester-ddl");
         System.out.println( pn.toExplainPlanString() );
         System.out.println( pn.toJSONString() );
         plannerTester.writePlanToFile( pn, path, "prettyJson.txt", "");
@@ -154,6 +149,7 @@ public class testPlannerTester extends PlannerTestCase {
         }
     }
 
+    /// Unit test some of the techniques used by plannerTester
     public void testGetList() {
         AbstractPlanNode pn1 = null;
         pn1 = compile("select * from l, t where t.b=l.b limit ?;");
@@ -175,54 +171,61 @@ public class testPlannerTester extends PlannerTestCase {
                                             "Scan time diff :",
                                             "(1 => 2)",
                                             "Table diff at leaf 0:",
-                                            "(INDEXSCAN on T => SEQSCAN on L)",
+                                            "(INDEXSCAN on T => INDEXSCAN on L)",
                                             "Table diff at leaf 1:",
                                             "([] => INDEXSCAN on T)") );
     }
 
+    /// Unit test plannerTester as a plan diff engine.
     public void testJoinDiff()
     {
-        assertTrue( compileDiffMatchPattern(
-                "select count(*) from t;",
-                "select * from l,t where l.a = t.a order by b limit ?;",
-                "Join Node List diff:",
-                "([] => NESTLOOPINDEX[5])"
-                ) );
+        assertTrue( compileDiffMatchPattern("select count(*) from t;",
+                                            "select * from l,t where l.a = t.a order by b limit ?;",
+                                            "Join Node List diff:",
+                                            "([] => NESTLOOPINDEX[5])") );
         assertTrue( compileDiffMatchPattern("select * from l, t where t.a=l.a;",
                                             "select * from l, t where t.b=l.b order by a limit ?;",
                                             "Join Node Type diff:",
                                             "(NESTLOOPINDEX[3] => NESTLOOP[5])") );
     }
 
+    /// Unit test plannerTester as a plan diff engine.
     public void testPlanNodeAndInlinePositionDiff()
     {
         assertTrue( compileDiffMatchPattern("select * from l order by a;",
                                             "select * from l order by a limit ?;",
                                             "ORDERBY diff:",
                                             "([3] => [4])",
-                                            "SEQSCAN diff:",
+                                            "INDEXSCAN diff:",
                                             "([4] => [5])",
                                             "PROJECTION diff:",
                                             "([2] => [3])",
                                             "LIMIT diff:" ,
                                             "([] => [2])",
                                             "Inline PROJECTION diff:",
-                                            "([SEQSCAN[4]] => [SEQSCAN[5]])") );
+                                            "([INDEXSCAN[4]] => [INDEXSCAN[5]])") );
     }
 
+    /// Unit test plannerTester as a plan diff engine.
     public void testComprehensiveDiff()
     {
         assertTrue( compileDiffMatchPattern("select * from l, t where t.a=l.a;",
                                             "select * from l, t where t.b=l.b order by a limit ?;",
-                                            "Diff scan at leaf 1 :",
-                                            "(INDEXSCAN on T => SEQSCAN on T)",
+                                            "Table diff at leaf 0:",
+                                            "(INDEXSCAN on L => SEQSCAN on T)",
+                                            "Table diff at leaf 1:",
+                                            "(INDEXSCAN on T => INDEXSCAN on L)",
                                             "Plan tree size diff: (4 => 7)",
                                             "ORDERBY diff:",
                                             "([] => [4])",
                                             "NESTLOOP diff:",
                                             "([] => [5])",
+                                            "SEQSCAN diff:",
+                                            "([] => [6])",
                                             "PROJECTION diff:",
                                             "([2] => [3])",
+                                            "INDEXSCAN diff:",
+                                            "([4] => [7])",
                                             "LIMIT diff:",
                                             "([] => [2])",
                                             "NESTLOOPINDEX diff:",
@@ -230,7 +233,7 @@ public class testPlannerTester extends PlannerTestCase {
                                             "Inline INDEXSCAN diff:",
                                             "([NESTLOOPINDEX[3]] => [])",
                                             "Inline PROJECTION diff:",
-                                            "([SEQSCAN[4]] => [SEQSCAN[6], SEQSCAN[7]])",
+                                            "([INDEXSCAN[4]] => [SEQSCAN[6], INDEXSCAN[7]])",
                                             "Join Node Type diff:",
                                             "(NESTLOOPINDEX[3] => NESTLOOP[5])") );
     }
@@ -242,22 +245,21 @@ public class testPlannerTester extends PlannerTestCase {
         plannerTester.diff( pn1, pn2, true );
         int numMatched = 0;
         for( String str : plannerTester.m_diffMessages ) {
-            for( String pattern : patterns )
-                if( str.contains( pattern ) )
-                    numMatched++;
+            String[] splits = str.split("\n");
+            for (String split : splits) {
+                int wasMatched = numMatched;
+                for( String pattern : patterns ) {
+                    if( split.trim().equals( pattern ) ) {
+                        numMatched++;
+                        break;
+                    }
+                }
+                if (wasMatched == numMatched) {
+                    System.out.println("Skipped harmless noise? :" + split);
+                }
+            }
         }
         return ( numMatched == patterns.length );
     }
 
-//  public void testMain() {
-//  String[] args = {"-d","-s","-e","-cs",
-//          "-C="+m_currentDir+"/tests/scripts/plannertester/config/test1",
-////          "-C="+m_currentDir+"/tests/scripts/plannertester/config/voltcache",
-////          "-C="+m_currentDir+"/tests/scripts/plannertester/config/voltkv",
-////          "-C="+m_currentDir+"/tests/scripts/plannertester/config/voter",
-//          "-r="+m_homeDir,
-////          "-help"
-//          };
-//  plannerTester.main(args);
-//}
 }

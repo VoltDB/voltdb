@@ -44,6 +44,10 @@ public class TestRateLimitedLogger extends TestCase {
                 break;
             }
         }
-        Mockito.verify(vlogger, Mockito.atLeast(4)).debug("foo");
+        // Rate limited to every 20 ms, we should get this logged
+        // no more than 5 times.  Add an extra possible count just
+        // to be safe; the real goal is that we not see an infinite
+        // number of these.
+        Mockito.verify(vlogger, Mockito.atMost(6)).debug("foo");
     }
 }

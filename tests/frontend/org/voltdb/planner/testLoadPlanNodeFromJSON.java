@@ -34,7 +34,6 @@ public class testLoadPlanNodeFromJSON extends PlannerTestCase {
     protected void setUp() throws Exception {
         setupSchema(TestIndexSelection.class.getResource("testplans-indexselection-ddl.sql"), "testindexselectionplans",
                                                          true);
-        forceHackPartitioning();
     }
 
     @Override

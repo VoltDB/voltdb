@@ -31,7 +31,6 @@ public class TestPlansOrderBy extends PlannerTestCase {
     protected void setUp() throws Exception {
         setupSchema(TestPlansGroupBy.class.getResource("testplans-orderby-ddl.sql"),
                     "testplansorderby", false);
-        forceReplication();
     }
 
     @Override
