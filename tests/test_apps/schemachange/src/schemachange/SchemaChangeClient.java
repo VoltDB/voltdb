@@ -154,7 +154,9 @@ public class SchemaChangeClient {
                     break;
                 case ClientResponse.GRACEFUL_FAILURE:
                     log.error(_F("GRACEFUL_FAILURE response in procedure call for: %s", procName));
-                    // caller should check status as needed.
+                    log.error(((ClientResponseImpl)cr).toJSONString());
+                    logStackTrace(new Throwable());
+                    // caller should always check return status
                     return cr;
                 case ClientResponse.UNEXPECTED_FAILURE:
                 case ClientResponse.USER_ABORT:
