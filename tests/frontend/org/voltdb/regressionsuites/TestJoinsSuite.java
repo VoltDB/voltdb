@@ -609,7 +609,6 @@ public void testThreeTableIndexInnerMultiJoin() throws NoConnectionsException, I
         project.addStmtProcedure("InsertP2", "INSERT INTO P2 VALUES(?, ?);");
         project.addStmtProcedure("InsertP3", "INSERT INTO P3 VALUES(?, ?);");
 
-        /* local
         config = new LocalCluster("testunion-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         if (!config.compile(project)) fail();
         builder.addServerConfig(config);
@@ -618,7 +617,7 @@ public void testThreeTableIndexInnerMultiJoin() throws NoConnectionsException, I
         config = new LocalCluster("testunion-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         if (!config.compile(project)) fail();
         builder.addServerConfig(config);
-*/
+
         // HSQLDB
         config = new LocalCluster("testunion-cluster.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         if (!config.compile(project)) fail();
