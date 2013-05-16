@@ -17,7 +17,10 @@
 
 package org.voltdb;
 
+import java.util.ArrayList;
 import java.util.Iterator;
+
+import org.voltdb.VoltTable.ColumnInfo;
 
 public class IndexStats extends SiteStatsSource {
     public IndexStats(long siteId) {
@@ -27,5 +30,22 @@ public class IndexStats extends SiteStatsSource {
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
         return null;
+    }
+
+    // Generally we fill in this schema from the EE, but we'll provide
+    // this so that we can fill in an empty table before the EE has
+    // provided us with a table.  Make sure that any changes to the EE
+    // schema are reflected here (sigh).
+    @Override
+    protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
+        super.populateColumnSchema(columns);
+        columns.add(new ColumnInfo("PARTITION_ID", VoltType.BIGINT));
+        columns.add(new ColumnInfo("INDEX_NAME", VoltType.STRING));
+        columns.add(new ColumnInfo("TABLE_NAME", VoltType.STRING));
+        columns.add(new ColumnInfo("INDEX_TYPE", VoltType.STRING));
+        columns.add(new ColumnInfo("IS_UNIQUE", VoltType.TINYINT));
+        columns.add(new ColumnInfo("IS_COUNTABLE", VoltType.TINYINT));
+        columns.add(new ColumnInfo("ENTRY_COUNT", VoltType.BIGINT));
+        columns.add(new ColumnInfo("MEMORY_ESTIMATE", VoltType.INTEGER));
     }
 }
