@@ -652,7 +652,7 @@ public abstract class AbstractParsedStmt {
         }
         // collect individual where/join expressions
         Collection<AbstractExpression> exprList = joinTree.getAllExpressions();
-        this.valueEquivalence.putAll(analyzeValueEquivalence(exprList));
+        valueEquivalence.putAll(analyzeValueEquivalence(exprList));
     }
 
     /**
@@ -790,8 +790,10 @@ public abstract class AbstractParsedStmt {
         // Apply implied transitive constant filter to join expressions
         // outer.partkey = ? and outer.partkey = inner.partkey is equivalent to
         // outer.partkey = ? and inner.partkey = ?
-        applyTransitiveEquivalence(joinNode.m_joinInnerList, joinNode.m_joinInnerOuterList);
-        applyTransitiveEquivalence(joinNode.m_joinOuterList, joinNode.m_joinInnerOuterList);
+        applyTransitiveEquivalence(joinNode,
+                                   joinNode.m_joinInnerList,
+                                   joinNode.m_joinOuterList,
+                                   joinNode.m_joinInnerOuterList);
 
         // Classify where expressions into the following categories:
         // 1. The OUTER-only filter conditions. If any are false for a given outer tuple,
@@ -806,8 +808,10 @@ public abstract class AbstractParsedStmt {
                 joinNode.m_whereInnerList, joinNode.m_whereInnerOuterList);
 
         // Apply implied transitive constant filter to where expressions
-        applyTransitiveEquivalence(joinNode.m_whereInnerList, joinNode.m_whereInnerOuterList);
-        applyTransitiveEquivalence(joinNode.m_whereOuterList, joinNode.m_whereInnerOuterList);
+        applyTransitiveEquivalence(joinNode,
+                joinNode.m_whereInnerList,
+                joinNode.m_whereOuterList,
+                joinNode.m_whereInnerOuterList);
     }
 
     /**
@@ -868,11 +872,27 @@ public abstract class AbstractParsedStmt {
         }
     }
 
-    private void applyTransitiveEquivalence(List<AbstractExpression> singleTableExprs, List<AbstractExpression> twoTableExprs) {
+    /**
+     * Apply implied transitive constant filter to join expressions
+     * outer.partkey = ? and outer.partkey = inner.partkey is equivalent to
+     * outer.partkey = ? and inner.partkey = ?
+     * @param joinNode a join node
+     * @param innerTableExprs inner table expressions
+     * @param outerTableExprs outer table expressions
+     * @param innerOuterTableExprs inner-outer tables expressions
+     */
+    private void applyTransitiveEquivalence(JoinNode joinNode,
+                                            List<AbstractExpression> innerTableExprs,
+                                            List<AbstractExpression> outerTableExprs,
+                                            List<AbstractExpression> innerOuterTableExprs) {
+        ArrayList<AbstractExpression> singleTableExprs = new ArrayList<AbstractExpression>();
+        singleTableExprs.addAll(innerTableExprs);
+        singleTableExprs.addAll(outerTableExprs);
         HashMap<AbstractExpression, Set<AbstractExpression> > eqMap1 = analyzeValueEquivalence(singleTableExprs);
 
-        ArrayList<AbstractExpression> simplifiedExprs = new ArrayList<AbstractExpression>();
-        for (AbstractExpression expr : twoTableExprs) {
+        ArrayList<AbstractExpression> simplifiedInnerExprs = new ArrayList<AbstractExpression>();
+        ArrayList<AbstractExpression> simplifiedOuterExprs = new ArrayList<AbstractExpression>();
+        for (AbstractExpression expr : innerOuterTableExprs) {
             if (! isSimpleEquivalenceExpression(expr)) {
                 continue;
             }
@@ -886,17 +906,24 @@ public abstract class AbstractParsedStmt {
                 if (eqSet1 == null) {
                     continue;
                 }
-                singleExpr = leftExpr;
+                singleExpr = rightExpr;
             }
 
             for (AbstractExpression eqExpr : eqSet1) {
                 if (eqExpr instanceof ConstantValueExpression) {
+                    TupleValueExpression tve = null;
                     if (singleExpr == leftExpr) {
                         expr.setLeft(eqExpr);
+                        tve = (TupleValueExpression) rightExpr;
                     } else {
                         expr.setRight(eqExpr);
+                        tve = (TupleValueExpression) leftExpr;
                     }
-                    simplifiedExprs.add(expr);
+                    if (joinNode.isInnerTable(tve.getTableName())) {
+                        simplifiedInnerExprs.add(expr);
+                    } else {
+                        simplifiedOuterExprs.add(expr);
+                    }
                     // Having more than one const value for a single column doesn't make
                     // much sense, right?
                     break;
@@ -905,8 +932,10 @@ public abstract class AbstractParsedStmt {
 
         }
 
-        singleTableExprs.addAll(simplifiedExprs);
-        twoTableExprs.removeAll(simplifiedExprs);
+        innerTableExprs.addAll(simplifiedInnerExprs);
+        outerTableExprs.addAll(simplifiedOuterExprs);
+        innerOuterTableExprs.removeAll(simplifiedInnerExprs);
+        innerOuterTableExprs.removeAll(simplifiedOuterExprs);
     }
 
     /**

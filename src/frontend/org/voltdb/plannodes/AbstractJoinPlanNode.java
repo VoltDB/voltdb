@@ -104,7 +104,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     public void setWherePredicate(AbstractExpression predicate)
     {
         if (predicate != null) {
-            m_wherePredicate = clonePredicate(predicate);
+            m_wherePredicate = (AbstractExpression) predicate.clone();
         }
     }
 
@@ -114,7 +114,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     public void setPreJoinPredicate(AbstractExpression predicate)
     {
         if (predicate != null) {
-            m_preJoinPredicate = clonePredicate(predicate);
+            m_preJoinPredicate = (AbstractExpression) predicate.clone();
         }
     }
 
@@ -124,7 +124,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     public void setJoinPredicate(AbstractExpression predicate)
     {
         if (predicate != null) {
-            m_joinPredicate = clonePredicate(predicate);
+            m_joinPredicate = (AbstractExpression) predicate.clone();
         }
     }
 
@@ -235,30 +235,6 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         if( !jobj.isNull( Members.WHERE_PREDICATE.name() )) {
             m_wherePredicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.WHERE_PREDICATE.name()), db);
         }
-    }
-
-    /**
-     * @param predicate the predicate to set
-     */
-    private AbstractExpression clonePredicate(AbstractExpression srcPredicate)
-    {
-        if (srcPredicate != null)
-        {
-            // PlanNodes all need private deep copies of expressions
-            // so that the resolveColumnIndexes results
-            // don't get bashed by other nodes or subsequent planner runs
-            try
-            {
-                return (AbstractExpression) srcPredicate.clone();
-            }
-            catch (CloneNotSupportedException e)
-            {
-                // This shouldn't ever happen
-                e.printStackTrace();
-                throw new RuntimeException(e.getMessage());
-            }
-        }
-        return null;
     }
 
     /**

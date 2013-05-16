@@ -137,6 +137,35 @@ public class JoinTree {
         }
 
         /**
+         * Returns true if table belongs to the right sub-tree
+         */
+        boolean isInnerTable(String tableName) {
+            return checkTable(tableName, true);
+        }
+
+        /**
+         * Returns true if table belongs to the left sub-tree
+         */
+        boolean isOuterTable(String tableName) {
+            return checkTable(tableName, false);
+        }
+
+        private boolean checkTable(String tableName, boolean checkRight) {
+            if (m_table != null) {
+                return false;
+            }
+            assert(m_rightNode != null && m_leftNode != null);
+            List<Table> innerTables = (checkRight == true) ?
+                    m_rightNode.generateTableJoinOrder() : m_leftNode.generateTableJoinOrder();
+            for (Table table : innerTables) {
+                if (table.getTypeName().equals(tableName)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
          * Returns tables in the order they are joined in the tree by iterating the tree depth-first
          */
         List<Table> generateTableJoinOrder() {

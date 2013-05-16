@@ -131,11 +131,11 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         }
         // Analyze children's where expressions together to identify possible identically
         // partitioned tables
-        analyzeValueEquivalence(m_filterSelectionList);
+        valueEquivalence.putAll(analyzeValueEquivalence(m_filterSelectionList));
 
         // these just shouldn't happen right?
-        assert(this.multiTableSelectionList.size() == 0);
-        assert(this.noTableSelectionList.size() == 0);
+        assert(multiTableSelectionList.size() == 0);
+        assert(noTableSelectionList.size() == 0);
 
         this.sql = sql;
         this.joinOrder = joinOrder;
