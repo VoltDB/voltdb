@@ -18,6 +18,7 @@
 package org.voltdb.rejoin;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -28,6 +29,7 @@ import java.util.Queue;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
@@ -71,7 +73,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     // contains all sites that are waiting to start a snapshot
     private final Queue<Long>                   m_snapshotSites  = new LinkedList<Long>();
     // Mapping of source to destination HSIds for the current snapshot
-    private final ArrayListMultimap<Long, Long> m_destToSource   = ArrayListMultimap.create();
+    private final ArrayListMultimap<Long, Long> m_srcToDest = ArrayListMultimap.create();
     // contains all sites that haven't finished replaying transactions
     private final Queue<Long>                   m_rejoiningSites = new LinkedList<Long>();
     // true if performing live rejoin
@@ -133,10 +135,12 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         }
     }
 
-    private String makeSnapshotRequest(Map<Long, Collection<Long>> sourceToDests)
+    private String makeSnapshotRequest(Multimap<Long, Long> sourceToDests)
     {
+        StreamSnapshotRequestConfig.Stream stream =
+            new StreamSnapshotRequestConfig.Stream(sourceToDests, null, null);
         StreamSnapshotRequestConfig config =
-            new StreamSnapshotRequestConfig(null, sourceToDests, null);
+            new StreamSnapshotRequestConfig(null, Arrays.asList(stream));
         return makeSnapshotRequest(config);
     }
 
@@ -226,12 +230,12 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         String data = null;
         synchronized(m_lock) {
             m_snapshotSites.remove(HSId);
-            m_destToSource.put(masterHSId, dataSinkHSId);
+            m_srcToDest.put(masterHSId, dataSinkHSId);
             m_rejoiningSites.add(HSId);
             nonce = m_nonces.get(HSId);
             if (m_snapshotSites.isEmpty()) {
-                data = makeSnapshotRequest(m_destToSource.asMap());
-                m_destToSource.clear();
+                data = makeSnapshotRequest(m_srcToDest);
+                m_srcToDest.clear();
             }
         }
         if (nonce == null) {

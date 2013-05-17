@@ -323,21 +323,17 @@ public class ElasticHashinator extends TheHashinator {
                 first = token;
             }
 
+            // if start is not null, there's an open range, now is
+            // the time to close it.
+            // else there is no open range, keep on going.
+            if (start != null) {
+                ranges.put(start, token);
+                start = null;
+            }
+
             if (pid == partition) {
                 // if start is null, there's no open range, start one.
-                // else there is already an open range, leave it open.
-                if (start == null) {
-                    start = token;
-                }
-            } else {
-                // hit a token that belongs to a different partition.
-                // if start is not null, there's an open range, now is
-                // the time to close it.
-                // else there is no open range, keep on going.
-                if (start != null) {
-                    ranges.put(start, token);
-                    start = null;
-                }
+                start = token;
             }
         }
 
@@ -351,5 +347,16 @@ public class ElasticHashinator extends TheHashinator {
         }
 
         return ranges;
+    }
+
+    @Override
+    public String toString()
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append(" Token               ").append("   Partition\n");
+        for (Map.Entry<Long, Integer> entry : tokens.entrySet()) {
+            sb.append(String.format("[%20d => %8d]\n", entry.getKey(), entry.getValue()));
+        }
+        return sb.toString();
     }
 }

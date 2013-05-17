@@ -39,6 +39,7 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
@@ -648,7 +649,7 @@ public class MiscUtils {
      * Zip the two lists up into a multimap
      * @return null if one of the lists is empty
      */
-    public static <K, V> Map<K, Collection<V>> zipToMap(List<K> keys, List<V> values)
+    public static <K, V> Multimap<K, V> zipToMap(List<K> keys, List<V> values)
     {
         if (keys.isEmpty() || values.isEmpty()) {
             return null;
@@ -669,7 +670,7 @@ public class MiscUtils {
             result.put(firstKey, valueIter.next());
         }
 
-        return result.asMap();
+        return result;
     }
 
     /**
