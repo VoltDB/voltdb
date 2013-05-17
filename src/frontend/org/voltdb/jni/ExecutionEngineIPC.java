@@ -1135,7 +1135,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
              * Error or no more tuple data for this table.
              */
             if (remaining == -1 || remaining == -2) {
-                return new int[] {(int) remaining};
+                return new int[] {(int) remaining + 1};
             }
 
             final int[] serialized = new int[count];
