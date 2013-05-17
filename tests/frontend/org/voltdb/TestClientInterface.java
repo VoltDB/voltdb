@@ -474,8 +474,10 @@ public class TestClientInterface {
     public void testLoadSinglePartTable() throws IOException {
         VoltTable table = new VoltTable(new ColumnInfo("i", VoltType.INTEGER));
         table.addRow(1);
-        ByteBuffer msg = createMsg("@LoadSinglepartitionTable", new byte[] {4}, "a", table);
-        readAndCheck(msg, "@LoadSinglepartitionTable", new byte[] {4}, false, false, true, false);
+
+        byte[] partitionParam = {0, 0, 0, 0, 0, 0, 0, 4};
+        ByteBuffer msg = createMsg("@LoadSinglepartitionTable", partitionParam, "a", table);
+        readAndCheck(msg, "@LoadSinglepartitionTable", partitionParam, false, false, true, false);
     }
 
     @Test
