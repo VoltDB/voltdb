@@ -25,11 +25,12 @@ import java.util.Map;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import java.util.Map.Entry;
+
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
@@ -154,10 +155,7 @@ public abstract class OpsAgent
 
     private void handleMailboxMessage(VoltMessage message) {
         try {
-            if (message instanceof LocalObjectMessage) {
-                LocalObjectMessage lom = (LocalObjectMessage)message;
-                ((Runnable)lom.payload).run();
-            } else if (message instanceof BinaryPayloadMessage) {
+            if (message instanceof BinaryPayloadMessage) {
                 BinaryPayloadMessage bpm = (BinaryPayloadMessage)message;
                 byte payload[] = CompressionService.decompressBytes(bpm.m_payload);
                 if (bpm.m_metadata[0] == JSON_PAYLOAD) {
@@ -262,11 +260,11 @@ public abstract class OpsAgent
              * Defensively check for an expired request not caught
              * by timeout check. Should never happen.
              */
-            Iterator<PendingOpsRequest> iter = m_pendingRequests.values().iterator();
+            Iterator<Entry<Long, PendingOpsRequest>> iter = m_pendingRequests.entrySet().iterator();
             final long now = System.currentTimeMillis();
             boolean foundExpiredRequest = false;
             while (iter.hasNext()) {
-                PendingOpsRequest por = iter.next();
+                PendingOpsRequest por = iter.next().getValue();
                 if (now - por.startTime > OPS_COLLECTION_TIMEOUT * 2) {
                     iter.remove();
                     foundExpiredRequest = true;

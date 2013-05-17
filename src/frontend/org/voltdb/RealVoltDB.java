@@ -1480,18 +1480,29 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_messenger = null;
 
                 //Also for test code that expects a fresh stats agent
-                // TODO: CLEAN ME UP
                 if (m_statsAgent != null) {
-                    m_statsAgent.shutdown();
-                    m_statsAgent = null;
+                    try {
+                        m_statsAgent.shutdown();
+                    }
+                    finally {
+                        m_statsAgent = null;
+                    }
                 }
                 if (m_catalogAgent != null) {
-                    m_catalogAgent.shutdown();
-                    m_catalogAgent = null;
+                    try {
+                        m_catalogAgent.shutdown();
+                    }
+                    finally {
+                        m_catalogAgent = null;
+                    }
                 }
                 if (m_sysInfoAgent != null) {
-                    m_sysInfoAgent.shutdown();
-                    m_sysInfoAgent = null;
+                    try {
+                        m_sysInfoAgent.shutdown();
+                    }
+                    finally {
+                        m_sysInfoAgent = null;
+                    }
                 }
 
                 if (m_asyncCompilerAgent != null) {

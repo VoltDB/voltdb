@@ -98,6 +98,7 @@ public class StatsAgent extends OpsAgent
     {
         JSONObject obj = new JSONObject();
         obj.put("selector", "STATISTICS");
+        // parseParamsForStatistics has a clumsy contract, see definition
         String err = null;
         if (selector == OpsSelector.STATISTICS) {
             err = parseParamsForStatistics(params, obj);
