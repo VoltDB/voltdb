@@ -314,6 +314,17 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public SystemCatalogAgent getSystemCatalogAgent()
+    {
+        return null;
+    }
+    @Override
+    public SystemInformationAgent getSystemInformationAgent()
+    {
+        return null;
+    }
+
+    @Override
     public MemoryStats getMemoryStatsSource() {
         return null;
     }

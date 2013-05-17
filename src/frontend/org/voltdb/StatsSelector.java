@@ -16,7 +16,7 @@
  */
 package org.voltdb;
 
-public enum SysProcSelector {
+public enum StatsSelector {
     TABLE,            // invoked as @stat table
     INDEX,            // invoked as @stat index
     PROCEDURE,        // invoked as @stat procedure

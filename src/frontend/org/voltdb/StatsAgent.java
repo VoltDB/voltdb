@@ -16,187 +16,38 @@
  */
 package org.voltdb;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 import org.json_voltpatches.JSONObject;
-import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.BinaryPayloadMessage;
-import org.voltcore.messaging.HostMessenger;
-import org.voltcore.messaging.LocalObjectMessage;
-import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
-import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.messaging.LocalMailbox;
-import org.voltdb.utils.CompressionService;
 
 /**
  * Agent responsible for collecting stats on this host.
- *
  */
-public class StatsAgent {
+public class StatsAgent extends OpsAgent
+{
+    private final HashMap<StatsSelector, HashMap<Long, ArrayList<StatsSource>>> registeredStatsSources =
+        new HashMap<StatsSelector, HashMap<Long, ArrayList<StatsSource>>>();
 
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
-    private static final byte JSON_PAYLOAD = 0;
-    private static final byte STATS_PAYLOAD = 1;
-    private static final int MAX_IN_FLIGHT_REQUESTS = 5;
-    static int STATS_COLLECTION_TIMEOUT = 60 * 1000;
-
-    private long m_nextRequestId = 0;
-    private Mailbox m_mailbox;
-    private final ScheduledThreadPoolExecutor m_es =
-        org.voltcore.utils.CoreUtils.getScheduledThreadPoolExecutor("StatsAgent", 1, CoreUtils.SMALL_STACK_SIZE);
-
-    private final HashMap<SysProcSelector, HashMap<Long, ArrayList<StatsSource>>> registeredStatsSources =
-        new HashMap<SysProcSelector, HashMap<Long, ArrayList<StatsSource>>>();
-
-    private HostMessenger m_messenger;
-
-    // Things that would be nice in the future:
-    // 1. Instead of the tables to be aggregates identified by index in the
-    // returned response, they should be named so it's safe if they return in
-    // any order.
-    // 2. Instead of guessing the number of returned tables, it would be nice
-    // if the selector mapped to something that specified the number of
-    // results, the call to get the stats, etc.
-    //
-    private static class PendingStatsRequest {
-        private final String selector;
-        private final Connection c;
-        private final long clientData;
-        private int expectedStatsResponses = 0;
-        private VoltTable[] aggregateTables = null;
-        private final long startTime;
-        public PendingStatsRequest(
-                String selector,
-                Connection c,
-                long clientData,
-                long startTime) {
-            this.startTime = startTime;
-            this.selector = selector;
-            this.c = c;
-            this.clientData = clientData;
-        }
-    }
-
-    private final Map<Long, PendingStatsRequest> m_pendingRequests = new HashMap<Long, PendingStatsRequest>();
-
-    public StatsAgent() {
-        SysProcSelector selectors[] = SysProcSelector.values();
+    public StatsAgent()
+    {
+        super("StatsAgent");
+        StatsSelector selectors[] = StatsSelector.values();
         for (int ii = 0; ii < selectors.length; ii++) {
             registeredStatsSources.put(selectors[ii], new HashMap<Long, ArrayList<StatsSource>>());
         }
-        m_messenger = null;
     }
 
-    public void registerMailbox(final HostMessenger hostMessenger, final long hsId) {
-        m_messenger = hostMessenger;
-        m_messenger.generateMailboxId(hsId);
-        m_mailbox = new LocalMailbox(hostMessenger, hsId) {
-            @Override
-            public void deliver(final VoltMessage message) {
-                m_es.submit(new Runnable() {
-                    @Override
-                    public void run() {
-                        handleMailboxMessage(message);
-                    }
-                });
-            }
-        };
-        hostMessenger.registerMailbox(m_mailbox);
-    }
-
-    private void handleMailboxMessage(VoltMessage message) {
-        try {
-            if (message instanceof LocalObjectMessage) {
-                LocalObjectMessage lom = (LocalObjectMessage)message;
-                ((Runnable)lom.payload).run();
-            } else if (message instanceof BinaryPayloadMessage) {
-                BinaryPayloadMessage bpm = (BinaryPayloadMessage)message;
-                byte payload[] = CompressionService.decompressBytes(bpm.m_payload);
-                if (bpm.m_metadata[0] == JSON_PAYLOAD) {
-                    String jsonString = new String(payload, "UTF-8");
-                    JSONObject obj = new JSONObject(jsonString);
-                    handleJSONMessage(obj);
-                } else if (bpm.m_metadata[0] == STATS_PAYLOAD) {
-                    handleStatsResponse(payload);
-                }
-            }
-        } catch (Throwable e) {
-            hostLog.error("Exception processing message in stats agent " + message, e);
-        }
-
-    }
-
-    private void handleStatsResponse(byte[] payload) throws Exception {
-        ByteBuffer buf = ByteBuffer.wrap(payload);
-        Long requestId = buf.getLong();
-
-        PendingStatsRequest request = m_pendingRequests.get(requestId);
-        if (request == null) {
-            hostLog.warn("Received a stats response for stats request " + requestId + " that no longer exists");
-            return;
-        }
-
-        // The first message we receive will create the correct number of tables.  Nobody else better
-        // disagree or there will be trouble here in River City.  Nobody else better add non-table
-        // stuff after the responses to the returned messages or said trouble will also occur.  Ick, fragile.
-        if (request.aggregateTables == null) {
-            List<VoltTable> tables = new ArrayList<VoltTable>();
-            while (buf.hasRemaining()) {
-                final int tableLength = buf.getInt();
-                int oldLimit = buf.limit();
-                buf.limit(buf.position() + tableLength);
-                ByteBuffer tableBuf = buf.slice();
-                buf.position(buf.limit()).limit(oldLimit);
-                ByteBuffer copy = ByteBuffer.allocate(tableBuf.capacity() * 2);
-                copy.put(tableBuf);
-                copy.limit(copy.position());
-                copy.position(0);
-                VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer( copy, false);
-                tables.add(vt);
-            }
-            request.aggregateTables = tables.toArray(new VoltTable[tables.size()]);
-        }
-        else {
-            for (int ii = 0; ii < request.aggregateTables.length; ii++) {
-                if (buf.hasRemaining()) {
-                    final int tableLength = buf.getInt();
-                    int oldLimit = buf.limit();
-                    buf.limit(buf.position() + tableLength);
-                    ByteBuffer tableBuf = buf.slice();
-                    buf.position(buf.limit()).limit(oldLimit);
-                    VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer( tableBuf, true);
-                    while (vt.advanceRow()) {
-                        request.aggregateTables[ii].add(vt);
-                    }
-                }
-            }
-        }
-
-        request.expectedStatsResponses--;
-        if (request.expectedStatsResponses > 0) return;
-
-        m_pendingRequests.remove(requestId);
-
-        dispatchFinalAggregations(request);
-        sendStatsResponse(request);
-    }
-
-    private void dispatchFinalAggregations(PendingStatsRequest request)
+    @Override
+    protected void dispatchFinalAggregations(PendingOpsRequest request)
     {
-        SysProcSelector selector = SysProcSelector.valueOf(request.selector);
-        switch (selector) {
+        StatsSelector subselector = StatsSelector.valueOf(request.subselector);
+        switch (subselector) {
             case PROCEDUREPROFILE:
                 request.aggregateTables =
                     aggregateProcedureProfileStats(request.aggregateTables);
@@ -206,7 +57,7 @@ public class StatsAgent {
     }
 
     /**
-     * Produce PROCEDUREPROFILE aggregation of PROCEDURE selector
+     * Produce PROCEDUREPROFILE aggregation of PROCEDURE subselector
      */
     private VoltTable[] aggregateProcedureProfileStats(VoltTable[] baseStats)
     {
@@ -237,69 +88,46 @@ public class StatsAgent {
      */
     public synchronized void notifyOfCatalogUpdate() {
         final HashMap<Long, ArrayList<StatsSource>> siteIdToStatsSources =
-            registeredStatsSources.get(SysProcSelector.PROCEDURE);
+            registeredStatsSources.get(StatsSelector.PROCEDURE);
         siteIdToStatsSources.clear();
     }
 
-    public void collectStats(final Connection c, final long clientHandle, final String selector,
-            final boolean interval) throws Exception
+    @Override
+    protected void collectStatsImpl(Connection c, long clientHandle, OpsSelector selector,
+            ParameterSet params) throws Exception
     {
-        m_es.submit(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    collectStatsImpl(c, clientHandle, selector, interval);
-                } catch (Throwable e) {
-                    hostLog.warn("Exception while attempting to collect stats", e);
-                }
-            }
-        });
-    }
-
-    private void collectStatsImpl(Connection c, long clientHandle, String selector, boolean interval)
-        throws Exception
-    {
-        if (m_pendingRequests.size() > MAX_IN_FLIGHT_REQUESTS) {
-            /*
-             * Defensively check for an expired request not caught
-             * by timeout check. Should never happen.
-             */
-            Iterator<PendingStatsRequest> iter = m_pendingRequests.values().iterator();
-            final long now = System.currentTimeMillis();
-            boolean foundExpiredRequest = false;
-            while (iter.hasNext()) {
-                PendingStatsRequest psr = iter.next();
-                if (now - psr.startTime > STATS_COLLECTION_TIMEOUT * 2) {
-                    iter.remove();
-                    foundExpiredRequest = true;
-                }
-            }
-            if (!foundExpiredRequest) {
-                final ClientResponseImpl errorResponse =
-                    new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
-                                         new VoltTable[0], "Too many pending stat requests", clientHandle);
-                ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-                buf.putInt(buf.capacity() - 4);
-                errorResponse.flattenToBuffer(buf).flip();
-                c.writeStream().enqueue(buf);
-                return;
-            }
+        JSONObject obj = new JSONObject();
+        obj.put("selector", "STATISTICS");
+        // parseParamsForStatistics has a clumsy contract, see definition
+        String err = null;
+        if (selector == OpsSelector.STATISTICS) {
+            err = parseParamsForStatistics(params, obj);
         }
+        else {
+            err = "StatsAgent received non-STATISTICS selector: " + selector.name();
+        }
+        if (err != null) {
+            sendErrorResponse(c, ClientResponse.GRACEFUL_FAILURE, err, clientHandle);
+            return;
+        }
+        String subselector = obj.getString("subselector");
 
         // Some selectors can provide a single answer based on global data.
         // Intercept them and respond before doing the distributed stuff.
-        if (selector.equals("TOPO")) {
-            PendingStatsRequest psr = new PendingStatsRequest(
+        if (subselector.equalsIgnoreCase("TOPO")) {
+            PendingOpsRequest psr = new PendingOpsRequest(
                 selector,
+                subselector,
                 c,
                 clientHandle,
                 System.currentTimeMillis());
             collectTopoStats(psr);
             return;
         }
-        else if (selector.equals("PARTITIONCOUNT")) {
-            PendingStatsRequest psr = new PendingStatsRequest(
+        else if (subselector.equalsIgnoreCase("PARTITIONCOUNT")) {
+            PendingOpsRequest psr = new PendingOpsRequest(
                 selector,
+                subselector,
                 c,
                 clientHandle,
                 System.currentTimeMillis());
@@ -307,91 +135,69 @@ public class StatsAgent {
             return;
         }
 
-        PendingStatsRequest psr =
-            new PendingStatsRequest(
+        PendingOpsRequest psr =
+            new PendingOpsRequest(
                     selector,
+                    subselector,
                     c,
                     clientHandle,
                     System.currentTimeMillis());
-        final long requestId = m_nextRequestId++;
-        m_pendingRequests.put(requestId, psr);
-        m_es.schedule(new Runnable() {
-            @Override
-            public void run() {
-                checkForRequestTimeout(requestId);
-            }
-        },
-        STATS_COLLECTION_TIMEOUT,
-        TimeUnit.MILLISECONDS);
+        distributeOpsWork(psr, obj);
+    }
 
-        JSONObject obj = new JSONObject();
-        obj.put("requestId", requestId);
-        obj.put("returnAddress", m_mailbox.getHSId());
-        obj.put("selector", selector);
+    // Parse the provided parameter set object and fill in subselector and interval into
+    // the provided JSONObject.  If there's an error, return that in the String, otherwise
+    // return null.  Yes, ugly.  Bang it out, then refactor later.
+    private String parseParamsForStatistics(ParameterSet params, JSONObject obj) throws Exception
+    {
+        if ((params.toArray().length < 1) || (params.toArray().length > 2)) {
+            return "Incorrect number of arguments to @Statistics (expects 2, received " +
+                    params.toArray().length + ")";
+        }
+        Object first = params.toArray()[0];
+        if (!(first instanceof String)) {
+            return "First argument to @Statistics must be a valid STRING selector, instead was " +
+                    first;
+        }
+        String subselector = (String)first;
+        try {
+            StatsSelector s = StatsSelector.valueOf(subselector.toUpperCase());
+            subselector = s.name();
+        }
+        catch (Exception e) {
+            return "First argument to @Statistics must be a valid STRING selector, instead was " +
+                    first;
+        }
+
+        boolean interval = false;
+        if (params.toArray().length == 2) {
+            interval = ((Number)(params.toArray()[1])).longValue() == 1L;
+        }
+        obj.put("subselector", subselector);
         obj.put("interval", interval);
-        byte payloadBytes[] = CompressionService.compressBytes(obj.toString(4).getBytes("UTF-8"));
-        for (int hostId : m_messenger.getLiveHostIds()) {
-            long agentHsId = CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.STATS_SITE_ID);
-            psr.expectedStatsResponses++;
-            BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[] {JSON_PAYLOAD}, payloadBytes);
-            m_mailbox.send(agentHsId, bpm);
-        }
+
+        return null;
     }
 
-    private void checkForRequestTimeout(long requestId) {
-        PendingStatsRequest psr = m_pendingRequests.remove(requestId);
-        if (psr == null) {
-            return;
+    @Override
+    protected void handleJSONMessage(JSONObject obj) throws Exception {
+        VoltTable[] results = null;
+
+        OpsSelector selector = OpsSelector.valueOf(obj.getString("selector").toUpperCase());
+        if (selector == OpsSelector.STATISTICS) {
+            results = collectDistributedStats(obj);
         }
-        hostLog.warn("Stats request " + requestId + " timed out, sending error to client");
-
-        ClientResponseImpl response =
-            new ClientResponseImpl(
-                    ClientResponse.GRACEFUL_FAILURE,
-                    ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
-                    null,
-                    new VoltTable[0], "Stats request hit sixty second timeout before all responses were received");
-        response.setClientHandle(psr.clientData);
-        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
-        buf.putInt(buf.capacity() - 4);
-        response.flattenToBuffer(buf).flip();
-        psr.c.writeStream().enqueue(buf);
-    }
-
-    private void sendStatsResponse(PendingStatsRequest request) throws Exception {
-        byte statusCode = ClientResponse.SUCCESS;
-        String statusString = null;
-        /*
-         * It is possible not to receive a table response if a feature is not enabled
-         */
-        // All of the null/empty table handling/detecting/generation sucks.  Just making it
-        // work for now, not making it pretty. --izzy
-        VoltTable responseTables[] = request.aggregateTables;
-        if (responseTables == null || responseTables.length == 0) {
-            responseTables = new VoltTable[0];
-            statusCode = ClientResponse.GRACEFUL_FAILURE;
-            statusString =
-                "Requested statistic \"" + request.selector +
-                "\" is not yet available or not supported in the current configuration.";
+        else {
+            hostLog.warn("StatsAgent received a non-STATISTICS OPS selector: " + selector);
         }
 
-        ClientResponseImpl response =
-            new ClientResponseImpl(statusCode, ClientResponse.UNINITIALIZED_APP_STATUS_CODE, null, responseTables, statusString);
-        response.setClientHandle(request.clientData);
-        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
-        buf.putInt(buf.capacity() - 4);
-        response.flattenToBuffer(buf).flip();
-        request.c.writeStream().enqueue(buf);
+        sendOpsResponse(results, obj);
     }
 
-    private void handleJSONMessage(JSONObject obj) throws Exception {
-        collectDistributedStats(obj);
-    }
-
-    private void collectTopoStats(PendingStatsRequest psr)
+    private void collectTopoStats(PendingOpsRequest psr)
     {
         VoltTable[] tables = null;
-        VoltTable topoStats = getStatsAggregate(SysProcSelector.TOPO, false, psr.startTime);
+        VoltTable topoStats = getStatsAggregate(StatsSelector.TOPO, false, psr.startTime);
         if (topoStats != null) {
             tables = new VoltTable[2];
             tables[0] = topoStats;
@@ -406,16 +212,16 @@ public class StatsAgent {
         psr.aggregateTables = tables;
 
         try {
-            sendStatsResponse(psr);
+            sendClientResponse(psr);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to return TOPO results to client.", true, e);
         }
     }
 
-    private void collectPartitionCount(PendingStatsRequest psr)
+    private void collectPartitionCount(PendingOpsRequest psr)
     {
         VoltTable[] tables = null;
-        VoltTable pcStats = getStatsAggregate(SysProcSelector.PARTITIONCOUNT, false, psr.startTime);
+        VoltTable pcStats = getStatsAggregate(StatsSelector.PARTITIONCOUNT, false, psr.startTime);
         if (pcStats != null) {
             tables = new VoltTable[1];
             tables[0] = pcStats;
@@ -423,23 +229,20 @@ public class StatsAgent {
         psr.aggregateTables = tables;
 
         try {
-            sendStatsResponse(psr);
+            sendClientResponse(psr);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to return PARTITIONCOUNT to client", true, e);
         }
     }
 
-    private void collectDistributedStats(JSONObject obj) throws Exception
+    private VoltTable[] collectDistributedStats(JSONObject obj) throws Exception
     {
-        long requestId = obj.getLong("requestId");
-        long returnAddress = obj.getLong("returnAddress");
-
         VoltTable[] stats = null;
         // dispatch to collection
-        String selectorString = obj.getString("selector");
+        String subselectorString = obj.getString("subselector");
         boolean interval = obj.getBoolean("interval");
-        SysProcSelector selector = SysProcSelector.valueOf(selectorString);
-        switch (selector) {
+        StatsSelector subselector = StatsSelector.valueOf(subselectorString);
+        switch (subselector) {
             case DR:
                 stats = collectDRStats();
                 break;
@@ -487,45 +290,14 @@ public class StatsAgent {
                 stats = collectManagementStats(interval);
                 break;
             default:
-                // Should have been successfully groomed in ClientInterface.dispatchStatistics().  Log something
+                // Should have been successfully groomed in collectStatsImpl().  Log something
                 // for our information but let the null check below return harmlessly
-                hostLog.warn("Received unknown stats selector in StatsAgent: " + selector.name() +
+                hostLog.warn("Received unknown stats selector in StatsAgent: " + subselector.name() +
                         ", this should be impossible.");
                 stats = null;
         }
 
-        // Send a response with no data since the stats is not supported or not yet available
-        if (stats == null) {
-            ByteBuffer responseBuffer = ByteBuffer.allocate(8);
-            responseBuffer.putLong(requestId);
-            byte responseBytes[] = CompressionService.compressBytes(responseBuffer.array());
-            BinaryPayloadMessage bpm = new BinaryPayloadMessage( new byte[] {STATS_PAYLOAD}, responseBytes);
-            m_mailbox.send(returnAddress, bpm);
-            return;
-        }
-
-        ByteBuffer[] bufs = new ByteBuffer[stats.length];
-        int statbytes = 0;
-        for (int i = 0; i < stats.length; i++) {
-            bufs[i] = stats[i].getBuffer();
-            bufs[i].position(0);
-            statbytes += bufs[i].remaining();
-        }
-
-        ByteBuffer responseBuffer = ByteBuffer.allocate(
-                8 + // requestId
-                4 * stats.length + // length prefix for each stats table
-                + statbytes);
-        responseBuffer.putLong(requestId);
-        for (int i = 0; i < bufs.length; i++) {
-            responseBuffer.putInt(bufs[i].remaining());
-            responseBuffer.put(bufs[i]);
-        }
-        byte responseBytes[] = CompressionService.compressBytes(responseBuffer.array());
-
-        BinaryPayloadMessage bpm = new BinaryPayloadMessage( new byte[] {STATS_PAYLOAD}, responseBytes);
-        m_mailbox.send(returnAddress, bpm);
-
+        return stats;
     }
 
     private VoltTable[] collectDRStats()
@@ -547,7 +319,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable nodeStats = getStatsAggregate(SysProcSelector.DRNODE, false, now);
+        VoltTable nodeStats = getStatsAggregate(StatsSelector.DRNODE, false, now);
         if (nodeStats != null) {
             stats = new VoltTable[1];
             stats[0] = nodeStats;
@@ -560,7 +332,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable partitionStats = getStatsAggregate(SysProcSelector.DRPARTITION, false, now);
+        VoltTable partitionStats = getStatsAggregate(StatsSelector.DRPARTITION, false, now);
         if (partitionStats != null) {
             stats = new VoltTable[1];
             stats[0] = partitionStats;
@@ -573,7 +345,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable ssStats = getStatsAggregate(SysProcSelector.SNAPSHOTSTATUS, false, now);
+        VoltTable ssStats = getStatsAggregate(StatsSelector.SNAPSHOTSTATUS, false, now);
         if (ssStats != null) {
             stats = new VoltTable[1];
             stats[0] = ssStats;
@@ -586,7 +358,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable mStats = getStatsAggregate(SysProcSelector.MEMORY, interval, now);
+        VoltTable mStats = getStatsAggregate(StatsSelector.MEMORY, interval, now);
         if (mStats != null) {
             stats = new VoltTable[1];
             stats[0] = mStats;
@@ -599,7 +371,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable iStats = getStatsAggregate(SysProcSelector.IOSTATS, interval, now);
+        VoltTable iStats = getStatsAggregate(StatsSelector.IOSTATS, interval, now);
         if (iStats != null) {
             stats = new VoltTable[1];
             stats[0] = iStats;
@@ -612,7 +384,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable iStats = getStatsAggregate(SysProcSelector.INITIATOR, interval, now);
+        VoltTable iStats = getStatsAggregate(StatsSelector.INITIATOR, interval, now);
         if (iStats != null) {
             stats = new VoltTable[1];
             stats[0] = iStats;
@@ -625,7 +397,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable tStats = getStatsAggregate(SysProcSelector.TABLE, interval, now);
+        VoltTable tStats = getStatsAggregate(StatsSelector.TABLE, interval, now);
         if (tStats != null) {
             stats = new VoltTable[1];
             stats[0] = tStats;
@@ -638,7 +410,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable tStats = getStatsAggregate(SysProcSelector.INDEX, interval, now);
+        VoltTable tStats = getStatsAggregate(StatsSelector.INDEX, interval, now);
         if (tStats != null) {
             stats = new VoltTable[1];
             stats[0] = tStats;
@@ -651,7 +423,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable pStats = getStatsAggregate(SysProcSelector.PROCEDURE, interval, now);
+        VoltTable pStats = getStatsAggregate(StatsSelector.PROCEDURE, interval, now);
         if (pStats != null) {
             stats = new VoltTable[1];
             stats[0] = pStats;
@@ -665,7 +437,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable sStats = getStatsAggregate(SysProcSelector.STARVATION, interval, now);
+        VoltTable sStats = getStatsAggregate(StatsSelector.STARVATION, interval, now);
         if (sStats != null) {
             stats = new VoltTable[1];
             stats[0] = sStats;
@@ -678,7 +450,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable pStats = getStatsAggregate(SysProcSelector.PLANNER, interval, now);
+        VoltTable pStats = getStatsAggregate(StatsSelector.PLANNER, interval, now);
         if (pStats != null) {
             stats = new VoltTable[1];
             stats[0] = pStats;
@@ -691,7 +463,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable lStats = getStatsAggregate(SysProcSelector.LIVECLIENTS, interval, now);
+        VoltTable lStats = getStatsAggregate(StatsSelector.LIVECLIENTS, interval, now);
         if (lStats != null) {
             stats = new VoltTable[1];
             stats[0] = lStats;
@@ -707,7 +479,7 @@ public class StatsAgent {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;
 
-        VoltTable lStats = getStatsAggregate(SysProcSelector.LATENCY, interval, now);
+        VoltTable lStats = getStatsAggregate(StatsSelector.LATENCY, interval, now);
         if (lStats != null) {
             stats = new VoltTable[1];
             stats[0] = lStats;
@@ -728,7 +500,7 @@ public class StatsAgent {
         VoltTable[] sStats = collectStarvationStats(interval);
         // Ugh, this is ugly.  Currently need to return null if
         // we're missing any of the tables so that we
-        // don't screw up the aggregation in handleStatsMessage (see my rant there)
+        // don't screw up the aggregation in handleStatsResponse (see my rant there)
         if (mStats == null || iStats == null || pStats == null ||
             ioStats == null || tStats == null || indStats == null ||
             sStats == null)
@@ -747,7 +519,7 @@ public class StatsAgent {
         return stats;
     }
 
-    public synchronized void registerStatsSource(SysProcSelector selector, long siteId, StatsSource source) {
+    public synchronized void registerStatsSource(StatsSelector selector, long siteId, StatsSource source) {
         assert selector != null;
         assert source != null;
         final HashMap<Long, ArrayList<StatsSource>> siteIdToStatsSources = registeredStatsSources.get(selector);
@@ -772,14 +544,14 @@ public class StatsAgent {
      * @return  statistics VoltTable results
      */
     public synchronized VoltTable getStatsAggregate(
-            final SysProcSelector selector,
+            final StatsSelector selector,
             final boolean interval,
             final Long now) {
         return getStatsAggregateInternal(selector, interval, now, null);
     }
 
     private synchronized VoltTable getStatsAggregateInternal(
-            final SysProcSelector selector,
+            final StatsSelector selector,
             final boolean interval,
             final Long now,
             VoltTable prevResults)
@@ -842,10 +614,5 @@ public class StatsAgent {
             }
         }
         return resultTable;
-    }
-
-    public void shutdown() throws InterruptedException {
-        m_es.shutdown();
-        m_es.awaitTermination(1, TimeUnit.DAYS);
     }
 }

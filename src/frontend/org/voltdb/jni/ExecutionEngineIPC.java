@@ -33,7 +33,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.FragmentPlanSource;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
-import org.voltdb.SysProcSelector;
+import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltTable;
@@ -878,7 +878,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public VoltTable[] getStats(
-            final SysProcSelector selector,
+            final StatsSelector selector,
             final int[] locators,
             final boolean interval,
             final Long now) {

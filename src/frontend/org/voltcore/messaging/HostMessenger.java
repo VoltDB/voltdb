@@ -147,10 +147,13 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private static final VoltLogger m_logger = new VoltLogger("org.voltdb.messaging.impl.HostMessenger");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
+    // I want to make these more dynamic at some point in the future --izzy
     public static final int AGREEMENT_SITE_ID = -1;
     public static final int STATS_SITE_ID = -2;
     public static final int ASYNC_COMPILER_SITE_ID = -3;
     public static final int CLIENT_INTERFACE_SITE_ID = -4;
+    public static final int SYSCATALOG_SITE_ID = -5;
+    public static final int SYSINFO_SITE_ID = -6;
 
     // we should never hand out this site ID.  Use it as an empty message destination
     public static final int VALHALLA = Integer.MIN_VALUE;
