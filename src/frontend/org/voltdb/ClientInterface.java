@@ -1652,6 +1652,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * differently, so have to convert it back to long if it's a number. UGLY!!!
      */
     ClientResponseImpl dispatchLoadSinglepartitionTable(ByteBuffer buf,
+                                                        Procedure catProc,
                                                         StoredProcedureInvocation task,
                                                         ClientInputHandler handler,
                                                         Connection ccxn)
@@ -1659,7 +1660,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         int[] involvedPartitions = null;
         try {
             CatalogMap<Table> tables = m_catalogContext.get().database.getTables();
-            Object valueToHash = convertByteArrayToPartitioningParamObject(tables, task);
+            Object valueToHash = getLoadSinglePartitionTablePartitionParam(tables, task);
             involvedPartitions = new int[]{TheHashinator.hashToPartition(valueToHash)};
         }
         catch (Exception e) {
@@ -1671,9 +1672,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         createTransaction(handler.connectionId(), handler.m_hostname,
                           handler.isAdmin(),
                           task,
-                          false,      // read only
-                          true,       // single partition
-                          false,      // every site
+                          catProc.getReadonly(),
+                          catProc.getSinglepartition(),
+                          catProc.getEverysite(),
                           involvedPartitions,
                           ccxn, buf.capacity(),
                           System.currentTimeMillis());
@@ -1683,7 +1684,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     /**
      * XXX: This should go away when we get rid of the legacy hashinator.
      */
-    private static Object convertByteArrayToPartitioningParamObject(CatalogMap<Table> tables,
+    private static Object getLoadSinglePartitionTablePartitionParam(CatalogMap<Table> tables,
                                                                     StoredProcedureInvocation spi)
         throws Exception
     {
@@ -1931,8 +1932,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     sendSentinelsToAllPartitions(task.getOriginalTxnId());
                 }
             } else if (task.procName.equals("@LoadSinglepartitionTable")) {
-                // TODO: When we get rid of the legacy hashinator, this has to go away
-                return dispatchLoadSinglepartitionTable(buf, task, handler, ccxn);
+                // FUTURE: When we get rid of the legacy hashinator, this should go away
+                return dispatchLoadSinglepartitionTable(buf, catProc, task, handler, ccxn);
             } else if (task.procName.equals("@SnapshotSave")) {
                 m_snapshotDaemon.requestUserSnapshot(task, ccxn);
                 return null;
