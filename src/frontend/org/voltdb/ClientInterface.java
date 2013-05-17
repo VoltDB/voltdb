@@ -22,6 +22,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
@@ -71,10 +72,12 @@ import org.voltcore.utils.Pair;
 import org.voltdb.ClientInterfaceHandleManager.Iv2InFlight;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
+import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.compiler.AdHocPlannedStatement;
@@ -1644,6 +1647,70 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     /**
+     * Coward way out of the legacy hashinator hell. LoadSinglepartitionTable gets the
+     * partitioning parameter as a byte array. Legacy hashinator hashes numbers and byte arrays
+     * differently, so have to convert it back to long if it's a number. UGLY!!!
+     */
+    ClientResponseImpl dispatchLoadSinglepartitionTable(ByteBuffer buf,
+                                                        Procedure catProc,
+                                                        StoredProcedureInvocation task,
+                                                        ClientInputHandler handler,
+                                                        Connection ccxn)
+    {
+        int[] involvedPartitions = null;
+        try {
+            CatalogMap<Table> tables = m_catalogContext.get().database.getTables();
+            Object valueToHash = getLoadSinglePartitionTablePartitionParam(tables, task);
+            involvedPartitions = new int[]{TheHashinator.hashToPartition(valueToHash)};
+        }
+        catch (Exception e) {
+            authLog.warn(e.getMessage());
+            return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                          new VoltTable[0], e.getMessage(), task.clientHandle);
+        }
+        assert(involvedPartitions != null);
+        createTransaction(handler.connectionId(), handler.m_hostname,
+                          handler.isAdmin(),
+                          task,
+                          catProc.getReadonly(),
+                          catProc.getSinglepartition(),
+                          catProc.getEverysite(),
+                          involvedPartitions,
+                          ccxn, buf.capacity(),
+                          System.currentTimeMillis());
+        return null;
+    }
+
+    /**
+     * XXX: This should go away when we get rid of the legacy hashinator.
+     */
+    private static Object getLoadSinglePartitionTablePartitionParam(CatalogMap<Table> tables,
+                                                                    StoredProcedureInvocation spi)
+        throws Exception
+    {
+        byte[] paramBytes = (byte[]) spi.getParameterAtIndex(0);
+        String tableName = (String) spi.getParameterAtIndex(1);
+
+        // get the table from the catalog
+        Table catTable = tables.getIgnoreCase(tableName);
+        if (catTable == null) {
+            throw new Exception(String .format("Unable to find target table \"%s\" for LoadSinglepartitionTable.",
+                                               tableName));
+        }
+
+        Column pCol = catTable.getPartitioncolumn();
+        VoltType paramType = VoltType.get((byte) pCol.getType());
+        ByteBuffer paramBuf = ByteBuffer.wrap(paramBytes);
+        paramBuf.order(ByteOrder.LITTLE_ENDIAN);
+
+        if (paramType.isNumber()) {
+            return paramBuf.getLong();
+        } else {
+            return paramBytes;
+        }
+    }
+
+    /**
      * Send a multipart sentinel to all partitions. This is only used when the
      * multipart didn't generate any sentinels for partitions, e.g. DR
      * @LoadMultipartitionTable.
@@ -1847,6 +1914,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         task.getType() == ProcedureInvocationType.REPLICATED) {
                     sendSentinelsToAllPartitions(task.getOriginalTxnId());
                 }
+            } else if (task.procName.equals("@LoadSinglepartitionTable")) {
+                // FUTURE: When we get rid of the legacy hashinator, this should go away
+                return dispatchLoadSinglepartitionTable(buf, catProc, task, handler, ccxn);
             } else if (task.procName.equals("@SnapshotSave")) {
                 m_snapshotDaemon.requestUserSnapshot(task, ccxn);
                 return null;
