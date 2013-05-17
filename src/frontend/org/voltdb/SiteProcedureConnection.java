@@ -148,7 +148,7 @@ public interface SiteProcedureConnection {
                              Integer partitionId,
                              String tableSignature);
 
-    public VoltTable[] getStats(SysProcSelector selector, int[] locators,
+    public VoltTable[] getStats(StatsSelector selector, int[] locators,
                                 boolean interval, Long now);
 
     // Snapshot services provided by the site

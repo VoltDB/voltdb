@@ -82,6 +82,7 @@ public class TestClientInterface {
     // mocked objects that CI requires
     private VoltDBInterface m_volt;
     private StatsAgent m_statsAgent;
+    private SystemInformationAgent m_sysinfoAgent;
     private HostMessenger m_messenger;
     private ClientInputHandler m_handler;
     private Cartographer m_cartographer;
@@ -109,6 +110,7 @@ public class TestClientInterface {
         // Set up CI with the mock objects.
         m_volt = mock(VoltDBInterface.class);
         m_statsAgent = mock(StatsAgent.class);
+        m_sysinfoAgent = mock(SystemInformationAgent.class);
         m_messenger = mock(HostMessenger.class);
         m_handler = mock(ClientInputHandler.class);
         m_cartographer = mock(Cartographer.class);
@@ -122,6 +124,7 @@ public class TestClientInterface {
          */
         VoltDB.replaceVoltDBInstanceForTest(m_volt);
         doReturn(m_statsAgent).when(m_volt).getStatsAgent();
+        doReturn(m_sysinfoAgent).when(m_volt).getSystemInformationAgent();
         doReturn(mock(SnapshotCompletionMonitor.class)).when(m_volt).getSnapshotCompletionMonitor();
         doReturn(m_messenger).when(m_volt).getHostMessenger();
         doReturn(mock(VoltNetworkPool.class)).when(m_messenger).getNetwork();
@@ -446,11 +449,12 @@ public class TestClientInterface {
     }
 
     @Test
-    public void testSystemInformation() throws IOException {
+    public void testSystemInformation() throws Exception {
         ByteBuffer msg = createMsg("@SystemInformation");
-        StoredProcedureInvocation invocation =
-                readAndCheck(msg, "@SystemInformation", 1, false, true, false, false);
-        assertEquals("OVERVIEW", invocation.getParams().toArray()[0]);
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNull(resp);
+        verify(m_sysinfoAgent).performOpsAction(any(Connection.class), anyInt(), eq(OpsSelector.SYSTEMINFORMATION),
+                any(ParameterSet.class));
     }
 
     /**
@@ -462,15 +466,8 @@ public class TestClientInterface {
         ByteBuffer msg = createMsg("@Statistics", "DR", 0);
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
-        verify(m_statsAgent).collectStats(any(Connection.class), anyInt(), eq("DR"), any(Boolean.class));
-    }
-
-    @Test
-    public void testStatisticsProc() throws Exception {
-        ByteBuffer msg = createMsg("@Statistics", "table", 0);
-        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
-        assertNull(resp);
-        verify(m_statsAgent).collectStats(any(Connection.class), anyInt(), eq("TABLE"), any(Boolean.class));
+        verify(m_statsAgent).performOpsAction(any(Connection.class), anyInt(), eq(OpsSelector.STATISTICS),
+                any(ParameterSet.class));
     }
 
     @Test

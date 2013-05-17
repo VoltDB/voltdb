@@ -27,7 +27,7 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.FragmentPlanSource;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
-import org.voltdb.SysProcSelector;
+import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
@@ -381,7 +381,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     @Override
     public VoltTable[] getStats(
-            final SysProcSelector selector,
+            final StatsSelector selector,
             final int locators[],
             final boolean interval,
             final Long now)

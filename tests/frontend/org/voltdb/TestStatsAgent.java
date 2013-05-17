@@ -76,7 +76,7 @@ public class TestStatsAgent {
     @After
     public void tearDown() throws Exception {
         MockStatsSource.delay = 0;
-        StatsAgent.STATS_COLLECTION_TIMEOUT = 60 * 1000;
+        StatsAgent.OPS_COLLECTION_TIMEOUT = 60 * 1000;
         m_mvoltdb.shutdown(null);
         VoltDB.replaceVoltDBInstanceForTest(null);
     }
@@ -91,7 +91,7 @@ public class TestStatsAgent {
                 { 42, "42" },
                 { 43, "43" }
         });
-        m_mvoltdb.getStatsAgent().registerStatsSource(SysProcSelector.DRPARTITION, 0, partitionSource);
+        m_mvoltdb.getStatsAgent().registerStatsSource(StatsSelector.DRPARTITION, 0, partitionSource);
 
         List<VoltTable.ColumnInfo> nodeColumns = Arrays.asList(new VoltTable.ColumnInfo[] {
                 new VoltTable.ColumnInfo( "c1", VoltType.STRING),
@@ -102,7 +102,7 @@ public class TestStatsAgent {
                 { "43", 43 },
                 { "42", 43 }
         });
-        m_mvoltdb.getStatsAgent().registerStatsSource(SysProcSelector.DRNODE, 0, nodeSource);
+        m_mvoltdb.getStatsAgent().registerStatsSource(StatsSelector.DRNODE, 0, nodeSource);
 
         List<VoltTable.ColumnInfo> snapshotStatusColumns = Arrays.asList(new VoltTable.ColumnInfo[] {
             new VoltTable.ColumnInfo("c1", VoltType.STRING),
@@ -113,13 +113,33 @@ public class TestStatsAgent {
             {"RYANLOVES", "THEYANKEES"},
             {"NOREALLY", "ASKHIM"}
         });
-        m_mvoltdb.getStatsAgent().registerStatsSource(SysProcSelector.SNAPSHOTSTATUS, 0, snapshotSource);
+        m_mvoltdb.getStatsAgent().registerStatsSource(StatsSelector.SNAPSHOTSTATUS, 0, snapshotSource);
+    }
+
+    private ParameterSet subselect(String subselector, int interval)
+    {
+        Object[] blah = new Object[2];
+        blah[0] = subselector;
+        blah[1] = interval;
+        return ParameterSet.fromArrayWithCopy(blah);
+    }
+
+    @Test
+    public void testInvalidStatisticsSubselector() throws Exception {
+        createAndRegisterStats();
+        m_mvoltdb.getStatsAgent().performOpsAction(m_mockConnection, 32,
+                OpsSelector.STATISTICS, subselect("CRAZY", 0));
+        ClientResponseImpl response = responses.take();
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, response.getStatus());
+        assertEquals("First argument to @Statistics must be a valid STRING selector, instead was CRAZY",
+                response.getStatusString());
+        System.out.println(response.toJSONString());
     }
 
     @Test
     public void testCollectDRStats() throws Exception {
         createAndRegisterStats();
-        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DR", false);
+        m_mvoltdb.getStatsAgent().performOpsAction(m_mockConnection, 32, OpsSelector.STATISTICS, subselect("DR", 0));
         ClientResponseImpl response = responses.take();
 
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
@@ -132,7 +152,8 @@ public class TestStatsAgent {
     @Test
     public void testCollectSnapshotStatusStats() throws Exception {
         createAndRegisterStats();
-        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "SNAPSHOTSTATUS", false);
+        m_mvoltdb.getStatsAgent().performOpsAction( m_mockConnection, 32, OpsSelector.STATISTICS,
+                subselect("SNAPSHOTSTATUS", 0));
         ClientResponseImpl response = responses.take();
 
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
@@ -155,14 +176,15 @@ public class TestStatsAgent {
 
     @Test
     public void testCollectUnavailableStats() throws Exception {
-        for (SysProcSelector selector : SysProcSelector.values()) {
-            m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, selector.name(), false);
+        for (StatsSelector selector : StatsSelector.values()) {
+            m_mvoltdb.getStatsAgent().performOpsAction(m_mockConnection, 32, OpsSelector.STATISTICS,
+                    subselect(selector.name(), 0));
             ClientResponseImpl response = responses.take();
             assertEquals(ClientResponse.GRACEFUL_FAILURE, response.getStatus());
             VoltTable results[] = response.getResults();
             assertEquals(0, results.length);
             assertEquals(
-                    "Requested statistic \"" + selector.name() + "\" is not yet available or not " +
+                    "Requested info \"" + selector.name() + "\" is not yet available or not " +
                     "supported in the current configuration.",
                     response.getStatusString());
         }
@@ -171,18 +193,17 @@ public class TestStatsAgent {
     @Test
     public void testCollectionTimeout() throws Exception {
         createAndRegisterStats();
-        StatsAgent.STATS_COLLECTION_TIMEOUT = 300;
+        StatsAgent.OPS_COLLECTION_TIMEOUT = 300;
         MockStatsSource.delay = 200;
-        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DR", false);
+        m_mvoltdb.getStatsAgent().performOpsAction(m_mockConnection, 32, OpsSelector.STATISTICS, subselect("DR", 0));
         ClientResponseImpl response = responses.take();
 
         assertEquals(ClientResponse.GRACEFUL_FAILURE, response.getStatus());
         VoltTable results[] = response.getResults();
         assertEquals(0, results.length);
         System.out.println(response.getStatusString());
-        assertTrue(
-                "Stats request hit sixty second timeout before all responses were received".equals(
-                response.getStatusString()));
+        assertEquals("OPS request hit sixty second timeout before all responses were received",
+                response.getStatusString());
     }
 
     @Test
@@ -194,7 +215,7 @@ public class TestStatsAgent {
          * Generate a bunch of requests, should get backpressure on some of them
          */
         for (int ii = 0; ii < 12; ii++) {
-            m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DR", false);
+            m_mvoltdb.getStatsAgent().performOpsAction(m_mockConnection, 32, OpsSelector.STATISTICS, subselect("DR", 0));
         }
 
         boolean hadBackpressure = false;
@@ -213,7 +234,7 @@ public class TestStatsAgent {
         /*
          * Now having recieved all responses, it should be possible to collect the stats
          */
-        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DR", false);
+        m_mvoltdb.getStatsAgent().performOpsAction(m_mockConnection, 32, OpsSelector.STATISTICS, subselect("DR", 0));
         ClientResponseImpl response = responses.take();
         verifyResults(response);
     }

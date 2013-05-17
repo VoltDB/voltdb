@@ -34,7 +34,7 @@ import org.voltdb.FragmentPlanSource;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.StatsAgent;
-import org.voltdb.SysProcSelector;
+import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
@@ -113,7 +113,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
         if (statsAgent != null) {
             m_plannerStats = new PlannerStatsCollector(siteId);
-            statsAgent.registerStatsSource(SysProcSelector.PLANNER, siteId, m_plannerStats);
+            statsAgent.registerStatsSource(StatsSelector.PLANNER, siteId, m_plannerStats);
         }
         m_planSource = planSource;
     }
@@ -410,7 +410,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @return Array of results tables. An array of length 0 indicates there are no results. null indicates failure.
      */
     abstract public VoltTable[] getStats(
-            SysProcSelector selector,
+            StatsSelector selector,
             int locators[],
             boolean interval,
             Long now);

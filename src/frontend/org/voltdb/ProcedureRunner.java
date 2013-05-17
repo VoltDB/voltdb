@@ -151,7 +151,7 @@ public class ProcedureRunner {
                 m_site.getCorrespondingPartitionId(),
                 m_catProc);
         VoltDB.instance().getStatsAgent().registerStatsSource(
-                SysProcSelector.PROCEDURE,
+                StatsSelector.PROCEDURE,
                 site.getCorrespondingSiteId(),
                 m_statsCollector);
 

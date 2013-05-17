@@ -253,8 +253,8 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         System.out.println("Test initiators table: " + results[0].toString());
         // Check the schema
         validateSchema(results[0], expectedTable);
-        // One WAREHOUSE.select row per host, plus a row for @SystemCatalog
-        assertEquals(HOSTS + 1, results[0].getRowCount());
+        // One WAREHOUSE.select row per host
+        assertEquals(HOSTS, results[0].getRowCount());
 
         // Verify the invocation counts
         int counts = 0;
@@ -521,10 +521,10 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         results = client.callProcedure("@Statistics", "procedureprofile", 0).getResults();
         System.out.println("\n\n\n" + results[0].toString() + "\n\n\n");
 
-        // expect NEW_ORDER.insert, GoSleep and SystemCatalog
+        // expect NEW_ORDER.insert, GoSleep
         // see TestStatsProcProfile.java for tests of the aggregation itself.
         assertEquals("Validate site filtering for PROCEDUREPROFILE",
-                3, results[0].getRowCount());
+                2, results[0].getRowCount());
     }
 
     public void testIOStatistics() throws Exception {

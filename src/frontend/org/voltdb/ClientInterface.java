@@ -1688,43 +1688,26 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         sendSentinel(invocation.getOriginalTxnId(), initiatorHSId, handle, connectionId, false);
     }
 
-    ClientResponseImpl dispatchStatistics(Procedure sysProc, ByteBuffer buf, StoredProcedureInvocation task,
-            ClientInputHandler handler, Connection ccxn) {
-        ParameterSet params = task.getParams();
-        if ((params.toArray().length < 1) || (params.toArray().length > 2)) {
-            return errorResponse(ccxn, task.clientHandle, ClientResponse.GRACEFUL_FAILURE,
-                    "Incorrect number of arguments to @Statistics (expects 2, received " +
-                    params.toArray().length + ")", null, false);
-        }
-        Object first = params.toArray()[0];
-        if (!(first instanceof String)) {
-            return errorResponse(ccxn, task.clientHandle, ClientResponse.GRACEFUL_FAILURE,
-                    "First argument to @Statistics must be a valid STRING selector, instead was " +
-                    first, null, false);
-        }
-        String selector = (String)first;
+    ClientResponseImpl dispatchStatistics(OpsSelector selector, StoredProcedureInvocation task, Connection ccxn)
+    {
         try {
-            SysProcSelector s = SysProcSelector.valueOf(selector.toUpperCase());
-            selector = s.name();
-        }
-        catch (Exception e) {
-            return errorResponse(ccxn, task.clientHandle, ClientResponse.GRACEFUL_FAILURE,
-                    "First argument to @Statistics must be a valid STRING selector, instead was " +
-                    first, null, false);
-        }
-
-        boolean interval = false;
-        try {
-            if (params.toArray().length == 2) {
-                interval = ((Number)(params.toArray()[1])).longValue() == 1L;
+            if (selector == OpsSelector.STATISTICS) {
+                VoltDB.instance().getStatsAgent().performOpsAction(ccxn, task.clientHandle, selector,
+                        task.getParams());
             }
-        }
-        catch (Exception e) {
-            // ugh, don't care?
-        }
+            else if (selector == OpsSelector.SYSTEMCATALOG) {
+                VoltDB.instance().getSystemCatalogAgent().performOpsAction(ccxn, task.clientHandle, selector,
+                        task.getParams());
+            }
+            else if (selector == OpsSelector.SYSTEMINFORMATION) {
+                VoltDB.instance().getSystemInformationAgent().performOpsAction(ccxn, task.clientHandle, selector,
+                        task.getParams());
+            }
+            else {
+                return errorResponse(ccxn, task.clientHandle, ClientResponse.GRACEFUL_FAILURE,
+                        "Unknown OPS selector", null, true);
+            }
 
-        try {
-            VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, selector, interval);
             return null;
         } catch (Exception e) {
             return errorResponse( ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);
@@ -1868,7 +1851,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 m_snapshotDaemon.requestUserSnapshot(task, ccxn);
                 return null;
             } else if (task.procName.equals("@Statistics")) {
-                return dispatchStatistics(catProc, buf, task, handler, ccxn);
+                return dispatchStatistics(OpsSelector.STATISTICS, task, ccxn);
             } else if (task.procName.equals("@Promote")) {
                 return dispatchPromote(catProc, buf, task, handler, ccxn);
             } else if (task.procName.equals("@SnapshotStatus")) {
@@ -1877,8 +1860,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 Object[] params = new Object[1];
                 params[0] = "SNAPSHOTSTATUS";
                 task.setParams(params);
-                return dispatchStatistics(SystemProcedureCatalog.listing.get("@Statistics").asCatalogProcedure(),
-                        buf, task, handler, ccxn);
+                return dispatchStatistics(OpsSelector.STATISTICS, task, ccxn);
+            } else if (task.procName.equals("@SystemCatalog")) {
+                return dispatchStatistics(OpsSelector.SYSTEMCATALOG, task, ccxn);
+            }
+            else if (task.procName.equals("@SystemInformation")) {
+                return dispatchStatistics(OpsSelector.SYSTEMINFORMATION, task, ccxn);
             }
 
             // If you're going to copy and paste something, CnP the pattern
@@ -1892,14 +1879,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             new VoltTable[0],
                             "" + task.procName + " is not available to this client",
                             task.clientHandle);
-                }
-            }
-            else if (task.procName.equals("@SystemInformation")) {
-                ParameterSet params = task.getParams();
-                // hacky: support old @SystemInformation behavior by
-                // filling in a missing selector to get the overview key/value info
-                if (params.toArray().length == 0) {
-                    task.setParams("OVERVIEW");
                 }
             }
         }

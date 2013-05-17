@@ -153,6 +153,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private ArrayList<ExecutionSiteRunner> m_runners;
     private ExecutionSite m_currentThreadSite;
     private StatsAgent m_statsAgent = new StatsAgent();
+    // TODO: CLEAN ME UP
+    private SystemCatalogAgent m_catalogAgent = new SystemCatalogAgent();
+    private SystemInformationAgent m_sysInfoAgent = new SystemInformationAgent();
+
     private AsyncCompilerAgent m_asyncCompilerAgent = new AsyncCompilerAgent();
     public AsyncCompilerAgent getAsyncCompilerAgent() { return m_asyncCompilerAgent; }
     FaultDistributor m_faultManager;
@@ -318,6 +322,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_messenger = null;
             m_startMode = null;
             m_statsAgent = new StatsAgent();
+            m_catalogAgent = new SystemCatalogAgent();
+            m_sysInfoAgent = new SystemInformationAgent();
             m_asyncCompilerAgent = new AsyncCompilerAgent();
             m_faultManager = null;
             m_snapshotCompletionMonitor = null;
@@ -538,18 +544,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // Initialize stats
             m_ioStats = new IOStats();
-            m_statsAgent.registerStatsSource(SysProcSelector.IOSTATS,
+            m_statsAgent.registerStatsSource(StatsSelector.IOSTATS,
                     0, m_ioStats);
             m_memoryStats = new MemoryStats();
-            m_statsAgent.registerStatsSource(SysProcSelector.MEMORY,
+            m_statsAgent.registerStatsSource(StatsSelector.MEMORY,
                     0, m_memoryStats);
-            m_statsAgent.registerStatsSource(SysProcSelector.TOPO, 0, m_cartographer);
+            m_statsAgent.registerStatsSource(StatsSelector.TOPO, 0, m_cartographer);
             m_partitionCountStats = new PartitionCountStats(m_cartographer);
-            m_statsAgent.registerStatsSource(SysProcSelector.PARTITIONCOUNT,
+            m_statsAgent.registerStatsSource(StatsSelector.PARTITIONCOUNT,
                     0, m_partitionCountStats);
             m_initiatorStats = new InitiatorStats(m_myHostId);
             m_liveClientsStats = new LiveClientsStats();
-            m_statsAgent.registerStatsSource(SysProcSelector.LIVECLIENTS, 0, m_liveClientsStats);
+            m_statsAgent.registerStatsSource(StatsSelector.LIVECLIENTS, 0, m_liveClientsStats);
             m_latencyStats = new LatencyStats(m_myHostId);
 
             /*
@@ -1475,8 +1481,28 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
                 //Also for test code that expects a fresh stats agent
                 if (m_statsAgent != null) {
-                    m_statsAgent.shutdown();
-                    m_statsAgent = null;
+                    try {
+                        m_statsAgent.shutdown();
+                    }
+                    finally {
+                        m_statsAgent = null;
+                    }
+                }
+                if (m_catalogAgent != null) {
+                    try {
+                        m_catalogAgent.shutdown();
+                    }
+                    finally {
+                        m_catalogAgent = null;
+                    }
+                }
+                if (m_sysInfoAgent != null) {
+                    try {
+                        m_sysInfoAgent.shutdown();
+                    }
+                    finally {
+                        m_sysInfoAgent = null;
+                    }
                 }
 
                 if (m_asyncCompilerAgent != null) {
@@ -1694,6 +1720,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public StatsAgent getStatsAgent() {
         return m_statsAgent;
+    }
+
+    // TODO: CLEAN ME UP
+    @Override
+    public SystemCatalogAgent getSystemCatalogAgent() {
+        return m_catalogAgent;
+    }
+    // TODO: CLEAN ME UP
+    @Override
+    public SystemInformationAgent getSystemInformationAgent() {
+        return m_sysInfoAgent;
     }
 
     @Override
