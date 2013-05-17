@@ -303,6 +303,9 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             // Update EE hashinator
             Pair<TheHashinator.HashinatorType, byte[]> currentConfig = TheHashinator.getCurrentConfig();
             context.updateHashinator(currentConfig);
+
+            // Update partition count stored on this site
+            context.setNumberOfPartitions(context.getNumberOfPartitions() + m_newPartitions.size());
         }
     }
 
