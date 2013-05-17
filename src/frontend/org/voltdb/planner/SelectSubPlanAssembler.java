@@ -178,6 +178,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      */
     private void queueOuterSubJoinOrders() {
         assert(m_parsedStmt.joinTree != null);
+        // TODO ENG_3038 >2 table outer join
+        // All join tree modifications must be perform on a clone of the original tree
+
         // Simplify the outer join if possible
         JoinTree simplifiedJoinTree = simplifyOuterJoin(m_parsedStmt.joinTree);
         // It is possible that simplified tree has inner joins only
