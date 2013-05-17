@@ -108,7 +108,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                             saveFilePath,
                             table,
                             context.getHostId(),
-                            tracker.m_numberOfPartitions,
+                            context.getNumberOfPartitions(),
                             txnId,
                             timestamp,
                             tracker.getPartitionsForHost(context.getHostId()));
