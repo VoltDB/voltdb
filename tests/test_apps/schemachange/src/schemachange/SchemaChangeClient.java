@@ -286,13 +286,20 @@ public class SchemaChangeClient {
         }
 
         // don't actually trust the call... manually verify
-        // get the observed schema version; -1 is no table found
         int obsCatVersion = verifyAndGetSchemaVersion();
 
         if (success == true) {
             if (obsCatVersion != schemaVersionNo+1) {
                 log.error(_F("Catalog update was reported to be successful but did not pass verification: expected V%d, observed V%d", schemaVersionNo+1, obsCatVersion));
+            assert(false);
+            System.exit(-1);
             }
+        } else if (obsCatVersion == schemaVersionNo)
+                // UAC didn't work
+                return null;
+        else {
+            assert(false);
+            System.exit(-1);
         }
 
         // if UAC was observed successful, update the count
