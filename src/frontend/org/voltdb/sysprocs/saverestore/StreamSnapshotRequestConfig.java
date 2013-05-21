@@ -67,17 +67,22 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
 
     // stream configs
     public final List<Stream> streams;
+    // true to also do a truncation snapshot
+    public final boolean shouldTruncate;
 
     /**
      * @param tables             See {@link #SnapshotRequestConfig(java.util.List)} for more
      * @param streams            Stream configurations
+     * @param shouldTruncate     true to also generate a truncation snapshot
      */
     public StreamSnapshotRequestConfig(List<Table> tables,
-                                       List<Stream> streams)
+                                       List<Stream> streams,
+                                       boolean shouldTruncate)
     {
         super(tables);
 
         this.streams = ImmutableList.copyOf(streams);
+        this.shouldTruncate = shouldTruncate;
     }
 
     public StreamSnapshotRequestConfig(JSONObject jsData,
@@ -87,6 +92,7 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
         super(jsData, catalogDatabase);
 
         this.streams = parseStreams(jsData, localHSIds);
+        this.shouldTruncate = jsData.optBoolean("shouldTruncate", false);
     }
 
     private ImmutableList<Stream> parseStreams(JSONObject jsData,
@@ -178,6 +184,7 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
     {
         super.toJSONString(stringer);
 
+        stringer.key("shouldTruncate").value(shouldTruncate);
         stringer.key("streams").array();
 
         for (Stream stream : streams) {

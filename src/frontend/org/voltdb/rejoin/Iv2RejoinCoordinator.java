@@ -140,12 +140,12 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         StreamSnapshotRequestConfig.Stream stream =
             new StreamSnapshotRequestConfig.Stream(sourceToDests, null, null);
         StreamSnapshotRequestConfig config =
-            new StreamSnapshotRequestConfig(null, Arrays.asList(stream));
+            new StreamSnapshotRequestConfig(null, Arrays.asList(stream), false);
         return makeSnapshotRequest(config);
     }
 
     @Override
-    public boolean startJoin(Database catalog, Cartographer cartographer) {
+    public boolean startJoin(Database catalog, Cartographer cartographer, String clSnapshotPath) {
         m_startTime = System.currentTimeMillis();
         if (m_liveRejoin) {
             long firstSite;

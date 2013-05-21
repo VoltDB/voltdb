@@ -19,8 +19,6 @@ package org.voltdb.sysprocs.saverestore;
 
 import java.io.IOException;
 
-import java.util.ArrayList;
-
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Set;
@@ -37,6 +35,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
 import com.google.common.primitives.Longs;
 import org.json_voltpatches.JSONObject;
 
@@ -54,7 +53,6 @@ import org.voltdb.expressions.HashRangeExpression;
 import org.voltdb.rejoin.StreamSnapshotDataTarget;
 
 import org.voltdb.SnapshotDataFilter;
-import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
@@ -86,10 +84,25 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         final List<Long> localHSIds = Longs.asList(tracker.getLocalSites());
         final StreamSnapshotRequestConfig config =
             new StreamSnapshotRequestConfig(jsData, context.getDatabase(), localHSIds);
+        final Map<Long, Integer> tokensToAdd = createTokensToAdd(config);
+
+        // Coalesce a truncation snapshot if shouldTruncate is true
+        if (config.shouldTruncate) {
+            /*
+             * The snapshot will only contain existing partitions. Write the new partition count
+             * down in the digest so that we can check if enough command log is collected on
+             * replay.
+             */
+            final int newPartitionCount =
+                calculateNewPartitionCount(context.getNumberOfPartitions(), tokensToAdd);
+            coalesceTruncationSnapshotPlan(file_path, file_nonce, txnId, partitionTransactionIds,
+                                           jsData, context, hostname, result,
+                                           exportSequenceNumbers, tracker, timestamp,
+                                           newPartitionCount);
+        }
 
         // Create post snapshot update hashinator work
         List<Integer> localPartitions = tracker.getPartitionsForHost(context.getHostId());
-        Map<Long, Integer> tokensToAdd = createTokensToAdd(config);
         if (!tokensToAdd.isEmpty()) {
             createUpdateHashinatorTasksForSites(localPartitions, tokensToAdd, txnId);
         }
@@ -137,6 +150,24 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         }
 
         return false;
+    }
+
+    private void coalesceTruncationSnapshotPlan(String file_path, String file_nonce, long txnId,
+                                                Map<Integer, Long> partitionTransactionIds,
+                                                JSONObject jsData,
+                                                SystemProcedureExecutionContext context,
+                                                String hostname, VoltTable result,
+                                                Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+                                                SiteTracker tracker, long timestamp,
+                                                int newPartitionCount)
+        throws IOException
+    {
+        NativeSnapshotWritePlan plan = new NativeSnapshotWritePlan();
+        plan.createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds,
+                                 jsData, context, hostname, result, exportSequenceNumbers,
+                                 tracker, timestamp, newPartitionCount);
+        m_targets.addAll(plan.m_targets);
+        m_taskListsForHSIds.putAll(plan.m_taskListsForHSIds);
     }
 
     /**
@@ -229,6 +260,12 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         return tokenBuilder.build();
     }
 
+    private static int calculateNewPartitionCount(int currentPartitionCount,
+                                                  Map<Long, Integer> tokensToPartitions)
+    {
+        return (currentPartitionCount + Sets.newHashSet(tokensToPartitions.values()).size());
+    }
+
     private static void createUpdateHashinatorTasksForSites(Collection<Integer> localPartitions,
                                                             Map<Long, Integer> tokensToPartitions,
                                                             long txnId)
@@ -282,6 +319,9 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             // Update EE hashinator
             Pair<TheHashinator.HashinatorType, byte[]> currentConfig = TheHashinator.getCurrentConfig();
             context.updateHashinator(currentConfig);
+
+            // Update partition count stored on this site
+            context.setNumberOfPartitions(context.getNumberOfPartitions() + m_newPartitions.size());
         }
     }
 

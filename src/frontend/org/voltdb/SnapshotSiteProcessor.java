@@ -444,14 +444,13 @@ public class SnapshotSiteProcessor {
             Pair<Table, SnapshotPredicates> tableAndPredicate =
                 tablesAndPredicates.get(task.m_table.getRelativeIndex());
             if (tableAndPredicate == null) {
+                // TODO: m_deleteTuples needs to be per-target
                 tableAndPredicate =
                     Pair.of(task.m_table, new SnapshotPredicates(task.m_deleteTuples));
                 tablesAndPredicates.put(task.m_table.getRelativeIndex(), tableAndPredicate);
             }
 
-            if (task.m_predicate != null) {
-                tableAndPredicate.getSecond().addPredicate(task.m_predicate);
-            }
+            tableAndPredicate.getSecond().addPredicate(task.m_predicate);
         }
 
         return tablesAndPredicates;

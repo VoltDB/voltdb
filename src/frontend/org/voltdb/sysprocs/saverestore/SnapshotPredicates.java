@@ -19,7 +19,11 @@ package org.voltdb.sysprocs.saverestore;
 
 import com.google.common.base.Charsets;
 import com.google.common.collect.ImmutableList;
+import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ComparisonExpression;
+import org.voltdb.expressions.ConstantValueExpression;
+import org.voltdb.types.ExpressionType;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -49,11 +53,21 @@ public class SnapshotPredicates {
 
     public byte[] toBytes()
     {
+        // Special case common case where there's only one target with no predicate
+        if (m_predicates.size() == 0 && m_predicates.get(0) == null) {
+            return serializeEmpty();
+        }
+
         byte[][] predicates = new byte[m_predicates.size()][];
         int i = 0;
         int size = 0;
         for (AbstractExpression predicate : m_predicates) {
-            predicates[i] = predicate.toJSONString().getBytes(Charsets.UTF_8);
+            if (predicate == null) {
+                predicates[i] = createAcceptAllPredicate().toJSONString()
+                                    .getBytes(Charsets.UTF_8);
+            } else {
+                predicates[i] = predicate.toJSONString().getBytes(Charsets.UTF_8);
+            }
             size += predicates[i].length;
             i++;
         }
@@ -71,5 +85,30 @@ public class SnapshotPredicates {
         }
 
         return buf.array();
+    }
+
+    private byte[] serializeEmpty()
+    {
+        assert m_predicates.size() == 0 && m_predicates.get(0) == null;
+
+        ByteBuffer buf = ByteBuffer.allocate(1 + // deleteTuples
+                                             4); // predicate count
+
+        buf.put(m_deleteTuples ? 1 : (byte) 0);
+        buf.putInt(0);
+
+        return buf.array();
+    }
+
+    /**
+     * Create a dummy always-true predicate so that EE won't complain.
+     */
+    private static AbstractExpression createAcceptAllPredicate()
+    {
+        ConstantValueExpression constant = new ConstantValueExpression();
+        constant.setValueType(VoltType.TINYINT);
+        constant.setValueSize(VoltType.TINYINT.getLengthInBytesForFixedTypes());
+        constant.setValue("1");
+        return new ComparisonExpression(ExpressionType.COMPARE_EQUAL, constant, constant);
     }
 }
