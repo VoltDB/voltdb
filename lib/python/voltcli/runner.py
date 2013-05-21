@@ -582,6 +582,8 @@ def run_command(verbspace, internal_verbspaces, config, *args, **kwargs):
     # Initialize utility function options according to parsed options.
     utility.set_verbose(command.opts.verbose)
     utility.set_debug(  command.opts.debug)
+    if hasattr(command.opts, 'dryrun'):
+        utility.set_dryrun( command.opts.dryrun)
 
     # Run the command. Pass along kwargs. This allows verbs calling other verbs
     # to add keyword arguments like "classpath".

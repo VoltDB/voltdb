@@ -1,11 +1,5 @@
-#!/usr/bin/env python
 # This file is part of VoltDB.
-
 # Copyright (C) 2008-2013 VoltDB Inc.
-#
-# This file contains original code and/or modifications of original code.
-# Any modifications made by VoltDB Inc. are licensed under the following
-# terms and conditions:
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -17,7 +11,7 @@
 #
 # The above copyright notice and this permission notice shall be
 # included in all copies or substantial portions of the Software.
-
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 # EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 # MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -26,14 +20,22 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import sys
+# All the commands supported by the Voter application.
+
 import os
-import toolrunner
+import schemaobject
 
-description = 'Preview release command line interface to the Voter example in examples/voter.'
-standalone = False
-directory = os.path.join('examples', 'voter')
-verbose = (sys.argv[1:]==['-v'])
 
-toolrunner.vmain(description=description, standalone=standalone,
-                 directory=directory, verbose=verbose)
+@VOLT.Command(
+    description='Access MySQL database schema.',
+    arguments=(
+        VOLT.StringArgument('database',
+                            help='Database name.')
+    )
+)
+def myschema(runner):
+    schema  = schemaobject.SchemaObject('mysql://username:password@localhost:3306/mydb')
+    tables = schema.databases['mydb'].tables #or schema.selected.tables
+    for t in tables:
+        assert tables[t].options['engine'].value == 'InnoDB'
+

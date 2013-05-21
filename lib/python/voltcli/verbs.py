@@ -152,6 +152,7 @@ class CommandVerb(BaseVerb):
         # Allow the bundles to adjust options.
         for bundle in self.bundles:
             bundle.initialize(self)
+        self.add_options(cli.BooleanOption(None, '--dry-run', 'dryrun', None))
 
     def execute(self, runner):
         # Start the bundles, e.g. to create client a connection.

@@ -209,6 +209,22 @@ def find_in_path(name):
     return None
 
 #===============================================================================
+def find_programs(*names):
+#===============================================================================
+    """
+    Check for required programs in the path.
+    """
+    missing = []
+    paths = {}
+    for name in names:
+        paths[name] = find_in_path(name)
+        if paths[name] is None:
+            missing.append(name)
+    if missing:
+        abort('Required program(s) are not in the path:', missing)
+    return paths
+
+#===============================================================================
 class PythonSourceFinder(object):
 #===============================================================================
     """
