@@ -1328,7 +1328,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             try {
                 m_joinCoordinator.setClientInterface(m_clientInterfaces.get(0));
 
-                if (!m_joinCoordinator.startJoin(m_catalogContext.database, m_cartographer)) {
+                String clSnapshotPath = m_catalogContext.cluster.getLogconfig().get("log")
+                                                        .getInternalsnapshotpath();
+
+                if (!m_joinCoordinator.startJoin(m_catalogContext.database,
+                                                 m_cartographer,
+                                                 clSnapshotPath)) {
                     VoltDB.crashLocalVoltDB("Failed to join the cluster", true, null);
                 }
             } catch (Exception e) {
