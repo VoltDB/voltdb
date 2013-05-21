@@ -450,7 +450,6 @@ public class SnapshotSiteProcessor {
                 tablesAndPredicates.put(task.m_table.getRelativeIndex(), tableAndPredicate);
             }
 
-            assert task.m_predicate != null;
             tableAndPredicate.getSecond().addPredicate(task.m_predicate);
         }
 
