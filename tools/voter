@@ -35,5 +35,5 @@ standalone = False
 directory = os.path.join('examples', 'voter')
 verbose = (sys.argv[1:]==['-v'])
 
-toolrunner.vmain(description=description, standalone=standalone,
-                 directory=directory, verbose=verbose)
+toolrunner.main(description=description, standalone=standalone,
+                directory=directory, verbose=verbose)

@@ -1037,3 +1037,20 @@ class VoltResponseWrapper(object):
         if self.table_count() > 0:
             output.append(self.format_tables())
         return '\n\n'.join(output)
+
+#===============================================================================
+class MessageDict(dict):
+#===============================================================================
+    """
+    Message dictionary provides message numbers as attributes or the messages
+    by looking up that message number in the underlying dictionary.
+        messages.MY_MESSAGE == <integer index>
+        messages[messages.MY_MESSAGE] == <string>
+    """
+    def __init__(self, **kwargs):
+        dict.__init__(self)
+        i = 0
+        for key in kwargs:
+            i += 1
+            self[i] = kwargs[key]
+            setattr(self, key, i)

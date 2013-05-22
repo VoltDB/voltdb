@@ -56,24 +56,24 @@ class G:
     verbose = False
 
 
-def main(description='(no description)', standalone=False, directory=None, verbose=False, cmd_path=None):
+def go(cmd_name, cmd_dir, base_dir, description, standalone, directory, verbose, *args):
     """
     Run tool after tweaking the Python library path to find voltcli libraries.
     Optionally change to a relative or absolute directory provided by the
     caller. The base directory is this file's parent directory and serves as
     the default working directory.
+    :param cmd_name:
+    :param cmd_dir:
+    :param base_dir:
     :param description:
     :param standalone:
     :param directory:
     :param verbose:
+    :param args:
     """
     G.verbose = verbose
     start_logging()
     try:
-        if not cmd_path:
-            cmd_path = sys.argv[0]
-        cmd_dir, cmd_name = os.path.split(os.path.realpath(cmd_path))
-        base_dir = os.path.dirname(cmd_dir)
         version = None
         try:
             # noinspection PyUnresolvedReferences
@@ -98,14 +98,28 @@ def main(description='(no description)', standalone=False, directory=None, verbo
         except ImportError:
             abort('Unable to import voltcli.runner using the following path:', sys.path)
         runner.main(cmd_name, cmd_dir, version, description,
-                    standalone=to_boolean(standalone), *sys.argv[1:])
+                    standalone=to_boolean(standalone), *args)
     finally:
         stop_logging()
 
 
+def main(description='(no description)', standalone=False, directory=None, verbose=False):
+    """
+    Main entry point for commands not running in a virtual environment.
+    :param description:
+    :param standalone:
+    :param directory:
+    :param verbose:
+    """
+    cmd_path = sys.argv[0]
+    cmd_dir, cmd_name = os.path.split(os.path.realpath(cmd_path))
+    base_dir = os.path.dirname(cmd_dir)
+    go(cmd_name, cmd_dir, base_dir, description, standalone, directory, verbose, *sys.argv[1:])
+
+
 def vmain(description='(no description)', standalone=False, directory='', packages=None, verbose=False):
     """
-    Run tool using virtual environment that will be created here as required.
+    Main entry point for commands running in an auto-generated virtual environment.
     :param description:
     :param standalone:
     :param directory:
@@ -129,7 +143,7 @@ def vmain(description='(no description)', standalone=False, directory='', packag
             try:
                 os.chdir(venv_base)
                 info('Initializing Python virtual environment ...')
-                run_cmd(virtualenv, '--clear', sys.platform)
+                run_cmd(virtualenv, '--clear', '--system-site-packages', sys.platform)
                 if packages:
                     for package in packages:
                         info('Installing package "%s" into virtual environment ...' % package)
@@ -140,8 +154,18 @@ def vmain(description='(no description)', standalone=False, directory='', packag
         # Exec the toolrunner.py script inside the virtual environment by using
         # the virtual environment's Python.
         python = os.path.join(venv_dir, 'bin', 'python')
-        args = [python, G.module_path, str(description), str(standalone), str(directory),
-                str(verbose), sys.argv[0]]
+        #def go(cmd_name, cmd_dir, base_dir, description, standalone, directory, verbose, *args):
+        args = [
+            python,
+            G.module_path,
+            G.script_name,
+            G.script_dir,
+            os.path.dirname(G.script_dir),
+            str(description),
+            str(standalone),
+            str(directory),
+            str(verbose),
+        ] + sys.argv[1:]
         verbose_info('Re-starting with virtual environment:', args)
         os.execvp(python, args)
     except KeyboardInterrupt:
@@ -353,4 +377,4 @@ if __name__ == '__main__':
     # vmain() re-exec's this script after setting up a virtual environment.
     # Since it runs with the virtual environment Python and libraries, just
     # call the main() here. It will convert CLI string arguments as needed.
-    main(*sys.argv[1:])
+    go(*sys.argv[1:])

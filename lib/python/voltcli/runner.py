@@ -562,7 +562,8 @@ class VoltCLIParser(cli.CLIParser):
         """
         VoltCLIParser constructor.
         """
-        cli.CLIParser.__init__(self, verbspace.verbs,
+        cli.CLIParser.__init__(self, environment.command_name,
+                                     verbspace.verbs,
                                      base_cli_spec.options,
                                      base_cli_spec.usage,
                                      '\n'.join((verbspace.description,

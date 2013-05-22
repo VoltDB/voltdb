@@ -322,10 +322,11 @@ class CLIParser(ExtendedHelpOptionParser):
     Command/sub-command (verb) argument and option parsing and validation.
     """
 
-    def __init__(self, verbs, base_options, usage, description, version):
+    def __init__(self, prog, verbs, base_options, usage, description, version):
         """
         Command line processor constructor.
         """
+        self.prog         = prog
         self.verb         = None
         self.verbs        = verbs
         self.verb_names   = verbs.keys()
@@ -333,6 +334,7 @@ class CLIParser(ExtendedHelpOptionParser):
         self.verb_names.sort()
         self.base_options.sort()
         optparse.OptionParser.__init__(self,
+            prog        = prog,
             description = description,
             usage       = usage,
             version     = version)
