@@ -40,6 +40,8 @@ import org.voltdb.messaging.FastSerializer.BufferGrowCallback;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
+import com.google.common.base.Throwables;
+
 /**
  * Wrapper for native Execution Engine library.
  * All native methods are private to make it simple
@@ -556,5 +558,22 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         assert(buffer != null);
         assert(fallbackBuffer == null);
         fallbackBuffer = buffer;
+    }
+
+    @Override
+    public byte[] executeTask(long taskId, byte[] task) {
+        fsForParameterSet.clear();
+        byte retval[] = null;
+        try {
+            fsForParameterSet.writeLong(taskId);
+            fsForParameterSet.write(task);
+
+            deserializer.clear();
+            nativeExecuteTask(pointer);
+            return (byte[])deserializer.readArray(byte.class);
+        } catch (IOException e) {
+            Throwables.propagate(e);
+        }
+        return retval;
     }
 }

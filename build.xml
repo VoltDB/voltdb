@@ -581,9 +581,6 @@ DISTRIBUTION
     </exec>
 
     <!-- strip the voltbin shared library (~40x size reduction) -->
-    <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>
-        <arg line="-c '/usr/bin/strip --strip-debug --strip-unneeded libvoltdb*'"/>
-    </exec>
 
     <!-- embed the path to the symbol file into the ELF binary -->
     <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>

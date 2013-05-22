@@ -1277,3 +1277,18 @@ void PersistentTable::printBucketInfo() {
     }
     std::cout << std::endl;
 }
+
+int64_t PersistentTable::validatePartitioning(TheHashinator *hashinator, int32_t partitionId) {
+    TableIterator iter = iterator();
+
+    int64_t mispartitionedRows = 0;
+
+    while (iter.hasNext()) {
+        TableTuple tuple(schema());
+        iter.next(tuple);
+        if (hashinator->hashinate(tuple.getNValue(m_partitionColumn)) != partitionId) {
+            mispartitionedRows++;
+        }
+    }
+    return mispartitionedRows;
+}

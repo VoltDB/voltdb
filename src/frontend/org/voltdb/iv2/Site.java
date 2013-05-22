@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -46,12 +47,12 @@ import org.voltdb.MemoryStats;
 import org.voltdb.ParameterSet;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProcedureRunner;
-import org.voltdb.StartAction;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
 import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
+import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
 import org.voltdb.SysProcSelector;
 import org.voltdb.SystemProcedureExecutionContext;
@@ -1209,5 +1210,27 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
         assert(frag != null);
         return frag.plan;
+    }
+
+    /**
+     * For the specified list of table ids, return the number of mispartitioned rows using
+     * the provided hashinator and hashinator config
+     */
+    @Override
+    public long[] validatePartitioning(long[] tableIds, int hashinatorType, byte[] hashinatorConfig) {
+        ByteBuffer paramBuffer = ByteBuffer.allocate(4 + (8 * tableIds.length) + 4 + 4 + hashinatorConfig.length);
+        paramBuffer.putInt(tableIds.length);
+        for (long tableId : tableIds) {
+            paramBuffer.putLong(tableId);
+        }
+        paramBuffer.putInt(hashinatorType);
+        paramBuffer.put(hashinatorConfig);
+
+        ByteBuffer resultBuffer = ByteBuffer.wrap(m_ee.executeTask( 0L, paramBuffer.array()));
+        long mispartitionedRows[] = new long[tableIds.length];
+        for (int ii = 0; ii < tableIds.length; ii++) {
+            mispartitionedRows[ii] = resultBuffer.getLong();
+        }
+        return mispartitionedRows;
     }
 }

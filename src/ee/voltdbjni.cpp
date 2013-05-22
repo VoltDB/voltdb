@@ -1242,6 +1242,7 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeUpdat
     VOLT_DEBUG("nativeUpdateHashinator in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     assert(engine);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     try {
         updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
         NValueArray& params = engine->getParameterContainer();
@@ -1252,7 +1253,7 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeUpdat
         engine->updateHashinator(hashinatorType, configValue);
         stringPool->purge();
     } catch (const FatalException &e) {
-        std::cout << "HASHINATE ERROR: " << e.m_reason << std::endl;
+        topend->crashVoltDB(e);
     }
 }
 
@@ -1302,6 +1303,24 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetR
 SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltcore_utils_DBBPool_deleteCharArrayMemory
   (JNIEnv *env, jclass clazz, jlong ptr) {
     delete[] reinterpret_cast<char*>(ptr);
+}
+
+JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecuteTask
+  (JNIEnv *env, jobject obj, jlong engine_ptr) {
+    VOLT_DEBUG("nativeHashinate in C++ called");
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    assert(engine);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    try {
+        updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
+        engine->resetReusedResultOutputBuffer();
+
+        ReferenceSerializeInput input(engine->getParameterBuffer(), engine->getParameterBufferCapacity());
+        int64_t taskId = input.readLong();
+        engine->executeTask(taskId, engine->getParameterBuffer() + sizeof(int64_t));
+    } catch (const FatalException &e) {
+        topend->crashVoltDB(e);
+    }
 }
 
 /** @} */ // end of JNI doxygen group
