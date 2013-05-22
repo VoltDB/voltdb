@@ -515,7 +515,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         if (nodes.size() == 1) {
             for (AccessPath path : joinNode.m_accessPaths) {
                 joinNode.m_currentAccessPath = path;
-                AbstractPlanNode plan = getSelectSubPlanForJoinNode(rootNode);
+                AbstractPlanNode plan = getSelectSubPlanForJoinNode(rootNode, false);
                 /*
                  * If the access plan for the table in the join order was for a
                  * distributed table scan there will be a send/receive pair at the top.
@@ -587,22 +587,24 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @return A completed plan-sub-graph that should match the correct tuples from the
      * correct tables.
      */
-    private AbstractPlanNode getSelectSubPlanForJoinNode(JoinNode joinNode) {
+    private AbstractPlanNode getSelectSubPlanForJoinNode(JoinNode joinNode, boolean deferIndexScanPredicate) {
         assert(joinNode != null);
         if (joinNode.m_table != null) {
             // End of recursion
-            Table joinOrder[] = new Table[1];
-            AccessPath accessPath[] = new AccessPath[1];
-            joinOrder[0] = joinNode.m_table;
-            accessPath[0] = joinNode.m_currentAccessPath;
-            return getSelectSubPlanForAccessPathsIterative(joinOrder, accessPath);
+            AbstractPlanNode scanNode = getAccessPlanForTable(joinNode.m_table, joinNode.m_currentAccessPath, deferIndexScanPredicate);
+            if (!joinNode.m_table.getIsreplicated() && !canDeferSendReceivePairForNode()) {
+                scanNode = addSendReceivePair(scanNode);
+            }
+            return scanNode;
         } else {
             assert(joinNode.m_leftNode != null && joinNode.m_rightNode != null);
             // Outer node
-            AbstractPlanNode outerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_leftNode);
+            AbstractPlanNode outerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_leftNode, false);
 
-            // Inner Node
-            AbstractPlanNode innerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_rightNode);
+            // Inner Node. We need to defer setting predicate for inner node in case of inner node is
+            // of IndexScan type. the reason for that is the predicate in this case consists of
+            // non-index join expressions which must stay at the NLIJ or NLJ nodes
+            AbstractPlanNode innerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_rightNode, true);
 
             // Join Node
             return getSelectSubPlanForOuterAccessPathStep(joinNode, outerScanPlan, innerScanPlan);
@@ -625,7 +627,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     protected AbstractPlanNode getSelectSubPlanForAccessPathsIterative(Table[] joinOrder, AccessPath[] accessPath) {
         AbstractPlanNode resultPlan = null;
         for (int at = joinOrder.length-1; at >= 0; --at) {
-            AbstractPlanNode scanPlan = getAccessPlanForTable(joinOrder[at], accessPath[at]);
+            boolean deferIndexScanPredicate = false;
+            AbstractPlanNode scanPlan = getAccessPlanForTable(joinOrder[at], accessPath[at], deferIndexScanPredicate);
             if (resultPlan == null) {
                 resultPlan = scanPlan;
             } else {
@@ -713,6 +716,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
             @SuppressWarnings("unused")
             IndexScanPlanNode innerNode = (IndexScanPlanNode) innerPlan;
+            // Set IndexScan predicate
+            innerNode.setPredicate(ExpressionUtil.combine(innerAccessPath.otherExprs));
 
             nlijNode.addInlinePlanNode(innerPlan);
 
@@ -726,6 +731,11 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         else {
             // get all the clauses that join the applicable two tables
             ArrayList<AbstractExpression> joinClauses = innerAccessPath.joinExprs;
+            if (innerPlan instanceof IndexScanPlanNode && innerAccessPath.otherExprs != null) {
+                // case of innerPlan is an IndexScan the non-index join expressions (if any) are
+                // in the otherExpr and must be added back to the join clauses
+                joinClauses.addAll(innerAccessPath.otherExprs);
+            }
             NestLoopPlanNode nljNode = new NestLoopPlanNode();
             if ((joinClauses != null) && ! joinClauses.isEmpty()) {
                 nljNode.setJoinPredicate(ExpressionUtil.combine(joinClauses));

@@ -989,7 +989,7 @@ public abstract class SubPlanAssembler {
      * @param path The access path to access the data in the table (index/scan/etc).
      * @return The root of a plan graph to get the data.
      */
-    protected AbstractPlanNode getAccessPlanForTable(Table table, AccessPath path) {
+    protected AbstractPlanNode getAccessPlanForTable(Table table, AccessPath path, boolean deferIndexScanPredicate) {
         assert(table != null);
         assert(path != null);
 
@@ -1001,7 +1001,7 @@ public abstract class SubPlanAssembler {
         }
         else
         {
-            scanNode = getIndexAccessPlanForTable(table, path);
+            scanNode = getIndexAccessPlanForTable(table, path, deferIndexScanPredicate);
         }
         // set the scan columns for this scan node based on the parsed SQL,
         // if any
@@ -1048,7 +1048,8 @@ public abstract class SubPlanAssembler {
      * @return An index scan plan node
      */
     protected AbstractScanPlanNode getIndexAccessPlanForTable(Table table,
-                                                              AccessPath path)
+                                                              AccessPath path,
+                                                              boolean deferIndexScanPredicate)
     {
         // now assume this will be an index scan and get the relevant index
         Index index = path.index;
@@ -1067,7 +1068,9 @@ public abstract class SubPlanAssembler {
         scanNode.setBindings(path.bindings);
         scanNode.setSortDirection(path.sortDirection);
         scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
-        scanNode.setPredicate(ExpressionUtil.combine(path.otherExprs));
+        if (!deferIndexScanPredicate) {
+            scanNode.setPredicate(ExpressionUtil.combine(path.otherExprs));
+        }
 
         scanNode.setTargetTableName(table.getTypeName());
         scanNode.setTargetTableAlias(table.getTypeName());
