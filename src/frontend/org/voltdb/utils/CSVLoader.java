@@ -35,6 +35,9 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.supercsv.cellprocessor.Optional;
 import org.supercsv.cellprocessor.ift.CellProcessor;
+import org.supercsv.io.CsvListReader;
+import org.supercsv.io.ICsvListReader;
+import org.supercsv.prefs.CsvPreference;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
@@ -235,24 +238,26 @@ public class CSVLoader {
 
         config = cfg;
         configuration();
-        CSVReader csvReader = null;
-
+        //CSVReader csvReader = null;
+        ICsvListReader listReader = null;
         try {
             if (CSVLoader.standin)
-                csvReader = new CSVReader(new BufferedReader(
-                        new InputStreamReader(System.in)), config.separator,
-                        config.quotechar, config.escape, config.skip,
-                        config.strictquotes, config.nowhitespace);
+            {
+            	listReader = new CsvListReader(new BufferedReader( new InputStreamReader(System.in)), CsvPreference.STANDARD_PREFERENCE);
+            }
             else
-                csvReader = new CSVReader(new FileReader(config.file),
-                        config.separator, config.quotechar, config.escape,
-                        config.skip, config.strictquotes, config.nowhitespace);
+            	listReader = new CsvListReader(new FileReader(config.file), CsvPreference.STANDARD_PREFERENCE);
+//                csvReader = new CSVReader(new FileReader(config.file),
+//                        config.separator, config.quotechar, config.escape,
+//                        config.skip, config.strictquotes, config.nowhitespace);
 
+            listReader.getHeader(true); // skip the header (can't be used with CsvListReader)
+            final CellProcessor[] processors = getProcessors();
         } catch (FileNotFoundException e) {
             m_log.error("CSV file '" + config.file + "' could not be found.");
             System.exit(-1);
         }
-        assert(csvReader != null);
+        assert(listReader != null);
         // Split server list
         String[] serverlist = config.servers.split(",");
 
@@ -272,23 +277,26 @@ public class CSVLoader {
         assert(csvClient != null);
 
         try {
+        	final CellProcessor[] processors = getProcessors();
             ProcedureCallback cb = null;
 
             boolean lastOK = true;
-            String line[] = null;
+            List<Object> lineList;
+            Object[] line;
 
             while ((config.limitrows-- > 0)
-                    && (line = csvReader.readNext()) != null) {
+                    && (lineList = listReader.read(processors) ) != null) {
                 outCount.incrementAndGet();
                 boolean queued = false;
                 while (queued == false) {
                     StringBuilder linedata = new StringBuilder();
+                    line = lineList.toArray();
                     for (int i = 0; i < line.length; i++) {
                         linedata.append("\"" + line[i] + "\"");
                         if (i != line.length - 1)
                             linedata.append(",");
                     }
-                    String[] correctedLine = line;
+                    Object[] correctedLine = line;
                     cb = new MyCallback(outCount.get(), config,
                             linedata.toString());
                     String lineCheckResult;
@@ -343,11 +351,11 @@ public class CSVLoader {
 
         produceFiles();
         close_cleanup();
-        csvReader.close();
+        listReader.close();
         csvClient.close();
     }
 
-    private static String checkparams_trimspace(String[] slot,
+    private static String checkparams_trimspace(Object[] slot,
             int columnCnt) {
         if (slot.length == 1 && slot[0].equals("")) {
             return "Error: blank line";
@@ -358,7 +366,7 @@ public class CSVLoader {
         }
         for (int i = 0; i < slot.length; i++) {
             // trim white space in this line.
-            slot[i] = slot[i].trim();
+            //slot[i] = slot[i].trim();
             // treat NULL, \N and "\N" as actual null value
             if ((slot[i]).equals("NULL") || slot[i].equals(VoltTable.CSV_NULL)
                     || !config.strictquotes && slot[i].equals(VoltTable.QUOTED_CSV_NULL))
