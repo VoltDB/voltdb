@@ -228,6 +228,87 @@ public class TestCSVLoader extends TestCase {
         test_Interface( mySchema, myOptions, myData, invalidLineCnt );
     }
 
+    public void testOpenQuote() throws Exception
+    {
+    	// 221794,0,2228449581,"Stella&DotCircleLinkChains15\""delicatechain","2010-10-07 14:35:26"
+        String mySchema =
+                "create table BLAH (" +
+                        "clm_integer integer default 0 not null, " + // column that is partitioned on
+
+                "clm_integer1 integer default 0, " +
+                "clm_bigint bigint default 0, " +
+
+                "clm_string varchar(200) default null, " +
+                "clm_string1 varchar(200) default null, " +
+                "clm_timestamp timestamp default null " +
+                "); ";
+        String []myOptions = {
+                "-f" + path_csv,
+                //"--procedure=blah.insert",
+                "--reportdir=" + reportDir,
+                //"--table=BLAH",
+                "--maxerrors=50",
+                //"-user",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--skip=0",
+                "--nowhitespace",
+                //"--strictquotes",
+                "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String []myData = {
+        		//"221794,0,2228449581,\"Stella&DotCircleLinkChains15\\\"\"delicatechain\",\"2010-10-07 14:35:26\"",
+        		"221794,0,2228449581,\"Stella&DotCircleLinkChains15\\\"\"delicatechain"+ "\n" +"nextline\",\"2010-10-07 14:35:26\"",
+        };
+        int invalidLineCnt = 0;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+    }
+
+    public void testUnmatchQuote() throws Exception
+    {
+    	// 221794,0,2228449581,"Stella&DotCircleLinkChains15\""delicatechain","2010-10-07 14:35:26"
+        String mySchema =
+                "create table BLAH (" +
+                        "clm_integer integer default 0 not null, " + // column that is partitioned on
+
+                "clm_integer1 integer default 0, " +
+                "clm_bigint bigint default 0, " +
+
+                "clm_string varchar(200) default null, " +
+                "clm_string1 varchar(200) default null, " +
+                "clm_timestamp timestamp default null " +
+                "); ";
+        String []myOptions = {
+                "-f" + path_csv,
+                //"--procedure=blah.insert",
+                "--reportdir=" + reportDir,
+                //"--table=BLAH",
+                "--maxerrors=50",
+                //"-user",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--skip=0",
+                "--nowhitespace",
+                //"--strictquotes",
+                "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String []myData = {
+        		"221794,0,2228449581,\"Stella&DotCircleLinkChains15\\\"\"delicatechain\",\"2010-10-07 14:35:26\"",
+        };
+        int invalidLineCnt = 1;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+    }
+
     public void testNULL() throws Exception
     {
         String mySchema =

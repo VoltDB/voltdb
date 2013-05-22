@@ -240,7 +240,7 @@ public class CSVLoader {
 
         // Create connection
         ClientConfig c_config = new ClientConfig(config.user, config.password);
-        c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
+        c_config.setProcedureCallTimeout(0); // Set procedure call to infinite
                                              // timeout, see ENG-2670
         Client csvClient = null;
         try {
