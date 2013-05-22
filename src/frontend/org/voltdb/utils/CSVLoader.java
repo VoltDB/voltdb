@@ -26,12 +26,15 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.supercsv.cellprocessor.Optional;
+import org.supercsv.cellprocessor.ift.CellProcessor;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
@@ -70,6 +73,8 @@ public class CSVLoader {
     private static BufferedWriter out_reportfile;
     private static String insertProcedure = "";
     private static Map<Long, String[]> errorInfo = new TreeMap<Long, String[]>();
+    private static int columnCnt = 0;
+    private static boolean isProcExist = false;
 
     private static Map <VoltType, String> blankValues = new HashMap<VoltType, String>();
     static {
@@ -207,6 +212,18 @@ public class CSVLoader {
         }
     }
 
+    /**
+	 * Sets up the processors used for the SuperCSV Reader.
+	 *
+	 * @return the cell processors
+	 */
+	private static CellProcessor[] getProcessors() {
+
+	        final CellProcessor[] processors = new CellProcessor[columnCnt];
+	        Arrays.fill( processors, new Optional());
+	        return processors;
+	}
+
     public static void main(String[] args) throws IOException,
             InterruptedException {
         start = System.currentTimeMillis();
@@ -219,6 +236,7 @@ public class CSVLoader {
         config = cfg;
         configuration();
         CSVReader csvReader = null;
+
         try {
             if (CSVLoader.standin)
                 csvReader = new CSVReader(new BufferedReader(
@@ -258,32 +276,6 @@ public class CSVLoader {
 
             boolean lastOK = true;
             String line[] = null;
-
-            int columnCnt = 0;
-            VoltTable procInfo = null;
-            boolean isProcExist = false;
-            try {
-                procInfo = csvClient.callProcedure("@SystemCatalog",
-                        "PROCEDURECOLUMNS").getResults()[0];
-                while (procInfo.advanceRow()) {
-                    if (insertProcedure.matches((String) procInfo.get(
-                            "PROCEDURE_NAME", VoltType.STRING))) {
-                        columnCnt++;
-                        isProcExist = true;
-                        String typeStr = (String)procInfo.get("TYPE_NAME", VoltType.STRING);
-                        typeList.add(VoltType.typeFromString(typeStr));
-                    }
-                }
-            } catch (Exception e) {
-                m_log.error(e.getMessage(), e);
-                close_cleanup();
-                System.exit(-1);
-            }
-            if (isProcExist == false) {
-                m_log.error("No matching insert procedure available");
-                close_cleanup();
-                System.exit(-1);
-            }
 
             while ((config.limitrows-- > 0)
                     && (line = csvReader.readNext()) != null) {
@@ -381,7 +373,7 @@ public class CSVLoader {
         return null;
     }
 
-    private static void configuration() {
+    private static void configuration() throws IOException, InterruptedException {
         if (config.file.equals(""))
             standin = true;
         if (!config.table.equals("")) {
@@ -419,6 +411,54 @@ public class CSVLoader {
             m_log.error(e.getMessage());
             System.exit(-1);
         }
+
+     // Split server list
+        String[] serverlist = config.servers.split(",");
+     // Create connection
+        ClientConfig c_config = new ClientConfig(config.user, config.password);
+        c_config.setProcedureCallTimeout(0); // Set procedure call to infinite
+                                             // timeout, see ENG-2670
+        Client csvClient = null;
+        try {
+            csvClient = CSVLoader.getClient(c_config, serverlist, config.port);
+        } catch (Exception e) {
+            m_log.error("Error to connect to the servers:"
+                    + config.servers);
+            close_cleanup();
+            System.exit(-1);
+        }
+        assert(csvClient != null);
+
+        try {
+        	columnCnt = 0;
+            VoltTable procInfo = null;
+            isProcExist = false;
+            try {
+                procInfo = csvClient.callProcedure("@SystemCatalog",
+                        "PROCEDURECOLUMNS").getResults()[0];
+                while (procInfo.advanceRow()) {
+                    if (insertProcedure.matches((String) procInfo.get(
+                            "PROCEDURE_NAME", VoltType.STRING))) {
+                        columnCnt++;
+                        isProcExist = true;
+                        String typeStr = (String)procInfo.get("TYPE_NAME", VoltType.STRING);
+                        typeList.add(VoltType.typeFromString(typeStr));
+                    }
+                }
+            } catch (Exception e) {
+                m_log.error(e.getMessage(), e);
+                close_cleanup();
+                System.exit(-1);
+            }
+            if (isProcExist == false) {
+                m_log.error("No matching insert procedure available");
+                close_cleanup();
+                System.exit(-1);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        csvClient.close();
     }
 
     private static Client getClient(ClientConfig config, String[] servers,
