@@ -28,6 +28,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.JoinTree.JoinNode;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -515,7 +516,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         if (nodes.size() == 1) {
             for (AccessPath path : joinNode.m_accessPaths) {
                 joinNode.m_currentAccessPath = path;
-                AbstractPlanNode plan = getSelectSubPlanForJoinNode(rootNode, false);
+                AbstractPlanNode plan = getSelectSubPlanForJoinNode(rootNode);
                 /*
                  * If the access plan for the table in the join order was for a
                  * distributed table scan there will be a send/receive pair at the top.
@@ -587,11 +588,11 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @return A completed plan-sub-graph that should match the correct tuples from the
      * correct tables.
      */
-    private AbstractPlanNode getSelectSubPlanForJoinNode(JoinNode joinNode, boolean deferIndexScanPredicate) {
+    private AbstractPlanNode getSelectSubPlanForJoinNode(JoinNode joinNode) {
         assert(joinNode != null);
         if (joinNode.m_table != null) {
             // End of recursion
-            AbstractPlanNode scanNode = getAccessPlanForTable(joinNode.m_table, joinNode.m_currentAccessPath, deferIndexScanPredicate);
+            AbstractPlanNode scanNode = getAccessPlanForTable(joinNode.m_table, joinNode.m_currentAccessPath);
             if (!joinNode.m_table.getIsreplicated() && !canDeferSendReceivePairForNode()) {
                 scanNode = addSendReceivePair(scanNode);
             }
@@ -599,12 +600,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         } else {
             assert(joinNode.m_leftNode != null && joinNode.m_rightNode != null);
             // Outer node
-            AbstractPlanNode outerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_leftNode, false);
+            AbstractPlanNode outerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_leftNode);
 
-            // Inner Node. We need to defer setting predicate for inner node in case of inner node is
-            // of IndexScan type. the reason for that is the predicate in this case consists of
-            // non-index join expressions which must stay at the NLIJ or NLJ nodes
-            AbstractPlanNode innerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_rightNode, true);
+            // Inner Node.
+            AbstractPlanNode innerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_rightNode);
 
             // Join Node
             return getSelectSubPlanForOuterAccessPathStep(joinNode, outerScanPlan, innerScanPlan);
@@ -627,8 +626,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     protected AbstractPlanNode getSelectSubPlanForAccessPathsIterative(Table[] joinOrder, AccessPath[] accessPath) {
         AbstractPlanNode resultPlan = null;
         for (int at = joinOrder.length-1; at >= 0; --at) {
-            boolean deferIndexScanPredicate = false;
-            AbstractPlanNode scanPlan = getAccessPlanForTable(joinOrder[at], accessPath[at], deferIndexScanPredicate);
+            AbstractPlanNode scanPlan = getAccessPlanForTable(joinOrder[at], accessPath[at]);
             if (resultPlan == null) {
                 resultPlan = scanPlan;
             } else {
@@ -732,9 +730,14 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             // get all the clauses that join the applicable two tables
             ArrayList<AbstractExpression> joinClauses = innerAccessPath.joinExprs;
             if (innerPlan instanceof IndexScanPlanNode && innerAccessPath.otherExprs != null) {
-                // case of innerPlan is an IndexScan the non-index join expressions (if any) are
-                // in the otherExpr and must be added back to the join clauses
+                // InnerPlan is an IndexScan. In this case the inner and inner-outer
+                // non-index join expressions (if any) are in the otherExpr. The former should stay as
+                // an IndexScanPlan predicate and the latter stay at the NLJ node also as a predicate
+                List<AbstractExpression> innerExpr = filterSingleTVEExpressions(innerAccessPath.otherExprs);
                 joinClauses.addAll(innerAccessPath.otherExprs);
+                AbstractExpression indexScaPredicate = (innerExpr.isEmpty()) ? null :
+                    ExpressionUtil.combine(innerExpr);
+                ((IndexScanPlanNode) innerPlan).setPredicate(indexScaPredicate);
             }
             NestLoopPlanNode nljNode = new NestLoopPlanNode();
             if ((joinClauses != null) && ! joinClauses.isEmpty()) {
@@ -760,6 +763,25 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             retval.setWherePredicate(ExpressionUtil.combine(whereClauses));
         }
         return retval;
+    }
+
+    /**
+     * A method to filter out single TVE expressions.
+     *
+     * @param expr List of expressions.
+     * @return List of single TVE expressions from the input collection.
+     *         They are also removed from the input.
+     */
+    private List<AbstractExpression> filterSingleTVEExpressions(List<AbstractExpression> exprs) {
+        List<AbstractExpression> singleTVEExprs = new ArrayList<AbstractExpression>();
+        for (AbstractExpression expr : exprs) {
+            List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(expr);
+            if (tves.size() == 1) {
+                singleTVEExprs.add(expr);
+            }
+        }
+        exprs.removeAll(singleTVEExprs);
+        return singleTVEExprs;
     }
 
     /**

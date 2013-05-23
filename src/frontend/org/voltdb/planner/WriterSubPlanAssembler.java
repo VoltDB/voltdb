@@ -74,7 +74,7 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
             // for each access path
             for (AccessPath accessPath : paths) {
                 // get a plan
-                AbstractPlanNode scanPlan = getAccessPlanForTable(m_targetTable, accessPath, false);
+                AbstractPlanNode scanPlan = getAccessPlanForTable(m_targetTable, accessPath);
                 m_plans.add(scanPlan);
             }
 

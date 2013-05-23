@@ -146,6 +146,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             // so that the resolveColumnIndexes results
             // don't get bashed by other nodes or subsequent planner runs
             m_predicate = (AbstractExpression) predicate.clone();
+        } else {
+            m_predicate = null;
         }
     }
 
