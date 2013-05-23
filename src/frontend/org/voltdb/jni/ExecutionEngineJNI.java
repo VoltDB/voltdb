@@ -561,11 +561,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public byte[] executeTask(long taskId, byte[] task) {
+    public byte[] executeTask(TaskType taskType, byte[] task) {
         fsForParameterSet.clear();
         byte retval[] = null;
         try {
-            fsForParameterSet.writeLong(taskId);
+            fsForParameterSet.writeLong(taskType.taskId);
             fsForParameterSet.write(task);
 
             deserializer.clear();

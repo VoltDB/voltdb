@@ -69,6 +69,7 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.jni.ExecutionEngine.TaskType;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.jni.MockExecutionEngine;
@@ -1226,7 +1227,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         paramBuffer.putInt(hashinatorType);
         paramBuffer.put(hashinatorConfig);
 
-        ByteBuffer resultBuffer = ByteBuffer.wrap(m_ee.executeTask( 0L, paramBuffer.array()));
+        ByteBuffer resultBuffer = ByteBuffer.wrap(m_ee.executeTask( TaskType.VALIDATE_PARTITIONING, paramBuffer.array()));
         long mispartitionedRows[] = new long[tableIds.length];
         for (int ii = 0; ii < tableIds.length; ii++) {
             mispartitionedRows[ii] = resultBuffer.getLong();

@@ -41,8 +41,8 @@ import com.google.common.primitives.Longs;
 /**
  * A system procedure for validating that the rows at every partition hash correctly when hashed with the
  * hash function stored at the MPI. Optionally you can supply your own hash function which is useful
- * for test where you want to make sure that mispartitioned rows are picked up.
- * @author aweisberg
+ * for test where you want to make provide an incorrect hash function to prove
+ * that it is actually doing the right thing.
  *
  */
 @ProcInfo(singlePartition = false)

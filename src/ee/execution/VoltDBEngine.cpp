@@ -1608,7 +1608,7 @@ void VoltDBEngine::updateHashinator(HashinatorType type, const char *config) {
     }
 }
 
-void VoltDBEngine::executeTask(int64_t taskId, const char* taskParams) {
+void VoltDBEngine::dispatchValidatePartitioningTask(const char *taskParams) {
     ReferenceSerializeInput taskInfo(taskParams, std::numeric_limits<std::size_t>::max());
     std::vector<CatalogId> tableIds;
     const int32_t numTables = taskInfo.readInt();
@@ -1642,6 +1642,16 @@ void VoltDBEngine::executeTask(int64_t taskId, const char* taskParams) {
 
     BOOST_FOREACH( int64_t mispartitionedRowCount, mispartitionedRowCounts) {
         output->writeLong(mispartitionedRowCount);
+    }
+}
+
+void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
+    switch (taskType) {
+    case TASK_TYPE_VALIDATE_PARTITIONING:
+        dispatchValidatePartitioningTask(taskParams);
+        break;
+    default:
+        throwFatalException("Unknown task type %d", taskType);
     }
 }
 

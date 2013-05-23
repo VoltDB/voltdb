@@ -1316,7 +1316,7 @@ JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecuteTask
         engine->resetReusedResultOutputBuffer();
 
         ReferenceSerializeInput input(engine->getParameterBuffer(), engine->getParameterBufferCapacity());
-        int64_t taskId = input.readLong();
+        TaskType taskId = static_cast<TaskType>(input.readLong());
         engine->executeTask(taskId, engine->getParameterBuffer() + sizeof(int64_t));
     } catch (const FatalException &e) {
         topend->crashVoltDB(e);

@@ -230,7 +230,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public byte[] executeTask(long taskId, byte[] task) {
+    public byte[] executeTask(TaskType taskType, byte[] task) {
         throw new UnsupportedOperationException();
     }
 }

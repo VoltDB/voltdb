@@ -52,6 +52,16 @@ import org.voltdb.utils.VoltTableUtil;
  */
 public abstract class ExecutionEngine implements FastDeserializer.DeserializationMonitor {
 
+    public static enum TaskType {
+        VALIDATE_PARTITIONING(0);
+
+        private TaskType(int taskId) {
+            this.taskId = taskId;
+        }
+
+        public final int taskId;
+    }
+
     // is the execution site dirty
     protected boolean m_dirty;
 
@@ -480,7 +490,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param task
      * @return
      */
-    public abstract byte[] executeTask(long taskId, byte task[]);
+    public abstract byte[] executeTask(TaskType taskType, byte task[]);
 
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to

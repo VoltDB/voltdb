@@ -1360,10 +1360,10 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public byte[] executeTask(long taskId, byte[] task) {
+    public byte[] executeTask(TaskType taskType, byte[] task) {
         m_data.clear();
         m_data.putInt(Commands.executeTask.m_id);
-        m_data.putLong(taskId);
+        m_data.putLong(taskType.taskId);
         m_data.put(task);
         try {
             m_data.flip();
