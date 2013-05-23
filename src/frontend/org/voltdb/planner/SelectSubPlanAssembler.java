@@ -484,7 +484,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
         // If the inner table is partitioned and the outer node is replicated,
         // the join node will be NLJ and not NLIJ, even for an index access path.
-        if (joinNode.m_isReplicated || canDeferSendReceivePairForNode()) {
+        if (innerNode.m_table.getIsreplicated() ||
+                (joinNode.m_isReplicated || canDeferSendReceivePairForNode())) {
             // This case can support either NLIJ -- assuming joinNode.m_joinInnerOuterList
             // is non-empty AND at least ONE of its clauses can be leveraged in the IndexScan
             // -- or NLJ, otherwise.

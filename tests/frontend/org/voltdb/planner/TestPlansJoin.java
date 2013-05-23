@@ -777,14 +777,13 @@ public class TestPlansJoin extends PlannerTestCase {
     }
 
     public void testDistributedIndexJoinConditions() {
-        // Distributed outer table, replicated inner -NLJ/IndexScan
+        // Distributed outer table, replicated inner -NLIJ/inlined IndexScan
         AbstractPlanNode pn = compile("select * FROM P1 LEFT JOIN R3 ON P1.C = R3.A");
         AbstractPlanNode n = pn.getChild(0).getChild(0);
-        assertTrue(n instanceof NestLoopPlanNode);
-        NestLoopPlanNode nl = (NestLoopPlanNode) n;
-        assertTrue(nl.getChildCount() == 2);
+        assertTrue(n instanceof NestLoopIndexPlanNode);
+        NestLoopIndexPlanNode nl = (NestLoopIndexPlanNode) n;
+        assertTrue(nl.getChildCount() == 1);
         assertTrue(nl.getChild(0) instanceof ReceivePlanNode);
-        assertTrue(nl.getChild(1) instanceof IndexScanPlanNode);
 
         // Distributed inner  and replicated outer tables -NLJ/IndexScan
         List<AbstractPlanNode> lpn = compileToFragments("select *  FROM R3 LEFT JOIN P2 ON R3.A = P2.A AND P2.A < 0 AND P2.E > 3 WHERE P2.A IS NULL");
