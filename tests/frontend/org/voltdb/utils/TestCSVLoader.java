@@ -204,7 +204,7 @@ public class TestCSVLoader extends TestCase {
                 "--separator=,",
                 "--quotechar=\"",
                 "--escape=\\",
-                "--skip=0",
+                "--skip=1",
                 "--nowhitespace",
                 //"--strictquotes",
                 "BlAh"
@@ -218,13 +218,14 @@ public class TestCSVLoader extends TestCase {
                 "6,6,NULL,666666, sixth, 6.60, 6.66,"+currentTime,
                 "7,NULL,7,7777777, seventh, 7.70, 7.77,"+currentTime,
                 "11, 1,1,\"1,000\",first,1.10,1.11,"+currentTime,
+                //empty line
+                "",
                 //invalid lines below
                 "8, 8",
-                "",
                 "10,10,10,10 101 010,second,2.20,2.22"+currentTime,
                 "12,n ull,12,12121212,twelveth,12.12,12.12"
         };
-        int invalidLineCnt = 4;
+        int invalidLineCnt = 3;
         test_Interface( mySchema, myOptions, myData, invalidLineCnt );
     }
 
@@ -239,7 +240,6 @@ public class TestCSVLoader extends TestCase {
                 "clm_bigint bigint default 0, " +
 
                 "clm_string varchar(200) default null, " +
-                "clm_string1 varchar(200) default null, " +
                 "clm_timestamp timestamp default null " +
                 "); ";
         String []myOptions = {
@@ -271,7 +271,10 @@ public class TestCSVLoader extends TestCase {
 
     public void testUnmatchQuote() throws Exception
     {
-    	// 221794,0,2228449581,"Stella&DotCircleLinkChains15\""delicatechain","2010-10-07 14:35:26"
+    	//test the following csv data
+    	//221794,0,2228449581,"Stella&DotCircleLinkChains15\""delicatechain","2010-10-07 14:35:26"
+    	//221794,0,2228449581,"Stella&DotCircleLinkChains15\""delicatechain
+    	//nextline,"2010-10-07 14:35:26"
         String mySchema =
                 "create table BLAH (" +
                         "clm_integer integer default 0 not null, " + // column that is partitioned on
@@ -280,7 +283,6 @@ public class TestCSVLoader extends TestCase {
                 "clm_bigint bigint default 0, " +
 
                 "clm_string varchar(200) default null, " +
-                "clm_string1 varchar(200) default null, " +
                 "clm_timestamp timestamp default null " +
                 "); ";
         String []myOptions = {
@@ -303,7 +305,10 @@ public class TestCSVLoader extends TestCase {
         };
         String currentTime = new TimestampType().toString();
         String []myData = {
+        		//valid line from shopzilla: unmatched quote is between two commas(which is treated as strings).
         		"221794,0,2228449581,\"Stella&DotCircleLinkChains15\\\"\"delicatechain\",\"2010-10-07 14:35:26\"",
+        		//invalid line: unmatched quote
+        		"221794,0,2228449581,\"Stella&DotCircleLinkChains15\\\"\"delicatechain"+ "\n" +"nextline,\"2010-10-07 14:35:26\"",
         };
         int invalidLineCnt = 1;
         test_Interface( mySchema, myOptions, myData, invalidLineCnt );
@@ -411,6 +416,7 @@ public class TestCSVLoader extends TestCase {
         test_Interface( mySchema, myOptions, myData, invalidLineCnt );
     }
 
+    //SuperCSV treats empty string "" as null
     public void testBlankError() throws Exception
     {
         String mySchema =
