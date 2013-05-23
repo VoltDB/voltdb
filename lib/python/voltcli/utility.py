@@ -1054,3 +1054,67 @@ class MessageDict(dict):
             i += 1
             self[i] = kwargs[key]
             setattr(self, key, i)
+
+#===============================================================================
+class CodeFormatter(object):
+#===============================================================================
+    """
+    Useful for formatting generated code. It is currently geared for DDL, but
+    this isn't etched in stone.
+    """
+    def __init__(self, separator=',', vcomment_prefix='', indent_string='    '):
+        self.separator = separator
+        self.vcomment_prefix = vcomment_prefix
+        self.indent_string = indent_string
+        self.level = 0
+        self.lines = []
+        self.pending_separator = [-1]
+        self.block_start_index = [0]
+    def _line(self, needs_separator, *lines):
+        if needs_separator and self.separator and self.pending_separator[-1] >= 0:
+            self.lines[self.pending_separator[-1]] += self.separator
+        for line in lines:
+            self.lines.append('%s%s' % (self.indent_string * self.level, line))
+        if needs_separator:
+            self.pending_separator[-1] = len(self.lines) - 1
+    def _block_line(self, *lines):
+        if self.pending_separator[-1] >= self.block_start_index[-1]:
+            self.pending_separator[-1] += len(lines)
+        for line in lines:
+            self.lines.insert(self.block_start_index[-1], line)
+            self.block_start_index[-1] += 1
+    def block_start(self, *lines):
+        if self.level == 0:
+            self._line(False, '')
+        self.block_start_index.append(len(self.lines))
+        self._line(False, *lines)
+        self._line(False, '(')
+        self.level += 1
+        self.pending_separator.append(-1)
+    def block_end(self, *lines):
+        self.level -= 1
+        self.pending_separator.pop()
+        if self.level == 0:
+            self._line(False, ');')
+        else:
+            self._line(True, ')')
+        self.block_start_index.pop()
+    def code(self, *lines):
+        self._line(True, *lines)
+    def comment(self, *lines):
+        for line in lines:
+            self._line(False, '-- %s' % line)
+    def vcomment(self, *lines):
+        for line in lines:
+            self._line(False, '--%s %s' % (self.vcomment_prefix, line))
+    def block_comment(self, *lines):
+        for line in lines:
+            self._block_line('-- %s' % line)
+    def block_vcomment(self, *lines):
+        for line in lines:
+            self._block_line('--%s %s' % (self.vcomment_prefix, line))
+    def blank(self, n=1):
+        for line in range(n):
+            self._line(False, '')
+    def __str__(self):
+        return '\n'.join(self.lines)
