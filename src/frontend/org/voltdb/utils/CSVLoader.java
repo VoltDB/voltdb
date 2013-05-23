@@ -269,7 +269,7 @@ public class CSVLoader {
         try {
             csvClient = CSVLoader.getClient(c_config, serverlist, config.port);
         } catch (Exception e) {
-            m_log.error("Error to connect to the servers:"
+            m_log.error("Error connecting to the servers:"
                     + config.servers);
             close_cleanup();
             System.exit(-1);
@@ -281,14 +281,15 @@ public class CSVLoader {
             ProcedureCallback cb = null;
 
             boolean lastOK = true;
-            List<Object> lineList;
+            List<String> lineList;
             Object[] line;
 
             while ((config.limitrows-- > 0)
-                    && (lineList = listReader.read(processors) ) != null) {
+                    && (lineList = listReader.read() ) != null) {
                 outCount.incrementAndGet();
                 boolean queued = false;
                 while (queued == false) {
+                	//needs clean up
                     StringBuilder linedata = new StringBuilder();
                     line = lineList.toArray();
                     for (int i = 0; i < line.length; i++) {
@@ -335,7 +336,8 @@ public class CSVLoader {
             }
             csvClient.drain();
 
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             e.printStackTrace();
         }
 
