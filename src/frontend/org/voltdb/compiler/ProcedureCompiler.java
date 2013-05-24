@@ -270,7 +270,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
                                 ));
                     }
                     @SuppressWarnings("unchecked")
-                    Map<String,Object> bindings  = (Map<String,Object>)binding.getVariables();
+                    Map<String,Object> bindings  = binding.getVariables();
                     ImmutableMap.Builder<String, Object> builder = ImmutableMap.builder();
 
                     for ( Map.Entry<String, Object> entry: bindings.entrySet()) {
@@ -296,8 +296,8 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
                 @Override
                 public Class<?>[] visitGroovy(Map<String, Object> p) {
                     @SuppressWarnings("unchecked")
-                    Closure<Object> transactOn = (Closure<Object>)p.get("transactOn");
-                    return (Class<?> [])transactOn.getParameterTypes();
+                    Closure<Object> transactOn = (Closure<Object>)p.get(GVY_PROCEDURE_ENTRY_CLOSURE);
+                    return transactOn.getParameterTypes();
                 }
     };
 
