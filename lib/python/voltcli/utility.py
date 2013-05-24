@@ -1100,7 +1100,7 @@ class CodeFormatter(object):
             self._line(True, ')')
         self.block_start_index.pop()
     def code(self, *lines):
-        self._line(True, *lines)
+        self._line(self.level > 0, *lines)
     def comment(self, *lines):
         for line in lines:
             self._line(False, '-- %s' % line)
@@ -1115,6 +1115,6 @@ class CodeFormatter(object):
             self._block_line('--%s %s' % (self.vcomment_prefix, line))
     def blank(self, n=1):
         for line in range(n):
-            self._line(False, '')
+            self.lines.append('')
     def __str__(self):
         return '\n'.join(self.lines)

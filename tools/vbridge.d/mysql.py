@@ -141,8 +141,8 @@ class MySQLSchemaGenerator(object):
                                 'Generated comments are prefixed by "%s"' % G.vcomment_prefix)
         for table_name in self.table_names:
             self.format_table(table_name)
-            self.format_table_partitioning(table_name)
             self.format_table_indexes(table_name)
+            self.format_table_partitioning(table_name)
         return str(self.formatter)
 
     def format_table(self, table_name):
@@ -293,9 +293,8 @@ class MySQLSchemaGenerator(object):
                     # Check if the referenced column is the partition key.
                     # If it is use the corresponding column in this table.
                     # Assume columns and referenced_columns are synchronized.
-                    print table.name, fk.referenced_columns[i], biggest_ptable.pkey_column_name
-                    if fk.referenced_columns[i] == biggest_ptable.pkey_column_name:
-                        pkey_column_name = fk.columns[i]
+                    if fk.referenced_columns[icolumn] == biggest_ptable.pkey_column_name:
+                        pkey_column_name = fk.columns[icolumn]
                         reason_chosen = ('%s references partitioned table %s through a '
                                          'foreign key that references the partition key'
                                                 % (table.name, biggest_ptable.name))
