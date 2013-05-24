@@ -27,11 +27,13 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -40,6 +42,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import java.util.jar.JarInputStream;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -90,6 +93,8 @@ import org.voltdb.utils.LogKeys;
 import org.xml.sax.ErrorHandler;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
+
+import com.google.common.collect.ImmutableList;
 
 /**
  * Compiles a project XML file and some metadata into a Jarfile
@@ -1829,6 +1834,75 @@ public class VoltCompiler {
 
     }
 
+
+    public List<Class<?>> getInnerClasses(Class <?> c)
+            throws VoltCompilerException {
+        ImmutableList.Builder<Class<?>> builder = ImmutableList.builder();
+        ClassLoader cl = c.getClassLoader();
+        if (cl == null) {
+            cl = Thread.currentThread().getContextClassLoader();
+        }
+
+        String stem = c.getName().replace('.', '/');
+        URL curl = cl.getResource(stem+".class");
+
+        if ("jar".equals(curl.getProtocol())) {
+            Pattern nameRE = Pattern.compile("\\A(" + stem + "\\$[^/]+).class\\z");
+            String jarFN;
+            try {
+                jarFN = URLDecoder.decode(curl.getFile(), "UTF-8");
+            } catch (UnsupportedEncodingException e) {
+                String msg = "Unable to UTF-8 decode " + curl.getFile() + " for class " + c;
+                throw new VoltCompilerException(msg);
+            }
+            jarFN = jarFN.substring(5, jarFN.indexOf('!'));
+            JarFile jar = null;
+            try {
+                jar = new JarFile(jarFN);
+                Enumeration<JarEntry> entries = jar.entries();
+                while (entries.hasMoreElements()) {
+                    String name = entries.nextElement().getName();
+                    Matcher mtc = nameRE.matcher(name);
+                    if (mtc.find()) {
+                        String innerName = mtc.group(1).replace('/', '.');
+                        Class<?> inner;
+                        try {
+                            inner = cl.loadClass(innerName);
+                        } catch (ClassNotFoundException e) {
+                            String msg = "Unable to load " + c + " inner class " + innerName;
+                            throw new VoltCompilerException(msg);
+                        }
+                        builder.add(inner);
+                    }
+                }
+            } catch (IOException e) {
+                String msg = "Cannot access class " + c + " source code location of " + jarFN;
+                throw new VoltCompilerException(msg);
+            } finally {
+                if ( jar != null) try {jar.close();} catch (Exception ignoreIt) {};
+            }
+        } else if ("file".equals(curl.getProtocol())) {
+            Pattern nameRE = Pattern.compile("/(" + stem + "\\$[^/]+).class\\z");
+            File sourceDH = new File(curl.getFile()).getParentFile();
+            for (File f: sourceDH.listFiles()) {
+                Matcher mtc = nameRE.matcher(f.getAbsolutePath());
+                if (mtc.find()) {
+                    String innerName = mtc.group(1).replace('/', '.');
+                    Class<?> inner;
+                    try {
+                        inner = cl.loadClass(innerName);
+                    } catch (ClassNotFoundException e) {
+                        String msg = "Unable to load " + c + " inner class " + innerName;
+                        throw new VoltCompilerException(msg);
+                    }
+                    builder.add(inner);
+                }
+            }
+
+        }
+        return builder.build();
+    }
+
     public void addClassToJar(final Class<?> cls)
     throws VoltCompiler.VoltCompilerException {
 
@@ -1838,7 +1912,7 @@ public class VoltCompiler {
             cachedAddedClasses.add(cls);
         }
 
-        for (final Class<?> nested : cls.getDeclaredClasses()) {
+        for (final Class<?> nested : getInnerClasses(cls)) {
             addClassToJar(nested);
         }
 

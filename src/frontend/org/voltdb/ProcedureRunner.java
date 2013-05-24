@@ -145,10 +145,13 @@ public class ProcedureRunner {
         assert(m_inputCRC.getValue() == 0L);
 
         String language = catProc.getLanguage();
+
         if (language != null && !language.trim().isEmpty()) {
             m_language = Language.valueOf(language.trim().toUpperCase());
-        } else {
+        } else if (procedure instanceof StmtProcedure){
             m_language = null;
+        } else {
+            m_language = Language.JAVA;
         }
 
         if (procedure instanceof StmtProcedure) {
