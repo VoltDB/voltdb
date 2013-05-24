@@ -47,9 +47,7 @@ import com.google.common.primitives.Longs;
  */
 @ProcInfo(singlePartition = false)
 public class ValidatePartitioning extends VoltSystemProcedure {
-    private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotDelete.class.getName());
-
-    private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
+    private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
 
     private static final int DEP_validatePartitioning = (int)
         SysProcFragmentId.PF_validatePartitioning | DtxnConstants.MULTIPARTITION_DEPENDENCY;
@@ -119,7 +117,7 @@ public class ValidatePartitioning extends VoltSystemProcedure {
         }
         final long endTime = System.currentTimeMillis();
         final long duration = endTime -startTime;
-        SNAP_LOG.info("Validating partitioning took " + duration + " milliseconds");
+        HOST_LOG.info("Validating partitioning took " + duration + " milliseconds");
         return retval;
     }
 

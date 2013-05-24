@@ -24,6 +24,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.util.Random;
 
 import junit.framework.Test;
 
@@ -34,6 +35,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
@@ -140,8 +142,17 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertEquals(results[0].get(0, VoltType.BIGINT), new Long(0));
     }
 
-    public void testLoadMultipartitionTableAndIndexStats() throws IOException {
+    public void testLoadMultipartitionTableAndIndexStatsAndValidatePartitioning() throws Exception {
         Client client = getClient();
+
+        /*
+         * Load a little partitioned data for the mispartitioned check
+         */
+        Random r = new Random(0);
+        for (int ii = 0; ii < 50; ii++) {
+            client.callProcedure(new NullCallback(), "@AdHoc",
+                    "INSERT INTO new_order values (" + (short)(r.nextDouble() * Short.MAX_VALUE) + ");");
+        }
 
         // try the failure case first
         try {
@@ -257,13 +268,38 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 if (success) {
                     success = memorySum == indexMemorySum;
                     if (success) {
-                        return;
+                        break;
                     }
                 }
                 Thread.sleep(1);
             }
             assertTrue(indexMemorySum != 120);//That is a row count, not memory usage
             assertEquals(memorySum, indexMemorySum);
+
+            /*
+             * Test once using the current correct hash function,
+             * expect no mispartitioned rows
+             */
+            VoltTable validateResult = client.callProcedure("@ValidatePartitioning", 0, null).getResults()[0];
+            System.out.println(validateResult);
+            while (validateResult.advanceRow()) {
+                assertEquals(0L, validateResult.getLong("MISPARTITIONED_ROWS"));
+            }
+
+            /*
+             * Test again with a bad hash function, expect mispartitioned rows
+             */
+            validateResult =
+                    client.callProcedure(
+                            "@ValidatePartitioning",
+                            0,
+                            new byte[] { 0, 0, 0, 9 }).getResults()[0];
+            System.out.println(validateResult);
+            while (validateResult.advanceRow()) {
+                if (validateResult.getString("TABLE").equals("NEW_ORDER")) {
+                    assertTrue(validateResult.getLong("MISPARTITIONED_ROWS") > 0);
+                }
+            }
         }
         catch (Exception e) {
             e.printStackTrace();
