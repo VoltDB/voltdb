@@ -155,6 +155,21 @@ class MySQLSchemaGenerator(object):
             self.format_column(table_name, column_name)
         self.format_primary_key(table_name)
         self.formatter.block_end()
+        self.format_foreign_keys(table_name)
+
+    def format_foreign_keys(self, table_name):
+        table = self.get_table(table_name)
+        if table.schema.foreign_keys:
+            self.formatter.blank()
+            for fk_name in sorted(table.schema.foreign_keys.keys()):
+                fk = table.schema.foreign_keys[fk_name]
+                self.formatter.comment('Foreign key: %s' % fk.name),
+                for i in range(len(fk.columns)):
+                    self.formatter.comment('  %s.%s -> %s.%s'
+                                                % (table.name,
+                                                   fk.columns[i],
+                                                   fk.referenced_table_name,
+                                                   fk.referenced_columns[i]))
 
     def format_table_partitioning(self, table_name):
         if table_name in self.partitioned_tables:
@@ -274,13 +289,13 @@ class MySQLSchemaGenerator(object):
                     continue
                 # It's a winner if one of the FK reference columns is the
                 # referenced table's partition key.
-                pkey = None
                 for icolumn in range(len(fk.columns)):
                     # Check if the referenced column is the partition key.
                     # If it is use the corresponding column in this table.
                     # Assume columns and referenced_columns are synchronized.
-                    if fk.referenced_columns[i].name == biggest_ptable.pkey_column_name:
-                        pkey_column_name = fk.columns[i].name
+                    print table.name, fk.referenced_columns[i], biggest_ptable.pkey_column_name
+                    if fk.referenced_columns[i] == biggest_ptable.pkey_column_name:
+                        pkey_column_name = fk.columns[i]
                         reason_chosen = ('%s references partitioned table %s through a '
                                          'foreign key that references the partition key'
                                                 % (table.name, biggest_ptable.name))
