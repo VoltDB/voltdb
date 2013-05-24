@@ -42,10 +42,6 @@ class G:
     osx_fix = 'ln -s /usr/local/mysql/lib/libmysqlclient.[0-9][0-9]*.dylib /usr/local/lib/'
     # The comment prefix used to annotate generated lines.
     vcomment_prefix = 'GEN:'
-    # The partitioning cut-off as a percentage of the maximum row count.
-    # E.g. 50 means that any table that has at least 50% of the maximum row
-    # count across all tables gets partitioned.
-    partitioning_row_count_percent = 50
 
 
 # Conversion error/warning messages.
@@ -254,45 +250,43 @@ class MySQLSchemaGenerator(object):
         self._determine_partitioning()
 
     def _determine_partitioning(self):
-        max_row_count = max((table.row_count for table in self.iter_tables()))
-        # Convenience function to
-        # Partition tables within the threshold percentage of the maximum row count.
+        # Partition the biggest table.
+        max_row_count = 0
+        biggest_table = None
         for table in self.iter_tables():
-            if ((table.row_count * 100) / G.partitioning_row_count_percent) >= max_row_count:
-                if table.primary_key_columns:
-                    # For now arbitrarily choose the first column in the primary key.
-                    pkey_column_name = table.primary_key_columns[0].name
-                    if table.row_count == max_row_count:
-                        reason_chosen = ('%s has the maximum row count of %d'
-                                            % (table.name, max_row_count))
-                    else:
-                        reason_chosen = ("%s row count (%d) is within %d%% of the maximum."
-                                            % (table.name, table.row_count,
-                                               G.partitioning_row_count_percent))
-                    ptable = PartitionedTable(table, pkey_column_name, reason_chosen)
-                    self.partitioned_tables[table.name] = ptable
-        # Also partition any tables having a foreign key referencing a partitioned table.
+            if table.row_count > max_row_count:
+                max_row_count = table.row_count
+                biggest_table = table
+        if not biggest_table:
+            utility.abort('No table has rows. The database must be populated')
+        pkey_column_name = biggest_table.primary_key_columns[0].name
+        reason_chosen = ('%s has the largest row count of %d.'
+                            % (biggest_table.name, max_row_count))
+        biggest_ptable = PartitionedTable(biggest_table, pkey_column_name, reason_chosen)
+        self.partitioned_tables[biggest_table.name] = biggest_ptable
+        # Partition other tables having a foreign key referencing the biggest table.
         for table in self.iter_tables():
-            if table.name not in self.partitioned_tables:
-                for fk_name in table.schema.foreign_keys:
-                    fk = table.schema.foreign_keys[fk_name]
-                    if fk.referenced_table_name in self.partitioned_tables:
-                        ptable = self.partitioned_tables[fk.referenced_table_name]
-                        # It's a winner if one of the FK reference columns is the
-                        # referenced table's partition key.
-                        pkey = None
-                        for icolumn in range(len(fk.columns)):
-                            # Check if the referenced column is the partition key.
-                            # If it is use the corresponding column in this table.
-                            # Assume columns and referenced_columns are synchronized.
-                            if fk.referenced_columns[i].name == ptable.pkey_column_name:
-                                pkey_column_name = fk.columns[i].name
-                                reason_chosen = ('%s references partitioned table %s through a '
-                                                 'foreign key that references the partition key'
-                                                        % (table.name, ptable.name))
-                                ptable = PartitionedTable(table, pkey_column_name, reason_chosen)
-                                self.partitioned_tables[table.name] = ptable
-                                break
+            if table.name == biggest_table.name:
+                continue
+            for fk_name in table.schema.foreign_keys:
+                fk = table.schema.foreign_keys[fk_name]
+                if fk.referenced_table_name != biggest_table.name:
+                    continue
+                # It's a winner if one of the FK reference columns is the
+                # referenced table's partition key.
+                pkey = None
+                for icolumn in range(len(fk.columns)):
+                    # Check if the referenced column is the partition key.
+                    # If it is use the corresponding column in this table.
+                    # Assume columns and referenced_columns are synchronized.
+                    if fk.referenced_columns[i].name == biggest_ptable.pkey_column_name:
+                        pkey_column_name = fk.columns[i].name
+                        reason_chosen = ('%s references partitioned table %s through a '
+                                         'foreign key that references the partition key'
+                                                % (table.name, biggest_ptable.name))
+                        fk_ptable = PartitionedTable(table, pkey_column_name, reason_chosen)
+                        self.partitioned_tables[table.name] = fk_ptable
+                        break
 
 
 def convert_type(mysql_type):

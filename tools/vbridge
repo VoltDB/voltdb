@@ -30,7 +30,7 @@
 import sys
 import toolrunner
 
-description = 'Preview release command line interface to VoltDB development functions.'
+description = 'External database bridge commands.'
 standalone = False
 # Required packages (auto-installed into virtual environment using pip).
 packages = ('mysql-python', 'ez_setup', 'schemaobject')
