@@ -17,7 +17,12 @@
 
 package org.voltdb.compiler;
 
+import groovy.lang.Binding;
+import groovy.lang.Closure;
+import groovy.lang.Script;
+
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.HashMap;
@@ -49,15 +54,18 @@ import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ParameterValueExpression;
+import org.voltdb.groovy.GroovyCodeBlockConstants;
 import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.CatalogUtil;
+
+import com.google.common.collect.ImmutableMap;
 
 /**
  * Compiles stored procedures into a given catalog,
  * invoking the StatementCompiler as needed.
  */
-public abstract class ProcedureCompiler {
+public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
 
     static void compile(VoltCompiler compiler, HSQLInterface hsql,
             DatabaseEstimates estimates, Catalog catalog, Database db,
@@ -134,6 +142,166 @@ public abstract class ProcedureCompiler {
     }
 
     /**
+     * Return a language visitor that, when run, it returns a map consisting of field names and their
+     * assigned objects
+     *
+     * @param compiler volt compiler instance
+     * @return a {@link Language.Visitor}
+     */
+    static Language.CheckedExceptionVisitor<Map<String,Object>, Class<?>, VoltCompilerException> procedureIntrospector(final VoltCompiler compiler) {
+            return new Language.CheckedExceptionVisitor<Map<String,Object>, Class<?>, VoltCompilerException>() {
+
+                @Override
+                public Map<String, Object> visitJava(Class<?> p) throws VoltCompilerException {
+                    // get the short name of the class (no package)
+                    String shortName = deriveShortProcedureName(p.getName());
+
+                    VoltProcedure procInstance;
+                    try {
+                        procInstance = (VoltProcedure)p.newInstance();
+                    } catch (InstantiationException e) {
+                        throw new RuntimeException("Error instantiating procedure \"%s\"" + p.getName(), e);
+                    } catch (IllegalAccessException e) {
+                        throw new RuntimeException("Error instantiating procedure \"%s\"" + p.getName(), e);
+                    }
+                    Map<String, SQLStmt> stmtMap = getValidSQLStmts(compiler, p.getSimpleName(), p, procInstance, true);
+
+                    ImmutableMap.Builder<String, Object> builder = ImmutableMap.builder();
+                    builder.putAll(stmtMap);
+
+                    // find the run() method and get the params
+                    Method procMethod = null;
+                    Method[] methods = p.getDeclaredMethods();
+                    for (final Method m : methods) {
+                        String name = m.getName();
+                        if (name.equals("run")) {
+                            assert (m.getDeclaringClass() == p);
+
+                            // if not null, then we've got more than one run method
+                            if (procMethod != null) {
+                                String msg = "Procedure: " + shortName + " has multiple public run(...) methods. ";
+                                msg += "Only a single run(...) method is supported.";
+                                throw compiler.new VoltCompilerException(msg);
+                            }
+
+                            if (Modifier.isPublic(m.getModifiers())) {
+                                // found it!
+                                procMethod = m;
+                            }
+                            else {
+                                compiler.addWarn("Procedure: " + shortName + " has non-public run(...) method.");
+                            }
+                        }
+                    }
+                    if (procMethod == null) {
+                        String msg = "Procedure: " + shortName + " has no run(...) method.";
+                        throw compiler.new VoltCompilerException(msg);
+                    }
+                    // check the return type of the run method
+                    if ((procMethod.getReturnType() != VoltTable[].class) &&
+                       (procMethod.getReturnType() != VoltTable.class) &&
+                       (procMethod.getReturnType() != long.class) &&
+                       (procMethod.getReturnType() != Long.class)) {
+
+                        String msg = "Procedure: " + shortName + " has run(...) method that doesn't return long, Long, VoltTable or VoltTable[].";
+                        throw compiler.new VoltCompilerException(msg);
+                    }
+
+                    builder.put("@run",procMethod);
+
+                    return builder.build();
+                }
+
+                @Override
+                public Map<String,Object> visitGroovy(Class<?> p) throws VoltCompilerException {
+                    // get the short name of the class (no package)
+                    String shortName = deriveShortProcedureName(p.getName());
+
+                    // all groovy scripts have an implicit run method defined
+                    Method run;
+                    try {
+                        run = p.getMethod("run", (Class<?>[]) null);
+                    } catch (NoSuchMethodException ex) {
+                        throw compiler.new VoltCompilerException(String.format(
+                                "Procedure \"%s\" code block is not a groovy script",
+                                shortName
+                                ));
+                    }
+                    // instantiate the script
+                    Script script;
+                    try {
+                        script = (Script)p.newInstance();
+                    } catch (InstantiationException e) {
+                        throw new RuntimeException(
+                                "Error instantiating the code block script for \"" + shortName + "\"", e
+                                );
+                    } catch (IllegalAccessException e) {
+                        throw new RuntimeException(
+                                "Error instantiating the code block script for \"" + shortName + "\"", e
+                                );
+                    } catch (ClassCastException ex) {
+                        throw compiler.new VoltCompilerException(String.format(
+                                "Procedure \"%s\" code block is not a groovy script",
+                                shortName
+                                ));
+                    }
+
+                    // inject the required volt binding
+                    Binding binding = new Binding();
+                    binding.setVariable(GVY_PROCEDURE_INSTANCE_VAR,(VoltProcedure)null);
+                    script.setBinding(binding);
+
+                    try {
+                        run.invoke(script, (Object[]) null);
+                    } catch (IllegalAccessException e) {
+                        throw new RuntimeException(
+                                "Error running the code block script for \"" + shortName + "\"", e
+                                );
+                    } catch (InvocationTargetException e) {
+                        throw new RuntimeException(
+                                "Error running the code block script for \"" + shortName + "\"", e
+                                );
+                    }
+                    Object transactOn = binding.getVariable(GVY_PROCEDURE_ENTRY_CLOSURE);
+                    if (transactOn == null || ! (transactOn instanceof Closure)) {
+                        throw compiler.new VoltCompilerException(String.format(
+                                "Procedure \"%s\" code block does not contain the required \"%s\" closure",
+                                shortName, GVY_PROCEDURE_ENTRY_CLOSURE
+                                ));
+                    }
+                    @SuppressWarnings("unchecked")
+                    Map<String,Object> bindings  = (Map<String,Object>)binding.getVariables();
+                    ImmutableMap.Builder<String, Object> builder = ImmutableMap.builder();
+
+                    for ( Map.Entry<String, Object> entry: bindings.entrySet()) {
+                        if (entry.getValue() != null) {
+                            builder.put(entry.getKey(), entry.getValue());
+                        }
+                    }
+
+                    return builder.build();
+                }
+            };
+    };
+
+    final static Language.Visitor<Class<?>[], Map<String,Object>> procedureEntryPointParametersTypeExtractor =
+            new Language.SimpleVisitor<Class<?>[], Map<String,Object>>() {
+
+                @Override
+                public Class<?>[] visitJava(Map<String, Object> p) {
+                    Method procMethod = (Method)p.get("@run");
+                    return procMethod.getParameterTypes();
+                }
+
+                @Override
+                public Class<?>[] visitGroovy(Map<String, Object> p) {
+                    @SuppressWarnings("unchecked")
+                    Closure<Object> transactOn = (Closure<Object>)p.get("transactOn");
+                    return (Class<?> [])transactOn.getParameterTypes();
+                }
+    };
+
+    /**
      * get the short name of the class (no package)
      * @param className fully qualified (or not) class name
      * @return short name of the class (no package)
@@ -155,15 +323,10 @@ public abstract class ProcedureCompiler {
     throws VoltCompiler.VoltCompilerException {
 
         final String className = procedureDescriptor.m_className;
+        final Language lang = procedureDescriptor.m_language;
 
         // Load the class given the class name
-        Class<?> procClass = null;
-        try {
-            procClass = Class.forName(className);
-        } catch (ClassNotFoundException e) {
-            String msg = "Cannot load class for procedure: " + className;
-            throw compiler.new VoltCompilerException(msg);
-        }
+        Class<?> procClass = procedureDescriptor.m_class;
 
         // get the short name of the class (no package)
         String shortName = deriveShortProcedureName(className);
@@ -183,6 +346,7 @@ public abstract class ProcedureCompiler {
         procedure.setSystemproc(false);
         procedure.setDefaultproc(procedureDescriptor.m_builtInStmt);
         procedure.setHasjava(true);
+        procedure.setLanguage(lang.name());
 
         // get the annotation
         // first try to get one that has been passed from the compiler
@@ -224,15 +388,6 @@ public abstract class ProcedureCompiler {
             }
         }
 
-        VoltProcedure procInstance = null;
-        try {
-            procInstance = (VoltProcedure) procClass.newInstance();
-        } catch (InstantiationException e1) {
-            e1.printStackTrace();
-        } catch (IllegalAccessException e1) {
-            e1.printStackTrace();
-        }
-
         // track if there are any writer statements and/or sequential scans and/or an overlooked common partitioning parameter
         boolean procHasWriteStmts = false;
         boolean procHasSeqScans = false;
@@ -242,11 +397,13 @@ public abstract class ProcedureCompiler {
         Object exampleSPvalue = null;
 
         // iterate through the fields and get valid sql statements
-        Map<String, SQLStmt> stmtMap = getValidSQLStmts(compiler, procClass.getSimpleName(), procClass, procInstance, true);
+        Map<String, Object> fields = lang.accept(procedureIntrospector(compiler), procClass);
 
         // determine if proc is read or read-write by checking if the proc contains any write sql stmts
         boolean readWrite = false;
-        for (SQLStmt stmt : stmtMap.values()) {
+        for (Object field : fields.values()) {
+            if (!(field instanceof SQLStmt)) continue;
+            SQLStmt stmt = (SQLStmt)field;
             QueryType qtype = QueryType.getFromSQL(stmt.getText());
             if (!qtype.isReadOnly()) {
                 readWrite = true;
@@ -258,9 +415,11 @@ public abstract class ProcedureCompiler {
         // but if it's a read-write proc, use a SAFER planning mode wrt determinism.
         final DeterminismMode detMode = readWrite ? DeterminismMode.SAFER : DeterminismMode.FASTER;
 
-        for (Entry<String, SQLStmt> entry : stmtMap.entrySet()) {
+        for (Entry<String, Object> entry : fields.entrySet()) {
+            if (!(entry.getValue() instanceof SQLStmt)) continue;
+
             String stmtName = entry.getKey();
-            SQLStmt stmt = entry.getValue();
+            SQLStmt stmt = (SQLStmt)entry.getValue();
 
             // add the statement to the catalog
             Statement catalogStmt = procedure.getStatements().add(stmtName);
@@ -392,47 +551,9 @@ public abstract class ProcedureCompiler {
             }
         }
 
-        // find the run() method and get the params
-        Method procMethod = null;
-        Method[] methods = procClass.getDeclaredMethods();
-        for (final Method m : methods) {
-            String name = m.getName();
-            if (name.equals("run")) {
-                assert (m.getDeclaringClass() == procClass);
-
-                // if not null, then we've got more than one run method
-                if (procMethod != null) {
-                    String msg = "Procedure: " + shortName + " has multiple public run(...) methods. ";
-                    msg += "Only a single run(...) method is supported.";
-                    throw compiler.new VoltCompilerException(msg);
-                }
-
-                if (Modifier.isPublic(m.getModifiers())) {
-                    // found it!
-                    procMethod = m;
-                }
-                else {
-                    compiler.addWarn("Procedure: " + shortName + " has non-public run(...) method.");
-                }
-            }
-        }
-        if (procMethod == null) {
-            String msg = "Procedure: " + shortName + " has no run(...) method.";
-            throw compiler.new VoltCompilerException(msg);
-        }
-        // check the return type of the run method
-        if ((procMethod.getReturnType() != VoltTable[].class) &&
-           (procMethod.getReturnType() != VoltTable.class) &&
-           (procMethod.getReturnType() != long.class) &&
-           (procMethod.getReturnType() != Long.class)) {
-
-            String msg = "Procedure: " + shortName + " has run(...) method that doesn't return long, Long, VoltTable or VoltTable[].";
-            throw compiler.new VoltCompilerException(msg);
-        }
-
         // set procedure parameter types
         CatalogMap<ProcParameter> params = procedure.getParameters();
-        Class<?>[] paramTypes = procMethod.getParameterTypes();
+        Class<?>[] paramTypes = lang.accept(procedureEntryPointParametersTypeExtractor, fields);
         for (int i = 0; i < paramTypes.length; i++) {
             Class<?> cls = paramTypes[i];
             ProcParameter param = params.add(String.valueOf(i));

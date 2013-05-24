@@ -45,18 +45,19 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
+import org.voltdb.compiler.Language;
 import org.voltdb.compiler.ProcedureCompiler;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
+import org.voltdb.groovy.GroovyScriptProcedureDelegate;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.VoltTableUtil;
 
 public class ProcedureRunner {
 
@@ -110,6 +111,7 @@ public class ProcedureRunner {
     protected ProcedureStatsCollector m_statsCollector;
     protected final Procedure m_catProc;
     protected final boolean m_isSysProc;
+    protected final Language m_language;
 
     // dependency ids for ad hoc
     protected final static int AGG_DEPID = 1;
@@ -123,6 +125,17 @@ public class ProcedureRunner {
         public final SQLStmt sql = new SQLStmt("TBD");
     }
 
+    private final static Language.Visitor<String, VoltProcedure> procedureNameRetriever =
+            new Language.Visitor<String, VoltProcedure>() {
+                @Override
+                public String visitJava(VoltProcedure p) {
+                    return p.getClass().getSimpleName();
+                }
+                @Override
+                public String visitGroovy(VoltProcedure p) {
+                    return ((GroovyScriptProcedureDelegate)p).getProcedureName();
+                }
+            };
 
     ProcedureRunner(VoltProcedure procedure,
                     SiteProcedureConnection site,
@@ -131,11 +144,18 @@ public class ProcedureRunner {
                     CatalogSpecificPlanner csp) {
         assert(m_inputCRC.getValue() == 0L);
 
+        String language = catProc.getLanguage();
+        if (language != null && !language.trim().isEmpty()) {
+            m_language = Language.valueOf(language.trim().toUpperCase());
+        } else {
+            m_language = null;
+        }
+
         if (procedure instanceof StmtProcedure) {
             m_procedureName = catProc.getTypeName().intern();
         }
         else {
-            m_procedureName = procedure.getClass().getSimpleName();
+            m_procedureName = m_language.accept(procedureNameRetriever, procedure);
         }
         m_procedure = procedure;
         m_isSysProc = procedure instanceof VoltSystemProcedure;
@@ -253,15 +273,25 @@ public class ProcedureRunner {
             // run a regular java class
             if (m_catProc.getHasjava()) {
                 try {
-                    if (log.isTraceEnabled()) {
-                        log.trace("invoking... procMethod=" + m_procMethod.getName() + ", class=" + getClass().getName());
+                    if (m_language == Language.JAVA) {
+                        if (log.isTraceEnabled()) {
+                            log.trace("invoking... procMethod=" + m_procMethod.getName() + ", class=" + getClass().getName());
+                        }
+                        try {
+                            Object rawResult = m_procMethod.invoke(m_procedure, paramList);
+                            results = getResultsFromRawResults(rawResult);
+                        } catch (IllegalAccessException e) {
+                            // If reflection fails, invoke the same error handling that other exceptions do
+                            throw new InvocationTargetException(e);
+                        }
                     }
-                    try {
-                        Object rawResult = m_procMethod.invoke(m_procedure, paramList);
+                    else if (m_language == Language.GROOVY) {
+                        if (log.isTraceEnabled()) {
+                            log.trace("invoking... groovy closure on class=" + getClass().getName());
+                        }
+                        GroovyScriptProcedureDelegate proc = (GroovyScriptProcedureDelegate)m_procedure;
+                        Object rawResult = proc.m_closure.call(paramList);
                         results = getResultsFromRawResults(rawResult);
-                    } catch (IllegalAccessException e) {
-                        // If reflection fails, invoke the same error handling that other exceptions do
-                        throw new InvocationTargetException(e);
                     }
                     log.trace("invoked");
                 }
@@ -754,6 +784,7 @@ public class ProcedureRunner {
         }
     }
 
+
     protected void reflect() {
         // fill in the sql for single statement procs
         if (m_catProc.getHasjava() == false) {
@@ -803,42 +834,37 @@ public class ProcedureRunner {
             }
         }
         else {
-            // parse the java run method
-            Method[] methods = m_procedure.getClass().getDeclaredMethods();
+            // this is where, in the case of java procedures, m_method is set
+            m_paramTypes = m_language.accept(parametersTypeRetriever, this);
 
-            for (final Method m : methods) {
-                String name = m.getName();
-                if (name.equals("run")) {
-                    if (Modifier.isPublic(m.getModifiers()) == false)
-                        continue;
-                    m_procMethod = m;
-                    m_paramTypes = m.getParameterTypes();
-                    int tempParamTypesLength = m_paramTypes.length;
+            int tempParamTypesLength = m_paramTypes.length;
+            m_paramTypeIsPrimitive = new boolean[tempParamTypesLength];
+            m_paramTypeIsArray = new boolean[tempParamTypesLength];
+            m_paramTypeComponentType = new Class<?>[tempParamTypesLength];
 
-                    m_paramTypeIsPrimitive = new boolean[tempParamTypesLength];
-                    m_paramTypeIsArray = new boolean[tempParamTypesLength];
-                    m_paramTypeComponentType = new Class<?>[tempParamTypesLength];
-                    for (int ii = 0; ii < tempParamTypesLength; ii++) {
-                        m_paramTypeIsPrimitive[ii] = m_paramTypes[ii].isPrimitive();
-                        m_paramTypeIsArray[ii] = m_paramTypes[ii].isArray();
-                        m_paramTypeComponentType[ii] = m_paramTypes[ii].getComponentType();
-                    }
-                }
+            for (int ii = 0; ii < tempParamTypesLength; ii++) {
+                m_paramTypeIsPrimitive[ii] = m_paramTypes[ii].isPrimitive();
+                m_paramTypeIsArray[ii] = m_paramTypes[ii].isArray();
+                m_paramTypeComponentType[ii] = m_paramTypes[ii].getComponentType();
             }
-
-            if (m_procMethod == null) {
+            if (m_procMethod == null && m_language == Language.JAVA) {
                 throw new RuntimeException("No \"run\" method found in: " + m_procedure.getClass().getName());
             }
         }
 
         // iterate through the fields and deal with sql statements
         Map<String, SQLStmt> stmtMap = null;
-        try {
-            stmtMap = ProcedureCompiler.getValidSQLStmts(null, m_procedureName, m_procedure.getClass(), m_procedure, true);
-        } catch (Exception e1) {
-            // shouldn't throw anything outside of the compiler
-            e1.printStackTrace();
-            return;
+        if (m_catProc.getHasjava() == false) {
+            try {
+                stmtMap = ProcedureCompiler.getValidSQLStmts(null, m_procedureName, m_procedure.getClass(), m_procedure, true);
+            } catch (Exception e1) {
+                // shouldn't throw anything outside of the compiler
+                e1.printStackTrace();
+                return;
+            }
+        }
+        else {
+            stmtMap = m_language.accept(sqlStatementsRetriever, this);
         }
 
         for (final Entry<String, SQLStmt> entry : stmtMap.entrySet()) {
@@ -859,7 +885,49 @@ public class ProcedureRunner {
         }
     }
 
-    /**
+    private final static Language.Visitor<Class<?>[], ProcedureRunner> parametersTypeRetriever =
+            new Language.Visitor<Class<?>[], ProcedureRunner>() {
+                @Override
+                public Class<?>[] visitJava(ProcedureRunner p) {
+                    Method[] methods = p.m_procedure.getClass().getDeclaredMethods();
+
+                    for (final Method m : methods) {
+                        String name = m.getName();
+                        if (name.equals("run")) {
+                            if (Modifier.isPublic(m.getModifiers()) == false)
+                                continue;
+                            p.m_procMethod = m;
+                            return m.getParameterTypes();
+                        }
+                    }
+                    return null;
+                }
+                @Override
+                public Class<?>[] visitGroovy(ProcedureRunner p) {
+                    return ((GroovyScriptProcedureDelegate)p.m_procedure).getParameterTypes();
+                }
+            };
+
+   private final static Language.Visitor<Map<String,SQLStmt>, ProcedureRunner> sqlStatementsRetriever =
+           new Language.Visitor<Map<String,SQLStmt>, ProcedureRunner>() {
+            @Override
+            public Map<String, SQLStmt> visitJava(ProcedureRunner p) {
+                Map<String, SQLStmt> stmtMap = null;
+                try {
+                    stmtMap = ProcedureCompiler.getValidSQLStmts(null, p.m_procedureName, p.m_procedure.getClass(), p.m_procedure, true);
+                } catch (Exception e1) {
+                    // shouldn't throw anything outside of the compiler
+                    e1.printStackTrace();
+                }
+                return stmtMap;
+            }
+            @Override
+            public Map<String, SQLStmt> visitGroovy(ProcedureRunner p) {
+                return ((GroovyScriptProcedureDelegate)p.m_procedure).getStatementMap();
+            }
+        };
+
+   /**
     *
     * @param e
     * @return A ClientResponse containing error information

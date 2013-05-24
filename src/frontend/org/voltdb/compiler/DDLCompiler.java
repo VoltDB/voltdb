@@ -17,6 +17,8 @@
 
 package org.voltdb.compiler;
 
+import groovy.lang.GroovyClassLoader;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -34,11 +36,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
+import org.codehaus.groovy.control.CompilationFailedException;
+import org.codehaus.groovy.control.CompilerConfiguration;
+import org.codehaus.groovy.control.customizers.ImportCustomizer;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -221,6 +227,37 @@ public class DDLCompiler {
             "\\z"                                   // end of DDL statement
             );
 
+    static final char   BLOCK_DELIMITER_CHAR = '#';
+    static final String BLOCK_DELIMITER = "###";
+
+    static final Pattern procedureWithScriptPattern = Pattern.compile(
+            "\\A" +                                 // beginning of DDL statement
+            "CREATE" +                              // CREATE token
+            "\\s+" +                                // one or more spaces
+            "PROCEDURE" +                           // PROCEDURE token
+            "\\s+" +                                // one or more spaces
+            "([\\w.$]+)" +                          // (1) procedure name
+            "(?:" +                                 // begin optional ALLOW clause
+            "\\s+" +                                //   one or more spaces
+            "ALLOW" +                               //   ALLOW token
+            "\\s+" +                                //   one or more spaces
+            "([\\w.$]+(?:\\s*,\\s*[\\w.$]+)*)" +    //   (2) comma-separated role list
+            ")?" +                                  // end optional ALLOW clause
+            "\\s+" +                                // one or more spaces
+            "AS" +                                  // AS token
+            "\\s+" +                                // one or more spaces
+            BLOCK_DELIMITER +                       // block delimiter ###
+            "(.+)" +                                // (3) code block content
+            BLOCK_DELIMITER +                       // block delimiter ###
+            "\\s+" +                                // one or more spaces
+            "LANGUAGE" +                            // LANGUAGE token
+            "\\s+" +                                // one or more spaces
+            "(GROOVY)" +                            // (4) language name
+            ";" +                                   // semi-colon terminator
+            "\\z",                                  // end of DDL statement
+            Pattern.CASE_INSENSITIVE|Pattern.MULTILINE|Pattern.DOTALL
+            );
+
     /**
      * Regex to parse the CREATE ROLE statement with optional WITH clause.
      * Leave the WITH clause argument as a single group because regexes
@@ -334,12 +371,49 @@ public class DDLCompiler {
     HashMap<String, Index> indexMap = new HashMap<String, Index>();
     HashMap<Table, String> matViewMap = new HashMap<Table, String>();
 
+
     private class DDLStatement {
         public DDLStatement() {
         }
         String statement = "";
         int lineNo;
     }
+
+    Language.Visitor<Class<?>, Pair<String,String>> codeBlockCompiler =
+            new Language.SimpleVisitor<Class<?>, Pair<String, String>>() {
+
+        CompilerConfiguration conf = new CompilerConfiguration(CompilerConfiguration.DEFAULT);
+        ImportCustomizer imports = new ImportCustomizer();
+        GroovyClassLoader gcl;
+
+        {
+            imports.addStarImports("org.voltdb");
+            conf.addCompilationCustomizers(imports);
+
+            File groovyOut = new File("groovyout");
+            if (!groovyOut.exists()) groovyOut.mkdir();
+            if (!groovyOut.isDirectory() || !groovyOut.canRead() || !groovyOut.canWrite()) {
+                throw new RuntimeException("Cannot access directory\"" + groovyOut + "\"");
+            }
+            List<String> classPath = conf.getClasspath();
+            classPath.add(groovyOut.getName());
+            conf.setClasspathList(classPath);
+
+            conf.setTargetDirectory(groovyOut);
+
+            gcl = new GroovyClassLoader(Thread.currentThread().getContextClassLoader(), conf);
+        }
+
+        @Override
+        public Class<?> visitJava(Pair<String, String> p) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Class<?> visitGroovy(Pair<String, String> p) {
+            return gcl.parseClass(p.getSecond(),p.getFirst() + ".groovy");
+        }
+    };
 
     public DDLCompiler(VoltCompiler compiler, HSQLInterface hsql, VoltDDLElementTracker tracker) {
         assert(compiler != null);
@@ -470,10 +544,18 @@ public class DDLCompiler {
         // matches if it is CREATE PROCEDURE [ALLOW <role> ...] FROM CLASS <class-name>;
         statementMatcher = procedureClassPattern.matcher(statement);
         if( statementMatcher.matches()) {
-            String clazz = checkIdentifierStart(statementMatcher.group(2), statement);
+            String className = checkIdentifierStart(statementMatcher.group(2), statement);
+            Class<?> clazz;
+            try {
+                clazz = Class.forName(className);
+            } catch (ClassNotFoundException e) {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "No class found for procedure \"%s\"",
+                        className));
+            }
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
-                    new ArrayList<String>(), clazz);
+                    new ArrayList<String>(), Language.JAVA, clazz);
 
             // Add roles if specified.
             if (statementMatcher.group(1) != null) {
@@ -499,7 +581,7 @@ public class DDLCompiler {
             String sqlStatement = statementMatcher.group(3);
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
-                    new ArrayList<String>(), clazz, sqlStatement, null, null, false);
+                    new ArrayList<String>(), clazz, sqlStatement, null, null, false, null, null);
 
             // Add roles if specified.
             if (statementMatcher.group(2) != null) {
@@ -508,6 +590,41 @@ public class DDLCompiler {
                 }
             }
 
+            m_tracker.add(descriptor);
+
+            return true;
+        }
+
+        // matches  if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] AS
+        // ### <code-block> ### LANGUAGE <language-name>
+        statementMatcher = procedureWithScriptPattern.matcher(statement);
+        if (statementMatcher.matches()) {
+
+            String className = checkIdentifierStart(statementMatcher.group(1), statement);
+            String codeBlock = statementMatcher.group(3);
+            Language language = Language.valueOf(statementMatcher.group(4).toUpperCase());
+
+            Class<?> scriptClass = null;
+            try {
+                scriptClass = language.accept(codeBlockCompiler, Pair.of(className,codeBlock));
+            } catch (CompilationFailedException ex) {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "Procedure \"%s\" code block has syntax errors:\n%s",
+                        className, ex.getMessage()));
+            } catch (Exception ex) {
+                throw m_compiler.new VoltCompilerException(ex);
+            }
+
+            ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
+                    new ArrayList<String>(), language, scriptClass);
+
+            // Add roles if specified.
+            if (statementMatcher.group(2) != null) {
+                for (String roleName : StringUtils.split(statementMatcher.group(2), ',')) {
+                    descriptor.m_authGroups.add(roleName.trim().toLowerCase());
+                }
+            }
+            // track the defined procedure
             m_tracker.add(descriptor);
 
             return true;
@@ -734,10 +851,17 @@ public class DDLCompiler {
     private static int kStateReadingStringLiteralSpecialChar = 4; // dealing with one or more single quotes
     private static int kStateReadingStringLiteral = 5;            // in the middle of a string literal
     private static int kStateCompleteStatement = 6;               // found end of statement
+    private static int kStateReadingCodeBlockDelim = 7 ;          // dealing with code block delimiter ###
+    private static int kStateReadingCodeBlockNextDelim = 8;       // dealing with code block delimiter ###
+    private static int kStateReadingCodeBlock = 9;                // reading code block
+    private static int kStateReadingEndCodeBlockDelim = 10 ;      // dealing with ending code block delimiter ###
+    private static int kStateReadingEndCodeBlockNextDelim = 11;   // dealing with ending code block delimiter ###
+
 
     private int readingState(char[] nchar, DDLStatement retval) {
         if (nchar[0] == '-') {
             // remember that a possible '--' is being examined
+            retval.statement += nchar[0];
             return kStateReadingCommentDelim;
         }
         else if (nchar[0] == '\n') {
@@ -757,12 +881,65 @@ public class DDLCompiler {
             retval.statement += nchar[0];
             return kStateReadingStringLiteral;
         }
+        else if (nchar[0] == BLOCK_DELIMITER_CHAR) {
+            // we may be examining ### code block delimiters
+            retval.statement += nchar[0];
+            return kStateReadingCodeBlockDelim;
+        }
         else {
             // accumulate and continue
             retval.statement += nchar[0];
         }
 
         return kStateReading;
+    }
+
+    private int readingCodeBlockStateDelim(char [] nchar, DDLStatement retval) {
+        retval.statement += nchar[0];
+        if (nchar[0] == BLOCK_DELIMITER_CHAR) {
+            return kStateReadingCodeBlockNextDelim;
+        } else {
+            return readingState(nchar, retval);
+        }
+    }
+
+    private int readingEndCodeBlockStateDelim(char [] nchar, DDLStatement retval) {
+        retval.statement += nchar[0];
+        if (nchar[0] == BLOCK_DELIMITER_CHAR) {
+            return kStateReadingEndCodeBlockNextDelim;
+        } else {
+            return kStateReadingCodeBlock;
+        }
+    }
+
+    private int readingCodeBlockStateNextDelim(char [] nchar, DDLStatement retval) {
+        if (nchar[0] == BLOCK_DELIMITER_CHAR) {
+            retval.statement += nchar[0];
+            return kStateReadingCodeBlock;
+        }
+        return readingState(nchar, retval);
+    }
+
+    private int readingEndCodeBlockStateNextDelim(char [] nchar, DDLStatement retval) {
+        retval.statement += nchar[0];
+        if (nchar[0] == BLOCK_DELIMITER_CHAR) {
+            return kStateReading;
+        }
+        return kStateReadingCodeBlock;
+    }
+
+    private int readingCodeBlock(char [] nchar, DDLStatement retval) {
+        // all characters in the literal are accumulated. keep track of
+        // newlines for error messages.
+        retval.statement += nchar[0];
+        if (nchar[0] == BLOCK_DELIMITER_CHAR) {
+            return kStateReadingEndCodeBlockDelim;
+        }
+
+        if (nchar[0] == '\n') {
+            m_currLineNo += 1;
+        }
+        return kStateReadingCodeBlock;
     }
 
     private int readingStringLiteralState(char[] nchar, DDLStatement retval) {
@@ -827,6 +1004,7 @@ public class DDLCompiler {
         @SuppressWarnings("synthetic-access")
         DDLStatement retval = new DDLStatement();
         retval.lineNo = m_currLineNo;
+        int codeBlockDelimiters = 0;
 
         try {
 
@@ -902,6 +1080,21 @@ public class DDLCompiler {
                 }
                 else if (state == kStateReadingStringLiteralSpecialChar) {
                     state = readingStringLiteralSpecialChar(nchar, retval);
+                }
+                else if (state == kStateReadingCodeBlockDelim) {
+                    state = readingCodeBlockStateDelim(nchar, retval);
+                }
+                else if (state == kStateReadingCodeBlockNextDelim) {
+                    state = readingCodeBlockStateNextDelim(nchar, retval);
+                }
+                else if (state == kStateReadingCodeBlock) {
+                    state = readingCodeBlock(nchar, retval);
+                }
+                else if (state == kStateReadingEndCodeBlockDelim) {
+                    state = readingEndCodeBlockStateDelim(nchar, retval);
+                }
+                else if (state == kStateReadingEndCodeBlockNextDelim) {
+                    state = readingEndCodeBlockStateNextDelim(nchar, retval);
                 }
                 else {
                     throw compiler.new VoltCompilerException("Unrecoverable error parsing DDL.");
