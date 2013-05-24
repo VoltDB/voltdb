@@ -227,13 +227,13 @@ public class CSVLoader {
         ICsvListReader listReader = null;
         try {
             if (CSVLoader.standin)
-            	listReader = new CsvListReader(new BufferedReader( new InputStreamReader(System.in)), CsvPreference.STANDARD_PREFERENCE);
+            	listReader = new CsvListReader(new BufferedReader( new InputStreamReader(System.in)), csvPreference);
 //                csvReader = new CSVReader(new BufferedReader(
 //                        new InputStreamReader(System.in)), config.separator,
 //                        config.quotechar, config.escape, config.skip,
 //                        config.strictquotes, config.nowhitespace);
             else
-            	listReader = new CsvListReader(new FileReader(config.file), CsvPreference.STANDARD_PREFERENCE);
+            	listReader = new CsvListReader(new FileReader(config.file), csvPreference);
 //                csvReader = new CSVReader(new FileReader(config.file),
 //                        config.separator, config.quotechar, config.escape,
 //                        config.skip, config.strictquotes, config.nowhitespace);
@@ -385,26 +385,35 @@ public class CSVLoader {
 
     private static String checkparams_trimspace(Object[] slot,
             int columnCnt) {
-        if (slot.length == 1 && slot[0].equals("")) {
-            return "Error: blank line";
-        }
+//        if (slot.length == 1 && slot[0].equals("")) {
+//            return "Error: blank line";
+//        }
         if (slot.length != columnCnt) {
             return "Error: Incorrect number of columns. " + slot.length
                     + " found, " + columnCnt + " expected.";
         }
-        for (int i = 0; i < slot.length && slot[i] != null; i++) {
-            // trim white space in this line. Now we can set trim white space in preference for SuperCSV
-            	slot[i] = ((String) slot[i]).trim();
-            // treat NULL, \N and "\N" as actual null value
-            if ( (slot[i]).equals("NULL") || slot[i].equals(VoltTable.CSV_NULL)
-                    || !config.strictquotes && slot[i].equals(VoltTable.QUOTED_CSV_NULL))
-                slot[i] = null;
-            else if (slot[i].equals("")) {
-                if (config.blank.equalsIgnoreCase("null") ) slot[i] = null;
+        for (int i = 0; i < slot.length; i++) {
+        	////now supercsv read "" to null
+        	if( slot[i] == null )
+        	{
+        		if(config.blank.equalsIgnoreCase("error"))
+        		{
+        			return "Error: blank item";
+        		}
                 else if (config.blank.equalsIgnoreCase("empty"))
                     slot[i] = blankValues.get(typeList.get(i));
-            }
-        }
+        	}
+
+            // trim white space in this line. Now we can set surroundingSpacesNeedQuotes for SuperCSV, SuperCSV preserves all the whitespace by default
+        	else
+	        	{
+	        		slot[i] = ((String) slot[i]).trim();
+	            // treat NULL, \N and "\N" as actual null value
+	        		if ( (slot[i]).equals("NULL") || slot[i].equals(VoltTable.CSV_NULL)
+	        				|| !config.strictquotes && slot[i].equals(VoltTable.QUOTED_CSV_NULL))
+	        			slot[i] = null;
+	            }
+        	}
         return null;
     }
 

@@ -445,6 +445,31 @@ public class TestCSVLoader extends TestCase {
         test_Interface( mySchema, myOptions, myData, invalidLineCnt );
     }
 
+    public void testStrictQuote() throws Exception
+    {
+        String mySchema =
+                "create table BLAH (" +
+                        "clm_integer integer default 0 not null, " + // column that is partitioned on
+                        "clm_tinyint tinyint default 0, " +
+                        "clm_smallint smallint default 0, " +
+                        "); ";
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--strictquotes",
+                "BLAH"
+        };
+
+        String []myData = {
+                "\"1\",\"1\",\"1\"",
+                "2,2,2",
+                "3,3,3",
+                "\"4\",\"4\",\"4\"",
+        };
+        int invalidLineCnt = 2;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+    }
+
     public void test_Interface( String my_schema, String[] my_options, String[] my_data, int invalidLineCnt ) throws Exception {
         try{
             BufferedWriter out_csv = new BufferedWriter( new FileWriter( path_csv ) );
