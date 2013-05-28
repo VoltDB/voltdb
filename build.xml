@@ -1827,7 +1827,7 @@ TEST CASES
 </target>
 
 <property name="ptdefaultconfigs"
-         value="json,voter,voltkv,voltcache,cust-report-2012-11-28,ENG-2549,joins,testplans-join,testjoins,aggs"
+         value="json,voter,voltkv,voltcache,cust-report-2012-11-28,ENG-2549,joins,testplans-join,testjoins,aggs,join-order"
    description="default hard-coded set of plannertester configs to run or refresh" />
 
 <target name="plannertester" description="Run plannertester">
@@ -1839,6 +1839,9 @@ TEST CASES
     </condition>
     <condition property="config" value="${config}" else="${ptdefaultconfigs}">
         <isset property="config"/>
+    </condition>
+    <condition property="explain" value="${explain}" else=""> <!-- Enable with -Dexplain=-re -->
+        <isset property="explain"/>
     </condition>
     <condition property="workpath" value="${workpath}" else="/tmp/${user}/plannertester/">
         <isset property="workpath"/>
@@ -1852,7 +1855,7 @@ TEST CASES
           dir="${plannertester.dir}"
           failonerror="true"
           fork="true">
-        <arg line="-C=${config} -dv -r=${reportpath} -sp=${workpath}"/>
+        <arg line="-C=${config} -dv ${explain} -r=${reportpath} -sp=${workpath}"/>
     </java>
 </target>
 
@@ -1866,6 +1869,9 @@ TEST CASES
     <condition property="config" value="${config}" else="${ptdefaultconfigs}">
         <isset property="config"/>
     </condition>
+    <condition property="explain" value="${explain}" else=""> <!-- Enable with -Dexplain=-re -->
+        <isset property="explain"/>
+    </condition>
     <condition property="workpath" value="${workpath}" else="/tmp/${user}/plannertester/">
         <isset property="workpath"/>
     </condition>
@@ -1878,7 +1884,7 @@ TEST CASES
           dir="${plannertester.dir}"
           failonerror="true"
           fork="true">
-        <arg line="-C=${config} -sv -r=${reportpath} -sp=${workpath} "/>
+        <arg line="-C=${config} -sv ${explain} -r=${reportpath} -sp=${workpath} "/>
     </java>
 </target>
 
