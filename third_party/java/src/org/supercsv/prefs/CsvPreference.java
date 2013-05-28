@@ -129,6 +129,8 @@ public final class CsvPreference {
 
 	private final boolean strictQuotes;
 
+	private final char escapeChar;
+
 	/**
 	 * Constructs a new <tt>CsvPreference</tt> from a Builder.
 	 */
@@ -141,6 +143,7 @@ public final class CsvPreference {
 		this.encoder = builder.encoder;
 		this.quoteMode = builder.quoteMode;
 		this.strictQuotes = builder.strictQuotes;
+		this.escapeChar = builder.escapeChar;
 	}
 
 	/**
@@ -210,6 +213,9 @@ public final class CsvPreference {
 		return strictQuotes;
 	}
 
+	public char getEscapeChar() {
+		return escapeChar;
+	}
 	/**
 	 * Builds immutable <tt>CsvPreference</tt> instances. The builder pattern allows for additional preferences to be
 	 * added in the future.
@@ -232,6 +238,8 @@ public final class CsvPreference {
 
 		private boolean strictQuotes = false;
 
+		private char escapeChar;
+
 		/**
 		 * Constructs a Builder with all of the values from an existing <tt>CsvPreference</tt> instance. Useful if you
 		 * want to base your preferences off one of the existing CsvPreference constants.
@@ -248,6 +256,7 @@ public final class CsvPreference {
 			this.quoteMode = preference.quoteMode;
 			this.commentMatcher = preference.commentMatcher;
 			this.strictQuotes = preference.strictQuotes;
+			this.escapeChar = preference.escapeChar;
 		}
 
 		/**
@@ -356,6 +365,10 @@ public final class CsvPreference {
 			return this;
 		}
 
+		public Builder useEscapeChar(char escapechar) {
+			this.escapeChar = escapechar;
+			return this;
+		}
 		/**
 		 * Builds the CsvPreference instance.
 		 *

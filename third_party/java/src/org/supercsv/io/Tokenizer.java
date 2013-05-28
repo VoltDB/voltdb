@@ -52,7 +52,7 @@ public class Tokenizer extends AbstractTokenizer {
 
 	private final boolean strictQuotes;
 
-	//private final int escapeChar;
+	private final int escapeChar;
 
 	/**
 	 * Enumeration of tokenizer states. QUOTE_MODE is activated between quotes.
@@ -78,6 +78,7 @@ public class Tokenizer extends AbstractTokenizer {
 		this.surroundingSpacesNeedQuotes = preferences.isSurroundingSpacesNeedQuotes();
 		this.commentMatcher = preferences.getCommentMatcher();
 		this.strictQuotes = preferences.getStrictQuotes();
+		this.escapeChar = preferences.getEscapeChar();
 	}
 
 	/**
