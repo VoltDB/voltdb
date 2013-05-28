@@ -1400,7 +1400,16 @@ public class VoltCompiler {
                 "and may not use the @partitioninfo project file procedure attribute.";
                 throw new VoltCompilerException(msg);
             }
-            return new ProcedureDescriptor(groups, classattr);
+            Class<?> clazz;
+            try {
+                clazz = Class.forName(classattr);
+            } catch (ClassNotFoundException e) {
+                throw new VoltCompilerException(String.format(
+                        "No class found for procedure \"%s\"",
+                        classattr));
+            }
+
+            return new ProcedureDescriptor(groups, Language.JAVA, clazz);
         }
     }
 

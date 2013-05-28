@@ -389,6 +389,8 @@ public class DDLCompiler {
         {
             imports.addStarImports("org.voltdb");
             conf.addCompilationCustomizers(imports);
+            conf.getOptimizationOptions().put("indy", true);
+
 
             File groovyOut = new File("groovyout");
             if (!groovyOut.exists()) groovyOut.mkdir();
@@ -1004,7 +1006,6 @@ public class DDLCompiler {
         @SuppressWarnings("synthetic-access")
         DDLStatement retval = new DDLStatement();
         retval.lineNo = m_currLineNo;
-        int codeBlockDelimiters = 0;
 
         try {
 
