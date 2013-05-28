@@ -83,14 +83,14 @@ public class TestParsedStatements extends TestCase {
             assertTrue(false);
         }
         // output the xml from hsql to disk for debugging
-        BuildDirectoryUtils.writeFile("statement-hsql-xml", stmtName + ".xml", xmlSQL.toString());
+        BuildDirectoryUtils.writeFile("statement-hsql-xml", stmtName + ".xml", xmlSQL.toString(), true);
 
         // get a parsed statement from the xml
         AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(stmtSQL, xmlSQL, null, m_db, null);
         // analyze expressions
         parsedStmt.analyzeTreeExpressions(parsedStmt.joinTree);
         // output a description of the parsed stmt
-        BuildDirectoryUtils.writeFile("statement-hsql-parsed", stmtName + ".txt", parsedStmt.toString());
+        BuildDirectoryUtils.writeFile("statement-hsql-parsed", stmtName + ".txt", parsedStmt.toString(), true);
 
         int clausesFound = 0;
         clausesFound += parsedStmt.noTableSelectionList.size();

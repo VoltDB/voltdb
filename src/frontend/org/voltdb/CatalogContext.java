@@ -143,6 +143,16 @@ public class CatalogContext {
     }
 
     /**
+     * Get a file/entry (as bytes) given a key/path in the source jar.
+     *
+     * @param key In-jar path to file.
+     * @return byte[] or null if the file doesn't exist.
+     */
+    public byte[] getFileInJar(String key) {
+        return m_jarfile.get(key);
+    }
+
+    /**
      * Write the original JAR file to the specified path/name
      * @param path
      * @param name

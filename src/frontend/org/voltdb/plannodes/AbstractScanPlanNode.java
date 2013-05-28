@@ -20,6 +20,7 @@ package org.voltdb.plannodes;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.SortedSet;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -54,6 +55,13 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
     protected AbstractScanPlanNode() {
         super();
+    }
+
+    @Override
+    protected void getThisNodesTablesAndIndexes(SortedSet<String> tablesRead, SortedSet<String> tablesUpdated, SortedSet<String> indexes) {
+        super.getThisNodesTablesAndIndexes(tablesRead, tablesUpdated, indexes);
+        assert(m_targetTableName.length() > 0);
+        tablesRead.add(m_targetTableName);
     }
 
     @Override

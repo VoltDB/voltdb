@@ -242,6 +242,27 @@ public class PlatformProperties implements Serializable {
         sb.append(String.format("JAVA RUNTIME:     %s\n", javaRuntime));
         sb.append(String.format("JAVA VM:          %s\n", javaVMInfo));
 
+        return sb.toString();
+    }
+
+    public String toHTML() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<tt>");
+
+        sb.append(String.format("CPU INFO:         %d Cores%s, %d Sockets, %d Hardware Threads<br/>\n",
+                                coreCount, isCoreReportedByJava ? " (Reported by Java)" : "",
+                                socketCount, hardwareThreads));
+        sb.append(String.format("CPU DESC:         %s<br/>\n", cpuDesc));
+        sb.append(String.format("HOST MEMORY (MB): %d<br/>\n", ramInMegabytes));
+
+        sb.append(String.format("OS PROFILE:       %s %s %s %s<br/>\n",
+                                osName, osVersion, osArch, locale));
+
+        sb.append(String.format("JAVA VERSION:     %s<br/>\n", javaVersion));
+        sb.append(String.format("JAVA RUNTIME:     %s<br/>\n", javaRuntime));
+        sb.append(String.format("JAVA VM:          %s<br/>\n", javaVMInfo));
+
+        sb.append("</tt>");
 
         return sb.toString();
     }
