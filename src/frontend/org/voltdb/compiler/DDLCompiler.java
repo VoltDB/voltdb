@@ -552,7 +552,7 @@ public class DDLCompiler {
                 clazz = Class.forName(className);
             } catch (ClassNotFoundException e) {
                 throw m_compiler.new VoltCompilerException(String.format(
-                        "No class found for procedure \"%s\"",
+                        "Cannot load class for procedure: %s",
                         className));
             }
 
@@ -863,7 +863,6 @@ public class DDLCompiler {
     private int readingState(char[] nchar, DDLStatement retval) {
         if (nchar[0] == '-') {
             // remember that a possible '--' is being examined
-            retval.statement += nchar[0];
             return kStateReadingCommentDelim;
         }
         else if (nchar[0] == '\n') {

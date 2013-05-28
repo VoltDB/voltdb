@@ -1370,6 +1370,16 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
     }
 
+    public void testDDLCompilerLeadingCommentAndHashMarks() throws IOException {
+        final String s =
+            "-- ### this is a leading comment\n" +
+            "  -- with some ### leading whitespace\n" +
+            "     create table t(id integer);";
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+    }
+
     public void testDDLCompilerNoNewlines() throws IOException {
         final String s =
             "create table t(id integer); create table r(id integer);";
@@ -1402,6 +1412,15 @@ public class TestVoltCompiler extends TestCase {
     public void testDDLCompilerTrailingComment2() throws IOException {
         final String s =
             "create table t(id integer) -- this is a trailing comment\n" +
+            ";\n";
+        VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
+        assertFalse(c.hasErrors());
+        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+    }
+
+    public void testDDLCompilerTrailingCommentAndHashMarks() throws IOException {
+        final String s =
+            "create table t(id varchar(128) default '###')  -- ### this ###### is a trailing comment\n" +
             ";\n";
         VoltCompiler c = compileForDDLTest(getPathForSchema(s), true);
         assertFalse(c.hasErrors());

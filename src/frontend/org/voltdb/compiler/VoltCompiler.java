@@ -1405,7 +1405,7 @@ public class VoltCompiler {
                 clazz = Class.forName(classattr);
             } catch (ClassNotFoundException e) {
                 throw new VoltCompilerException(String.format(
-                        "No class found for procedure \"%s\"",
+                        "Cannot load class for procedure: %s",
                         classattr));
             }
 
