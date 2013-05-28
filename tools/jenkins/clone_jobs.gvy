@@ -15,13 +15,9 @@ def workspace_name = str_search_1.replace("nextrelease", str_branch)
 //whitespace separated list of email addresses
 def recipientlist = "qa@voltdb.com"
 
-/*
-import hudson.plugins.build_timeout
-BuildTimeoutWrapper.ABSOLUTE;
-*/
-  
 AbstractProject kit = null
-  
+downstream = ""
+
 for(item in Hudson.instance.items)
 {
   if ( ! item.disabled && (item.getName().contains(str_search_1) || item.getName().contains(str_search_2))) {
@@ -51,9 +47,9 @@ for(item in Hudson.instance.items)
 
       // set the any parameter named BRANCH to the branch to build
       for ( ParametersDefinitionProperty pd: project.getActions(ParametersDefinitionProperty))
-      { 
+      {
         pd.parameterDefinitions.each
-        { 
+        {
           if (it.name == "BRANCH")
             it.defaultValue = str_branch
         }
@@ -69,8 +65,12 @@ for(item in Hudson.instance.items)
         t = job.getTrigger(triggers.TimerTrigger.class)
         //println t.getSpec() // crontab specification as string ie. "0 22 * * *"
         // to create a new trigger use addTrigger(new Trigger("0 22 * * *"))
-        if (t != null) job.removeTrigger(t.getDescriptor())
-        kit.getPublishersList().add(new tasks.BuildTrigger(project.getName(), false))
+        if (t != null)
+          job.removeTrigger(t.getDescriptor())
+        if (project != kit) {
+          // make a list of all jobs for a BuildTrigger for the kit build job
+          downstream = downstream + "," + project.getName() // make a list of downstream projects
+        }
     }
 
     // option to modify build timeout
@@ -95,9 +95,15 @@ for(item in Hudson.instance.items)
           project.disabled = !enable_performance
       if (project.getName().startsWith("system-test-"))
           project.disabled = !enable_systemtest
-          
+
       project.save()
 
       println(" $item.name copied as $newName")
   }
+}
+
+if (len(downstream) > 0) {
+// finally, set all projects to be downstream of/triggered-by the kit build job
+  kit.getPublishersList().add(new tasks.BuildTrigger(downstream.substring(1), false))
+  kit.save()
 }
