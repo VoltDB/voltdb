@@ -294,74 +294,72 @@ public class CSVLoader {
             }
 
             List<String> lineList = null;
+            while ((config.limitrows-- > 0) && !listReader.isEOF() ) {
+            try{
+	        		while( listReader.getLineNumber() < config.skip )
+	        			lineList = listReader.read();
+	        		lineList = listReader.read();
+	        		if(lineList == null)
+	        			break;
+	        		outCount.incrementAndGet();
+	                boolean queued = false;
+	                while (queued == false) {
+	                    Object[] correctedLine = lineList.toArray();
+	                    cb = new MyCallback(outCount.get(), config,
+	                            lineList.toString());
+	                    String lineCheckResult;
 
-            do {
-            	try{
-            		if( listReader.getLineNumber() == 0 )//havent' started yet
-            			lineList = listReader.read();//read the first line
-            		if( listReader.getLineNumber() <= config.skip ) {
-            			lineList = listReader.read();
-            			continue;
-            		}
-            		outCount.incrementAndGet();
-                    boolean queued = false;
-                    while (queued == false) {
-                        Object[] correctedLine = lineList.toArray();
-                        cb = new MyCallback(outCount.get(), config,
-                                lineList.toString());
-                        String lineCheckResult;
+	                    if ((lineCheckResult = checkparams_trimspace(correctedLine,
+	                            columnCnt)) != null) {
+	                        synchronized (errorInfo) {
+	                            if (!errorInfo.containsKey(outCount.get())) {
+	                                String[] info = { lineList.toString(),
+	                                        lineCheckResult };
+	                                errorInfo.put(outCount.get(), info);
+	                            }
+	                            if (errorInfo.size() >= config.maxerrors) {
+	                                m_log.error("The number of Failure row data exceeds "
+	                                        + config.maxerrors);
+	                                produceFiles();
+	                                close_cleanup();
+	                                System.exit(-1);
+	                            }
+	                        }
+	                        break;
+	                    }
 
-                        if ((lineCheckResult = checkparams_trimspace(correctedLine,
-                                columnCnt)) != null) {
-                            synchronized (errorInfo) {
-                                if (!errorInfo.containsKey(outCount.get())) {
-                                    String[] info = { lineList.toString(),
-                                            lineCheckResult };
-                                    errorInfo.put(outCount.get(), info);
-                                }
-                                if (errorInfo.size() >= config.maxerrors) {
-                                    m_log.error("The number of Failure row data exceeds "
-                                            + config.maxerrors);
-                                    produceFiles();
-                                    close_cleanup();
-                                    System.exit(-1);
-                                }
-                            }
-                            break;
-                        }
+	                    queued = csvClient.callProcedure(cb, insertProcedure,
+	                            (Object[]) correctedLine);
 
-                        queued = csvClient.callProcedure(cb, insertProcedure,
-                                (Object[]) correctedLine);
-
-                        if (queued == false) {
-                            ++waits;
-                            if (lastOK == false) {
-                                ++shortWaits;
-                            }
-                            Thread.sleep(waitSeconds);
-                        }
-                        lastOK = queued;
-                    }
-                    lineList = listReader.read();
-                }
-            	catch (SuperCsvException e){
-            		outCount.incrementAndGet();
-            		String msg = e.getMessage();
-            		 synchronized (errorInfo) {
-                         if (!errorInfo.containsKey(outCount.get())) {
-                             String[] info = { "At line" + listReader.getLineNumber(), msg };
-                             errorInfo.put(outCount.get(), info);
-                         }
-                         if (errorInfo.size() >= config.maxerrors) {
-                             m_log.error("The number of Failure row data exceeds "
-                                     + config.maxerrors);
-                             produceFiles();
-                             close_cleanup();
-                             System.exit(-1);
-                         }
+	                    if (queued == false) {
+	                        ++waits;
+	                        if (lastOK == false) {
+	                            ++shortWaits;
+	                        }
+	                        Thread.sleep(waitSeconds);
+	                    }
+	                    lastOK = queued;
+	                }
+	            }
+        	catch (SuperCsvException e){
+        		//System.out.println( listReader.incrementRowNumber() );
+        		outCount.incrementAndGet();
+        		String msg = e.getMessage();
+        		 synchronized (errorInfo) {
+                     if (!errorInfo.containsKey(outCount.get())) {
+                         String[] info = { "At line" + listReader.getLineNumber(), msg };
+                         errorInfo.put(outCount.get(), info);
                      }
-            	}
-            }while ((config.limitrows-- > 0) && lineList != null);
+                     if (errorInfo.size() >= config.maxerrors) {
+                         m_log.error("The number of Failure row data exceeds "
+                                 + config.maxerrors);
+                         produceFiles();
+                         close_cleanup();
+                         System.exit(-1);
+                     }
+                 }
+        	}
+        }
             csvClient.drain();
         } catch (Exception e) {
             e.printStackTrace();
@@ -422,7 +420,7 @@ public class CSVLoader {
 //      config.separator, config.quotechar, config.escape,
 //      config.skip, config.strictquotes, config.nowhitespace);
 
-    	csvPreference = new CsvPreference.Builder(config.quotechar, config.separator, "\n").build();
+    	csvPreference = new CsvPreference.Builder(config.quotechar, config.separator, "\n").useStrictQuotes(config.strictquotes).build();
         if (config.file.equals(""))
             standin = true;
         if (!config.table.equals("")) {
