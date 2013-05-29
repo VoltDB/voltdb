@@ -26,32 +26,42 @@ import org.voltcore.messaging.HostMessenger;
 public class OpsRegistrar {
     private Map<OpsSelector, OpsAgent> m_agents;
 
-    public OpsRegistrar()
-    {
+    public OpsRegistrar() {
         m_agents = new HashMap<OpsSelector, OpsAgent>();
         for (OpsSelector selector : OpsSelector.values()) {
             try {
-                Constructor<?> constructor = selector.getAgentClass().getConstructor();
+                Constructor<?> constructor = selector.getAgentClass()
+                        .getConstructor();
                 OpsAgent newAgent = (OpsAgent) constructor.newInstance();
                 m_agents.put(selector, newAgent);
-            }
-            catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Unable to instantiate OpsAgent for selector: " + selector.name(), true, e);
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB(
+                        "Unable to instantiate OpsAgent for selector: "
+                                + selector.name(), true, e);
             }
         }
     }
 
-    public void registerMailboxes(HostMessenger messenger)
-    {
+    public void registerMailboxes(HostMessenger messenger) {
         for (Entry<OpsSelector, OpsAgent> entry : m_agents.entrySet()) {
-            entry.getValue().registerMailbox(messenger, entry.getKey().getSiteId());
+            entry.getValue().registerMailbox(messenger,
+                    entry.getKey().getHSId(messenger.getHostId()));
         }
     }
 
-    public OpsAgent getAgent(OpsSelector selector)
-    {
+    public OpsAgent getAgent(OpsSelector selector) {
         OpsAgent agent = m_agents.get(selector);
-        assert(agent != null);
+        assert (agent != null);
         return agent;
+    }
+
+    public void shutdown() {
+        for (Entry<OpsSelector, OpsAgent> entry : m_agents.entrySet()) {
+            try {
+                entry.getValue().shutdown();
+            }
+            catch (InterruptedException e) {}
+        }
+        m_agents.clear();
     }
 }

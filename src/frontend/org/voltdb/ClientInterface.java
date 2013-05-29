@@ -1758,17 +1758,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     ClientResponseImpl dispatchStatistics(OpsSelector selector, StoredProcedureInvocation task, Connection ccxn)
     {
         try {
-            if (selector == OpsSelector.STATISTICS) {
-                VoltDB.instance().getStatsAgent().performOpsAction(ccxn, task.clientHandle, selector,
-                        task.getParams());
-            }
-            else if (selector == OpsSelector.SYSTEMCATALOG) {
-                VoltDB.instance().getSystemCatalogAgent().performOpsAction(ccxn, task.clientHandle, selector,
-                        task.getParams());
-            }
-            else if (selector == OpsSelector.SYSTEMINFORMATION) {
-                VoltDB.instance().getSystemInformationAgent().performOpsAction(ccxn, task.clientHandle, selector,
-                        task.getParams());
+            OpsAgent agent = VoltDB.instance().getOpsAgent(selector);
+            if (agent != null) {
+                agent.performOpsAction(ccxn, task.clientHandle, selector, task.getParams());
             }
             else {
                 return errorResponse(ccxn, task.clientHandle, ClientResponse.GRACEFUL_FAILURE,
