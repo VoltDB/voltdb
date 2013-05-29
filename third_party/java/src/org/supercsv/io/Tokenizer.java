@@ -118,6 +118,7 @@ public class Tokenizer extends AbstractTokenizer {
 		int potentialSpaces = 0; // keep track of spaces (so leading/trailing space can be removed if required)
 		int charIndex = 0;
 		boolean espectQuote = false;
+		boolean isEscape = false;
 
 		while( true ) {
 
@@ -128,8 +129,31 @@ public class Tokenizer extends AbstractTokenizer {
 				/*
 				 * NORMAL mode (not within quotes).
 				 */
+				if( isEscape ) {
+					/*
+					 * Just a normal character. Add any required spaces (but trim any leading spaces if surrounding
+					 * spaces need quotes), add the character, then continue to next character.
+					 */
+					isEscape = false;
+					if( this.strictQuotes && espectQuote ) {
 
-				if( c == delimeterChar ) {
+						throw new SuperCsvException(
+								String.format(
+										"strictQuotes: quotes needed at line %d: %s",
+										  getLineNumber(), line));
+					}
+					if( !surroundingSpacesNeedQuotes || currentColumn.length() > 0 ) {
+						appendSpaces(currentColumn, potentialSpaces);
+					}
+
+					potentialSpaces = 0;
+					currentColumn.append(c);
+				}
+				else if( c == escapeChar ) {
+					isEscape = true;
+				}
+
+				else if( c == delimeterChar ) {
 					/*
 					 * Delimiter. Save the column (trim trailing space if required) then continue to next character.
 					 */

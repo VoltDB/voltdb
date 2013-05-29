@@ -420,7 +420,9 @@ public class CSVLoader {
 //      config.separator, config.quotechar, config.escape,
 //      config.skip, config.strictquotes, config.nowhitespace);
 
-    	csvPreference = new CsvPreference.Builder(config.quotechar, config.separator, "\n").useStrictQuotes(config.strictquotes).build();
+    	csvPreference = new CsvPreference.Builder(config.quotechar, config.separator, "\n").
+    			useStrictQuotes(config.strictquotes).
+    			useEscapeChar(config.escape).build();
         if (config.file.equals(""))
             standin = true;
         if (!config.table.equals("")) {
