@@ -20,6 +20,8 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 
 public enum OpsSelector {
+    // IZZY: UNMAGIC ME
+    SNAPSHOTSCAN(SnapshotScanAgent.class, -7),
     STATISTICS(StatsAgent.class, HostMessenger.STATS_SITE_ID),
     SYSTEMCATALOG(SystemCatalogAgent.class, HostMessenger.SYSCATALOG_SITE_ID),
     SYSTEMINFORMATION(SystemInformationAgent.class, HostMessenger.SYSINFO_SITE_ID);
