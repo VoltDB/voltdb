@@ -1929,6 +1929,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             else if (task.procName.equals("@SystemInformation")) {
                 return dispatchStatistics(OpsSelector.SYSTEMINFORMATION, task, ccxn);
             }
+            else if (task.procName.equals("@SnapshotScan")) {
+                return dispatchStatistics(OpsSelector.SNAPSHOTSCAN, task, ccxn);
+            }
 
             // If you're going to copy and paste something, CnP the pattern
             // up above.  -rtb.
@@ -2413,6 +2416,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         });
         spi.clientHandle = clientData;
+        // Ugh, need to consolidate this with handleRead() somehow but not feeling it at the moment
+        if (procedureName.equals("@SnapshotScan")) {
+            dispatchStatistics(OpsSelector.SNAPSHOTSCAN, spi, m_snapshotDaemonAdapter);
+            return;
+        }
         // initiate the transaction
         createTransaction(m_snapshotDaemonAdapter.connectionId(),
                 "SnapshotDaemon",

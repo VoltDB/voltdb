@@ -20,6 +20,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.StringWriter;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -71,7 +72,18 @@ public class SnapshotScanAgent extends OpsAgent
             err = "SnapshotScanAgent received non-SNAPSHOTSCAN selector: " + selector.name();
         }
         if (err != null) {
-            sendErrorResponse(c, ClientResponse.GRACEFUL_FAILURE, err, clientHandle);
+            // Maintain old @SnapshotScan behavior.
+            ColumnInfo[] result_columns = new ColumnInfo[1];
+            result_columns[0] = new ColumnInfo("ERR_MSG", VoltType.STRING);
+            VoltTable results[] = new VoltTable[] { new VoltTable(result_columns) };
+            results[0].addRow(err);
+            ClientResponseImpl errorResponse = new ClientResponseImpl(ClientResponse.SUCCESS,
+                    ClientResponse.UNINITIALIZED_APP_STATUS_CODE, null, results, err);
+            errorResponse.setClientHandle(clientHandle);
+            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+            buf.putInt(buf.capacity() - 4);
+            errorResponse.flattenToBuffer(buf).flip();
+            c.writeStream().enqueue(buf);
             return;
         }
         String subselector = obj.getString("subselector");
@@ -173,8 +185,6 @@ public class SnapshotScanAgent extends OpsAgent
         // get disk free scan tables
         VoltTable diskFreeResults = getDiskFreeResults(path);
 
-        // if any results are null, we need to return nothing because of
-        // the current way aggregation works at the requesting agent
         tables[0] = digestResults;
         tables[1] = diskFreeResults;
         tables[2] = scanResults;
