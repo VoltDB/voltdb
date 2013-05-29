@@ -259,7 +259,6 @@ public class TestCSVLoader extends TestCase {
                 "--nowhitespace",
                 "BlAh"
         };
-        String currentTime = new TimestampType().toString();
         String []myData = {
         		//"221794,0,2228449581,\"Stella&DotCircleLinkChains15\\\"\"delicatechain\",\"2010-10-07 14:35:26\"",
         		"221794,0,2228449581,\"Stella&DotCircleLinkChains15\\\"\"delicatechain"+ "\n" +"nextline\",\"2010-10-07 14:35:26\"",
@@ -299,7 +298,6 @@ public class TestCSVLoader extends TestCase {
                 "--strictquotes",
                 "BlAh"
         };
-        String currentTime = new TimestampType().toString();
         String []myData = {
         		//"221794,0,2228449581,\"Stella&DotCircleLinkChains15\\\"\"delicatechain\",\"2010-10-07 14:35:26\"",
         		"\"221794\",\"0\",\"2228449581\",\"Stella&DotCircleLinkChains15\\\"\"delicatechain"+ "\n" +"nextline\",\"2010-10-07 14:35:26\"",
@@ -342,7 +340,6 @@ public class TestCSVLoader extends TestCase {
                 //"--strictquotes",
                 "BlAh"
         };
-        String currentTime = new TimestampType().toString();
         String []myData = {
         		//valid line from shopzilla: unmatched quote is between two commas(which is treated as strings).
         		"221794,0,2228449581,\"Stella&DotCircleLinkChains15\\\"\"delicatechain\",\"2010-10-07 14:35:26\"",

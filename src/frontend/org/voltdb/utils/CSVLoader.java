@@ -223,21 +223,12 @@ public class CSVLoader {
 
         config = cfg;
         configuration();
-        //CSVReader csvReader = null;
         ICsvListReader listReader = null;
         try {
             if (CSVLoader.standin)
             	listReader = new CsvListReader(new BufferedReader( new InputStreamReader(System.in)), csvPreference);
-//                csvReader = new CSVReader(new BufferedReader(
-//                        new InputStreamReader(System.in)), config.separator,
-//                        config.quotechar, config.escape, config.skip,
-//                        config.strictquotes, config.nowhitespace);
             else
             	listReader = new CsvListReader(new FileReader(config.file), csvPreference);
-//                csvReader = new CSVReader(new FileReader(config.file),
-//                        config.separator, config.quotechar, config.escape,
-//                        config.skip, config.strictquotes, config.nowhitespace);
-
         } catch (FileNotFoundException e) {
             m_log.error("CSV file '" + config.file + "' could not be found.");
             System.exit(-1);
@@ -265,7 +256,6 @@ public class CSVLoader {
             ProcedureCallback cb = null;
 
             boolean lastOK = true;
-           // String line[] = null;
 
             int columnCnt = 0;
             VoltTable procInfo = null;
@@ -383,9 +373,6 @@ public class CSVLoader {
 
     private static String checkparams_trimspace(Object[] slot,
             int columnCnt) {
-//        if (slot.length == 1 && slot[0].equals("")) {
-//            return "Error: blank line";
-//        }
         if (slot.length != columnCnt) {
             return "Error: Incorrect number of columns. " + slot.length
                     + " found, " + columnCnt + " expected.";
@@ -416,10 +403,6 @@ public class CSVLoader {
     }
 
     private static void configuration() {
-//    	new FileReader(config.file),
-//      config.separator, config.quotechar, config.escape,
-//      config.skip, config.strictquotes, config.nowhitespace);
-
     	csvPreference = new CsvPreference.Builder(config.quotechar, config.separator, "\n").
     			useStrictQuotes(config.strictquotes).
     			useEscapeChar(config.escape).build();

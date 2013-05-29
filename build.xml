@@ -728,6 +728,7 @@ JAR BUILDING
             <include name="org/eclipse/jetty_voltpatches/**" />
             <include name="javax/servlet_voltpatches/**" />
             <include name="au/com/bytecode/opencsv_voltpatches/**" />
+            <include name="org/supercsv/**/**" />
             <include name="org/hsqldb_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
             <include name="org/mindrot/**" />
@@ -966,7 +967,8 @@ JAVA COMPILATION
         includes="org/voltcore/**/*.java,org/apache/**/*.java
                   au/**/*.java,org/spearce_voltpatches/**/*.java
                   org/json_voltpatches/**/*.java
-                  vanilla/**/*.java" />
+                  vanilla/**/*.java 
+                  org/supercsv/**/*.java" />
     <!-- non-voltcore voltdb code -->
     <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java" />
 
