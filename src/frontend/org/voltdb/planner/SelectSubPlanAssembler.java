@@ -484,8 +484,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
         // If the inner table is partitioned and the outer node is replicated,
         // the join node will be NLJ and not NLIJ, even for an index access path.
-        if (innerNode.m_table.getIsreplicated() ||
-                (joinNode.m_isReplicated || canDeferSendReceivePairForNode())) {
+        if (innerNode.m_table.getIsreplicated() || canDeferSendReceivePairForNode()) {
             // This case can support either NLIJ -- assuming joinNode.m_joinInnerOuterList
             // is non-empty AND at least ONE of its clauses can be leveraged in the IndexScan
             // -- or NLJ, otherwise.
@@ -730,20 +729,17 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         else {
             // get all the clauses that join the applicable two tables
             ArrayList<AbstractExpression> joinClauses = innerAccessPath.joinExprs;
-            if (innerPlan instanceof IndexScanPlanNode && innerAccessPath.otherExprs != null) {
+            if (innerPlan instanceof IndexScanPlanNode) {
                 // InnerPlan is an IndexScan. In this case the inner and inner-outer
                 // non-index join expressions (if any) are in the otherExpr. The former should stay as
-                // an IndexScanPlan predicate and the latter stay at the NLJ node also as a predicate
+                // an IndexScanPlan predicate and the latter stay at the NLJ node as a join predicate
                 List<AbstractExpression> innerExpr = filterSingleTVEExpressions(innerAccessPath.otherExprs);
                 joinClauses.addAll(innerAccessPath.otherExprs);
-                AbstractExpression indexScaPredicate = (innerExpr.isEmpty()) ? null :
-                    ExpressionUtil.combine(innerExpr);
-                ((IndexScanPlanNode) innerPlan).setPredicate(indexScaPredicate);
+                AbstractExpression indexScanPredicate = ExpressionUtil.combine(innerExpr);
+                ((IndexScanPlanNode)innerPlan).setPredicate(indexScanPredicate);
             }
             NestLoopPlanNode nljNode = new NestLoopPlanNode();
-            if ((joinClauses != null) && ! joinClauses.isEmpty()) {
-                nljNode.setJoinPredicate(ExpressionUtil.combine(joinClauses));
-            }
+            nljNode.setJoinPredicate(ExpressionUtil.combine(joinClauses));
             nljNode.setJoinType(joinNode.m_rightNode.m_joinType);
 
             // combine the tails plan graph with the new head node
