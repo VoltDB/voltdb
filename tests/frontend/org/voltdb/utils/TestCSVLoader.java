@@ -257,13 +257,52 @@ public class TestCSVLoader extends TestCase {
                 "--escape=\\",
                 "--skip=0",
                 "--nowhitespace",
-                //"--strictquotes",
                 "BlAh"
         };
         String currentTime = new TimestampType().toString();
         String []myData = {
         		//"221794,0,2228449581,\"Stella&DotCircleLinkChains15\\\"\"delicatechain\",\"2010-10-07 14:35:26\"",
         		"221794,0,2228449581,\"Stella&DotCircleLinkChains15\\\"\"delicatechain"+ "\n" +"nextline\",\"2010-10-07 14:35:26\"",
+        };
+        int invalidLineCnt = 0;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+    }
+
+    public void testOpenQuoteAndStrictQuotes() throws Exception
+    {
+    	// 221794,0,2228449581,"Stella&DotCircleLinkChains15\""delicatechain","2010-10-07 14:35:26"
+        String mySchema =
+                "create table BLAH (" +
+                        "clm_integer integer default 0 not null, " + // column that is partitioned on
+
+                "clm_integer1 integer default 0, " +
+                "clm_bigint bigint default 0, " +
+
+                "clm_string varchar(200) default null, " +
+                "clm_timestamp timestamp default null " +
+                "); ";
+        String []myOptions = {
+                "-f" + path_csv,
+                //"--procedure=blah.insert",
+                "--reportdir=" + reportDir,
+                //"--table=BLAH",
+                "--maxerrors=50",
+                //"-user",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--skip=0",
+                "--nowhitespace",
+                "--strictquotes",
+                "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String []myData = {
+        		//"221794,0,2228449581,\"Stella&DotCircleLinkChains15\\\"\"delicatechain\",\"2010-10-07 14:35:26\"",
+        		"\"221794\",\"0\",\"2228449581\",\"Stella&DotCircleLinkChains15\\\"\"delicatechain"+ "\n" +"nextline\",\"2010-10-07 14:35:26\"",
         };
         int invalidLineCnt = 0;
         test_Interface( mySchema, myOptions, myData, invalidLineCnt );
@@ -346,15 +385,15 @@ public class TestCSVLoader extends TestCase {
                 //"--strictquotes",
                 "BLAH"
         };
-
+        //Both \N and \\N as csv input are treated as NULL
         String []myData = {
-                "1," + VoltTable.CSV_NULL        + ",1,11111111,\"\"NULL\"\",1.10,1.11",
+                "1,\\" + VoltTable.CSV_NULL        + ",1,11111111,\"\"NULL\"\",1.10,1.11",
                 "2," + VoltTable.QUOTED_CSV_NULL + ",1,11111111,\"NULL\",1.10,1.11",
-                "3," + VoltTable.CSV_NULL        + ",1,11111111,  " + VoltTable.CSV_NULL        + "  ,1.10,1.11",
+                "3," + VoltTable.CSV_NULL        + ",1,11111111,  \\" + VoltTable.CSV_NULL        + "  ,1.10,1.11",
                 "4," + VoltTable.CSV_NULL        + ",1,11111111,  " + VoltTable.QUOTED_CSV_NULL + "  ,1.10,1.11",
-                "5," + VoltTable.CSV_NULL        + ",1,11111111, \"  " + VoltTable.CSV_NULL   + "  \",1.10,1.11",
-                "6," + VoltTable.CSV_NULL        + ",1,11111111, \"  " + VoltTable.CSV_NULL  + " L \",1.10,1.11",
-                "7," + VoltTable.CSV_NULL        + ",1,11111111,  \"abc" + VoltTable.CSV_NULL + "\"  ,1.10,1.11"
+                "5,\\" + VoltTable.CSV_NULL        + ",1,11111111, \"  \\" + VoltTable.CSV_NULL   + "  \",1.10,1.11",
+                "6,\\" + VoltTable.CSV_NULL        + ",1,11111111, \"  \\" + VoltTable.CSV_NULL  + " L \",1.10,1.11",
+                "7,\\" + VoltTable.CSV_NULL        + ",1,11111111,  \"abc\\" + VoltTable.CSV_NULL + "\"  ,1.10,1.11"
         };
         int invalidLineCnt = 0;
         test_Interface( mySchema, myOptions, myData, invalidLineCnt );

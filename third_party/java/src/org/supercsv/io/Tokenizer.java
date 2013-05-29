@@ -149,7 +149,7 @@ public class Tokenizer extends AbstractTokenizer {
 					potentialSpaces = 0;
 					currentColumn.append(c);
 				}
-				else if( c == escapeChar ) {
+				else if( c == escapeChar && !(line.charAt(charIndex+1) == 'N') ) {
 					isEscape = true;
 				}
 
