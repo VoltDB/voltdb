@@ -236,7 +236,8 @@ public abstract class ProcedureCompiler {
         // track if there are any writer statements and/or sequential scans and/or an overlooked common partitioning parameter
         boolean procHasWriteStmts = false;
         boolean procHasSeqScans = false;
-        boolean procWantsCommonPartitioning = true; // true but procPartitionExpression == null means a correctly MP proc
+        // procWantsCommonPartitioning == true but commonPartitionExpression == null means a correctly MP proc
+        boolean procWantsCommonPartitioning = true;
         AbstractExpression commonPartitionExpression = null;
         String exampleSPstatement = null;
         Object exampleSPvalue = null;
