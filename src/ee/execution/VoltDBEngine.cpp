@@ -1620,7 +1620,7 @@ void VoltDBEngine::dispatchValidatePartitioningTask(const char *taskParams) {
     const char *config = taskParams + (sizeof(int32_t) * 2) +  (sizeof(int64_t) * tableIds.size());
     boost::scoped_ptr<TheHashinator> hashinator;
     switch(type) {
-    case HASHINATOR_LEGACY:
+        case HASHINATOR_LEGACY:
             hashinator.reset(LegacyHashinator::newInstance(config));
             break;
         case HASHINATOR_ELASTIC:
@@ -1634,7 +1634,12 @@ void VoltDBEngine::dispatchValidatePartitioningTask(const char *taskParams) {
     std::vector<int64_t> mispartitionedRowCounts;
 
     BOOST_FOREACH( CatalogId tableId, tableIds) {
-        mispartitionedRowCounts.push_back(m_tables[tableId]->validatePartitioning(hashinator.get(), m_partitionId));
+        std::map<CatalogId, Table*>::iterator table = m_tables.find(tableId);
+        if (table == m_tables.end()) {
+            throwFatalException("Unknown table id %d", tableId);
+        } else {
+            mispartitionedRowCounts.push_back(m_tables[tableId]->validatePartitioning(hashinator.get(), m_partitionId));
+        }
     }
 
     ReferenceSerializeOutput *output = getResultOutputSerializer();
