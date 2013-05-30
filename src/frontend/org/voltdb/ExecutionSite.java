@@ -2140,4 +2140,9 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     public byte[] planForFragmentId(long fragmentId) {
         return null;
     }
+
+    @Override
+    public long[] validatePartitioning(long[] tableIds, int hashinatorType, byte[] hashinatorConfig) {
+        throw new UnsupportedOperationException();
+    }
 }

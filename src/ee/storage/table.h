@@ -59,6 +59,7 @@
 #include "common/TupleSchema.h"
 #include "common/Pool.hpp"
 #include "common/tabletuple.h"
+#include "common/TheHashinator.h"
 #include "storage/TupleBlock.h"
 #include "stx/btree_set.h"
 #include "common/ThreadLocalPool.h"
@@ -352,6 +353,11 @@ class Table {
 
     virtual bool isExport() {
         return false;
+    }
+
+    virtual int64_t validatePartitioning(TheHashinator *hashinator, int32_t partitionId) {
+        throwFatalException("Validate partitioning unsupported on this table type");
+        return 0;
     }
 
 protected:

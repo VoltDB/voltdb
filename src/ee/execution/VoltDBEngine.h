@@ -390,7 +390,17 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void updateHashinator(HashinatorType type, const char *config);
 
+        /*
+         * Execute an arbitrary task represented by the task id and serialized parameters.
+         * Returns serialized representation of the results
+         */
+        void executeTask(TaskType taskType, const char* taskParams);
     private:
+
+        /*
+         * Tasks dispatched by executeTask
+         */
+        void dispatchValidatePartitioningTask(const char *taskParams);
 
         void setCurrentUndoQuantum(voltdb::UndoQuantum* undoQuantum);
 
