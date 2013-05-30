@@ -358,7 +358,7 @@ public class CSVLoader {
                     + " found, " + columnCnt + " expected.";
         }
         for (int i = 0; i < slot.length; i++) {
-        	////now supercsv read "" to null
+        	//supercsv read "" to null
         	if( slot[i] == null )
         	{
         		if(config.blank.equalsIgnoreCase("error"))
@@ -367,9 +367,10 @@ public class CSVLoader {
         		}
                 else if (config.blank.equalsIgnoreCase("empty"))
                     slot[i] = blankValues.get(typeList.get(i));
+        		//else config.blank == null which is already the case
         	}
 
-            // trim white space in this line. Now we can set surroundingSpacesNeedQuotes for SuperCSV, SuperCSV preserves all the whitespace by default
+            // trim white space in this line. SuperCSV preserves all the whitespace by default
         	else
 	        	{
 	        		slot[i] = ((String) slot[i]).trim();
