@@ -228,4 +228,9 @@ public class MockExecutionEngine extends ExecutionEngine {
     public long getThreadLocalPoolAllocations() {
         return 0L;
     }
+
+    @Override
+    public byte[] executeTask(TaskType taskType, byte[] task) {
+        throw new UnsupportedOperationException();
+    }
 }

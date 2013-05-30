@@ -176,4 +176,6 @@ public interface SiteProcedureConnection {
      * Get the full JSON plan associated with a given site-local fragment id.
      */
     public byte[] planForFragmentId(long fragmentId);
+
+    public long[] validatePartitioning(long tableIds[], int hashinatorType, byte hashinatorConfig[]);
 }

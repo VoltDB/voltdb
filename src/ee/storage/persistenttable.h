@@ -283,6 +283,8 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     // This is a testability feature not intended for use in product logic.
     int getTuplesPendingDeleteCount() const { return m_tuplesPendingDeleteCount; }
 
+    virtual int64_t validatePartitioning(TheHashinator *hashinator, int32_t partitionId);
+
   private:
 
     bool activateStream(CatalogId tableId);
