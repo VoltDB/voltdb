@@ -106,18 +106,8 @@ public class CSVLoader {
         public void clientCallback(ClientResponse response) throws Exception {
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 m_log.error( response.getStatusString() );
-                synchronized (errorInfo) {
-                    if (!errorInfo.containsKey(m_lineNum)) {
-                        String[] info = { m_rowdata, response.getStatusString() };
-                        errorInfo.put(m_lineNum, info);
-                    }
-                    if (errorInfo.size() >= m_config.maxerrors) {
-                        m_log.error("The number of Failure row data exceeds " + m_config.maxerrors);
-                        produceFiles();
-                        close_cleanup();
-                        System.exit(-1);
-                    }
-                }
+        		String[] info = { m_rowdata, response.getStatusString() };
+            	synchronizeErrorInfo( info );
                 return;
             }
 
@@ -301,20 +291,8 @@ public class CSVLoader {
 
 	                    if ((lineCheckResult = checkparams_trimspace(correctedLine,
 	                            columnCnt)) != null) {
-	                        synchronized (errorInfo) {
-	                            if (!errorInfo.containsKey(outCount.get())) {
-	                                String[] info = { lineList.toString(),
-	                                        lineCheckResult };
-	                                errorInfo.put(outCount.get(), info);
-	                            }
-	                            if (errorInfo.size() >= config.maxerrors) {
-	                                m_log.error("The number of Failure row data exceeds "
-	                                        + config.maxerrors);
-	                                produceFiles();
-	                                close_cleanup();
-	                                System.exit(-1);
-	                            }
-	                        }
+	                    	String[] info = { lineList.toString(), lineCheckResult };
+	                    	synchronizeErrorInfo( info );
 	                        break;
 	                    }
 
@@ -332,22 +310,9 @@ public class CSVLoader {
 	                }
 	            }
         	catch (SuperCsvException e){
-        		//System.out.println( listReader.incrementRowNumber() );
         		outCount.incrementAndGet();
-        		String msg = e.getMessage();
-        		 synchronized (errorInfo) {
-                     if (!errorInfo.containsKey(outCount.get())) {
-                         String[] info = { "At line" + listReader.getLineNumber(), msg };
-                         errorInfo.put(outCount.get(), info);
-                     }
-                     if (errorInfo.size() >= config.maxerrors) {
-                         m_log.error("The number of Failure row data exceeds "
-                                 + config.maxerrors);
-                         produceFiles();
-                         close_cleanup();
-                         System.exit(-1);
-                     }
-                 }
+        		String[] info = { "At line " + listReader.getLineNumber(), e.getMessage() };
+            	synchronizeErrorInfo( info );
         	}
         }
             csvClient.drain();
@@ -369,6 +334,21 @@ public class CSVLoader {
         close_cleanup();
         listReader.close();
         csvClient.close();
+    }
+
+    private static void synchronizeErrorInfo( String[] info ) throws IOException, InterruptedException {
+        synchronized (errorInfo) {
+            if (!errorInfo.containsKey(outCount.get())) {
+                errorInfo.put(outCount.get(), info);
+            }
+            if (errorInfo.size() >= config.maxerrors) {
+                m_log.error("The number of Failure row data exceeds "
+                        + config.maxerrors);
+                produceFiles();
+                close_cleanup();
+                System.exit(-1);
+            }
+        }
     }
 
     private static String checkparams_trimspace(Object[] slot,
