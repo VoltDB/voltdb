@@ -128,6 +128,7 @@ bool TupleOutputStreamProcessor::writeRow(TupleSerializer &tupleSerializer,
                 deleteRow = deleteRow || *iDeleteFlag;
             }
             ++ipredicate;
+            ++iDeleteFlag;
         }
 
         if (accepted) {
