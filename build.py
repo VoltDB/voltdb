@@ -290,9 +290,10 @@ CTX.INPUT['indexes'] = """
 CTX.INPUT['storage'] = """
  constraintutil.cpp
  CopyOnWriteContext.cpp
+ ElasticContext.cpp
  CopyOnWriteIterator.cpp
  ConstraintFailureException.cpp
- ElasticStreamer.cpp
+ TableStreamer.cpp
  ElasticScanner.cpp
  MaterializedViewMetadata.cpp
  persistenttable.cpp

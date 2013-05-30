@@ -20,13 +20,11 @@
 
 namespace voltdb
 {
-namespace elastic
-{
 
 /**
  * Constructor.
  */
-Scanner::Scanner(PersistentTable &table, ScannerStrayTupleCatcher *strayTupleCatcher) :
+ElasticScanner::ElasticScanner(PersistentTable &table) :
     m_table(table),
     m_blockMap(table.m_data),
     m_tupleSize(table.getTupleLength()),
@@ -35,18 +33,17 @@ Scanner::Scanner(PersistentTable &table, ScannerStrayTupleCatcher *strayTupleCat
     m_currentBlockPtr(NULL),
     m_tuplePtr(NULL),
     m_tupleIndex(0),
-    m_strayTupleCatcher(strayTupleCatcher),
     m_scanComplete(false)
 {}
 
-Scanner::~Scanner()
+ElasticScanner::~ElasticScanner()
 {}
 
 /**
  * Internal method that handles transitions between blocks and
  * returns true as long as tuples are available.
  */
-bool Scanner::continueScan() {
+bool ElasticScanner::continueScan() {
     if (!m_scanComplete) {
         // First block or end of block?
         if (m_currentBlockPtr == NULL || m_tupleIndex >= m_currentBlockPtr->unusedTupleBoundry()) {
@@ -70,7 +67,7 @@ bool Scanner::continueScan() {
 /**
  * Get the next tuple or return false if none is available.
  */
-bool Scanner::next(TableTuple &out)
+bool ElasticScanner::next(TableTuple &out)
 {
     bool found = false;
     while (!found && continueScan()) {
@@ -94,7 +91,7 @@ bool Scanner::next(TableTuple &out)
 /**
  * Block compaction hook.
  */
-void Scanner::notifyBlockWasCompactedAway(TBPtr block) {
+void ElasticScanner::notifyBlockWasCompactedAway(TBPtr block) {
     if (!m_scanComplete && m_blockIterator != m_blockEnd) {
         TBPtr nextBlock = m_blockIterator.data();
         if (nextBlock == block) {
@@ -125,35 +122,4 @@ void Scanner::notifyBlockWasCompactedAway(TBPtr block) {
     }
 }
 
-/**
- * Tuple insert hook.
- */
-void Scanner::notifyTupleInsert(TableTuple &tuple) {
-    // Nothing to do for insert. The caller will deal with it.
-}
-
-/**
- * Tuple update hook.
- */
-void Scanner::notifyTupleUpdate(TableTuple &tuple) {
-    // Nothing to do for update. The caller will deal with it.
-}
-
-/**
- * Tuple movement hook.
- */
-void Scanner::notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock, TableTuple &tuple) {
-    if (!m_scanComplete && m_strayTupleCatcher != NULL) {
-        /*
-         * Provide out of band tuples that get moved to a block we've already
-         * processed from a block we haven't reached yet.
-         */
-        if (   m_scannedBlocks.find(targetBlock) != m_scannedBlocks.end()
-            && m_scannedBlocks.find(sourceBlock) == m_scannedBlocks.end()) {
-            m_strayTupleCatcher->catchTuple(tuple);
-        }
-    }
-}
-
-} // namespace elastic
 } // namespace voltdb

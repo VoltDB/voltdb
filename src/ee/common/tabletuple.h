@@ -70,17 +70,14 @@ namespace voltdb {
 
 class TableColumn;
 class TupleIterator;
-
-namespace elastic {
-    class Scanner;
-}
+class ElasticScanner;
 
 class TableTuple {
     // friend access is intended to allow write access to the tuple flags -- try not to abuse it.
     friend class Table;
     friend class TempTable;
     friend class PersistentTable;
-    friend class elastic::Scanner;
+    friend class ElasticScanner;
     friend class CopyOnWriteIterator;
     friend class CopyOnWriteContext;
     friend class ::CopyOnWriteTest_TestTableTupleFlags;

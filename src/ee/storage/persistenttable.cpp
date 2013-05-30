@@ -77,7 +77,7 @@
 
 #include <algorithm>    // std::find
 
-using namespace voltdb;
+namespace voltdb {
 
 void* keyTupleStorage = NULL;
 TableTuple keyTuple;
@@ -257,11 +257,6 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
         target.setDirtyFalse();
     }
 
-    // Notify active elastic scanner.
-    if (m_elasticScanner != NULL && !m_elasticScanner->isScanComplete()) {
-        m_elasticScanner->notifyTupleInsert(target);
-    }
-
     if (!tryInsertOnAllIndexes(&target)) {
         deleteTupleStorage(target); // also frees object columns
         throw ConstraintFailureException(this, source, TableTuple(),
@@ -360,11 +355,6 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
 
     if (m_tableStreamer != NULL) {
         m_tableStreamer->notifyTupleUpdate(targetTupleToUpdate);
-    }
-
-    // Notify active elastic scanner.
-    if (m_elasticScanner != NULL && !m_elasticScanner->isScanComplete()) {
-        m_elasticScanner->notifyTupleUpdate(targetTupleToUpdate);
     }
 
     /**
@@ -575,8 +565,9 @@ void PersistentTable::deleteTupleRelease(char* tupleData)
 void PersistentTable::deleteTupleFinalize(TableTuple &target)
 {
     // A snapshot (background scan) in progress can still cause a hold-up.
+    // canSafelyFreeTuple() defaults to returning true for all context types
+    // other than CopyOnWriteContext.
     if (   m_tableStreamer != NULL
-        && m_tableStreamer->isCopyOnWriteActive()
         && ! m_tableStreamer->canSafelyFreeTuple(target)) {
         // Mark it pending delete and let the snapshot land the finishing blow.
 
@@ -911,29 +902,35 @@ bool PersistentTable::activateStream(
     CatalogId tableId,
     ReferenceSerializeInput &serializeIn) {
 
-    // Expect m_tableStreamer to be null. Only make it fatal in debug builds.
-    assert(m_tableStreamer.get() == NULL);
-    if (m_tableStreamer.get() == NULL) {
-        // Prepare a TableStreamer.
-        m_tableStreamer.reset(
-              new elastic::Streamer(tupleSerializer, streamType, partitionId, serializeIn));
-    }
-
-    return activateStream(tableId);
+    return activateStreamInternal(
+        tableId,
+        boost::shared_ptr<TableStreamer>(
+            new TableStreamer(tupleSerializer, streamType, partitionId, serializeIn)));
 }
 
 /** Prepare table for streaming. */
-bool PersistentTable::activateStream(CatalogId tableId) {
+bool PersistentTable::activateStreamInternal(
+     CatalogId tableId,
+     boost::shared_ptr<TableStreamerInterface> tableStreamer) {
 
+    // Expect m_tableStreamer to be null. Only make it fatal in debug builds.
+    assert(m_tableStreamer == NULL);
+    if (m_tableStreamer == NULL) {
+        m_tableStreamer = tableStreamer;
+    }
+
+    // true => context is already active.
     if (m_tableStreamer->isAlreadyActive()) {
-        // true => COW or recovery context is already active.
         return true;
     }
 
+    // false => no tuples.
     if (m_tupleCount == 0) {
         return false;
     }
 
+    //TODO: Move this special case snapshot code into the COW context.
+    // Probably want to move all of the snapshot-related stuff there.
     if (m_tableStreamer->getStreamType() == TABLE_STREAM_SNAPSHOT) {
         //All blocks are now pending snapshot
         m_blocksPendingSnapshot.swap(m_blocksNotPendingSnapshot);
@@ -963,7 +960,7 @@ int64_t PersistentTable::streamMore(TupleOutputStreamProcessor &outputStreams,
     int64_t remaining = m_tableStreamer->streamMore(outputStreams, retPositions);
     if (remaining <= 0) {
         // clang needs the cast for some reason.
-        m_tableStreamer.reset((elastic::Streamer*)NULL);
+        m_tableStreamer.reset((TableStreamer*)NULL);
     }
     return remaining;
 }
@@ -1020,20 +1017,15 @@ void PersistentTable::notifyBlockWasCompactedAway(TBPtr block) {
         assert(m_tableStreamer.get() != NULL);
         assert(m_blocksPendingSnapshot.find(block) != m_blocksPendingSnapshot.end());
         m_tableStreamer->notifyBlockWasCompactedAway(block);
-
-        // Notify active elastic scanner.
-        if (m_elasticScanner != NULL && !m_elasticScanner->isScanComplete()) {
-            m_elasticScanner->notifyBlockWasCompactedAway(block);
-        }
     }
 
 }
 
 // Call-back from TupleBlock::merge() for each tuple moved.
-void PersistentTable::notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock, TableTuple &tuple) {
-    // Notify active elastic scanner.
-    if (m_elasticScanner != NULL && !m_elasticScanner->isScanComplete()) {
-        m_elasticScanner->notifyTupleMovement(sourceBlock, targetBlock, tuple);
+void PersistentTable::notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
+                                          TableTuple &sourceTuple, TableTuple &targetTuple) {
+    if (m_tableStreamer != NULL) {
+        m_tableStreamer->notifyTupleMovement(sourceBlock, targetBlock, sourceTuple, targetTuple);
     }
 }
 
@@ -1178,7 +1170,8 @@ void PersistentTable::doIdleCompaction() {
 }
 
 void PersistentTable::doForcedCompaction() {
-    if (m_tableStreamer.get() != NULL && m_tableStreamer->isRecoveryActive()) {
+    if (   m_tableStreamer.get() != NULL
+        && m_tableStreamer->getActiveStreamType() == TABLE_STREAM_RECOVERY) {
         LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO,
             "Deferring compaction until recovery is complete.");
         return;
@@ -1300,11 +1293,4 @@ void PersistentTable::printBucketInfo() {
     std::cout << std::endl;
 }
 
-/**
- * Initialize and get the elastic scanner.
- */
-boost::shared_ptr<elastic::Scanner> PersistentTable::getElasticScanner(
-        elastic::ScannerStrayTupleCatcher *strayTupleCatcher) {
-    m_elasticScanner = elastic::ScannerFactory::makeScanner(*this, strayTupleCatcher);
-    return m_elasticScanner;
-}
+} // namespace voltdb

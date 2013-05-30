@@ -57,8 +57,7 @@
 #include "storage/TupleStreamWrapper.h"
 #include "storage/TableStats.h"
 #include "storage/PersistentTableStats.h"
-#include "storage/ElasticStreamer.h"
-#include "storage/ElasticScanner.h"
+#include "storage/TableStreamerInterface.h"
 #include "storage/RecoveryContext.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
@@ -85,10 +84,7 @@ class MaterializedViewMetadata;
 class RecoveryProtoMsg;
 class TupleOutputStreamProcessor;
 class ReferenceSerializeInput;
-
-namespace elastic {
-    class Scanner;
-}
+class ElasticScanner;
 
 
 /**
@@ -121,7 +117,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                         public TupleMovementListener {
     friend class CopyOnWriteContext;
     friend class CopyOnWriteIterator;
-    friend class elastic::Scanner;
     friend class TableFactory;
     friend class TableTuple;
     friend class TableIterator;
@@ -129,6 +124,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     friend class PersistentTableUndoDeleteAction;
     friend class PersistentTableUndoInsertAction;
     friend class PersistentTableUndoUpdateAction;
+    friend class ElasticScanner;
     friend class ::CopyOnWriteTest_CopyOnWriteIterator;
     friend class ::CopyOnWriteTest_ElasticScannerTest;
     friend class ::CompactionTest_BasicCompaction;
@@ -213,7 +209,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     std::string tableType() const;
     virtual std::string debug();
 
-    int partitionColumn() { return m_partitionColumn; }
+    int partitionColumn() const { return m_partitionColumn; }
     /** inlined here because it can't be inlined in base Table, as it
      *  uses Tuple.copy.
      */
@@ -278,14 +274,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return m_data.size();
     }
 
-    bool isCopyOnWriteActive() const {
-        return m_tableStreamer.get() != NULL && m_tableStreamer->isCopyOnWriteActive();
-    }
-
-    bool isRecoveryActive() const {
-        return m_tableStreamer.get() != NULL && m_tableStreamer->isRecoveryActive();
-    }
-
     bool canSafelyFreeTuple(TableTuple &tuple) const {
         return m_tableStreamer.get() != NULL && m_tableStreamer->canSafelyFreeTuple(tuple);
     }
@@ -295,7 +283,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
   private:
 
-    bool activateStream(CatalogId tableId);
+    bool activateStreamInternal(CatalogId tableId, boost::shared_ptr<TableStreamerInterface> tableStreamer);
 
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
         if (nextBlock != NULL) {
@@ -332,7 +320,8 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     void notifyBlockWasCompactedAway(TBPtr block);
 
     // Call-back from TupleBlock::merge() for each tuple moved.
-    virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock, TableTuple &tuple);
+    virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
+                                     TableTuple &sourceTuple, TableTuple &targetTuple);
 
     void swapTuples(TableTuple &sourceTupleWithNewValues, TableTuple &destinationTuple);
 
@@ -357,12 +346,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
      * to do additional processing for views and Export
      */
     virtual void processLoadedTuple(TableTuple &tuple);
-
-    /**
-     * Initialize and get the elastic scanner.
-     */
-    boost::shared_ptr<elastic::Scanner> getElasticScanner(
-             elastic::ScannerStrayTupleCatcher *strayTupleCatcher = NULL);
 
     TBPtr allocateNextBlock();
 
@@ -400,10 +383,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     stx::btree_set<TBPtr > m_blocksWithSpace;
 
     // Provides access to all table streaming apparati, including COW and recovery.
-    boost::shared_ptr<elastic::Streamer> m_tableStreamer;
-
-    // Elastic scanners require notifications to keep track of moved tuples.
-    boost::shared_ptr<elastic::Scanner> m_elasticScanner;
+    boost::shared_ptr<TableStreamerInterface> m_tableStreamer;
 
   private:
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
@@ -442,6 +422,11 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
         tuple.setPendingDeleteFalse();
         // This count is a testability feature not intended for use in product logic.
         --m_tuplesPendingDeleteCount;
+    }
+
+    // Let the context handle it as needed.
+    if (m_tableStreamer != NULL) {
+        m_tableStreamer->notifyTupleDelete(tuple);
     }
 
     if (block.get() == NULL) {

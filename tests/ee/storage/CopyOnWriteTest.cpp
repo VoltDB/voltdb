@@ -1060,14 +1060,47 @@ static void dumpValueSet(const std::string &tag, const T_ValueSet &set) {
     }
 }
 
-class TupleCatcher : public elastic::ScannerStrayTupleCatcher {
+/**
+ * Dummy TableStreamer for intercepting and tracking tuple notifications.
+ */
+class DummyTableStreamer : public TableStreamerInterface {
 public:
-    TupleCatcher(T_ValueSet &set) : m_set(set)
+    DummyTableStreamer(TableStreamType type) : m_type(type)
     {}
-    virtual void catchTuple(TableTuple &tuple) {
-        m_set.insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
+
+    bool activateStream(PersistentTable &table, CatalogId tableId) {
+        return true;
     }
-    T_ValueSet &m_set;
+
+    virtual int64_t streamMore(TupleOutputStreamProcessor &outputStreams,
+                               std::vector<int> &retPositions) {
+        return 0;
+    }
+
+    virtual bool canSafelyFreeTuple(TableTuple &tuple) const { return true; }
+
+    // Saying it's already active forces activateStream() to return without doing anything.
+    virtual bool isAlreadyActive() const { return true; }
+
+    virtual TableStreamType getStreamType() const { return m_type; }
+
+    virtual TableStreamType getActiveStreamType() const { return m_type; }
+
+    virtual bool notifyTupleInsert(TableTuple &tuple) { return false; }
+
+    virtual bool notifyTupleUpdate(TableTuple &tuple) { return false; }
+
+    virtual bool notifyTupleDelete(TableTuple &tuple) { return false; }
+
+    virtual void notifyBlockWasCompactedAway(TBPtr block) {}
+
+    virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
+                                     TableTuple &sourceTuple, TableTuple &targetTuple) {
+        m_shuffles.insert(*reinterpret_cast<int64_t*>(sourceTuple.address() + 1));
+    }
+
+    TableStreamType m_type;
+    T_ValueSet m_shuffles;
 };
 
 // Test the elastic::Scanner.
@@ -1092,7 +1125,6 @@ TEST_F(CopyOnWriteTest, ElasticScannerTest) {
     T_ValueSet updateTargets;
     T_ValueSet deletes;
     T_ValueSet returns;
-    T_ValueSet shuffles;
 
     // Each repetition starts fresh.
     m_table->deleteAllTuples(true);
@@ -1101,8 +1133,10 @@ TEST_F(CopyOnWriteTest, ElasticScannerTest) {
     addRandomUniqueTuples(m_table, NUM_INITIAL);
     getTableValueSet(initial);
 
-    TupleCatcher catcher(shuffles);
-    boost::shared_ptr<elastic::Scanner> scanner = m_table->getElasticScanner(&catcher);
+    DummyTableStreamer *dummyStreamer = new DummyTableStreamer(TABLE_STREAM_ELASTIC);
+    boost::shared_ptr<TableStreamerInterface> dummyStreamerPtr(dummyStreamer);
+    ElasticScanner scanner(*m_table);
+    m_table->activateStreamInternal(m_tableId, dummyStreamerPtr);
 
     bool scanComplete = false;
 
@@ -1135,7 +1169,7 @@ TEST_F(CopyOnWriteTest, ElasticScannerTest) {
             }
         }
 
-        scanComplete = !scanner->next(tuple);
+        scanComplete = !scanner.next(tuple);
         if (scanComplete) {
             break;
         }
@@ -1145,7 +1179,7 @@ TEST_F(CopyOnWriteTest, ElasticScannerTest) {
 
     // Scan the remaining tuples that weren't encountered in the mutate/scan loop.
     if (!scanComplete) {
-        while (scanner->next(tuple)) {
+        while (scanner.next(tuple)) {
             T_Value value = *reinterpret_cast<T_Value*>(tuple.address() + 1);
             returns.insert(value);
         }
@@ -1188,7 +1222,7 @@ TEST_F(CopyOnWriteTest, ElasticScannerTest) {
         if(returns.find(value) == returns.end() &&
            deletes.find(value) == deletes.end() &&
            updateSources.find(value) == updateSources.end() &&
-           shuffles.find(value) == shuffles.end()) {
+           dummyStreamer->m_shuffles.find(value) == dummyStreamer->m_shuffles.end()) {
             missing.insert(value);
         }
     }

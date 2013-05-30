@@ -253,7 +253,8 @@ class TupleMovementListener {
 public:
     virtual ~TupleMovementListener() {}
 
-    virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock, TableTuple &tuple) = 0;
+    virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
+                                     TableTuple &sourceTuple, TableTuple &targetTuple) = 0;
 };
 
 }
