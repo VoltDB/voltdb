@@ -16,13 +16,15 @@
  */
 
 #include "common/NValue.hpp"
+#include "common/StlFriendlyNValue.h"
 #include "common/executorcontext.hpp"
 #include "logging/LogManager.h"
 
 #include <cstdio>
 #include <sstream>
+#include <algorithm>
 
-using namespace voltdb;
+namespace voltdb {
 
 Pool* NValue::getTempStringPool() {
     return ExecutorContext::getTempStringPool();
@@ -395,8 +397,85 @@ NValue NValue::opDivideDecimals(const NValue lhs, const NValue rhs) const {
     return getDecimalValue(retval);
 }
 
+/** Serialize this NValue to a SerializeOutput in the same format that gets read
+ * by deserializeFromAllocateForStorage  -- useful for testing NValue deserialization
+ * and operations that depend on deserialized values.
+ **/
+void NValue::serializeTypedNValueTo(SerializeOutput &output) const
+{
+    const ValueType type = getValueType();
+    output.writeByte(static_cast<const int8_t>(type));
+    if (type == VALUE_TYPE_NULL) {
+        // This trivial case is not handled by serializeTo since it only handles valid column types.
+        return;
+    }
+    serializeTo(output);
+}
 
-namespace voltdb {
+//TODO: Add parameter support.
+// Parameters are supported by passing a non-null varbinary bitmap as the first NValue.
+// The bitmap has a bit for each of the other NValues, indicating how to interpret it.
+// A 0 bit treats the NValue as a constant element of the list.
+// A 1 bit treats the NValue as an integer parameter index for a variable element of the list which
+// must be resolved to an actual value once per statement execution.
+//TODO: This O(length) implementation should be replaced by an O(ln(length)) or better implementation.
+// This should wait until the param support TODO has been done as that will effect the timing
+// of any IN-LIST pre-processing until after parameters have been bound to their values (per execution).
+struct NValueSet {
+    void* operator new(size_t size, int length, Pool &pool)
+    {
+        return pool.allocate(size + length*sizeof(StlFriendlyNValue));
+    }
+    void operator delete(void*, int, Pool &) {}
+    void operator delete(void*) {}
+
+    void deserializeNValues(int length, SerializeInput &input, Pool *dataPool)
+    {
+        m_length = length;
+        m_nParams = input.readInt();
+        //TODO: Disallowing the VARBINARY param control for now.
+        if ( m_nParams != 0 ) {
+            throwFatalLogicErrorStreamed("In NValueSet::deserializeNValues, params not yet supported: " << m_nParams);
+        }
+        for (int ii = 0; ii < m_length; ++ii) {
+            m_values[ii].deserializeFromAllocateForStorage(input, dataPool);
+        }
+    }
+
+    StlFriendlyNValue const* begin() const { return m_values; }
+    StlFriendlyNValue const* end() const { return m_values + m_length; }
+
+    int m_length;
+    int m_nParams;
+    StlFriendlyNValue m_values[];
+};
+
+bool NValue::isInTheNValueSet(const NValueSet* listOfNValues) const
+{
+    const StlFriendlyNValue& value = *static_cast<const StlFriendlyNValue*>(this);
+    return std::find(listOfNValues->begin(), listOfNValues->end(), value) != listOfNValues->end();
+}
+
+NValueSet* NValue::deserializeIntoANewNValueSet(SerializeInput &input, Pool *dataPool)
+{
+    int length = input.readInt();
+    NValueSet* nvset = new (length, *dataPool) NValueSet();
+    nvset->deserializeNValues(length, input, dataPool);
+    return nvset;
+}
+
+NValueSet* NValue::deserializeIntoANewNValueSet(const std::string& buffer)
+{
+    //TODO: Decide on format for IN LIST constants from compiled plans, including two counts,
+    // and a list of parameter indexes and/or data values. Human readable? Hex?
+    // This construction method must use the persistent data pool
+    // (somehow hacked through SRef?) for all allocations.
+    throwFatalLogicErrorStreamed(
+        "In NValue::deserializeIntoANewNValueSet, IN LIST constants not yet supported: (" <<
+        buffer << ")");
+}
+
+
 
 int warn_if(int condition, const char* message)
 {

@@ -47,7 +47,7 @@
 #include "murmur3/MurmurHash3.h"
 
 namespace voltdb {
-
+class NValueSet;
 /*
  * Objects are length preceded with a short length value or a long length value
  * depending on how many bytes are needed to represent the length. These
@@ -278,13 +278,18 @@ class NValue {
         // eliminate the potential NValue copy.
 
     /* Read a ValueType from the SerializeInput stream and deserialize
-       a scalar value of the specified type from the provided
+       a scalar value of the specified type into this NValue from the provided
        SerializeInput and perform allocations as necessary. */
-    static const NValue deserializeFromAllocateForStorage(
-        SerializeInput &input, Pool *dataPool);
+    void deserializeFromAllocateForStorage(SerializeInput &input, Pool *dataPool);
 
     /* Serialize this NValue to a SerializeOutput */
     void serializeTo(SerializeOutput &output) const;
+
+    /** Serialize this NValue to a SerializeOutput in the same format that gets read
+     * by deserializeFromAllocateForStorage  -- useful for testing NValue deserialization
+     * and operations that depend on deserialized values.
+     **/
+    void serializeTypedNValueTo(SerializeOutput &output) const;
 
     /* Serialize this NValue to an Export stream */
     void serializeToExport(ExportSerializeOutput&) const;
@@ -339,6 +344,19 @@ class NValue {
      * This NValue is the value and the rhs is the pattern
      */
     NValue like(const NValue rhs) const;
+
+    //TODO: passing NValue arguments by const reference SHOULD be standard practice
+    // for the dozens of NValue "operator" functions. It saves on needless NValue copies.
+    //TODO: returning bool (vs. NValue getTrue()/getFalse()) SHOULD be standard practice
+    // for NValue "logical operator" functions.
+    // It saves on needless NValue copies and makes unit tests more readable.
+    // Cases that need the NValue -- for some actual purpose other than an immediate call to
+    // "isTrue()" -- are rare and getting rarer as optimizations like short-cut eval are introduced.
+    /**
+     * Return true if this NValue is listed as a member of the IN LIST
+     * represented as an NValueSet* value cached in rhsList.
+     */
+    bool inList(NValue const& rhsList) const;
 
     /*
      * Out must have space for 16 bytes
@@ -495,6 +513,12 @@ class NValue {
     std::string createStringFromDecimal() const;
     NValue opDivideDecimals(const NValue lhs, const NValue rhs) const;
     NValue opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const;
+
+    // Helpers for inList.
+    // These are purposely not inlines to avoid exposure of NValueSet details.
+    static NValueSet* deserializeIntoANewNValueSet(SerializeInput &input, Pool *dataPool);
+    static NValueSet* deserializeIntoANewNValueSet(const std::string& buffer);
+    bool isInTheNValueSet(const NValueSet* opaqueSetOfNValues) const;
 
     // Promotion Rules. Initialized in NValue.cpp
     static ValueType s_intPromotionTable[];
@@ -1921,6 +1945,14 @@ class NValue {
         return retval;
     }
 
+    static NValue getInListValueFromString(const std::string &value)
+    {
+        NValue retval(VALUE_TYPE_INLIST);
+        NValueSet* rhsList = deserializeIntoANewNValueSet(value);
+        *(reinterpret_cast<const NValueSet**>(retval.m_data)) = rhsList;
+        return retval;
+    }
+
     static Pool* getTempStringPool();
 
     static NValue getTempStringValue(const char* value, size_t size) {
@@ -2525,27 +2557,28 @@ inline void NValue::deserializeFrom(SerializeInput &input, const ValueType type,
  * provided SerializeInput and perform allocations as necessary.
  * This is used to deserialize parameter sets.
  */
-inline const NValue NValue::deserializeFromAllocateForStorage(SerializeInput &input, Pool *dataPool) {
+inline void NValue::deserializeFromAllocateForStorage(SerializeInput &input, Pool *dataPool)
+{
     const ValueType type = static_cast<ValueType>(input.readByte());
-    NValue retval(type);
+    setValueType(type);
     switch (type) {
       case VALUE_TYPE_BIGINT:
-        retval.getBigInt() = input.readLong();
+        getBigInt() = input.readLong();
         break;
       case VALUE_TYPE_TIMESTAMP:
-        retval.getTimestamp() = input.readLong();
+        getTimestamp() = input.readLong();
         break;
       case VALUE_TYPE_TINYINT:
-        retval.getTinyInt() = input.readByte();
+        getTinyInt() = input.readByte();
         break;
       case VALUE_TYPE_SMALLINT:
-        retval.getSmallInt() = input.readShort();
+        getSmallInt() = input.readShort();
         break;
       case VALUE_TYPE_INTEGER:
-        retval.getInteger() = input.readInt();
+        getInteger() = input.readInt();
         break;
       case VALUE_TYPE_DOUBLE:
-        retval.getDouble() = input.readDouble();
+        getDouble() = input.readDouble();
         break;
       case VALUE_TYPE_VARCHAR:
       case VALUE_TYPE_VARBINARY:
@@ -2553,21 +2586,33 @@ inline const NValue NValue::deserializeFromAllocateForStorage(SerializeInput &in
           const int32_t length = input.readInt();
           // the NULL SQL string is a NULL C pointer
           if (length == OBJECTLENGTH_NULL) {
-              retval.setNull();
+              setNull();
               break;
           }
           const char *str = (const char*) input.getRawPointer(length);
-          retval.initAllocatedValue(str, (size_t)length, dataPool);
+          initAllocatedValue(str, (size_t)length, dataPool);
           break;
       }
       case VALUE_TYPE_DECIMAL: {
-          retval.getDecimal().table[1] = input.readLong();
-          retval.getDecimal().table[0] = input.readLong();
+          getDecimal().table[1] = input.readLong();
+          getDecimal().table[0] = input.readLong();
           break;
 
       }
       case VALUE_TYPE_NULL: {
-          retval.setNull();
+          setNull();
+          break;
+      }
+      case VALUE_TYPE_INLIST: {
+          // Someday, we may want support SQL standard array and row typed values,
+          // and that is likely to warrant an extension to the NValue typing system,
+          // but those end-user data types are different from the special case of this
+          // system-internal structure built specifically for rhs arguments of non-subquery
+          // IN LIST operations.
+          // This case needs to be able to include both constant values and parameters as list elements
+          // and must support some form of internal restructuring to optimize access.
+          NValueSet* rhsList = deserializeIntoANewNValueSet(input, dataPool);
+          *(reinterpret_cast<const NValueSet**>(m_data)) = rhsList;
           break;
       }
       default:
@@ -2575,7 +2620,6 @@ inline const NValue NValue::deserializeFromAllocateForStorage(SerializeInput &in
                   "NValue::deserializeFromAllocateForStorage() unrecognized type '%s'",
                   getTypeName(type).c_str());
     }
-    return retval;
 }
 
 /**
@@ -2677,6 +2721,7 @@ inline void NValue::serializeToExport(ExportSerializeOutput &io) const
       case VALUE_TYPE_NULL:
       case VALUE_TYPE_BOOLEAN:
       case VALUE_TYPE_ADDRESS:
+      case VALUE_TYPE_INLIST:
       case VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC:
           char message[128];
           snprintf(message, sizeof(message), "Invalid type in serializeToExport: %s", getTypeName(getValueType()).c_str());
@@ -3281,6 +3326,33 @@ inline NValue NValue::like(const NValue rhs) const {
     Liker liker(valueChars, patternChars, valueUTF8Length, patternUTF8Length);
 
     return liker.like() ? getTrue() : getFalse();
+}
+
+/**
+ * This NValue can be of any scalar value type.
+ * @param rhs  a VALUE_TYPE_INLIST NValue whose referent must be an NValueSet.
+ *             The NValue elements of the NValueSet should be comparable to and ideally
+ *             of exactly the same VALUE_TYPE as "this".
+ * The planner and/or deserializer should have taken care of this with checks and
+ * explicit cast operators and and/or constant promotions as needed.
+ * @return a VALUE_TYPE_BOOLEAN NValue.
+ */
+inline bool NValue::inList(const NValue& rhs) const
+{
+    //TODO: research: does the SQL standard allow a null to match a null list element
+    // vs. returning FALSE or NULL?
+    const bool lhsIsNull = isNull();
+    if (lhsIsNull) {
+        return false;
+    }
+
+    const ValueType rhsType = rhs.getValueType();
+    if (rhsType != VALUE_TYPE_INLIST) {
+        throwDynamicSQLException("rhs of IN expression is of a non-list type %s", rhs.getValueTypeString().c_str());
+    }
+    const NValueSet* opaqueSetOfNValues = *reinterpret_cast<NValueSet* const*>(rhs.m_data);
+    assert(opaqueSetOfNValues);
+    return isInTheNValueSet(opaqueSetOfNValues);
 }
 
 } // namespace voltdb

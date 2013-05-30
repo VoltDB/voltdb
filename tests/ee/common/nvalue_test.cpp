@@ -1169,40 +1169,40 @@ TEST_F(NValueTest, TestComparisonOps)
     NValue integer = ValueFactory::getIntegerValue(1000001);
     NValue bigInt = ValueFactory::getBigIntValue(10000000000001);
     NValue floatVal = ValueFactory::getDoubleValue(12000.456);
-    EXPECT_TRUE(smallInt.op_greaterThan(tinyInt).isTrue());
-    EXPECT_TRUE(integer.op_greaterThan(smallInt).isTrue());
-    EXPECT_TRUE(bigInt.op_greaterThan(integer).isTrue());
-    EXPECT_TRUE(tinyInt.op_lessThan(smallInt).isTrue());
-    EXPECT_TRUE(smallInt.op_lessThan(integer).isTrue());
-    EXPECT_TRUE(integer.op_lessThan(bigInt).isTrue());
-    EXPECT_TRUE(tinyInt.op_lessThan(floatVal).isTrue());
-    EXPECT_TRUE(smallInt.op_lessThan(floatVal).isTrue());
-    EXPECT_TRUE(integer.op_greaterThan(floatVal).isTrue());
-    EXPECT_TRUE(bigInt.op_greaterThan(floatVal).isTrue());
-    EXPECT_TRUE(floatVal.op_lessThan(bigInt).isTrue());
-    EXPECT_TRUE(floatVal.op_lessThan(integer).isTrue());
-    EXPECT_TRUE(floatVal.op_greaterThan(smallInt).isTrue());
-    EXPECT_TRUE(floatVal.op_greaterThan(tinyInt).isTrue());
+    EXPECT_TRUE(smallInt.compare(tinyInt) > 0);
+    EXPECT_TRUE(integer.compare(smallInt) > 0);
+    EXPECT_TRUE(bigInt.compare(integer) > 0);
+    EXPECT_TRUE(tinyInt.compare(smallInt) < 0);
+    EXPECT_TRUE(smallInt.compare(integer) < 0);
+    EXPECT_TRUE(integer.compare(bigInt) < 0);
+    EXPECT_TRUE(tinyInt.compare(floatVal) < 0);
+    EXPECT_TRUE(smallInt.compare(floatVal) < 0);
+    EXPECT_TRUE(integer.compare(floatVal) > 0);
+    EXPECT_TRUE(bigInt.compare(floatVal) > 0);
+    EXPECT_TRUE(floatVal.compare(bigInt) < 0);
+    EXPECT_TRUE(floatVal.compare(integer) < 0);
+    EXPECT_TRUE(floatVal.compare(smallInt) > 0);
+    EXPECT_TRUE(floatVal.compare(tinyInt) > 0);
 
     tinyInt = ValueFactory::getTinyIntValue(-101);
     smallInt = ValueFactory::getSmallIntValue(-1001);
     integer = ValueFactory::getIntegerValue(-1000001);
     bigInt = ValueFactory::getBigIntValue(-10000000000001);
     floatVal = ValueFactory::getDoubleValue(-12000.456);
-    EXPECT_TRUE(smallInt.op_lessThan(tinyInt).isTrue());
-    EXPECT_TRUE(integer.op_lessThan(smallInt).isTrue());
-    EXPECT_TRUE(bigInt.op_lessThan(integer).isTrue());
-    EXPECT_TRUE(tinyInt.op_greaterThan(smallInt).isTrue());
-    EXPECT_TRUE(smallInt.op_greaterThan(integer).isTrue());
-    EXPECT_TRUE(integer.op_greaterThan(bigInt).isTrue());
-    EXPECT_TRUE(tinyInt.op_greaterThan(floatVal).isTrue());
-    EXPECT_TRUE(smallInt.op_greaterThan(floatVal).isTrue());
-    EXPECT_TRUE(integer.op_lessThan(floatVal).isTrue());
-    EXPECT_TRUE(bigInt.op_lessThan(floatVal).isTrue());
-    EXPECT_TRUE(floatVal.op_greaterThan(bigInt).isTrue());
-    EXPECT_TRUE(floatVal.op_greaterThan(integer).isTrue());
-    EXPECT_TRUE(floatVal.op_lessThan(smallInt).isTrue());
-    EXPECT_TRUE(floatVal.op_lessThan(tinyInt).isTrue());
+    EXPECT_TRUE(smallInt.compare(tinyInt) < 0);
+    EXPECT_TRUE(integer.compare(smallInt) < 0);
+    EXPECT_TRUE(bigInt.compare(integer) < 0);
+    EXPECT_TRUE(tinyInt.compare(smallInt) > 0);
+    EXPECT_TRUE(smallInt.compare(integer) > 0);
+    EXPECT_TRUE(integer.compare(bigInt) > 0);
+    EXPECT_TRUE(tinyInt.compare(floatVal) > 0);
+    EXPECT_TRUE(smallInt.compare(floatVal) > 0);
+    EXPECT_TRUE(integer.compare(floatVal) < 0);
+    EXPECT_TRUE(bigInt.compare(floatVal) < 0);
+    EXPECT_TRUE(floatVal.compare(bigInt) > 0);
+    EXPECT_TRUE(floatVal.compare(integer) > 0);
+    EXPECT_TRUE(floatVal.compare(smallInt) < 0);
+    EXPECT_TRUE(floatVal.compare(tinyInt) < 0);
 }
 
 TEST_F(NValueTest, TestNullHandling)
@@ -2153,6 +2153,102 @@ TEST_F(NValueTest, TestExtract)
     result = midSeptember.callUnary<FUNC_EXTRACT_SECOND>();
     EXPECT_EQ(0, result.compare(ValueFactory::getDecimalValueFromString(EXPECTED_SECONDS)));
 
+    delete poolHolder;
+    delete testPool;
+}
+
+static NValue streamNValueArrayintoInList(NValue* nvalue, int length, Pool* testPool)
+{
+    char serial_buffer[1024];
+    // This requires intimate knowledge of NValueSet wire protocol
+    ReferenceSerializeOutput setup(serial_buffer, sizeof(serial_buffer));
+    ReferenceSerializeInput input(serial_buffer, sizeof(serial_buffer));
+    setup.writeByte(VALUE_TYPE_INLIST);
+    setup.writeInt(length); // number of list elements
+    setup.writeInt(0); // number of them that are param indexes
+    for (int ii = 0; ii < length; ++ii) {
+        nvalue[ii].serializeTypedNValueTo(setup);
+    }
+    NValue list;
+    list.deserializeFromAllocateForStorage(input, testPool);
+    return list;
+}
+
+static void initNValueArray(NValue* int_NV_set, int* int_set, size_t length)
+{
+    for (size_t ii = 0; ii < length; ++ii) {
+        int_NV_set[ii] = ValueFactory::getIntegerValue(int_set[ii]);
+    }
+}
+
+static void initNValueArray(NValue* string_NV_set, const char ** string_set, size_t length)
+{
+    for (size_t ii = 0; ii < length; ++ii) {
+        string_NV_set[ii] = ValueFactory::getStringValue(string_set[ii]);
+    }
+}
+
+static void freeNValueArray(NValue* string_NV_set, size_t length)
+{
+    for (size_t ii = 0; ii < length; ++ii) {
+        string_NV_set[ii].free();
+    }
+}
+
+#define SIZE_OF_ARRAY(ARRAY) (sizeof(ARRAY) / sizeof(ARRAY[0]))
+TEST_F(NValueTest, TestInList)
+{
+    assert(ExecutorContext::getExecutorContext() == NULL);
+    Pool* testPool = new Pool();
+    UndoQuantum* wantNoQuantum = NULL;
+    Topend* topless = NULL;
+    ExecutorContext* poolHolder =
+        new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, false, "", 0);
+
+    int int_set1[] = { 10, 2, -3 };
+    int int_set2[] = { 0, 1, 100, 10000, 1000000 };
+
+    const int int_length1 = SIZE_OF_ARRAY(int_set1);
+    const int int_length2 = SIZE_OF_ARRAY(int_set2);
+    NValue int_NV_set1[int_length1];
+    NValue int_NV_set2[int_length2];
+    initNValueArray(int_NV_set1, int_set1, int_length1);
+    initNValueArray(int_NV_set2, int_set2, int_length2);
+
+    NValue int_list1 = streamNValueArrayintoInList(int_NV_set1, int_length1, testPool);
+    NValue int_list2 = streamNValueArrayintoInList(int_NV_set2, int_length2, testPool);
+    for (size_t ii = 0; ii < int_length1; ++ii) {
+        EXPECT_TRUE(int_NV_set1[ii].inList(int_list1));
+        EXPECT_FALSE(int_NV_set1[ii].inList(int_list2));
+    }
+    for (size_t jj = 0; jj < int_length2; ++jj) {
+        EXPECT_FALSE(int_NV_set2[jj].inList(int_list1));
+        EXPECT_TRUE(int_NV_set2[jj].inList(int_list2));
+    }
+
+    const char* string_set1[] = { "10", "2", "-3" };
+    const char* string_set2[] = { "0", "1", "100", "10000", "1000000" };
+
+    const int string_length1 = SIZE_OF_ARRAY(string_set1);
+    const int string_length2 = SIZE_OF_ARRAY(string_set2);
+    NValue string_NV_set1[string_length1];
+    NValue string_NV_set2[string_length2];
+    initNValueArray(string_NV_set1, string_set1, string_length1);
+    initNValueArray(string_NV_set2, string_set2, string_length2);
+
+    NValue string_list1 = streamNValueArrayintoInList(string_NV_set1, string_length1, testPool);
+    NValue string_list2 = streamNValueArrayintoInList(string_NV_set2, string_length2, testPool);
+    for (size_t ii = 0; ii < string_length1; ++ii) {
+        EXPECT_TRUE(string_NV_set1[ii].inList(string_list1));
+        EXPECT_FALSE(string_NV_set1[ii].inList(string_list2));
+    }
+    for (size_t jj = 0; jj < string_length2; ++jj) {
+        EXPECT_FALSE(string_NV_set2[jj].inList(string_list1));
+        EXPECT_TRUE(string_NV_set2[jj].inList(string_list2));
+    }
+
+    freeNValueArray(string_NV_set1, string_length1);
+    freeNValueArray(string_NV_set2, string_length2);
     delete poolHolder;
     delete testPool;
 }

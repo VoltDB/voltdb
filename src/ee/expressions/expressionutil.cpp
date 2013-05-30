@@ -76,8 +76,8 @@ hashRangeFactory(PlannerDomValue obj) {
     return new HashRangeExpression(hashColumnValue.asInt(), ranges, static_cast<int>(rangesArray.arrayLen()));
 }
 
-/** Function static helper templated functions to vivify an optimal
-    comparison class. */
+/** Instantiate a custom AbstractExpression class that implements eval
+ *  as the specified comparison of two generic AbstractExpression-based sub-expressions. **/
 static AbstractExpression*
 getGeneral(ExpressionType c,
            AbstractExpression *l,
@@ -110,6 +110,8 @@ getGeneral(ExpressionType c,
 }
 
 
+/** Instantiate a custom AbstractExpression class that implements eval
+ *  as the specified comparison of two concretely expression-typed sub-expressions. **/
 template <typename L, typename R>
 static AbstractExpression*
 getMoreSpecialized(ExpressionType c, L* l, R* r)
@@ -139,19 +141,13 @@ getMoreSpecialized(ExpressionType c, L* l, R* r)
     }
 }
 
-/** convert the enumerated value type into a concrete c type for the
- * comparison helper templates. */
+/** convert the enumerated operator value and optionally (in common cases) the dynamic operand types
+ * and into a concrete instantiation of an AbstractExpression-based helper template. **/
 AbstractExpression *
 ExpressionUtil::comparisonFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc)
 {
     assert(lc);
-    /*printf("left: %s\n", left_optimized->debug("").c_str());
-    fflush(stdout);
-    printf("right: %s\n", right_optimized->debug("").c_str());
-    fflush(stdout);*/
-
-    //printf("%s\n", right_optimized->debug().c_str());
-    //fflush(stdout);
+    assert(rc);
 
     // more specialization available?
     ConstantValueExpression *l_const =
@@ -166,18 +162,24 @@ ExpressionUtil::comparisonFactory(ExpressionType et, AbstractExpression *lc, Abs
     TupleValueExpression *r_tuple =
       dynamic_cast<TupleValueExpression*>(rc);
 
-    // this will inline getValue(), hooray!
-    if (l_const != NULL && r_const != NULL) { // CONST-CONST can it happen?
-        return getMoreSpecialized<ConstantValueExpression, ConstantValueExpression>(et, l_const, r_const);
-    } else if (l_const != NULL && r_tuple != NULL) { // CONST-TUPLE
-        return getMoreSpecialized<ConstantValueExpression, TupleValueExpression>(et, l_const, r_tuple);
-    } else if (l_tuple != NULL && r_const != NULL) { // TUPLE-CONST
+    // This will inline eval() for common column-based comparisons, hooray!
+    // There's no point in bloating the code with instantiations for comparisons
+    // strictly among constants and/or parameters
+    // -- there's something VERY WRONG about a plan that (repeatedly?) compares between
+    // (unchanging?) constants -- or parameters for that matter -- in a fast path tight loop.
+    if (l_tuple != NULL && r_const != NULL) { // TUPLE-CONST
         return getMoreSpecialized<TupleValueExpression, ConstantValueExpression >(et, l_tuple, r_const);
-    } else if (l_tuple != NULL && r_tuple != NULL) { // TUPLE-TUPLE
+    }
+    //TODO: get by with fewer, simpler instantiations (smaller code) by reversing the operands in this
+    // case to keep the tuple value always on the left
+    // -- and reversing the operator, e.g. swapping '>' for '<').
+    else if (l_const != NULL && r_tuple != NULL) { // CONST-TUPLE
+        return getMoreSpecialized<ConstantValueExpression, TupleValueExpression>(et, l_const, r_tuple);
+    }
+    else if (l_tuple != NULL && r_tuple != NULL) { // TUPLE-TUPLE
         return getMoreSpecialized<TupleValueExpression, TupleValueExpression>(et, l_tuple, r_tuple);
     }
 
-    //okay, still getTypedValue is beneficial.
     return getGeneral(et, lc, rc);
 }
 
@@ -289,6 +291,9 @@ constantValueFactory(PlannerDomValue obj,
         break;
     case VALUE_TYPE_DECIMAL:
         newvalue = ValueFactory::getDecimalValueFromString(valueValue.asStr());
+        break;
+    case VALUE_TYPE_INLIST:
+        newvalue = ValueFactory::getInListValueFromString(valueValue.asStr());
         break;
     default:
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
