@@ -54,6 +54,8 @@ public class Tokenizer extends AbstractTokenizer {
 
 	private final int escapeChar;
 
+	private final int columnLimitSize;
+
 	/**
 	 * Enumeration of tokenizer states. QUOTE_MODE is activated between quotes.
 	 */
@@ -79,6 +81,7 @@ public class Tokenizer extends AbstractTokenizer {
 		this.commentMatcher = preferences.getCommentMatcher();
 		this.strictQuotes = preferences.getStrictQuotes();
 		this.escapeChar = preferences.getEscapeChar();
+		this.columnLimitSize = preferences.getColumnLimitSize();
 	}
 
 	/**
@@ -230,7 +233,16 @@ public class Tokenizer extends AbstractTokenizer {
 					 * character. For a large file with an unterminated quoted section (no trailing quote), this could
 					 * cause memory issues as it will keep reading lines looking for the trailing quote. Maybe there
 					 * should be a configurable limit on max lines to read in quoted mode?
+					 *
+					 * Yes I'll set the limit to be 16*1024*1024B = 16MB by default
 					 */
+				    if( currentColumn.length() > columnLimitSize ) {
+				        throw new SuperCsvException(
+	                            String
+	                                .format(
+	                                    "oversized column while reading quoted column beginning on line %d and ending on line %d",
+	                                    quoteScopeStartingLine, getLineNumber()));
+				    }
 					currentColumn.append(NEWLINE);
 					currentRow.append(NEWLINE); // specific line terminator lost, \n will have to suffice
 
