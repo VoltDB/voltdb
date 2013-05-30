@@ -103,8 +103,8 @@ public class CSVLoader {
         public void clientCallback(ClientResponse response) throws Exception {
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 m_log.error( response.getStatusString() );
-        		String[] info = { m_rowdata, response.getStatusString() };
-            	synchronizeErrorInfo( info );
+                        String[] info = { m_rowdata, response.getStatusString() };
+                synchronizeErrorInfo( info );
                 return;
             }
 
@@ -213,9 +213,9 @@ public class CSVLoader {
         ICsvListReader listReader = null;
         try {
             if (CSVLoader.standin)
-            	listReader = new CsvListReader(new BufferedReader( new InputStreamReader(System.in)), csvPreference);
+                listReader = new CsvListReader(new BufferedReader( new InputStreamReader(System.in)), csvPreference);
             else
-            	listReader = new CsvListReader(new FileReader(config.file), csvPreference);
+                listReader = new CsvListReader(new FileReader(config.file), csvPreference);
         } catch (FileNotFoundException e) {
             m_log.error("CSV file '" + config.file + "' could not be found.");
             System.exit(-1);
@@ -273,45 +273,45 @@ public class CSVLoader {
             List<String> lineList = null;
             while ((config.limitrows-- > 0) && !listReader.isEOF() ) {
             try{
-	        		while( listReader.getLineNumber() < config.skip )
-	        			lineList = listReader.read();
-	        		lineList = listReader.read();
-	        		if(lineList == null)
-	        			break;
-	        		outCount.incrementAndGet();
-	                boolean queued = false;
-	                while (queued == false) {
-	                    Object[] correctedLine = lineList.toArray();
-	                    cb = new MyCallback(outCount.get(), config,
-	                            lineList.toString());
-	                    String lineCheckResult;
+                                while( listReader.getLineNumber() < config.skip )
+                                        lineList = listReader.read();
+                                lineList = listReader.read();
+                                if(lineList == null)
+                                        break;
+                                outCount.incrementAndGet();
+                        boolean queued = false;
+                        while (queued == false) {
+                            Object[] correctedLine = lineList.toArray();
+                            cb = new MyCallback(outCount.get(), config,
+                                    lineList.toString());
+                            String lineCheckResult;
 
-	                    if ((lineCheckResult = checkparams_trimspace(correctedLine,
-	                            columnCnt)) != null) {
-	                    	String[] info = { lineList.toString(), lineCheckResult };
-	                    	synchronizeErrorInfo( info );
-	                        break;
-	                    }
+                            if ((lineCheckResult = checkparams_trimspace(correctedLine,
+                                    columnCnt)) != null) {
+                                String[] info = { lineList.toString(), lineCheckResult };
+                                synchronizeErrorInfo( info );
+                                break;
+                            }
 
-	                    queued = csvClient.callProcedure(cb, insertProcedure,
-	                            (Object[]) correctedLine);
+                            queued = csvClient.callProcedure(cb, insertProcedure,
+                                    (Object[]) correctedLine);
 
-	                    if (queued == false) {
-	                        ++waits;
-	                        if (lastOK == false) {
-	                            ++shortWaits;
-	                        }
-	                        Thread.sleep(waitSeconds);
-	                    }
-	                    lastOK = queued;
-	                }
-	            }
-        	catch (SuperCsvException e){
-        		//Catch rows that can not be read by superCSV listReader. E.g. items without quotes when strictquotes is enabled.
-        		outCount.incrementAndGet();
-        		String[] info = { e.getMessage(), "" };
-            	synchronizeErrorInfo( info );
-        	}
+                            if (queued == false) {
+                                ++waits;
+                                if (lastOK == false) {
+                                    ++shortWaits;
+                                }
+                                Thread.sleep(waitSeconds);
+                            }
+                            lastOK = queued;
+                        }
+                    }
+                catch (SuperCsvException e){
+                        //Catch rows that can not be read by superCSV listReader. E.g. items without quotes when strictquotes is enabled.
+                        outCount.incrementAndGet();
+                        String[] info = { e.getMessage(), "" };
+                synchronizeErrorInfo( info );
+                }
         }
             csvClient.drain();
         } catch (Exception e) {
@@ -356,39 +356,39 @@ public class CSVLoader {
                     + " found, " + columnCnt + " expected.";
         }
         for (int i = 0; i < slot.length; i++) {
-        	//supercsv read "" to null
-        	if( slot[i] == null )
-        	{
-        		if(config.blank.equalsIgnoreCase("error"))
-        		{
-        			return "Error: blank item";
-        		}
+                //supercsv read "" to null
+                if( slot[i] == null )
+                {
+                        if(config.blank.equalsIgnoreCase("error"))
+                        {
+                                return "Error: blank item";
+                        }
                 else if (config.blank.equalsIgnoreCase("empty"))
                     slot[i] = blankValues.get(typeList.get(i));
-        		//else config.blank == null which is already the case
-        	}
+                        //else config.blank == null which is already the case
+                }
 
             // trim white space in this line. SuperCSV preserves all the whitespace by default
-        	else
-	        	{
-        			if( config.nowhitespace && ( slot[i].toString().charAt(0) == ' ' || slot[i].toString().charAt( slot[i].toString().length() - 1 ) == ' ')) {
-        				return "Error: White Space Detected in nowhitespace mode.";
-        			}
-        			else
-        				slot[i] = ((String) slot[i]).trim();
-	            // treat NULL, \N and "\N" as actual null value
-	        		if ( (slot[i]).equals("NULL") || slot[i].equals(VoltTable.CSV_NULL)
-	        				|| !config.strictquotes && slot[i].equals(VoltTable.QUOTED_CSV_NULL))
-	        			slot[i] = null;
-	            }
-        	}
+                else
+                        {
+                                if( config.nowhitespace && ( slot[i].toString().charAt(0) == ' ' || slot[i].toString().charAt( slot[i].toString().length() - 1 ) == ' ')) {
+                                        return "Error: White Space Detected in nowhitespace mode.";
+                                }
+                                else
+                                        slot[i] = ((String) slot[i]).trim();
+                    // treat NULL, \N and "\N" as actual null value
+                                if ( (slot[i]).equals("NULL") || slot[i].equals(VoltTable.CSV_NULL)
+                                                || !config.strictquotes && slot[i].equals(VoltTable.QUOTED_CSV_NULL))
+                                        slot[i] = null;
+                    }
+                }
         return null;
     }
 
     private static void configuration() {
-    	csvPreference = new CsvPreference.Builder(config.quotechar, config.separator, "\n").
-    			useStrictQuotes(config.strictquotes).
-    			useEscapeChar(config.escape).build();
+        csvPreference = new CsvPreference.Builder(config.quotechar, config.separator, "\n").
+                        useStrictQuotes(config.strictquotes).
+                        useEscapeChar(config.escape).build();
         if (config.file.equals(""))
             standin = true;
         if (!config.table.equals("")) {

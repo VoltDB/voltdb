@@ -229,7 +229,7 @@ public class TestCSVLoader extends TestCase {
 
     public void testOpenQuote() throws Exception
     {
-    	// 221794,0,2228449581,"Stella&DotCircleLinkChains15\""delicatechain","2010-10-07 14:35:26"
+        // 221794,0,2228449581,"Stella&DotCircleLinkChains15\""delicatechain","2010-10-07 14:35:26"
         String mySchema =
                 "create table BLAH (" +
                         "clm_integer integer default 0 not null, " + // column that is partitioned on
@@ -257,8 +257,8 @@ public class TestCSVLoader extends TestCase {
                 "BlAh"
         };
         String []myData = {
-        		//"221794,0,2228449581,\"Stella&DotCircleLinkChains15\\\"\"delicatechain\",\"2010-10-07 14:35:26\"",
-        		"221794,0,2228449581,\"Stella&DotCircleLinkChains15\\\"\"delicatechain"+ "\n" +"nextline\",\"2010-10-07 14:35:26\"",
+                        //"221794,0,2228449581,\"Stella&DotCircleLinkChains15\\\"\"delicatechain\",\"2010-10-07 14:35:26\"",
+                        "221794,0,2228449581,\"Stella&DotCircleLinkChains15\\\"\"delicatechain"+ "\n" +"nextline\",\"2010-10-07 14:35:26\"",
         };
         int invalidLineCnt = 0;
         test_Interface( mySchema, myOptions, myData, invalidLineCnt );
@@ -266,7 +266,7 @@ public class TestCSVLoader extends TestCase {
 
     public void testOpenQuoteAndStrictQuotes() throws Exception
     {
-    	// 221794,0,2228449581,"Stella&DotCircleLinkChains15\""delicatechain","2010-10-07 14:35:26"
+        // 221794,0,2228449581,"Stella&DotCircleLinkChains15\""delicatechain","2010-10-07 14:35:26"
         String mySchema =
                 "create table BLAH (" +
                         "clm_integer integer default 0 not null, " + // column that is partitioned on
@@ -295,8 +295,8 @@ public class TestCSVLoader extends TestCase {
                 "BlAh"
         };
         String []myData = {
-        		//"221794,0,2228449581,\"Stella&DotCircleLinkChains15\\\"\"delicatechain\",\"2010-10-07 14:35:26\"",
-        		"\"221794\",\"0\",\"2228449581\",\"Stella&DotCircleLinkChains15\\\"\"delicatechain"+ "\n" +"nextline\",\"2010-10-07 14:35:26\"",
+                        //"221794,0,2228449581,\"Stella&DotCircleLinkChains15\\\"\"delicatechain\",\"2010-10-07 14:35:26\"",
+                        "\"221794\",\"0\",\"2228449581\",\"Stella&DotCircleLinkChains15\\\"\"delicatechain"+ "\n" +"nextline\",\"2010-10-07 14:35:26\"",
         };
         int invalidLineCnt = 0;
         test_Interface( mySchema, myOptions, myData, invalidLineCnt );
@@ -304,10 +304,10 @@ public class TestCSVLoader extends TestCase {
 
     public void testUnmatchQuote() throws Exception
     {
-    	//test the following csv data
-    	//221794,0,2228449581,"Stella&DotCircleLinkChains15\""delicatechain","2010-10-07 14:35:26"
-    	//221794,0,2228449581,"Stella&DotCircleLinkChains15\""delicatechain
-    	//nextline,"2010-10-07 14:35:26"
+        //test the following csv data
+        //221794,0,2228449581,"Stella&DotCircleLinkChains15\""delicatechain","2010-10-07 14:35:26"
+        //221794,0,2228449581,"Stella&DotCircleLinkChains15\""delicatechain
+        //nextline,"2010-10-07 14:35:26"
         String mySchema =
                 "create table BLAH (" +
                         "clm_integer integer default 0 not null, " + // column that is partitioned on
@@ -336,10 +336,10 @@ public class TestCSVLoader extends TestCase {
                 "BlAh"
         };
         String []myData = {
-        		//valid line from shopzilla: unmatched quote is between two commas(which is treated as strings).
-        		"221794,0,2228449581,\"Stella&DotCircleLinkChains15\\\"\"delicatechain\",\"2010-10-07 14:35:26\"",
-        		//invalid line: unmatched quote
-        		"221794,0,2228449581,\"Stella&DotCircleLinkChains15\\\"\"delicatechain"+ "\n" +"nextline,\"2010-10-07 14:35:26\"",
+                        //valid line from shopzilla: unmatched quote is between two commas(which is treated as strings).
+                        "221794,0,2228449581,\"Stella&DotCircleLinkChains15\\\"\"delicatechain\",\"2010-10-07 14:35:26\"",
+                        //invalid line: unmatched quote
+                        "221794,0,2228449581,\"Stella&DotCircleLinkChains15\\\"\"delicatechain"+ "\n" +"nextline,\"2010-10-07 14:35:26\"",
         };
         int invalidLineCnt = 1;
         test_Interface( mySchema, myOptions, myData, invalidLineCnt );
@@ -583,7 +583,7 @@ public class TestCSVLoader extends TestCase {
     {
         String mySchema =
                 "create table BLAH (" +
-                		"clm_string varchar(20), " +
+                                "clm_string varchar(20), " +
                         "clm_integer integer default 0 not null, " + // column that is partitioned on
                         "clm_tinyint tinyint default 0, " +
                         "clm_smallint smallint default 0, " +
@@ -608,7 +608,7 @@ public class TestCSVLoader extends TestCase {
     {
         String mySchema =
                 "create table BLAH (" +
-                		"clm_string varchar(20), " +
+                                "clm_string varchar(20), " +
                         "clm_integer integer default 0 not null, " + // column that is partitioned on
                         "clm_tinyint tinyint default 0, " +
                         "clm_smallint smallint default 0, " +
