@@ -142,7 +142,6 @@ public class TestCSVLoader extends TestCase {
                     "--quotechar=\"",
                     "--escape=\\",
                     "--skip=0",
-                    "--nowhitespace",
                     //"--strictquotes",
                     "BLAH"
             };
@@ -205,7 +204,6 @@ public class TestCSVLoader extends TestCase {
                 "--quotechar=\"",
                 "--escape=\\",
                 "--skip=1",
-                "--nowhitespace",
                 //"--strictquotes",
                 "BlAh"
         };
@@ -256,7 +254,6 @@ public class TestCSVLoader extends TestCase {
                 "--quotechar=\"",
                 "--escape=\\",
                 "--skip=0",
-                "--nowhitespace",
                 "BlAh"
         };
         String []myData = {
@@ -294,7 +291,6 @@ public class TestCSVLoader extends TestCase {
                 "--quotechar=\"",
                 "--escape=\\",
                 "--skip=0",
-                "--nowhitespace",
                 "--strictquotes",
                 "BlAh"
         };
@@ -336,7 +332,6 @@ public class TestCSVLoader extends TestCase {
                 "--quotechar=\"",
                 "--escape=\\",
                 "--skip=0",
-                "--nowhitespace",
                 //"--strictquotes",
                 "BlAh"
         };
@@ -378,7 +373,6 @@ public class TestCSVLoader extends TestCase {
                 "--quotechar=\"",
                 "--escape=\\",
                 "--skip=0",
-                "--nowhitespace",
                 //"--strictquotes",
                 "BLAH"
         };
@@ -536,7 +530,6 @@ public class TestCSVLoader extends TestCase {
                 "--quotechar=\"",
                 "--escape=\\",
                 "--skip=10",
-                "--nowhitespace",
                 //"--strictquotes",
                 "BlAh"
         };
@@ -608,6 +601,32 @@ public class TestCSVLoader extends TestCase {
                 "~'escapeprimesymbol,3,3,3"
         };
         int invalidLineCnt = 0;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+    }
+
+    public void testNoWhiteSpace() throws Exception
+    {
+        String mySchema =
+                "create table BLAH (" +
+                		"clm_string varchar(20), " +
+                        "clm_integer integer default 0 not null, " + // column that is partitioned on
+                        "clm_tinyint tinyint default 0, " +
+                        "clm_smallint smallint default 0, " +
+                        "); ";
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--nowhitespace",
+                "BLAH"
+        };
+
+        String []myData = {
+                "nospace,1,1,1",
+                "   frontspace,2,2,2",
+                "rearspace   ,3,3,3",
+                "\" inquotespace \"   ,4,4,4"
+        };
+        int invalidLineCnt = 3;
         test_Interface( mySchema, myOptions, myData, invalidLineCnt );
     }
 

@@ -46,9 +46,6 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 
-import au.com.bytecode.opencsv_voltpatches.CSVParser;
-import au.com.bytecode.opencsv_voltpatches.CSVReader;
-
 /**
  * CSVLoader is a simple utility to load data from a CSV formatted file to a
  * table (or pass it to any stored proc, but ignoring any result other than the
@@ -139,22 +136,22 @@ public class CSVLoader {
         String blank = "error";
 
         @Option(desc = "delimiter to use for separating entries")
-        char separator = CSVParser.DEFAULT_SEPARATOR;
+        char separator = ',';
 
         @Option(desc = "character to use for quoted elements (default: \")")
-        char quotechar = CSVParser.DEFAULT_QUOTE_CHARACTER;
+        char quotechar = '\"';
 
         @Option(desc = "character to use for escaping a separator or quote (default: \\)")
-        char escape = CSVParser.DEFAULT_ESCAPE_CHARACTER;
+        char escape = '\\';
 
         @Option(desc = "require all input values to be enclosed in quotation marks", hasArg = false)
-        boolean strictquotes = CSVParser.DEFAULT_STRICT_QUOTES;
+        boolean strictquotes = false;
 
         @Option(desc = "number of lines to skip before inserting rows into the database")
-        int skip = CSVReader.DEFAULT_SKIP_LINES;
+        int skip = 0;
 
         @Option(desc = "do not allow whitespace between values and separators", hasArg = false)
-        boolean nowhitespace = !CSVParser.DEFAULT_IGNORE_LEADING_WHITESPACE;
+        boolean nowhitespace = false;
 
         @Option(shortOpt = "s", desc = "list of servers to connect to (default: localhost)")
         String servers = "localhost";
@@ -312,7 +309,7 @@ public class CSVLoader {
         	catch (SuperCsvException e){
         		//Catch rows that can not be read by superCSV listReader. E.g. items without quotes when strictquotes is enabled.
         		outCount.incrementAndGet();
-        		String[] info = { e.getMessage() };
+        		String[] info = { e.getMessage(), "" };
             	synchronizeErrorInfo( info );
         	}
         }
@@ -374,7 +371,11 @@ public class CSVLoader {
             // trim white space in this line. SuperCSV preserves all the whitespace by default
         	else
 	        	{
-	        		slot[i] = ((String) slot[i]).trim();
+        			if( config.nowhitespace && ( slot[i].toString().charAt(0) == ' ' || slot[i].toString().charAt( slot[i].toString().length() - 1 ) == ' ')) {
+        				return "Error: White Space Detected in nowhitespace mode.";
+        			}
+        			else
+        				slot[i] = ((String) slot[i]).trim();
 	            // treat NULL, \N and "\N" as actual null value
 	        		if ( (slot[i]).equals("NULL") || slot[i].equals(VoltTable.CSV_NULL)
 	        				|| !config.strictquotes && slot[i].equals(VoltTable.QUOTED_CSV_NULL))
