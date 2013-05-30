@@ -154,7 +154,7 @@ public class CSVLoader {
         boolean nowhitespace = false;
 
         @Option(desc = "max size of a column (default: 16*1024*1024(Bytes))")
-        int columnlimitsize = 16*1024*1024;
+        int columnsizelimit = 16*1024*1024;
 
         @Option(shortOpt = "s", desc = "list of servers to connect to (default: localhost)")
         String servers = "localhost";
@@ -392,7 +392,7 @@ public class CSVLoader {
         csvPreference = new CsvPreference.Builder(config.quotechar, config.separator, "\n").
                         useStrictQuotes(config.strictquotes).
                         useEscapeChar(config.escape).
-                        setColumnLimitSize(config.columnlimitsize).build();
+                        setColumnLimitSize(config.columnsizelimit).build();
         if (config.file.equals(""))
             standin = true;
         if (!config.table.equals("")) {

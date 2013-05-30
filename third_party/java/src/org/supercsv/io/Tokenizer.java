@@ -54,7 +54,7 @@ public class Tokenizer extends AbstractTokenizer {
 
 	private final int escapeChar;
 
-	private final int columnLimitSize;
+	private final int columnSizeLimit;
 
 	/**
 	 * Enumeration of tokenizer states. QUOTE_MODE is activated between quotes.
@@ -81,7 +81,7 @@ public class Tokenizer extends AbstractTokenizer {
 		this.commentMatcher = preferences.getCommentMatcher();
 		this.strictQuotes = preferences.getStrictQuotes();
 		this.escapeChar = preferences.getEscapeChar();
-		this.columnLimitSize = preferences.getColumnLimitSize();
+		this.columnSizeLimit = preferences.getColumnLimitSize();
 	}
 
 	/**
@@ -236,7 +236,7 @@ public class Tokenizer extends AbstractTokenizer {
 					 *
 					 * Yes I'll set the limit to be 16*1024*1024B = 16MB by default
 					 */
-				    if( currentColumn.length() > columnLimitSize ) {
+				    if( currentColumn.length() > columnSizeLimit ) {
 				        throw new SuperCsvException(
 	                            String
 	                                .format(

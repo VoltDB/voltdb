@@ -642,7 +642,7 @@ public class TestCSVLoader extends TestCase {
         String []myOptions = {
                 "-f" + path_csv,
                 "--reportdir=" + reportDir,
-                "--columnlimitsize=10",
+                "--columnsizelimit=10",
                 "BLAH"
         };
 

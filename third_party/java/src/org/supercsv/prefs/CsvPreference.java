@@ -131,7 +131,7 @@ public final class CsvPreference {
 
 	private final char escapeChar;
 
-	private final int columnLimitSize;
+	private final int columnSizeLimit;
 
 	/**
 	 * Constructs a new <tt>CsvPreference</tt> from a Builder.
@@ -146,7 +146,7 @@ public final class CsvPreference {
 		this.quoteMode = builder.quoteMode;
 		this.strictQuotes = builder.strictQuotes;
 		this.escapeChar = builder.escapeChar;
-		this.columnLimitSize = builder.columnLimitSize;
+		this.columnSizeLimit = builder.columnSizeLimit;
 	}
 
 	/**
@@ -221,7 +221,7 @@ public final class CsvPreference {
 	}
 
     public int getColumnLimitSize() {
-        return columnLimitSize;
+        return columnSizeLimit;
     }
 	/**
 	 * Builds immutable <tt>CsvPreference</tt> instances. The builder pattern allows for additional preferences to be
@@ -247,7 +247,7 @@ public final class CsvPreference {
 
 		private char escapeChar;
 
-		private int columnLimitSize = 16*1024*1024; //16MB
+		private int columnSizeLimit = 16*1024*1024; //16MB
 
 		/**
 		 * Constructs a Builder with all of the values from an existing <tt>CsvPreference</tt> instance. Useful if you
@@ -266,7 +266,7 @@ public final class CsvPreference {
 			this.commentMatcher = preference.commentMatcher;
 			this.strictQuotes = preference.strictQuotes;
 			this.escapeChar = preference.escapeChar;
-			this.columnLimitSize = preference.columnLimitSize;
+			this.columnSizeLimit = preference.columnSizeLimit;
 		}
 
 		/**
@@ -381,7 +381,7 @@ public final class CsvPreference {
 		}
 
 	      public Builder setColumnLimitSize(int size) {
-	            this.columnLimitSize = size;
+	            this.columnSizeLimit = size;
 	            return this;
 	        }
 		/**
