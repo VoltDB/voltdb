@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
-#TODO: the exclude file is hardwired - take as an input and use checked in
-#      version as default
+#TODO: apprunner tz_offset calculation is hardwired to EDT.  That's not
+#good
 #TODO: get apprunner output from a URL
 #TODO: other file formats (default is server log)
 #           - messages
+#           - VEM log - aka stdout.txt - (uses timestamp of 13/05/23 06:26:38
 #TODO: Find out where the CRLFs went to - some (but not all) are missing
 
 
@@ -65,6 +66,7 @@ def decorated_log_split(f, offset, keyfunc, fnamedict = {}):
             currentdict["filename"] = fname
             #Add a year if none exists (like in apprunner.log)
             #Note to self: make apprunner log the year.
+
             if currentdict["datetime"][4] != '-':
                 currentdict["datetime"] = str(datetime.now().year) + \
                     '-' + currentdict["datetime"]
@@ -79,6 +81,15 @@ def decorated_log_split(f, offset, keyfunc, fnamedict = {}):
             if "message" in currentdict:
                 currentdict["message"] += line
     yield (new_epoch_ms, currentdict)
+
+def exclude_callback(option, opt_str, value, parser):
+    if value.lower() == "none":
+        # If the next thing is another arg, set exclude file to no file
+        setattr(parser.values, option.dest, '')
+    else:
+        # If not another arg, assume it is a filename
+        setattr(parser.values, option.dest, value)
+
 
 def tz_offset_callback(option, opt_str, value, parser):
     """ check to see the tz_offset looks like [+-]nn:nn and then store it
@@ -107,7 +118,7 @@ class ApprunnerTarFile():
         #validate this file is really apprunner
         if not re.match('tmp/\S+/apprunner/\S+',
                         os.path.commonprefix(self.tar.getnames())):
-            raise IOError("This isn't a valid apprunner file")
+            raise IOError(f + " isn't a valid apprunner file")
 
     def show_files(self):
         return self.tar.getnames()
@@ -117,16 +128,27 @@ class ApprunnerTarFile():
         return [f for f in self.tar.getnames() if re.search(pat,f)]
 
     def get_otherlogs(self):
-        patterns = ['apprunner.log',
-                    '\.Benchmark\.',
-                    'VoltDBReplicationAgent'
-                    ]
+        patterns = [
+            'apprunner.log',           #apprunner logging
+            '\.Benchmark\.',           #client benchmark
+            'VoltDBReplicationAgent',  #dragent
+            #'stdout.txt$',            #VEM
+            ]
         pat = '|'.join(patterns)
         return [f for f in self.tar.getnames() if re.search(pat,f)]
 
     def get_server_tzoffset(self):
-        """open a server file and apprunner.py - compute time delta"""
-        return str(-4 * 60 * 60 * 1000)
+        """Gets the date 1st file in the apprunner archive
+        EDT or EST and returns the appropriate offset.
+        This method will do dumb things if we run in another timezone
+        and possibly when daylight savings is set/unset
+        """
+        mtime = self.tar.getmember(self.tar.getnames()[0]).mtime
+        if time.localtime(mtime).tm_isdst:
+            offset_hours = -4
+        else:
+            offset_hours = -5
+        return str(offset_hours * 60 * 60 * 1000)
 
 if __name__ == "__main__":
 
@@ -134,12 +156,36 @@ if __name__ == "__main__":
     parser.add_option("-o", "--output", dest="outputfile",
                       help="write to ")
     parser.add_option("-t", "--tzoffset", type="string", default="0",
-                      nargs=1, metavar="TZ_OFFSET",
+                      nargs=1, #metavar="TZ_OFFSET",
                       action="callback", callback=tz_offset_callback,
                       help="Change the timestamps by [-|+]hh:mm to timezones. "
                       "EST is -05:00, PDT is -08:00. Don't forget daylight savings.")
+    parser.add_option("-e", "--exclude", type = "string",
+                      default = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                               'exclude.txt'),
+                      nargs=1,
+                      dest = "exclude_file",  action = "callback", callback = exclude_callback,
+                      help="Exclude file to use. Default it exclude.txt.  If 'None' is specified, no exclude file will be used"
+                      )
+
     (options, args) = parser.parse_args()
+
     offsets = {}
+    tar = None
+
+    #No files no luck
+    if len(args) == 0:
+        parser.error("You must provide at least one logfile or apprunner archive")
+
+    #You can only specify 1 apprunnder file and no other files
+    if len(args) >= 1:
+        try:
+            tarfiles = [f for f in args if tarfile.is_tarfile(f)]
+        except IOError as e:
+            sys.exit("Cannot open input file: " + str(e))
+
+        if len(tarfiles) >= 1 and len(args) > 1:
+            parser.error("There can only specify 1 apprunner archive")
 
     #If we have 1 arg, see if it is a tarfile
     if len(args) == 1 and tarfile.is_tarfile(args[0]):
@@ -155,6 +201,7 @@ if __name__ == "__main__":
         for f in otherlogs:
             offsets[f] = 0
         files = map(tar.tar.extractfile, serverlogs + otherlogs)
+
 
     else:
         try:
@@ -172,10 +219,13 @@ if __name__ == "__main__":
                      (options.outputfile, str(e)))
 
     excludes = []
-    exclude_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                'exclude.txt')
-    with open(exclude_file) as exf:
-        excludes = [l.rstrip() for l in exf if l[0] != '#']
+    if options.exclude_file:
+        try:
+            with open(options.exclude_file) as ef:
+                excludes = [l.rstrip() for l in ef if l[0] != '#']
+        except IOError as e:
+            sys.exit("Cannot read exclude file %s: %s" %
+                     (options.exclude_file, str(e)))
 
     name_dict = {
         '(volt\w*)-.*.txt': '  ',
@@ -192,7 +242,6 @@ if __name__ == "__main__":
                 if fmatch:
                     entry["filename"] = "%s %s %s" % (
                         name_dict[key], fmatch.group(1), name_dict[key])
-
 
         ematch = None
         for e in excludes:
