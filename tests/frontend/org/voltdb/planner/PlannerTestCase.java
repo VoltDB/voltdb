@@ -79,7 +79,6 @@ public class PlannerTestCase extends TestCase {
     }
 
     final int paramCount = 0;
-    final boolean planForSinglePartition = true;
     String noJoinOrder = null;
     /** A helper here where the junit test can assert success */
     protected List<AbstractPlanNode> compileSinglePartitionToFragments(String sql)
@@ -103,7 +102,9 @@ public class PlannerTestCase extends TestCase {
     }
 
     /** A helper here where the junit test can assert success */
-    private List<AbstractPlanNode> compileWithJoinOrderToFragments(String sql, boolean planForSinglePartitionFalse, String joinOrder)
+    private List<AbstractPlanNode> compileWithJoinOrderToFragments(String sql,
+                                                                   boolean planForSinglePartition,
+                                                                   String joinOrder)
     {
         int paramCount = 0;
         for (int ii = 0; ii < sql.length(); ii++) {
@@ -112,16 +113,15 @@ public class PlannerTestCase extends TestCase {
                 paramCount++;
             }
         }
-        return compileWithJoinOrderToFragments(sql, paramCount, planForSinglePartitionFalse, joinOrder);
+        return compileWithJoinOrderToFragments(sql, paramCount, planForSinglePartition, joinOrder);
     }
 
     /** A helper here where the junit test can assert success */
-    protected List<AbstractPlanNode> compileWithJoinOrderToFragments(String sql, int paramCount,
-                                                                     boolean planForSinglePartition,
-                                                                     String joinOrder)
+    private List<AbstractPlanNode> compileWithJoinOrderToFragments(String sql, int paramCount,
+                                                                   boolean planForSinglePartition,
+                                                                   String joinOrder)
     {
-        boolean planForSinglePartitionFalse = false;
-        List<AbstractPlanNode> pn = m_aide.compile(sql, paramCount, planForSinglePartitionFalse, joinOrder);
+        List<AbstractPlanNode> pn = m_aide.compile(sql, paramCount, planForSinglePartition, joinOrder);
         assertTrue(pn != null);
         assertFalse(pn.isEmpty());
         if (planForSinglePartition) {
