@@ -310,8 +310,9 @@ public class CSVLoader {
 	                }
 	            }
         	catch (SuperCsvException e){
+        		//Catch rows that can not be read by superCSV listReader. E.g. items without quotes when strictquotes is enabled.
         		outCount.incrementAndGet();
-        		String[] info = { "At line " + listReader.getLineNumber(), e.getMessage() };
+        		String[] info = { e.getMessage() };
             	synchronizeErrorInfo( info );
         	}
         }
