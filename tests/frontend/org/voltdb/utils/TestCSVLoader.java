@@ -617,7 +617,6 @@ public class TestCSVLoader extends TestCase {
                 "-f" + path_csv,
                 "--reportdir=" + reportDir,
                 "--nowhitespace",
-                "--columnlimitsize=10",
                 "BLAH"
         };
 
@@ -628,6 +627,31 @@ public class TestCSVLoader extends TestCase {
                 "\" inquotespace \"   ,4,4,4"
         };
         int invalidLineCnt = 3;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+    }
+
+    public void testColumnLimitSize() throws Exception
+    {
+        String mySchema =
+                "create table BLAH (" +
+                                "clm_string varchar(20), " +
+                        "clm_integer integer default 0 not null, " + // column that is partitioned on
+                        "clm_tinyint tinyint default 0, " +
+                        "clm_smallint smallint default 0, " +
+                        "); ";
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--columnlimitsize=10",
+                "BLAH"
+        };
+
+        String []myData = {
+                "\"openquote,1,1,1",
+                "second,2,2,2",
+                "third,3,3,3"
+        };
+        int invalidLineCnt = 1;
         test_Interface( mySchema, myOptions, myData, invalidLineCnt );
     }
 
