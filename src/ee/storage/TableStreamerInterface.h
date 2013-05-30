@@ -32,6 +32,9 @@ namespace voltdb
     {
     public:
 
+        virtual ~TableStreamerInterface()
+        {}
+
         /**
          * Activate streaming.
          */
