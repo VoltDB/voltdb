@@ -921,7 +921,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     }
                 }
                 messageLengthBuffer.rewind();
-                final ByteBuffer messageBuffer = ByteBuffer.allocate(messageLengthBuffer.getInt());
+                int length = messageLengthBuffer.getInt();
+                if (length == 0) {
+                    return null;
+                }
+                final ByteBuffer messageBuffer = ByteBuffer.allocate(length);
                 while (messageBuffer.hasRemaining()) {
                     int read = m_connection.m_socketChannel.read(messageBuffer);
                     if (read == -1) {

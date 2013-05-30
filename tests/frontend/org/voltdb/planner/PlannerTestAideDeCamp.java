@@ -39,12 +39,11 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
-import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.compiler.VoltCompiler;
-import org.voltdb.compiler.VoltDDLElementTracker;
+import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.plannodes.SchemaColumn;
@@ -71,28 +70,16 @@ public class PlannerTestAideDeCamp {
      * @throws Exception
      */
     public PlannerTestAideDeCamp(URL ddlurl, String basename) throws Exception {
-        catalog = new Catalog();
-        catalog.execute("add / clusters cluster");
-        catalog.execute("add /clusters[cluster] databases database");
-        db = catalog.getClusters().get("cluster").getDatabases().get("database");
-        proc = db.getProcedures().add(basename);
-
         String schemaPath = URLDecoder.decode(ddlurl.getPath(), "UTF-8");
-
         VoltCompiler compiler = new VoltCompiler();
         hsql = HSQLInterface.loadHsqldb();
-        //hsql.runDDLFile(schemaPath);
-        VoltDDLElementTracker partitionMap = new VoltDDLElementTracker(compiler);
-        DDLCompiler ddl_compiler = new DDLCompiler(compiler, hsql, partitionMap, db);
-        ddl_compiler.loadSchema(schemaPath);
-        ddl_compiler.compileToCatalog(catalog, db);
+        VoltCompiler.DdlProceduresToLoad no_procs = DdlProceduresToLoad.NO_DDL_PROCEDURES;
+        catalog = compiler.loadSchema(hsql, no_procs, schemaPath);
+        db = compiler.getCatalogDatabase();
+        proc = db.getProcedures().add(basename);
     }
 
     public void tearDown() {
-    }
-
-    public Catalog getCatalog() {
-        return catalog;
     }
 
     public Database getDatabase() {
@@ -118,11 +105,6 @@ public class PlannerTestAideDeCamp {
     {
         compile(sql, 0, null, null, true, false, detMode);
         return m_currentPlan;
-    }
-
-    public List<AbstractPlanNode> compile(String sql, int paramCount)
-    {
-        return compile(sql, paramCount, false, null);
     }
 
     public List<AbstractPlanNode> compile(String sql, int paramCount, boolean singlePartition) {

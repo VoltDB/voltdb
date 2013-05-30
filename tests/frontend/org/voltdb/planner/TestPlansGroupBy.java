@@ -30,7 +30,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
     protected void setUp() throws Exception {
         setupSchema(TestPlansGroupBy.class.getResource("testplans-groupby-ddl.sql"),
                     "testplansgroupby", false);
-        forceHackPartitioning();
     }
 
     @Override

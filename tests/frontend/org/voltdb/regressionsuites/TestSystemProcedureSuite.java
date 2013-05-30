@@ -40,9 +40,9 @@ import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestSystemProcedureSuite extends RegressionSuite {
 
-    private static int sites = 3;
-    private static int hosts = 2;
-    private static int kfactor = 1;
+    private static int SITES = 3;
+    private static int HOSTS = 2;
+    private static int KFACTOR = 1;
     private static boolean hasLocalServer = false;
 
     static final Class<?>[] PROCEDURES =
@@ -202,16 +202,17 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             client.callProcedure("@LoadMultipartitionTable", "ITEM",
                                  replicated_table);
 
-            int foundItem = 0;
+            // 20 rows per site for the replicated table.  Wait for it...
+            int rowcount = 0;
             VoltTable results[] = client.callProcedure("@Statistics", "table", 0).getResults();
-            while (foundItem != 6) {
-                foundItem = 0;
+            while (rowcount != (20 * SITES * HOSTS)) {
+                rowcount = 0;
                 results = client.callProcedure("@Statistics", "table", 0).getResults();
                 // Check that tables loaded correctly
                 while(results[0].advanceRow()) {
                     if (results[0].getString("TABLE_NAME").equals("ITEM"))
                     {
-                        ++foundItem;
+                        rowcount += results[0].getLong("TUPLE_COUNT");
                     }
                 }
             }
@@ -219,6 +220,8 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             System.out.println(results[0]);
 
             // Check that tables loaded correctly
+            int foundItem = 0;
+            results = client.callProcedure("@Statistics", "table", 0).getResults();
             while(results[0].advanceRow()) {
                 if (results[0].getString("TABLE_NAME").equals("ITEM"))
                 {
@@ -229,6 +232,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             }
             assertEquals(6, foundItem);
 
+            // Table finally loaded fully should mean that index is okay on first read.
             VoltTable indexStats =
                     client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
             System.out.println(indexStats);
@@ -378,7 +382,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         /*
          * Add a cluster configuration for sysprocs too
          */
-        config = new LocalCluster("sysproc-cluster.jar", TestSystemProcedureSuite.sites, TestSystemProcedureSuite.hosts, TestSystemProcedureSuite.kfactor,
+        config = new LocalCluster("sysproc-cluster.jar", TestSystemProcedureSuite.SITES, TestSystemProcedureSuite.HOSTS, TestSystemProcedureSuite.KFACTOR,
                                   BackendTarget.NATIVE_EE_JNI);
         ((LocalCluster) config).setHasLocalServer(hasLocalServer);
         boolean success = config.compile(project);

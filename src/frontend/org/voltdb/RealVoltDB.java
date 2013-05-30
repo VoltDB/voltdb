@@ -143,7 +143,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    private static final String m_defaultVersionString = "3.2.1";
+    private static final String m_defaultVersionString = "3.3";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
@@ -1328,7 +1328,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             try {
                 m_joinCoordinator.setClientInterface(m_clientInterfaces.get(0));
 
-                if (!m_joinCoordinator.startJoin(m_catalogContext.database, m_cartographer)) {
+                String clSnapshotPath = m_catalogContext.cluster.getLogconfig().get("log")
+                                                        .getInternalsnapshotpath();
+
+                if (!m_joinCoordinator.startJoin(m_catalogContext.database,
+                                                 m_cartographer,
+                                                 clSnapshotPath)) {
                     VoltDB.crashLocalVoltDB("Failed to join the cluster", true, null);
                 }
             } catch (Exception e) {

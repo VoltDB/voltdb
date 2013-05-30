@@ -65,7 +65,6 @@ public class TestJoinOrder extends PlannerTestCase {
     @Override
     protected void setUp() throws Exception {
         setupSchema(TestJoinOrder.class.getResource("testjoinorder-ddl.sql"), "testjoinorder", true);
-        forceReplication();
     }
 
     @Override

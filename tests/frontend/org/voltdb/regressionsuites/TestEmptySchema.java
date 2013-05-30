@@ -25,10 +25,13 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
+
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.Client;
 import org.voltdb.compiler.VoltProjectBuilder;
 
@@ -44,13 +47,63 @@ public class TestEmptySchema extends RegressionSuite
         return builder;
     }
 
+    void validateSchema(VoltTable result, VoltTable expected)
+    {
+        assertEquals(expected.getColumnCount(), result.getColumnCount());
+        for (int i = 0; i < result.getColumnCount(); i++) {
+            assertEquals("Failed name column: " + i, expected.getColumnName(i), result.getColumnName(i));
+            assertEquals("Failed type column: " + i, expected.getColumnType(i), result.getColumnType(i));
+        }
+    }
+
     public void testEmptySchema() throws Exception {
         final Client client = getClient();
+        // sleep a little so that we have time for the IPC backend to actually be running
+        // so it can screw us on empty results
+        Thread.sleep(1000);
 
         // Even running should be an improvement (ENG-4645), but do something just to be sure
+        // Also, check to be sure we get a full schema for the table and index stats
+        ColumnInfo[] expectedSchema = new ColumnInfo[11];
+        expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
+        expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
+        expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
+        expectedSchema[3] = new ColumnInfo("SITE_ID", VoltType.INTEGER);
+        expectedSchema[4] = new ColumnInfo("PARTITION_ID", VoltType.BIGINT);
+        expectedSchema[5] = new ColumnInfo("TABLE_NAME", VoltType.STRING);
+        expectedSchema[6] = new ColumnInfo("TABLE_TYPE", VoltType.STRING);
+        expectedSchema[7] = new ColumnInfo("TUPLE_COUNT", VoltType.BIGINT);
+        expectedSchema[8] = new ColumnInfo("TUPLE_ALLOCATED_MEMORY", VoltType.INTEGER);
+        expectedSchema[9] = new ColumnInfo("TUPLE_DATA_MEMORY", VoltType.INTEGER);
+        expectedSchema[10] = new ColumnInfo("STRING_DATA_MEMORY", VoltType.INTEGER);
+        VoltTable expectedTable = new VoltTable(expectedSchema);
+
         VoltTable[] results = client.callProcedure("@Statistics", "TABLE", 0).getResults();
-        System.out.println("RESULTS: " + results[0]);
+        System.out.println("TABLE RESULTS: " + results[0]);
         assertEquals(0, results[0].getRowCount());
+        assertEquals(11, results[0].getColumnCount());
+        validateSchema(results[0], expectedTable);
+
+        expectedSchema = new ColumnInfo[12];
+        expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
+        expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
+        expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
+        expectedSchema[3] = new ColumnInfo("SITE_ID", VoltType.INTEGER);
+        expectedSchema[4] = new ColumnInfo("PARTITION_ID", VoltType.BIGINT);
+        expectedSchema[5] = new ColumnInfo("INDEX_NAME", VoltType.STRING);
+        expectedSchema[6] = new ColumnInfo("TABLE_NAME", VoltType.STRING);
+        expectedSchema[7] = new ColumnInfo("INDEX_TYPE", VoltType.STRING);
+        expectedSchema[8] = new ColumnInfo("IS_UNIQUE", VoltType.TINYINT);
+        expectedSchema[9] = new ColumnInfo("IS_COUNTABLE", VoltType.TINYINT);
+        expectedSchema[10] = new ColumnInfo("ENTRY_COUNT", VoltType.BIGINT);
+        expectedSchema[11] = new ColumnInfo("MEMORY_ESTIMATE", VoltType.INTEGER);
+        expectedTable = new VoltTable(expectedSchema);
+
+        results = client.callProcedure("@Statistics", "INDEX", 0).getResults();
+        System.out.println("INDEX RESULTS: " + results[0]);
+        assertEquals(0, results[0].getRowCount());
+        assertEquals(12, results[0].getColumnCount());
+        validateSchema(results[0], expectedTable);
     }
 
     static public Test suite() throws IOException {

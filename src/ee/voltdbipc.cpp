@@ -889,13 +889,19 @@ void VoltDBIPC::getStats(struct ipc_command *cmd) {
 
         // write the results array back across the wire
         const int8_t successResult = kErrorCode_Success;
-        if (result == 1) {
+        if (result == 0 || result == 1) {
             writeOrDie(m_fd, (const unsigned char*)&successResult, sizeof(int8_t));
 
-            // write the dependency tables back across the wire
-            // the result set includes the total serialization size
-            const int32_t size = m_engine->getResultsSize();
-            writeOrDie(m_fd, (unsigned char*)(m_engine->getReusedResultBuffer()), size);
+            if (result == 1) {
+                const int32_t size = m_engine->getResultsSize();
+                // write the dependency tables back across the wire
+                // the result set includes the total serialization size
+                writeOrDie(m_fd, (unsigned char*)(m_engine->getReusedResultBuffer()), size);
+            }
+            else {
+                int32_t zero = 0;
+                writeOrDie(m_fd, (const unsigned char*)&zero, sizeof(int32_t));
+            }
         } else {
             sendException(kErrorCode_Error);
         }

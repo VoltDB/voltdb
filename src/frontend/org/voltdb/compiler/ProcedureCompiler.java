@@ -526,7 +526,7 @@ public abstract class ProcedureCompiler {
         }
 
         // put the compiled code for this procedure into the jarfile
-        VoltCompiler.addClassToJar(procClass, compiler);
+        compiler.addClassToJar(procClass);
     }
 
     static void compileSingleStmtProcedure(VoltCompiler compiler, HSQLInterface hsql,

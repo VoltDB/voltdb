@@ -142,6 +142,11 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         } catch (InterruptedException e) {
             VoltDB.crashLocalVoltDB("Interrupted while deserializing a parameter set", false, e);
         } catch (ExecutionException e) {
+            // Don't rethrow Errors as RuntimeExceptions because we will eat their
+            // delicious goodness later
+            if (e.getCause() != null && e.getCause() instanceof Error) {
+                throw (Error)e.getCause();
+            }
             throw new RuntimeException(e);
         }
         return null;

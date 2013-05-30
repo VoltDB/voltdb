@@ -29,8 +29,8 @@ public class TestColumnTrimmingPlans extends PlannerTestCase
     @Override
     protected void setUp() throws Exception {
         boolean planForSinglePartition = true;
-        setupSchema(TestColumnTrimmingPlans.class.getResource("testplans-trimming-ddl.sql"), "testtrimmingplans", planForSinglePartition);
-        forceHackPartitioning();
+        setupSchema(TestColumnTrimmingPlans.class.getResource("testplans-trimming-ddl.sql"),
+                    "testtrimmingplans", planForSinglePartition);
     }
 
     @Override

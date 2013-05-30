@@ -77,7 +77,7 @@ public class LocalCluster implements VoltServerConfig {
     int m_hostCount;
     int m_kfactor = 0;
     boolean m_enableIv2 = false;
-    protected final BackendTarget m_target;
+    protected BackendTarget m_target;
     protected String m_jarFileName;
     boolean m_running = false;
     private final boolean m_debug;
@@ -240,6 +240,7 @@ public class LocalCluster implements VoltServerConfig {
      */
     public void overrideAnyRequestForValgrind() {
         if (templateCmdLine.m_backend == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
+            m_target = BackendTarget.NATIVE_EE_JNI;
             templateCmdLine.m_backend = BackendTarget.NATIVE_EE_JNI;
         }
     }

@@ -18,8 +18,10 @@
 package org.voltdb.sysprocs.saverestore;
 
 import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSortedMap;
+import com.google.common.collect.Multimap;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -34,33 +36,53 @@ import java.util.Map;
 import java.util.SortedMap;
 
 public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
-    // src -> (dest1, dest2,...)
-    public final Map<Long, Collection<Long>> streamPairs;
-    // partitions with the ranges each partition has
-    public final Map<Integer, SortedMap<Long, Long>> partitionsToAdd;
+
+    /**
+     * Represents a stream in the snapshot. A stream has its own stream pairs,
+     * may or may not specify a partition to add and the hash ranges that partition owns.
+     *
+     * A single snapshot can contain multiple streams.
+     */
+    public static class Stream {
+        // src -> (dest1, dest2,...)
+        public final Multimap<Long, Long> streamPairs;
+        // the partition the ranges associate to
+        public final Integer partition;
+        // partitions with the ranges each partition has
+        public final SortedMap<Long, Long> ranges;
+
+        public Stream(Multimap<Long, Long> streamPairs, Integer partition, Map<Long, Long> ranges)
+        {
+            this.streamPairs = ImmutableMultimap.copyOf(streamPairs);
+
+            if (partition == null || ranges == null) {
+                this.partition = null;
+                this.ranges = null;
+            } else {
+                this.partition = partition;
+                this.ranges = ImmutableSortedMap.copyOf(ranges);
+            }
+        }
+    }
+
+    // stream configs
+    public final List<Stream> streams;
+    // true to also do a truncation snapshot
+    public final boolean shouldTruncate;
 
     /**
      * @param tables             See {@link #SnapshotRequestConfig(java.util.List)} for more
-     * @param streamPairs        This cannot be null for stream snapshot
-     * @param partitionsToAdd
+     * @param streams            Stream configurations
+     * @param shouldTruncate     true to also generate a truncation snapshot
      */
     public StreamSnapshotRequestConfig(List<Table> tables,
-                                       Map<Long, Collection<Long>> streamPairs,
-                                       Map<Integer, Map<Long, Long>> partitionsToAdd)
+                                       List<Stream> streams,
+                                       boolean shouldTruncate)
     {
         super(tables);
 
-        this.streamPairs = ImmutableMap.copyOf(streamPairs);
-
-        if (partitionsToAdd == null) {
-            this.partitionsToAdd = null;
-        } else {
-            ImmutableMap.Builder<Integer, SortedMap<Long, Long>> builder = ImmutableMap.builder();
-            for (Map.Entry<Integer, Map<Long, Long>> entry : partitionsToAdd.entrySet()) {
-                builder.put(entry.getKey(), ImmutableSortedMap.copyOf(entry.getValue()));
-            }
-            this.partitionsToAdd = builder.build();
-        }
+        this.streams = ImmutableList.copyOf(streams);
+        this.shouldTruncate = shouldTruncate;
     }
 
     public StreamSnapshotRequestConfig(JSONObject jsData,
@@ -69,56 +91,65 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
     {
         super(jsData, catalogDatabase);
 
-        streamPairs = ImmutableMap.copyOf(parseStreamPairs(jsData, localHSIds));
-        partitionsToAdd = parsePostSnapshotTasks(jsData);
+        this.streams = parseStreams(jsData, localHSIds);
+        this.shouldTruncate = jsData.optBoolean("shouldTruncate", false);
     }
 
-    private Map<Integer, SortedMap<Long, Long>> parsePostSnapshotTasks(JSONObject jsData)
+    private ImmutableList<Stream> parseStreams(JSONObject jsData,
+                                               Collection<Long> localHSIds)
     {
-        ImmutableMap.Builder<Integer, SortedMap<Long, Long>> partitionBuilder =
-            ImmutableMap.builder();
+        ImmutableList.Builder<Stream> builder = ImmutableList.builder();
 
+        try {
+            JSONArray streamArray = jsData.getJSONArray("streams");
+
+            for (int i = 0; i < streamArray.length(); i++) {
+                JSONObject streamObj = streamArray.getJSONObject(i);
+
+                Stream config = new Stream(parseStreamPairs(streamObj, localHSIds),
+                                           streamObj.optInt("partition"),
+                                           parsePostSnapshotTasks(streamObj));
+
+                builder.add(config);
+            }
+        } catch (JSONException e) {
+            SNAP_LOG.warn("Failed to parse stream snapshot request config", e);
+        }
+
+        return builder.build();
+    }
+
+    private SortedMap<Long, Long> parsePostSnapshotTasks(JSONObject jsData)
+    {
         if (jsData != null) {
             try {
                 JSONObject cts = jsData.optJSONObject("postSnapshotTasks");
                 if (cts != null) {
-                    Iterator taskNames = cts.keys();
-                    while (taskNames.hasNext()) {
-                        String taskName = (String) taskNames.next();
-                        if (taskName.equalsIgnoreCase("addPartitions")) {
-                            // Get the set of new partitions to add
-                            JSONObject newPartitionsObj = cts.getJSONObject(taskName);
-                            Iterator partitionKey = newPartitionsObj.keys();
-                            while (partitionKey.hasNext()) {
-                                String partitionStr = (String) partitionKey.next();
-                                int partition = Integer.parseInt(partitionStr);
-                                JSONObject rangeObj = newPartitionsObj.getJSONObject(partitionStr);
-                                Iterator rangeKey = rangeObj.keys();
+                    // Get the set of new partitions to add
+                    JSONObject rangeObj = cts.getJSONObject("ranges");
+                    Iterator rangeKey = rangeObj.keys();
 
-                                ImmutableSortedMap.Builder<Long, Long> rangeBuilder =
-                                    ImmutableSortedMap.naturalOrder();
-                                while (rangeKey.hasNext()) {
-                                    String rangeStartStr = (String) rangeKey.next();
-                                    long rangeStart = Long.parseLong(rangeStartStr);
-                                    long rangeEnd = rangeObj.getLong(rangeStartStr);
-                                    rangeBuilder.put(rangeStart, rangeEnd);
-                                }
-
-                                partitionBuilder.put(partition, rangeBuilder.build());
-                            }
-                        }
+                    ImmutableSortedMap.Builder<Long, Long> rangeBuilder =
+                        ImmutableSortedMap.naturalOrder();
+                    while (rangeKey.hasNext()) {
+                        String rangeStartStr = (String) rangeKey.next();
+                        long rangeStart = Long.parseLong(rangeStartStr);
+                        long rangeEnd = rangeObj.getLong(rangeStartStr);
+                        rangeBuilder.put(rangeStart, rangeEnd);
                     }
+
+                    return rangeBuilder.build();
                 }
             } catch (JSONException e) {
                 SNAP_LOG.warn("Failed to parse completion task information", e);
             }
         }
 
-        return partitionBuilder.build();
+        return null;
     }
 
-    private static Map<Long, Collection<Long>> parseStreamPairs(JSONObject jsData,
-                                                                Collection<Long> localHSIds)
+    private static Multimap<Long, Long> parseStreamPairs(JSONObject jsData,
+                                                         Collection<Long> localHSIds)
     {
         ArrayListMultimap<Long, Long> streamPairs = ArrayListMultimap.create();
 
@@ -145,7 +176,7 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
             }
         }
 
-        return streamPairs.asMap();
+        return streamPairs;
     }
 
     @Override
@@ -153,31 +184,37 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
     {
         super.toJSONString(stringer);
 
-        stringer.key("streamPairs").object();
-        for (Map.Entry<Long, Collection<Long>> entry : streamPairs.entrySet()) {
-            stringer.key(Long.toString(entry.getKey())).array();
-            for (long destHSId : entry.getValue()) {
-                stringer.value(destHSId);
+        stringer.key("shouldTruncate").value(shouldTruncate);
+        stringer.key("streams").array();
+
+        for (Stream stream : streams) {
+            stringer.object();
+
+            stringer.key("partition").value(stream.partition);
+
+            stringer.key("streamPairs").object();
+            for (Map.Entry<Long, Collection<Long>> entry : stream.streamPairs.asMap().entrySet()) {
+                stringer.key(Long.toString(entry.getKey())).array();
+                for (long destHSId : entry.getValue()) {
+                    stringer.value(destHSId);
+                }
+                stringer.endArray();
             }
-            stringer.endArray();
-        }
-        stringer.endObject();
+            stringer.endObject();
 
-        stringer.key("postSnapshotTasks").object();
-        if (partitionsToAdd != null && !partitionsToAdd.isEmpty()) {
-            stringer.key("addPartitions").object();
-            for (Map.Entry<Integer, SortedMap<Long, Long>> entry : partitionsToAdd.entrySet()) {
-                int partition = entry.getKey();
-                Map<Long, Long> ranges = entry.getValue();
-
-                stringer.key(Integer.toString(partition)).object();
-                for (Map.Entry<Long, Long> rangeEntry : ranges.entrySet()) {
+            if (stream.ranges != null && !stream.ranges.isEmpty()) {
+                stringer.key("postSnapshotTasks").object();
+                stringer.key("ranges").object();
+                for (Map.Entry<Long, Long> rangeEntry : stream.ranges.entrySet()) {
                     stringer.key(rangeEntry.getKey().toString()).value(rangeEntry.getValue());
                 }
                 stringer.endObject();
+                stringer.endObject();
             }
+
             stringer.endObject();
         }
-        stringer.endObject();
+
+        stringer.endArray();
     }
 }

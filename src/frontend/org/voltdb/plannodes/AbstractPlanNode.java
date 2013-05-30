@@ -73,6 +73,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     // TODO: planner accesses this data directly. Should be protected.
     protected List<ScalarValueHints> m_outputColumnHints = new ArrayList<ScalarValueHints>();
     protected long m_estimatedOutputTupleCount = 0;
+    protected long m_estimatedProcessedTupleCount = 0;
+    protected boolean m_hasComputedEstimates = false;
 
     // The output schema for this node
     protected boolean m_hasSignificantOutputSchema;
@@ -112,6 +114,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         copy.m_hasSignificantOutputSchema = m_hasSignificantOutputSchema;
         copy.m_outputColumnHints = m_outputColumnHints;
         copy.m_estimatedOutputTupleCount = m_estimatedOutputTupleCount;
+        copy.m_estimatedProcessedTupleCount = m_estimatedProcessedTupleCount;
 
         // clone is not yet implemented for every node.
         assert(m_inlineNodes.size() == 0);
@@ -263,20 +266,64 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         return getPlanNodeType() + "[" + m_id + "]";
     }
 
-    public void computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
-        assert(estimates != null);
+    /**
+     * Called to compute cost estimates and statistics on a plan graph. Computing of the costs
+     * should be idempotent, but updating the PlanStatistics instance isn't, so this should
+     * be called once per finished graph, and once per PlanStatistics instance.
+     */
+    public final void computeEstimatesRecursively(PlanStatistics stats,
+                                                  Cluster cluster,
+                                                  Database db,
+                                                  DatabaseEstimates estimates,
+                                                  ScalarValueHints[] paramHints)
+    {
+        assert(stats != null);
 
         m_outputColumnHints.clear();
         m_estimatedOutputTupleCount = 0;
 
         // recursively compute and collect stats from children
+        long childOutputTupleCountEstimate = 0;
         for (AbstractPlanNode child : m_children) {
             child.computeEstimatesRecursively(stats, cluster, db, estimates, paramHints);
             m_outputColumnHints.addAll(child.m_outputColumnHints);
-            m_estimatedOutputTupleCount += child.m_estimatedOutputTupleCount;
-
-            stats.incrementStatistic(0, StatsField.TUPLES_READ, m_estimatedOutputTupleCount);
+            childOutputTupleCountEstimate += child.m_estimatedOutputTupleCount;
         }
+
+        // make sure any inlined scans (for NLIJ mostly) are costed as well
+        for (Entry<PlanNodeType, AbstractPlanNode> entry : m_inlineNodes.entrySet()) {
+            AbstractPlanNode inlineNode = entry.getValue();
+            if (inlineNode instanceof AbstractScanPlanNode) {
+                inlineNode.computeCostEstimates(0, cluster, db, estimates, paramHints);
+            }
+        }
+
+        computeCostEstimates(childOutputTupleCountEstimate, cluster, db, estimates, paramHints);
+        stats.incrementStatistic(0, StatsField.TUPLES_READ, m_estimatedProcessedTupleCount);
+    }
+
+    /**
+     * Given the number of tuples expected as input to this node, compute an estimate
+     * of the number of tuples read/processed and the number of tuples output.
+     * This will be called by
+     * {@see AbstractPlanNode#computeEstimatesRecursively(PlanStatistics, Cluster, Database, DatabaseEstimates, ScalarValueHints[])}.
+     */
+    protected void computeCostEstimates(long childOutputTupleCountEstimate,
+                                        Cluster cluster,
+                                        Database db,
+                                        DatabaseEstimates estimates,
+                                        ScalarValueHints[] paramHints)
+    {
+        m_estimatedOutputTupleCount = childOutputTupleCountEstimate;
+        m_estimatedProcessedTupleCount = childOutputTupleCountEstimate;
+    }
+
+    public long getEstimatedOutputTupleCount() {
+        return m_estimatedOutputTupleCount;
+    }
+
+    public long getEstimatedProcessedTupleCount() {
+        return m_estimatedProcessedTupleCount;
     }
 
     /**
