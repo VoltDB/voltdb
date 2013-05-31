@@ -49,8 +49,11 @@ class G:
     """
     script = os.path.realpath(sys.argv[0])
     script_dir, script_name = os.path.split(script)
+    base_dir = os.path.dirname(script_dir)
     log_path = os.path.join(script_dir, '%s.log' % script_name)
     module_path = os.path.realpath(__file__)
+    virtualenv = os.path.join(base_dir, 'third_party', 'python', 'virtualenv-1.9.1')
+    virtualenv_module = os.path.join(virtualenv, 'virtualenv.py')
     # Opened by main() and vmain()
     log_file = None
     verbose = False
@@ -137,13 +140,22 @@ def vmain(description='(no description)', standalone=False, directory='', packag
             info('Creating virtual environment "%s" ...' % venv_dir)
             os.makedirs(venv_base)
         if not os.path.isdir(venv_dir):
-            virtualenv = find_in_path('virtualenv', required=True)
+            # Prefer to use the system virtualenv, but fall back to the third_party copy.
+            virtualenv = find_in_path('virtualenv', required=False)
+            if virtualenv:
+                args = [virtualenv]
+            else:
+                info('Running local virtualenv: %s' % G.virtualenv_module)
+                if not os.path.exists(G.virtualenv_module):
+                    abort('virtualenv is missing.', 'See https://pypi.python.org/pypi/virtualenv.')
+                args = ['python', G.virtualenv_module]
             pip = os.path.join(venv_dir, 'bin', 'pip')
             save_dir = os.getcwd()
             try:
                 os.chdir(venv_base)
                 info('Initializing Python virtual environment ...')
-                run_cmd(virtualenv, '--clear', '--system-site-packages', sys.platform)
+                args += ['--clear', '--system-site-packages', sys.platform]
+                run_cmd(*args)
                 if packages:
                     for package in packages:
                         info('Installing package "%s" into virtual environment ...' % package)
