@@ -167,49 +167,31 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
              * persistent table.
              */
             if (m_tuplesRemaining > 0) {
-#ifdef DEBUG
-                throwFatalException("serializeMore(): tuple count > 0 after streaming:\n"
-                                    "Table name: %s\n"
-                                    "Table type: %s\n"
-                                    "Original tuple count: %jd\n"
-                                    "Active tuple count: %jd\n"
-                                    "Remaining tuple count: %jd\n"
-                                    "Compacted block count: %jd\n"
-                                    "Dirty insert count: %jd\n"
-                                    "Dirty update count: %jd\n"
-                                    "Partition column: %d\n",
-                                    table.name().c_str(),
-                                    table.tableType().c_str(),
-                                    (intmax_t)m_totalTuples,
-                                    (intmax_t)table.activeTupleCount(),
-                                    (intmax_t)m_tuplesRemaining,
-                                    (intmax_t)m_blocksCompacted,
-                                    (intmax_t)m_inserts,
-                                    (intmax_t)m_updates,
-                                    table.partitionColumn());
-#else
                 char message[1024 * 16];
                 snprintf(message, 1024 * 16,
-                        "serializeMore(): tuple count > 0 after streaming:\n"
-                        "Table name: %s\n"
-                        "Table type: %s\n"
-                        "Original tuple count: %jd\n"
-                        "Active tuple count: %jd\n"
-                        "Remaining tuple count: %jd\n"
-                        "Compacted block count: %jd\n"
-                        "Dirty insert count: %jd\n"
-                        "Dirty update count: %jd\n"
-                        "Partition column: %d\n",
-                        m_table.name().c_str(),
-                        m_table.tableType().c_str(),
-                        (intmax_t)m_totalTuples,
-                        (intmax_t)m_table.activeTupleCount(),
-                        (intmax_t)m_tuplesRemaining,
-                        (intmax_t)m_blocksCompacted,
-                        (intmax_t)m_inserts,
-                        (intmax_t)m_updates,
-                        m_table.partitionColumn());
-             LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, message);
+                         "serializeMore(): tuple count > 0 after streaming:\n"
+                         "Table name: %s\n"
+                         "Table type: %s\n"
+                         "Original tuple count: %jd\n"
+                         "Active tuple count: %jd\n"
+                         "Remaining tuple count: %jd\n"
+                         "Compacted block count: %jd\n"
+                         "Dirty insert count: %jd\n"
+                         "Dirty update count: %jd\n"
+                         "Partition column: %d\n",
+                         table.name().c_str(),
+                         table.tableType().c_str(),
+                         (intmax_t)m_totalTuples,
+                         (intmax_t)table.activeTupleCount(),
+                         (intmax_t)m_tuplesRemaining,
+                         (intmax_t)m_blocksCompacted,
+                         (intmax_t)m_inserts,
+                         (intmax_t)m_updates,
+                         table.partitionColumn());
+#ifdef DEBUG
+                throwFatalException(message);
+#else
+                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, message);
 #endif
             }
             // -1 is used for tests when we don't bother counting. Need to force it to 0 here.
