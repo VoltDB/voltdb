@@ -21,6 +21,7 @@ import org.voltcore.utils.CoreUtils;
 
 public enum OpsSelector {
     // IZZY: UNMAGIC ME
+    SNAPSHOTDELETE(SnapshotDeleteAgent.class, -8),
     SNAPSHOTSCAN(SnapshotScanAgent.class, -7),
     STATISTICS(StatsAgent.class, HostMessenger.STATS_SITE_ID),
     SYSTEMCATALOG(SystemCatalogAgent.class, HostMessenger.SYSCATALOG_SITE_ID),
