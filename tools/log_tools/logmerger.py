@@ -50,6 +50,8 @@ def decorated_log_split(f, offset, keyfunc, fnamedict = {}):
                              \s+
                              (?P<message>.*)
                              ''' % ts_format, re.VERBOSE)
+    new_epoch_ms = None
+
     if hasattr(f, 'name'):
         fname = os.path.basename(f.name)
     else:
@@ -80,6 +82,10 @@ def decorated_log_split(f, offset, keyfunc, fnamedict = {}):
         else:
             if "message" in currentdict:
                 currentdict["message"] += line
+
+    if not new_epoch_ms:
+        sys.stderr.write("Entry in %s had no valid timestamp" % f.name)
+        sys.stderr.write("    %s" % line)
     yield (new_epoch_ms, currentdict)
 
 def exclude_callback(option, opt_str, value, parser):
@@ -131,7 +137,7 @@ class ApprunnerTarFile():
         patterns = [
             'apprunner.log',           #apprunner logging
             '\.Benchmark\.',           #client benchmark
-            'VoltDBReplicationAgent',  #dragent
+            'VoltDBReplicationAgent\.(?!jstack)',  #dragent
             #'stdout.txt$',            #VEM
             ]
         pat = '|'.join(patterns)
