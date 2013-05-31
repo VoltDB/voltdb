@@ -38,8 +38,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google.common.collect.ListMultimap;
-import com.google.common.util.concurrent.Futures;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -56,11 +54,13 @@ import org.voltdb.iv2.SnapshotTask;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.MiscUtils;
 
+import com.google.common.collect.ListMultimap;
 import com.google.common.util.concurrent.Callables;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
-import org.voltdb.utils.MiscUtils;
 
 /**
  * Encapsulates the state needed to manage an ongoing snapshot at the
@@ -446,11 +446,11 @@ public class SnapshotSiteProcessor {
             if (tableAndPredicate == null) {
                 // TODO: m_deleteTuples needs to be per-target
                 tableAndPredicate =
-                    Pair.of(task.m_table, new SnapshotPredicates(task.m_deleteTuples));
+                    Pair.of(task.m_table, new SnapshotPredicates());
                 tablesAndPredicates.put(task.m_table.getRelativeIndex(), tableAndPredicate);
             }
 
-            tableAndPredicate.getSecond().addPredicate(task.m_predicate);
+            tableAndPredicate.getSecond().addPredicate(task.m_predicate, task.m_deleteTuples);
         }
 
         return tablesAndPredicates;
