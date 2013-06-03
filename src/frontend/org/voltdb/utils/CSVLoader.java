@@ -36,6 +36,7 @@ import org.supercsv.exception.SuperCsvException;
 import org.supercsv.io.CsvListReader;
 import org.supercsv.io.ICsvListReader;
 import org.supercsv.prefs.CsvPreference;
+import org.tokenizer.Tokenizer;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
@@ -213,12 +214,19 @@ public class CSVLoader {
 
         config = cfg;
         configuration();
+        Tokenizer tokenizer = null;
         ICsvListReader listReader = null;
         try {
-            if (CSVLoader.standin)
-                listReader = new CsvListReader(new BufferedReader( new InputStreamReader(System.in)), csvPreference);
-            else
-                listReader = new CsvListReader(new FileReader(config.file), csvPreference);
+            if (CSVLoader.standin) {
+                tokenizer = new Tokenizer(new BufferedReader( new InputStreamReader(System.in)), csvPreference,
+                                                              config.strictquotes, config.escape, config.columnsizelimit) ;
+                listReader = new CsvListReader(tokenizer, csvPreference);
+            }
+            else {
+                tokenizer = new Tokenizer(new FileReader(config.file), csvPreference,
+                        config.strictquotes, config.escape, config.columnsizelimit) ;
+                listReader = new CsvListReader(tokenizer, csvPreference);
+            }
         } catch (FileNotFoundException e) {
             m_log.error("CSV file '" + config.file + "' could not be found.");
             System.exit(-1);
@@ -273,8 +281,8 @@ public class CSVLoader {
                 System.exit(-1);
             }
 
-            List<String> lineList = null;
-            while ((config.limitrows-- > 0) && !listReader.isEOF() ) {
+            List<String> lineList = new ArrayList<String>();
+            while ((config.limitrows-- > 0) && lineList != null ) {
             try{
                                 while( listReader.getLineNumber() < config.skip )
                                         lineList = listReader.read();
@@ -389,10 +397,7 @@ public class CSVLoader {
     }
 
     private static void configuration() {
-        csvPreference = new CsvPreference.Builder(config.quotechar, config.separator, "\n").
-                        useStrictQuotes(config.strictquotes).
-                        useEscapeChar(config.escape).
-                        setColumnLimitSize(config.columnsizelimit).build();
+        csvPreference = new CsvPreference.Builder(config.quotechar, config.separator, "\n").build();
         if (config.file.equals(""))
             standin = true;
         if (!config.table.equals("")) {
