@@ -61,8 +61,7 @@ CopyOnWriteContext::CopyOnWriteContext(
         TupleSerializer &serializer,
         int32_t partitionId,
         const std::vector<std::string> &predicateStrings,
-        int64_t totalTuples,
-        bool doDelete) :
+        int64_t totalTuples) :
              m_table(table),
              m_backedUpTuples(TableFactory::getCopiedTempTable(table.databaseId(),
                                                                "COW of " + table.name(),
@@ -80,14 +79,13 @@ CopyOnWriteContext::CopyOnWriteContext(
              m_blocksCompacted(0),
              m_serializationBatches(0),
              m_inserts(0),
-             m_updates(0),
-             m_doDelete(doDelete)
+             m_updates(0)
 {
     // Parse predicate strings. The factory type determines the kind of
     // predicates that get generated.
     // Throws an exception to be handled by caller on errors.
     std::ostringstream errmsg;
-    if (!m_predicates.parseStrings(predicateStrings, errmsg)) {
+    if (!m_predicates.parseStrings(predicateStrings, errmsg, m_predicateDeleteFlags)) {
         throwFatalException("CopyOnWriteContext() failed to parse predicate strings.");
     }
 }
@@ -106,7 +104,7 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
     if (outputStreams.empty()) {
         throwFatalException("serializeMore() expects at least one output stream.");
     }
-    outputStreams.open(m_table, m_maxTupleLength, m_partitionId, m_predicates);
+    outputStreams.open(m_table, m_maxTupleLength, m_partitionId, m_predicates, m_predicateDeleteFlags);
 
     //=== Tuple processing loop
 
@@ -131,8 +129,8 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
              * Done if any of the buffers filled up.
              * The returned copy count helps decide when to delete if m_doDelete is true.
              */
-            int32_t numCopiesMade = 0;
-            yield = outputStreams.writeRow(m_serializer, tuple, numCopiesMade);
+            bool deleteTuple = false;
+            yield = outputStreams.writeRow(m_serializer, tuple, deleteTuple);
 
             /*
              * May want to delete tuple if processing the actual table.
@@ -154,7 +152,7 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
                  * This is used for Elastic rebalancing, which is wrapped in a transaction.
                  * The delete for undo is generic enough to support this operation.
                  */
-                else if (m_doDelete && numCopiesMade > 0) {
+                else if (deleteTuple) {
                     m_table.deleteTupleForUndo(tuple.address(), true);
                 }
             }
