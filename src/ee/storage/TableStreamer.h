@@ -124,9 +124,6 @@ private:
     /// Predicate strings.
     std::vector<std::string> m_predicateStrings;
 
-    /// True if rows should be deleted after streaming.
-    bool m_doDelete;
-
     /// Context to keep track of snapshot scans.
     boost::scoped_ptr<CopyOnWriteContext> m_COWContext;
 

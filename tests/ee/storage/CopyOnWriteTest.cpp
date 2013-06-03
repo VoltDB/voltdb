@@ -413,9 +413,9 @@ TEST_F(CopyOnWriteTest, BigTest) {
             ASSERT_TRUE(inserted);
         }
 
-        char config[5];
-        ::memset(config, 0, 5);
-        ReferenceSerializeInput input(config, 5);
+        char config[4];
+        ::memset(config, 0, 4);
+        ReferenceSerializeInput input(config, 4);
 
         m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
 
@@ -479,9 +479,9 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
             ASSERT_TRUE(inserted);
         }
 
-        char config[5];
-        ::memset(config, 0, 5);
-        ReferenceSerializeInput input(config, 5);
+        char config[4];
+        ::memset(config, 0, 4);
+        ReferenceSerializeInput input(config, 4);
         m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
 
         stx::btree_set<int64_t> COWTuples;
@@ -545,9 +545,9 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
             ASSERT_TRUE(inserted);
         }
 
-        char config[5];
-        ::memset(config, 0, 5);
-        ReferenceSerializeInput input(config, 5);
+        char config[4];
+        ::memset(config, 0, 4);
+        ReferenceSerializeInput input(config, 4);
         m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
 
         stx::btree_set<int64_t> COWTuples;
@@ -735,7 +735,7 @@ public:
     // Work around unsupported modulus operator with other integer operators:
     //    Should be: result = (value % nparts) == ipart
     //  Work-around: result = (value - ((value / nparts) * nparts)) == ipart
-    std::string generatePredicateString(int32_t ipart) {
+    std::string generatePredicateString(int32_t ipart, bool deleteForPredicate) {
         std::string tblname = table.name();
         int colidx = table.partitionColumn();
         std::string colname = table.columnName(colidx);
@@ -755,7 +755,11 @@ public:
                        );
 
         std::ostringstream os;
-        json_spirit::write(json, os);
+
+        json_spirit::Object predicateStuff;
+        predicateStuff.push_back(json_spirit::Pair("triggersDelete", deleteForPredicate));
+        predicateStuff.push_back(json_spirit::Pair("predicateExpression", json));
+        json_spirit::write(predicateStuff, os);
         return os.str();
     }
 
@@ -809,16 +813,15 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
         for (int32_t i = 0; i < npartitions; i++) {
             buffers[i].reset(new char[BUFFER_SIZE]);
             if (i != skippedPartition) {
-                strings[i] = tool.generatePredicateString(i);
+                strings[i] = tool.generatePredicateString(i, doDelete);
             }
             else {
-                strings[i] = tool.generatePredicateString(-1);
+                strings[i] = tool.generatePredicateString(-1, doDelete);
             }
         }
 
         char buffer[1024 * 256];
         ReferenceSerializeOutput output(buffer, 1024 * 256);
-        output.writeByte((int8_t)(doDelete ? 1 : 0));
         output.writeInt(npartitions);
         for (std::vector<std::string>::iterator i = strings.begin(); i != strings.end(); i++) {
             output.writeTextString(*i);
