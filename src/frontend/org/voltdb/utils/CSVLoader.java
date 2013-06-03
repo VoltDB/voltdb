@@ -74,6 +74,15 @@ public class CSVLoader {
     private static Map<Long, String[]> errorInfo = new TreeMap<Long, String[]>();
     private static CsvPreference csvPreference = null;
 
+    public static final char DEFAULT_SEPARATOR = ',';
+    public static final char DEFAULT_QUOTE_CHARACTER = '\"';
+    public static final char DEFAULT_ESCAPE_CHARACTER = '\\';
+    public static final boolean DEFAULT_STRICT_QUOTES = false;
+    public static final int DEFAULT_SKIP_LINES = 0;
+    public static final boolean DEFAULT_NO_WHITESPACE = false;
+    public static final int DEFAULT_COLUMN_LIMIT_SIZE = 16*1024*1024;
+
+
     private static Map <VoltType, String> blankValues = new HashMap<VoltType, String>();
     static {
         blankValues.put(VoltType.NUMERIC, "0");
@@ -137,25 +146,25 @@ public class CSVLoader {
         String blank = "error";
 
         @Option(desc = "delimiter to use for separating entries")
-        char separator = ',';
+        char separator = DEFAULT_SEPARATOR;
 
         @Option(desc = "character to use for quoted elements (default: \")")
-        char quotechar = '\"';
+        char quotechar = DEFAULT_QUOTE_CHARACTER;
 
         @Option(desc = "character to use for escaping a separator or quote (default: \\)")
-        char escape = '\\';
+        char escape = DEFAULT_ESCAPE_CHARACTER;
 
         @Option(desc = "require all input values to be enclosed in quotation marks", hasArg = false)
-        boolean strictquotes = false;
+        boolean strictquotes = DEFAULT_STRICT_QUOTES;
 
         @Option(desc = "number of lines to skip before inserting rows into the database")
-        int skip = 0;
+        int skip = DEFAULT_SKIP_LINES;
 
         @Option(desc = "do not allow whitespace between values and separators", hasArg = false)
-        boolean nowhitespace = false;
+        boolean nowhitespace = DEFAULT_NO_WHITESPACE;
 
         @Option(desc = "max size of a column (default: 16*1024*1024(Bytes))")
-        int columnsizelimit = 16*1024*1024;
+        int columnsizelimit = DEFAULT_COLUMN_LIMIT_SIZE;
 
         @Option(shortOpt = "s", desc = "list of servers to connect to (default: localhost)")
         String servers = "localhost";
@@ -231,7 +240,7 @@ public class CSVLoader {
             m_log.error("CSV file '" + config.file + "' could not be found.");
             System.exit(-1);
         }
-        assert(listReader != null);
+
         // Split server list
         String[] serverlist = config.servers.split(",");
 
@@ -367,30 +376,33 @@ public class CSVLoader {
                     + " found, " + columnCnt + " expected.";
         }
         for (int i = 0; i < slot.length; i++) {
+                Object thisSlot = slot[i];
                 //supercsv read "" to null
-                if( slot[i] == null )
+                if( thisSlot == null )
                 {
                         if(config.blank.equalsIgnoreCase("error"))
                         {
                                 return "Error: blank item";
                         }
                 else if (config.blank.equalsIgnoreCase("empty"))
-                    slot[i] = blankValues.get(typeList.get(i));
+                    thisSlot = blankValues.get(typeList.get(i));
                         //else config.blank == null which is already the case
                 }
 
             // trim white space in this line. SuperCSV preserves all the whitespace by default
                 else
-                        {
-                                if( config.nowhitespace && ( slot[i].toString().charAt(0) == ' ' || slot[i].toString().charAt( slot[i].toString().length() - 1 ) == ' ')) {
+                    {
+                        String str = thisSlot.toString();
+                                if( config.nowhitespace &&
+                                        ( str.charAt(0) == ' ' || str.charAt( str.length() - 1 ) == ' ') ) {
                                         return "Error: White Space Detected in nowhitespace mode.";
                                 }
                                 else
-                                        slot[i] = ((String) slot[i]).trim();
+                                        thisSlot = ((String) thisSlot).trim();
                     // treat NULL, \N and "\N" as actual null value
-                                if ( (slot[i]).equals("NULL") || slot[i].equals(VoltTable.CSV_NULL)
-                                                || !config.strictquotes && slot[i].equals(VoltTable.QUOTED_CSV_NULL))
-                                        slot[i] = null;
+                                if ( thisSlot.equals("NULL") || thisSlot.equals(VoltTable.CSV_NULL)
+                                                || !config.strictquotes && thisSlot.equals(VoltTable.QUOTED_CSV_NULL))
+                                        thisSlot = null;
                     }
                 }
         return null;
