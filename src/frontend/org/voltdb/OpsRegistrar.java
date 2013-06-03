@@ -23,9 +23,16 @@ import java.util.Map.Entry;
 
 import org.voltcore.messaging.HostMessenger;
 
+/**
+ * This class centralizes construction of and access to much of the OpsAgent machinery.
+ */
 public class OpsRegistrar {
     private Map<OpsSelector, OpsAgent> m_agents;
 
+    /**
+     * Construct an OpsRegistrar.  Will iterate through the OpsSelectors and instantiate one
+     * instance of each OpsAgent for each selector.
+     */
     public OpsRegistrar() {
         m_agents = new HashMap<OpsSelector, OpsAgent>();
         for (OpsSelector selector : OpsSelector.values()) {
@@ -42,6 +49,11 @@ public class OpsRegistrar {
         }
     }
 
+    /**
+     * Register the local mailboxes for each local OpsAgent.  Needs to be separated from
+     * construction so that any additional operations to make the OpsAgent ready for access
+     * can take place before requests get routed to it (example: registerStatsSource for StatsAgent)
+     */
     public void registerMailboxes(HostMessenger messenger) {
         for (Entry<OpsSelector, OpsAgent> entry : m_agents.entrySet()) {
             entry.getValue().registerMailbox(messenger,
@@ -49,12 +61,19 @@ public class OpsRegistrar {
         }
     }
 
+    /**
+     * Return the OpsAgent for the specified selector.
+     */
     public OpsAgent getAgent(OpsSelector selector) {
         OpsAgent agent = m_agents.get(selector);
         assert (agent != null);
         return agent;
     }
 
+    /**
+     * Shutdown all the OpsAgent's executor services.  Should be possible
+     * to eventually consolidate all of them into a single executor service.
+     */
     public void shutdown() {
         for (Entry<OpsSelector, OpsAgent> entry : m_agents.entrySet()) {
             try {
