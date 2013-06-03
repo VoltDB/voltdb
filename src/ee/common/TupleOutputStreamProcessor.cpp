@@ -142,7 +142,7 @@ bool TupleOutputStreamProcessor::writeRow(TupleSerializer &tupleSerializer,
             if (!yield) {
                 // Yield when the buffer is not capable of handling another tuple
                 // or when the total bytes serialized threshold is exceeded.
-                yield = yield || (   !iter->canFit(m_maxTupleLength)
+                yield = (   !iter->canFit(m_maxTupleLength)
                          || iter->getTotalBytesSerialized() > m_bytesSerializedThreshold);
             }
         }
