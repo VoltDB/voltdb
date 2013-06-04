@@ -297,13 +297,12 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         assert(joinNode.m_rightNode != null);
         JoinNode leftNode = joinNode.m_leftNode;
         JoinNode rightNode = joinNode.m_rightNode;
-        assert(leftNode.m_joinType == JoinType.INNER || rightNode.m_joinType == JoinType.INNER);
         JoinNode innerNode = null;
-        if (rightNode.m_joinType == JoinType.LEFT || leftNode.m_joinType == JoinType.RIGHT) {
+        if (joinNode.m_joinType == JoinType.LEFT) {
             innerNode = rightNode;
-        } else if (rightNode.m_joinType == JoinType.RIGHT || leftNode.m_joinType == JoinType.LEFT) {
+        } else if (joinNode.m_joinType == JoinType.RIGHT) {
             innerNode = leftNode;
-        } else if (!(rightNode.m_joinType == JoinType.INNER && leftNode.m_joinType == JoinType.INNER)) {
+        } else if (joinNode.m_joinType == JoinType.FULL) {
             // Full joins are not supported
             assert(false);
         }
@@ -312,8 +311,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 if (innerNode.m_table != null) {
                     if (ExpressionUtil.isNullRejectingExpression(expr, innerNode.m_table.getTypeName())) {
                         // We are done at this level
-                        leftNode.m_joinType = JoinType.INNER;
-                        rightNode.m_joinType = JoinType.INNER;
+                        joinNode.m_joinType = JoinType.INNER;
                         break;
                     }
                 } else {
@@ -324,8 +322,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                     for (Table table : tables) {
                         if (ExpressionUtil.isNullRejectingExpression(expr, table.getTypeName())) {
                             // We are done at this level
-                            leftNode.m_joinType = JoinType.INNER;
-                            rightNode.m_joinType = JoinType.INNER;
+                            joinNode.m_joinType = JoinType.INNER;
                             rejectNull = true;
                             break;
                         }
@@ -442,13 +439,16 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 // This is the outer table which can have the naive access path and possible index path(s)
                 // Optimizations - outer-table-only where expressions can be pushed down to the child node
                 // to pre-qualify the outer tuples before they enter the join.
+                // For inner joins outer-table-only join expressions can be pushed down as well.
+                List<AbstractExpression> joinOuterList =  (parentNode.m_joinType == JoinType.INNER) ?
+                        parentNode.m_joinOuterList : null;
                 if (childNode.m_table != null) {
                     childNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(childNode.m_table,
-                                                                                  null,
+                                                                                  joinOuterList,
                                                                                   parentNode.m_whereOuterList,
                                                                                   null));
                 } else {
-                    childNode.m_accessPaths.add(getRelevantNaivePathForTable(null, parentNode.m_whereOuterList));
+                    childNode.m_accessPaths.add(getRelevantNaivePathForTable(joinOuterList, parentNode.m_whereOuterList));
                 }
             } else {
                 assert(parentNode.m_rightNode == childNode);
@@ -472,6 +472,13 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @return List of valid access paths
      */
     protected List<AccessPath> getRelevantAccessPathsForInnerNode(JoinNode joinNode, JoinNode innerNode) {
+        // In case of inner join WHERE and JOIN expressions can be merged
+        if (joinNode.m_joinType == JoinType.INNER) {
+            joinNode.m_joinInnerOuterList.addAll(joinNode.m_whereInnerOuterList);
+            joinNode.m_whereInnerOuterList.clear();
+            joinNode.m_joinInnerList.addAll(joinNode.m_whereInnerList);
+            joinNode.m_whereInnerList.clear();
+        }
         if (innerNode.m_table == null) {
             // The inner node is a join node itself. Only naive access path is possible
             ArrayList<AccessPath> accessPaths = new ArrayList<AccessPath>();
@@ -710,7 +717,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 hasInnerOuterIndexExpression(joinNode.m_joinInnerOuterList, innerAccessPath.otherExprs)) {
             NestLoopIndexPlanNode nlijNode = new NestLoopIndexPlanNode();
 
-            nlijNode.setJoinType(joinNode.m_rightNode.m_joinType);
+            nlijNode.setJoinType(joinNode.m_joinType);
 
             @SuppressWarnings("unused")
             IndexScanPlanNode innerNode = (IndexScanPlanNode) innerPlan;
@@ -740,7 +747,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             }
             NestLoopPlanNode nljNode = new NestLoopPlanNode();
             nljNode.setJoinPredicate(ExpressionUtil.combine(joinClauses));
-            nljNode.setJoinType(joinNode.m_rightNode.m_joinType);
+            nljNode.setJoinType(joinNode.m_joinType);
 
             // combine the tails plan graph with the new head node
             nljNode.addAndLinkChild(outerPlan);
@@ -752,13 +759,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             retval = nljNode;
         }
 
-        if ((joinNode.m_joinOuterList != null) && ! joinNode.m_joinOuterList.isEmpty()) {
-            retval.setPreJoinPredicate(ExpressionUtil.combine(joinNode.m_joinOuterList));
-        }
+        retval.setPreJoinPredicate(ExpressionUtil.combine(joinNode.m_joinOuterList));
 
-        if ((whereClauses != null) && ! whereClauses.isEmpty()) {
-            retval.setWherePredicate(ExpressionUtil.combine(whereClauses));
-        }
+        retval.setWherePredicate(ExpressionUtil.combine(whereClauses));
+
         return retval;
     }
 

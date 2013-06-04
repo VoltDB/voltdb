@@ -76,8 +76,6 @@ public class JoinTree {
         public AbstractExpression m_joinExpr = null;
         // Additional filter expression (WHERE) associated with this node
         public AbstractExpression m_whereExpr = null;
-        // True if either all children are replicated or table is replicated. False otherwise
-        boolean m_isReplicated = false;
 
         // Buckets for children expression classification
         public ArrayList<AbstractExpression> m_joinOuterList = new ArrayList<AbstractExpression>();
@@ -107,6 +105,18 @@ public class JoinTree {
         }
 
         /**
+         * Construct a join node
+         * @param joinType - join type
+         * @param leftNode - left node
+         * @param rightNode - right node
+         */
+        JoinNode(JoinType joinType, JoinNode leftNode, JoinNode rightNode) {
+            m_joinType = joinType;
+            m_leftNode = leftNode;
+            m_rightNode = rightNode;
+        }
+
+        /**
          * Construct an empty join node
          */
         JoinNode() {
@@ -126,13 +136,11 @@ public class JoinTree {
             m_rightNode.toLeftJoin();
 
             // Swap own children
-            if (m_rightNode.m_joinType == JoinType.RIGHT) {
-                assert(m_leftNode.m_joinType == JoinType.INNER);
+            if (m_joinType == JoinType.RIGHT) {
                 JoinNode node = m_rightNode;
                 m_rightNode = m_leftNode;
                 m_leftNode = node;
-                m_rightNode.m_joinType = JoinType.LEFT;
-                m_leftNode.m_joinType = JoinType.INNER;
+                m_joinType = JoinType.LEFT;
             }
         }
 
@@ -188,8 +196,7 @@ public class JoinTree {
                 return false;
             }
             assert(m_leftNode != null && m_rightNode != null);
-            return m_leftNode.m_joinType != JoinType.INNER ||
-                    m_rightNode.m_joinType != JoinType.INNER ||
+            return m_joinType != JoinType.INNER ||
                     m_leftNode.hasOuterJoin() || m_rightNode.hasOuterJoin();
         }
 
@@ -275,29 +282,6 @@ public class JoinTree {
             return m_root.generateTableJoinOrder();
         }
         return new ArrayList<Table>();
-    }
-
-    /**
-     * Sets isReplicated flag for all nodes in the tree
-     */
-    public void setReplicatedFlag() {
-        if (m_root != null) {
-            setReplicatedFlag(m_root);
-        }
-    }
-
-    /**
-     * Sets isReplicated flag for all nodes in the tree recursively
-     */
-    private void setReplicatedFlag(JoinNode joinNode) {
-        if (joinNode.m_table != null) {
-            joinNode.m_isReplicated = joinNode.m_table.getIsreplicated();
-        } else {
-            assert (joinNode.m_rightNode != null &  joinNode.m_leftNode != null);
-            setReplicatedFlag(joinNode.m_leftNode);
-            setReplicatedFlag(joinNode.m_rightNode);
-            joinNode.m_isReplicated = joinNode.m_rightNode.m_isReplicated && joinNode.m_leftNode.m_isReplicated;
-        }
     }
 
 }

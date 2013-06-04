@@ -572,16 +572,15 @@ public abstract class AbstractParsedStmt {
        if (joinTree == null) {
            joinTree = new JoinTree();
        }
-
-       JoinNode joinNode = new JoinNode(table, joinType, joinExpr, whereExpr);
+       // The join type of the leaf node is always INNER
+       JoinNode joinNode = new JoinNode(table, JoinType.INNER, joinExpr, whereExpr);
        if (joinTree.m_root == null) {
            // this is the first table
            joinTree.m_root = joinNode;
        } else {
            // Build the tree by attaching the next table always to the right
-           JoinNode node = new JoinNode();
-           node.m_leftNode = joinTree.m_root;
-           node.m_rightNode = joinNode;
+           // The node's join type is determined by the type of its right node
+           JoinNode node = new JoinNode(joinType, joinTree.m_root, joinNode);
            joinTree.m_root = node;
        }
        if (joinType != JoinType.INNER) {
@@ -597,8 +596,6 @@ public abstract class AbstractParsedStmt {
         // temp guard against self-joins.
         Set<Table> visited = new HashSet<Table>(tableList);
 
-        // temp restriction on number of tables for an outer join statement
-        int tableCount = 0;
         for (VoltXMLElement node : tablesNode.children) {
             if (node.name.equalsIgnoreCase("tablescan")) {
 
@@ -614,14 +611,8 @@ public abstract class AbstractParsedStmt {
                 parseTable(node);
                 visited.add(table);
 
-                ++tableCount;
-//                if (joinTree.m_hasOuterJoin && tableCount > 2) {
-//                    throw new PlanningErrorException("VoltDB does not support outer joins with more than two tables involved");
-//                }
             }
         }
-        // Once the join tree is build set isReplicated flag for each node
-        joinTree.setReplicatedFlag();
     }
 
     /**
@@ -756,8 +747,7 @@ public abstract class AbstractParsedStmt {
         }
 
         // At this moment all RIGHT joins are already converted to the LEFT ones
-        assert (joinNode.m_rightNode.m_joinType == JoinType.LEFT || joinNode.m_rightNode.m_joinType == JoinType.INNER);
-        assert (joinNode.m_leftNode.m_joinType == JoinType.INNER);
+        assert (joinNode.m_joinType == JoinType.LEFT || joinNode.m_joinType == JoinType.INNER);
 
         ArrayList<AbstractExpression> joinList = new ArrayList<AbstractExpression>();
         ArrayList<AbstractExpression> whereList = new ArrayList<AbstractExpression>();
@@ -809,10 +799,9 @@ public abstract class AbstractParsedStmt {
         applyTransitiveEquivalence(joinNode.m_whereInnerList,
                 joinNode.m_whereOuterList, joinNode.m_whereInnerOuterList);
 
-        // In case of multi-table outer join the node's WHERE expressions may actually contain
-        // join/where expressions which belong not to this node but to a descendant node(s).
-        // They needs to be pushed down to the tree where they belong.
-        pushDownOuterWhereExpressions(joinNode);
+        // In case of multi-table joins certain expressions could be pushed down to the children
+        // to improve join performance.
+        reclassifyExpressions(joinNode);
     }
 
     /**
@@ -933,41 +922,36 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
-     * Push down outer expressions for a given node to its left (outer) child. For the inner join
-     * both where and join outer table expressions can be pushed down. For the outer joins only the
-     * latter can be pushed down.
-     * if this child is a join node itself.
-     * Since sub-query are not supported, all join trees always grow to the right only meaning that
-     * out of two children only the left one can be a join node itself and this is where expressions
-     * need to go.
+     * Push down outer expressions for a given node to its children.
+     *  1. The OUTER WHERE expressions can be pushed down to the outer (left) child for all joins
+     *    (INNER and LEFT).
+     *  2. The INNER WHERE expressions can be pushed down to the inner (right) child for the INNER joins.
      * @param joinNode JoinNode
      */
-    private void pushDownOuterWhereExpressions(JoinNode joinNode) {
+    private void reclassifyExpressions(JoinNode joinNode) {
         assert (joinNode != null && joinNode.m_leftNode != null && joinNode.m_rightNode != null);
         JoinNode outerNode = joinNode.m_leftNode;
-        JoinType joinType = joinNode.m_rightNode.m_joinType;
-        if (joinType == JoinType.INNER) {
-            // There is no distinction between WHERE and JOIN expressions for the inner joins
-            // They can be merged together
-            joinNode.m_joinInnerList.addAll(joinNode.m_whereInnerList);
-            joinNode.m_whereInnerList.clear();
-            joinNode.m_joinOuterList.addAll(joinNode.m_whereOuterList);
-            joinNode.m_whereOuterList.clear();
-            joinNode.m_joinInnerOuterList.addAll(joinNode.m_whereInnerOuterList);
-            joinNode.m_whereInnerOuterList.clear();
-        }
         if (outerNode.m_table == null) {
-            // outerNode is a join node. Distribute expressions to the appropriate WHERE list
-            Collection<Table> innerTables = outerNode.m_rightNode.generateTableJoinOrder();
-            Collection<Table> outerTables = outerNode.m_leftNode.generateTableJoinOrder();
-            List<AbstractExpression> pushDownExprList = (joinType == JoinType.INNER) ?
-                    joinNode.m_joinOuterList : joinNode.m_whereOuterList;
+            reclassifyExpressionsRecursively(outerNode, joinNode.m_whereOuterList);
+        }
+        JoinNode innerNode = joinNode.m_rightNode;
+        if (innerNode.m_table == null && joinNode.m_joinType == JoinType.INNER) {
+                reclassifyExpressionsRecursively(innerNode, joinNode.m_whereInnerList);
+        }
+    }
+
+    private void reclassifyExpressionsRecursively(JoinNode joinNode, List<AbstractExpression> pushDownExprList) {
+        if (joinNode.m_table == null) {
+            // It is a join node. Classify pushed down expressions as inner, outer, or inner-outer
+            // WHERE expressions.
+            Collection<Table> innerTables = joinNode.m_rightNode.generateTableJoinOrder();
+            Collection<Table> outerTables = joinNode.m_leftNode.generateTableJoinOrder();
             classifyOuterJoinExpressions(pushDownExprList, outerTables, innerTables,
-                    outerNode.m_whereOuterList, outerNode.m_whereInnerList, outerNode.m_whereInnerOuterList);
+                    joinNode.m_whereOuterList, joinNode.m_whereInnerList, joinNode.m_whereInnerOuterList);
             // Remove them from the original list
             pushDownExprList.clear();
-            // Descend to the outer child
-            pushDownOuterWhereExpressions(outerNode);
+            // Descend to the inner child
+            reclassifyExpressions(joinNode);
         }
     }
 
