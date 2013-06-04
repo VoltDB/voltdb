@@ -53,7 +53,6 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.sysprocs.SnapshotSave;
-import org.voltdb.sysprocs.SnapshotScan;
 
 import com.google.common.util.concurrent.Callables;
 
@@ -663,7 +662,7 @@ public class TestSnapshotDaemon {
 
             @Override
             public VoltTable[] getResults() {
-                VoltTable resultTable = new VoltTable(SnapshotScan.clientColumnInfo);
+                VoltTable resultTable = new VoltTable(SnapshotScanAgent.clientColumnInfo);
                 resultTable.addRow(
                         "/tmp",
                         "woobie_",
@@ -725,7 +724,7 @@ public class TestSnapshotDaemon {
 
             @Override
             public VoltTable[] getResults() {
-                VoltTable resultTable = new VoltTable(SnapshotScan.clientColumnInfo);
+                VoltTable resultTable = new VoltTable(SnapshotScanAgent.clientColumnInfo);
                 resultTable.addRow(
                         "/tmp",
                         "woobie_2",
