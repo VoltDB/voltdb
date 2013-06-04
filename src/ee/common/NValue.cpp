@@ -397,84 +397,109 @@ NValue NValue::opDivideDecimals(const NValue lhs, const NValue rhs) const {
     return getDecimalValue(retval);
 }
 
-/** Serialize this NValue to a SerializeOutput in the same format that gets read
- * by deserializeFromAllocateForStorage  -- useful for testing NValue deserialization
- * and operations that depend on deserialized values.
- **/
-void NValue::serializeTypedNValueTo(SerializeOutput &output) const
-{
-    const ValueType type = getValueType();
-    output.writeByte(static_cast<const int8_t>(type));
-    if (type == VALUE_TYPE_NULL) {
-        // This trivial case is not handled by serializeTo since it only handles valid column types.
-        return;
-    }
-    serializeTo(output);
-}
-
-//TODO: Add parameter support.
-// Parameters are supported by passing a non-null varbinary bitmap as the first NValue.
-// The bitmap has a bit for each of the other NValues, indicating how to interpret it.
-// A 0 bit treats the NValue as a constant element of the list.
-// A 1 bit treats the NValue as an integer parameter index for a variable element of the list which
-// must be resolved to an actual value once per statement execution.
 //TODO: This O(length) implementation should be replaced by an O(ln(length)) or better implementation.
-// This should wait until the param support TODO has been done as that will effect the timing
-// of any IN-LIST pre-processing until after parameters have been bound to their values (per execution).
-struct NValueSet {
-    void* operator new(size_t size, int length, Pool &pool)
+struct NValueList {
+    static int allocationSizeForLength(int length)
     {
-        return pool.allocate(size + length*sizeof(StlFriendlyNValue));
+        //TODO: May want to consider extra allocation, here,
+        // such as space for a sorted copy of the array.
+        // This allocation has the advantage of getting freed via NValue::free.
+        return (int)(sizeof(NValueList) + length*sizeof(StlFriendlyNValue));
     }
-    void operator delete(void*, int, Pool &) {}
+
+    void* operator new(size_t size, char* placement)
+    {
+        return placement;
+    }
+    void operator delete(void*, char*) {}
     void operator delete(void*) {}
 
-    void deserializeNValues(int length, SerializeInput &input, Pool *dataPool)
+    NValueList(int length, ValueType elementType) : m_length(length), m_elementType(elementType)
+    { }
+
+    void deserializeNValues(SerializeInput &input, Pool *dataPool)
     {
-        m_length = length;
-        m_nParams = input.readInt();
-        //TODO: Disallowing the VARBINARY param control for now.
-        if ( m_nParams != 0 ) {
-            throwFatalLogicErrorStreamed("In NValueSet::deserializeNValues, params not yet supported: " << m_nParams);
-        }
         for (int ii = 0; ii < m_length; ++ii) {
-            m_values[ii].deserializeFromAllocateForStorage(input, dataPool);
+            m_values[ii].deserializeFromAllocateForStorage(m_elementType, input, dataPool);
         }
     }
 
     StlFriendlyNValue const* begin() const { return m_values; }
     StlFriendlyNValue const* end() const { return m_values + m_length; }
 
-    int m_length;
-    int m_nParams;
+    const int m_length;
+    const ValueType m_elementType;
     StlFriendlyNValue m_values[];
 };
 
-bool NValue::isInTheNValueSet(const NValueSet* listOfNValues) const
+/**
+ * This NValue can be of any scalar value type.
+ * @param rhs  a VALUE_TYPE_ARRAY NValue whose referent must be an NValueList.
+ *             The NValue elements of the NValueList should be comparable to and ideally
+ *             of exactly the same VALUE_TYPE as "this".
+ * The planner and/or deserializer should have taken care of this with checks and
+ * explicit cast operators and and/or constant promotions as needed.
+ * @return a VALUE_TYPE_BOOLEAN NValue.
+ */
+bool NValue::inList(const NValue& rhs) const
 {
+    //TODO: research: does the SQL standard allow a null to match a null list element
+    // vs. returning FALSE or NULL?
+    const bool lhsIsNull = isNull();
+    if (lhsIsNull) {
+        return false;
+    }
+
+    const ValueType rhsType = rhs.getValueType();
+    if (rhsType != VALUE_TYPE_ARRAY) {
+        throwDynamicSQLException("rhs of IN expression is of a non-list type %s", rhs.getValueTypeString().c_str());
+    }
+    const NValueList* listOfNValues = (NValueList*)rhs.getObjectValue();
     const StlFriendlyNValue& value = *static_cast<const StlFriendlyNValue*>(this);
     return std::find(listOfNValues->begin(), listOfNValues->end(), value) != listOfNValues->end();
 }
 
-NValueSet* NValue::deserializeIntoANewNValueSet(SerializeInput &input, Pool *dataPool)
+void NValue::deserializeIntoANewNValueList(SerializeInput &input, Pool *dataPool)
 {
-    int length = input.readInt();
-    NValueSet* nvset = new (length, *dataPool) NValueSet();
-    nvset->deserializeNValues(length, input, dataPool);
-    return nvset;
+    ValueType elementType = (ValueType)input.readByte();
+    int length = input.readShort();
+    int trueSize = NValueList::allocationSizeForLength(length);
+    char* storage = allocateValueStorage(trueSize, dataPool);
+    ::memset(storage, 0, trueSize);
+    NValueList* nvset = new (storage) NValueList(length, elementType);
+    nvset->deserializeNValues(input, dataPool);
 }
 
-NValueSet* NValue::deserializeIntoANewNValueSet(const std::string& buffer)
+void NValue::deserializeIntoANewNValueList(const std::string& buffer)
 {
     //TODO: Decide on format for IN LIST constants from compiled plans, including two counts,
     // and a list of parameter indexes and/or data values. Human readable? Hex?
     // This construction method must use the persistent data pool
     // (somehow hacked through SRef?) for all allocations.
     throwFatalLogicErrorStreamed(
-        "In NValue::deserializeIntoANewNValueSet, IN LIST constants not yet supported: (" <<
+        "In NValue::deserializeIntoANewNValueList, IN LIST constants not yet supported: (" <<
         buffer << ")");
 }
 
+void NValue::allocateANewNValueList(int length, ValueType elementType)
+{
+    int trueSize = NValueList::allocationSizeForLength(length);
+    char* storage = allocateValueStorage(trueSize, NULL);
+    ::memset(storage, 0, trueSize);
+    new (storage) NValueList(length, elementType);
+}
+
+void NValue::setArrayElements(std::vector<NValue> &args)
+{
+    assert(m_valueType == VALUE_TYPE_ARRAY);
+    NValueList* listOfNValues = (NValueList*)getObjectValue();
+    // Assign each of the elements.
+    int ii = (int)args.size();
+    assert(ii == listOfNValues->m_length);
+    while (ii--) {
+        listOfNValues->m_values[ii] = args[ii];
+    }
+}
 
 
 int warn_if(int condition, const char* message)

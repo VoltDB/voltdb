@@ -94,8 +94,14 @@ public:
         return NValue::getDecimalValueFromString(txt);
     }
 
-    static inline NValue getInListValueFromString(const std::string &txt) {
-        return NValue::getInListValueFromString(txt);
+    static NValue getArrayValueFromString(const std::string &txt)
+    {
+        return NValue::getAllocatedArrayValueFromString(txt);
+    }
+
+    static NValue getArrayValueFromSizeAndType(int elementCount, ValueType elementType)
+    {
+        return NValue::getAllocatedArrayValueFromSizeAndType(elementCount, elementType);
     }
 
     static inline NValue getAddressValue(void *address) {

@@ -76,8 +76,8 @@ hashRangeFactory(PlannerDomValue obj) {
     return new HashRangeExpression(hashColumnValue.asInt(), ranges, static_cast<int>(rangesArray.arrayLen()));
 }
 
-/** Instantiate a custom AbstractExpression class that implements eval
- *  as the specified comparison of two generic AbstractExpression-based sub-expressions. **/
+/** Function static helper templated functions to vivify an optimal
+    comparison class. */
 static AbstractExpression*
 getGeneral(ExpressionType c,
            AbstractExpression *l,
@@ -100,6 +100,8 @@ getGeneral(ExpressionType c,
         return new ComparisonExpression<CmpGte>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_LIKE):
         return new ComparisonExpression<CmpLike>(c, l, r);
+    case (EXPRESSION_TYPE_COMPARE_IN):
+        return new ComparisonExpression<CmpIn>(c, l, r);
     default:
         char message[256];
         snprintf(message, 256, "Invalid ExpressionType '%s' called"
@@ -110,8 +112,6 @@ getGeneral(ExpressionType c,
 }
 
 
-/** Instantiate a custom AbstractExpression class that implements eval
- *  as the specified comparison of two concretely expression-typed sub-expressions. **/
 template <typename L, typename R>
 static AbstractExpression*
 getMoreSpecialized(ExpressionType c, L* l, R* r)
@@ -133,6 +133,8 @@ getMoreSpecialized(ExpressionType c, L* l, R* r)
         return new InlinedComparisonExpression<CmpGte, L, R>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_LIKE):
         return new InlinedComparisonExpression<CmpLike, L, R>(c, l, r);
+    case (EXPRESSION_TYPE_COMPARE_IN):
+        return new InlinedComparisonExpression<CmpIn, L, R>(c, l, r);
     default:
         char message[256];
         snprintf(message, 256, "Invalid ExpressionType '%s' called for"
@@ -141,13 +143,19 @@ getMoreSpecialized(ExpressionType c, L* l, R* r)
     }
 }
 
-/** convert the enumerated operator value and optionally (in common cases) the dynamic operand types
- * and into a concrete instantiation of an AbstractExpression-based helper template. **/
+/** convert the enumerated value type into a concrete c type for the
+ * comparison helper templates. */
 AbstractExpression *
 ExpressionUtil::comparisonFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc)
 {
     assert(lc);
-    assert(rc);
+    /*printf("left: %s\n", left_optimized->debug("").c_str());
+    fflush(stdout);
+    printf("right: %s\n", right_optimized->debug("").c_str());
+    fflush(stdout);*/
+
+    //printf("%s\n", right_optimized->debug().c_str());
+    //fflush(stdout);
 
     // more specialization available?
     ConstantValueExpression *l_const =
@@ -162,24 +170,18 @@ ExpressionUtil::comparisonFactory(ExpressionType et, AbstractExpression *lc, Abs
     TupleValueExpression *r_tuple =
       dynamic_cast<TupleValueExpression*>(rc);
 
-    // This will inline eval() for common column-based comparisons, hooray!
-    // There's no point in bloating the code with instantiations for comparisons
-    // strictly among constants and/or parameters
-    // -- there's something VERY WRONG about a plan that (repeatedly?) compares between
-    // (unchanging?) constants -- or parameters for that matter -- in a fast path tight loop.
-    if (l_tuple != NULL && r_const != NULL) { // TUPLE-CONST
-        return getMoreSpecialized<TupleValueExpression, ConstantValueExpression >(et, l_tuple, r_const);
-    }
-    //TODO: get by with fewer, simpler instantiations (smaller code) by reversing the operands in this
-    // case to keep the tuple value always on the left
-    // -- and reversing the operator, e.g. swapping '>' for '<').
-    else if (l_const != NULL && r_tuple != NULL) { // CONST-TUPLE
+    // this will inline getValue(), hooray!
+    if (l_const != NULL && r_const != NULL) { // CONST-CONST can it happen?
+        return getMoreSpecialized<ConstantValueExpression, ConstantValueExpression>(et, l_const, r_const);
+    } else if (l_const != NULL && r_tuple != NULL) { // CONST-TUPLE
         return getMoreSpecialized<ConstantValueExpression, TupleValueExpression>(et, l_const, r_tuple);
-    }
-    else if (l_tuple != NULL && r_tuple != NULL) { // TUPLE-TUPLE
+    } else if (l_tuple != NULL && r_const != NULL) { // TUPLE-CONST
+        return getMoreSpecialized<TupleValueExpression, ConstantValueExpression >(et, l_tuple, r_const);
+    } else if (l_tuple != NULL && r_tuple != NULL) { // TUPLE-TUPLE
         return getMoreSpecialized<TupleValueExpression, TupleValueExpression>(et, l_tuple, r_tuple);
     }
 
+    //okay, still getTypedValue is beneficial.
     return getGeneral(et, lc, rc);
 }
 
@@ -292,8 +294,8 @@ constantValueFactory(PlannerDomValue obj,
     case VALUE_TYPE_DECIMAL:
         newvalue = ValueFactory::getDecimalValueFromString(valueValue.asStr());
         break;
-    case VALUE_TYPE_INLIST:
-        newvalue = ValueFactory::getInListValueFromString(valueValue.asStr());
+    case VALUE_TYPE_ARRAY:
+        newvalue = ValueFactory::getArrayValueFromString(valueValue.asStr());
         break;
     default:
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
@@ -393,6 +395,7 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     case (EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO):
     case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
     case (EXPRESSION_TYPE_COMPARE_LIKE):
+    case (EXPRESSION_TYPE_COMPARE_IN):
         ret = comparisonFactory( et, lc, rc);
     break;
 
@@ -429,6 +432,16 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
                      nameString.c_str(), aliasBuffer, functionId, (int)args->size());
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, fn_message);
         }
+    }
+    break;
+
+    case (EXPRESSION_TYPE_INLISTBUILDER): {
+        // Parse whatever is needed out of obj and pass the pieces to inListFactory
+        // to make it easier to unit test independently of the parsing.
+        // The first argument is used as the list element type.
+        // If the ValueType of the list builder expression needs to be "ARRAY" or something else,
+        // a separate element type attribute will have to be serialized and passed in here.
+        ret = inListFactory(vt, args);
     }
     break;
 
