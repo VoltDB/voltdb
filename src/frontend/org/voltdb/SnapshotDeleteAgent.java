@@ -106,7 +106,7 @@ public class SnapshotDeleteAgent extends OpsAgent
         }
 
         for (String path : paths) {
-            if (path == null || path.equals("")) {
+            if (path == null || path.trim().isEmpty()) {
                 return "A path was null or the empty string";
             }
         }
@@ -128,7 +128,7 @@ public class SnapshotDeleteAgent extends OpsAgent
         }
 
         for (String nonce : nonces) {
-            if (nonce == null || nonce.equals("")) {
+            if (nonce == null || nonce.trim().isEmpty()) {
                 return "A nonce was null or the empty string";
             }
         }
