@@ -152,10 +152,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private Map<Long, Thread> m_siteThreads;
     private ArrayList<ExecutionSiteRunner> m_runners;
     private ExecutionSite m_currentThreadSite;
-    private StatsAgent m_statsAgent = new StatsAgent();
-    // TODO: CLEAN ME UP
-    private SystemCatalogAgent m_catalogAgent = new SystemCatalogAgent();
-    private SystemInformationAgent m_sysInfoAgent = new SystemInformationAgent();
+    private OpsRegistrar m_opsRegistrar = new OpsRegistrar();
 
     private AsyncCompilerAgent m_asyncCompilerAgent = new AsyncCompilerAgent();
     public AsyncCompilerAgent getAsyncCompilerAgent() { return m_asyncCompilerAgent; }
@@ -271,6 +268,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     // The configured license api: use to decide enterprise/community edition feature enablement
     LicenseApi m_licenseApi;
+    @SuppressWarnings("unused")
     private LatencyStats m_latencyStats;
 
     @Override
@@ -321,9 +319,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_deployment = null;
             m_messenger = null;
             m_startMode = null;
-            m_statsAgent = new StatsAgent();
-            m_catalogAgent = new SystemCatalogAgent();
-            m_sysInfoAgent = new SystemInformationAgent();
+            m_opsRegistrar = new OpsRegistrar();
             m_asyncCompilerAgent = new AsyncCompilerAgent();
             m_faultManager = null;
             m_snapshotCompletionMonitor = null;
@@ -474,7 +470,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                             TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId());
                     // each node has an MPInitiator (and exactly 1 node has the master MPI).
                     long mpiBuddyHSId = m_iv2Initiators.get(0).getInitiatorHSId();
-                    m_MPI = new MpInitiator(m_messenger, mpiBuddyHSId, m_statsAgent);
+                    m_MPI = new MpInitiator(m_messenger, mpiBuddyHSId, getStatsAgent());
                     m_iv2Initiators.add(m_MPI);
                 }
 
@@ -544,18 +540,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // Initialize stats
             m_ioStats = new IOStats();
-            m_statsAgent.registerStatsSource(StatsSelector.IOSTATS,
+            getStatsAgent().registerStatsSource(StatsSelector.IOSTATS,
                     0, m_ioStats);
             m_memoryStats = new MemoryStats();
-            m_statsAgent.registerStatsSource(StatsSelector.MEMORY,
+            getStatsAgent().registerStatsSource(StatsSelector.MEMORY,
                     0, m_memoryStats);
-            m_statsAgent.registerStatsSource(StatsSelector.TOPO, 0, m_cartographer);
+            getStatsAgent().registerStatsSource(StatsSelector.TOPO, 0, m_cartographer);
             m_partitionCountStats = new PartitionCountStats(m_cartographer);
-            m_statsAgent.registerStatsSource(StatsSelector.PARTITIONCOUNT,
+            getStatsAgent().registerStatsSource(StatsSelector.PARTITIONCOUNT,
                     0, m_partitionCountStats);
             m_initiatorStats = new InitiatorStats(m_myHostId);
             m_liveClientsStats = new LiveClientsStats();
-            m_statsAgent.registerStatsSource(StatsSelector.LIVECLIENTS, 0, m_liveClientsStats);
+            getStatsAgent().registerStatsSource(StatsSelector.LIVECLIENTS, 0, m_liveClientsStats);
             m_latencyStats = new LatencyStats(m_myHostId);
 
             /*
@@ -601,7 +597,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                             csp,
                             clusterConfig.getPartitionCount(),
                             m_config.m_startAction,
-                            m_statsAgent,
+                            getStatsAgent(),
                             m_memoryStats,
                             m_commandLog,
                             m_nodeDRGateway,
@@ -621,6 +617,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Unable to start GlobalServiceElector", true, e);
             }
+
+            // Need to register the OpsAgents right before we turn on the client interface
+            m_opsRegistrar.registerMailboxes(m_messenger);
 
             // Create the client interface
             int portOffset = 0;
@@ -782,7 +781,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         List<Initiator> initiators = new ArrayList<Initiator>();
         for (Integer partition : partitions)
         {
-            Initiator initiator = new SpInitiator(m_messenger, partition, m_statsAgent,
+            Initiator initiator = new SpInitiator(m_messenger, partition, getStatsAgent(),
                     m_snapshotCompletionMonitor, startAction);
             initiators.add(initiator);
             m_partitionsToSitesAtStartupForExportInit.add(Pair.of(partition, initiator.getInitiatorHSId()));
@@ -1480,28 +1479,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_messenger = null;
 
                 //Also for test code that expects a fresh stats agent
-                if (m_statsAgent != null) {
+                if (m_opsRegistrar != null) {
                     try {
-                        m_statsAgent.shutdown();
+                        m_opsRegistrar.shutdown();
                     }
                     finally {
-                        m_statsAgent = null;
-                    }
-                }
-                if (m_catalogAgent != null) {
-                    try {
-                        m_catalogAgent.shutdown();
-                    }
-                    finally {
-                        m_catalogAgent = null;
-                    }
-                }
-                if (m_sysInfoAgent != null) {
-                    try {
-                        m_sysInfoAgent.shutdown();
-                    }
-                    finally {
-                        m_sysInfoAgent = null;
+                        m_opsRegistrar = null;
                     }
                 }
 
@@ -1673,7 +1656,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // 4. Flush StatisticsAgent old catalog statistics.
             // Otherwise, the stats agent will hold all old catalogs
             // in memory.
-            m_statsAgent.notifyOfCatalogUpdate();
+            getStatsAgent().notifyOfCatalogUpdate();
 
             // 5. MPIs don't run fragments. Update them here. Do
             // this after flushing the stats -- this will re-register
@@ -1718,19 +1701,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     @Override
-    public StatsAgent getStatsAgent() {
-        return m_statsAgent;
+    public OpsAgent getOpsAgent(OpsSelector selector) {
+        return m_opsRegistrar.getAgent(selector);
     }
 
-    // TODO: CLEAN ME UP
     @Override
-    public SystemCatalogAgent getSystemCatalogAgent() {
-        return m_catalogAgent;
-    }
-    // TODO: CLEAN ME UP
-    @Override
-    public SystemInformationAgent getSystemInformationAgent() {
-        return m_sysInfoAgent;
+    public StatsAgent getStatsAgent() {
+        OpsAgent statsAgent = m_opsRegistrar.getAgent(OpsSelector.STATISTICS);
+        assert(statsAgent instanceof StatsAgent);
+        return (StatsAgent)statsAgent;
     }
 
     @Override

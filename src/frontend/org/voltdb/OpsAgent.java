@@ -66,7 +66,7 @@ public abstract class OpsAgent
     protected final String m_name;
     private final ScheduledThreadPoolExecutor m_es;
 
-    private HostMessenger m_messenger;
+    protected HostMessenger m_messenger;
 
     // Things that would be nice in the future:
     // 1. Instead of the tables to be aggregates identified by index in the
