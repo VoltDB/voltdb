@@ -603,8 +603,11 @@ class FastSerializer:
         if value is None:
             val = self.__class__.NULL_BIGINT_INDICATOR
         else:
-            seconds = int(value.strftime("%s"))
-            val = seconds * 1000000 + value.microsecond
+            val = int(value.strftime("%s")) * 1000000
+            try:
+                val += value.microsecond
+            except AttributeError:
+                pass
         self.wbuf.extend(struct.pack(self.int64Type(1), val))
 
     def readDecimal(self):
