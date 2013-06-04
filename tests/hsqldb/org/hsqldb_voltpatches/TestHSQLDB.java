@@ -179,6 +179,58 @@ public class TestHSQLDB extends TestCase {
 
     }*/
 
+    private void expectFailStmt(HSQLInterface hsql, String stmt) {
+        try {
+            VoltXMLElement xml = hsql.getXMLCompiledStatement(stmt);
+            System.out.println(xml.toString());
+            fail();
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void testSqlInToXML() throws HSQLParseException {
+        HSQLInterface hsql = setupTPCCDDL();
+        assertTrue(hsql != null);
+        VoltXMLElement stmt;
+
+        // The next few statements should work
+
+        stmt = hsql.getXMLCompiledStatement("select * from new_order where no_w_id in (5,7);");
+        System.out.println(stmt.toString());
+
+        stmt = hsql.getXMLCompiledStatement("select * from new_order where no_w_id in (?);");
+        System.out.println(stmt.toString());
+
+        stmt = hsql.getXMLCompiledStatement("select * from new_order where no_w_id in (?,5,3,?);");
+        System.out.println(stmt.toString());
+
+        stmt = hsql.getXMLCompiledStatement("select * from new_order where no_w_id not in (?,5,3,?);");
+        System.out.println(stmt.toString());
+
+        stmt = hsql.getXMLCompiledStatement("select * from warehouse where w_name not in (?, 'foo');");
+        System.out.println(stmt.toString());
+
+        stmt = hsql.getXMLCompiledStatement("select * from new_order where no_w_id in (no_d_id, no_o_id, ?, 7);");
+        System.out.println(stmt.toString());
+
+        stmt = hsql.getXMLCompiledStatement("select * from new_order where no_w_id in (abs(-1), ?, 17761776);");
+        System.out.println(stmt.toString());
+
+        stmt = hsql.getXMLCompiledStatement("select * from new_order where no_w_id in (abs(17761776), ?, 17761776) and no_d_id in (abs(-1), ?, 17761776);");
+        System.out.println(stmt.toString());
+
+        //stmt = hsql.getXMLCompiledStatement("select * from new_order where no_w_id in ?;");
+        //System.out.println(stmt.toString());
+
+        // The ones below here should continue to give sensible errors
+        expectFailStmt(hsql, "select * from new_order where no_w_id in (select w_id from warehouse);");
+        expectFailStmt(hsql, "select * from new_order where no_w_id <> (5, 7, 8);");
+        expectFailStmt(hsql, "select * from new_order where exists (select w_id from warehouse);");
+        expectFailStmt(hsql, "select * from new_order where not exists (select w_id from warehouse);");
+    }
+
     public void testVarbinary() {
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
         URL url = getClass().getResource("hsqltest-varbinaryddl.sql");

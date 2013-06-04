@@ -21,6 +21,7 @@ import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultConstants;
+import org.voltdb.planner.AbstractParsedStmt;
 
 /**
  * This class is built to create a single in-memory database
@@ -189,9 +190,103 @@ public class HSQLInterface {
         // it'll get called next time
         sessionProxy.sessionData.persistentStoreCollection.clearAllTables();
 
+        // clean up sql-in expressions
+        fixupInStatementExpressions(xml);
+
         assert(xml != null);
 
         return xml;
+    }
+
+    /**
+     * Loop through any in-lists found in the XML and munge them into the
+     * simpler thing we want to pass to the {@link AbstractParsedStmt}.
+     */
+    private void fixupInStatementExpressions(VoltXMLElement root) {
+        while (true) {
+            VoltXMLElement in = getFirstEqualsExpressionThatSmellLikeIn(root);
+            if (in == null) {
+                break;
+            }
+
+            inFixup(in);
+        }
+    }
+
+    /**
+     * Find in-expressions in fresh-off-the-hsql-boat Volt XML. This returns the first one
+     * that matches the pattern. The way this is used is to find the first, munge it using
+     * {@link HSQLInterface#inFixup(VoltXMLElement)} and then repeat until there are none
+     * left that match the pattern. The act of fixing it up will make it not match on a
+     * subsequent pass.
+     */
+    private VoltXMLElement getFirstEqualsExpressionThatSmellLikeIn(VoltXMLElement root) {
+        if (root.name.equals("operation") &&
+                root.attributes.containsKey("optype") &&
+                root.attributes.get("optype").equals("equal"))
+            {
+                int rowCount = 0;
+                int tableCount = 0;
+                for (VoltXMLElement child : root.children) {
+                    if (child.name.equals("row")) {
+                        rowCount++;
+                    }
+                    if (child.name.equals("table")) {
+                        tableCount++;
+                    }
+                }
+                if ((tableCount + rowCount) > 0) {
+                    assert((rowCount + tableCount) == 2);
+                    return root;
+                }
+            }
+
+        for (VoltXMLElement child : root.children) {
+            VoltXMLElement match = getFirstEqualsExpressionThatSmellLikeIn(child);
+            if (match != null) {
+                return match;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Take an equality-test expression that represents in-list
+     * and munge it into the simpler thing we want to output
+     * to the ParsedExrpession classes.
+     */
+    private void inFixup(VoltXMLElement inElement) {
+        // make this an in expression
+        inElement.name = "operation";
+        inElement.attributes.put("optype", "in");
+
+        VoltXMLElement rowElem = null;
+        VoltXMLElement tableElem = null;
+        for (VoltXMLElement child : inElement.children) {
+            if (child.name.equals("row")) {
+                rowElem = child;
+            }
+            else if (child.name.equals("table")) {
+                tableElem = child;
+            }
+        }
+        assert(rowElem.children.size() == 1);
+
+        // make the table expression an in-list
+        VoltXMLElement inlist = new VoltXMLElement("value");
+        inlist.attributes.put("valuetype", "vector");
+        for (VoltXMLElement child : tableElem.children) {
+            assert(child.name.equals("row"));
+            assert(child.children.size() == 1);
+            inlist.children.addAll(child.children);
+        }
+
+        inElement.children.clear();
+        // short out the row expression
+        inElement.children.addAll(rowElem.children);
+        // add the inlist
+        inElement.children.add(inlist);
     }
 
     /**

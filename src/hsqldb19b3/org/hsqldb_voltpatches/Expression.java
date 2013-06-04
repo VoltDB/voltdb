@@ -66,6 +66,7 @@
 
 package org.hsqldb_voltpatches;
 
+import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -1460,8 +1461,8 @@ public class Expression {
         prototypes.put(OpTypes.SCALAR_SUBQUERY,null); // not yet supported subquery feature, query based row/table
         prototypes.put(OpTypes.ROW_SUBQUERY,  null); // not yet supported subquery feature
         prototypes.put(OpTypes.TABLE_SUBQUERY,null); // not yet supported subquery feature
-        prototypes.put(OpTypes.ROW,           null); // not yet supported subquery feature    // rows
-        prototypes.put(OpTypes.TABLE,         null); // not yet supported subquery feature
+        prototypes.put(OpTypes.ROW,           new VoltXMLElement("row")); // rows
+        prototypes.put(OpTypes.TABLE,         new VoltXMLElement("table")); // not yet supported subquery feature, but needed for "in"
         prototypes.put(OpTypes.FUNCTION,      null); // not used (HSQL user-defined functions).
         prototypes.put(OpTypes.SQL_FUNCTION,  new VoltXMLElement("function"));
         prototypes.put(OpTypes.ROUTINE_FUNCTION, null); // not used
@@ -1892,5 +1893,30 @@ public class Expression {
             array_element.setAttributesAsColumn(column, false);
 
         }
+    }
+
+    @Override
+    public String toString() {
+        String type = null;
+        Field[] fields = OpTypes.class.getFields();
+        for (Field f : fields) {
+            if (f.getType() != int.class) continue;
+            int value = 0;
+            try {
+                value = f.getInt(null);
+            } catch (IllegalArgumentException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            } catch (IllegalAccessException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+            if (value == opType) {
+                type = f.getName();
+            }
+        }
+        assert(type != null);
+
+        return super.toString() + ": " + type;
     }
 }
