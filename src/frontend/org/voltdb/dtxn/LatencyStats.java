@@ -23,7 +23,7 @@ import java.util.List;
 
 import org.voltdb.ClientInterface;
 import org.voltdb.SiteStatsSource;
-import org.voltdb.SysProcSelector;
+import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
@@ -131,7 +131,7 @@ public class LatencyStats extends SiteStatsSource {
 
     public LatencyStats(long siteId) {
         super(siteId, false);
-        VoltDB.instance().getStatsAgent().registerStatsSource(SysProcSelector.LATENCY, 0, this);
+        VoltDB.instance().getStatsAgent().registerStatsSource(StatsSelector.LATENCY, 0, this);
     }
 
     @Override

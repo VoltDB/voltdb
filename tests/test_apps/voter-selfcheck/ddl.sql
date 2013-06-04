@@ -74,7 +74,7 @@ PARTITION TABLE votes ON COLUMN phone_number;
 PARTITION TABLE rejected_votes_by_phone_number ON COLUMN phone_number;
 
 CREATE ROLE dbuser WITH adhoc, defaultproc, export;
-CREATE ROLE adminuser WITH sysproc;
+CREATE ROLE adminuser WITH sysproc,adhoc;
 CREATE ROLE hockey WITH adhoc;
 
 

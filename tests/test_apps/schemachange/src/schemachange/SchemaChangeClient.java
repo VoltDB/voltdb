@@ -153,11 +153,10 @@ public class SchemaChangeClient {
                     try { Thread.sleep(30 * 1000); } catch (Exception e) {}
                     break;
                 case ClientResponse.GRACEFUL_FAILURE:
-                    log.error(_F("GRACEFUL_FAILURE response in procedure call for: %s", procName));
-                    log.error(((ClientResponseImpl)cr).toJSONString());
-                    logStackTrace(new Throwable());
-                    // caller should always check return status
-                    return cr;
+                    //log.error(_F("GRACEFUL_FAILURE response in procedure call for: %s", procName));
+                    //log.error(((ClientResponseImpl)cr).toJSONString());
+                    //logStackTrace(new Throwable());
+                    return cr; // caller should always check return status
                 case ClientResponse.UNEXPECTED_FAILURE:
                 case ClientResponse.USER_ABORT:
                     log.error(_F("Error in procedure call for: %s", procName));
@@ -268,6 +267,7 @@ public class SchemaChangeClient {
             case ClientResponse.SUCCESS:
                 // hooray!
                 success = true;
+                log.info("Catalog update was reported to be successful");
                 break;
             case ClientResponse.CONNECTION_LOST:
             case ClientResponse.CONNECTION_TIMEOUT:
@@ -285,31 +285,25 @@ public class SchemaChangeClient {
         }
 
         // don't actually trust the call... manually verify
-        if (success == true) {
-            if (schemaVersionNo > 0) {
-                if (isSchemaVersionObservable(schemaVersionNo)) {
-                    log.info(_F("Catalog update was reported to be successful but a a before-update object is observable."));
-                    System.exit(-1);
-                }
-            }
-            if (!isSchemaVersionObservable(schemaVersionNo+1)) {
-                log.info(_F("Catalog update was reported to be successful but a after-update table is not observable."));
+        int obsCatVersion = verifyAndGetSchemaVersion();
+
+        if (obsCatVersion == schemaVersionNo) {
+            if (success == true) {
+                log.error(_F("Catalog update was reported to be successful but did not pass verification: expected V%d, observed V%d", schemaVersionNo+1, obsCatVersion));
+                assert(false);
                 System.exit(-1);
             }
-        } else {
-            if (schemaVersionNo > 0) {
-                if (!isSchemaVersionObservable(schemaVersionNo)) {
-                    log.info(_F("Catalog update was reported to be un-successful but a before-update table is not observable."));
-                    System.exit(-1);
-                }
-            }
-            if (isSchemaVersionObservable(schemaVersionNo+1)) {
-                log.info(_F("Catalog update was reported to be un-successful but a after-update table is observable."));
-                System.exit(-1);
-            }
+
+            // UAC didn't work
+            return null;
         }
 
-        schemaVersionNo++;
+        // UAC worked
+        if (obsCatVersion == schemaVersionNo+1) schemaVersionNo++;
+        else {
+            assert(false);
+            System.exit(-1);
+        }
 
         long end = System.nanoTime();
         double seconds = (end - start) / 1000000000.0;
@@ -372,28 +366,23 @@ public class SchemaChangeClient {
      * is the right one.
      */
     private int verifyAndGetSchemaVersion() {
-        ClientResponse cr = callROProcedureWithRetry("@Statistics", "TABLE", 0);
-        assert(cr.getStatus() == ClientResponse.SUCCESS);
-        VoltTable result = cr.getResults()[0];
-        result.resetRowPosition();
-        int version = -1;
-        while (result.advanceRow()) {
-            String tableName = result.getString("TABLE_NAME");
-            if (tableName.startsWith("V")) {
-                int rowVersion = Integer.parseInt(tableName.substring(1));
-                if (version >= 0) {
-                    assert(rowVersion == version);
-                }
-                version = rowVersion;
+        // start with the last schema id we thought we had verified
+        int version = schemaVersionNo;
+        if (!isSchemaVersionObservable(version)) {
+            if (!isSchemaVersionObservable(++version)) {
+                // version should be one of these two values
+                log.error("Catalog version is out of range");
+                assert(false);
+                System.exit(-1);
             }
         }
-        assert(version >= 0);
+        //log.info(_F("detected catalog version is: %d", version));
         return version;
     }
 
     private boolean isSchemaVersionObservable(int schemaid) {
         ClientResponse cr = callROProcedureWithRetry("@AdHoc",
-                String.format("select count(*) from V%d limit 1;", schemaid));
+                String.format("select count(*) from V%d;", schemaid));
         return (cr.getStatus() == ClientResponse.SUCCESS);
     }
 

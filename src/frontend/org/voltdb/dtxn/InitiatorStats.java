@@ -26,7 +26,7 @@ import java.util.Queue;
 
 import org.voltdb.ClientInterface;
 import org.voltdb.SiteStatsSource;
-import org.voltdb.SysProcSelector;
+import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
@@ -47,7 +47,7 @@ public class InitiatorStats extends SiteStatsSource {
      */
     public InitiatorStats(long hostId) {
         super(hostId, false);
-        VoltDB.instance().getStatsAgent().registerStatsSource(SysProcSelector.INITIATOR, 0, this);
+        VoltDB.instance().getStatsAgent().registerStatsSource(StatsSelector.INITIATOR, 0, this);
     }
 
     public static class InvocationInfo {

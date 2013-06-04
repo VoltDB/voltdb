@@ -33,7 +33,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.FragmentPlanSource;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
-import org.voltdb.SysProcSelector;
+import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltTable;
@@ -880,7 +880,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public VoltTable[] getStats(
-            final SysProcSelector selector,
+            final StatsSelector selector,
             final int[] locators,
             final boolean interval,
             final Long now) {
@@ -1137,7 +1137,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
              * Error or no more tuple data for this table.
              */
             if (remaining == -1 || remaining == -2) {
-                return new int[] {(int) remaining};
+                return new int[] {(int) remaining + 1};
             }
 
             final int[] serialized = new int[count];

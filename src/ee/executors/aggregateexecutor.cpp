@@ -481,10 +481,12 @@ inline void AggregateExecutorBase::executeAggBase(const NValueArray& params)
     }
 }
 
-inline void AggregateExecutorBase::initGroupByKeyTuple(PoolBackedTempTuple &nextGroupByKeyTuple, const TableTuple& nxtTuple)
+inline void AggregateExecutorBase::initGroupByKeyTuple(PoolBackedTupleStorage &nextGroupByKeyStorage,
+                                                       const TableTuple& nxtTuple)
 {
+    TableTuple& nextGroupByKeyTuple = nextGroupByKeyStorage;
     if (nextGroupByKeyTuple.isNullTuple()) {
-        nextGroupByKeyTuple.allocateActiveTuple();
+        nextGroupByKeyStorage.allocateActiveTuple();
     }
     // TODO: Here is where an inline projection executor could be used to initialize both a group key tuple
     // and an agg input tuple from the same raw input tuple.
@@ -560,9 +562,10 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
     TableIterator it = input_table->iterator();
     TableTuple nxtTuple(input_table->schema());
-    PoolBackedTempTuple nextGroupByKeyTuple(m_groupByKeySchema, &m_memoryPool);
+    PoolBackedTupleStorage nextGroupByKeyStorage(m_groupByKeySchema, &m_memoryPool);
+    TableTuple& nextGroupByKeyTuple = nextGroupByKeyStorage;
     while (it.next(nxtTuple)) {
-        initGroupByKeyTuple(nextGroupByKeyTuple, nxtTuple);
+        initGroupByKeyTuple(nextGroupByKeyStorage, nxtTuple);
         AggregateRow *aggregateRow;
         // Search for the matching group.
         HashAggregateMapType::const_iterator keyIter = hash.find(nextGroupByKeyTuple);
@@ -613,11 +616,12 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
     TableIterator it = input_table->iterator();
     TableTuple nxtTuple(input_table->schema());
-    PoolBackedTempTuple nextGroupByKeyTuple(m_groupByKeySchema, &m_memoryPool);
+    PoolBackedTupleStorage nextGroupByKeyStorage(m_groupByKeySchema, &m_memoryPool);
+    TableTuple& nextGroupByKeyTuple = nextGroupByKeyStorage;
     VOLT_TRACE("looping..");
     // Use the first input tuple to "prime" the system.
     if (it.next(nxtTuple)) {
-        initGroupByKeyTuple(nextGroupByKeyTuple, nxtTuple);
+        initGroupByKeyTuple(nextGroupByKeyStorage, nxtTuple);
         // Start the aggregation calculation.
         initAggInstances(aggregateRow);
         aggregateRow->m_passThroughTuple = nxtTuple;
@@ -651,7 +655,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
         void* inProgressStorage = nextGroupByKeyTuple.address();
         inProgressGroupByKeyTuple.move(inProgressStorage);
         nextGroupByKeyTuple.move(recycledStorage);
-        initGroupByKeyTuple(nextGroupByKeyTuple, nxtTuple);
+        initGroupByKeyTuple(nextGroupByKeyStorage, nxtTuple);
 
         // Test for repetition of equal GROUP BY keys.
         // Testing keys from last to first will typically be faster --

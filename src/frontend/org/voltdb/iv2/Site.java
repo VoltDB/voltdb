@@ -54,7 +54,7 @@ import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
-import org.voltdb.SysProcSelector;
+import org.voltdb.StatsSelector;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStats;
 import org.voltdb.TheHashinator;
@@ -366,11 +366,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         if (agent != null) {
             m_tableStats = new TableStats(m_siteId);
-            agent.registerStatsSource(SysProcSelector.TABLE,
+            agent.registerStatsSource(StatsSelector.TABLE,
                                       m_siteId,
                                       m_tableStats);
             m_indexStats = new IndexStats(m_siteId);
-            agent.registerStatsSource(SysProcSelector.INDEX,
+            agent.registerStatsSource(StatsSelector.INDEX,
                                       m_siteId,
                                       m_indexStats);
             m_memStats = memStats;
@@ -820,7 +820,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
             // update table stats
             final VoltTable[] s1 =
-                m_ee.getStats(SysProcSelector.TABLE, tableIds, false, time);
+                m_ee.getStats(StatsSelector.TABLE, tableIds, false, time);
             if ((s1 != null) && (s1.length > 0)) {
                 VoltTable stats = s1[0];
                 assert(stats != null);
@@ -844,7 +844,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
             // update index stats
             final VoltTable[] s2 =
-                m_ee.getStats(SysProcSelector.INDEX, tableIds, false, time);
+                m_ee.getStats(StatsSelector.INDEX, tableIds, false, time);
             if ((s2 != null) && (s2.length > 0)) {
                 VoltTable stats = s2[0];
                 assert(stats != null);
@@ -890,7 +890,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public VoltTable[] getStats(SysProcSelector selector, int[] locators,
+    public VoltTable[] getStats(StatsSelector selector, int[] locators,
                                 boolean interval, Long now)
     {
         return m_ee.getStats(selector, locators, interval, now);

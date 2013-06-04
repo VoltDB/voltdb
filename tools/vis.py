@@ -29,7 +29,7 @@ def COLORS(k):
 MARKERS = ['+', '*', '<', '>', '^', '_',
            'D', 'H', 'd', 'h', 'o', 'p']
 
-def get_stats(hostname, port, days):
+def get_stats(hostname, port, days, branch):
     """Get statistics of all runs
 
     Example return value:
@@ -47,8 +47,9 @@ def get_stats(hostname, port, days):
 
     conn = FastSerializer(hostname, port)
     proc = VoltProcedure(conn, 'BestOfPeriod',
-                         [FastSerializer.VOLTTYPE_SMALLINT])
-    resp = proc.call([days])
+                         [FastSerializer.VOLTTYPE_SMALLINT,
+                         FastSerializer.VOLTTYPE_STRING])
+    resp = proc.call([days, branch])
     conn.close()
 
     # keyed on app name, value is a list of runs sorted chronologically
@@ -134,6 +135,7 @@ def generate_index_file(filenames):
         <td>%s</td>
         <td><a href="%s"><img src="%s" width="400" height="200"/></a></td>
         <td><a href="%s"><img src="%s" width="400" height="200"/></a></td>
+        <td><a href="%s"><img src="%s" width="400" height="200"/></a></td>
       </tr>
 """
 
@@ -148,19 +150,19 @@ def generate_index_file(filenames):
     </table>
   </body>
 </html>
-""" % (''.join([row % (i[0], i[1], i[1], i[2], i[2]) for i in filenames]))
+""" % (''.join([row % (i[0], i[1], i[1], i[2], i[2], i[3], i[3]) for i in filenames]))
     return full_content
 
 def usage():
     print "Usage:"
-    print "\t", sys.argv[0], "output_dir filename_base" \
+    print "\t", sys.argv[0], "output_dir filename_base branch [ndays]" \
         " [width] [height]"
     print
     print "\t", "width in pixels"
     print "\t", "height in pixels"
 
 def main():
-    if len(sys.argv) < 3:
+    if len(sys.argv) < 4:
         usage()
         exit(-1)
 
@@ -170,32 +172,38 @@ def main():
 
     prefix = sys.argv[2]
     path = os.path.join(sys.argv[1], sys.argv[2])
+    branch = sys.argv[3]
     ndays = 1000
-    if len(sys.argv) >=4:
-        ndays = int(sys.argv[3])
+    if len(sys.argv) >=5:
+        ndays = int(sys.argv[4])
     width = None
     height = None
-    if len(sys.argv) >= 5:
-        width = int(sys.argv[4])
     if len(sys.argv) >= 6:
-        height = int(sys.argv[5])
+        width = int(sys.argv[5])
+    if len(sys.argv) >= 7:
+        height = int(sys.argv[6])
 
     # show all the history
-    stats = get_stats(STATS_SERVER, 21212, ndays)
+    stats = get_stats(STATS_SERVER, 21212, ndays, branch)
 
     # Plot single node stats for all apps
     filenames = []              # (appname, latency, throughput)
     for app, data in stats.iteritems():
         app_filename = app.replace(' ', '_')
-        latency_filename = '%s-latency-%s.png' % (prefix, app_filename)
+        latency95_filename = '%s-latency95-%s.png' % (prefix, app_filename)
+        latency99_filename = '%s-latency99-%s.png' % (prefix, app_filename)
         throughput_filename = '%s-throughput-%s.png' % (prefix, app_filename)
-        filenames.append((app, latency_filename, throughput_filename))
+        filenames.append((app, latency95_filename, latency99_filename, throughput_filename))
 
-        plot(app + " latency", "Time", "Latency (ms)",
-             path + "-latency-" + app_filename + ".png", width, height, app,
+        plot(app + " latency95", "Time", "Latency (ms)",
+             path + "-latency95-" + app_filename + ".png", width, height, app,
+             data, 'lat95')
+
+        plot(app + " latency99", "Time", "Latency (ms)",
+             path + "-latency99-" + app_filename + ".png", width, height, app,
              data, 'lat99')
 
-        plot(app + " throughput", "Time", "Throughput (txns/sec)",
+        plot(app + " throughput(best)", "Time", "Throughput (txns/sec)",
              path + "-throughput-" + app_filename + ".png", width, height, app,
              data, 'tps')
 

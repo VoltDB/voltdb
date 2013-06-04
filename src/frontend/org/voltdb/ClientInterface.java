@@ -22,6 +22,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
@@ -71,10 +72,12 @@ import org.voltcore.utils.Pair;
 import org.voltdb.ClientInterfaceHandleManager.Iv2InFlight;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
+import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.compiler.AdHocPlannedStatement;
@@ -1644,6 +1647,70 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     /**
+     * Coward way out of the legacy hashinator hell. LoadSinglepartitionTable gets the
+     * partitioning parameter as a byte array. Legacy hashinator hashes numbers and byte arrays
+     * differently, so have to convert it back to long if it's a number. UGLY!!!
+     */
+    ClientResponseImpl dispatchLoadSinglepartitionTable(ByteBuffer buf,
+                                                        Procedure catProc,
+                                                        StoredProcedureInvocation task,
+                                                        ClientInputHandler handler,
+                                                        Connection ccxn)
+    {
+        int[] involvedPartitions = null;
+        try {
+            CatalogMap<Table> tables = m_catalogContext.get().database.getTables();
+            Object valueToHash = getLoadSinglePartitionTablePartitionParam(tables, task);
+            involvedPartitions = new int[]{TheHashinator.hashToPartition(valueToHash)};
+        }
+        catch (Exception e) {
+            authLog.warn(e.getMessage());
+            return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                          new VoltTable[0], e.getMessage(), task.clientHandle);
+        }
+        assert(involvedPartitions != null);
+        createTransaction(handler.connectionId(), handler.m_hostname,
+                          handler.isAdmin(),
+                          task,
+                          catProc.getReadonly(),
+                          catProc.getSinglepartition(),
+                          catProc.getEverysite(),
+                          involvedPartitions,
+                          ccxn, buf.capacity(),
+                          System.currentTimeMillis());
+        return null;
+    }
+
+    /**
+     * XXX: This should go away when we get rid of the legacy hashinator.
+     */
+    private static Object getLoadSinglePartitionTablePartitionParam(CatalogMap<Table> tables,
+                                                                    StoredProcedureInvocation spi)
+        throws Exception
+    {
+        byte[] paramBytes = (byte[]) spi.getParameterAtIndex(0);
+        String tableName = (String) spi.getParameterAtIndex(1);
+
+        // get the table from the catalog
+        Table catTable = tables.getIgnoreCase(tableName);
+        if (catTable == null) {
+            throw new Exception(String .format("Unable to find target table \"%s\" for LoadSinglepartitionTable.",
+                                               tableName));
+        }
+
+        Column pCol = catTable.getPartitioncolumn();
+        VoltType paramType = VoltType.get((byte) pCol.getType());
+        ByteBuffer paramBuf = ByteBuffer.wrap(paramBytes);
+        paramBuf.order(ByteOrder.LITTLE_ENDIAN);
+
+        if (paramType.isNumber()) {
+            return paramBuf.getLong();
+        } else {
+            return paramBytes;
+        }
+    }
+
+    /**
      * Send a multipart sentinel to all partitions. This is only used when the
      * multipart didn't generate any sentinels for partitions, e.g. DR
      * @LoadMultipartitionTable.
@@ -1688,43 +1755,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         sendSentinel(invocation.getOriginalTxnId(), initiatorHSId, handle, connectionId, false);
     }
 
-    ClientResponseImpl dispatchStatistics(Procedure sysProc, ByteBuffer buf, StoredProcedureInvocation task,
-            ClientInputHandler handler, Connection ccxn) {
-        ParameterSet params = task.getParams();
-        if ((params.toArray().length < 1) || (params.toArray().length > 2)) {
-            return errorResponse(ccxn, task.clientHandle, ClientResponse.GRACEFUL_FAILURE,
-                    "Incorrect number of arguments to @Statistics (expects 2, received " +
-                    params.toArray().length + ")", null, false);
-        }
-        Object first = params.toArray()[0];
-        if (!(first instanceof String)) {
-            return errorResponse(ccxn, task.clientHandle, ClientResponse.GRACEFUL_FAILURE,
-                    "First argument to @Statistics must be a valid STRING selector, instead was " +
-                    first, null, false);
-        }
-        String selector = (String)first;
+    ClientResponseImpl dispatchStatistics(OpsSelector selector, StoredProcedureInvocation task, Connection ccxn)
+    {
         try {
-            SysProcSelector s = SysProcSelector.valueOf(selector.toUpperCase());
-            selector = s.name();
-        }
-        catch (Exception e) {
-            return errorResponse(ccxn, task.clientHandle, ClientResponse.GRACEFUL_FAILURE,
-                    "First argument to @Statistics must be a valid STRING selector, instead was " +
-                    first, null, false);
-        }
-
-        boolean interval = false;
-        try {
-            if (params.toArray().length == 2) {
-                interval = ((Number)(params.toArray()[1])).longValue() == 1L;
+            OpsAgent agent = VoltDB.instance().getOpsAgent(selector);
+            if (agent != null) {
+                agent.performOpsAction(ccxn, task.clientHandle, selector, task.getParams());
             }
-        }
-        catch (Exception e) {
-            // ugh, don't care?
-        }
+            else {
+                return errorResponse(ccxn, task.clientHandle, ClientResponse.GRACEFUL_FAILURE,
+                        "Unknown OPS selector", null, true);
+            }
 
-        try {
-            VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, selector, interval);
             return null;
         } catch (Exception e) {
             return errorResponse( ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);
@@ -1864,11 +1906,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         task.getType() == ProcedureInvocationType.REPLICATED) {
                     sendSentinelsToAllPartitions(task.getOriginalTxnId());
                 }
+            } else if (task.procName.equals("@LoadSinglepartitionTable")) {
+                // FUTURE: When we get rid of the legacy hashinator, this should go away
+                return dispatchLoadSinglepartitionTable(buf, catProc, task, handler, ccxn);
             } else if (task.procName.equals("@SnapshotSave")) {
                 m_snapshotDaemon.requestUserSnapshot(task, ccxn);
                 return null;
             } else if (task.procName.equals("@Statistics")) {
-                return dispatchStatistics(catProc, buf, task, handler, ccxn);
+                return dispatchStatistics(OpsSelector.STATISTICS, task, ccxn);
             } else if (task.procName.equals("@Promote")) {
                 return dispatchPromote(catProc, buf, task, handler, ccxn);
             } else if (task.procName.equals("@SnapshotStatus")) {
@@ -1877,9 +1922,20 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 Object[] params = new Object[1];
                 params[0] = "SNAPSHOTSTATUS";
                 task.setParams(params);
-                return dispatchStatistics(SystemProcedureCatalog.listing.get("@Statistics").asCatalogProcedure(),
-                        buf, task, handler, ccxn);
+                return dispatchStatistics(OpsSelector.STATISTICS, task, ccxn);
+            } else if (task.procName.equals("@SystemCatalog")) {
+                return dispatchStatistics(OpsSelector.SYSTEMCATALOG, task, ccxn);
             }
+            else if (task.procName.equals("@SystemInformation")) {
+                return dispatchStatistics(OpsSelector.SYSTEMINFORMATION, task, ccxn);
+            }
+            else if (task.procName.equals("@SnapshotScan")) {
+                return dispatchStatistics(OpsSelector.SNAPSHOTSCAN, task, ccxn);
+            }
+            else if (task.procName.equals("@SnapshotDelete")) {
+                return dispatchStatistics(OpsSelector.SNAPSHOTDELETE, task, ccxn);
+            }
+
 
             // If you're going to copy and paste something, CnP the pattern
             // up above.  -rtb.
@@ -1892,14 +1948,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             new VoltTable[0],
                             "" + task.procName + " is not available to this client",
                             task.clientHandle);
-                }
-            }
-            else if (task.procName.equals("@SystemInformation")) {
-                ParameterSet params = task.getParams();
-                // hacky: support old @SystemInformation behavior by
-                // filling in a missing selector to get the overview key/value info
-                if (params.toArray().length == 0) {
-                    task.setParams("OVERVIEW");
                 }
             }
         }
@@ -2372,6 +2420,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         });
         spi.clientHandle = clientData;
+        // Ugh, need to consolidate this with handleRead() somehow but not feeling it at the moment
+        if (procedureName.equals("@SnapshotScan")) {
+            dispatchStatistics(OpsSelector.SNAPSHOTSCAN, spi, m_snapshotDaemonAdapter);
+            return;
+        }
+        else if (procedureName.equals("@SnapshotDelete")) {
+            dispatchStatistics(OpsSelector.SNAPSHOTDELETE, spi, m_snapshotDaemonAdapter);
+            return;
+        }
         // initiate the transaction
         createTransaction(m_snapshotDaemonAdapter.connectionId(),
                 "SnapshotDaemon",

@@ -50,12 +50,15 @@ __NULL = {FastSerializer.VOLTTYPE_TINYINT: FastSerializer.NULL_TINYINT_INDICATOR
           FastSerializer.VOLTTYPE_SMALLINT: FastSerializer.NULL_SMALLINT_INDICATOR,
           FastSerializer.VOLTTYPE_INTEGER: FastSerializer.NULL_INTEGER_INDICATOR,
           FastSerializer.VOLTTYPE_BIGINT: FastSerializer.NULL_BIGINT_INDICATOR,
-          FastSerializer.VOLTTYPE_FLOAT: FastSerializer.NULL_FLOAT_INDICATOR}
+          FastSerializer.VOLTTYPE_FLOAT: FastSerializer.NULL_FLOAT_INDICATOR,
+          FastSerializer.VOLTTYPE_STRING: FastSerializer.NULL_STRING_INDICATOR}
 
 SIGNIFICANT_DIGITS = 13
 
 def normalize_value(v, vtype):
     global __NULL
+    if not v:
+        return None
     if vtype in __NULL and v == __NULL[vtype]:
         return None
     elif vtype == FastSerializer.VOLTTYPE_FLOAT:
@@ -151,7 +154,6 @@ def parse_sql(x):
 def normalize(table, sql):
     """Normalizes the result tuples of ORDER BY statements.
     """
-
     normalize_values(table.tuples, table.columns)
 
     sort_cols = parse_sql(sql)

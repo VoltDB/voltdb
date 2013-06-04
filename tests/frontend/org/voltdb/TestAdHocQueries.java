@@ -498,6 +498,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("did not fail on selfjoin");
             }
             catch (ProcCallException pcex) {
+                System.out.println("DEBUG what?" + pcex.getMessage());
                 assertTrue(pcex.getMessage().indexOf("not support self joins") > 0);
             }
             adHocQuery = "SELECT PNAME \n" +
@@ -790,7 +791,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                                          BackendTarget.NATIVE_EE_JNI,
                                          LocalCluster.FailureState.ALL_RUNNING,
                                          m_debug);
-            m_cluster.setHasLocalServer(false);
+            m_cluster.setHasLocalServer(true);
             boolean success = m_cluster.compile(m_builder);
             assert(success);
 

@@ -323,7 +323,7 @@ public class SystemInformation extends VoltSystemProcedure
      * This function does the real work. Everything else is
      * boilerplate sysproc stuff.
      */
-    private VoltTable populateOverviewTable()
+    static public VoltTable populateOverviewTable()
     {
         VoltTable vt = constructOverviewTable();
         int hostId = VoltDB.instance().getHostMessenger().getHostId();
@@ -339,9 +339,9 @@ public class SystemInformation extends VoltSystemProcedure
             addr = InetAddress.getByName(iface);
             clientPort = jsObj.getInt("clientPort");
         } catch (JSONException e) {
-            hostLog.error("Failed to get local metadata", e);
+            hostLog.info("Failed to get local metadata, falling back to first resolvable IP address.");
         } catch (UnknownHostException e) {
-            hostLog.error("Failed to determine hostname", e);
+            hostLog.info("Failed to determine hostname, falling back to first resolvable IP address.");
         }
 
         // host name and IP address.
@@ -388,8 +388,7 @@ public class SystemInformation extends VoltSystemProcedure
         return vt;
     }
 
-    private VoltTable
-    populateDeploymentProperties(Cluster cluster, Database database)
+    static public VoltTable populateDeploymentProperties(Cluster cluster, Database database)
     {
         VoltTable results = new VoltTable(clusterInfoSchema);
         // it would be awesome if these property names could come
@@ -510,7 +509,7 @@ public class SystemInformation extends VoltSystemProcedure
         return results;
     }
 
-    private String addEscapes(String name)
+    static private String addEscapes(String name)
     {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < name.length(); i++)

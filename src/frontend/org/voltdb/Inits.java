@@ -215,7 +215,7 @@ public class Inits {
         SetupAdminMode
         StartHTTPServer
         InitHashinator
-        InitStatsAgent
+        InitAsyncCompilerAgent
         SetupReplicationRole
         CreateRestoreAgentAndPlan
         DistributeCatalog <- CreateRestoreAgentAndPlan
@@ -627,17 +627,13 @@ public class Inits {
         }
     }
 
-    class InitStatsAgent extends InitWork {
-        InitStatsAgent() {
+    class InitAsyncCompilerAgent extends InitWork {
+        InitAsyncCompilerAgent() {
         }
 
         @Override
         public void run() {
             try {
-                final long statsAgentHSId = m_rvdb.getHostMessenger().getHSIdForLocalSite(HostMessenger.STATS_SITE_ID);
-                m_rvdb.getStatsAgent().registerMailbox(
-                            VoltDB.instance().getHostMessenger(),
-                            statsAgentHSId);
                 m_rvdb.getAsyncCompilerAgent().createMailbox(
                             VoltDB.instance().getHostMessenger(),
                             m_rvdb.getHostMessenger().getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID));
