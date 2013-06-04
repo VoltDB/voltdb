@@ -36,7 +36,7 @@ import org.supercsv.exception.SuperCsvException;
 import org.supercsv.io.CsvListReader;
 import org.supercsv.io.ICsvListReader;
 import org.supercsv.prefs.CsvPreference;
-import org.tokenizer.Tokenizer;
+import org.supercsv_voltpatches.tokenizer.Tokenizer;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
@@ -101,9 +101,9 @@ public class CSVLoader {
     private static final class MyCallback implements ProcedureCallback {
         private final long m_lineNum;
         private final CSVConfig m_config;
-        private final String m_rowdata;
+        private final List<String> m_rowdata;
 
-        MyCallback(long lineNumber, CSVConfig cfg, String rowdata) {
+        MyCallback(long lineNumber, CSVConfig cfg, List<String> rowdata) {
             m_lineNum = lineNumber;
             m_config = cfg;
             m_rowdata = rowdata;
@@ -113,7 +113,7 @@ public class CSVLoader {
         public void clientCallback(ClientResponse response) throws Exception {
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 m_log.error( response.getStatusString() );
-                        String[] info = { m_rowdata, response.getStatusString() };
+                        String[] info = { m_rowdata.toString(), response.getStatusString() };
                 synchronizeErrorInfo( info );
                 return;
             }
@@ -292,46 +292,46 @@ public class CSVLoader {
 
             List<String> lineList = new ArrayList<String>();
             while ((config.limitrows-- > 0) && lineList != null ) {
-            try{
-                while( listReader.getLineNumber() < config.skip )
-                        lineList = listReader.read();
-                lineList = listReader.read();
-                if(lineList == null)
-                        break;
-                outCount.incrementAndGet();
-                boolean queued = false;
-                while (queued == false) {
-                    Object[] correctedLine = lineList.toArray();
-                    cb = new MyCallback(outCount.get(), config,
-                            lineList.toString());
-                    String lineCheckResult;
-
-                    if ((lineCheckResult = checkparams_trimspace(correctedLine,
-                            columnCnt)) != null) {
-                        String[] info = { lineList.toString(), lineCheckResult };
-                        synchronizeErrorInfo( info );
-                        break;
-                    }
-
-                    queued = csvClient.callProcedure(cb, insertProcedure,
-                            (Object[]) correctedLine);
-
-                    if (queued == false) {
-                        ++waits;
-                        if (lastOK == false) {
-                            ++shortWaits;
-                        }
-                        Thread.sleep(waitSeconds);
-                    }
-                    lastOK = queued;
-                }
-            }
-            catch (SuperCsvException e){
-                    //Catch rows that can not be read by superCSV listReader. E.g. items without quotes when strictquotes is enabled.
+                try{
+                    while( listReader.getLineNumber() < config.skip )
+                            lineList = listReader.read();
+                    lineList = listReader.read();
+                    if(lineList == null)
+                            break;
                     outCount.incrementAndGet();
-                    String[] info = { e.getMessage(), "" };
-            synchronizeErrorInfo( info );
-            }
+                    boolean queued = false;
+                    while (queued == false) {
+                        Object[] correctedLine = lineList.toArray();
+                        cb = new MyCallback(outCount.get(), config,
+                                lineList);
+                        String lineCheckResult;
+
+                        if ((lineCheckResult = checkparams_trimspace(correctedLine,
+                                columnCnt)) != null) {
+                            String[] info = { lineList.toString(), lineCheckResult };
+                            synchronizeErrorInfo( info );
+                            break;
+                        }
+
+                        queued = csvClient.callProcedure(cb, insertProcedure,
+                                (Object[]) correctedLine);
+
+                        if (queued == false) {
+                            ++waits;
+                            if (lastOK == false) {
+                                ++shortWaits;
+                            }
+                            Thread.sleep(waitSeconds);
+                        }
+                        lastOK = queued;
+                    }
+                }
+                catch (SuperCsvException e){
+                        //Catch rows that can not be read by superCSV listReader. E.g. items without quotes when strictquotes is enabled.
+                        outCount.incrementAndGet();
+                        String[] info = { e.getMessage(), "" };
+                synchronizeErrorInfo( info );
+                }
         }
             csvClient.drain();
         } catch (Exception e) {
@@ -369,8 +369,7 @@ public class CSVLoader {
         }
     }
 
-    private static String checkparams_trimspace(Object[] slot,
-            int columnCnt) {
+    private static String checkparams_trimspace(Object[] slot, int columnCnt) {
         if (slot.length != columnCnt) {
             return "Error: Incorrect number of columns. " + slot.length
                     + " found, " + columnCnt + " expected.";
@@ -380,31 +379,31 @@ public class CSVLoader {
             //supercsv read "" to null
             if( thisSlot == null )
             {
-                    if(config.blank.equalsIgnoreCase("error"))
-                    {
-                            return "Error: blank item";
-                    }
-            else if (config.blank.equalsIgnoreCase("empty"))
-                thisSlot = blankValues.get(typeList.get(i));
+                if(config.blank.equalsIgnoreCase("error"))
+                {
+                        return "Error: blank item";
+                }
+                else if (config.blank.equalsIgnoreCase("empty"))
+                    thisSlot = blankValues.get(typeList.get(i));
 
             //else config.blank == null which is already the case
             }
 
             // trim white space in this line. SuperCSV preserves all the whitespace by default
             else {
-                    String str = thisSlot.toString();
-                            if( config.nowhitespace &&
-                                    ( str.charAt(0) == ' ' || str.charAt( str.length() - 1 ) == ' ') ) {
-                                    return "Error: White Space Detected in nowhitespace mode.";
-                            }
-                            else
-                                    thisSlot = ((String) thisSlot).trim();
-                // treat NULL, \N and "\N" as actual null value
-                            if ( thisSlot.equals("NULL") || thisSlot.equals(VoltTable.CSV_NULL)
-                                            || !config.strictquotes && thisSlot.equals(VoltTable.QUOTED_CSV_NULL))
-                                    thisSlot = null;
+                String str = thisSlot.toString();
+                if( config.nowhitespace &&
+                        ( str.charAt(0) == ' ' || str.charAt( str.length() - 1 ) == ' ') ) {
+                    return "Error: White Space Detected in nowhitespace mode.";
                 }
-            }
+                else
+                    thisSlot = ((String) thisSlot).trim();
+                // treat NULL, \N and "\N" as actual null value
+                if ( thisSlot.equals("NULL") || thisSlot.equals(VoltTable.CSV_NULL)
+                                || !config.strictquotes && thisSlot.equals(VoltTable.QUOTED_CSV_NULL))
+                    thisSlot = null;
+                }
+        }
         return null;
     }
 
