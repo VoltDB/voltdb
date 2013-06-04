@@ -30,18 +30,17 @@ public enum OpsSelector {
     SYSTEMINFORMATION(SystemInformationAgent.class, HostMessenger.SYSINFO_SITE_ID);
 
     // OpsAgent subclass providing the implementation for this OPS selector
-    private final Class<?> m_agentClass;
+    private final Class<? extends OpsAgent> m_agentClass;
     // Well-known site ID for this OPS selector (I want to make this go away, but, no time)
     private final int m_siteId;
 
-    private OpsSelector(Class<?> agentClass, int siteId)
+    private <T extends OpsAgent> OpsSelector(Class<T> agentClass, int siteId)
     {
-        assert(agentClass.getSuperclass().getSimpleName().equalsIgnoreCase("OpsAgent"));
         m_agentClass = agentClass;
         m_siteId = siteId;
     }
 
-    public Class<?> getAgentClass()
+    public Class<? extends OpsAgent> getAgentClass()
     {
         return m_agentClass;
     }
