@@ -17,7 +17,7 @@
 package org.voltdb;
 
 import java.lang.reflect.Constructor;
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -34,7 +34,7 @@ public class OpsRegistrar {
      * instance of each OpsAgent for each selector.
      */
     public OpsRegistrar() {
-        m_agents = new HashMap<OpsSelector, OpsAgent>();
+        m_agents = new EnumMap<OpsSelector, OpsAgent>(OpsSelector.class);
         for (OpsSelector selector : OpsSelector.values()) {
             try {
                 Constructor<?> constructor = selector.getAgentClass()
