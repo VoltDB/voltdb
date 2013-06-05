@@ -1245,7 +1245,7 @@ void VoltDBIPC::pushExportBuffer(
 
 void VoltDBIPC::executeTask(struct ipc_command *cmd) {
     execute_task *task = (execute_task*)cmd;
-    int64_t taskId = ntohll(task->taskId);
+    voltdb::TaskType taskId = static_cast<voltdb::TaskType>(ntohll(task->taskId));
     m_engine->resetReusedResultOutputBuffer(1);
     m_engine->executeTask(taskId, task->task);
     int32_t responseLength = m_engine->getResultsSize();
