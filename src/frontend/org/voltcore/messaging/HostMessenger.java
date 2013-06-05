@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -63,6 +64,7 @@ import com.google.common.primitives.Longs;
  * and failure detection.
  */
 public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMessenger {
+
     private static final VoltLogger logger = new VoltLogger("NETWORK");
 
     /**
@@ -213,6 +215,27 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 this);
     }
 
+    private final DisconnectFailedHostsCallback m_failedHostsCallback = new DisconnectFailedHostsCallback() {
+        @Override
+        public void disconnect(Set<Integer> failedHostIds) {
+            synchronized(HostMessenger.this) {
+                for (int hostId: failedHostIds) {
+                    m_knownFailedHosts.add(hostId);
+                    removeForeignHost(hostId);
+                    logger.warn(String.format("Host %d failed", hostId));
+                }
+            }
+        }
+        @Override
+        public void disconnect(int failedHostId) {
+            synchronized(HostMessenger.this) {
+                m_knownFailedHosts.add(failedHostId);
+                removeForeignHost(failedHostId);
+                logger.warn(String.format("Host %d failed", failedHostId));
+            }
+        }
+    };
+
     /**
      * Synchronization protects m_knownFailedHosts and ensures that every failed host is only reported
      * once
@@ -225,7 +248,18 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         m_knownFailedHosts.add(hostId);
         long initiatorSiteId = CoreUtils.getHSIdFromHostAndSite(hostId, AGREEMENT_SITE_ID);
         removeForeignHost(hostId);
-        m_agreementSite.reportFault(initiatorSiteId);
+        m_agreementSite.reportFault(initiatorSiteId, true);
+        logger.warn(String.format("Host %d failed", hostId));
+    }
+
+    @Override
+    public synchronized void relayForeignHostFailed(int hostId) {
+        if (m_knownFailedHosts.contains(hostId)) {
+            return;
+        }
+        long initiatorSiteId = CoreUtils.getHSIdFromHostAndSite(hostId, AGREEMENT_SITE_ID);
+        removeForeignHost(hostId);
+        m_agreementSite.reportFault(initiatorSiteId, false /* not detected */);
         logger.warn(String.format("Host %d failed", hostId));
     }
 
@@ -277,7 +311,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                         new InetSocketAddress(
                                 m_config.zkInterface.split(":")[0],
                                 Integer.parseInt(m_config.zkInterface.split(":")[1])),
-                                m_config.backwardsTimeForgivenessWindow);
+                                m_config.backwardsTimeForgivenessWindow,
+                                m_failedHostsCallback);
             m_agreementSite.start();
             m_agreementSite.waitForRecovery();
             m_zk = org.voltcore.zk.ZKUtil.getClient(
@@ -584,7 +619,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                     new InetSocketAddress(
                             m_config.zkInterface.split(":")[0],
                             Integer.parseInt(m_config.zkInterface.split(":")[1])),
-                            m_config.backwardsTimeForgivenessWindow);
+                            m_config.backwardsTimeForgivenessWindow,
+                            m_failedHostsCallback);
 
         /*
          * Now that the agreement site mailbox has been created it is safe

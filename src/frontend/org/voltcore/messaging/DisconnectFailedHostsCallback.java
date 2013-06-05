@@ -14,10 +14,12 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.voltcore.agreement;
 
-public interface InterfaceToMessenger {
-    public void reportForeignHostFailed(int hostId);
-    public void relayForeignHostFailed(int hostId);
-    public String getHostnameForHostID(int hostId);
+package org.voltcore.messaging;
+
+import java.util.Set;
+
+public interface DisconnectFailedHostsCallback {
+    public void disconnect(Set<Integer> failedHostIds);
+    public void disconnect(int failedHostId);
 }

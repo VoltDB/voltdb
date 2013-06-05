@@ -319,7 +319,7 @@ public class ForeignHost {
         if (message instanceof FailureSiteUpdateMessage)
         {
             for (long failedHostId : ((FailureSiteUpdateMessage)message).m_failedHSIds) {
-                m_hostMessenger.reportForeignHostFailed((int)failedHostId);
+                m_hostMessenger.relayForeignHostFailed((int)failedHostId);
             }
         }
     }

@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -49,6 +48,7 @@ import org.voltcore.TransactionIdManager;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.AgreementTaskMessage;
 import org.voltcore.messaging.BinaryPayloadMessage;
+import org.voltcore.messaging.DisconnectFailedHostsCallback;
 import org.voltcore.messaging.FailureSiteUpdateMessage;
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HeartbeatResponseMessage;
@@ -112,6 +112,9 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     private byte m_recoverySnapshot[] = null;
     private Long m_recoverBeforeTxn = null;
     private Long m_siteRequestingRecovery = null;
+    private final DisconnectFailedHostsCallback m_failedHostsCallback;
+    private final MeshArbiter m_meshArbiter;
+
 
     /**
      * Failed sites which haven't been agreed upon as failed
@@ -121,9 +124,11 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     public static final class FaultMessage extends VoltMessage {
 
         public final long failedSite;
+        public final boolean detected;
 
-        public FaultMessage(long failedSite) {
+        public FaultMessage(long failedSite, boolean detected) {
             this.failedSite = failedSite;
+            this.detected = detected;
         }
 
         @Override
@@ -153,10 +158,13 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             int initiatorId,
             Mailbox mailbox,
             InetSocketAddress address,
-            long backwardsTimeForgiveness) throws IOException {
+            long backwardsTimeForgiveness,
+            DisconnectFailedHostsCallback failedHostsCallback
+            ) throws IOException {
         m_mailbox = mailbox;
         m_hsId = myAgreementHSId;
         m_hsIds.addAll(agreementHSIds);
+        m_failedHostsCallback = failedHostsCallback;
 
         m_idManager = new TransactionIdManager( initiatorId, 0, backwardsTimeForgiveness );
         // note, the agreement site always uses the safety dance, even
@@ -170,8 +178,8 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             m_safetyState.addState(hsId);
         }
 
-        m_cnxnFactory =
-            new NIOServerCnxn.Factory( address, 10);
+        m_meshArbiter = new MeshArbiter(m_hsId, mailbox, m_meshAide);
+        m_cnxnFactory = new NIOServerCnxn.Factory( address, 10);
         m_server = new ZooKeeperServer(this);
         if (agreementHSIds.size() > 1) {
             m_recovering = true;
@@ -342,8 +350,12 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     }
 
     private void sendHeartbeats() {
+        sendHeartbeats(m_hsIds);
+    }
+
+    private void sendHeartbeats(Set<Long> hsIds) {
         long txnId = m_idManager.getNextUniqueTransactionId();
-        for (long initiatorId : m_hsIds) {
+        for (long initiatorId : hsIds) {
             HeartbeatMessage heartbeat =
                 new HeartbeatMessage( m_hsId, txnId, m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(initiatorId));
             m_mailbox.send( initiatorId, heartbeat);
@@ -506,6 +518,15 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 " ignoring");
                 return;
             }
+
+            if (m_recovering) {
+                org.voltdb.VoltDB.crashLocalVoltDB(
+                        "Aborting recovery due to a remote node (" + CoreUtils.hsIdToString(fm.failedSite) +
+                        ") failure. Retry again.",
+                        true,
+                        null);
+            }
+
             discoverGlobalFaultData(fm);
         } else if (message instanceof RecoveryMessage) {
             RecoveryMessage rm = (RecoveryMessage)message;
@@ -558,10 +579,45 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
      * Key is source site, and initiator id
      * Value is safe txnid
      */
-    private final HashMap<Pair<Long, Long>, Long>
-    m_failureSiteUpdateLedger = new HashMap<Pair<Long, Long>, Long>();
+    private final HashMap<Pair<Long, Long>, Long> m_failureSiteUpdateLedger =
+            new HashMap<Pair<Long, Long>, Long>();
+
+    private final MeshAide m_meshAide = new MeshAide() {
+        @Override
+        public void sendHeartbeats(Set<Long> hsIds) {
+            sendHeartbeats(hsIds);
+        }
+        @Override
+        public Long getNewestSafeTransactionForInitiator(Long initiatorId) {
+            return m_txnQueue.getNewestSafeTransactionForInitiator(initiatorId);
+        }
+    };
 
     private void discoverGlobalFaultData(FaultMessage faultMessage) {
+        //Keep it simple and don't try to recover on the recovering node.
+        if (m_recovering) {
+            org.voltdb.VoltDB.crashLocalVoltDB(
+                    "Aborting recovery due to a remote node (" + CoreUtils.hsIdToString(faultMessage.failedSite) +
+                    ") failure. Retry again.",
+                    true,
+                    null);
+        }
+        Map<Long, Long> initiatorSafeInitPoint = m_meshArbiter.reconfigureOnFault(m_hsIds, faultMessage);
+        if (initiatorSafeInitPoint.isEmpty()) return;
+
+        Set<Long> failedSites = initiatorSafeInitPoint.keySet();
+        handleSiteFaults(failedSites,initiatorSafeInitPoint);
+
+        ImmutableSet.Builder<Integer> failedHosts = ImmutableSet.builder();
+        for (long hsId: failedSites) {
+            failedHosts.add(CoreUtils.getHostIdFromHSId(hsId));
+        }
+        m_failedHostsCallback.disconnect(failedHosts.build());
+
+        m_hsIds.removeAll(failedSites);
+    }
+
+    private void oldDiscoverGlobalFaultData(FaultMessage faultMessage) {
         //Keep it simple and don't try to recover on the recovering node.
         if (m_recovering) {
             org.voltdb.VoltDB.crashLocalVoltDB(
@@ -592,8 +648,9 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     }
 
     private void handleSiteFaults(
-            HashMap<Long, Long> initiatorSafeInitPoint) {
-        Set<Long> newFailedSiteIds = Collections.unmodifiableSet(m_pendingFailedSites);
+            Set<Long> newFailedSiteIds,
+            Map<Long, Long> initiatorSafeInitPoint) {
+
         m_recoveryLog.info("Agreement, handling site faults for newly failed sites " +
                 CoreUtils.hsIdCollectionToString(newFailedSiteIds) +
                 " initiatorSafeInitPoints " + CoreUtils.hsIdKeyMapToString(initiatorSafeInitPoint));
@@ -625,6 +682,10 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 m_txnQueue.faultTransaction(ts);
             }
         }
+    }
+
+    private void handleSiteFaults(HashMap<Long, Long> initiatorSafeInitPoint) {
+        handleSiteFaults(ImmutableSet.copyOf(m_pendingFailedSites), initiatorSafeInitPoint);
     }
 
     /**
@@ -857,8 +918,8 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         return sem;
     }
 
-    public void reportFault(long faultingSite) {
-        FaultMessage fm = new FaultMessage(faultingSite);
+    public void reportFault(long faultingSite, boolean detected) {
+        FaultMessage fm = new FaultMessage(faultingSite, detected);
         fm.m_sourceHSId = m_hsId;
         m_mailbox.deliver(fm);
     }
