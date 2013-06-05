@@ -113,7 +113,7 @@ public class CSVLoader {
         public void clientCallback(ClientResponse response) throws Exception {
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 m_log.error( response.getStatusString() );
-                        String[] info = { m_rowdata.toString(), response.getStatusString() };
+                String[] info = { m_rowdata.toString(), response.getStatusString() };
                 synchronizeErrorInfo( info );
                 return;
             }
@@ -294,10 +294,10 @@ public class CSVLoader {
             while ((config.limitrows-- > 0) && lineList != null ) {
                 try{
                     while( listReader.getLineNumber() < config.skip )
-                            lineList = listReader.read();
+                        lineList = listReader.read();
                     lineList = listReader.read();
                     if(lineList == null)
-                            break;
+                        break;
                     outCount.incrementAndGet();
                     boolean queued = false;
                     while (queued == false) {
@@ -327,12 +327,12 @@ public class CSVLoader {
                     }
                 }
                 catch (SuperCsvException e){
-                        //Catch rows that can not be read by superCSV listReader. E.g. items without quotes when strictquotes is enabled.
-                        outCount.incrementAndGet();
-                        String[] info = { e.getMessage(), "" };
-                synchronizeErrorInfo( info );
+                    //Catch rows that can not be read by superCSV listReader. E.g. items without quotes when strictquotes is enabled.
+                    outCount.incrementAndGet();
+                    String[] info = { e.getMessage(), "" };
+                    synchronizeErrorInfo( info );
                 }
-        }
+            }
             csvClient.drain();
         } catch (Exception e) {
             e.printStackTrace();
@@ -390,16 +390,16 @@ public class CSVLoader {
             else {
                 String str = thisSlot.toString();
                 if( config.nowhitespace &&
-                  ( str.charAt(0) == ' ' || str.charAt( str.length() - 1 ) == ' ') ) {
+                        ( str.charAt(0) == ' ' || str.charAt( str.length() - 1 ) == ' ') ) {
                     return "Error: White Space Detected in nowhitespace mode.";
                 }
                 else
                     thisSlot = ((String) thisSlot).trim();
                 // treat NULL, \N and "\N" as actual null value
                 if ( thisSlot.equals("NULL") || thisSlot.equals(VoltTable.CSV_NULL) ||
-                     !config.strictquotes && thisSlot.equals(VoltTable.QUOTED_CSV_NULL))
+                        !config.strictquotes && thisSlot.equals(VoltTable.QUOTED_CSV_NULL))
                     thisSlot = null;
-                }
+            }
         }
         return null;
     }
