@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 import org.voltcore.agreement.AgreementSite.FaultMessage;
 import org.voltcore.logging.VoltLogger;
@@ -49,6 +50,7 @@ public class MeshArbiter {
     protected final MeshAide m_meshAide;
     protected final HashMap<Pair<Long, Long>, Long> m_failureSiteUpdateLedger =
             new HashMap<Pair<Long, Long>, Long>();
+    protected final Set<Long> m_failedSites = new TreeSet<Long>();
 
     public MeshArbiter(final long hsId, final Mailbox mailbox,
             final MeshAide meshAide) {
@@ -59,6 +61,11 @@ public class MeshArbiter {
     }
 
     public Map<Long,Long> reconfigureOnFault(Set<Long> hsIds, AgreementSite.FaultMessage fm) {
+        if (m_failedSites.contains(fm.failedSite)) {
+            m_recoveryLog.debug("Received fault message for stale failed site " +
+                    CoreUtils.hsIdToString(fm.failedSite) + " ignoring");
+            return ImmutableMap.of();
+        }
 
         if (m_inTrouble.containsKey(fm.failedSite)) {
 
@@ -84,11 +91,12 @@ public class MeshArbiter {
         discoverGlobalFaultData_send(survivors);
 
         if (discoverGlobalFaultData_rcv(hsIds,survivors)) {
+            m_failedSites.addAll(m_inTrouble.keySet());
+            m_inTrouble.clear();
             return extractGlobalFaultData(hsIds,survivors);
         } else {
             return ImmutableMap.of();
         }
-
     }
 
     /**
