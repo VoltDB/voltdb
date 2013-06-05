@@ -835,11 +835,9 @@ public class TestPlansJoin extends PlannerTestCase {
                      "VoltDB does not support full outer joins");
        failToCompile("select R1.C FROM R1 FULL OUTER JOIN R2 ON R1.C = R2.C",
                      "VoltDB does not support full outer joins");
-//       // OUTER JOIN with more then two tables. Temporary restriction
-//       failToCompile("select R1.C FROM R1 LEFT OUTER JOIN R2 ON R1.C = R2.C RIGHT JOIN R3 ON R3.C = R1.C",
-//                     "VoltDB does not support outer joins with more than two tables involved");
-//       failToCompile("select R1.C FROM R1 LEFT JOIN R2 ON R1.C = R2.C, R3 WHERE R3.C = R1.C",
-//                     "VoltDB does not support outer joins with more than two tables involved");
+       // OUTER JOIN with >5 tables.
+       failToCompile("select R1.C FROM R3,R2, P1, P2, P3 LEFT OUTER JOIN R1 ON R1.C = R2.C WHERE R3.A = R2.A and R2.A = P1.A and P1.A = P2.A and P3.A = P2.A",
+                     "join of > 5 tables was requested without specifying a join order");
        // Self JOIN . Temporary restriction
        failToCompile("select R1.C FROM R1 LEFT OUTER JOIN R2 ON R1.C = R2.C RIGHT JOIN R2 ON R2.C = R1.C",
                      "VoltDB does not support self joins, consider using views instead");
@@ -901,6 +899,194 @@ public class TestPlansJoin extends PlannerTestCase {
        assertTrue(n instanceof NestLoopPlanNode);
        assertTrue(((NestLoopPlanNode) n).getJoinType() == JoinType.LEFT);
    }
+
+    public void testInnerOuterJoin() {
+        AbstractPlanNode pn = compile("select * FROM R1 INNER JOIN R2 ON R1.A = R2.A LEFT JOIN R3 ON R3.C = R2.C");
+        AbstractPlanNode n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        NestLoopPlanNode nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.LEFT == nlj.getJoinType());
+        n = nlj.getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.INNER == nlj.getJoinType());
+
+        pn = compile("select * FROM R1, R2 LEFT JOIN R3 ON R3.C = R2.C WHERE R1.A = R2.A");
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.LEFT == nlj.getJoinType());
+        n = nlj.getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.INNER == nlj.getJoinType());
+    }
+
+    public void testOuterOuterJoin() {
+        AbstractPlanNode pn = compile("select * FROM R1 LEFT JOIN R2 ON R1.A = R2.A LEFT JOIN R3 ON R3.C = R1.C");
+        AbstractPlanNode n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        NestLoopPlanNode nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.LEFT == nlj.getJoinType());
+        n = nlj.getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.LEFT == nlj.getJoinType());
+
+        pn = compile("select * FROM R1 LEFT JOIN R2 ON R1.A = R2.A RIGHT JOIN R3 ON R3.C = R1.C");
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.LEFT == nlj.getJoinType());
+        n = nlj.getChild(1);
+        assertTrue(n instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.LEFT == nlj.getJoinType());
+
+        pn = compile("select * FROM R1 RIGHT JOIN R2 ON R1.A = R2.A RIGHT JOIN R3 ON R3.C = R2.C");
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.LEFT == nlj.getJoinType());
+        n = nlj.getChild(1);
+        assertTrue(n instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.LEFT == nlj.getJoinType());
+    }
+
+    public void testPushDownExprJoin() {
+        // R3.A > 0 gets pushed down all the way to the R3 scan node and used as an index
+        AbstractPlanNode pn = compile("select * FROM R3, R2 LEFT JOIN R1 ON R1.C = R2.C WHERE R3.C = R2.C AND R3.A > 0");
+        AbstractPlanNode n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        NestLoopPlanNode nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.LEFT == nlj.getJoinType());
+        n = nlj.getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.INNER == nlj.getJoinType());
+        n = nlj.getChild(0);
+        assertTrue(n instanceof IndexScanPlanNode);
+
+        // R3.A > 0 is now outer join expresion and must stay at the LEF join
+        pn = compile("select * FROM R3, R2 LEFT JOIN R1 ON R1.C = R2.C  AND R3.A > 0 WHERE R3.C = R2.C");
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.LEFT == nlj.getJoinType());
+        n = nlj.getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.INNER == nlj.getJoinType());
+        n = nlj.getChild(0);
+        assertTrue(n instanceof SeqScanPlanNode);
+
+        pn = compile("select * FROM R3 JOIN R2 ON R3.C = R2.C RIGHT JOIN R1 ON R1.C = R2.C  AND R3.A > 0");
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.LEFT == nlj.getJoinType());
+        n = nlj.getChild(1);
+        assertTrue(n instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.INNER == nlj.getJoinType());
+        n = nlj.getChild(0);
+        assertTrue(n instanceof SeqScanPlanNode);
+
+        // R3.A > 0 gets pushed down all the way to the R3 scan node and used as an index
+        pn = compile("select * FROM R2, R3 LEFT JOIN R1 ON R1.C = R2.C WHERE R3.C = R2.C AND R3.A > 0");
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.LEFT == nlj.getJoinType());
+        n = nlj.getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.INNER == nlj.getJoinType());
+        n = nlj.getChild(1);
+        assertTrue(n instanceof IndexScanPlanNode);
+
+        // R3.A = R2.C gets pushed down to the R2, R3 join node scan node and used as an index
+        pn = compile("select * FROM R2, R3 LEFT JOIN R1 ON R1.C = R2.C WHERE R3.A = R2.C");
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.LEFT == nlj.getJoinType());
+        n = nlj.getChild(0);
+        assertTrue(n instanceof NestLoopIndexPlanNode);
+        NestLoopIndexPlanNode nlij = (NestLoopIndexPlanNode) n;
+        assertTrue(JoinType.INNER == nlij.getJoinType());
+    }
+
+    public void testOuterSimplificationJoin() {
+        // NULL_rejection simplification is the first transformation -
+        // before the LEFT-to-RIGHT and the WHERE expressions push down
+        AbstractPlanNode pn = compile("select * FROM R1, R3 RIGHT JOIN R2 ON R1.A = R2.A WHERE R3.C = R1.C");
+        AbstractPlanNode n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        NestLoopPlanNode nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.INNER == nlj.getJoinType());
+        n = nlj.getChild(1);
+        assertTrue(n instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.INNER == nlj.getJoinType());
+
+        // The second R3.C = R2.C join condition is NULL-rejecting for the first LEFT join
+        pn = compile("select * FROM R1 LEFT JOIN R2 ON R1.A = R2.A LEFT JOIN R3 ON R3.C = R2.C");
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.LEFT == nlj.getJoinType());
+        n = nlj.getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.INNER == nlj.getJoinType());
+
+        // The second R3.C = R2.C join condition is NULL-rejecting for the first LEFT join
+        pn = compile("select * FROM R1 LEFT JOIN R2 ON R1.A = R2.A RIGHT JOIN R3 ON R3.C = R2.C");
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.LEFT == nlj.getJoinType());
+        n = nlj.getChild(1);
+        assertTrue(n instanceof NestLoopPlanNode);
+        nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.INNER == nlj.getJoinType());
+    }
+
+    public void testMultitableDistributedJoin() {
+      // One distributed table
+      List<AbstractPlanNode> lpn = compileToFragments("select *  FROM R3,R1 LEFT JOIN P2 ON R3.A = P2.A WHERE R3.A=R1.A ");
+      assertTrue(lpn.size() == 2);
+      AbstractPlanNode n = lpn.get(0).getChild(0).getChild(0);
+      assertTrue(n instanceof NestLoopPlanNode);
+      assertTrue(JoinType.LEFT == ((NestLoopPlanNode) n).getJoinType());
+      AbstractPlanNode c = n.getChild(0);
+      assertTrue(c instanceof NestLoopPlanNode);
+
+      // R3.A and P2.A have an index. P2,R1 is NLJ/IndexScan because P2 is distributed
+      lpn = compileToFragments("select *  FROM P2,R1 LEFT JOIN R3 ON R3.A = P2.A WHERE P2.A=R1.A ");
+      assertTrue(lpn.size() == 2);
+      n = lpn.get(0).getChild(0).getChild(0);
+      assertTrue(n instanceof NestLoopIndexPlanNode);
+      assertTrue(JoinType.LEFT == ((NestLoopIndexPlanNode) n).getJoinType());
+      c = n.getChild(0);
+      assertTrue(c instanceof NestLoopPlanNode);
+      assertTrue(JoinType.INNER == ((NestLoopPlanNode) c).getJoinType());
+      n = lpn.get(1).getChild(0);
+      assertTrue(n instanceof IndexScanPlanNode);
+
+      // Two distributed table
+      lpn = compileToFragments("select *  FROM R3,P1 LEFT JOIN P2 ON R3.A = P2.A WHERE R3.A=P1.A ");
+      assertTrue(lpn.size() == 2);
+      n = lpn.get(0).getChild(0).getChild(0);
+      assertTrue(n instanceof ReceivePlanNode);
+      n = lpn.get(1).getChild(0);
+      assertTrue(JoinType.LEFT == ((NestLoopIndexPlanNode) n).getJoinType());
+      c = n.getChild(0);
+      assertTrue(c instanceof NestLoopPlanNode);
+      assertTrue(JoinType.INNER == ((NestLoopPlanNode) c).getJoinType());
+    }
 
     @Override
     protected void setUp() throws Exception {
