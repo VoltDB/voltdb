@@ -21,7 +21,6 @@ import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultConstants;
-import org.voltdb.planner.AbstractParsedStmt;
 
 /**
  * This class is built to create a single in-memory database
@@ -200,7 +199,7 @@ public class HSQLInterface {
 
     /**
      * Loop through any in-lists found in the XML and munge them into the
-     * simpler thing we want to pass to the {@link AbstractParsedStmt}.
+     * simpler thing we want to pass to the AbstractParsedStmt.
      */
     private void fixupInStatementExpressions(VoltXMLElement root) {
         while (true) {
