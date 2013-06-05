@@ -308,20 +308,15 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public StatsAgent getStatsAgent()
+    public OpsAgent getOpsAgent(OpsSelector selector)
     {
-        return m_statsAgent;
+        return null;
     }
 
     @Override
-    public SystemCatalogAgent getSystemCatalogAgent()
+    public StatsAgent getStatsAgent()
     {
-        return null;
-    }
-    @Override
-    public SystemInformationAgent getSystemInformationAgent()
-    {
-        return null;
+        return m_statsAgent;
     }
 
     @Override

@@ -124,7 +124,8 @@ public class TestClientInterface {
          */
         VoltDB.replaceVoltDBInstanceForTest(m_volt);
         doReturn(m_statsAgent).when(m_volt).getStatsAgent();
-        doReturn(m_sysinfoAgent).when(m_volt).getSystemInformationAgent();
+        doReturn(m_statsAgent).when(m_volt).getOpsAgent(OpsSelector.STATISTICS);
+        doReturn(m_sysinfoAgent).when(m_volt).getOpsAgent(OpsSelector.SYSTEMINFORMATION);
         doReturn(mock(SnapshotCompletionMonitor.class)).when(m_volt).getSnapshotCompletionMonitor();
         doReturn(m_messenger).when(m_volt).getHostMessenger();
         doReturn(mock(VoltNetworkPool.class)).when(m_messenger).getNetwork();
