@@ -142,7 +142,6 @@ public class TestCSVLoader extends TestCase {
                     "--quotechar=\"",
                     "--escape=\\",
                     "--skip=0",
-                    "--nowhitespace",
                     //"--strictquotes",
                     "BLAH"
             };
@@ -204,8 +203,7 @@ public class TestCSVLoader extends TestCase {
                 "--separator=,",
                 "--quotechar=\"",
                 "--escape=\\",
-                "--skip=0",
-                "--nowhitespace",
+                "--skip=1",
                 //"--strictquotes",
                 "BlAh"
         };
@@ -218,13 +216,128 @@ public class TestCSVLoader extends TestCase {
                 "6,6,NULL,666666, sixth, 6.60, 6.66,"+currentTime,
                 "7,NULL,7,7777777, seventh, 7.70, 7.77,"+currentTime,
                 "11, 1,1,\"1,000\",first,1.10,1.11,"+currentTime,
+                //empty line
+                "",
                 //invalid lines below
                 "8, 8",
-                "",
                 "10,10,10,10 101 010,second,2.20,2.22"+currentTime,
                 "12,n ull,12,12121212,twelveth,12.12,12.12"
         };
-        int invalidLineCnt = 4;
+        int invalidLineCnt = 3;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+    }
+
+    public void testOpenQuote() throws Exception
+    {
+        String mySchema =
+                "create table BLAH (" +
+                        "clm_integer integer default 0 not null, " + // column that is partitioned on
+
+                "clm_integer1 integer default 0, " +
+                "clm_bigint bigint default 0, " +
+
+                "clm_string varchar(200) default null, " +
+                "clm_timestamp timestamp default null " +
+                "); ";
+        String []myOptions = {
+                "-f" + path_csv,
+                //"--procedure=blah.insert",
+                "--reportdir=" + reportDir,
+                //"--table=BLAH",
+                "--maxerrors=50",
+                //"-user",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--skip=0",
+                "BlAh"
+        };
+        String []myData = {
+                        "1,1,1,\"Jesus\\\"\"loves"+ "\n" +"you\",\"7777-12-25 14:35:26\"",
+        };
+        int invalidLineCnt = 0;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+    }
+
+    public void testOpenQuoteAndStrictQuotes() throws Exception
+    {
+        String mySchema =
+                "create table BLAH (" +
+                        "clm_integer integer default 0 not null, " + // column that is partitioned on
+
+                "clm_integer1 integer default 0, " +
+                "clm_bigint bigint default 0, " +
+
+                "clm_string varchar(200) default null, " +
+                "clm_timestamp timestamp default null " +
+                "); ";
+        String []myOptions = {
+                "-f" + path_csv,
+                //"--procedure=blah.insert",
+                "--reportdir=" + reportDir,
+                //"--table=BLAH",
+                "--maxerrors=50",
+                //"-user",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--skip=0",
+                "--strictquotes",
+                "BlAh"
+        };
+        String []myData = {
+                        "\"1\",\"1\",\"1\",\"Jesus\\\"\"loves"+ "\n" +"you\",\"7777-12-25 14:35:26\"",
+        };
+        int invalidLineCnt = 0;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+    }
+
+    public void testUnmatchQuote() throws Exception
+    {
+        //test the following csv data
+        //1,1,1,"Jesus\""loves","7777-12-25 14:35:26"
+        //1,1,1,"Jesus\""loves
+        //you,"7777-12-25 14:35:26"
+        String mySchema =
+                "create table BLAH (" +
+                        "clm_integer integer default 0 not null, " + // column that is partitioned on
+
+                "clm_integer1 integer default 0, " +
+                "clm_bigint bigint default 0, " +
+
+                "clm_string varchar(200) default null, " +
+                "clm_timestamp timestamp default null " +
+                "); ";
+        String []myOptions = {
+                "-f" + path_csv,
+                //"--procedure=blah.insert",
+                "--reportdir=" + reportDir,
+                //"--table=BLAH",
+                "--maxerrors=50",
+                //"-user",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--skip=0",
+                //"--strictquotes",
+                "BlAh"
+        };
+        String []myData = {
+                        //valid line from shopzilla: unmatched quote is between two commas(which is treated as strings).
+                        "1,1,1,\"Jesus\\\"\"loves"+ "\n" +"you\",\"7777-12-25 14:35:26\"",
+                        //invalid line: unmatched quote
+                        "1,1,1,\"Jesus\\\"\"loves"+ "\n" +"you,\"7777-12-25 14:35:26\"",
+        };
+        int invalidLineCnt = 1;
         test_Interface( mySchema, myOptions, myData, invalidLineCnt );
     }
 
@@ -256,19 +369,18 @@ public class TestCSVLoader extends TestCase {
                 "--quotechar=\"",
                 "--escape=\\",
                 "--skip=0",
-                "--nowhitespace",
                 //"--strictquotes",
                 "BLAH"
         };
-
+        //Both \N and \\N as csv input are treated as NULL
         String []myData = {
-                "1," + VoltTable.CSV_NULL        + ",1,11111111,\"\"NULL\"\",1.10,1.11",
+                "1,\\" + VoltTable.CSV_NULL        + ",1,11111111,\"\"NULL\"\",1.10,1.11",
                 "2," + VoltTable.QUOTED_CSV_NULL + ",1,11111111,\"NULL\",1.10,1.11",
-                "3," + VoltTable.CSV_NULL        + ",1,11111111,  " + VoltTable.CSV_NULL        + "  ,1.10,1.11",
+                "3," + VoltTable.CSV_NULL        + ",1,11111111,  \\" + VoltTable.CSV_NULL        + "  ,1.10,1.11",
                 "4," + VoltTable.CSV_NULL        + ",1,11111111,  " + VoltTable.QUOTED_CSV_NULL + "  ,1.10,1.11",
-                "5," + VoltTable.CSV_NULL        + ",1,11111111, \"  " + VoltTable.CSV_NULL   + "  \",1.10,1.11",
-                "6," + VoltTable.CSV_NULL        + ",1,11111111, \"  " + VoltTable.CSV_NULL  + " L \",1.10,1.11",
-                "7," + VoltTable.CSV_NULL        + ",1,11111111,  \"abc" + VoltTable.CSV_NULL + "\"  ,1.10,1.11"
+                "5,\\" + VoltTable.CSV_NULL        + ",1,11111111, \"  \\" + VoltTable.CSV_NULL   + "  \",1.10,1.11",
+                "6,\\" + VoltTable.CSV_NULL        + ",1,11111111, \"  \\" + VoltTable.CSV_NULL  + " L \",1.10,1.11",
+                "7,\\" + VoltTable.CSV_NULL        + ",1,11111111,  \"abc\\" + VoltTable.CSV_NULL + "\"  ,1.10,1.11"
         };
         int invalidLineCnt = 0;
         test_Interface( mySchema, myOptions, myData, invalidLineCnt );
@@ -330,6 +442,7 @@ public class TestCSVLoader extends TestCase {
         test_Interface( mySchema, myOptions, myData, invalidLineCnt );
     }
 
+    //SuperCSV treats empty string "" as null
     public void testBlankError() throws Exception
     {
         String mySchema =
@@ -353,6 +466,186 @@ public class TestCSVLoader extends TestCase {
 
         String []myData = {
                 "0,,,,,,,,",
+        };
+        int invalidLineCnt = 1;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+    }
+
+    public void testStrictQuote() throws Exception
+    {
+        String mySchema =
+                "create table BLAH (" +
+                        "clm_integer integer default 0 not null, " + // column that is partitioned on
+                        "clm_tinyint tinyint default 0, " +
+                        "clm_smallint smallint default 0, " +
+                        "); ";
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--strictquotes",
+                "BLAH"
+        };
+
+        String []myData = {
+                "\"1\",\"1\",\"1\"",
+                "2,2,2",
+                "3,3,3",
+                "\"4\",\"4\",\"4\"",
+        };
+        int invalidLineCnt = 2;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+    }
+
+    public void testSkip() throws Exception
+    {
+        String mySchema =
+                "create table BLAH (" +
+                        "clm_integer integer default 0 not null, " + // column that is partitioned on
+
+                "clm_tinyint tinyint default 0, " +
+                "clm_smallint smallint default 0, " +
+                "clm_bigint bigint default 0, " +
+
+                "clm_string varchar(20) default null, " +
+                "clm_decimal decimal default null, " +
+                "clm_float float default null, "+
+                //"clm_varinary varbinary default null," +
+                "clm_timestamp timestamp default null " +
+                "); ";
+        String []myOptions = {
+                "-f" + path_csv,
+                //"--procedure=blah.insert",
+                "--reportdir=" + reportDir,
+                //"--table=BLAH",
+                "--maxerrors=50",
+                //"-user",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--skip=10",
+                //"--strictquotes",
+                "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String []myData = { "1,1,1,11111111,first,1.10,1.11,"+currentTime,
+                "2,2,2,222222,second,3.30,NULL,"+currentTime,
+                "3,3,3,333333, third ,NULL, 3.33,"+currentTime,
+                "4,4,4,444444, NULL ,4.40 ,4.44,"+currentTime,
+                "5,5,5,5555555,  \"abcde\"g, 5.50, 5.55,"+currentTime,
+                "6,6,NULL,666666, sixth, 6.60, 6.66,"+currentTime,
+                "7,NULL,7,7777777, seventh, 7.70, 7.77,"+currentTime,
+                "11, 1,1,\"1,000\",first,1.10,1.11,"+currentTime,
+                //empty line
+                "",
+                //invalid lines below
+                "8, 8",
+                "10,10,10,10 101 010,second,2.20,2.22"+currentTime,
+                "12,n ull,12,12121212,twelveth,12.12,12.12"
+        };
+        int invalidLineCnt = 2;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+    }
+
+    public void testEmptyFile() throws Exception
+    {
+        String mySchema =
+                "create table BLAH (" +
+                        "clm_integer integer default 0 not null, " + // column that is partitioned on
+                        "clm_tinyint tinyint default 0, " +
+                        "clm_smallint smallint default 0, " +
+                        "clm_bigint bigint default 0, " +
+                        "clm_string varchar(20) default null, " +
+                        "clm_decimal decimal default null, " +
+                        "clm_float float default null, "+
+                        "clm_timestamp timestamp default null, " +
+                        "clm_varinary varbinary default null" +
+                        "); ";
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--blank=" + "empty",
+                "BLAH"
+        };
+
+        String []myData = null;
+        int invalidLineCnt = 0;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+    }
+
+    public void testEscapeChar() throws Exception
+    {
+        String mySchema =
+                "create table BLAH (" +
+                                "clm_string varchar(20), " +
+                        "clm_integer integer default 0 not null, " + // column that is partitioned on
+                        "clm_tinyint tinyint default 0, " +
+                        "clm_smallint smallint default 0, " +
+                        "); ";
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--escape=~",
+                "BLAH"
+        };
+
+        String []myData = {
+                "~\"escapequotes,1,1,1",
+                "~\\nescapenewline,2,2,2",
+                "~'escapeprimesymbol,3,3,3"
+        };
+        int invalidLineCnt = 0;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+    }
+
+    public void testNoWhiteSpace() throws Exception
+    {
+        String mySchema =
+                "create table BLAH (" +
+                                "clm_string varchar(20), " +
+                        "clm_integer integer default 0 not null, " + // column that is partitioned on
+                        "clm_tinyint tinyint default 0, " +
+                        "clm_smallint smallint default 0, " +
+                        "); ";
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--nowhitespace",
+                "BLAH"
+        };
+
+        String []myData = {
+                "nospace,1,1,1",
+                "   frontspace,2,2,2",
+                "rearspace   ,3,3,3",
+                "\" inquotespace \"   ,4,4,4"
+        };
+        int invalidLineCnt = 3;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+    }
+
+    public void testColumnLimitSize() throws Exception
+    {
+        String mySchema =
+                "create table BLAH (" +
+                                "clm_string varchar(20), " +
+                        "clm_integer integer default 0 not null, " + // column that is partitioned on
+                        "clm_tinyint tinyint default 0, " +
+                        "clm_smallint smallint default 0, " +
+                        "); ";
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--columnsizelimit=10",
+                "BLAH"
+        };
+
+        String []myData = {
+                "\"openquote,1,1,1",
+                "second,2,2,2",
+                "third,3,3,3"
         };
         int invalidLineCnt = 1;
         test_Interface( mySchema, myOptions, myData, invalidLineCnt );
