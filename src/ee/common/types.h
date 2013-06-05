@@ -377,6 +377,13 @@ enum RecoveryMsgType {
 };
 
 // ------------------------------------------------------------------
+// Types of generic tasks that can be submitted to the EE
+// ------------------------------------------------------------------
+enum TaskType {
+    TASK_TYPE_VALIDATE_PARTITIONING = 0
+};
+
+// ------------------------------------------------------------------
 // Utility functions.
 // -----------------------------------------------------------------
 std::string getTypeName(ValueType type);

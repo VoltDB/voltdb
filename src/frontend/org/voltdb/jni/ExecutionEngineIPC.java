@@ -33,7 +33,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.FragmentPlanSource;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
-import org.voltdb.SysProcSelector;
+import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltTable;
@@ -43,10 +43,11 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
-
-import com.google.common.base.Charsets;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+
+import com.google.common.base.Charsets;
+import com.google.common.base.Throwables;
 
 /* Serializes data over a connection that presumably is being read
  * by a voltdb execution engine. The serialization is currently a
@@ -123,7 +124,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         Hashinate(23),
         GetPoolAllocations(24),
         GetUSOs(25),
-        updateHashinator(27);
+        updateHashinator(27),
+        executeTask(28);
         Commands(final int id) {
             m_id = id;
         }
@@ -878,7 +880,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public VoltTable[] getStats(
-            final SysProcSelector selector,
+            final StatsSelector selector,
             final int[] locators,
             final boolean interval,
             final Long now) {
@@ -1135,7 +1137,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
              * Error or no more tuple data for this table.
              */
             if (remaining == -1 || remaining == -2) {
-                return new int[] {(int) remaining};
+                return new int[] {(int) remaining + 1};
             }
 
             final int[] serialized = new int[count];
@@ -1355,5 +1357,39 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             System.out.println("Exception: " + e.getMessage());
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public byte[] executeTask(TaskType taskType, byte[] task) {
+        m_data.clear();
+        m_data.putInt(Commands.executeTask.m_id);
+        m_data.putLong(taskType.taskId);
+        m_data.put(task);
+        try {
+            m_data.flip();
+            m_connection.write();
+
+            m_connection.readStatusByte();
+            ByteBuffer length = ByteBuffer.allocate(4);
+            while (length.hasRemaining()) {
+                int read = m_connection.m_socketChannel.read(length);
+                if (read <= 0) {
+                    throw new EOFException();
+                }
+            }
+            length.flip();
+
+            ByteBuffer retval = ByteBuffer.allocate(length.getInt());
+            while (retval.hasRemaining()) {
+                int read = m_connection.m_socketChannel.read(retval);
+                if (read <= 0) {
+                    throw new EOFException();
+                }
+            }
+            return  retval.array();
+        } catch (IOException e) {
+            Throwables.propagate(e);
+        }
+        throw new RuntimeException("Failed to executeTask in IPC client");
     }
 }

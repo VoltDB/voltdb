@@ -27,7 +27,7 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.FragmentPlanSource;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
-import org.voltdb.SysProcSelector;
+import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
@@ -39,6 +39,8 @@ import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FastSerializer.BufferGrowCallback;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+
+import com.google.common.base.Throwables;
 
 /**
  * Wrapper for native Execution Engine library.
@@ -381,7 +383,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     @Override
     public VoltTable[] getStats(
-            final SysProcSelector selector,
+            final StatsSelector selector,
             final int locators[],
             final boolean interval,
             final Long now)
@@ -556,5 +558,22 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         assert(buffer != null);
         assert(fallbackBuffer == null);
         fallbackBuffer = buffer;
+    }
+
+    @Override
+    public byte[] executeTask(TaskType taskType, byte[] task) {
+        fsForParameterSet.clear();
+        byte retval[] = null;
+        try {
+            fsForParameterSet.writeLong(taskType.taskId);
+            fsForParameterSet.write(task);
+
+            deserializer.clear();
+            nativeExecuteTask(pointer);
+            return (byte[])deserializer.readArray(byte.class);
+        } catch (IOException e) {
+            Throwables.propagate(e);
+        }
+        return retval;
     }
 }

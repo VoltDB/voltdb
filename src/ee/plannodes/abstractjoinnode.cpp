@@ -53,18 +53,20 @@ using namespace std;
 using namespace voltdb;
 
 AbstractJoinPlanNode::AbstractJoinPlanNode(CatalogId id)
-    : AbstractPlanNode(id), m_predicate(NULL)
+    : AbstractPlanNode(id), m_preJoinPredicate(NULL), m_joinPredicate(NULL), m_wherePredicate(NULL)
 {
 }
 
 AbstractJoinPlanNode::AbstractJoinPlanNode()
-    : AbstractPlanNode(), m_predicate(NULL)
+    : AbstractPlanNode(), m_preJoinPredicate(NULL), m_joinPredicate(NULL), m_wherePredicate(NULL)
 {
 }
 
 AbstractJoinPlanNode::~AbstractJoinPlanNode()
 {
-    delete m_predicate;
+    delete m_preJoinPredicate;
+    delete m_joinPredicate;
+    delete m_wherePredicate;
 }
 
 JoinType AbstractJoinPlanNode::getJoinType() const
@@ -72,33 +74,39 @@ JoinType AbstractJoinPlanNode::getJoinType() const
     return m_joinType;
 }
 
-void AbstractJoinPlanNode::setJoinType(JoinType join_type)
+AbstractExpression* AbstractJoinPlanNode::getPreJoinPredicate() const
 {
-    m_joinType = join_type;
+    return m_preJoinPredicate;
 }
 
-void AbstractJoinPlanNode::setPredicate(AbstractExpression* predicate)
+AbstractExpression* AbstractJoinPlanNode::getJoinPredicate() const
 {
-    assert(!m_predicate);
-    if (m_predicate != predicate)
-    {
-        delete m_predicate;
-    }
-    m_predicate = predicate;
+    return m_joinPredicate;
 }
 
-AbstractExpression* AbstractJoinPlanNode::getPredicate() const
+AbstractExpression* AbstractJoinPlanNode::getWherePredicate() const
 {
-    return m_predicate;
+    return m_wherePredicate;
 }
 
 string AbstractJoinPlanNode::debugInfo(const string& spacer) const
 {
     ostringstream buffer;
     buffer << spacer << "JoinType[" << m_joinType << "]\n";
-    if (m_predicate != NULL)
+    if (m_preJoinPredicate != NULL)
     {
-        buffer << m_predicate->debug(spacer);
+        buffer << spacer << "Pre-Join Predicate\n";
+        buffer << m_preJoinPredicate->debug(spacer);
+    }
+    if (m_joinPredicate != NULL)
+    {
+        buffer << spacer << "Join Predicate\n";
+        buffer << m_joinPredicate->debug(spacer);
+    }
+    if (m_wherePredicate != NULL)
+    {
+        buffer << spacer << "Where Predicate\n";
+        buffer << m_wherePredicate->debug(spacer);
     }
     return (buffer.str());
 }
@@ -108,10 +116,19 @@ AbstractJoinPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
     m_joinType = stringToJoin(obj.valueForKey("JOIN_TYPE").asStr());
 
-    if (obj.hasNonNullKey("PREDICATE")) {
-        m_predicate = AbstractExpression::buildExpressionTree(obj.valueForKey("PREDICATE"));
+    loadPredicateFromJSONObject("PRE_JOIN_PREDICATE", obj, m_preJoinPredicate);
+    loadPredicateFromJSONObject("JOIN_PREDICATE", obj, m_joinPredicate);
+    loadPredicateFromJSONObject("WHERE_PREDICATE", obj, m_wherePredicate);
+}
+
+
+void
+AbstractJoinPlanNode::loadPredicateFromJSONObject(const char* predicateType, const PlannerDomValue& obj, AbstractExpression*& predicate)
+{
+    if (obj.hasNonNullKey(predicateType)) {
+        predicate = AbstractExpression::buildExpressionTree(obj.valueForKey(predicateType));
     }
     else {
-        m_predicate = NULL;
+        predicate = NULL;
     }
 }

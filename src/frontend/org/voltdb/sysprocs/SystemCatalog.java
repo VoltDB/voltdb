@@ -65,13 +65,8 @@ public class SystemCatalog extends VoltSystemProcedure
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
                            String selector) throws VoltAbortException
     {
-        VoltTable[] results = new VoltTable[1];
-        results[0] = VoltDB.instance().getCatalogContext().m_jdbc.getMetaData(selector);
-        if (results[0] == null)
-        {
-            throw new VoltAbortException("Invalid @SystemCatalog selector: " + selector);
-        }
-        return results;
+        VoltDB.crashLocalVoltDB("This should never be called.", false, null);
+        return null;
     }
 
 }

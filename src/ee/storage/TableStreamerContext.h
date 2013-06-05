@@ -106,7 +106,7 @@ protected:
         // predicates that get generated.
         // Throws an exception to be handled by caller on errors.
         std::ostringstream errmsg;
-        if (!m_predicates.parseStrings(predicateStrings, errmsg)) {
+        if (!m_predicates.parseStrings(predicateStrings, errmsg, m_predicateDeleteFlags)) {
             throwFatalException("TableStreamerContext() failed to parse predicate strings.");
         }
     }
@@ -117,6 +117,14 @@ protected:
     TableStreamerContext(PersistentTable &table) :
         m_table(table)
     {}
+
+    /**
+     * Predicate delete flags accessor.
+     */
+    std::vector<bool> &getPredicateDeleteFlags()
+    {
+        return m_predicateDeleteFlags;
+    }
 
 private:
 
@@ -130,6 +138,10 @@ private:
      */
     StreamPredicateList m_predicates;
 
+    /**
+     * Per-predicate delete if true flags.
+     */
+    std::vector<bool> m_predicateDeleteFlags;
 };
 
 } // namespace voltdb

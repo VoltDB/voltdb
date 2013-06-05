@@ -26,7 +26,7 @@ import java.util.Random;
 import org.voltcore.utils.DBBPool;
 import org.voltdb.FragmentPlanSource;
 import org.voltdb.ParameterSet;
-import org.voltdb.SysProcSelector;
+import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltTable;
@@ -125,7 +125,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public VoltTable[] getStats(final SysProcSelector selector, final int[] locators, boolean interval, Long now) {
+    public VoltTable[] getStats(final StatsSelector selector, final int[] locators, boolean interval, Long now) {
         return null;
     }
 
@@ -227,5 +227,10 @@ public class MockExecutionEngine extends ExecutionEngine {
     @Override
     public long getThreadLocalPoolAllocations() {
         return 0L;
+    }
+
+    @Override
+    public byte[] executeTask(TaskType taskType, byte[] task) {
+        throw new UnsupportedOperationException();
     }
 }

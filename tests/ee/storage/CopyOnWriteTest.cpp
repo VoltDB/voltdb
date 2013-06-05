@@ -488,9 +488,9 @@ TEST_F(CopyOnWriteTest, BigTest) {
         T_ValueSet originalTuples;
         getTableValueSet(originalTuples);
 
-        char config[5];
-        ::memset(config, 0, 5);
-        ReferenceSerializeInput input(config, 5);
+        char config[4];
+        ::memset(config, 0, 4);
+        ReferenceSerializeInput input(config, 4);
 
         m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
 
@@ -553,9 +553,9 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
             ASSERT_TRUE(inserted);
         }
 
-        char config[5];
-        ::memset(config, 0, 5);
-        ReferenceSerializeInput input(config, 5);
+        char config[4];
+        ::memset(config, 0, 4);
+        ReferenceSerializeInput input(config, 4);
         m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
 
         T_ValueSet COWTuples;
@@ -618,9 +618,9 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
             ASSERT_TRUE(inserted);
         }
 
-        char config[5];
-        ::memset(config, 0, 5);
-        ReferenceSerializeInput input(config, 5);
+        char config[4];
+        ::memset(config, 0, 4);
+        ReferenceSerializeInput input(config, 4);
         m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
 
         T_ValueSet COWTuples;
@@ -808,7 +808,7 @@ public:
     // Work around unsupported modulus operator with other integer operators:
     //    Should be: result = (value % nparts) == ipart
     //  Work-around: result = (value - ((value / nparts) * nparts)) == ipart
-    std::string generatePredicateString(int32_t ipart) {
+    std::string generatePredicateString(int32_t ipart, bool deleteForPredicate) {
         std::string tblname = table.name();
         int colidx = table.partitionColumn();
         std::string colname = table.columnName(colidx);
@@ -828,11 +828,15 @@ public:
                        );
 
         std::ostringstream os;
-        json_spirit::write(json, os);
+
+        json_spirit::Object predicateStuff;
+        predicateStuff.push_back(json_spirit::Pair("triggersDelete", deleteForPredicate));
+        predicateStuff.push_back(json_spirit::Pair("predicateExpression", json));
+        json_spirit::write(predicateStuff, os);
         return os.str();
     }
 
-    std::string generateHashRange(T_HashRangeVector& ranges) {
+    std::string generateHashRangePredicate(T_HashRangeVector& ranges) {
         int colidx = table.partitionColumn();
         json_spirit::Object json;
         std::string op = expressionToString(EXPRESSION_TYPE_HASH_RANGE);
@@ -848,8 +852,11 @@ public:
             array.push_back(range);
         }
         json.push_back(json_spirit::Pair("RANGES", array));
+        json_spirit::Object predicateStuff;
+        predicateStuff.push_back(json_spirit::Pair("triggersDelete", false));
+        predicateStuff.push_back(json_spirit::Pair("predicateExpression", json));
         std::ostringstream os;
-        json_spirit::write(json, os);
+        json_spirit::write(predicateStuff, os);
         return os.str();
     }
 
@@ -901,16 +908,15 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
         for (int32_t i = 0; i < npartitions; i++) {
             buffers[i].reset(new char[BUFFER_SIZE]);
             if (i != skippedPartition) {
-                strings[i] = tool.generatePredicateString(i);
+                strings[i] = tool.generatePredicateString(i, doDelete);
             }
             else {
-                strings[i] = tool.generatePredicateString(-1);
+                strings[i] = tool.generatePredicateString(-1, doDelete);
             }
         }
 
         char buffer[1024 * 256];
         ReferenceSerializeOutput output(buffer, 1024 * 256);
-        output.writeByte((int8_t)(doDelete ? 1 : 0));
         output.writeInt(npartitions);
         for (std::vector<std::string>::iterator i = strings.begin(); i != strings.end(); i++) {
             output.writeTextString(*i);
@@ -1087,9 +1093,9 @@ TEST_F(CopyOnWriteTest, BufferBoundaryCondition) {
     size_t origPendingCount = m_table->getBlocksNotPendingSnapshotCount();
     // This should succeed in one call to serializeMore().
     char serializationBuffer[bufferSize];
-    char config[5];
-    ::memset(config, 0, 5);
-    ReferenceSerializeInput input(config, 5);
+    char config[4];
+    ::memset(config, 0, 4);
+    ReferenceSerializeInput input(config, 4);
     m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
     TupleOutputStreamProcessor outputStreams(serializationBuffer, bufferSize);
     std::vector<int> retPositions;
@@ -1420,10 +1426,11 @@ TEST_F(CopyOnWriteTest, ElasticContextIndexTest) {
     T_HashRangeVector ranges;
     ranges.push_back(T_HashRange(0x0000000000000000, 0x7fffffffffffffff));
     std::vector<std::string> predicateStrings;
-    predicateStrings.push_back(tool.generateHashRange(ranges));
+    predicateStrings.push_back(tool.generateHashRangePredicate(ranges));
+    std::vector<bool> deleteFlags;
     StreamPredicateList predicates;
     std::ostringstream errmsg;
-    ASSERT_TRUE(predicates.parseStrings(predicateStrings, errmsg));
+    ASSERT_TRUE(predicates.parseStrings(predicateStrings, errmsg, deleteFlags));
 
     DummyElasticTableStreamer *streamerPtr =
             new DummyElasticTableStreamer(*m_table, predicateStrings);

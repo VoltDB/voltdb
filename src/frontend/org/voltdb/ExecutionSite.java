@@ -2096,7 +2096,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     }
 
     @Override
-    public VoltTable[] getStats(SysProcSelector selector, int[] locators,
+    public VoltTable[] getStats(StatsSelector selector, int[] locators,
                                 boolean interval, Long now)
     {
         return ee.getStats(selector, locators, interval, now);
@@ -2139,5 +2139,10 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     @Override
     public byte[] planForFragmentId(long fragmentId) {
         return null;
+    }
+
+    @Override
+    public long[] validatePartitioning(long[] tableIds, int hashinatorType, byte[] hashinatorConfig) {
+        throw new UnsupportedOperationException();
     }
 }

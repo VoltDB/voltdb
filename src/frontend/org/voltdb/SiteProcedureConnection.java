@@ -148,7 +148,7 @@ public interface SiteProcedureConnection {
                              Integer partitionId,
                              String tableSignature);
 
-    public VoltTable[] getStats(SysProcSelector selector, int[] locators,
+    public VoltTable[] getStats(StatsSelector selector, int[] locators,
                                 boolean interval, Long now);
 
     // Snapshot services provided by the site
@@ -176,4 +176,6 @@ public interface SiteProcedureConnection {
      * Get the full JSON plan associated with a given site-local fragment id.
      */
     public byte[] planForFragmentId(long fragmentId);
+
+    public long[] validatePartitioning(long tableIds[], int hashinatorType, byte hashinatorConfig[]);
 }

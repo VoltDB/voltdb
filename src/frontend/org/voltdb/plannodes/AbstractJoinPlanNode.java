@@ -34,11 +34,15 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
 
     public enum Members {
         JOIN_TYPE,
-        PREDICATE;
+        PRE_JOIN_PREDICATE,
+        JOIN_PREDICATE,
+        WHERE_PREDICATE;
     }
 
     protected JoinType m_joinType = JoinType.INNER;
-    protected AbstractExpression m_predicate;
+    protected AbstractExpression m_preJoinPredicate;
+    protected AbstractExpression m_joinPredicate;
+    protected AbstractExpression m_wherePredicate;
 
     protected AbstractJoinPlanNode() {
         super();
@@ -48,8 +52,14 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     public void validate() throws Exception {
         super.validate();
 
-        if (m_predicate != null) {
-            m_predicate.validate();
+        if (m_preJoinPredicate != null) {
+            m_preJoinPredicate.validate();
+        }
+        if (m_joinPredicate != null) {
+            m_joinPredicate.validate();
+        }
+        if (m_wherePredicate != null) {
+            m_wherePredicate.validate();
         }
     }
 
@@ -68,23 +78,53 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     }
 
     /**
-     * @return the predicate
+     * @return the  pre join predicate
      */
-    public AbstractExpression getPredicate() {
-        return m_predicate;
+    public AbstractExpression getPreJoinPredicate() {
+        return m_preJoinPredicate;
     }
 
     /**
-     * @param predicate the predicate to set
+     * @return the  join predicate
      */
-    public void setPredicate(AbstractExpression predicate)
+    public AbstractExpression getJoinPredicate() {
+        return m_joinPredicate;
+    }
+
+    /**
+     * @return the  where predicate
+     */
+    public AbstractExpression getWherePredicate() {
+        return m_wherePredicate;
+    }
+
+    /**
+     * @param predicate the where predicate to set
+     */
+    public void setWherePredicate(AbstractExpression predicate)
     {
-        if (predicate != null)
-        {
-            // PlanNodes all need private deep copies of expressions
-            // so that the resolveColumnIndexes results
-            // don't get bashed by other nodes or subsequent planner runs
-            m_predicate = (AbstractExpression) predicate.clone();
+        if (predicate != null) {
+            m_wherePredicate = (AbstractExpression) predicate.clone();
+        }
+    }
+
+    /**
+     * @param predicate the join predicate to set
+     */
+    public void setPreJoinPredicate(AbstractExpression predicate)
+    {
+        if (predicate != null) {
+            m_preJoinPredicate = (AbstractExpression) predicate.clone();
+        }
+    }
+
+    /**
+     * @param predicate the join predicate to set
+     */
+    public void setJoinPredicate(AbstractExpression predicate)
+    {
+        if (predicate != null) {
+            m_joinPredicate = (AbstractExpression) predicate.clone();
         }
     }
 
@@ -165,9 +205,46 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         m_outputSchema = new_output_schema;
         m_hasSignificantOutputSchema = true;
 
+        // Finally, resolve predicates
+        resolvePredicate(m_preJoinPredicate, outer_schema, inner_schema);
+        resolvePredicate(m_joinPredicate, outer_schema, inner_schema);
+        resolvePredicate(m_wherePredicate, outer_schema, inner_schema);
+    }
+
+    @Override
+    public void toJSONString(JSONStringer stringer) throws JSONException
+    {
+        super.toJSONString(stringer);
+        stringer.key(Members.JOIN_TYPE.name()).value(m_joinType.toString());
+        stringer.key(Members.PRE_JOIN_PREDICATE.name()).value(m_preJoinPredicate);
+        stringer.key(Members.JOIN_PREDICATE.name()).value(m_joinPredicate);
+        stringer.key(Members.WHERE_PREDICATE.name()).value(m_wherePredicate);
+    }
+
+    @Override
+    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException
+    {
+        helpLoadFromJSONObject(jobj, db);
+        this.m_joinType = JoinType.get( jobj.getString( Members.JOIN_TYPE.name() ) );
+        if( !jobj.isNull( Members.PRE_JOIN_PREDICATE.name() )) {
+            m_preJoinPredicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.PRE_JOIN_PREDICATE.name()), db);
+        }
+        if( !jobj.isNull( Members.JOIN_PREDICATE.name() )) {
+            m_joinPredicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.JOIN_PREDICATE.name()), db);
+        }
+        if( !jobj.isNull( Members.WHERE_PREDICATE.name() )) {
+            m_wherePredicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.WHERE_PREDICATE.name()), db);
+        }
+    }
+
+    /**
+     * @param predicate the predicate to set
+     */
+    private void resolvePredicate(AbstractExpression predicate, NodeSchema outer_schema, NodeSchema inner_schema)
+    {
         // Finally, resolve m_predicate
         List<TupleValueExpression> predicate_tves =
-            ExpressionUtil.getTupleValueExpressions(m_predicate);
+                ExpressionUtil.getTupleValueExpressions(predicate);
         for (TupleValueExpression tve : predicate_tves)
         {
             int index = outer_schema.getIndexOfTve(tve);
@@ -184,19 +261,4 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         }
     }
 
-    @Override
-    public void toJSONString(JSONStringer stringer) throws JSONException {
-        super.toJSONString(stringer);
-        stringer.key(Members.JOIN_TYPE.name()).value(m_joinType.toString());
-        stringer.key(Members.PREDICATE.name()).value(m_predicate);
-    }
-
-    @Override
-    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
-        helpLoadFromJSONObject(jobj, db);
-        this.m_joinType = JoinType.get( jobj.getString( Members.JOIN_TYPE.name() ) );
-        if( !jobj.isNull( Members.PREDICATE.name() )) {
-            m_predicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.PREDICATE.name()), db);
-        }
-    }
 }

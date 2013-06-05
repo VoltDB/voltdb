@@ -97,8 +97,7 @@ private:
                        TupleSerializer &serializer,
                        int32_t partitionId,
                        const std::vector<std::string> &predicateStrings,
-                       int64_t totalTuples,
-                       bool doDelete);
+                       int64_t totalTuples);
 
     /**
      * Temp table for copies of tuples that were dirtied.
@@ -138,14 +137,14 @@ private:
 
     const int32_t m_partitionId;
 
+    StreamPredicateList m_predicates;
+
     int64_t m_totalTuples;
     int64_t m_tuplesRemaining;
     int64_t m_blocksCompacted;
     int64_t m_serializationBatches;
     int64_t m_inserts;
     int64_t m_updates;
-
-    bool m_doDelete;
 
     void checkRemainingTuples(const std::string &label);
 

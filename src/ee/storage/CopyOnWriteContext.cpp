@@ -61,8 +61,7 @@ CopyOnWriteContext::CopyOnWriteContext(
         TupleSerializer &serializer,
         int32_t partitionId,
         const std::vector<std::string> &predicateStrings,
-        int64_t totalTuples,
-        bool doDelete) :
+        int64_t totalTuples) :
              TableStreamerContext(table, predicateStrings),
              m_backedUpTuples(TableFactory::getCopiedTempTable(table.databaseId(),
                                                                "COW of " + table.name(),
@@ -80,10 +79,8 @@ CopyOnWriteContext::CopyOnWriteContext(
              m_blocksCompacted(0),
              m_serializationBatches(0),
              m_inserts(0),
-             m_updates(0),
-             m_doDelete(doDelete)
-{
-}
+             m_updates(0)
+{}
 
 /*
  * Serialize to multiple output streams.
@@ -99,7 +96,8 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
     if (outputStreams.empty()) {
         throwFatalException("serializeMore() expects at least one output stream.");
     }
-    outputStreams.open(getTable(), m_maxTupleLength, m_partitionId, getPredicates());
+    outputStreams.open(getTable(), m_maxTupleLength, m_partitionId, getPredicates(),
+                       getPredicateDeleteFlags());
 
     //=== Tuple processing loop
 
@@ -125,8 +123,8 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
              * Done if any of the buffers filled up.
              * The returned copy count helps decide when to delete if m_doDelete is true.
              */
-            int32_t numCopiesMade = 0;
-            yield = outputStreams.writeRow(m_serializer, tuple, numCopiesMade);
+            bool deleteTuple = false;
+            yield = outputStreams.writeRow(m_serializer, tuple, deleteTuple);
 
             /*
              * May want to delete tuple if processing the actual table.
@@ -148,7 +146,7 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
                  * This is used for Elastic rebalancing, which is wrapped in a transaction.
                  * The delete for undo is generic enough to support this operation.
                  */
-                else if (m_doDelete && numCopiesMade > 0) {
+                else if (deleteTuple) {
                     table.deleteTupleForUndo(tuple.address(), true);
                 }
             }

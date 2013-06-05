@@ -38,12 +38,10 @@ TableStreamer::TableStreamer(TupleSerializer &tupleSerializer,
                    ReferenceSerializeInput &serializeIn) :
     m_tupleSerializer(tupleSerializer),
     m_streamType(streamType),
-    m_partitionId(partitionId),
-    m_doDelete(false)
+    m_partitionId(partitionId)
 {
     // Grab the predicates and delete flag for snapshots or elastic contexts.
     if (streamType == TABLE_STREAM_SNAPSHOT || streamType == TABLE_STREAM_ELASTIC) {
-        m_doDelete = (serializeIn.readByte() != 0);
         int npreds = serializeIn.readInt();
         if (npreds > 0) {
             m_predicateStrings.reserve(npreds);
@@ -70,8 +68,7 @@ bool TableStreamer::activateStream(PersistentTable &table, CatalogId tableId)
                     // Constructor can throw exception when it parses the predicates.
                     CopyOnWriteContext *newContext =
                         new CopyOnWriteContext(table, m_tupleSerializer, m_partitionId,
-                                               m_predicateStrings, table.activeTupleCount(),
-                                               m_doDelete);
+                                               m_predicateStrings, table.activeTupleCount());
                     m_context.reset(newContext);
                     break;
                 }
