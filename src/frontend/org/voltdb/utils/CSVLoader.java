@@ -380,13 +380,10 @@ public class CSVLoader {
             if( thisSlot == null )
             {
                 if(config.blank.equalsIgnoreCase("error"))
-                {
-                        return "Error: blank item";
-                }
+                    return "Error: blank item";
                 else if (config.blank.equalsIgnoreCase("empty"))
                     thisSlot = blankValues.get(typeList.get(i));
-
-            //else config.blank == null which is already the case
+              //else config.blank == null which is already the case
             }
 
             // trim white space in this line. SuperCSV preserves all the whitespace by default
