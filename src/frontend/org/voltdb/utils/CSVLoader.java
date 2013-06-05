@@ -390,14 +390,14 @@ public class CSVLoader {
             else {
                 String str = thisSlot.toString();
                 if( config.nowhitespace &&
-                        ( str.charAt(0) == ' ' || str.charAt( str.length() - 1 ) == ' ') ) {
+                  ( str.charAt(0) == ' ' || str.charAt( str.length() - 1 ) == ' ') ) {
                     return "Error: White Space Detected in nowhitespace mode.";
                 }
                 else
                     thisSlot = ((String) thisSlot).trim();
                 // treat NULL, \N and "\N" as actual null value
-                if ( thisSlot.equals("NULL") || thisSlot.equals(VoltTable.CSV_NULL)
-                                || !config.strictquotes && thisSlot.equals(VoltTable.QUOTED_CSV_NULL))
+                if ( thisSlot.equals("NULL") || thisSlot.equals(VoltTable.CSV_NULL) ||
+                     !config.strictquotes && thisSlot.equals(VoltTable.QUOTED_CSV_NULL))
                     thisSlot = null;
                 }
         }
