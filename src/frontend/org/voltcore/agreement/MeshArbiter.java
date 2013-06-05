@@ -164,13 +164,19 @@ public class MeshArbiter {
             }
             if (!hsIds.contains(m.m_sourceHSId)) continue;
 
-            FailureSiteUpdateMessage fsum = null;
-
             if (m.getSubject() == Subject.FAILURE_SITE_UPDATE.getId()) {
-                fsum = (FailureSiteUpdateMessage)m;
+                FailureSiteUpdateMessage fsum = (FailureSiteUpdateMessage)m;
+
                 m_failureSiteUpdateLedger.put(
                         Pair.of(fsum.m_sourceHSId, fsum.m_initiatorForSafeTxnId),
                         fsum.m_safeTxnId);
+
+                m_recoveryLog.info("Agreement, Received failure message from " +
+                        CoreUtils.hsIdToString(fsum.m_sourceHSId) + " for failed sites " +
+                        CoreUtils.hsIdCollectionToString(fsum.m_failedHSIds) +
+                        " safe txn id " + fsum.m_safeTxnId + " failed site " +
+                        CoreUtils.hsIdToString(fsum.m_initiatorForSafeTxnId));
+
             } else if (m.getSubject() == Subject.FAILURE.getId()) {
                 /*
                  * If the fault distributor reports a new fault, ignore it if it is known , otherwise
@@ -192,11 +198,6 @@ public class MeshArbiter {
 
             }
 
-            m_recoveryLog.info("Agreement, Received failure message from " +
-                    CoreUtils.hsIdToString(fsum.m_sourceHSId) + " for failed sites " +
-                    CoreUtils.hsIdCollectionToString(fsum.m_failedHSIds) +
-                    " safe txn id " + fsum.m_safeTxnId + " failed site " +
-                    CoreUtils.hsIdToString(fsum.m_initiatorForSafeTxnId));
         } while(!haveNecessaryFaultInfo(survivors, false));
 
         return true;
