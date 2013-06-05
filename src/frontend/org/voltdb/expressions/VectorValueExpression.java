@@ -1,8 +1,8 @@
 /* This file is part of VoltDB.
- *import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
-import org.voltdb.catalog.Database;
-nder the terms of the GNU Affero General Public License as
+ * Copyright (C) 2008-2013 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
  * published by the Free Software Foundation, either version 3 of the
  * License, or (at your option) any later version.
  *
