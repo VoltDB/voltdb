@@ -497,7 +497,12 @@ class NValue {
     static const uint16_t kMaxDecScale = 12;
     static const int64_t kMaxScaleFactor = 1000000000000;
 
-    void setArrayElements(std::vector<NValue> &args);
+    // setArrayElements is a const method since it doesn't actually mutate any NValue state, just
+    // the state of the contained NValues which are referenced via the allocated object storage.
+    // For example, it is not intended to ever "grow the array" which would require the NValue's
+    // object reference (in m_data) to be mutable.
+    // The array size is predetermined in allocateANewNValueList.
+    void setArrayElements(std::vector<NValue> &args) const;
 
   private:
     /*
@@ -515,7 +520,7 @@ class NValue {
     // These are purposely not inlines to avoid exposure of NValueList details.
     void deserializeIntoANewNValueList(SerializeInput &input, Pool *dataPool);
     void deserializeIntoANewNValueList(const std::string& buffer);
-    void allocateANewNValueList(int elementCount, ValueType elementType);
+    void allocateANewNValueList(size_t elementCount, ValueType elementType);
 
     // Promotion Rules. Initialized in NValue.cpp
     static ValueType s_intPromotionTable[];
@@ -1949,7 +1954,7 @@ class NValue {
         return retval;
     }
 
-    static NValue getAllocatedArrayValueFromSizeAndType(int elementCount, ValueType elementType)
+    static NValue getAllocatedArrayValueFromSizeAndType(size_t elementCount, ValueType elementType)
     {
         NValue retval(VALUE_TYPE_ARRAY);
         retval.allocateANewNValueList(elementCount, elementType);

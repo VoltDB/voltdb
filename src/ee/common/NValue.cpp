@@ -399,7 +399,7 @@ NValue NValue::opDivideDecimals(const NValue lhs, const NValue rhs) const {
 
 //TODO: This O(length) implementation should be replaced by an O(ln(length)) or better implementation.
 struct NValueList {
-    static int allocationSizeForLength(int length)
+    static int allocationSizeForLength(size_t length)
     {
         //TODO: May want to consider extra allocation, here,
         // such as space for a sorted copy of the array.
@@ -414,7 +414,7 @@ struct NValueList {
     void operator delete(void*, char*) {}
     void operator delete(void*) {}
 
-    NValueList(int length, ValueType elementType) : m_length(length), m_elementType(elementType)
+    NValueList(size_t length, ValueType elementType) : m_length(length), m_elementType(elementType)
     { }
 
     void deserializeNValues(SerializeInput &input, Pool *dataPool)
@@ -427,7 +427,7 @@ struct NValueList {
     StlFriendlyNValue const* begin() const { return m_values; }
     StlFriendlyNValue const* end() const { return m_values + m_length; }
 
-    const int m_length;
+    const size_t m_length;
     const ValueType m_elementType;
     StlFriendlyNValue m_values[];
 };
@@ -462,7 +462,7 @@ bool NValue::inList(const NValue& rhs) const
 void NValue::deserializeIntoANewNValueList(SerializeInput &input, Pool *dataPool)
 {
     ValueType elementType = (ValueType)input.readByte();
-    int length = input.readShort();
+    size_t length = input.readShort();
     int trueSize = NValueList::allocationSizeForLength(length);
     char* storage = allocateValueStorage(trueSize, dataPool);
     ::memset(storage, 0, trueSize);
@@ -481,7 +481,7 @@ void NValue::deserializeIntoANewNValueList(const std::string& buffer)
         buffer << ")");
 }
 
-void NValue::allocateANewNValueList(int length, ValueType elementType)
+void NValue::allocateANewNValueList(size_t length, ValueType elementType)
 {
     int trueSize = NValueList::allocationSizeForLength(length);
     char* storage = allocateValueStorage(trueSize, NULL);
@@ -489,7 +489,7 @@ void NValue::allocateANewNValueList(int length, ValueType elementType)
     new (storage) NValueList(length, elementType);
 }
 
-void NValue::setArrayElements(std::vector<NValue> &args)
+void NValue::setArrayElements(std::vector<NValue> &args) const
 {
     assert(m_valueType == VALUE_TYPE_ARRAY);
     NValueList* listOfNValues = (NValueList*)getObjectValue();

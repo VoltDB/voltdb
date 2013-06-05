@@ -38,6 +38,13 @@ struct StlFriendlyNValue : public NValue {
         return compare(other) == 0;
     }
 
+    const StlFriendlyNValue& operator=(const NValue& other)
+    {
+        // Just call "super".
+        (*(NValue*)this) = other;
+        return *this;
+    }
+
 };
 
 }

@@ -99,7 +99,7 @@ public:
         return NValue::getAllocatedArrayValueFromString(txt);
     }
 
-    static NValue getArrayValueFromSizeAndType(int elementCount, ValueType elementType)
+    static NValue getArrayValueFromSizeAndType(size_t elementCount, ValueType elementType)
     {
         return NValue::getAllocatedArrayValueFromSizeAndType(elementCount, elementType);
     }
