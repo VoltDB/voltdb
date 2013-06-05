@@ -120,13 +120,14 @@ std::pair<int, int> TupleBlock::merge(Table *table, TBPtr source, TupleMovementL
             continue;
         }
 
+        destinationTuple.move(nextFreeTuple().first);
+        table->swapTuples(sourceTupleWithNewValues, destinationTuple);
+
         // Notify the listener if provided.
         if (listener != NULL) {
             listener->notifyTupleMovement(source, this, sourceTupleWithNewValues, destinationTuple);
         }
 
-        destinationTuple.move(nextFreeTuple().first);
-        table->swapTuples(sourceTupleWithNewValues, destinationTuple);
         source->freeTuple(sourceTupleWithNewValues.address());
     }
     source->lastCompactionOffset(m_nextTupleInSourceOffset);

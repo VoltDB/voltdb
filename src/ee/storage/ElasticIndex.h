@@ -19,11 +19,14 @@
 
 #include <iostream>
 #include <stx/btree.h>
+#include <boost/iterator/iterator_facade.hpp>
 #include "storage/persistenttable.h"
 #include "storage/TupleBlock.h"
 #include "common/tabletuple.h"
 
 namespace voltdb {
+
+class ElasticIndexIterator;
 
 /**
  * Elastic hash value container with some useful/convenient operations.
@@ -100,6 +103,16 @@ class ElasticIndexKey
      */
     const ElasticIndexKey &operator=(const ElasticIndexKey &other);
 
+    /**
+     * Equality operator.
+     */
+    bool operator==(const ElasticIndexKey &other) const;
+
+    /**
+     * Tuple address accessor.
+     */
+    char *getTupleAddress() const;
+
   private:
 
     ElasticHash m_hash;
@@ -118,15 +131,23 @@ class ElasticIndexComparator
 /**
  * The elastic index (set)
  */
-class ElasticIndex : private stx::btree_set<ElasticIndexKey, ElasticIndexComparator,
-                                            stx::btree_default_set_traits<ElasticIndexKey> >
+class ElasticIndex : public stx::btree_set<ElasticIndexKey, ElasticIndexComparator,
+                                           stx::btree_default_set_traits<ElasticIndexKey> >
 {
+    friend class ElasticIndexIterator;
+
   public:
 
     /**
      * Return true if key is in the index.
      */
     bool has(const PersistentTable &table, const TableTuple &tuple);
+
+    /**
+     * Get the hash and tuple address if found.
+     * Return true if key is in the index.
+     */
+    bool get(const PersistentTable &table, const TableTuple &tuple, ElasticIndexKey &key);
 
     /**
      * Add key to index.
@@ -238,6 +259,22 @@ inline const ElasticIndexKey &ElasticIndexKey::operator=(const ElasticIndexKey &
 }
 
 /**
+ * Equality operator.
+ */
+inline bool ElasticIndexKey::operator==(const ElasticIndexKey &other) const
+{
+    return m_hash == other.m_hash && m_ptr == other.m_ptr;
+}
+
+/**
+ * Tuple address accessor.
+ */
+inline char *ElasticIndexKey::getTupleAddress() const
+{
+    return m_ptr;
+}
+
+/**
  * Required less than comparison operator method for ElasticIndexKey.
  */
 inline bool ElasticIndexComparator::operator()(
@@ -252,6 +289,21 @@ inline bool ElasticIndexComparator::operator()(
 inline bool ElasticIndex::has(const PersistentTable &table, const TableTuple &tuple)
 {
     return exists(ElasticIndexKey(table, tuple));
+}
+
+/**
+ * Get the hash and tuple address if found.
+ * Return true if key is in the index.
+ */
+inline bool ElasticIndex::get(const PersistentTable &table, const TableTuple &tuple,
+                              ElasticIndexKey &key)
+{
+    ElasticIndexKey keyCmp(table, tuple);
+    if (exists(keyCmp)) {
+        key = keyCmp;
+        return true;
+    }
+    return false;
 }
 
 /**

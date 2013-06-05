@@ -46,10 +46,30 @@ int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStrea
     TableTuple tuple(table.schema());
     while (m_scanner.next(tuple)) {
         if (getPredicates()[0].eval(&tuple).isTrue()) {
-            assert(m_index.add(table, tuple));
+            m_index.add(table, tuple);
         }
     }
     return 0;
+}
+
+/**
+ * Tuple insert handler lets us add late arriving tuples to the index.
+ */
+bool ElasticContext::notifyTupleInsert(TableTuple &tuple)
+{
+    PersistentTable &table = getTable();
+    if (getPredicates()[0].eval(&tuple).isTrue()) {
+        m_index.add(table, tuple);
+    }
+    return true;
+}
+
+/**
+ * Tuple update handler is not currently needed.
+ */
+bool ElasticContext::notifyTupleUpdate(TableTuple &tuple)
+{
+    return true;
 }
 
 /**
@@ -59,7 +79,11 @@ bool ElasticContext::notifyTupleDelete(TableTuple &tuple)
 {
     PersistentTable &table = getTable();
     if (m_index.has(table, tuple)) {
-        assert(m_index.remove(table, tuple));
+#ifdef DEBUG
+        bool removed =
+#endif
+        m_index.remove(table, tuple);
+        assert(removed);
     }
     return true;
 }
@@ -74,8 +98,18 @@ void ElasticContext::notifyTupleMovement(TBPtr sourceBlock,
 {
     PersistentTable &table = getTable();
     if (m_index.has(table, sourceTuple)) {
-        assert(m_index.remove(getTable(), sourceTuple));
-        assert(m_index.add(getTable(), targetTuple));
+#ifdef DEBUG
+        bool removed =
+#endif
+        m_index.remove(getTable(), sourceTuple);
+        assert(removed);
+    }
+    if (getPredicates()[0].eval(&targetTuple).isTrue()) {
+#ifdef DEBUG
+        bool added =
+#endif
+        m_index.add(getTable(), targetTuple);
+        assert(added);
     }
 }
 

@@ -62,10 +62,9 @@
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
 
-class CopyOnWriteTest_CopyOnWriteIterator;
-class CopyOnWriteTest_ElasticScannerTest;
 class CompactionTest_BasicCompaction;
 class CompactionTest_CompactionWithCopyOnWrite;
+class CopyOnWriteTest;
 
 namespace catalog {
 class MaterializedViewInfo;
@@ -117,6 +116,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                         public TupleMovementListener {
     friend class CopyOnWriteContext;
     friend class CopyOnWriteIterator;
+    friend class ::CopyOnWriteTest;
     friend class TableFactory;
     friend class TableTuple;
     friend class TableIterator;
@@ -125,8 +125,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     friend class PersistentTableUndoInsertAction;
     friend class PersistentTableUndoUpdateAction;
     friend class ElasticScanner;
-    friend class ::CopyOnWriteTest_CopyOnWriteIterator;
-    friend class ::CopyOnWriteTest_ElasticScannerTest;
     friend class ::CompactionTest_BasicCompaction;
     friend class ::CompactionTest_CompactionWithCopyOnWrite;
 

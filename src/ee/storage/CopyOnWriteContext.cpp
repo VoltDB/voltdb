@@ -189,7 +189,8 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
                          (intmax_t)m_updates,
                          table.partitionColumn());
 #ifdef DEBUG
-                throwFatalException(message);
+                // Use a format string to prevent overzealous compiler warnings.
+                throwFatalException("%s", message);
 #else
                 LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, message);
 #endif

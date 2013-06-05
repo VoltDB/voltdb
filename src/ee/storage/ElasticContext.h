@@ -25,6 +25,8 @@
 #include "storage/TableStreamerContext.h"
 #include "storage/TupleBlock.h"
 
+class DummyElasticTableStreamer;
+
 namespace voltdb {
 
 class PersistentTable;
@@ -34,6 +36,7 @@ class ElasticContext : public TableStreamerContext
 {
 
     friend bool TableStreamer::activateStream(PersistentTable&, CatalogId);
+    friend class ::DummyElasticTableStreamer;
 
 public:
 
@@ -47,6 +50,16 @@ public:
      */
     virtual int64_t handleStreamMore(TupleOutputStreamProcessor &outputStreams,
                                      std::vector<int> &retPositions);
+
+    /**
+     * Optional tuple insert handler.
+     */
+    virtual bool notifyTupleInsert(TableTuple &tuple);
+
+    /**
+     * Optional tuple update handler.
+     */
+    virtual bool notifyTupleUpdate(TableTuple &tuple);
 
     /**
      * Optional tuple delete handler.

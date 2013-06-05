@@ -39,6 +39,7 @@
 #include "storage/tableiterator.h"
 #include "storage/CopyOnWriteIterator.h"
 #include "storage/ElasticScanner.h"
+#include "storage/ElasticContext.h"
 #include "stx/btree_set.h"
 #include "common/DefaultTupleSerializer.h"
 #include <vector>
@@ -94,7 +95,8 @@ const size_t MAX_DETAIL_COUNT = 50;
 // Handy types and values.
 typedef int64_t T_Value;
 typedef stx::btree_set<T_Value> T_ValueSet;
-typedef std::pair<int32_t, int32_t> HashRange;
+typedef std::pair<int64_t, int64_t> T_HashRange;
+typedef std::vector<T_HashRange> T_HashRangeVector;
 
 /**
  * The strategy of this test is to create a table with 5 blocks of tuples with the first column (primary key)
@@ -315,29 +317,33 @@ public:
         }
     }
 
-    void checkTuples(size_t tupleCount, T_ValueSet& originalTuples, T_ValueSet& COWTuples) {
+    void doForcedCompaction(PersistentTable *table) {
+        table->doForcedCompaction();
+    }
+
+    void checkTuples(size_t tupleCount, T_ValueSet& expected, T_ValueSet& received) {
         std::vector<int64_t> diff;
         std::insert_iterator<std::vector<int64_t> > ii( diff, diff.begin());
-        std::set_difference(originalTuples.begin(), originalTuples.end(), COWTuples.begin(), COWTuples.end(), ii);
+        std::set_difference(expected.begin(), expected.end(), received.begin(), received.end(), ii);
         for (int ii = 0; ii < diff.size(); ii++) {
             int32_t *values = reinterpret_cast<int32_t*>(&diff[ii]);
-            printf("Tuple in original not in COW is %d and %d\n", values[0], values[1]);
+            printf("Expected tuple was not received: %d/%d\n", values[0], values[1]);
         }
 
         diff.clear();
         ii = std::insert_iterator<std::vector<int64_t> >(diff, diff.begin());
-        std::set_difference( COWTuples.begin(), COWTuples.end(), originalTuples.begin(), originalTuples.end(), ii);
+        std::set_difference( received.begin(), received.end(), expected.begin(), expected.end(), ii);
         for (int ii = 0; ii < diff.size(); ii++) {
             int32_t *values = reinterpret_cast<int32_t*>(&diff[ii]);
-            printf("Tuple in COW not in original is %d and %d\n", values[0], values[1]);
+            printf("Unexpected tuple received: %d/%d\n", values[0], values[1]);
         }
 
-        int numTuples = 0;
+        size_t numTuples = 0;
         voltdb::TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
             if (tuple.isDirty()) {
-                printf("Found tuple %d is active and dirty at end of COW\n",
+                printf("Tuple %d is active and dirty\n",
                        ValuePeeker::peekAsInteger(tuple.getNValue(0)));
             }
             numTuples++;
@@ -346,12 +352,13 @@ public:
             }
             ASSERT_FALSE(tuple.isDirty());
         }
-        if (tupleCount > 0) {
+        if (tupleCount > 0 and numTuples != tupleCount) {
+            printf("Expected %lu tuples, received %lu\n", numTuples, tupleCount);
             ASSERT_EQ(numTuples, tupleCount);
         }
 
-        ASSERT_EQ(originalTuples.size(), COWTuples.size());
-        ASSERT_TRUE(originalTuples == COWTuples);
+        ASSERT_EQ(expected.size(), received.size());
+        ASSERT_TRUE(expected == received);
     }
 
     void getTableValueSet(T_ValueSet &set) {
@@ -365,8 +372,38 @@ public:
                 int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
                 printf("Failed to insert %d\n", primaryKey);
             }
-            ASSERT_TRUE(inserted);
+            if (!inserted) {
+                ASSERT_TRUE(inserted);
+            }
         }
+    }
+
+    // Avoid the need to make each individual test a friend by exposing
+    // PersistentTable privates from here. Tests should call these methods
+    // instead of adding them as friends.
+
+    TBMap &getTableData() {
+        return m_table->m_data;
+    }
+
+    boost::unordered_set<TBPtr> &getBlocksPendingSnapshot() {
+        return m_table->m_blocksPendingSnapshot;
+    }
+
+    boost::unordered_set<TBPtr> &getBlocksNotPendingSnapshot() {
+        return m_table->m_blocksNotPendingSnapshot;
+    }
+
+    TBBucketMap &getBlocksPendingSnapshotLoad() {
+        return m_table->m_blocksPendingSnapshotLoad;
+    }
+
+    TBBucketMap &getBlocksNotPendingSnapshotLoad() {
+        return m_table->m_blocksNotPendingSnapshotLoad;
+    }
+
+    bool activateStreamInternal(CatalogId tableId, boost::shared_ptr<TableStreamerInterface> streamer) {
+        return m_table->activateStreamInternal(m_tableId, streamer);
     }
 
     voltdb::VoltDBEngine *m_engine;
@@ -377,6 +414,7 @@ public:
     std::vector<int32_t> m_tableSchemaColumnSizes;
     std::vector<bool> m_tableSchemaAllowNull;
     std::vector<int> m_primaryKeyIndexColumns;
+    DefaultTupleSerializer m_serializer;
 
     int32_t m_tuplesInserted;
     int32_t m_tuplesUpdated;
@@ -399,10 +437,9 @@ TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
     addRandomUniqueTuples( m_table, tupleCount);
 
     voltdb::TableIterator& iterator = m_table->iterator();
-    TBMap blocks(m_table->m_data);
-    DefaultTupleSerializer serializer;
-    m_table->m_blocksPendingSnapshot.swap(m_table->m_blocksNotPendingSnapshot);
-    m_table->m_blocksPendingSnapshotLoad.swap(m_table->m_blocksNotPendingSnapshotLoad);
+    TBMap blocks(getTableData());
+    getBlocksPendingSnapshot().swap(getBlocksNotPendingSnapshot());
+    getBlocksPendingSnapshotLoad().swap(getBlocksNotPendingSnapshotLoad());
     voltdb::CopyOnWriteIterator COWIterator(m_table, blocks.begin(), blocks.end());
     TableTuple tuple(m_table->schema());
     TableTuple COWTuple(m_table->schema());
@@ -447,7 +484,6 @@ TEST_F(CopyOnWriteTest, BigTest) {
     initTable(true);
     int tupleCount = TUPLE_COUNT;
     addRandomUniqueTuples( m_table, tupleCount);
-    DefaultTupleSerializer serializer;
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         T_ValueSet originalTuples;
         getTableValueSet(originalTuples);
@@ -456,7 +492,7 @@ TEST_F(CopyOnWriteTest, BigTest) {
         ::memset(config, 0, 5);
         ReferenceSerializeInput input(config, 5);
 
-        m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+        m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
 
         T_ValueSet COWTuples;
         char serializationBuffer[BUFFER_SIZE];
@@ -502,7 +538,6 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
     addRandomUniqueTuples( m_table, tupleCount);
     m_engine->setUndoToken(0);
     m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0);
-    DefaultTupleSerializer serializer;
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         T_ValueSet originalTuples;
         voltdb::TableIterator& iterator = m_table->iterator();
@@ -521,7 +556,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
         char config[5];
         ::memset(config, 0, 5);
         ReferenceSerializeInput input(config, 5);
-        m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+        m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
 
         T_ValueSet COWTuples;
         char serializationBuffer[BUFFER_SIZE];
@@ -568,7 +603,6 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
     addRandomUniqueTuples( m_table, tupleCount);
     m_engine->setUndoToken(0);
     m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0);
-    DefaultTupleSerializer serializer;
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         T_ValueSet originalTuples;
         voltdb::TableIterator& iterator = m_table->iterator();
@@ -587,7 +621,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
         char config[5];
         ::memset(config, 0, 5);
         ReferenceSerializeInput input(config, 5);
-        m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+        m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
 
         T_ValueSet COWTuples;
         char serializationBuffer[BUFFER_SIZE];
@@ -634,11 +668,11 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
 class MultiStreamTestTool {
 public:
     MultiStreamTestTool(PersistentTable& table, size_t nparts) :
-    table(table),
-    nparts(nparts),
-    iteration(-1),
-    nerrors(0),
-    showTuples(TUPLE_COUNT <= MAX_DETAIL_COUNT)
+        table(table),
+        nparts(nparts),
+        iteration(-1),
+        nerrors(0),
+        showTuples(TUPLE_COUNT <= MAX_DETAIL_COUNT)
     {
         strcpy(stage, "Initialize");
         TableTuple tuple(table.schema());
@@ -668,7 +702,11 @@ public:
         if (nerrors++ == 0) {
             std::cerr << std::endl;
         }
-        std::cerr << "ERROR(iteration=" << iteration << ": " << stage << "): " << buffer << std::endl;
+        std::cerr << "ERROR(";
+        if (iteration >= 0) {
+            std::cerr << "iteration=" << iteration << ": ";
+        }
+        std::cerr << stage << "): " << buffer << std::endl;
     }
 
     void error(const std::string& msg, ...) {
@@ -794,6 +832,27 @@ public:
         return os.str();
     }
 
+    std::string generateHashRange(T_HashRangeVector& ranges) {
+        int colidx = table.partitionColumn();
+        json_spirit::Object json;
+        std::string op = expressionToString(EXPRESSION_TYPE_HASH_RANGE);
+        json.push_back(json_spirit::Pair("TYPE", json_spirit::Value(op)));
+        json.push_back(json_spirit::Pair("VALUE_TYPE", json_spirit::Value(valueToString(VALUE_TYPE_BIGINT))));
+        json.push_back(json_spirit::Pair("VALUE_SIZE", json_spirit::Value(8)));
+        json.push_back(json_spirit::Pair("HASH_COLUMN", json_spirit::Value(colidx)));
+        json_spirit::Array array;
+        for (size_t i = 0; i < ranges.size(); i++) {
+            json_spirit::Object range;
+            range.push_back(json_spirit::Pair("RANGE_START", ranges[i].first));
+            range.push_back(json_spirit::Pair("RANGE_END", ranges[i].second));
+            array.push_back(range);
+        }
+        json.push_back(json_spirit::Pair("RANGES", array));
+        std::ostringstream os;
+        json_spirit::write(json, os);
+        return os.str();
+    }
+
     PersistentTable& table;
     size_t nparts;
     int iteration;
@@ -812,8 +871,6 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
     // Constants
     const int32_t npartitions = 7;
     const int tupleCount = TUPLE_COUNT;
-
-    DefaultTupleSerializer serializer;
 
     initTable(true);
     addRandomUniqueTuples(m_table, tupleCount);
@@ -884,7 +941,7 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
         tool.context("activate");
 
         ReferenceSerializeInput input(buffer, output.position());
-        bool alreadyActivated = m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+        bool alreadyActivated = m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
         if (alreadyActivated) {
             tool.error("COW was previously activated");
         }
@@ -1029,12 +1086,11 @@ TEST_F(CopyOnWriteTest, BufferBoundaryCondition) {
     addRandomUniqueTuples(m_table, tupleCount);
     size_t origPendingCount = m_table->getBlocksNotPendingSnapshotCount();
     // This should succeed in one call to serializeMore().
-    DefaultTupleSerializer serializer;
     char serializationBuffer[bufferSize];
     char config[5];
     ::memset(config, 0, 5);
     ReferenceSerializeInput input(config, 5);
-    m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+    m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
     TupleOutputStreamProcessor outputStreams(serializationBuffer, bufferSize);
     std::vector<int> retPositions;
     int64_t remaining = m_table->streamMore(outputStreams, retPositions);
@@ -1065,17 +1121,12 @@ static void dumpValueSet(const std::string &tag, const T_ValueSet &set) {
  */
 class DummyTableStreamer : public TableStreamerInterface {
 public:
-    DummyTableStreamer(TableStreamType type) : m_type(type)
-    {}
+    DummyTableStreamer(TableStreamType type) : m_type(type) {}
 
-    bool activateStream(PersistentTable &table, CatalogId tableId) {
-        return true;
-    }
+    virtual bool activateStream(PersistentTable &table, CatalogId tableId) { return true; }
 
     virtual int64_t streamMore(TupleOutputStreamProcessor &outputStreams,
-                               std::vector<int> &retPositions) {
-        return 0;
-    }
+                               std::vector<int> &retPositions) { return 0; }
 
     virtual bool canSafelyFreeTuple(TableTuple &tuple) const { return true; }
 
@@ -1103,7 +1154,78 @@ public:
     T_ValueSet m_shuffles;
 };
 
-// Test the elastic::Scanner.
+class ElasticTableScrambler {
+public:
+
+    ElasticTableScrambler(CopyOnWriteTest &test,
+                          int tuplesPerBlock, int numInitial,
+                          int freqInsert, int freqDelete, int freqUpdate, int freqCompaction) :
+        test(test),
+        tuplesPerBlock(tuplesPerBlock),
+        numInitial(numInitial),
+        freqInsert(freqInsert),
+        freqDelete(freqDelete),
+        freqUpdate(freqUpdate),
+        freqCompaction(freqCompaction),
+        icycle(0)
+    {}
+
+    void initialize() {
+        test.initTable(true, static_cast<int>(test.m_tupleWidth * (tuplesPerBlock + sizeof(int32_t))));
+
+        test.m_table->deleteAllTuples(true);
+        test.addRandomUniqueTuples(test.m_table, numInitial, &initial);
+    }
+
+    void scramble() {
+        // Make sure to offset the initial cycles based on the frequency.
+        if (freqInsert > 0 && (icycle + freqInsert - 1) % freqInsert == 0) {
+            test.doRandomInsert(test.m_table, &inserts);
+        }
+
+        if (freqDelete > 0 && (icycle + freqDelete - 1) % freqDelete == 0) {
+            test.doRandomDelete(test.m_table, &deletes);
+        }
+
+        if (freqUpdate > 0 && (icycle + freqUpdate - 1) % freqUpdate == 0) {
+            test.doRandomUpdate(test.m_table, &updatesSrc, &updatesTgt);
+        }
+
+        if (freqCompaction > 0 && (icycle + freqCompaction - 1) % freqCompaction == 0) {
+            size_t churn = test.m_table->activeTupleCount() / 2;
+            // Delete half the tuples to create enough fragmentation for
+            // compaction to happen.
+            for (size_t i = 0; i < churn; i++) {
+                test.doRandomDelete(test.m_table, &deletes);
+            }
+            test.doForcedCompaction(test.m_table);
+            // Re-insert the same number of tuples.
+            for (size_t i = 0; i < churn; i++) {
+                test.doRandomInsert(test.m_table, &inserts);
+            }
+        }
+        icycle++;
+    }
+
+    CopyOnWriteTest &test;
+
+    int tuplesPerBlock;
+    int numInitial;
+    int freqInsert;
+    int freqDelete;
+    int freqUpdate;
+    int freqCompaction;
+    int icycle;
+
+    // Value sets used for checking results.
+    T_ValueSet initial;
+    T_ValueSet inserts;
+    T_ValueSet updatesSrc;
+    T_ValueSet updatesTgt;
+    T_ValueSet deletes;
+};
+
+// Test the elastic scanner.
 TEST_F(CopyOnWriteTest, ElasticScannerTest) {
 
     const int TUPLES_PER_BLOCK = 50;
@@ -1114,60 +1236,29 @@ TEST_F(CopyOnWriteTest, ElasticScannerTest) {
     const int FREQ_UPDATE = 5;
     const int FREQ_COMPACTION = 100;
 
-    initTable(true, static_cast<int>(m_tupleWidth * (TUPLES_PER_BLOCK + sizeof(int32_t))));
+    ElasticTableScrambler tableScrambler(*this,
+                                         TUPLES_PER_BLOCK, NUM_INITIAL,
+                                         FREQ_INSERT, FREQ_DELETE,
+                                         FREQ_UPDATE, FREQ_COMPACTION);
+
+    tableScrambler.initialize();
 
     TableTuple tuple(m_table->schema());
 
     // Value sets used for checking results.
-    T_ValueSet initial;
-    T_ValueSet inserts;
-    T_ValueSet updateSources;
-    T_ValueSet updateTargets;
-    T_ValueSet deletes;
     T_ValueSet returns;
-
-    // Each repetition starts fresh.
-    m_table->deleteAllTuples(true);
-
-    // Populate the table with initial tuples.
-    addRandomUniqueTuples(m_table, NUM_INITIAL);
-    getTableValueSet(initial);
 
     DummyTableStreamer *dummyStreamer = new DummyTableStreamer(TABLE_STREAM_ELASTIC);
     boost::shared_ptr<TableStreamerInterface> dummyStreamerPtr(dummyStreamer);
     ElasticScanner scanner(*m_table);
-    m_table->activateStreamInternal(m_tableId, dummyStreamerPtr);
+    activateStreamInternal(m_tableId, dummyStreamerPtr);
 
     bool scanComplete = false;
 
     // Mutate/scan loop.
     for (size_t icycle = 0; icycle < NUM_CYCLES; icycle++) {
-
-        if ((icycle - 1) % FREQ_INSERT == 0) {
-            doRandomInsert(m_table, &inserts);
-        }
-
-        if ((icycle - 1) % FREQ_DELETE == 0) {
-            doRandomDelete(m_table, &deletes);
-        }
-
-        if ((icycle - 1) % FREQ_UPDATE == 0) {
-            doRandomUpdate(m_table, &updateSources, &updateTargets);
-        }
-
-        if ((icycle - 1) % FREQ_COMPACTION == 0) {
-            size_t churn = m_table->activeTupleCount() / 2;
-            // Delete half the tuples to create enough fragmentation for
-            // compaction to happen.
-            for (size_t i = 0; i < churn; i++) {
-                doRandomDelete(m_table, &deletes);
-            }
-            m_table->doForcedCompaction();
-            // Re-insert the same number of tuples.
-            for (size_t i = 0; i < churn; i++) {
-                doRandomInsert(m_table, &inserts);
-            }
-        }
+        // Periodically delete, insert, update, compact, etc..
+        tableScrambler.scramble();
 
         scanComplete = !scanner.next(tuple);
         if (scanComplete) {
@@ -1193,13 +1284,13 @@ TEST_F(CopyOnWriteTest, ElasticScannerTest) {
     // which updates or deletes should be visible or not.
 
     // 1) Should be able to account for all scan returns in the initial,
-    //    inserts or updateTargets sets.
+    //    inserts or updatesTgt sets.
     T_ValueSet missing;
     for (T_ValueSet::const_iterator iter = returns.begin(); iter != returns.end(); ++iter) {
         T_Value value = *iter;
-        if(initial.find(value) == initial.end() &&
-           inserts.find(value) == inserts.end() &&
-           updateTargets.find(value) == updateTargets.end()) {
+        if(tableScrambler.initial.find(value) == tableScrambler.initial.end() &&
+           tableScrambler.inserts.find(value) == tableScrambler.inserts.end() &&
+           tableScrambler.updatesTgt.find(value) == tableScrambler.updatesTgt.end()) {
             missing.insert(value);
         }
     }
@@ -1209,19 +1300,20 @@ TEST_F(CopyOnWriteTest, ElasticScannerTest) {
                   << " in the initial, insert or update (target) sets."
                   << std::endl;
         dumpValueSet("unexpected returned tuple values", missing);
-        dumpValueSet("initial tuple values", initial);
-        dumpValueSet("inserted tuple values", inserts);
-        dumpValueSet("updated tuple target values", updateTargets);
+        dumpValueSet("initial tuple values", tableScrambler.initial);
+        dumpValueSet("inserted tuple values", tableScrambler.inserts);
+        dumpValueSet("updated tuple target values", tableScrambler.updatesTgt);
         ASSERT_TRUE(missing.empty());
     }
 
     // 2) Should be able to account for all initial values in the returns,
     //    deletes or update (source) sets.
-    for (T_ValueSet::const_iterator iter = initial.begin(); iter != initial.end(); ++iter) {
+    for (T_ValueSet::const_iterator iter = tableScrambler.initial.begin();
+         iter != tableScrambler.initial.end(); ++iter) {
         T_Value value = *iter;
         if(returns.find(value) == returns.end() &&
-           deletes.find(value) == deletes.end() &&
-           updateSources.find(value) == updateSources.end() &&
+           tableScrambler.deletes.find(value) == tableScrambler.deletes.end() &&
+           tableScrambler.updatesSrc.find(value) == tableScrambler.updatesSrc.end() &&
            dummyStreamer->m_shuffles.find(value) == dummyStreamer->m_shuffles.end()) {
             missing.insert(value);
         }
@@ -1237,9 +1329,208 @@ TEST_F(CopyOnWriteTest, ElasticScannerTest) {
                   << std::endl;
         dumpValueSet("missing initial tuple values", missing);
         dumpValueSet("returned tuple values", returns);
-        dumpValueSet("deleted tuple values", deletes);
-        dumpValueSet("updated tuple source values", updateSources);
+        dumpValueSet("deleted tuple values", tableScrambler.deletes);
+        dumpValueSet("updated tuple source values", tableScrambler.updatesSrc);
         ASSERT_TRUE(missing.empty());
+    }
+}
+
+/**
+ * Dummy pass-through elastic TableStreamer for testing the index.
+ */
+class DummyElasticTableStreamer : public DummyTableStreamer {
+public:
+    DummyElasticTableStreamer(PersistentTable& table,
+                              const std::vector<std::string> &predicateStrings) :
+        DummyTableStreamer(TABLE_STREAM_ELASTIC),
+        m_predicateStrings(predicateStrings)
+    {}
+
+    virtual bool activateStream(PersistentTable &table, CatalogId tableId) {
+        m_context.reset(new ElasticContext(table, m_predicateStrings));
+        return true;
+    }
+
+    virtual int64_t streamMore(TupleOutputStreamProcessor &outputStreams,
+                               std::vector<int> &retPositions) {
+        return m_context->handleStreamMore(outputStreams, retPositions);
+    }
+
+    virtual bool isAlreadyActive() const {
+        return (m_context != NULL);
+    }
+
+    virtual bool notifyTupleInsert(TableTuple &tuple) {
+        return m_context->notifyTupleInsert(tuple);
+    }
+
+    virtual bool notifyTupleUpdate(TableTuple &tuple) {
+        return m_context->notifyTupleUpdate(tuple);
+    }
+
+    virtual bool notifyTupleDelete(TableTuple &tuple) {
+        return m_context->notifyTupleDelete(tuple);
+    }
+
+    virtual void notifyBlockWasCompactedAway(TBPtr block) {
+        m_context->notifyBlockWasCompactedAway(block);
+    }
+
+    virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
+                                     TableTuple &sourceTuple, TableTuple &targetTuple) {
+        DummyTableStreamer::notifyTupleMovement(sourceBlock, targetBlock, sourceTuple, targetTuple);
+        m_context->notifyTupleMovement(sourceBlock, targetBlock, sourceTuple, targetTuple);
+        T_Value value = *reinterpret_cast<T_Value*>(sourceTuple.address() + 1);
+        m_moved.insert(value);
+    }
+
+    ElasticContext& getContext() {
+        return *m_context.get();
+    }
+
+    ElasticIndex& getIndex() {
+        // Abuse the friendship.
+        return getContext().m_index;
+    }
+
+    const std::vector<std::string> &m_predicateStrings;
+    boost::scoped_ptr<ElasticContext> m_context;
+    T_ValueSet m_moved;
+};
+
+// Test elastic context index creation.
+TEST_F(CopyOnWriteTest, ElasticContextIndexTest) {
+    const int TUPLES_PER_BLOCK = 50;
+    const int NUM_INITIAL = 300;
+    const int NUM_CYCLES = 300;
+    const int FREQ_INSERT = 1;
+    const int FREQ_DELETE = 10;
+    const int FREQ_UPDATE = 5;
+    const int FREQ_COMPACTION = 100;
+
+    ElasticTableScrambler tableScrambler(*this,
+                                         TUPLES_PER_BLOCK, NUM_INITIAL,
+                                         FREQ_INSERT, FREQ_DELETE,
+                                         FREQ_UPDATE, FREQ_COMPACTION);
+
+    tableScrambler.initialize();
+
+    MultiStreamTestTool tool(*m_table, 1);
+
+    T_HashRangeVector ranges;
+    ranges.push_back(T_HashRange(0x0000000000000000, 0x7fffffffffffffff));
+    std::vector<std::string> predicateStrings;
+    predicateStrings.push_back(tool.generateHashRange(ranges));
+    StreamPredicateList predicates;
+    std::ostringstream errmsg;
+    ASSERT_TRUE(predicates.parseStrings(predicateStrings, errmsg));
+
+    DummyElasticTableStreamer *streamerPtr =
+            new DummyElasticTableStreamer(*m_table, predicateStrings);
+    boost::shared_ptr<TableStreamerInterface> streamer(streamerPtr);
+    activateStreamInternal(m_tableId, streamer);
+
+    for (size_t icycle = 0; icycle < NUM_CYCLES; icycle++) {
+        tableScrambler.scramble();
+    }
+
+    TupleOutputStreamProcessor outputStreams;
+    std::vector<int> retPositions;
+    while (m_table->streamMore(outputStreams, retPositions) > 0) {
+        ;
+    }
+
+    tool.context("check");
+    ElasticIndex &index = streamerPtr->getIndex();
+    voltdb::TableIterator& iterator = m_table->iterator();
+    TableTuple tuple(m_table->schema());
+    T_ValueSet accepted;
+    T_ValueSet rejected;
+    T_ValueSet missing;
+    T_ValueSet extra;
+    while (iterator.next(tuple)) {
+        bool isAccepted = true;
+        for (StreamPredicateList::iterator ipred = predicates.begin();
+             ipred != predicates.end(); ++ipred) {
+            if (ipred->eval(&tuple).isFalse()) {
+                isAccepted = false;
+                break;
+            }
+        }
+        T_Value value = *reinterpret_cast<T_Value*>(tuple.address() + 1);
+        bool isIndexed = index.has(*m_table, tuple);
+        if (isAccepted) {
+            accepted.insert(value);
+            if (!isIndexed) {
+                missing.insert(value);
+            }
+        }
+        else {
+            rejected.insert(value);
+            if (isIndexed) {
+                extra.insert(value);
+            }
+        }
+    }
+    if (missing.size() > 0 || extra.size() > 0) {
+        size_t ninitialMIA = 0;
+        size_t ninsertedMIA = 0;
+        size_t nupdatedMIA = 0;
+        size_t nmovedMIA = 0;
+        size_t wtf = 0;
+        if (missing.size() > 0) {
+            BOOST_FOREACH(T_Value value, missing) {
+                bool wasDeleted = tableScrambler.deletes.find(value) != tableScrambler.deletes.end();
+                bool wasUpdated = tableScrambler.updatesSrc.find(value) != tableScrambler.updatesSrc.end();
+                bool accountedFor = false;
+                if (!wasDeleted && !wasUpdated) {
+                    if (tableScrambler.initial.find(value) != tableScrambler.initial.end()) {
+                        ninitialMIA++;
+                        accountedFor = true;
+                    }
+                    if (tableScrambler.inserts.find(value) != tableScrambler.inserts.end()) {
+                        ninsertedMIA++;
+                        accountedFor = true;
+                    }
+                    if (tableScrambler.updatesTgt.find(value) != tableScrambler.updatesTgt.end()) {
+                        nupdatedMIA++;
+                        accountedFor = true;
+                    }
+                    if (streamerPtr->m_moved.find(value) != streamerPtr->m_moved.end()) {
+                        nmovedMIA++;
+                    }
+                }
+                if (!accountedFor) {
+                    wtf++;
+                }
+            }
+        }
+        size_t ninitial = tableScrambler.initial.size();
+        size_t ninserted = tableScrambler.inserts.size();
+        size_t ndeleted = tableScrambler.deletes.size();
+        size_t nupdated = tableScrambler.updatesTgt.size();
+        size_t ntotal = ninitial + ninserted - ndeleted;
+        size_t nactive = (size_t)m_table->activeTupleCount();
+        size_t nrejected = rejected.size();
+        size_t nexpected = nactive - nrejected;
+        size_t nindexed = index.size();
+        size_t nmissing = missing.size();
+        size_t nextra = extra.size();
+        size_t nmoved = streamerPtr->m_moved.size();
+        tool.error("Bad index - tuple statistics:");
+        tool.error("     Tuples: %lu = %lu+%lu-%lu (%lu)", ntotal, ninitial,
+                   ninserted, ndeleted, nupdated);
+        tool.error("   Expected: %lu = %lu-%lu", nexpected, nactive, nrejected);
+        tool.error("      Found: %lu", nindexed);
+        tool.error("      Moved: %lu", nmoved);
+        tool.error("    Missing: %lu (%lu/%lu/%lu/%lu/%lu)", nmissing, ninitialMIA,
+                   ninsertedMIA, nupdatedMIA, nmovedMIA, wtf);
+        tool.error("      Extra: %lu", nextra);
+        /*BOOST_FOREACH(T_Value value, missing) {
+            std::cout << value << std::endl;
+        }*/
+        ASSERT_EQ(0, nmissing);
+        ASSERT_EQ(0, nextra);
     }
 }
 
