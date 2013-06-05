@@ -21,5 +21,4 @@ import java.util.Set;
 
 public interface DisconnectFailedHostsCallback {
     public void disconnect(Set<Integer> failedHostIds);
-    public void disconnect(int failedHostId);
 }

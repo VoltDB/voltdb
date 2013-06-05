@@ -124,11 +124,11 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     public static final class FaultMessage extends VoltMessage {
 
         public final long failedSite;
-        public final boolean detected;
+        public final boolean witnessed;
 
-        public FaultMessage(long failedSite, boolean detected) {
+        public FaultMessage(long failedSite, boolean witnessed) {
             this.failedSite = failedSite;
-            this.detected = detected;
+            this.witnessed = witnessed;
         }
 
         @Override
@@ -513,19 +513,13 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         } else if (message instanceof FaultMessage) {
             FaultMessage fm = (FaultMessage)message;
 
+            /*
             if (m_pendingFailedSites.contains(fm.failedSite)) {
                 m_recoveryLog.info("Received fault message for failed site " + CoreUtils.hsIdToString(fm.failedSite) +
                 " ignoring");
                 return;
             }
-
-            if (m_recovering) {
-                org.voltdb.VoltDB.crashLocalVoltDB(
-                        "Aborting recovery due to a remote node (" + CoreUtils.hsIdToString(fm.failedSite) +
-                        ") failure. Retry again.",
-                        true,
-                        null);
-            }
+             */
 
             discoverGlobalFaultData(fm);
         } else if (message instanceof RecoveryMessage) {
@@ -918,8 +912,8 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         return sem;
     }
 
-    public void reportFault(long faultingSite, boolean detected) {
-        FaultMessage fm = new FaultMessage(faultingSite, detected);
+    public void reportFault(long faultingSite, boolean witnessed) {
+        FaultMessage fm = new FaultMessage(faultingSite, witnessed);
         fm.m_sourceHSId = m_hsId;
         m_mailbox.deliver(fm);
     }

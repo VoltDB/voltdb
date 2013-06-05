@@ -59,12 +59,11 @@ public class MeshArbiter {
     }
 
     public Map<Long,Long> reconfigureOnFault(Set<Long> hsIds, AgreementSite.FaultMessage fm) {
-        boolean detected = fm.detected && fm.m_sourceHSId == m_hsId;
 
         if (m_inTrouble.containsKey(fm.failedSite)) {
 
-            if (detected && !m_inTrouble.get(fm.failedSite)) {
-                m_inTrouble.put(fm.failedSite,detected);
+            if (fm.witnessed && !m_inTrouble.get(fm.failedSite)) {
+                m_inTrouble.put(fm.failedSite, fm.witnessed);
             }
 
             m_recoveryLog.info("Received fault message for failed site " +
@@ -72,7 +71,7 @@ public class MeshArbiter {
 
             return ImmutableMap.of();
         }
-        m_inTrouble.put(fm.failedSite,detected);
+        m_inTrouble.put(fm.failedSite,fm.witnessed);
 
         HashSet<Long> survivorSet = new HashSet<Long>(hsIds);
         survivorSet.removeAll(m_inTrouble.keySet());
@@ -133,7 +132,6 @@ public class MeshArbiter {
      */
     private boolean discoverGlobalFaultData_rcv(Set<Long> hsIds, long [] survivors) {
 
-        ArrayList<FailureSiteUpdateMessage> messages = new ArrayList<FailureSiteUpdateMessage>();
         long blockedOnReceiveStart = System.currentTimeMillis();
         long lastReportTime = 0;
         do {
@@ -158,32 +156,39 @@ public class MeshArbiter {
             }
             if (!hsIds.contains(m.m_sourceHSId)) continue;
 
-            FailureSiteUpdateMessage fm = null;
+            FailureSiteUpdateMessage fsum = null;
 
             if (m.getSubject() == Subject.FAILURE_SITE_UPDATE.getId()) {
-                fm = (FailureSiteUpdateMessage)m;
-                messages.add(fm);
+                fsum = (FailureSiteUpdateMessage)m;
                 m_failureSiteUpdateLedger.put(
-                        Pair.of(fm.m_sourceHSId, fm.m_initiatorForSafeTxnId),
-                        fm.m_safeTxnId);
+                        Pair.of(fsum.m_sourceHSId, fsum.m_initiatorForSafeTxnId),
+                        fsum.m_safeTxnId);
             } else if (m.getSubject() == Subject.FAILURE.getId()) {
                 /*
-                 * If the fault distributor reports a new fault, assert that the fault currently
-                 * being handled is included, redeliver the message to ourself and then abort so
-                 * that the process can restart.
+                 * If the fault distributor reports a new fault, ignore it if it is known , otherwise
+                 * re-deliver the message to ourself and then abort so that the process can restart.
                  */
-                Long newFault = ((FaultMessage)m).failedSite;
-                m_mailbox.deliverFront(m);
-                m_recoveryLog.info("Agreement, Detected a concurrent failure from FaultDistributor, new failed site "
-                        + CoreUtils.hsIdToString(newFault));
-                return false;
+                FaultMessage fm = (FaultMessage)m;
+
+                Boolean alreadyWitnessed = m_inTrouble.get(fm.failedSite);
+                if (alreadyWitnessed == null) {
+                    m_mailbox.deliverFront(m);
+                    m_recoveryLog.info("Agreement, Detected a concurrent failure from FaultDistributor, new failed site "
+                            + CoreUtils.hsIdToString(fm.failedSite));
+                    return false;
+                }
+
+                if (!alreadyWitnessed && fm.witnessed) {
+                    m_inTrouble.put(fm.failedSite, fm.witnessed);
+                }
+
             }
 
             m_recoveryLog.info("Agreement, Received failure message from " +
-                    CoreUtils.hsIdToString(fm.m_sourceHSId) + " for failed sites " +
-                    CoreUtils.hsIdCollectionToString(fm.m_failedHSIds) +
-                    " safe txn id " + fm.m_safeTxnId + " failed site " +
-                    CoreUtils.hsIdToString(fm.m_initiatorForSafeTxnId));
+                    CoreUtils.hsIdToString(fsum.m_sourceHSId) + " for failed sites " +
+                    CoreUtils.hsIdCollectionToString(fsum.m_failedHSIds) +
+                    " safe txn id " + fsum.m_safeTxnId + " failed site " +
+                    CoreUtils.hsIdToString(fsum.m_initiatorForSafeTxnId));
         } while(!haveNecessaryFaultInfo(survivors, false));
 
         return true;

@@ -226,14 +226,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 }
             }
         }
-        @Override
-        public void disconnect(int failedHostId) {
-            synchronized(HostMessenger.this) {
-                m_knownFailedHosts.add(failedHostId);
-                removeForeignHost(failedHostId);
-                logger.warn(String.format("Host %d failed", failedHostId));
-            }
-        }
     };
 
     /**
@@ -242,24 +234,15 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     @Override
     public synchronized void reportForeignHostFailed(int hostId) {
-        if (m_knownFailedHosts.contains(hostId)) {
-            return;
-        }
-        m_knownFailedHosts.add(hostId);
         long initiatorSiteId = CoreUtils.getHSIdFromHostAndSite(hostId, AGREEMENT_SITE_ID);
-        removeForeignHost(hostId);
-        m_agreementSite.reportFault(initiatorSiteId, true);
+        m_agreementSite.reportFault(initiatorSiteId, true /* witnessed */);
         logger.warn(String.format("Host %d failed", hostId));
     }
 
     @Override
     public synchronized void relayForeignHostFailed(int hostId) {
-        if (m_knownFailedHosts.contains(hostId)) {
-            return;
-        }
         long initiatorSiteId = CoreUtils.getHSIdFromHostAndSite(hostId, AGREEMENT_SITE_ID);
-        removeForeignHost(hostId);
-        m_agreementSite.reportFault(initiatorSiteId, false /* not detected */);
+        m_agreementSite.reportFault(initiatorSiteId, false /* not witnessed */);
         logger.warn(String.format("Host %d failed", hostId));
     }
 
