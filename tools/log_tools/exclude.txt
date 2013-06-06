@@ -3,10 +3,13 @@ DEBUG
 INFO Replica bandwidth usage
 INFO Pending buffers
 INFO Master throughput
+
+#Server logs
 JOIN: Sending fault data .* lastKnownGloballyCommitedMultiPartTxnId \d*
 HOST: Received failure message from initiator.*commit point.*safe txn id .*
 HOST: Received failure message from .* safe txn id
 INFO.*HOST:
+
 #Clientlog exceptions
 Connection to database host .* was lost before a response
 ERROR: Non success in ProcCallback
