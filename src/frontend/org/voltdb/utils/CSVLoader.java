@@ -384,30 +384,29 @@ public class CSVLoader {
                     + " found, " + columnCnt + " expected.";
         }
         for (int i = 0; i < slot.length; i++) {
-            Object thisSlot = slot[i];
             //supercsv read "" to null
-            if( thisSlot == null )
+            if( slot[i] == null )
             {
                 if(config.blank.equalsIgnoreCase("error"))
                     return "Error: blank item";
                 else if (config.blank.equalsIgnoreCase("empty"))
-                    thisSlot = blankValues.get(typeList.get(i));
+                    slot[i] = blankValues.get(typeList.get(i));
               //else config.blank == null which is already the case
             }
 
             // trim white space in this line. SuperCSV preserves all the whitespace by default
             else {
-                String str = thisSlot.toString();
+                String str = slot[i].toString();
                 if( config.nowhitespace &&
                         ( str.charAt(0) == ' ' || str.charAt( str.length() - 1 ) == ' ') ) {
                     return "Error: White Space Detected in nowhitespace mode.";
                 }
                 else
-                    thisSlot = ((String) thisSlot).trim();
+                    slot[i] = ((String) slot[i]).trim();
                 // treat NULL, \N and "\N" as actual null value
-                if ( thisSlot.equals("NULL") || thisSlot.equals(VoltTable.CSV_NULL) ||
-                        !config.strictquotes && thisSlot.equals(VoltTable.QUOTED_CSV_NULL))
-                    thisSlot = null;
+                if ( slot[i].equals("NULL") || slot[i].equals(VoltTable.CSV_NULL) ||
+                        !config.strictquotes && slot[i].equals(VoltTable.QUOTED_CSV_NULL))
+                    slot[i] = null;
             }
         }
         return null;
