@@ -519,7 +519,6 @@ class NValue {
     // Helpers for inList.
     // These are purposely not inlines to avoid exposure of NValueList details.
     void deserializeIntoANewNValueList(SerializeInput &input, Pool *dataPool);
-    void deserializeIntoANewNValueList(const std::string& buffer);
     void allocateANewNValueList(size_t elementCount, ValueType elementType);
 
     // Promotion Rules. Initialized in NValue.cpp
@@ -1944,13 +1943,6 @@ class NValue {
     static NValue getDecimalValueFromString(const std::string &value) {
         NValue retval(VALUE_TYPE_DECIMAL);
         retval.createDecimalFromString(value);
-        return retval;
-    }
-
-    static NValue getAllocatedArrayValueFromString(const std::string &value)
-    {
-        NValue retval(VALUE_TYPE_ARRAY);
-        retval.deserializeIntoANewNValueList(value);
         return retval;
     }
 

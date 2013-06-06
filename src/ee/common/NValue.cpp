@@ -397,7 +397,6 @@ NValue NValue::opDivideDecimals(const NValue lhs, const NValue rhs) const {
     return getDecimalValue(retval);
 }
 
-//TODO: This O(length) implementation should be replaced by an O(ln(length)) or better implementation.
 struct NValueList {
     static int allocationSizeForLength(size_t length)
     {
@@ -456,6 +455,10 @@ bool NValue::inList(const NValue& rhs) const
     }
     const NValueList* listOfNValues = (NValueList*)rhs.getObjectValue();
     const StlFriendlyNValue& value = *static_cast<const StlFriendlyNValue*>(this);
+    //TODO: An O(ln(length)) implementation vs. the current O(length) implementation
+    // such as binary search would likely require some kind of sorting/re-org of values
+    // post-update/pre-lookup, and would likely require some sortable inequality method
+    // (operator<()?) to be defined on StlFriendlyNValue.
     return std::find(listOfNValues->begin(), listOfNValues->end(), value) != listOfNValues->end();
 }
 
@@ -468,17 +471,8 @@ void NValue::deserializeIntoANewNValueList(SerializeInput &input, Pool *dataPool
     ::memset(storage, 0, trueSize);
     NValueList* nvset = new (storage) NValueList(length, elementType);
     nvset->deserializeNValues(input, dataPool);
-}
-
-void NValue::deserializeIntoANewNValueList(const std::string& buffer)
-{
-    //TODO: Decide on format for IN LIST constants from compiled plans, including two counts,
-    // and a list of parameter indexes and/or data values. Human readable? Hex?
-    // This construction method must use the persistent data pool
-    // (somehow hacked through SRef?) for all allocations.
-    throwFatalLogicErrorStreamed(
-        "In NValue::deserializeIntoANewNValueList, IN LIST constants not yet supported: (" <<
-        buffer << ")");
+    //TODO: An O(ln(length)) implementation vs. the current O(length) implementation of NValue::inList
+    // would likely require some kind of sorting/re-org of values at this point post-update pre-lookup.
 }
 
 void NValue::allocateANewNValueList(size_t length, ValueType elementType)
@@ -499,6 +493,8 @@ void NValue::setArrayElements(std::vector<NValue> &args) const
     while (ii--) {
         listOfNValues->m_values[ii] = args[ii];
     }
+    //TODO: An O(ln(length)) implementation vs. the current O(length) implementation of NValue::inList
+    // would likely require some kind of sorting/re-org of values at this point post-update pre-lookup.
 }
 
 

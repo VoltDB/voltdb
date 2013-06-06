@@ -94,11 +94,6 @@ public:
         return NValue::getDecimalValueFromString(txt);
     }
 
-    static NValue getArrayValueFromString(const std::string &txt)
-    {
-        return NValue::getAllocatedArrayValueFromString(txt);
-    }
-
     static NValue getArrayValueFromSizeAndType(size_t elementCount, ValueType elementType)
     {
         return NValue::getAllocatedArrayValueFromSizeAndType(elementCount, elementType);
