@@ -47,7 +47,7 @@ public class SnapshotPredicates {
     public byte[] toBytes()
     {
         // Special case common case where there's only one target with no predicate
-        if (m_predicates.size() == 0 && m_predicates.get(0) == null) {
+        if (m_predicates.isEmpty() || m_predicates.get(0) == null) {
             return serializeEmpty();
         }
 
