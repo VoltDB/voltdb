@@ -84,7 +84,7 @@ public class DefaultCommandLogReinitiator implements CommandLogReinitiator
     }
 
     @Override
-    public void generateReplayPlan() {
+    public void generateReplayPlan(int newPartitionCount) {
     }
 
     @Override
