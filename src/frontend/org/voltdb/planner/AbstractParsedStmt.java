@@ -37,6 +37,7 @@ import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.expressions.VectorValueExpression;
 import org.voltdb.planner.JoinTree.JoinNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
@@ -233,6 +234,9 @@ public abstract class AbstractParsedStmt {
         if (elementName.equals("value")) {
             retval = parseValueExpression(paramsById, root);
         }
+        else if (elementName.equals("vector")) {
+            retval = parseVectorExpression(paramsById, root);
+        }
         else if (elementName.equals("columnref")) {
             retval = parseColumnRefExpression(root);
         }
@@ -251,10 +255,29 @@ public abstract class AbstractParsedStmt {
         else if (elementName.equals("asterisk")) {
             return null;
         }
-        else
+        else {
             throw new PlanningErrorException("Unsupported expression node '" + elementName + "'");
+        }
 
         return retval;
+    }
+
+    /**
+     * Parse a Vector value for SQL-IN
+     */
+    private static AbstractExpression parseVectorExpression(HashMap<Long, Integer> paramsById, VoltXMLElement exprNode) {
+        ArrayList<AbstractExpression> args = new ArrayList<AbstractExpression>();
+        for (VoltXMLElement argNode : exprNode.children) {
+            assert(argNode != null);
+            // recursively parse each argument subtree (could be any kind of expression).
+            AbstractExpression argExpr = parseExpressionTree(paramsById, argNode);
+            assert(argExpr != null);
+            args.add(argExpr);
+        }
+
+        VectorValueExpression vve = new VectorValueExpression();
+        vve.setArgs(args);
+        return vve;
     }
 
     /**
@@ -339,6 +362,12 @@ public abstract class AbstractParsedStmt {
         String optype = exprNode.attributes.get("optype");
         ExpressionType exprType = ExpressionType.get(optype);
         AbstractExpression expr = null;
+
+        // XXX remove this code to enable SQL-IN
+        // also re-enable sql-in tests in TestParsedStatements
+        if (exprType == ExpressionType.COMPARE_IN) {
+            throw new PlanningErrorException("VoltDB does not support SQL IN expressions.");
+        }
 
         if (exprType == ExpressionType.INVALID) {
             throw new PlanningErrorException("Unsupported operation type '" + optype + "'");
