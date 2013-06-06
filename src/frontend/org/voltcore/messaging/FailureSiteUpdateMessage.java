@@ -26,11 +26,11 @@ import org.voltcore.utils.CoreUtils;
 
 public class FailureSiteUpdateMessage extends VoltMessage {
 
-    /** Site id of the failed sites */
+    /** Site id of the reported failed sites */
     public HashSet<Long> m_failedHSIds = new HashSet<Long>();
 
-    /** Safe txn id is for this specific initiator **/
-    public long m_initiatorForSafeTxnId;
+    /** Site id of the reported failed site **/
+    public long m_failedHSId;
 
     /** Greatest 2PC transaction id at source m_sourceSiteId seen from failed initiator */
     public long m_safeTxnId;
@@ -45,7 +45,7 @@ public class FailureSiteUpdateMessage extends VoltMessage {
             long committedTxnId)
     {
         m_failedHSIds = new HashSet<Long>(failedHSIds);
-        m_initiatorForSafeTxnId = initiatorForSafeTxnId;
+        m_failedHSId = initiatorForSafeTxnId;
         m_safeTxnId = safeTxnId;
         m_committedTxnId = committedTxnId;
     }
@@ -74,7 +74,7 @@ public class FailureSiteUpdateMessage extends VoltMessage {
         for (Long hostId : m_failedHSIds) {
             buf.putLong(hostId);
         }
-        buf.putLong(m_initiatorForSafeTxnId);
+        buf.putLong(m_failedHSId);
         buf.putLong(m_safeTxnId);
         buf.putLong(m_committedTxnId);
 
@@ -88,7 +88,7 @@ public class FailureSiteUpdateMessage extends VoltMessage {
         for (int ii = 0; ii < numIds; ii++) {
             m_failedHSIds.add(buf.getLong());
         }
-        m_initiatorForSafeTxnId = buf.getLong();
+        m_failedHSId = buf.getLong();
         m_safeTxnId = buf.getLong();
         m_committedTxnId = buf.getLong();
 
@@ -106,8 +106,8 @@ public class FailureSiteUpdateMessage extends VoltMessage {
         for (Long hsId : m_failedHSIds) {
             sb.append(CoreUtils.hsIdToString(hsId)).append(' ');
         }
-        sb.append(" initiator for safe txn:").
-        append((int)m_initiatorForSafeTxnId).append(':').append((int)(m_initiatorForSafeTxnId >> 32));
+        sb.append(" failed site id:").
+        append((int)m_failedHSId).append(':').append((int)(m_failedHSId >> 32));
         sb.append(" safe txn: ");
         sb.append(m_safeTxnId);
         sb.append(" committed txn: ");

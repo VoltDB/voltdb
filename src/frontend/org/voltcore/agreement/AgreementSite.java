@@ -579,7 +579,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     private final MeshAide m_meshAide = new MeshAide() {
         @Override
         public void sendHeartbeats(Set<Long> hsIds) {
-            sendHeartbeats(hsIds);
+            AgreementSite.this.sendHeartbeats(hsIds);
         }
         @Override
         public Long getNewestSafeTransactionForInitiator(Long initiatorId) {
@@ -760,7 +760,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 fm = (FailureSiteUpdateMessage)m;
                 messages.add(fm);
                 m_failureSiteUpdateLedger.put(
-                        Pair.of(fm.m_sourceHSId, fm.m_initiatorForSafeTxnId),
+                        Pair.of(fm.m_sourceHSId, fm.m_failedHSId),
                         fm.m_safeTxnId);
             } else if (m.getSubject() == Subject.FAILURE.getId()) {
                 /*
@@ -779,7 +779,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                     CoreUtils.hsIdToString(fm.m_sourceHSId) + " for failed sites " +
                     CoreUtils.hsIdCollectionToString(fm.m_failedHSIds) +
                     " safe txn id " + fm.m_safeTxnId + " failed site " +
-                    CoreUtils.hsIdToString(fm.m_initiatorForSafeTxnId));
+                    CoreUtils.hsIdToString(fm.m_failedHSId));
         } while(!haveNecessaryFaultInfo(survivorSet, false));
         return true;
     }

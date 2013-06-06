@@ -91,9 +91,18 @@ public class MeshArbiter {
         discoverGlobalFaultData_send(survivors);
 
         if (discoverGlobalFaultData_rcv(hsIds,survivors)) {
+            Map<Long,Long> lastTxnIdByFailedSite = extractGlobalFaultData(hsIds,survivors);
+
             m_failedSites.addAll(m_inTrouble.keySet());
+
+            m_recoveryLog.info(
+                    "Adding "
+                  + CoreUtils.hsIdCollectionToString(m_inTrouble.keySet())
+                  + " to failed sites history");
+
             m_inTrouble.clear();
-            return extractGlobalFaultData(hsIds,survivors);
+
+            return lastTxnIdByFailedSite;
         } else {
             return ImmutableMap.of();
         }
@@ -168,14 +177,14 @@ public class MeshArbiter {
                 FailureSiteUpdateMessage fsum = (FailureSiteUpdateMessage)m;
 
                 m_failureSiteUpdateLedger.put(
-                        Pair.of(fsum.m_sourceHSId, fsum.m_initiatorForSafeTxnId),
+                        Pair.of(fsum.m_sourceHSId, fsum.m_failedHSId),
                         fsum.m_safeTxnId);
 
                 m_recoveryLog.info("Agreement, Received failure message from " +
                         CoreUtils.hsIdToString(fsum.m_sourceHSId) + " for failed sites " +
                         CoreUtils.hsIdCollectionToString(fsum.m_failedHSIds) +
                         " safe txn id " + fsum.m_safeTxnId + " failed site " +
-                        CoreUtils.hsIdToString(fsum.m_initiatorForSafeTxnId));
+                        CoreUtils.hsIdToString(fsum.m_failedHSId));
 
             } else if (m.getSubject() == Subject.FAILURE.getId()) {
                 /*
@@ -248,7 +257,7 @@ public class MeshArbiter {
             final Pair<Long, Long> key = entry.getKey();
             final Long safeTxnId = entry.getValue();
 
-            if (!hsIds.contains(key.getFirst())) {
+            if (!hsIds.contains(key.getFirst()) || m_failedSites.contains(key.getSecond())) {
                 continue;
             }
 

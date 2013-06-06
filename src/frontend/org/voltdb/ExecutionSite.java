@@ -1598,7 +1598,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                 fm = (FailureSiteUpdateMessage)m;
                 messages.add(fm);
                 m_failureSiteUpdateLedger.put(
-                        Pair.of(fm.m_sourceHSId, fm.m_initiatorForSafeTxnId),
+                        Pair.of(fm.m_sourceHSId, fm.m_failedHSId),
                         Pair.of(fm.m_safeTxnId, fm.m_committedTxnId));
             } else if (m.getSubject() == Subject.FAILURE.getId()) {
                 /*
@@ -1620,7 +1620,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                 hostLog.info("Received failure message from " + CoreUtils.hsIdToString(fm.m_sourceHSId) +
                         " for failed sites " +
                         CoreUtils.hsIdCollectionToString(fm.m_failedHSIds) + " for initiator id " +
-                        CoreUtils.hsIdToString(fm.m_initiatorForSafeTxnId) +
+                        CoreUtils.hsIdToString(fm.m_failedHSId) +
                         " with commit point " + fm.m_committedTxnId + " safe txn id " + fm.m_safeTxnId);
             }
         } while(!haveNecessaryFaultInfo(newTracker, m_pendingFailedSites, false));

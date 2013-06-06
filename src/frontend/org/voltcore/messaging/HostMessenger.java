@@ -243,7 +243,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public synchronized void relayForeignHostFailed(int hostId) {
         long initiatorSiteId = CoreUtils.getHSIdFromHostAndSite(hostId, AGREEMENT_SITE_ID);
         m_agreementSite.reportFault(initiatorSiteId, false /* not witnessed */);
-        logger.warn(String.format("Host %d failed", hostId));
+        logger.warn(String.format("Someone else claims that host %d has failed", hostId));
     }
 
     /**
