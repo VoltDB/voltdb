@@ -136,7 +136,7 @@ class ApprunnerTarFile():
     def get_otherlogs(self):
         patterns = [
             'apprunner.log',           #apprunner logging
-            '\.Benchmark\.',           #client benchmark
+            '\.Benchmark\.(?!jstack)',           #client benchmark
             'VoltDBReplicationAgent\.(?!jstack)',  #dragent
             #'stdout.txt$',            #VEM
             ]
@@ -235,11 +235,15 @@ if __name__ == "__main__":
 
     name_dict = {
         '(volt\w*)-.*.txt': '  ',
-        'org.voltdb.(dr).VoltDBReplicationAgent': '%%',
+        'org.voltdb.dr.VoltDB(ReplicationAgent)': '%%',
         '(apprunner).log': '&&',
         '(.*)\.Benchmark\.': '--',
         }
 
+    #Go, go, go
+    print "------ Files merged"
+    print '\n'.join(sorted(['  ' + f.name for f in files]))
+    print "------"
     for  (time_str, entry) in merge_logs(files, offsets):
         #This is really only good for apprunnerish stuff
         if tar:
