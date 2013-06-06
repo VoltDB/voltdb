@@ -969,8 +969,6 @@ public abstract class SubPlanAssembler {
     protected AbstractPlanNode addSendReceivePair(AbstractPlanNode scanNode) {
 
         SendPlanNode sendNode = new SendPlanNode();
-        // this will make the child planfragment be sent to all partitions
-        sendNode.isMultiPartition = true;
         sendNode.addAndLinkChild(scanNode);
 
         ReceivePlanNode recvNode = new ReceivePlanNode();
