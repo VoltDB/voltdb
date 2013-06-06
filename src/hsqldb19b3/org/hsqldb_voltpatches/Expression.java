@@ -1895,28 +1895,39 @@ public class Expression {
         }
     }
 
+    /**
+     * This ugly code is never called by HSQL or VoltDB
+     * explicitly, but it does make debugging in eclipse
+     * easier because it makes expressions display their
+     * type when you mouse over them.
+     */
     @Override
     public String toString() {
         String type = null;
+
+        // iterate through all optypes, looking for
+        // a match...
+        // sadly do this with reflection
         Field[] fields = OpTypes.class.getFields();
         for (Field f : fields) {
             if (f.getType() != int.class) continue;
             int value = 0;
             try {
                 value = f.getInt(null);
-            } catch (IllegalArgumentException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            } catch (IllegalAccessException e) {
+            } catch (Exception e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
             }
+
+            // found a match
             if (value == opType) {
                 type = f.getName();
+                break;
             }
         }
         assert(type != null);
 
+        // return the original default impl + the type
         return super.toString() + ": " + type;
     }
 }

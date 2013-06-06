@@ -198,56 +198,53 @@ public class HSQLInterface {
     }
 
     /**
-     * Loop through any in-lists found in the XML and munge them into the
+     * Recursively find all in-lists found in the XML and munge them into the
      * simpler thing we want to pass to the AbstractParsedStmt.
      */
-    private void fixupInStatementExpressions(VoltXMLElement root) {
-        while (true) {
-            VoltXMLElement in = getFirstEqualsExpressionThatSmellLikeIn(root);
-            if (in == null) {
-                break;
-            }
+    private void fixupInStatementExpressions(VoltXMLElement expr) {
+        if (doesExpressionReallyMeanIn(expr)) {
+            inFixup(expr);
+            // can return because in can't be nested
+            return;
+        }
 
-            inFixup(in);
+        // recursive hunt
+        for (VoltXMLElement child : expr.children) {
+            fixupInStatementExpressions(child);
         }
     }
 
     /**
-     * Find in-expressions in fresh-off-the-hsql-boat Volt XML. This returns the first one
-     * that matches the pattern. The way this is used is to find the first, munge it using
-     * {@link HSQLInterface#inFixup(VoltXMLElement)} and then repeat until there are none
-     * left that match the pattern. The act of fixing it up will make it not match on a
-     * subsequent pass.
+     * Find in-expressions in fresh-off-the-hsql-boat Volt XML. Is this fake XML
+     * representing an in-list in the weird table/row way that HSQL generates
+     * in-list expressions. Used by {@link this#fixupInStatementExpressions(VoltXMLElement)}.
      */
-    private VoltXMLElement getFirstEqualsExpressionThatSmellLikeIn(VoltXMLElement root) {
-        if (root.name.equals("operation") &&
-                root.attributes.containsKey("optype") &&
-                root.attributes.get("optype").equals("equal"))
-            {
-                int rowCount = 0;
-                int tableCount = 0;
-                for (VoltXMLElement child : root.children) {
-                    if (child.name.equals("row")) {
-                        rowCount++;
-                    }
-                    if (child.name.equals("table")) {
-                        tableCount++;
-                    }
-                }
-                if ((tableCount + rowCount) > 0) {
-                    assert((rowCount + tableCount) == 2);
-                    return root;
-                }
-            }
-
-        for (VoltXMLElement child : root.children) {
-            VoltXMLElement match = getFirstEqualsExpressionThatSmellLikeIn(child);
-            if (match != null) {
-                return match;
-            }
+    private boolean doesExpressionReallyMeanIn(VoltXMLElement expr) {
+        if (!expr.name.equals("operation")) {
+            return false;
+        }
+        if (!expr.attributes.containsKey("optype") ||
+            !expr.attributes.get("optype").equals("equal")) {
+            return false;
         }
 
-        return null;
+        // see if the children are "row" and "table".
+        int rowCount = 0;
+        int tableCount = 0;
+        for (VoltXMLElement child : expr.children) {
+            if (child.name.equals("row")) {
+                rowCount++;
+            }
+            if (child.name.equals("table")) {
+                tableCount++;
+            }
+        }
+        if ((tableCount + rowCount) > 0) {
+            assert((rowCount + tableCount) == 2);
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -273,8 +270,7 @@ public class HSQLInterface {
         assert(rowElem.children.size() == 1);
 
         // make the table expression an in-list
-        VoltXMLElement inlist = new VoltXMLElement("value");
-        inlist.attributes.put("valuetype", "vector");
+        VoltXMLElement inlist = new VoltXMLElement("vector");
         for (VoltXMLElement child : tableElem.children) {
             assert(child.name.equals("row"));
             assert(child.children.size() == 1);

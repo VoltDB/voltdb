@@ -234,6 +234,9 @@ public abstract class AbstractParsedStmt {
         if (elementName.equals("value")) {
             retval = parseValueExpression(paramsById, root);
         }
+        else if (elementName.equals("vector")) {
+            retval = parseVectorExpression(paramsById, root);
+        }
         else if (elementName.equals("columnref")) {
             retval = parseColumnRefExpression(root);
         }
@@ -260,6 +263,24 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
+     * Parse a Vector value for SQL-IN
+     */
+    private static AbstractExpression parseVectorExpression(HashMap<Long, Integer> paramsById, VoltXMLElement exprNode) {
+        ArrayList<AbstractExpression> args = new ArrayList<AbstractExpression>();
+        for (VoltXMLElement argNode : exprNode.children) {
+            assert(argNode != null);
+            // recursively parse each argument subtree (could be any kind of expression).
+            AbstractExpression argExpr = parseExpressionTree(paramsById, argNode);
+            assert(argExpr != null);
+            args.add(argExpr);
+        }
+
+        VectorValueExpression vve = new VectorValueExpression();
+        vve.setArgs(args);
+        return vve;
+    }
+
+    /**
      *
      * @param paramsById
      * @param exprNode
@@ -269,22 +290,6 @@ public abstract class AbstractParsedStmt {
         String type = exprNode.attributes.get("valuetype");
         String isParam = exprNode.attributes.get("isparam");
         String isPlannerGenerated = exprNode.attributes.get("isplannergenerated");
-
-        // parse expression vectors for SQL-IN
-        if (type.equalsIgnoreCase("vector")) {
-            ArrayList<AbstractExpression> args = new ArrayList<AbstractExpression>();
-            for (VoltXMLElement argNode : exprNode.children) {
-                assert(argNode != null);
-                // recursively parse each argument subtree (could be any kind of expression).
-                AbstractExpression argExpr = parseExpressionTree(paramsById, argNode);
-                assert(argExpr != null);
-                args.add(argExpr);
-            }
-
-            VectorValueExpression vve = new VectorValueExpression();
-            vve.setArgs(args);
-            return vve;
-        }
 
         VoltType vt = VoltType.typeFromString(type);
         int size = VoltType.MAX_VALUE_LENGTH;

@@ -26,7 +26,7 @@ import org.voltdb.types.ExpressionType;
  * Represents a vector of expression trees.
  * Currently used for SQL IN lists (of values, not subqueries).
  */
-public class VectorValueExpression extends AbstractValueExpression {
+public class VectorValueExpression extends AbstractExpression {
 
     public VectorValueExpression() {
         super(ExpressionType.VALUE_VECTOR);
@@ -56,5 +56,12 @@ public class VectorValueExpression extends AbstractValueExpression {
     @Override
     protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {
         // nothing used besides the m_args list in AbstractExpression
+    }
+
+    @Override
+    public void finalizeValueTypes() {
+        // just make sure the children have the
+        finalizeChildValueTypes();
+        // probably need to set them all to the same large type? ugh...
     }
 }
