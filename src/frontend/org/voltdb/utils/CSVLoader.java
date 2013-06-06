@@ -291,12 +291,21 @@ public class CSVLoader {
             }
 
             List<String> lineList = new ArrayList<String>();
-            while ((config.limitrows-- > 0) && lineList != null ) {
-                try{
-                    while( listReader.getLineNumber() < config.skip )
-                        lineList = listReader.read();
+            //Skip lines
+            try{
+                while( listReader.getLineNumber() < config.skip )
                     lineList = listReader.read();
-                    if(lineList == null)
+            }
+            catch (SuperCsvException e){
+                //Catch rows that can not be read by superCSV listReader.
+                //E.g. items without quotes when strictquotes is enabled.
+                //But do not record this line since we are skipping it.
+            }
+
+            while ((config.limitrows-- > 0)) {
+                try{
+                    lineList = listReader.read();
+                    if(lineList == null) //EOF
                         break;
                     outCount.incrementAndGet();
                     boolean queued = false;
