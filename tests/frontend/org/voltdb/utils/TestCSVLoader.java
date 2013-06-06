@@ -226,7 +226,8 @@ public class TestCSVLoader extends TestCase {
                 "12,n ull,12,12121212,twelveth,12.12,12.12"
         };
         int invalidLineCnt = 4;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = 7;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     public void testOpenQuote() throws Exception
@@ -261,7 +262,8 @@ public class TestCSVLoader extends TestCase {
                         "1,1,1,\"Jesus\\\"\"loves"+ "\n" +"you\",\"7777-12-25 14:35:26\"",
         };
         int invalidLineCnt = 0;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     public void testOpenQuoteAndStrictQuotes() throws Exception
@@ -297,7 +299,8 @@ public class TestCSVLoader extends TestCase {
                         "\"1\",\"1\",\"1\",\"Jesus\\\"\"loves"+ "\n" +"you\",\"7777-12-25 14:35:26\"",
         };
         int invalidLineCnt = 0;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     public void testUnmatchQuote() throws Exception
@@ -340,7 +343,8 @@ public class TestCSVLoader extends TestCase {
                         "1,1,1,\"Jesus\\\"\"loves"+ "\n" +"you,\"7777-12-25 14:35:26\"",
         };
         int invalidLineCnt = 1;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     public void testNULL() throws Exception
@@ -385,7 +389,8 @@ public class TestCSVLoader extends TestCase {
                 "7,\\" + VoltTable.CSV_NULL        + ",1,11111111,  \"abc\\" + VoltTable.CSV_NULL + "\"  ,1.10,1.11"
         };
         int invalidLineCnt = 0;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     public void testBlankNull() throws Exception
@@ -413,7 +418,8 @@ public class TestCSVLoader extends TestCase {
                 "1,,,,,,,,",
         };
         int invalidLineCnt = 0;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     public void testBlankEmpty() throws Exception
@@ -441,7 +447,8 @@ public class TestCSVLoader extends TestCase {
                 "0,,,,,,,,",
         };
         int invalidLineCnt = 0;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     //SuperCSV treats empty string "" as null
@@ -470,7 +477,8 @@ public class TestCSVLoader extends TestCase {
                 "0,,,,,,,,",
         };
         int invalidLineCnt = 1;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     public void testStrictQuote() throws Exception
@@ -495,7 +503,8 @@ public class TestCSVLoader extends TestCase {
                 "\"4\",\"4\",\"4\"",
         };
         int invalidLineCnt = 2;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     public void testSkip() throws Exception
@@ -548,7 +557,8 @@ public class TestCSVLoader extends TestCase {
                 "12,n ull,12,12121212,twelveth,12.12,12.12"
         };
         int invalidLineCnt = 2;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = 0;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     public void testSkipOverFlow() throws Exception
@@ -602,7 +612,8 @@ public class TestCSVLoader extends TestCase {
                 "12,n ull,12,12121212,twelveth,12.12,12.12"
         };
         int invalidLineCnt = 0;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = 0;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     public void testEmptyFile() throws Exception
@@ -628,7 +639,8 @@ public class TestCSVLoader extends TestCase {
 
         String []myData = null;
         int invalidLineCnt = 0;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = 0;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     public void testEscapeChar() throws Exception
@@ -653,7 +665,8 @@ public class TestCSVLoader extends TestCase {
                 "~'escapeprimesymbol,3,3,3"
         };
         int invalidLineCnt = 0;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     public void testNoWhiteSpace() throws Exception
@@ -679,7 +692,8 @@ public class TestCSVLoader extends TestCase {
                 "\" inquotespace \"   ,4,4,4"
         };
         int invalidLineCnt = 3;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     public void testColumnLimitSize() throws Exception
@@ -704,10 +718,12 @@ public class TestCSVLoader extends TestCase {
                 "third,3,3,3"
         };
         int invalidLineCnt = 1;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
-    public void test_Interface( String my_schema, String[] my_options, String[] my_data, int invalidLineCnt ) throws Exception {
+    public void test_Interface( String my_schema, String[] my_options, String[] my_data, int invalidLineCnt,
+            int validLineCnt) throws Exception {
         try{
             BufferedWriter out_csv = new BufferedWriter( new FileWriter( path_csv ) );
             for( int i = 0; i < my_data.length; i++ )
@@ -771,6 +787,7 @@ public class TestCSVLoader extends TestCase {
             }
             System.out.println(String.format("The rows infected: (%d,%s)", lineCount, rowct));
             assertEquals(lineCount, rowct);
+            assertEquals(validLineCnt, rowct);
             assertEquals(invalidLineCnt, invalidlinecnt);
 
         }
