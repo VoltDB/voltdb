@@ -32,6 +32,11 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.supercsv.exception.SuperCsvException;
+import org.supercsv.io.CsvListReader;
+import org.supercsv.io.ICsvListReader;
+import org.supercsv.prefs.CsvPreference;
+import org.supercsv_voltpatches.tokenizer.Tokenizer;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
@@ -41,9 +46,6 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
-
-import au.com.bytecode.opencsv_voltpatches.CSVParser;
-import au.com.bytecode.opencsv_voltpatches.CSVReader;
 
 /**
  * CSVLoader is a simple utility to load data from a CSV formatted file to a
@@ -70,6 +72,16 @@ public class CSVLoader {
     private static BufferedWriter out_reportfile;
     private static String insertProcedure = "";
     private static Map<Long, String[]> errorInfo = new TreeMap<Long, String[]>();
+    private static CsvPreference csvPreference = null;
+
+    public static final char DEFAULT_SEPARATOR = ',';
+    public static final char DEFAULT_QUOTE_CHARACTER = '\"';
+    public static final char DEFAULT_ESCAPE_CHARACTER = '\\';
+    public static final boolean DEFAULT_STRICT_QUOTES = false;
+    public static final int DEFAULT_SKIP_LINES = 0;
+    public static final boolean DEFAULT_NO_WHITESPACE = false;
+    public static final int DEFAULT_COLUMN_LIMIT_SIZE = 16*1024*1024;
+
 
     private static Map <VoltType, String> blankValues = new HashMap<VoltType, String>();
     static {
@@ -89,9 +101,9 @@ public class CSVLoader {
     private static final class MyCallback implements ProcedureCallback {
         private final long m_lineNum;
         private final CSVConfig m_config;
-        private final String m_rowdata;
+        private final List<String> m_rowdata;
 
-        MyCallback(long lineNumber, CSVConfig cfg, String rowdata) {
+        MyCallback(long lineNumber, CSVConfig cfg, List<String> rowdata) {
             m_lineNum = lineNumber;
             m_config = cfg;
             m_rowdata = rowdata;
@@ -101,18 +113,8 @@ public class CSVLoader {
         public void clientCallback(ClientResponse response) throws Exception {
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 m_log.error( response.getStatusString() );
-                synchronized (errorInfo) {
-                    if (!errorInfo.containsKey(m_lineNum)) {
-                        String[] info = { m_rowdata, response.getStatusString() };
-                        errorInfo.put(m_lineNum, info);
-                    }
-                    if (errorInfo.size() >= m_config.maxerrors) {
-                        m_log.error("The number of Failure row data exceeds " + m_config.maxerrors);
-                        produceFiles();
-                        close_cleanup();
-                        System.exit(-1);
-                    }
-                }
+                String[] info = { m_rowdata.toString(), response.getStatusString() };
+                synchronizeErrorInfo( info );
                 return;
             }
 
@@ -144,22 +146,25 @@ public class CSVLoader {
         String blank = "error";
 
         @Option(desc = "delimiter to use for separating entries")
-        char separator = CSVParser.DEFAULT_SEPARATOR;
+        char separator = DEFAULT_SEPARATOR;
 
         @Option(desc = "character to use for quoted elements (default: \")")
-        char quotechar = CSVParser.DEFAULT_QUOTE_CHARACTER;
+        char quotechar = DEFAULT_QUOTE_CHARACTER;
 
         @Option(desc = "character to use for escaping a separator or quote (default: \\)")
-        char escape = CSVParser.DEFAULT_ESCAPE_CHARACTER;
+        char escape = DEFAULT_ESCAPE_CHARACTER;
 
         @Option(desc = "require all input values to be enclosed in quotation marks", hasArg = false)
-        boolean strictquotes = CSVParser.DEFAULT_STRICT_QUOTES;
+        boolean strictquotes = DEFAULT_STRICT_QUOTES;
 
         @Option(desc = "number of lines to skip before inserting rows into the database")
-        int skip = CSVReader.DEFAULT_SKIP_LINES;
+        int skip = DEFAULT_SKIP_LINES;
 
         @Option(desc = "do not allow whitespace between values and separators", hasArg = false)
-        boolean nowhitespace = !CSVParser.DEFAULT_IGNORE_LEADING_WHITESPACE;
+        boolean nowhitespace = DEFAULT_NO_WHITESPACE;
+
+        @Option(desc = "max size of a column (default: 16*1024*1024(Bytes))")
+        int columnsizelimit = DEFAULT_COLUMN_LIMIT_SIZE;
 
         @Option(shortOpt = "s", desc = "list of servers to connect to (default: localhost)")
         String servers = "localhost";
@@ -218,23 +223,24 @@ public class CSVLoader {
 
         config = cfg;
         configuration();
-        CSVReader csvReader = null;
+        Tokenizer tokenizer = null;
+        ICsvListReader listReader = null;
         try {
-            if (CSVLoader.standin)
-                csvReader = new CSVReader(new BufferedReader(
-                        new InputStreamReader(System.in)), config.separator,
-                        config.quotechar, config.escape, config.skip,
-                        config.strictquotes, config.nowhitespace);
-            else
-                csvReader = new CSVReader(new FileReader(config.file),
-                        config.separator, config.quotechar, config.escape,
-                        config.skip, config.strictquotes, config.nowhitespace);
-
+            if (CSVLoader.standin) {
+                tokenizer = new Tokenizer(new BufferedReader( new InputStreamReader(System.in)), csvPreference,
+                                                              config.strictquotes, config.escape, config.columnsizelimit) ;
+                listReader = new CsvListReader(tokenizer, csvPreference);
+            }
+            else {
+                tokenizer = new Tokenizer(new FileReader(config.file), csvPreference,
+                        config.strictquotes, config.escape, config.columnsizelimit) ;
+                listReader = new CsvListReader(tokenizer, csvPreference);
+            }
         } catch (FileNotFoundException e) {
             m_log.error("CSV file '" + config.file + "' could not be found.");
             System.exit(-1);
         }
-        assert(csvReader != null);
+
         // Split server list
         String[] serverlist = config.servers.split(",");
 
@@ -257,7 +263,6 @@ public class CSVLoader {
             ProcedureCallback cb = null;
 
             boolean lastOK = true;
-            String line[] = null;
 
             int columnCnt = 0;
             VoltTable procInfo = null;
@@ -285,56 +290,50 @@ public class CSVLoader {
                 System.exit(-1);
             }
 
-            while ((config.limitrows-- > 0)
-                    && (line = csvReader.readNext()) != null) {
-                outCount.incrementAndGet();
-                boolean queued = false;
-                while (queued == false) {
-                    StringBuilder linedata = new StringBuilder();
-                    for (int i = 0; i < line.length; i++) {
-                        linedata.append("\"" + line[i] + "\"");
-                        if (i != line.length - 1)
-                            linedata.append(",");
-                    }
-                    String[] correctedLine = line;
-                    cb = new MyCallback(outCount.get(), config,
-                            linedata.toString());
-                    String lineCheckResult;
-
-                    if ((lineCheckResult = checkparams_trimspace(correctedLine,
-                            columnCnt)) != null) {
-                        synchronized (errorInfo) {
-                            if (!errorInfo.containsKey(outCount.get())) {
-                                String[] info = { linedata.toString(),
-                                        lineCheckResult };
-                                errorInfo.put(outCount.get(), info);
-                            }
-                            if (errorInfo.size() >= config.maxerrors) {
-                                m_log.error("The number of Failure row data exceeds "
-                                        + config.maxerrors);
-                                produceFiles();
-                                close_cleanup();
-                                System.exit(-1);
-                            }
-                        }
+            List<String> lineList = new ArrayList<String>();
+            while ((config.limitrows-- > 0) && lineList != null ) {
+                try{
+                    while( listReader.getLineNumber() < config.skip )
+                        lineList = listReader.read();
+                    lineList = listReader.read();
+                    if(lineList == null)
                         break;
-                    }
+                    outCount.incrementAndGet();
+                    boolean queued = false;
+                    while (queued == false) {
+                        Object[] correctedLine = lineList.toArray();
+                        cb = new MyCallback(outCount.get(), config,
+                                lineList);
+                        String lineCheckResult;
 
-                    queued = csvClient.callProcedure(cb, insertProcedure,
-                            (Object[]) correctedLine);
-
-                    if (queued == false) {
-                        ++waits;
-                        if (lastOK == false) {
-                            ++shortWaits;
+                        if ((lineCheckResult = checkparams_trimspace(correctedLine,
+                                columnCnt)) != null) {
+                            String[] info = { lineList.toString(), lineCheckResult };
+                            synchronizeErrorInfo( info );
+                            break;
                         }
-                        Thread.sleep(waitSeconds);
+
+                        queued = csvClient.callProcedure(cb, insertProcedure,
+                                (Object[]) correctedLine);
+
+                        if (queued == false) {
+                            ++waits;
+                            if (lastOK == false) {
+                                ++shortWaits;
+                            }
+                            Thread.sleep(waitSeconds);
+                        }
+                        lastOK = queued;
                     }
-                    lastOK = queued;
+                }
+                catch (SuperCsvException e){
+                    //Catch rows that can not be read by superCSV listReader. E.g. items without quotes when strictquotes is enabled.
+                    outCount.incrementAndGet();
+                    String[] info = { e.getMessage(), "" };
+                    synchronizeErrorInfo( info );
                 }
             }
             csvClient.drain();
-
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -351,37 +350,62 @@ public class CSVLoader {
 
         produceFiles();
         close_cleanup();
-        csvReader.close();
+        listReader.close();
         csvClient.close();
     }
 
-    private static String checkparams_trimspace(String[] slot,
-            int columnCnt) {
-        if (slot.length == 1 && slot[0].equals("")) {
-            return "Error: blank line";
+    private static void synchronizeErrorInfo( String[] info ) throws IOException, InterruptedException {
+        synchronized (errorInfo) {
+            if (!errorInfo.containsKey(outCount.get())) {
+                errorInfo.put(outCount.get(), info);
+            }
+            if (errorInfo.size() >= config.maxerrors) {
+                m_log.error("The number of Failure row data exceeds "
+                        + config.maxerrors);
+                produceFiles();
+                close_cleanup();
+                System.exit(-1);
+            }
         }
+    }
+
+    private static String checkparams_trimspace(Object[] slot, int columnCnt) {
         if (slot.length != columnCnt) {
             return "Error: Incorrect number of columns. " + slot.length
                     + " found, " + columnCnt + " expected.";
         }
         for (int i = 0; i < slot.length; i++) {
-            // trim white space in this line.
-            slot[i] = slot[i].trim();
-            // treat NULL, \N and "\N" as actual null value
-            if ((slot[i]).equals("NULL") || slot[i].equals(VoltTable.CSV_NULL)
-                    || !config.strictquotes && slot[i].equals(VoltTable.QUOTED_CSV_NULL))
-                slot[i] = null;
-            else if (slot[i].equals("")) {
-                if (config.blank.equalsIgnoreCase("null") ) slot[i] = null;
+            Object thisSlot = slot[i];
+            //supercsv read "" to null
+            if( thisSlot == null )
+            {
+                if(config.blank.equalsIgnoreCase("error"))
+                    return "Error: blank item";
                 else if (config.blank.equalsIgnoreCase("empty"))
-                    slot[i] = blankValues.get(typeList.get(i));
+                    thisSlot = blankValues.get(typeList.get(i));
+              //else config.blank == null which is already the case
+            }
+
+            // trim white space in this line. SuperCSV preserves all the whitespace by default
+            else {
+                String str = thisSlot.toString();
+                if( config.nowhitespace &&
+                        ( str.charAt(0) == ' ' || str.charAt( str.length() - 1 ) == ' ') ) {
+                    return "Error: White Space Detected in nowhitespace mode.";
+                }
+                else
+                    thisSlot = ((String) thisSlot).trim();
+                // treat NULL, \N and "\N" as actual null value
+                if ( thisSlot.equals("NULL") || thisSlot.equals(VoltTable.CSV_NULL) ||
+                        !config.strictquotes && thisSlot.equals(VoltTable.QUOTED_CSV_NULL))
+                    thisSlot = null;
             }
         }
-
         return null;
     }
 
     private static void configuration() {
+        csvPreference = new CsvPreference.Builder(config.quotechar, config.separator, "\n").build();
         if (config.file.equals(""))
             standin = true;
         if (!config.table.equals("")) {
