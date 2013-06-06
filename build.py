@@ -249,6 +249,7 @@ CTX.INPUT['executors'] = """
 CTX.INPUT['expressions'] = """
  abstractexpression.cpp
  expressionutil.cpp
+ inlistbuilderexpression.cpp
  functionexpression.cpp
  tupleaddressexpression.cpp
 """

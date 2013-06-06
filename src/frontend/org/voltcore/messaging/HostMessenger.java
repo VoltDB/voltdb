@@ -154,6 +154,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public static final int CLIENT_INTERFACE_SITE_ID = -4;
     public static final int SYSCATALOG_SITE_ID = -5;
     public static final int SYSINFO_SITE_ID = -6;
+    public static final int SNAPSHOTSCAN_SITE_ID = -7;
+    public static final int SNAPSHOTDELETE_SITE_ID = -8;
 
     // we should never hand out this site ID.  Use it as an empty message destination
     public static final int VALHALLA = Integer.MIN_VALUE;
