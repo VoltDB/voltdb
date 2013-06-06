@@ -111,10 +111,11 @@ public class CSVLoader {
 
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
+            //System.err.println( response );
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 m_log.error( response.getStatusString() );
                 String[] info = { m_rowdata.toString(), response.getStatusString() };
-                synchronizeErrorInfo( info );
+                synchronizeErrorInfo( m_lineNum , info );
                 return;
             }
 
@@ -292,14 +293,16 @@ public class CSVLoader {
 
             List<String> lineList = new ArrayList<String>();
             //Skip lines
-            try{
-                while( listReader.getLineNumber() < config.skip )
-                    lineList = listReader.read();
-            }
-            catch (SuperCsvException e){
-                //Catch rows that can not be read by superCSV listReader.
-                //E.g. items without quotes when strictquotes is enabled.
-                //But do not record this line since we are skipping it.
+            while( listReader.getLineNumber() < config.skip ) {
+                try{
+                    if( listReader.read() == null )
+                        break;
+                }
+                catch (SuperCsvException e){
+                    //Catch rows that can not be read by superCSV listReader.
+                    //E.g. items without quotes when strictquotes is enabled.
+                    //But do not record this line since we are skipping it.
+                }
             }
 
             while ((config.limitrows-- > 0)) {
@@ -318,7 +321,7 @@ public class CSVLoader {
                         if ((lineCheckResult = checkparams_trimspace(correctedLine,
                                 columnCnt)) != null) {
                             String[] info = { lineList.toString(), lineCheckResult };
-                            synchronizeErrorInfo( info );
+                            synchronizeErrorInfo( outCount.get(), info );
                             break;
                         }
 
@@ -339,7 +342,7 @@ public class CSVLoader {
                     //Catch rows that can not be read by superCSV listReader. E.g. items without quotes when strictquotes is enabled.
                     outCount.incrementAndGet();
                     String[] info = { e.getMessage(), "" };
-                    synchronizeErrorInfo( info );
+                    synchronizeErrorInfo( outCount.get(), info );
                 }
             }
             csvClient.drain();
@@ -363,10 +366,10 @@ public class CSVLoader {
         csvClient.close();
     }
 
-    private static void synchronizeErrorInfo( String[] info ) throws IOException, InterruptedException {
+    private static void synchronizeErrorInfo( long lineNum, String[] info ) throws IOException, InterruptedException {
         synchronized (errorInfo) {
-            if (!errorInfo.containsKey(outCount.get())) {
-                errorInfo.put(outCount.get(), info);
+            if (!errorInfo.containsKey(lineNum)) {
+                errorInfo.put(lineNum, info);
             }
             if (errorInfo.size() >= config.maxerrors) {
                 m_log.error("The number of Failure row data exceeds "
