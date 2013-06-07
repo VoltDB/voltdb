@@ -111,7 +111,6 @@ public class CSVLoader {
 
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
-            //System.err.println( response );
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 m_log.error( response.getStatusString() );
                 String[] info = { m_rowdata.toString(), response.getStatusString() };
@@ -295,6 +294,7 @@ public class CSVLoader {
             //Skip lines
             while( listReader.getLineNumber() < config.skip ) {
                 try{
+                    outCount.incrementAndGet();
                     if( listReader.read() == null )
                         break;
                 }
@@ -313,7 +313,7 @@ public class CSVLoader {
                     outCount.incrementAndGet();
                     boolean queued = false;
                     while (queued == false) {
-                        Object[] correctedLine = lineList.toArray();
+                        String[] correctedLine = lineList.toArray(new String[0]);
                         cb = new MyCallback(outCount.get(), config,
                                 lineList);
                         String lineCheckResult;
@@ -381,7 +381,7 @@ public class CSVLoader {
         }
     }
 
-    private static String checkparams_trimspace(Object[] slot, int columnCnt) {
+    private static String checkparams_trimspace(String[] slot, int columnCnt) {
         if (slot.length != columnCnt) {
             return "Error: Incorrect number of columns. " + slot.length
                     + " found, " + columnCnt + " expected.";
@@ -399,16 +399,16 @@ public class CSVLoader {
 
             // trim white space in this line. SuperCSV preserves all the whitespace by default
             else {
-                String str = slot[i].toString();
                 if( config.nowhitespace &&
-                        ( str.charAt(0) == ' ' || str.charAt( str.length() - 1 ) == ' ') ) {
+                        ( slot[i].charAt(0) == ' ' || slot[i].charAt( slot[i].length() - 1 ) == ' ') ) {
                     return "Error: White Space Detected in nowhitespace mode.";
                 }
                 else
                     slot[i] = ((String) slot[i]).trim();
                 // treat NULL, \N and "\N" as actual null value
-                if ( slot[i].equals("NULL") || slot[i].equals(VoltTable.CSV_NULL) ||
-                        !config.strictquotes && slot[i].equals(VoltTable.QUOTED_CSV_NULL))
+                if ( slot[i].equals("NULL") ||
+                        slot[i].equals(VoltTable.CSV_NULL) ||
+                        slot[i].equals(VoltTable.QUOTED_CSV_NULL) )
                     slot[i] = null;
             }
         }
