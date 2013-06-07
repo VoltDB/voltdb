@@ -40,11 +40,15 @@ public class PlannerTestCase extends TestCase {
     protected void failToCompile(String sql, String... patterns)
     {
         int paramCount = 0;
-        for (int ii = 0; ii < sql.length(); ii++) {
+        int skip = 0;
+        while(true) {
             // Yes, we ARE assuming that test queries don't contain quoted question marks.
-            if (sql.charAt(ii) == '?') {
-                paramCount++;
+            skip = sql.indexOf('?', skip);
+            if (skip == -1) {
+                break;
             }
+            skip++;
+            paramCount++;
         }
         try {
             m_aide.compile(sql, paramCount, m_byDefaultPlanForSinglePartition, null);

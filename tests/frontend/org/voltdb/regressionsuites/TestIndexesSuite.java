@@ -37,6 +37,7 @@ import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.indexes.CheckMultiMultiIntGTEFailure;
+import org.voltdb_testprocs.regressionsuites.indexes.CompiledInLists;
 import org.voltdb_testprocs.regressionsuites.indexes.Insert;
 
 /**
@@ -49,7 +50,7 @@ public class TestIndexesSuite extends RegressionSuite {
 
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Insert.class,
-        CheckMultiMultiIntGTEFailure.class};
+        CheckMultiMultiIntGTEFailure.class, CompiledInLists.class};
 
     // Index stuff to test:
     // scans against tree
@@ -298,6 +299,112 @@ public class TestIndexesSuite extends RegressionSuite {
         result = client.callProcedure("@AdHoc", "select * from P3 where NUM < 4 order by num desc")
                        .getResults()[0];
         assertEquals(4, result.getRowCount());
+    }
+
+    public void testInList()
+            throws IOException, ProcCallException
+    {
+        String[] tables = {"P3", "R3"};
+        Client client = getClient();
+        String query;
+        VoltTable[] results;
+        for (String table : tables) {
+            client.callProcedure("Insert", table, 1, "a", 100, 1, 14.5);
+            client.callProcedure("Insert", table, 2, "b", 100, 2, 15.5);
+            client.callProcedure("Insert", table, 3, "c", 200, 3, 16.5);
+            client.callProcedure("Insert", table, 6, "f", 200, 6, 17.5);
+            client.callProcedure("Insert", table, 7, "g", 300, 7, 18.5);
+            client.callProcedure("Insert", table, 8, "h", 300, 8, 19.5);
+            query = String.format("select * from %s T where T.NUM IN (200, 300)", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(4, results[0].getRowCount());
+            query = String.format("select * from %s T where T.NUM IN (10, 200, 300, -1)", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(4, results[0].getRowCount());
+
+            query = String.format("select * from %s T where T.NUM IN (10, 200, 300, -1, 200)", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(4, results[0].getRowCount());
+
+            query = String.format("select * from %s T where T.NUM IN (200)", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(2, results[0].getRowCount());
+
+            query = String.format("select * from %s T where T.NUM IN (10)", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(0, results[0].getRowCount());
+
+            //query = String.format("select * from %s T where T.NUM IN ()", table);
+            //results = client.callProcedure("@AdHoc", query).getResults();
+            //assertEquals(0, results[0].getRowCount());
+
+            query = String.format("select * from %s T where T.DESC IN ('c', 'f', 'g', 'h')", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(4, results[0].getRowCount());
+            query = String.format("select * from %s T where T.DESC IN ('', 'c', 'f', 'g', 'h', " +
+                "'a value with some length to it in case there are object allocation issues'" +
+                ")", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(4, results[0].getRowCount());
+
+            query = String.format("select * from %s T where T.DESC IN ('', 'c', 'f', 'g', 'h', 'f')", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(4, results[0].getRowCount());
+
+            query = String.format("select * from %s T where T.DESC IN ('b')", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(1, results[0].getRowCount());
+
+            query = String.format("select * from %s T where T.DESC IN ('')", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(0, results[0].getRowCount());
+
+
+            query = String.format("select * from %s T where T.DESC IN ('c', 'f', 'g', 'h')" +
+                " and T.NUM IN (200, 300)", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(4, results[0].getRowCount());
+            query = String.format("select * from %s T where T.DESC IN ('', 'c', 'f', 'g', 'h', " +
+                "'a value with some length to it in case there are object allocation issues'" +
+                ")" +
+                " and T.NUM IN (10, 200, 300, -1)", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(4, results[0].getRowCount());
+
+            query = String.format("select * from %s T where T.DESC IN ('', 'c', 'f', 'g', 'h', 'f')" +
+                " and T.NUM IN (10, 200, 300, -1, 200)", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(4, results[0].getRowCount());
+
+            query = String.format("select * from %s T where T.DESC IN ('b')" +
+                " and T.NUM IN (100)", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(1, results[0].getRowCount());
+
+            query = String.format("select * from %s T where T.DESC IN ('')" +
+                 " and T.NUM IN (10)", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(0, results[0].getRowCount());
+        }
+
+        String[] fewdescs = new String[] { "", "b", "no match", "this either",
+        "and last but not least the obligatory longish value to test object allocation" };
+        int[] fewnums = new int[] { 10, 100, 100, 100, -1 };
+        results = client.callProcedure("CompiledInLists", fewdescs, fewnums).getResults();
+        assertEquals(4, results.length);
+        assertEquals(1, results[0].getRowCount());
+        assertEquals(1, results[1].getRowCount());
+        assertEquals(2, results[2].getRowCount());
+        assertEquals(2, results[3].getRowCount());
+
+        String[] manydescs = new String[] { "b", "c", "f", "g", "h" };
+        int[] manynums = new int[] { 100, 200, 300, 200, 100 };
+        results = client.callProcedure("CompiledInLists", manydescs, manynums).getResults();
+        assertEquals(4, results.length);
+        assertEquals(5, results[0].getRowCount());
+        assertEquals(5, results[1].getRowCount());
+        assertEquals(4, results[2].getRowCount());
+        assertEquals(4, results[3].getRowCount());
     }
 
     public void testTicket195()
