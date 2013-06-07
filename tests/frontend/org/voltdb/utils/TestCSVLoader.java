@@ -787,7 +787,8 @@ public class TestCSVLoader extends TestCase {
             }
             System.out.println(String.format("The rows infected: (%d,%s)", lineCount, rowct));
             assertEquals(lineCount, rowct);
-            assertEquals(validLineCnt, rowct);
+            //assert validLineCnt specified equals the successfully inserted lineCount
+            assertEquals(validLineCnt, lineCount);
             assertEquals(invalidLineCnt, invalidlinecnt);
 
         }
