@@ -238,11 +238,11 @@ public class Tokenizer extends AbstractTokenizer {
 		     * Yes I'll set the limit to be 16*1024*1024B = 16MB by default
 		     */
 		    if( currentColumn.length() > columnSizeLimit ) {
-			throw new SuperCsvException(
-						                                String
-										.format(
-											"oversized column while reading quoted column beginning on line %d and ending on line %d",
-											quoteScopeStartingLine, getLineNumber()));
+		        throw new SuperCsvException(
+		                String
+		                .format(
+		                        "oversized column while reading quoted column beginning on line %d and ending on line %d",
+		                        quoteScopeStartingLine, getLineNumber()));
 		    }
 		    currentColumn.append(NEWLINE);
 		    currentRow.append(NEWLINE); // specific line terminator lost, \n will have to suffice
@@ -259,7 +259,6 @@ public class Tokenizer extends AbstractTokenizer {
 
 		    currentRow.append(line); // update untokenized CSV row
 		    line += NEWLINE; // add newline to simplify parsing
-
 		} else if( c == quoteChar ) {
 
 		    if( line.charAt(charIndex + 1) == quoteChar ) {

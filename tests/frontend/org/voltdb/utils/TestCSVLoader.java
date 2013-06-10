@@ -715,7 +715,8 @@ public class TestCSVLoader extends TestCase {
         String []myData = {
                 "\"openquote,1,1,1",
                 "second,2,2,2",
-                "third,3,3,3"
+                "third,3,3,3",
+                "\"fourthfourthfourth\",4,4,4"
         };
         int invalidLineCnt = 1;
         int validLineCnt = myData.length - invalidLineCnt;

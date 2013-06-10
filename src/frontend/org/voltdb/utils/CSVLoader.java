@@ -164,7 +164,7 @@ public class CSVLoader {
         @Option(desc = "do not allow whitespace between values and separators", hasArg = false)
         boolean nowhitespace = DEFAULT_NO_WHITESPACE;
 
-        @Option(desc = "max size of a column (default: 16*1024*1024(Bytes))")
+        @Option(desc = "max size of a quoted column in bytes(default: 16777216 = 16MB)")
         int columnsizelimit = DEFAULT_COLUMN_LIMIT_SIZE;
 
         @Option(shortOpt = "s", desc = "list of servers to connect to (default: localhost)")
