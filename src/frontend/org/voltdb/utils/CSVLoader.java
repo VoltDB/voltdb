@@ -81,7 +81,7 @@ public class CSVLoader {
     public static final boolean DEFAULT_STRICT_QUOTES = false;
     public static final int DEFAULT_SKIP_LINES = 0;
     public static final boolean DEFAULT_NO_WHITESPACE = false;
-    public static final int DEFAULT_COLUMN_LIMIT_SIZE = 16*1024*1024;
+    public static final long DEFAULT_COLUMN_LIMIT_SIZE = 16777216;
 
 
     private static Map <VoltType, String> blankValues = new HashMap<VoltType, String>();
@@ -165,7 +165,7 @@ public class CSVLoader {
         boolean nowhitespace = DEFAULT_NO_WHITESPACE;
 
         @Option(desc = "max size of a quoted column in bytes(default: 16777216 = 16MB)")
-        int columnsizelimit = DEFAULT_COLUMN_LIMIT_SIZE;
+        long columnsizelimit = DEFAULT_COLUMN_LIMIT_SIZE;
 
         @Option(shortOpt = "s", desc = "list of servers to connect to (default: localhost)")
         String servers = "localhost";
@@ -296,7 +296,7 @@ public class CSVLoader {
             //Skip lines
             while( listReader.getLineNumber() < config.skip ) {
                 try{
-                    totalCount.getAndIncrement();
+                    totalCount.set(listReader.getLineNumber());
                     if( listReader.read() == null )
                         break;
                 }
@@ -309,27 +309,27 @@ public class CSVLoader {
 
             while ((config.limitrows-- > 0)) {
                 try{
+                    totalCount.set( listReader.getLineNumber() );
                     lineList = listReader.read();
                     if(lineList == null) //EOF
                         break;
-                    totalCount.getAndIncrement();
                     boolean queued = false;
                     while (queued == false) {
                         String[] correctedLine = lineList.toArray(new String[0]);
-                        outCount.incrementAndGet();
-                        cb = new MyCallback(totalCount.get(), config,
+                        cb = new MyCallback(totalCount.get()+1, config,
                                 lineList);
                         String lineCheckResult;
 
                         if ((lineCheckResult = checkparams_trimspace(correctedLine,
                                 columnCnt)) != null) {
                             String[] info = { lineList.toString(), lineCheckResult };
-                            synchronizeErrorInfo( totalCount.get(), info );
+                            synchronizeErrorInfo( totalCount.get()+1, info );
                             break;
                         }
 
                         queued = csvClient.callProcedure(cb, insertProcedure,
                                 (Object[]) correctedLine);
+                        outCount.incrementAndGet();
 
                         if (queued == false) {
                             ++waits;
@@ -343,9 +343,8 @@ public class CSVLoader {
                 }
                 catch (SuperCsvException e){
                     //Catch rows that can not be read by superCSV listReader. E.g. items without quotes when strictquotes is enabled.
-                    totalCount.getAndIncrement();
                     String[] info = { e.getMessage(), "" };
-                    synchronizeErrorInfo( totalCount.get(), info );
+                    synchronizeErrorInfo( totalCount.get()+1, info );
                 }
             }
             csvClient.drain();

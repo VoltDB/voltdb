@@ -723,6 +723,30 @@ public class TestCSVLoader extends TestCase {
         test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
+    public void testColumnLimitSize2() throws Exception
+    {
+        String mySchema =
+                "create table BLAH (" +
+                        "clm_integer integer default 0 not null, " + // column that is partitioned on
+                        "clm_string varchar(20), "+
+                        "); ";
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--columnsizelimit=4",
+                "BLAH"
+        };
+
+        String []myData = {
+                "1,\"Edwr" + "\n" + "Burnam\"",
+                "2,\"Tabatha" + "\n" +
+                "Gehling",
+        };
+        int invalidLineCnt = 3;
+        int validLineCnt = 0;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
+    }
+
     public void test_Interface( String my_schema, String[] my_options, String[] my_data, int invalidLineCnt,
             int validLineCnt) throws Exception {
         try{
