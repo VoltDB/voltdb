@@ -336,7 +336,9 @@ enum IndexLookupType {
 // ------------------------------------------------------------------
 enum TableStreamType {
    TABLE_STREAM_SNAPSHOT,
-   TABLE_STREAM_RECOVERY
+   TABLE_STREAM_RECOVERY,
+   TABLE_STREAM_ELASTIC,
+   TABLE_STREAM_NONE = -1
 };
 
 // ------------------------------------------------------------------

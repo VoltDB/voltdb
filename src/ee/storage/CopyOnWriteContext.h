@@ -22,8 +22,9 @@
 #include <utility>
 #include "common/TupleSerializer.h"
 #include "common/TupleOutputStreamProcessor.h"
-#include "common/StreamPredicateList.h"
 #include "storage/persistenttable.h"
+#include "storage/TableStreamer.h"
+#include "storage/TableStreamerContext.h"
 #include "common/Pool.hpp"
 #include "common/tabletuple.h"
 #include <boost/scoped_ptr.hpp>
@@ -35,18 +36,11 @@ class TempTable;
 class ParsedPredicate;
 class TupleOutputStreamProcessor;
 
-class CopyOnWriteContext {
+class CopyOnWriteContext : public TableStreamerContext {
+
+    friend bool TableStreamer::activateStream(PersistentTable&, CatalogId);
 
 public:
-    /**
-     * Construct a copy on write context for the specified table that will serialize tuples
-     * using the provided serializer
-     */
-      CopyOnWriteContext(PersistentTable &table,
-                         TupleSerializer &serializer,
-                         int32_t partitionId,
-                         const std::vector<std::string> &predicateStrings,
-                         int64_t totalTuples);
 
     /**
      * Serialize tuples to the provided output until no more tuples can be serialized.
@@ -63,18 +57,47 @@ public:
      */
     void markTupleDirty(TableTuple tuple, bool newTuple);
 
-    void notifyBlockWasCompactedAway(TBPtr block);
-
-    bool canSafelyFreeTuple(TableTuple tuple);
-
     virtual ~CopyOnWriteContext();
+
+    /**
+     * Mandatory TableStreamContext override.
+     */
+    virtual int64_t handleStreamMore(TupleOutputStreamProcessor &outputStreams,
+                                     std::vector<int> &retPositions);
+
+    /**
+     * Optional block compaction handler.
+     */
+    virtual void notifyBlockWasCompactedAway(TBPtr block);
+
+    /**
+     * Optional tuple insert handler.
+     */
+    virtual bool notifyTupleInsert(TableTuple &tuple);
+
+    /**
+     * Optional tuple update handler.
+     */
+    virtual bool notifyTupleUpdate(TableTuple &tuple);
+
+    /**
+     * Optional tuple freeing check handler.
+     */
+    virtual bool canSafelyFreeTuple(TableTuple tuple);
+
 
 private:
 
     /**
-     * Table being copied
+     * Construct a copy on write context for the specified table that will
+     * serialize tuples using the provided serializer.
+     * Private so that only TableStreamer::activateStream() can call.
      */
-    PersistentTable &m_table;
+    CopyOnWriteContext(PersistentTable &table,
+                       TupleSerializer &serializer,
+                       int32_t partitionId,
+                       const std::vector<std::string> &predicateStrings,
+                       int64_t totalTuples);
 
     /**
      * Temp table for copies of tuples that were dirtied.
@@ -115,7 +138,6 @@ private:
     const int32_t m_partitionId;
 
     StreamPredicateList m_predicates;
-    std::vector<bool> m_predicateDeleteFlags;
 
     int64_t m_totalTuples;
     int64_t m_tuplesRemaining;

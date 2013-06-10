@@ -355,6 +355,19 @@ class Table {
         return false;
     }
 
+    /**
+     * These metrics are needed by some iterators.
+     */
+    uint32_t getTupleLength() const {
+        return m_tupleLength;
+    }
+    int getTableAllocationSize() const {
+        return m_tableAllocationSize;
+    }
+    uint32_t getTuplesPerBlock() const {
+        return m_tuplesPerBlock;
+    }
+
     virtual int64_t validatePartitioning(TheHashinator *hashinator, int32_t partitionId) {
         throwFatalException("Validate partitioning unsupported on this table type");
         return 0;
