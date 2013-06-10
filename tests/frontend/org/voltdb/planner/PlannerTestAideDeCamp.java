@@ -89,44 +89,26 @@ public class PlannerTestAideDeCamp {
     /**
      * Compile a statement and return the head of the plan.
      * @param sql
-     */
-    public CompiledPlan compileAdHocPlan(String sql)
-    {
-        compile(sql, 0, null, null, true, false);
-        return m_currentPlan;
-    }
-
-    /**
-     * Compile a statement and return the head of the plan.
-     * @param sql
      * @param detMode
      */
-    public CompiledPlan compileAdHocPlan(String sql, DeterminismMode detMode)
+    CompiledPlan compileAdHocPlan(String sql, DeterminismMode detMode)
     {
-        compile(sql, 0, null, null, true, false, detMode);
+        compile(sql, 0, null, null, detMode);
         return m_currentPlan;
     }
 
-    public List<AbstractPlanNode> compile(String sql, int paramCount, boolean singlePartition) {
-        return compile(sql, paramCount, singlePartition, null);
-    }
-
-    public List<AbstractPlanNode> compile(String sql, int paramCount, boolean singlePartition, String joinOrder) {
-        Object partitionBy = null;
+    List<AbstractPlanNode> compile(String sql, int paramCount, boolean singlePartition, String joinOrder) {
+        Object partitionParameter = null;
         if (singlePartition) {
-            partitionBy = "Forced single partitioning";
+            partitionParameter = "Forced single partitioning";
         }
-        return compile(sql, paramCount, joinOrder, partitionBy, true, false);
-    }
-
-    public List<AbstractPlanNode> compile(String sql, int paramCount, String joinOrder, Object partitionParameter, boolean inferSP, boolean lockInSP) {
-        return compile(sql, paramCount, joinOrder, partitionParameter, inferSP, lockInSP, DeterminismMode.SAFER);
+        return compile(sql, paramCount, joinOrder, partitionParameter, DeterminismMode.SAFER);
     }
 
     /**
      * Compile and cache the statement and plan and return the final plan graph.
      */
-    public List<AbstractPlanNode> compile(String sql, int paramCount, String joinOrder, Object partitionParameter, boolean inferSP, boolean lockInSP, DeterminismMode detMode)
+    private List<AbstractPlanNode> compile(String sql, int paramCount, String joinOrder, Object partitionParameter, DeterminismMode detMode)
     {
         Statement catalogStmt = proc.getStatements().add("stmt-" + String.valueOf(compileCounter++));
         catalogStmt.setSqltext(sql);
@@ -155,7 +137,7 @@ public class PlannerTestAideDeCamp {
 
         DatabaseEstimates estimates = new DatabaseEstimates();
         TrivialCostModel costModel = new TrivialCostModel();
-        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, inferSP, lockInSP);
+        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, true, true);
         QueryPlanner planner =
             new QueryPlanner(catalogStmt.getSqltext(), catalogStmt.getTypeName(),
                     catalogStmt.getParent().getTypeName(), catalog.getClusters().get("cluster"),

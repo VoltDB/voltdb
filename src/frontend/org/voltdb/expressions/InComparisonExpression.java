@@ -39,16 +39,18 @@ public class InComparisonExpression extends ComparisonExpression {
         if (m_args.isEmpty()) {
             throw new Exception("ERROR: There were no values defined for '" + this + "'");
         }
-        for (AbstractExpression exp : m_args) {
-            exp.validate();
-        }
         //
-        // We always need a left node, but should never have a right node
+        // We always need both a left node and a right node
         //
         if (m_left == null) {
             throw new Exception("ERROR: The left node for '" + this + "' is NULL");
-        } else if (m_right != null) {
-            throw new Exception("ERROR: The right node for '" + this + "' is '" + m_right + "', but we were expecting it to be NULL");
+        } else if (m_right == null) {
+            throw new Exception("ERROR: The right node for '" + this + "' is NULL");
+        }
+
+        // right needs to be vector or parameter
+        if (!(m_right instanceof VectorValueExpression) && !(m_right instanceof ParameterValueExpression)) {
+            throw new Exception("ERROR: The right node for '" + this + "' is not a list or a parameter");
         }
     }
 

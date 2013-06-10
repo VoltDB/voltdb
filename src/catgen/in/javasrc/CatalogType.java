@@ -349,6 +349,10 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         if ((obj == null) || (obj.getClass().equals(getClass()) == false))
             return false;
 
+        // Do the identity check
+        if (obj == this)
+            return true;
+
         // this is safe because of the class check
         // it is also known that the childCollections var will be the same
         //  from the class check
@@ -379,6 +383,16 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         }
 
         return true;
+    }
+
+    @Override
+    public int hashCode()
+    {
+        int result = 1;
+        // Generate something reasonably unique but consistent for this element
+        result = 37 * result + m_path.hashCode();
+        result = 31 * result + m_typename.hashCode();
+        return result;
     }
 
     /**

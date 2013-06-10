@@ -16,8 +16,45 @@
  */
 package org.voltdb;
 
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.utils.CoreUtils;
+
+/**
+ * Conveniently encapsulate some of the data required for each OPS selector.
+ */
 public enum OpsSelector {
-    STATISTICS,
-    SYSTEMCATALOG,
-    SYSTEMINFORMATION
+    SNAPSHOTDELETE(SnapshotDeleteAgent.class, HostMessenger.SNAPSHOTSCAN_SITE_ID),
+    SNAPSHOTSCAN(SnapshotScanAgent.class, HostMessenger.SNAPSHOTDELETE_SITE_ID),
+    STATISTICS(StatsAgent.class, HostMessenger.STATS_SITE_ID),
+    SYSTEMCATALOG(SystemCatalogAgent.class, HostMessenger.SYSCATALOG_SITE_ID),
+    SYSTEMINFORMATION(SystemInformationAgent.class, HostMessenger.SYSINFO_SITE_ID);
+
+    // OpsAgent subclass providing the implementation for this OPS selector
+    private final Class<? extends OpsAgent> m_agentClass;
+    // Well-known site ID for this OPS selector (I want to make this go away, but, no time)
+    private final int m_siteId;
+
+    private <T extends OpsAgent> OpsSelector(Class<T> agentClass, int siteId)
+    {
+        m_agentClass = agentClass;
+        m_siteId = siteId;
+    }
+
+    public Class<? extends OpsAgent> getAgentClass()
+    {
+        return m_agentClass;
+    }
+
+    public int getSiteId()
+    {
+        return m_siteId;
+    }
+
+    /**
+     * Convenience method: given the provided hostId, return the HSId for this OPS selector
+     */
+    public long getHSId(int hostId)
+    {
+        return CoreUtils.getHSIdFromHostAndSite(hostId, m_siteId);
+    }
 }

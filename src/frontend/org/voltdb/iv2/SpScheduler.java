@@ -946,7 +946,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event)
     {
         if (event.truncationSnapshot) {
-            writeIv2ViableReplayEntry();
+            synchronized(m_lock) {
+                writeIv2ViableReplayEntry();
+            }
         }
         return new CountDownLatch(0);
     }
