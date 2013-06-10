@@ -40,12 +40,12 @@ public class FailureSiteUpdateMessage extends VoltMessage {
 
     public FailureSiteUpdateMessage(
             Set<Long> failedHSIds,
-            long initiatorForSafeTxnId,
+            long failedHSId,
             long safeTxnId,
             long committedTxnId)
     {
         m_failedHSIds = new HashSet<Long>(failedHSIds);
-        m_failedHSId = initiatorForSafeTxnId;
+        m_failedHSId = failedHSId;
         m_safeTxnId = safeTxnId;
         m_committedTxnId = committedTxnId;
     }

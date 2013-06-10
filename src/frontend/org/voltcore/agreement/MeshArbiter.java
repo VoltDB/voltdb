@@ -171,9 +171,10 @@ public class MeshArbiter {
                 m_meshAide.sendHeartbeats(hsIds);
                 continue;
             }
-            if (!hsIds.contains(m.m_sourceHSId)) continue;
 
             if (m.getSubject() == Subject.FAILURE_SITE_UPDATE.getId()) {
+                if (!hsIds.contains(m.m_sourceHSId)) continue;
+
                 FailureSiteUpdateMessage fsum = (FailureSiteUpdateMessage)m;
 
                 m_failureSiteUpdateLedger.put(
