@@ -69,8 +69,8 @@ class ElasticHash
 
   private:
 
-    // Elastic hash values are 16 bytes.
-    int64_t m_hash[2];
+    // Elastic hashes are 16 bytes, but we only keep the least significant 8 bytes.
+    int64_t m_hashValue;
 };
 
 /**
@@ -165,35 +165,34 @@ class ElasticIndex : public stx::btree_set<ElasticIndexKey, ElasticIndexComparat
 /**
  * Default constructor
  */
-inline ElasticHash::ElasticHash()
-{
-    m_hash[0] = m_hash[1] = 0;
-}
+inline ElasticHash::ElasticHash() :
+    m_hashValue(0)
+{}
 
 /**
  * Full constructor
  */
 inline ElasticHash::ElasticHash(const PersistentTable &table, const TableTuple &tuple)
 {
-    tuple.getNValue(table.partitionColumn()).murmurHash3(m_hash);
+    int64_t hashValues[2];
+    tuple.getNValue(table.partitionColumn()).murmurHash3(hashValues);
+    // Only the least significant 8 bytes is used.
+    m_hashValue = hashValues[0];
 }
 
 /**
  * Copy constructor
  */
-inline ElasticHash::ElasticHash(const ElasticHash &other)
-{
-    m_hash[0] = other.m_hash[0];
-    m_hash[1] = other.m_hash[1];
-}
+inline ElasticHash::ElasticHash(const ElasticHash &other) :
+    m_hashValue(other.m_hashValue)
+{}
 
 /**
  * Assignment operator
  */
 inline const ElasticHash &ElasticHash::operator=(const ElasticHash &other)
 {
-    m_hash[0] = other.m_hash[0];
-    m_hash[1] = other.m_hash[1];
+    m_hashValue = other.m_hashValue;
     return *this;
 }
 
@@ -202,8 +201,7 @@ inline const ElasticHash &ElasticHash::operator=(const ElasticHash &other)
  */
 inline bool ElasticHash::operator<(const ElasticHash &other) const
 {
-    return (   m_hash[0] < other.m_hash[0]
-            || (m_hash[0] == other.m_hash[0] && m_hash[1] < other.m_hash[1]));
+    return (m_hashValue < other.m_hashValue);
 }
 
 /**
@@ -211,7 +209,7 @@ inline bool ElasticHash::operator<(const ElasticHash &other) const
  */
 inline bool ElasticHash::operator==(const ElasticHash &other) const
 {
-    return (m_hash[0] == other.m_hash[0] && m_hash[1] == other.m_hash[1]);
+    return (m_hashValue == other.m_hashValue);
 }
 
 /**
@@ -219,9 +217,7 @@ inline bool ElasticHash::operator==(const ElasticHash &other) const
  */
 inline std::ostream &operator<<(std::ostream &os, const ElasticHash &hash)
 {
-    os << std::setfill('0') << std::setw(16) << std::hex << hash.m_hash[0]
-       << ':'
-       << std::setfill('0') << std::setw(16) << std::hex << hash.m_hash[1];
+    os << std::setfill('0') << std::setw(16) << std::hex << hash.m_hashValue;
     return os;
 }
 
