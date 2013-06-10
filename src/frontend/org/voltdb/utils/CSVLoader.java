@@ -61,6 +61,7 @@ public class CSVLoader {
 
     private static final AtomicLong inCount = new AtomicLong(0);
     private static final AtomicLong outCount = new AtomicLong(0);
+    private static final AtomicLong totalCount = new AtomicLong(0);
     private static final int reportEveryNRows = 10000;
     private static final int waitSeconds = 10;
     private static CSVConfig config = null;
@@ -225,6 +226,7 @@ public class CSVLoader {
         configuration();
         Tokenizer tokenizer = null;
         ICsvListReader listReader = null;
+
         try {
             if (CSVLoader.standin) {
                 tokenizer = new Tokenizer(new BufferedReader( new InputStreamReader(System.in)), csvPreference,
@@ -294,7 +296,7 @@ public class CSVLoader {
             //Skip lines
             while( listReader.getLineNumber() < config.skip ) {
                 try{
-                    outCount.incrementAndGet();
+                    totalCount.getAndIncrement();
                     if( listReader.read() == null )
                         break;
                 }
@@ -310,18 +312,19 @@ public class CSVLoader {
                     lineList = listReader.read();
                     if(lineList == null) //EOF
                         break;
-                    outCount.incrementAndGet();
+                    totalCount.getAndIncrement();
                     boolean queued = false;
                     while (queued == false) {
                         String[] correctedLine = lineList.toArray(new String[0]);
-                        cb = new MyCallback(outCount.get(), config,
+                        outCount.incrementAndGet();
+                        cb = new MyCallback(totalCount.get(), config,
                                 lineList);
                         String lineCheckResult;
 
                         if ((lineCheckResult = checkparams_trimspace(correctedLine,
                                 columnCnt)) != null) {
                             String[] info = { lineList.toString(), lineCheckResult };
-                            synchronizeErrorInfo( outCount.get(), info );
+                            synchronizeErrorInfo( totalCount.get(), info );
                             break;
                         }
 
@@ -340,9 +343,9 @@ public class CSVLoader {
                 }
                 catch (SuperCsvException e){
                     //Catch rows that can not be read by superCSV listReader. E.g. items without quotes when strictquotes is enabled.
-                    outCount.incrementAndGet();
+                    totalCount.getAndIncrement();
                     String[] info = { e.getMessage(), "" };
-                    synchronizeErrorInfo( outCount.get(), info );
+                    synchronizeErrorInfo( totalCount.get(), info );
                 }
             }
             csvClient.drain();
@@ -366,10 +369,10 @@ public class CSVLoader {
         csvClient.close();
     }
 
-    private static void synchronizeErrorInfo( long lineNum, String[] info ) throws IOException, InterruptedException {
+    private static void synchronizeErrorInfo( long errLineNum, String[] info ) throws IOException, InterruptedException {
         synchronized (errorInfo) {
-            if (!errorInfo.containsKey(lineNum)) {
-                errorInfo.put(lineNum, info);
+            if (!errorInfo.containsKey(errLineNum)) {
+                errorInfo.put(errLineNum, info);
             }
             if (errorInfo.size() >= config.maxerrors) {
                 m_log.error("The number of Failure row data exceeds "
@@ -465,7 +468,7 @@ public class CSVLoader {
         return client;
     }
 
-    private static void produceFiles() {
+    private static void produceFiles( ) {
         latency = System.currentTimeMillis() - start;
         m_log.info("CSVLoader elapsed: " + latency / 1000F
                 + " seconds");
@@ -493,7 +496,7 @@ public class CSVLoader {
             out_reportfile.write("csvloader elaspsed: " + elapsedTimeSec
                     + " seconds\n");
             out_reportfile.write("Number of rows read from input: "
-                    + outCount.get() + "\n");
+                    + (totalCount.get() - config.skip) + "\n");
             out_reportfile.write("Number of rows successfully inserted: "
                     + inCount.get() + "\n");
             // if prompted msg changed, change it also for test case
