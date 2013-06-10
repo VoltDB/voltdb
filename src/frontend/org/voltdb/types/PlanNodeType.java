@@ -55,6 +55,7 @@ public enum PlanNodeType {
     INDEXSCAN       (11, IndexScanPlanNode.class),
     INDEXCOUNT       (12, IndexCountPlanNode.class),
     TABLECOUNT       (13, TableCountPlanNode.class),
+    MATERIALIZEDSCAN (14, TableCountPlanNode.class),
 
     //
     // Join Nodes
