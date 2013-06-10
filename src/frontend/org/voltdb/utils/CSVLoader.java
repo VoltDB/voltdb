@@ -468,7 +468,7 @@ public class CSVLoader {
         return client;
     }
 
-    private static void produceFiles( ) {
+    private static void produceFiles() {
         latency = System.currentTimeMillis() - start;
         m_log.info("CSVLoader elapsed: " + latency / 1000F
                 + " seconds");
