@@ -305,8 +305,12 @@ public class CSVLoader {
                     else
                         totalLineCount.set( listReader.getLineNumber() );
                     lineList = listReader.read();
-                    if(lineList == null) //EOF
+                    //EOF
+                    if(lineList == null) {
+                        if( totalLineCount.get() > listReader.getLineNumber() )
+                            totalLineCount.set( listReader.getLineNumber() );
                         break;
+                    }
                     totalRowCount.getAndIncrement();
                     boolean queued = false;
                     while (queued == false) {
