@@ -312,7 +312,11 @@ public class SystemStatsCollector {
         try {
             rss = ExecutionEngine.nativeGetRSS();
         }
-        catch (Exception e) {}
+        // This catch is broad to specifically include the UnsatisfiedLinkError that arises when
+        // using the hsqldb backend on linux -- along with any other exceptions that might arise.
+        // Otherwise, the hsql backend would get an annoying report to stdout
+        // as the useless stats thread got needlessly killed.
+        catch (Throwable e) { }
         if (rss > 0) mode = GetRSSMode.MACOSX_NATIVE;
 
         // try procfs
