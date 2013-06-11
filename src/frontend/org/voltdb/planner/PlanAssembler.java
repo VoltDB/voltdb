@@ -346,10 +346,7 @@ public class PlanAssembler {
      * @return A not-previously returned query plan or null if no more
      *         computable plans.
      */
-    CompiledPlan getNextPlan() {
-        // reset the plan column guids and pool
-        //PlanColumn.resetAll();
-
+    private CompiledPlan getNextPlan() {
         CompiledPlan retval = new CompiledPlan();
         AbstractParsedStmt nextStmt = null;
         if (m_parsedUnion != null) {
@@ -596,8 +593,8 @@ public class PlanAssembler {
         // connect the nodes to build the graph
         deleteNode.addAndLinkChild(subSelectRoot);
 
-        if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.hasPartitioningConstantLockedIn()) {
-            deleteNode.generateOutputSchema(m_catalogDb);
+        if (m_partitioning.wasSpecifiedAsSingle() ||
+            (m_partitioning.effectivePartitioningExpression() != null)) {
             return deleteNode;
         }
 
@@ -679,9 +676,8 @@ public class PlanAssembler {
         // connect the nodes to build the graph
         updateNode.addAndLinkChild(subSelectRoot);
 
-        if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.hasPartitioningConstantLockedIn()) {
-            updateNode.generateOutputSchema(m_catalogDb);
-
+        if (m_partitioning.wasSpecifiedAsSingle() ||
+            (m_partitioning.effectivePartitioningExpression() != null)) {
             return updateNode;
         }
 
@@ -711,7 +707,6 @@ public class PlanAssembler {
         // the root of the insert plan is always an InsertPlanNode
         InsertPlanNode insertNode = new InsertPlanNode();
         insertNode.setTargetTableName(targetTable.getTypeName());
-        insertNode.setMultiPartition(m_partitioning.wasSpecifiedAsSingle() == false);
 
         // the materialize node creates a tuple to insert (which is frankly not
         // always optimal)
@@ -785,13 +780,14 @@ public class PlanAssembler {
         insertNode.addAndLinkChild(materializeNode);
         insertNode.generateOutputSchema(m_catalogDb);
 
-        if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.hasPartitioningConstantLockedIn()) {
+        if (m_partitioning.wasSpecifiedAsSingle() ||
+            (m_partitioning.effectivePartitioningExpression() != null)) {
+            insertNode.setMultiPartition(false);
             return insertNode;
         }
 
+        insertNode.setMultiPartition(true);
         SendPlanNode sendNode = new SendPlanNode();
-        // this will make the child plan fragment be sent to all partitions
-        sendNode.isMultiPartition = true;
         sendNode.addAndLinkChild(insertNode);
         // sendNode.generateOutputSchema(m_catalogDb);
 

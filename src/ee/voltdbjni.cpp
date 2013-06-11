@@ -453,7 +453,7 @@ void deserializeParameterSetCommon(int cnt, ReferenceSerializeInput &serialize_i
                                    NValueArray &params, Pool *stringPool)
 {
     for (int i = 0; i < cnt; ++i) {
-        params[i] = NValue::deserializeFromAllocateForStorage(serialize_in, stringPool);
+        params[i].deserializeFromAllocateForStorage(serialize_in, stringPool);
     }
 }
 
