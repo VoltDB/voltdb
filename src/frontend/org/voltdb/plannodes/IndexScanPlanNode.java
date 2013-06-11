@@ -27,6 +27,8 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
@@ -68,7 +70,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     // This list of expressions corresponds to the values that we will use
     // at runtime in the lookup on the index
-    protected List<AbstractExpression> m_searchkeyExpressions = new ArrayList<AbstractExpression>();
+    protected final List<AbstractExpression> m_searchkeyExpressions = new ArrayList<AbstractExpression>();
 
     // ???
     protected Boolean m_keyIterate = false;
@@ -84,6 +86,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     protected Index m_catalogIndex = null;
 
     private ArrayList<AbstractExpression> m_bindings = null;
+
+    private boolean m_forDeterminismOnly = false;
 
     public IndexScanPlanNode() {
         super();
@@ -131,7 +135,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         // the only case in which a non-unique index can guarantee determinism is for an indexed-column-only scan,
         // because it would ignore any differences in the entries.
         // TODO: return true for an index-only scan --
-        // That would require testing of an inline projection node consisting solely of (functions of?) the indexed columns.
+        // That would require testing for an inline projection node consisting solely
+        // of (functions of?) the indexed columns.
         m_nondeterminismDetail = "index scan may provide insufficient ordering";
         return false;
     }
@@ -424,22 +429,101 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             keySize = 1;
         }
 
-        String scanType = "unique-scan";
-        if (m_lookupType != IndexLookupType.EQ)
-            scanType = "range-scan";
+        String usageInfo;
+        if (keySize == 0) {
+            if (m_forDeterminismOnly) {
+                usageInfo = " (for deterministic order only)";
+            } else {
+                usageInfo = " (for sort order only)";
+            }
+        }
+        else {
+            String[] asIndexed = new String[indexSize];
+            // Not really expecting to need these fall-back labels,
+            // but in the case of an unexpected error accessing the catalog data,
+            // they beat an NPE.
+            for (int ii = 0; ii < keySize; ++ii) {
+                asIndexed[ii] = "(index key " + ii + ")";
+            }
+            String jsonExpr = m_catalogIndex.getExpressionsjson();
+            // if this is a pure-column index...
+            if (jsonExpr.isEmpty()) {
+                // grab the short names of the indexed columns in use.
+                for (ColumnRef cref : m_catalogIndex.getColumns()) {
+                    Column col = cref.getColumn();
+                    asIndexed[cref.getIndex()] = col.getName();
+                }
+            }
+            else {
+                try {
+                    List<AbstractExpression> indexExpressions =
+                        AbstractExpression.fromJSONArrayString(jsonExpr, null);
+                    // From here, only the indexed expressions actually in use need consideration.
+                    int ii = 0;
+                    for (AbstractExpression ae : indexExpressions) {
+                        asIndexed[ii++] = ae.explain(m_targetTableName);
+                    }
+                } catch (JSONException e) {
+                    // If something unexpected went wrong,
+                    // just fall back on the positional key labels.
+                }
+            }
 
-        String cover = "covering";
-        if (indexSize > keySize)
-            cover = String.format("%d/%d cols", keySize, indexSize);
+            String start = explainSearchKeys(asIndexed, keySize);
+            if (m_lookupType == IndexLookupType.EQ) {
+                if (m_catalogIndex.getUnique()) {
+                    usageInfo = " uniquely match " + start;
+                }
+                else {
+                    usageInfo = " scan matches for " + start;
+                }
+            }
+            else {
+                if (indexSize == keySize) {
+                    usageInfo = " range-scan covering from " + start;
+                }
+                else {
+                    usageInfo = String.format(" range-scan %d/%d cols from %s", keySize, indexSize, start);
+                }
 
-        String usageInfo = String.format("(%s %s)", scanType, cover);
-        if (keySize == 0)
-            usageInfo = "(for sort order only)";
-
+                usageInfo += explainEndKeys(asIndexed);
+            }
+        }
+        String predicate = explainPredicate();
         String retval = "INDEX SCAN of \"" + m_targetTableName + "\"";
         retval += " using \"" + m_targetIndexName + "\"";
-        retval += " " + usageInfo;
+        retval += usageInfo + predicate;
         return retval;
+    }
+
+    private String explainSearchKeys(String[] asIndexed, int nCovered)
+    {
+        // By default, indexing starts at the start of the index.
+        if (m_searchkeyExpressions.isEmpty()) {
+            return "start";
+        }
+        String conjunction = "";
+        String result = "(";
+        int prefixSize = nCovered - 1;
+        for (int ii = 0; ii < prefixSize; ++ii) {
+            result += conjunction +
+                asIndexed[ii] + " = " + m_searchkeyExpressions.get(ii).explain(m_targetTableName);
+            conjunction = ") AND (";
+        }
+        // last element
+        result += conjunction +
+            asIndexed[prefixSize] + " " + m_lookupType.getSymbol() + " " +
+                m_searchkeyExpressions.get(prefixSize).explain(m_targetTableName) + ")";
+        return result;
+    }
+
+    private String explainEndKeys(String[] asIndexed)
+    {
+        // By default, indexing starts at the start of the index.
+        if (m_endExpression == null) {
+            return " to end";
+        }
+        return " while " + m_endExpression.explain(m_targetTableName);
     }
 
     public void setBindings(ArrayList<AbstractExpression> bindings) {
@@ -448,5 +532,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     public ArrayList<AbstractExpression> getBindings() {
         return m_bindings;
+    }
+
+    public void setForDeterminismOnly() {
+        m_forDeterminismOnly = true;
     }
 }
