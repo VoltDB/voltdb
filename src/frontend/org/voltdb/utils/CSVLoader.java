@@ -500,6 +500,8 @@ public class CSVLoader {
                     + trueSkip + "\n");
             out_reportfile.write("Number of lines read from input: "
                     + (totalLineCount.get() - trueSkip) + "\n");
+            if( config.limitrows < totalLineCount.get() )
+                out_reportfile.write("Input stopped after "+ totalRowCount.get() +" rows read"+"\n");
             out_reportfile.write("Number of rows discovered: "
                     + totalRowCount.get() + "\n");
             out_reportfile.write("Number of rows successfully inserted: "

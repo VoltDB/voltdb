@@ -204,6 +204,7 @@ public class TestCSVLoader extends TestCase {
                 "--quotechar=\"",
                 "--escape=\\",
                 "--skip=1",
+                "--limitrows=100",
                 //"--strictquotes",
                 "BlAh"
         };
