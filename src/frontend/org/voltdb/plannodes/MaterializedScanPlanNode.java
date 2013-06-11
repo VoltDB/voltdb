@@ -17,10 +17,6 @@
 
 package org.voltdb.plannodes;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -29,6 +25,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.VectorValueExpression;
 import org.voltdb.types.PlanNodeType;
 
 /**
@@ -40,7 +37,7 @@ import org.voltdb.types.PlanNodeType;
  */
 public class MaterializedScanPlanNode extends AbstractPlanNode {
 
-    protected List<AbstractExpression> m_tableData = new ArrayList<AbstractExpression>();
+    protected AbstractExpression m_rowData;
 
     public enum Members {
         TABLE_DATA;
@@ -55,15 +52,13 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
         return PlanNodeType.MATERIALIZEDSCAN;
     }
 
-    public void setTableData(List<AbstractExpression> rows) {
-        m_tableData.clear();
-        m_tableData.addAll(rows);
+    public void setRowData(AbstractExpression rowData) {
+        assert(rowData instanceof VectorValueExpression);
+        m_rowData = rowData;
     }
 
-    public List<AbstractExpression> getTableData() {
-        List<AbstractExpression> retval = new ArrayList<AbstractExpression>();
-        retval.addAll(m_tableData);
-        return retval;
+    public AbstractExpression getTableData() {
+        return m_rowData;
     }
 
     /**
@@ -99,14 +94,10 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
         super.toJSONString(stringer);
 
         stringer.key(Members.TABLE_DATA.name());
-        stringer.array();
-        for (int i = 0; i < m_tableData.size(); i++) {
-            stringer.object();
-            AbstractExpression ae = m_tableData.get(i);
-            assert(ae != null);
-            ae.toJSONString(stringer);
-            stringer.endObject();
-        }
+        stringer.object();
+        assert(m_rowData != null);
+        m_rowData.toJSONString(stringer);
+        stringer.endObject();
     }
 
     @Override
@@ -114,13 +105,7 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
         helpLoadFromJSONObject(obj, db);
 
         assert(!obj.isNull(Members.TABLE_DATA.name()));
-
-        //load table data
-        JSONArray jarray = null;
-        jarray = obj.getJSONArray(Members.TABLE_DATA.name());
-        for (int i = 0; i < jarray.length(); i++) {
-            AbstractExpression ae = AbstractExpression.fromJSONObject(obj, db);
-            m_tableData.add(ae);
-        }
+        JSONObject rowDataObj = obj.getJSONObject(Members.TABLE_DATA.name());
+        m_rowData = AbstractExpression.fromJSONObject(rowDataObj, db);
     }
 }
