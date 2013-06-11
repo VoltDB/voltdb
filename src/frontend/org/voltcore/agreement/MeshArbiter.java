@@ -82,6 +82,7 @@ public class MeshArbiter {
 
         HashSet<Long> survivorSet = new HashSet<Long>(hsIds);
         survivorSet.removeAll(m_inTrouble.keySet());
+        survivorSet.removeAll(m_failedSites);
         long survivors[] = Longs.toArray(survivorSet);
         m_recoveryLog.info("Agreement, Sending fault data "
                 + CoreUtils.hsIdCollectionToString(m_inTrouble.keySet())

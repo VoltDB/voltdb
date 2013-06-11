@@ -91,7 +91,7 @@ public class TestMeshArbiter {
     }
 
     @Test
-    public void testBasiceScenario() throws Exception {
+    public void testBasicScenario() throws Exception {
         Maker<FailureSiteUpdateMessage> fsum =
                 a(FailureSiteUpdateMessage, with(fsumSite,1L),with(fsumTxnid,2L));
 
@@ -104,6 +104,7 @@ public class TestMeshArbiter {
 
         Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L, true));
 
+        verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
         verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L, 2L)));
         assertThat(Longs.asList(survivorCaptor.getValue()), contains(0L,2L,3L));
 
@@ -111,7 +112,47 @@ public class TestMeshArbiter {
     }
 
     @Test
-    public void testInterleavedFailure() throws Exception {
+    public void testSubsequentFailures() throws Exception {
+        Maker<FailureSiteUpdateMessage> fsum =
+                a(FailureSiteUpdateMessage, with(fsumSite,1L),with(fsumTxnid,2L));
+
+        when(aide.getNewestSafeTransactionForInitiator(1L)).thenReturn(2L);
+        when(aide.getNewestSafeTransactionForInitiator(2L)).thenReturn(3L);
+
+        when(mbox.recvBlocking(any(Subject[].class), eq(5L)))
+            .thenReturn(make(fsum.but(with(fsumSource, 0L))))
+            .thenReturn(make(fsum.but(with(fsumSource, 2L))))
+            .thenReturn(make(fsum.but(with(fsumSource, 3L))))
+            ;
+
+        Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L, true));
+
+        verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
+        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L, 2L)));
+        assertThat(Longs.asList(survivorCaptor.getValue()), contains(0L,2L,3L));
+
+        assertEquals(decision,ImmutableMap.<Long,Long>of(1L,2L));
+
+        reset(mbox);
+        when(mbox.recvBlocking(any(Subject[].class),eq(5L)))
+            .thenReturn(make(fsum.but(with(fsumSource,0L))))
+            .thenReturn(make(fsum.but(with(fsumSource,0L),with(fsumSite,2L),with(fsumTxnid,3L))))
+            .thenReturn(make(fsum.but(with(fsumSource,3L))))
+            .thenReturn(make(fsum.but(with(fsumSource,3L),with(fsumSite,2L),with(fsumTxnid,3L))))
+        ;
+
+        decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(2L, true));
+
+        verify(mbox,never()).deliverFront(any(VoltMessage.class));
+        verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
+        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(2L,3L)));
+        assertThat(Longs.asList(survivorCaptor.getValue()), contains(0L,3L));
+
+        assertEquals(decision,ImmutableMap.<Long,Long>of(2L,3L));
+    }
+
+    @Test
+    public void testInterleavedFailures() throws Exception {
         Maker<FailureSiteUpdateMessage> fsum =
                 a(FailureSiteUpdateMessage, with(fsumSite,1L),with(fsumTxnid,3L));
 
@@ -125,6 +166,7 @@ public class TestMeshArbiter {
         Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L, true));
 
         verify(mbox,times(1)).deliverFront(any(VoltMessage.class));
+        verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
         verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L,3L)));
         assertThat(Longs.asList(survivorCaptor.getValue()), contains(0L,2L,3L));
 
@@ -141,6 +183,7 @@ public class TestMeshArbiter {
         decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(2L, true));
 
         verify(mbox,never()).deliverFront(any(VoltMessage.class));
+        verify(mbox,times(2)).send(any(long[].class), any(VoltMessage.class));
         verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L,3L)));
         assertThat(Longs.asList(survivorCaptor.getValue()), contains(0L,3L));
         verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(2L,4L)));
@@ -163,6 +206,7 @@ public class TestMeshArbiter {
         Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L, true));
 
         verify(mbox,times(1)).deliverFront(any(VoltMessage.class));
+        verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
         verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L,5L)));
         assertThat(Longs.asList(survivorCaptor.getValue()), contains(0L,2L,3L));
 
@@ -194,6 +238,7 @@ public class TestMeshArbiter {
         decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(2L, true));
 
         verify(mbox,never()).deliverFront(any(VoltMessage.class));
+        verify(mbox,times(2)).send(any(long[].class), any(VoltMessage.class));
         verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L,5L)));
         assertThat(Longs.asList(survivorCaptor.getValue()), contains(0L,3L));
         verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(2L,6L)));
@@ -227,6 +272,7 @@ public class TestMeshArbiter {
 
         Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L, true));
 
+        verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
         verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L, 2L)));
         assertThat(Longs.asList(survivorCaptor.getValue()), contains(0L,2L,3L));
         verify(aide,atLeast(2)).sendHeartbeats(destinationCaptor.capture());
