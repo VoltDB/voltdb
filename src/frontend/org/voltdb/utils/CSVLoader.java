@@ -61,7 +61,8 @@ public class CSVLoader {
 
     private static final AtomicLong inCount = new AtomicLong(0);
     private static final AtomicLong outCount = new AtomicLong(0);
-    private static final AtomicLong totalCount = new AtomicLong(0);
+    private static final AtomicLong totalLineCount = new AtomicLong(0);
+    private static final AtomicLong totalRowCount = new AtomicLong(0);
     private static final int reportEveryNRows = 10000;
     private static final int waitSeconds = 10;
     private static CSVConfig config = null;
@@ -159,7 +160,7 @@ public class CSVLoader {
         boolean strictquotes = DEFAULT_STRICT_QUOTES;
 
         @Option(desc = "number of lines to skip before inserting rows into the database")
-        int skip = DEFAULT_SKIP_LINES;
+        long skip = DEFAULT_SKIP_LINES;
 
         @Option(desc = "do not allow whitespace between values and separators", hasArg = false)
         boolean nowhitespace = DEFAULT_NO_WHITESPACE;
@@ -230,12 +231,14 @@ public class CSVLoader {
         try {
             if (CSVLoader.standin) {
                 tokenizer = new Tokenizer(new BufferedReader( new InputStreamReader(System.in)), csvPreference,
-                                                              config.strictquotes, config.escape, config.columnsizelimit) ;
+                        config.strictquotes, config.escape, config.columnsizelimit,
+                        config.skip) ;
                 listReader = new CsvListReader(tokenizer, csvPreference);
             }
             else {
                 tokenizer = new Tokenizer(new FileReader(config.file), csvPreference,
-                        config.strictquotes, config.escape, config.columnsizelimit) ;
+                        config.strictquotes, config.escape, config.columnsizelimit,
+                        config.skip) ;
                 listReader = new CsvListReader(tokenizer, csvPreference);
             }
         } catch (FileNotFoundException e) {
@@ -293,37 +296,29 @@ public class CSVLoader {
             }
 
             List<String> lineList = new ArrayList<String>();
-            //Skip lines
-            while( listReader.getLineNumber() < config.skip ) {
-                try{
-                    totalCount.set(listReader.getLineNumber());
-                    if( listReader.read() == null )
-                        break;
-                }
-                catch (SuperCsvException e){
-                    //Catch rows that can not be read by superCSV listReader.
-                    //E.g. items without quotes when strictquotes is enabled.
-                    //But do not record this line since we are skipping it.
-                }
-            }
 
             while ((config.limitrows-- > 0)) {
                 try{
-                    totalCount.set( listReader.getLineNumber() );
+                    //Initial setting of totalLineCount
+                    if( listReader.getLineNumber() == 0  )
+                        totalLineCount.set(cfg.skip);
+                    else
+                        totalLineCount.set( listReader.getLineNumber() );
                     lineList = listReader.read();
                     if(lineList == null) //EOF
                         break;
+                    totalRowCount.getAndIncrement();
                     boolean queued = false;
                     while (queued == false) {
                         String[] correctedLine = lineList.toArray(new String[0]);
-                        cb = new MyCallback(totalCount.get()+1, config,
+                        cb = new MyCallback(totalLineCount.get()+1, config,
                                 lineList);
                         String lineCheckResult;
 
                         if ((lineCheckResult = checkparams_trimspace(correctedLine,
                                 columnCnt)) != null) {
                             String[] info = { lineList.toString(), lineCheckResult };
-                            synchronizeErrorInfo( totalCount.get()+1, info );
+                            synchronizeErrorInfo( totalLineCount.get()+1, info );
                             break;
                         }
 
@@ -343,8 +338,9 @@ public class CSVLoader {
                 }
                 catch (SuperCsvException e){
                     //Catch rows that can not be read by superCSV listReader. E.g. items without quotes when strictquotes is enabled.
+                    totalRowCount.getAndIncrement();
                     String[] info = { e.getMessage(), "" };
-                    synchronizeErrorInfo( totalCount.get()+1, info );
+                    synchronizeErrorInfo( totalLineCount.get()+1, info );
                 }
             }
             csvClient.drain();
@@ -494,8 +490,18 @@ public class CSVLoader {
             float elapsedTimeSec = latency / 1000F;
             out_reportfile.write("csvloader elaspsed: " + elapsedTimeSec
                     + " seconds\n");
-            out_reportfile.write("Number of rows read from input: "
-                    + (totalCount.get() - config.skip) + "\n");
+            long trueSkip = 0;
+            //get the actuall number of lines skipped
+            if( config.skip < totalLineCount.get() )
+                trueSkip = config.skip;
+            else
+                trueSkip = totalLineCount.get();
+            out_reportfile.write("Number of input lines skipped: "
+                    + trueSkip + "\n");
+            out_reportfile.write("Number of lines read from input: "
+                    + (totalLineCount.get() - trueSkip) + "\n");
+            out_reportfile.write("Number of rows discovered: "
+                    + totalRowCount.get() + "\n");
             out_reportfile.write("Number of rows successfully inserted: "
                     + inCount.get() + "\n");
             // if prompted msg changed, change it also for test case

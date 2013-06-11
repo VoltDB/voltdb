@@ -734,6 +734,7 @@ public class TestCSVLoader extends TestCase {
                 "-f" + path_csv,
                 "--reportdir=" + reportDir,
                 "--columnsizelimit=4",
+                "--skip=1",
                 "BLAH"
         };
 
