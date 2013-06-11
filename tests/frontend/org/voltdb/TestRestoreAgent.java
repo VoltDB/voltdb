@@ -846,8 +846,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     public void testConsistentRestorePlan() {
         List<SnapshotInfo> infos = new ArrayList<SnapshotInfo>();
         InstanceId id = new InstanceId(0, 0);
-        SnapshotInfo info1 = new SnapshotInfo(0, "blah", "nonce", 3, 0, 0, id);
-        SnapshotInfo info2 = new SnapshotInfo(0, "blah", "nonce", 3, 0, 1, id);
+        SnapshotInfo info1 = new SnapshotInfo(0, "blah", "nonce", 3, 3, 0, 0, id);
+        SnapshotInfo info2 = new SnapshotInfo(0, "blah", "nonce", 3, 3, 0, 1, id);
 
         infos.add(info1);
         infos.add(info2);
@@ -890,14 +890,15 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             frags.put(txnid, si);
         }
         InstanceId id = new InstanceId(0, 0);
-        si.add(new SnapshotInfo(txnid, "dummy", "dummy", 1, crc, -1, id));
+        si.add(new SnapshotInfo(txnid, "dummy", "dummy", 1, 1, crc, -1, id));
     }
 
     @Test
     public void testSnapshotInfoRoundTrip() throws JSONException
     {
         InstanceId id = new InstanceId(1234, 4321);
-        RestoreAgent.SnapshotInfo dut = new RestoreAgent.SnapshotInfo(1234L, "dummy", "stupid", 11, 4321L, 13, id);
+        RestoreAgent.SnapshotInfo dut = new RestoreAgent.SnapshotInfo(1234L, "dummy", "stupid",
+                                                                      11, 11, 4321L, 13, id);
         dut.partitionToTxnId.put(1, 7000L);
         dut.partitionToTxnId.put(7, 1000L);
         byte[] serial = dut.toJSONObject().toString().getBytes(VoltDB.UTF8ENCODING);
