@@ -31,9 +31,12 @@ import org.voltdb.types.JoinType;
 
 /**
  * JoinTree class captures the hierarchical data model of a given SQl join.
+ * @TODO ENG_3038
+ * Once the inner and outer join evaluation paths are merged the whole JoinTree and
+ * all its methods/attributes will be obsolete and will be replaced with the JoinNode class
  *
  */
-public class JoinTree {
+public class JoinTree implements Cloneable {
 
     public static class TablePair {
         public Table t1;
@@ -62,7 +65,7 @@ public class JoinTree {
      * filter expressions
      *
      */
-    public static class JoinNode {
+    public static class JoinNode implements Cloneable {
 
         // Left child
         public JoinNode m_leftNode = null;
@@ -76,6 +79,8 @@ public class JoinTree {
         public AbstractExpression m_joinExpr = null;
         // Additional filter expression (WHERE) associated with this node
         public AbstractExpression m_whereExpr = null;
+        // Node id. Must be unique within a given tree
+        public int m_id = 0;
 
         // Buckets for children expression classification
         public ArrayList<AbstractExpression> m_joinOuterList = new ArrayList<AbstractExpression>();
@@ -96,12 +101,14 @@ public class JoinTree {
          * @param joinType - join type
          * @param joinExpr - join expression
          * @param whereExpr - filter expression
+         * @param id - node id
          */
-        JoinNode(Table table, JoinType joinType, AbstractExpression joinExpr, AbstractExpression  whereExpr) {
+        JoinNode(Table table, JoinType joinType, AbstractExpression joinExpr, AbstractExpression  whereExpr, int id) {
             m_table = table;
             m_joinType = joinType;
             m_joinExpr = joinExpr;
             m_whereExpr = whereExpr;
+            m_id = id;
         }
 
         /**
@@ -109,17 +116,83 @@ public class JoinTree {
          * @param joinType - join type
          * @param leftNode - left node
          * @param rightNode - right node
+         * @param id - node id
          */
-        JoinNode(JoinType joinType, JoinNode leftNode, JoinNode rightNode) {
+        JoinNode(JoinType joinType, JoinNode leftNode, JoinNode rightNode, int id) {
             m_joinType = joinType;
             m_leftNode = leftNode;
             m_rightNode = rightNode;
+            m_id = id;
         }
 
         /**
          * Construct an empty join node
          */
-        JoinNode() {
+        JoinNode(int id) {
+            m_id = id;
+        }
+
+        /**
+         * Deep clone
+         */
+        @Override
+        public Object clone() {
+            JoinNode newNode = new JoinNode(m_id);
+            newNode.m_joinType = m_joinType;
+            if (m_joinExpr != null) {
+                newNode.m_joinExpr = (AbstractExpression) m_joinExpr.clone();
+            }
+            if (m_whereExpr != null) {
+                newNode.m_whereExpr = (AbstractExpression) m_whereExpr.clone();
+            }
+            if (m_table == null) {
+                assert(m_leftNode != null && m_rightNode != null);
+                newNode.m_leftNode = (JoinNode) m_leftNode.clone();
+                newNode.m_rightNode = (JoinNode) m_rightNode.clone();
+            } else {
+                newNode.m_table = m_table;
+            }
+            return newNode;
+        }
+
+        /**
+         * Collect all JOIN and WHERE expressions combined with AND for the entire tree.
+         */
+        Collection<AbstractExpression> getAllExpressions() {
+            ArrayDeque<JoinNode> joinNodes = new ArrayDeque<JoinNode>();
+            ArrayDeque<AbstractExpression> in = new ArrayDeque<AbstractExpression>();
+            ArrayDeque<AbstractExpression> out = new ArrayDeque<AbstractExpression>();
+            // Iterate over the join nodes to collect their join and where expressions
+            joinNodes.add(this);
+            while (!joinNodes.isEmpty()) {
+                JoinNode joinNode = joinNodes.poll();
+                if (joinNode.m_joinExpr != null) {
+                    in.add(joinNode.m_joinExpr);
+                }
+                if (joinNode.m_whereExpr != null) {
+                    in.add(joinNode.m_whereExpr);
+                }
+                if (joinNode.m_leftNode != null) {
+                    joinNodes.add(joinNode.m_leftNode);
+                }
+                if (joinNode.m_rightNode != null) {
+                    joinNodes.add(joinNode.m_rightNode);
+                }
+            }
+
+            // this chunk of code breaks the code into a list of expression that
+            // all have to be true for the where clause to be true
+            AbstractExpression inExpr = null;
+            while ((inExpr = in.poll()) != null) {
+                if (inExpr.getExpressionType() == ExpressionType.CONJUNCTION_AND) {
+                    in.add(inExpr.getLeft());
+                    in.add(inExpr.getRight());
+                }
+                else {
+                    out.add(inExpr);
+                }
+            }
+            return out;
         }
 
         /**
@@ -147,43 +220,55 @@ public class JoinTree {
         /**
          * Returns tables in the order they are joined in the tree by iterating the tree depth-first
          */
-        List<Table> generateTableJoinOrder() {
-            ArrayList<Table> tables = new ArrayList<Table>();
-            generateTableJoinOrderRecursive(this, tables);
-            return tables;
+        List<JoinNode> generateLeafNodesJoinOrder() {
+            ArrayList<JoinNode> leafNodes = new ArrayList<JoinNode>();
+            generateLeafNodesJoinOrderRecursive(this, leafNodes);
+            return leafNodes;
         }
 
-        private void generateTableJoinOrderRecursive(JoinNode node, ArrayList<Table> tables) {
+        private void generateLeafNodesJoinOrderRecursive(JoinNode node, ArrayList<JoinNode> leafNodes) {
             if (node == null) {
                 return;
             }
             if (node.m_leftNode != null || node.m_rightNode != null) {
                 assert(node.m_leftNode != null && node.m_rightNode != null);
-                generateTableJoinOrderRecursive(node.m_leftNode, tables);
-                generateTableJoinOrderRecursive(node.m_rightNode, tables);
+                generateLeafNodesJoinOrderRecursive(node.m_leftNode, leafNodes);
+                generateLeafNodesJoinOrderRecursive(node.m_rightNode, leafNodes);
             } else {
                 assert(node.m_table != null);
+                leafNodes.add(node);
+            }
+        }
+
+        /**
+         * Returns tables in the order they are joined in the tree by iterating the tree depth-first
+         */
+        List<Table> generateTableJoinOrder() {
+            List<JoinNode> leafNodes = generateLeafNodesJoinOrder();
+            ArrayList<Table> tables = new ArrayList<Table>();
+            for (JoinNode node : leafNodes) {
                 tables.add(node.m_table);
             }
+            return tables;
         }
 
         /**
          * Returns nodes in the order they are joined in the tree by iterating the tree depth-first
          */
-        List<JoinNode> generateJoinOrder() {
+        List<JoinNode> generateAllNodesJoinOrder() {
             ArrayList<JoinNode> nodes = new ArrayList<JoinNode>();
-            generateJoinOrderRecursive(this, nodes);
+            generateAllNodesJoinOrderRecursive(this, nodes);
             return nodes;
         }
 
-        private void generateJoinOrderRecursive(JoinNode node, ArrayList<JoinNode> nodes) {
+        private void generateAllNodesJoinOrderRecursive(JoinNode node, ArrayList<JoinNode> nodes) {
             if (node == null) {
                 return;
             }
             if (node.m_leftNode != null || node.m_rightNode != null) {
                 assert(node.m_leftNode != null && node.m_rightNode != null);
-                generateJoinOrderRecursive(node.m_leftNode, nodes);
-                generateJoinOrderRecursive(node.m_rightNode, nodes);
+                generateAllNodesJoinOrderRecursive(node.m_leftNode, nodes);
+                generateAllNodesJoinOrderRecursive(node.m_rightNode, nodes);
             }
             nodes.add(node);
         }
@@ -222,6 +307,19 @@ public class JoinTree {
     }
 
     /**
+     * Deep clone
+     */
+    @Override
+    public Object clone() {
+        JoinTree newTree = new JoinTree();
+        if (m_root != null) {
+            newTree.m_root = (JoinNode) m_root.clone();
+        }
+        newTree.m_hasOuterJoin = m_hasOuterJoin;
+        return newTree;
+    }
+
+    /**
      * Collect all JOIN and WHERE expressions for the entire statement and combine them into
      * a single expression joined by AND.
      */
@@ -233,45 +331,13 @@ public class JoinTree {
     }
 
     /**
-     * Collect all JOIN and WHERE expressions combined with AND for the entire statement.
+     * Collect all JOIN and WHERE expressions combined with AND for the entire tree.
      */
     Collection<AbstractExpression> getAllExpressions() {
-        ArrayDeque<JoinNode> joinNodes = new ArrayDeque<JoinNode>();
-        ArrayDeque<AbstractExpression> in = new ArrayDeque<AbstractExpression>();
-        ArrayDeque<AbstractExpression> out = new ArrayDeque<AbstractExpression>();
-        // Iterate over the join nodes to collect their join and where expressions
         if (m_root != null) {
-            joinNodes.add(m_root);
+            return m_root.getAllExpressions();
         }
-        while (!joinNodes.isEmpty()) {
-            JoinNode joinNode = joinNodes.poll();
-            if (joinNode.m_joinExpr != null) {
-                in.add(joinNode.m_joinExpr);
-            }
-            if (joinNode.m_whereExpr != null) {
-                in.add(joinNode.m_whereExpr);
-            }
-            if (joinNode.m_leftNode != null) {
-                joinNodes.add(joinNode.m_leftNode);
-            }
-            if (joinNode.m_rightNode != null) {
-                joinNodes.add(joinNode.m_rightNode);
-            }
-        }
-
-        // this chunk of code breaks the code into a list of expression that
-        // all have to be true for the where clause to be true
-        AbstractExpression inExpr = null;
-        while ((inExpr = in.poll()) != null) {
-            if (inExpr.getExpressionType() == ExpressionType.CONJUNCTION_AND) {
-                in.add(inExpr.getLeft());
-                in.add(inExpr.getRight());
-            }
-            else {
-                out.add(inExpr);
-            }
-        }
-        return out;
+        return new ArrayList<AbstractExpression>();
     }
 
     /**

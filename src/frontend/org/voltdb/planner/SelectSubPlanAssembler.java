@@ -20,6 +20,7 @@ package org.voltdb.planner;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -178,8 +179,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      */
     private void queueOuterSubJoinOrders() {
         assert(m_parsedStmt.joinTree != null);
-        // TODO ENG_3038 >2 table outer join
-        // All join tree modifications must be perform on a clone of the original tree
 
         // Simplify the outer join if possible
         JoinTree simplifiedJoinTree = simplifyOuterJoin(m_parsedStmt.joinTree);
@@ -192,7 +191,243 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         // The execution engine expects to see the outer table on the left side only
         // which means that RIGHT joins need to be converted to the LEFT ones
         simplifiedJoinTree.m_root.toLeftJoin();
-        m_joinOrders.add(simplifiedJoinTree);
+        // Clone the original
+        JoinNode clonedTree = (JoinNode) simplifiedJoinTree.m_root.clone();
+        // Split join tree into a set of subtrees. The join type for all nodes in a subtree is the same
+        List<JoinNode> subTrees = new ArrayList<JoinNode>();
+        extractSubTrees(clonedTree, subTrees);
+        assert(!subTrees.isEmpty());
+        // Generate possible join orders for each sub-tree separately
+        ArrayList<ArrayList<JoinNode>> joinOrderList = generateJoinOrders(subTrees);
+        // Reassemble the all possible combinations of the sub-tree and queue them
+        queueOuterSubJoinOrders(joinOrderList, new ArrayList<JoinNode>());
+}
+
+    /**
+     * Split a join tree into one or more sub-trees. Each sub-tree has the same join type
+     * for all join nodes.
+     * @param root - The root of the join tree
+     * @param subTrees - the list of sub-trees from the input tree
+     */
+    private void extractSubTrees(JoinNode root, List<JoinNode> subTrees) {
+        // Extract the first sub-tree starting at the root
+        List<JoinNode> leafNodes = new ArrayList<JoinNode>();
+        extractSubTree(root, leafNodes);
+        subTrees.add(root);
+
+        // Continue with the leafs
+        for (JoinNode leaf : leafNodes) {
+            extractSubTrees(leaf, subTrees);
+        }
+    }
+
+    /**
+     * Starting from the root recurse to its children stopping at the first join node
+     * of the different type and discontinue the tree at this point by replacing the join node with
+     * the temporary node which id matches the join node id. This join node is the root of the next
+     * sub-tree.
+     * @param root - The root of the join tree
+     * @param leafNodes - the list of the root nodes of the next sub-trees
+     */
+    private void extractSubTree(JoinNode root, List<JoinNode> leafNodes) {
+        if (root.m_table != null) {
+            return;
+        }
+        JoinNode[] children = {root.m_leftNode, root.m_rightNode};
+        for (JoinNode child : children) {
+            if (child.m_joinType == root.m_joinType) {
+                // The join type for this node is the same as the root's one
+                extractSubTree(child, leafNodes);
+            } else if (child.m_table == null) {
+                // The join type for this join differs from the root's one
+                // Terminate the sub-tree
+                leafNodes.add(child);
+                // Replace the join node with the temporary node having the same id
+                // This will help to reassemble the tree at the later stage
+                JoinNode tempNode = new JoinNode(
+                        new Table(), child.m_joinType, child.m_joinExpr, child.m_whereExpr, child.m_id);
+                if (child == root.m_leftNode) {
+                    root.m_leftNode = tempNode;
+                } else {
+                    root.m_rightNode = tempNode;
+                }
+            }
+        }
+    }
+
+    private void queueOuterSubJoinOrders(List<ArrayList<JoinNode>> joinOrderList, ArrayList<JoinNode> currentJoinOrder) {
+        if (joinOrderList.isEmpty()) {
+            // End of recursion
+            assert(!currentJoinOrder.isEmpty());
+            JoinTree joinTree = new JoinTree();
+            joinTree.m_hasOuterJoin = true;
+            // Reconstruct the tree. The first element is the first sub-tree and so on
+            joinTree.m_root = reassembleJoinTree(
+                    currentJoinOrder.get(0), currentJoinOrder.subList(1, currentJoinOrder.size()));
+            m_joinOrders.add(joinTree);
+            return;
+        }
+        // Recursive step
+        ArrayList<JoinNode> headTrees = joinOrderList.get(0) ;
+        for (JoinNode headTree: headTrees) {
+            ArrayList<JoinNode> updatedJoinOrder = new ArrayList<JoinNode>();
+            // Order is important: The top sub-trees must be first
+            for (JoinNode node : currentJoinOrder) {
+                updatedJoinOrder.add((JoinNode)node.clone());
+            }
+            updatedJoinOrder.add((JoinNode)headTree.clone());
+            queueOuterSubJoinOrders(joinOrderList.subList(1, joinOrderList.size()), updatedJoinOrder);
+        }
+    }
+
+    /**
+     * Reassemble the join tree by adding sub-trees to the root. The root of each sub-tree
+     * has a corresponding temporary node (same id) in the main tree.
+     * @param root - The root of the join tree
+     * @param leafNodes - the list of the sub-trees
+     */
+    private JoinNode reassembleJoinTree(JoinNode root, List<JoinNode> subTrees) {
+        assert(root != null);
+        if (subTrees.isEmpty()) {
+            return root;
+        }
+        // Attached the first sub-tree
+        JoinNode head = subTrees.get(0);
+        replaceChild(root, head);
+        // Continue with the rest
+        List<JoinNode> tail = subTrees.subList(1, subTrees.size());
+        return reassembleJoinTree(root, tail);
+    }
+
+    private boolean replaceChild(JoinNode root, JoinNode node) {
+        // can't replace self
+        assert (root != null && root.m_id != node.m_id);
+        if (root.m_table != null) {
+            return false;
+        }
+
+        JoinNode[] children = {root.m_leftNode, root.m_rightNode};
+        for (JoinNode child : children) {
+            if (child.m_id == node.m_id) {
+                if (child == root.m_leftNode) {
+                    root.m_leftNode = node;
+                } else {
+                    root.m_rightNode = node;
+                }
+                return true;
+            } else if (replaceChild(child, node) == true) {
+                return true;
+            }
+        }
+        // It better be a child node with the same id
+        assert(false);
+        return false;
+    }
+
+    /**
+     * For each join tree from the input list generate a set of the join trees by permuting the leafs
+     * (table nodes) of the tree without breaking the joins semantic.
+     *
+     * @param subTrees the list of join trees.
+     * @return The list containing the list of trees of all possible permutations of the input trees
+     */
+    ArrayList<ArrayList<JoinNode>> generateJoinOrders(List<JoinNode> subTrees) {
+        ArrayList<ArrayList<JoinNode>> permutations = new ArrayList<ArrayList<JoinNode>>();
+        for (JoinNode subTree : subTrees) {
+            // Clone it
+            //JoinNode joinNode = (JoinNode)subTree.clone();
+            ArrayList<JoinNode> treePermutations = new ArrayList<JoinNode>();
+            if (subTree.m_joinType != JoinType.INNER) {
+                // Permutations for Outer Join are not supported yet
+                treePermutations.add(subTree);
+            } else {
+                // if all joins are inner then all join orders obtained by the permutation of
+                // the original tables are valid. Create arrays of the leaf nodes(tables) to permute them
+                JoinNode[] inputNodes = subTree.generateLeafNodesJoinOrder().toArray(new JoinNode[1]);
+                JoinNode[] outputNodes = new JoinNode[inputNodes.length];
+                // use recursion to solve...
+                List<JoinNode> newTrees = new ArrayList<JoinNode>();
+                queueInnerSubJoinOrdersRecursively(inputNodes, outputNodes, 0, newTrees);
+                //Collect all the join/where conditions to reassign them later
+                Collection<AbstractExpression> combinedExprs = subTree.getAllExpressions();
+                AbstractExpression combinedWhereExpr = ExpressionUtil.combine(combinedExprs);
+                for (JoinNode newTree : newTrees) {
+                    //
+                    if (combinedWhereExpr != null) {
+                        newTree.m_whereExpr = (AbstractExpression)combinedWhereExpr.clone();
+                    }
+                    // The new tree root node id must match the original one to be able to reconnect the
+                    // subtrees
+                    newTree.m_id = subTree.m_id;
+                    treePermutations.add(newTree);
+                }
+            }
+            permutations.add(treePermutations);
+        }
+        return permutations;
+    }
+
+    /**
+     * Recursively add all join orders (permutations) for the input node list.
+     * @TODO ENG_3038 This is a cut-and-paste copy of the queueInnerSubJoinOrdersRecursively for tables
+     * After the inner and outer join paths will be merged the original version can be retired
+     *
+     * @param inputTables An array of tables to order.
+     * @param outputTables A scratch space for recursion for an array of tables. Making this a parameter
+     * might make the procedure a slight bit faster than if it was a return value.
+     * @param place The index of the table to permute (all tables before index=place are fixed).
+     * @param joinNodes - The list containing trees for all possible permutations of the input nodes
+     */
+    private void queueInnerSubJoinOrdersRecursively(JoinNode[] inputNodes,
+                                                    JoinNode[] outputNodes,
+                                                    int place,
+                                                    List<JoinNode> joinNodes) {
+        // recursive stopping condition:
+        //
+        // stop when there is only one place and one table to permute
+        if (place == inputNodes.length) {
+            // The inner join doesn't need a tree at all, only the the flat list of joined table.
+            // The join and where conditions are always the same regardless of the table order need to be
+            // analyzed only once.
+            // Rebuild the tree from the join order
+            JoinNode root = null;
+            for (JoinNode outputNode : outputNodes) {
+                assert(outputNode.m_table != null);
+                JoinNode node = new JoinNode(outputNode.m_table, outputNode.m_joinType, null, null, outputNode.m_id);
+                if (root == null) {
+                    root = node;
+                } else {
+                    // We only care about the root node id to be able to reconnect the sub-trees
+                    // The intermediate node id can be anything. For the final root node its id
+                    // will be set later to the original tree's root id
+                    root = new JoinNode(JoinType.INNER, root, node, -node.m_id);
+                }
+            }
+            joinNodes.add(root);
+            return;
+        }
+
+        // recursive step:
+        //
+        // pick all possible options for the current
+        for (int i = 0; i < outputNodes.length; i++) {
+            // choose a candidate table for this place
+            outputNodes[place] = inputNodes[i];
+
+            // don't select tables that have been chosen before
+            boolean duplicate = false;
+            for (int j = 0; j < place; j++) {
+                if (outputNodes[j].m_id == outputNodes[place].m_id) {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (duplicate)
+                continue;
+
+            // recursively call this function to permute the remaining places
+            queueInnerSubJoinOrdersRecursively(inputNodes, outputNodes, place + 1, joinNodes);
+        }
     }
 
     /**
@@ -210,7 +445,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
         // use recursion to solve...
         queueInnerSubJoinOrdersRecursively(inputTables, outputTables, 0);
-
     }
 
     /**
@@ -221,7 +455,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * might make the procedure a slight bit faster than if it was a return value.
      * @param place The index of the table to permute (all tables before index=place are fixed).
      */
-    private void queueInnerSubJoinOrdersRecursively(Table[] inputTables, Table[] outputTables, int place) {
+    private void queueInnerSubJoinOrdersRecursively(Table[] inputTables,
+                                                    Table[] outputTables,
+                                                    int place) {
         // recursive stopping condition:
         //
         // stop when there is only one place and one table to permute
@@ -405,7 +641,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         // generate the access paths for all nodes
         generateAccessPaths(null, joinTree.m_root);
 
-        List<JoinNode> nodes = joinNode.generateJoinOrder();
+        List<JoinNode> nodes = joinNode.generateAllNodesJoinOrder();
         generateSubPlanForJoinNodeRecursively(joinNode, nodes);
     }
 

@@ -573,14 +573,16 @@ public abstract class AbstractParsedStmt {
            joinTree = new JoinTree();
        }
        // The join type of the leaf node is always INNER
-       JoinNode joinNode = new JoinNode(table, JoinType.INNER, joinExpr, whereExpr);
+       // For a new tree its node's ids start with 0 and keep incrementing by 1
+       int nodeId = (joinTree.m_root == null) ? 0 : joinTree.m_root.m_id + 1;
+       JoinNode joinNode = new JoinNode(table, JoinType.INNER, joinExpr, whereExpr, nodeId);
        if (joinTree.m_root == null) {
            // this is the first table
            joinTree.m_root = joinNode;
        } else {
            // Build the tree by attaching the next table always to the right
            // The node's join type is determined by the type of its right node
-           JoinNode node = new JoinNode(joinType, joinTree.m_root, joinNode);
+           JoinNode node = new JoinNode(joinType, joinTree.m_root, joinNode, nodeId + 1);
            joinTree.m_root = node;
        }
        if (joinType != JoinType.INNER) {
@@ -754,9 +756,12 @@ public abstract class AbstractParsedStmt {
 
         joinList.addAll(ExpressionUtil.uncombineAny(joinNode.m_rightNode.m_joinExpr));
         joinList.addAll(ExpressionUtil.uncombineAny(joinNode.m_leftNode.m_joinExpr));
+        joinList.addAll(ExpressionUtil.uncombineAny(joinNode.m_joinExpr));
 
         whereList.addAll(ExpressionUtil.uncombineAny(joinNode.m_leftNode.m_whereExpr));
         whereList.addAll(ExpressionUtil.uncombineAny(joinNode.m_rightNode.m_whereExpr));
+        whereList.addAll(ExpressionUtil.uncombineAny(joinNode.m_whereExpr));
+
 
         Collection<Table> innerTables = joinNode.m_rightNode.generateTableJoinOrder();
         Collection<Table> outerTables = joinNode.m_leftNode.generateTableJoinOrder();
@@ -818,7 +823,7 @@ public abstract class AbstractParsedStmt {
      * @param innerList expressions with inner table only
      * @param innerOuterList with inner and outer tables
      */
-    void classifyOuterJoinExpressions(List<AbstractExpression> exprList,
+    void classifyOuterJoinExpressions(Collection<AbstractExpression> exprList,
             Collection<Table> outerTables, Collection<Table> innerTables,
             List<AbstractExpression> outerList, List<AbstractExpression> innerList,
             List<AbstractExpression> innerOuterList) {
