@@ -48,6 +48,7 @@
 #include <stdint.h>
 #include <stdarg.h>
 #include <boost/foreach.hpp>
+#include <boost/shared_ptr.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
 #include <json_spirit/json_spirit.h>
 #include <json_spirit/json_spirit_writer.h>
@@ -386,6 +387,11 @@ public:
         return m_table->m_data;
     }
 
+    PersistentTableSurgeon& getSurgeon() {
+        return m_table->m_surgeon;
+    }
+
+
     boost::unordered_set<TBPtr> &getBlocksPendingSnapshot() {
         return m_table->m_blocksPendingSnapshot;
     }
@@ -404,6 +410,10 @@ public:
 
     bool activateStreamInternal(CatalogId tableId, boost::shared_ptr<TableStreamerInterface> streamer) {
         return m_table->activateStreamInternal(m_tableId, streamer);
+    }
+
+    boost::shared_ptr<ElasticScanner> getElasticScanner() {
+        return boost::shared_ptr<ElasticScanner>(new ElasticScanner(*m_table, m_table->m_surgeon.getData()));
     }
 
     voltdb::VoltDBEngine *m_engine;
@@ -440,7 +450,7 @@ TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
     TBMap blocks(getTableData());
     getBlocksPendingSnapshot().swap(getBlocksNotPendingSnapshot());
     getBlocksPendingSnapshotLoad().swap(getBlocksNotPendingSnapshotLoad());
-    voltdb::CopyOnWriteIterator COWIterator(m_table, blocks.begin(), blocks.end());
+    voltdb::CopyOnWriteIterator COWIterator(m_table, &getSurgeon(), blocks.begin(), blocks.end());
     TableTuple tuple(m_table->schema());
     TableTuple COWTuple(m_table->schema());
 
@@ -1129,7 +1139,10 @@ class DummyTableStreamer : public TableStreamerInterface {
 public:
     DummyTableStreamer(TableStreamType type) : m_type(type) {}
 
-    virtual bool activateStream(PersistentTable &table, CatalogId tableId) { return true; }
+    virtual bool activateStream(PersistentTable &table,
+                                PersistentTableSurgeon &surgeon,
+                                CatalogId tableId)
+    { return true; }
 
     virtual int64_t streamMore(TupleOutputStreamProcessor &outputStreams,
                                std::vector<int> &retPositions) { return 0; }
@@ -1254,9 +1267,9 @@ TEST_F(CopyOnWriteTest, ElasticScannerTest) {
     // Value sets used for checking results.
     T_ValueSet returns;
 
-    DummyTableStreamer *dummyStreamer = new DummyTableStreamer(TABLE_STREAM_ELASTIC);
+    DummyTableStreamer *dummyStreamer = new DummyTableStreamer(TABLE_STREAM_ELASTIC_INDEX_BUILD);
     boost::shared_ptr<TableStreamerInterface> dummyStreamerPtr(dummyStreamer);
-    ElasticScanner scanner(*m_table);
+    boost::shared_ptr<ElasticScanner>scanner = getElasticScanner();
     activateStreamInternal(m_tableId, dummyStreamerPtr);
 
     bool scanComplete = false;
@@ -1266,7 +1279,7 @@ TEST_F(CopyOnWriteTest, ElasticScannerTest) {
         // Periodically delete, insert, update, compact, etc..
         tableScrambler.scramble();
 
-        scanComplete = !scanner.next(tuple);
+        scanComplete = !scanner->next(tuple);
         if (scanComplete) {
             break;
         }
@@ -1276,7 +1289,7 @@ TEST_F(CopyOnWriteTest, ElasticScannerTest) {
 
     // Scan the remaining tuples that weren't encountered in the mutate/scan loop.
     if (!scanComplete) {
-        while (scanner.next(tuple)) {
+        while (scanner->next(tuple)) {
             T_Value value = *reinterpret_cast<T_Value*>(tuple.address() + 1);
             returns.insert(value);
         }
@@ -1347,13 +1360,19 @@ TEST_F(CopyOnWriteTest, ElasticScannerTest) {
 class DummyElasticTableStreamer : public DummyTableStreamer {
 public:
     DummyElasticTableStreamer(PersistentTable& table,
+                              int32_t partitionId,
+                              TupleSerializer &serializer,
                               const std::vector<std::string> &predicateStrings) :
-        DummyTableStreamer(TABLE_STREAM_ELASTIC),
+        DummyTableStreamer(TABLE_STREAM_ELASTIC_INDEX_BUILD),
+        m_partitionId(partitionId),
+        m_serializer(serializer),
         m_predicateStrings(predicateStrings)
     {}
 
-    virtual bool activateStream(PersistentTable &table, CatalogId tableId) {
-        m_context.reset(new ElasticContext(table, m_predicateStrings));
+    virtual bool activateStream(PersistentTable &table,
+                                PersistentTableSurgeon &surgeon,
+                                CatalogId tableId) {
+        m_context.reset(new ElasticContext(table, surgeon, m_partitionId, m_serializer, m_predicateStrings, true));
         return true;
     }
 
@@ -1399,6 +1418,8 @@ public:
         return getContext().m_index;
     }
 
+    int32_t m_partitionId;
+    TupleSerializer &m_serializer;
     const std::vector<std::string> &m_predicateStrings;
     boost::scoped_ptr<ElasticContext> m_context;
     T_ValueSet m_moved;
@@ -1433,18 +1454,12 @@ TEST_F(CopyOnWriteTest, ElasticContextIndexTest) {
     ASSERT_TRUE(predicates.parseStrings(predicateStrings, errmsg, deleteFlags));
 
     DummyElasticTableStreamer *streamerPtr =
-            new DummyElasticTableStreamer(*m_table, predicateStrings);
+            new DummyElasticTableStreamer(*m_table, 0, m_serializer, predicateStrings);
     boost::shared_ptr<TableStreamerInterface> streamer(streamerPtr);
     activateStreamInternal(m_tableId, streamer);
 
     for (size_t icycle = 0; icycle < NUM_CYCLES; icycle++) {
         tableScrambler.scramble();
-    }
-
-    TupleOutputStreamProcessor outputStreams;
-    std::vector<int> retPositions;
-    while (m_table->streamMore(outputStreams, retPositions) > 0) {
-        ;
     }
 
     tool.context("check");

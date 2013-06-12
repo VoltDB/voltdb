@@ -21,6 +21,7 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <boost/shared_ptr.hpp>
 #include "common/StreamPredicateList.h"
 #include "common/FatalException.hpp"
 #include "storage/TupleBlock.h"
@@ -30,12 +31,20 @@ namespace voltdb
 
 class TupleOutputStreamProcessor;
 class TableTuple;
+class TupleSerializer;
 class PersistentTable;
+class PersistentTableSurgeon;
+class TableStreamerHelper;
+
+/// Pointer type returned by factory method.
+typedef boost::shared_ptr<TableStreamerHelper> TableStreamerHelperPtr;
 
 /**
  * Abstract class that provides the interface for all table streamer contexts.
  */
 class TableStreamerContext {
+
+    friend class TableStreamerHelper;
 
 public:
 
@@ -94,29 +103,54 @@ public:
         return m_predicates;
     }
 
+    /**
+     * Tuple length accessor.
+     */
+    int getMaxTupleLength() const
+    {
+        return m_maxTupleLength;
+    }
+
+    /**
+     * Tuple serializer accessor.
+     */
+    TupleSerializer &getSerializer()
+    {
+        return m_serializer;
+    }
+
+    /**
+     * Partition ID accessor.
+     */
+    int32_t getPartitionId() const
+    {
+        return m_partitionId;
+    }
+
+    /**
+     * Create an output processor used in handleStreamMore.
+     */
+    TableStreamerHelperPtr createTableStreamerHelper(TupleOutputStreamProcessor &outputStreams,
+                                                     std::vector<int> &retPositions);
+
 protected:
 
     /**
      * Constructor with predicates.
      */
-    TableStreamerContext(PersistentTable &table, const std::vector<std::string> &predicateStrings) :
-        m_table(table)
-    {
-        // Parse predicate strings. The factory type determines the kind of
-        // predicates that get generated.
-        // Throws an exception to be handled by caller on errors.
-        std::ostringstream errmsg;
-        if (!m_predicates.parseStrings(predicateStrings, errmsg, m_predicateDeleteFlags)) {
-            throwFatalException("TableStreamerContext() failed to parse predicate strings.");
-        }
-    }
+    TableStreamerContext(PersistentTable &table,
+                         PersistentTableSurgeon &surgeon,
+                         int32_t partitionId,
+                         TupleSerializer &serializer,
+                         const std::vector<std::string> &predicateStrings);
 
     /**
      * Constructor without predicates.
      */
-    TableStreamerContext(PersistentTable &table) :
-        m_table(table)
-    {}
+    TableStreamerContext(PersistentTable &table,
+                         PersistentTableSurgeon &surgeon,
+                         int32_t partitionId,
+                         TupleSerializer &serializer);
 
     /**
      * Predicate delete flags accessor.
@@ -125,6 +159,8 @@ protected:
     {
         return m_predicateDeleteFlags;
     }
+
+    PersistentTableSurgeon &m_surgeon;
 
 private:
 
@@ -142,6 +178,23 @@ private:
      * Per-predicate delete if true flags.
      */
     std::vector<bool> m_predicateDeleteFlags;
+
+    /**
+     * Maximum serialized length of a tuple
+     */
+    const int m_maxTupleLength;
+
+    /**
+     * Serializer for tuples
+     */
+    TupleSerializer &m_serializer;
+
+    /**
+     * Partition ID
+     */
+    const int32_t m_partitionId;
+
+
 };
 
 } // namespace voltdb

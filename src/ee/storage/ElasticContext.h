@@ -35,7 +35,7 @@ class TupleOutputStreamProcessor;
 class ElasticContext : public TableStreamerContext
 {
 
-    friend bool TableStreamer::activateStream(PersistentTable&, CatalogId);
+    friend bool TableStreamer::activateStream(PersistentTable&, PersistentTableSurgeon&, CatalogId);
     friend class ::DummyElasticTableStreamer;
 
 public:
@@ -77,7 +77,12 @@ private:
     /**
      * Constructor - private so that only TableStreamer::activateStream() can call.
      */
-    ElasticContext(PersistentTable &table, const std::vector<std::string> &predicateStrings);
+    ElasticContext(PersistentTable &table,
+                   PersistentTableSurgeon &surgeon,
+                   int32_t partitionId,
+                   TupleSerializer &serializer,
+                   const std::vector<std::string> &predicateStrings,
+                   bool buildIndex);
 
     /**
      * Scanner for retrieveing rows.
@@ -89,6 +94,20 @@ private:
      */
     ElasticIndex m_index;
 
+    /**
+     * True when creating the index.
+     */
+    const bool m_buildIndex;
+
+    /**
+     * Set to remaining tuple count after index is initialized.
+     */
+    int m_remaining;
+
+    /**
+     * Iterator for reading from the index.
+     */
+    ElasticIndex::const_iterator m_iter;
 };
 
 } // namespace voltdb

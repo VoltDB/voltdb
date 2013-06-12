@@ -40,7 +40,7 @@ class ElasticScanner : public TupleIterator
     /**
      * Constructor.
      */
-    ElasticScanner(PersistentTable &table);
+    ElasticScanner(PersistentTable &table, TBMap &data);
 
     /**
      * Destructor.

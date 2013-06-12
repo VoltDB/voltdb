@@ -333,13 +333,57 @@ enum IndexLookupType {
 
 // ------------------------------------------------------------------
 // Table Stream Types
+//
+// IMPORTANT: Keep this enum in sync with the Java equivalent
+//            in TableStreamType.java!
+//
+// Use the functions in preference to switch/case constructs on enum
+// values. This minimizes the spread of stream type assumptions and
+// makes it less painful to change the enum.
 // ------------------------------------------------------------------
 enum TableStreamType {
-   TABLE_STREAM_SNAPSHOT,
-   TABLE_STREAM_RECOVERY,
-   TABLE_STREAM_ELASTIC,
-   TABLE_STREAM_NONE = -1
+    // Table stream types that use predicates.
+    TABLE_STREAM_SNAPSHOT,
+    TABLE_STREAM_ELASTIC_INDEX_BUILD,
+    TABLE_STREAM_ELASTIC_INDEX_READ,
+
+    // Table stream types that don't use predicates.
+    // Add new non-predicate types below TABLE_STREAM_RECOVERY so
+    // that tableStreamTypeHasPredicates() doesn't have to change.
+    TABLE_STREAM_RECOVERY,
+
+    // Table stream type provided when no stream is active.
+    TABLE_STREAM_NONE = -1
 };
+
+/**
+ * Return true if the table stream type uses predicates.
+ * Assumes a specific order for the enum values to make the comparison easy.
+ */
+inline bool tableStreamTypeHasPredicates(TableStreamType streamType) {
+    return streamType < TABLE_STREAM_RECOVERY;
+}
+
+/**
+ * Return true if the table stream type is performing a snapshot.
+ */
+inline bool tableStreamTypeIsSnapshot(TableStreamType streamType) {
+    return streamType == TABLE_STREAM_SNAPSHOT;
+}
+
+/**
+ * Return true if the table stream type is for recovery.
+ */
+inline bool tableStreamTypeIsRecovery(TableStreamType streamType) {
+    return streamType == TABLE_STREAM_RECOVERY;
+}
+
+/**
+ * Return true if the table stream type valid.
+ */
+inline bool tableStreamTypeIsValid(TableStreamType streamType) {
+    return streamType != TABLE_STREAM_NONE;
+}
 
 // ------------------------------------------------------------------
 // Statistics Selector Types

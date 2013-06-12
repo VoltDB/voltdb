@@ -17,23 +17,51 @@
 
 #include "storage/ElasticContext.h"
 #include "storage/persistenttable.h"
+#include "storage/TableStreamerHelper.h"
 #include "common/TupleOutputStreamProcessor.h"
 
 namespace voltdb {
 
 ElasticContext::ElasticContext(PersistentTable &table,
-                               const std::vector<std::string> &predicateStrings) :
-    TableStreamerContext(table, predicateStrings),
-    m_scanner(table)
+                               PersistentTableSurgeon &surgeon,
+                               int32_t partitionId,
+                               TupleSerializer &serializer,
+                               const std::vector<std::string> &predicateStrings,
+                               bool buildIndex) :
+    TableStreamerContext(table, surgeon, partitionId, serializer, predicateStrings),
+    m_scanner(table, surgeon.getData()),
+    m_buildIndex(buildIndex),
+    m_remaining(-1)
 {
     if (predicateStrings.size() != 1) {
-        throwFatalException("ElasticContext() expects a single predicate");
+        throwFatalException("ElasticContext::ElasticContext() expects a single predicate.");
+    }
+
+    if (m_buildIndex) {
+        if (m_remaining >= 0) {
+            throwFatalException("ElasticContext::ElasticContext() was called more than once in index build mode.")
+        }
+
+        // Populate index with current tuples.
+        // Table changes are tracked through notifications.
+        TableTuple tuple(table.schema());
+        while (m_scanner.next(tuple)) {
+            if (getPredicates()[0].eval(&tuple).isTrue()) {
+                m_index.add(table, tuple);
+            }
+        }
+        m_remaining = static_cast<int>(m_index.size());
+    }
+    else {
+        if (m_remaining < 0) {
+            throwFatalException("ElasticContext::ElasticContext() was never called in index build mode.")
+        }
+        m_iter = m_index.begin();
     }
 }
 
 ElasticContext::~ElasticContext()
-{
-}
+{}
 
 /*
  * Serialize to multiple output streams.
@@ -42,14 +70,58 @@ ElasticContext::~ElasticContext()
 int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStreams,
                                          std::vector<int> &retPositions)
 {
+    if (m_remaining < 0) {
+        throwFatalException("ElasticContext::handleStreamMore() was called before the index was built.");
+    }
+
+    if (m_buildIndex) {
+        throwFatalException("ElasticContext::handleStreamMore() was called while in index build mode.");
+    }
+
+    if (m_iter == m_index.end()) {
+        throwFatalException("ElasticContext::handleStreamMore() was called after iteration completed");
+    }
+
+    // Create streaming helper and open output stream(s).
+    TableStreamerHelperPtr helper = createTableStreamerHelper(outputStreams, retPositions);
+    helper->open();
+
+    //=== Tuple processing loop
+
     PersistentTable &table = getTable();
-    TableTuple tuple(table.schema());
-    while (m_scanner.next(tuple)) {
-        if (getPredicates()[0].eval(&tuple).isTrue()) {
-            m_index.add(table, tuple);
+    const TupleSchema *schema = table.schema();
+    // Set to yield to true to break out of the loop.
+    bool yield = false;
+    while (!yield) {
+        ElasticIndexKey key = *m_iter;
+        char *data = key.getTupleAddress();
+        TableTuple tuple(data, schema);
+        bool deleteTuple = true;
+        yield = helper->write(tuple, deleteTuple);
+
+        /*
+         * Delete a moved tuple?
+         * This is used for Elastic rebalancing, which is wrapped in a transaction.
+         * The delete for undo is generic enough to support this operation.
+         */
+        if (deleteTuple) {
+            m_surgeon.deleteTupleForUndo(tuple.address(), true);
+        }
+
+        m_remaining--;
+        if (++m_iter == m_index.end()) {
+            if (m_remaining != 0) {
+                throwFatalException("ElasticContext::handleStreamMore() non-zero final tuple count: %d",
+                                    m_remaining);
+            }
+            yield = true;
         }
     }
-    return 0;
+
+    // Close output stream(s) and update position vector.
+    helper->close();
+
+    return m_remaining;
 }
 
 /**
