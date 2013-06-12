@@ -130,8 +130,6 @@ public class TestParsedStatements extends TestCase {
     }
 
     public void testParsedInStatements() {
-        //These pass if the code in AbstractParsedStmt#parseOperationExpression is removed
-
         runSQLTest("1", "select * from new_order where no_w_id in (5,7);");
         runSQLTest("2", "select * from new_order where no_w_id in (?);");
         runSQLTest("3", "select * from new_order where no_w_id in (?,5,3,?);");
