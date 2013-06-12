@@ -61,6 +61,8 @@ public class CSVLoader {
 
     private static final AtomicLong inCount = new AtomicLong(0);
     private static final AtomicLong outCount = new AtomicLong(0);
+    private static final AtomicLong totalLineCount = new AtomicLong(0);
+    private static final AtomicLong totalRowCount = new AtomicLong(0);
     private static final int reportEveryNRows = 10000;
     private static final int waitSeconds = 10;
     private static CSVConfig config = null;
@@ -80,7 +82,7 @@ public class CSVLoader {
     public static final boolean DEFAULT_STRICT_QUOTES = false;
     public static final int DEFAULT_SKIP_LINES = 0;
     public static final boolean DEFAULT_NO_WHITESPACE = false;
-    public static final int DEFAULT_COLUMN_LIMIT_SIZE = 16*1024*1024;
+    public static final long DEFAULT_COLUMN_LIMIT_SIZE = 16777216;
 
 
     private static Map <VoltType, String> blankValues = new HashMap<VoltType, String>();
@@ -114,7 +116,7 @@ public class CSVLoader {
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 m_log.error( response.getStatusString() );
                 String[] info = { m_rowdata.toString(), response.getStatusString() };
-                synchronizeErrorInfo( info );
+                synchronizeErrorInfo( m_lineNum , info );
                 return;
             }
 
@@ -158,13 +160,13 @@ public class CSVLoader {
         boolean strictquotes = DEFAULT_STRICT_QUOTES;
 
         @Option(desc = "number of lines to skip before inserting rows into the database")
-        int skip = DEFAULT_SKIP_LINES;
+        long skip = DEFAULT_SKIP_LINES;
 
         @Option(desc = "do not allow whitespace between values and separators", hasArg = false)
         boolean nowhitespace = DEFAULT_NO_WHITESPACE;
 
-        @Option(desc = "max size of a column (default: 16*1024*1024(Bytes))")
-        int columnsizelimit = DEFAULT_COLUMN_LIMIT_SIZE;
+        @Option(desc = "max size of a quoted column in bytes(default: 16777216 = 16MB)")
+        long columnsizelimit = DEFAULT_COLUMN_LIMIT_SIZE;
 
         @Option(shortOpt = "s", desc = "list of servers to connect to (default: localhost)")
         String servers = "localhost";
@@ -225,15 +227,18 @@ public class CSVLoader {
         configuration();
         Tokenizer tokenizer = null;
         ICsvListReader listReader = null;
+
         try {
             if (CSVLoader.standin) {
                 tokenizer = new Tokenizer(new BufferedReader( new InputStreamReader(System.in)), csvPreference,
-                                                              config.strictquotes, config.escape, config.columnsizelimit) ;
+                        config.strictquotes, config.escape, config.columnsizelimit,
+                        config.skip) ;
                 listReader = new CsvListReader(tokenizer, csvPreference);
             }
             else {
                 tokenizer = new Tokenizer(new FileReader(config.file), csvPreference,
-                        config.strictquotes, config.escape, config.columnsizelimit) ;
+                        config.strictquotes, config.escape, config.columnsizelimit,
+                        config.skip) ;
                 listReader = new CsvListReader(tokenizer, csvPreference);
             }
         } catch (FileNotFoundException e) {
@@ -291,30 +296,39 @@ public class CSVLoader {
             }
 
             List<String> lineList = new ArrayList<String>();
-            while ((config.limitrows-- > 0) && lineList != null ) {
+
+            while ((config.limitrows-- > 0)) {
                 try{
-                    while( listReader.getLineNumber() < config.skip )
-                        lineList = listReader.read();
+                    //Initial setting of totalLineCount
+                    if( listReader.getLineNumber() == 0  )
+                        totalLineCount.set(cfg.skip);
+                    else
+                        totalLineCount.set( listReader.getLineNumber() );
                     lineList = listReader.read();
-                    if(lineList == null)
+                    //EOF
+                    if(lineList == null) {
+                        if( totalLineCount.get() > listReader.getLineNumber() )
+                            totalLineCount.set( listReader.getLineNumber() );
                         break;
-                    outCount.incrementAndGet();
+                    }
+                    totalRowCount.getAndIncrement();
                     boolean queued = false;
                     while (queued == false) {
-                        Object[] correctedLine = lineList.toArray();
-                        cb = new MyCallback(outCount.get(), config,
+                        String[] correctedLine = lineList.toArray(new String[0]);
+                        cb = new MyCallback(totalLineCount.get()+1, config,
                                 lineList);
                         String lineCheckResult;
 
                         if ((lineCheckResult = checkparams_trimspace(correctedLine,
                                 columnCnt)) != null) {
                             String[] info = { lineList.toString(), lineCheckResult };
-                            synchronizeErrorInfo( info );
+                            synchronizeErrorInfo( totalLineCount.get()+1, info );
                             break;
                         }
 
                         queued = csvClient.callProcedure(cb, insertProcedure,
                                 (Object[]) correctedLine);
+                        outCount.incrementAndGet();
 
                         if (queued == false) {
                             ++waits;
@@ -328,9 +342,9 @@ public class CSVLoader {
                 }
                 catch (SuperCsvException e){
                     //Catch rows that can not be read by superCSV listReader. E.g. items without quotes when strictquotes is enabled.
-                    outCount.incrementAndGet();
+                    totalRowCount.getAndIncrement();
                     String[] info = { e.getMessage(), "" };
-                    synchronizeErrorInfo( info );
+                    synchronizeErrorInfo( totalLineCount.get()+1, info );
                 }
             }
             csvClient.drain();
@@ -354,10 +368,10 @@ public class CSVLoader {
         csvClient.close();
     }
 
-    private static void synchronizeErrorInfo( String[] info ) throws IOException, InterruptedException {
+    private static void synchronizeErrorInfo( long errLineNum, String[] info ) throws IOException, InterruptedException {
         synchronized (errorInfo) {
-            if (!errorInfo.containsKey(outCount.get())) {
-                errorInfo.put(outCount.get(), info);
+            if (!errorInfo.containsKey(errLineNum)) {
+                errorInfo.put(errLineNum, info);
             }
             if (errorInfo.size() >= config.maxerrors) {
                 m_log.error("The number of Failure row data exceeds "
@@ -369,36 +383,35 @@ public class CSVLoader {
         }
     }
 
-    private static String checkparams_trimspace(Object[] slot, int columnCnt) {
+    private static String checkparams_trimspace(String[] slot, int columnCnt) {
         if (slot.length != columnCnt) {
             return "Error: Incorrect number of columns. " + slot.length
                     + " found, " + columnCnt + " expected.";
         }
         for (int i = 0; i < slot.length; i++) {
-            Object thisSlot = slot[i];
             //supercsv read "" to null
-            if( thisSlot == null )
+            if( slot[i] == null )
             {
                 if(config.blank.equalsIgnoreCase("error"))
                     return "Error: blank item";
                 else if (config.blank.equalsIgnoreCase("empty"))
-                    thisSlot = blankValues.get(typeList.get(i));
+                    slot[i] = blankValues.get(typeList.get(i));
               //else config.blank == null which is already the case
             }
 
             // trim white space in this line. SuperCSV preserves all the whitespace by default
             else {
-                String str = thisSlot.toString();
                 if( config.nowhitespace &&
-                        ( str.charAt(0) == ' ' || str.charAt( str.length() - 1 ) == ' ') ) {
+                        ( slot[i].charAt(0) == ' ' || slot[i].charAt( slot[i].length() - 1 ) == ' ') ) {
                     return "Error: White Space Detected in nowhitespace mode.";
                 }
                 else
-                    thisSlot = ((String) thisSlot).trim();
+                    slot[i] = ((String) slot[i]).trim();
                 // treat NULL, \N and "\N" as actual null value
-                if ( thisSlot.equals("NULL") || thisSlot.equals(VoltTable.CSV_NULL) ||
-                        !config.strictquotes && thisSlot.equals(VoltTable.QUOTED_CSV_NULL))
-                    thisSlot = null;
+                if ( slot[i].equals("NULL") ||
+                        slot[i].equals(VoltTable.CSV_NULL) ||
+                        slot[i].equals(VoltTable.QUOTED_CSV_NULL) )
+                    slot[i] = null;
             }
         }
         return null;
@@ -481,8 +494,21 @@ public class CSVLoader {
             float elapsedTimeSec = latency / 1000F;
             out_reportfile.write("csvloader elaspsed: " + elapsedTimeSec
                     + " seconds\n");
-            out_reportfile.write("Number of rows read from input: "
-                    + outCount.get() + "\n");
+            long trueSkip = 0;
+            //get the actuall number of lines skipped
+            if( config.skip < totalLineCount.get() )
+                trueSkip = config.skip;
+            else
+                trueSkip = totalLineCount.get();
+            out_reportfile.write("Number of input lines skipped: "
+                    + trueSkip + "\n");
+            out_reportfile.write("Number of lines read from input: "
+                    + (totalLineCount.get() - trueSkip) + "\n");
+            if( config.limitrows == -1 ) {
+                out_reportfile.write("Input stopped after "+ totalRowCount.get() +" rows read"+"\n");
+            }
+            out_reportfile.write("Number of rows discovered: "
+                    + totalRowCount.get() + "\n");
             out_reportfile.write("Number of rows successfully inserted: "
                     + inCount.get() + "\n");
             // if prompted msg changed, change it also for test case
