@@ -29,6 +29,9 @@ public class LatencyBucketSet {
     /** */
     public long buckets[];
 
+    public int maxNumberOfBins = 10;
+    public long maxBinHeight = 80;
+
     public LatencyBucketSet(int msPerBucket, int numberOfBuckets) {
         this.msPerBucket = msPerBucket;
         this.numberOfBuckets = numberOfBuckets;
@@ -151,6 +154,30 @@ public class LatencyBucketSet {
             else {
                 sb.append(", ");
             }
+        }
+        return sb.toString();
+    }
+
+    public String latencyHistoReport(int upper) {
+        StringBuilder sb = new StringBuilder();
+
+        int numberOfBucketsPerBin = (upper <= maxNumberOfBins * msPerBucket * 1.2) ? 1 :
+                                        (int)Math.ceil((double) upper / (double) maxNumberOfBins / (double) msPerBucket);
+        int binWidth = numberOfBucketsPerBin * msPerBucket;
+        int numberOfBins = (int)Math.ceil(upper / binWidth);
+
+        for(int i = 0; i < numberOfBins; i++) {
+            sb.append(String.format("%1$-4s - %2$-4sms: [", i * numberOfBucketsPerBin * msPerBucket,
+                        (i * numberOfBucketsPerBin + numberOfBucketsPerBin) * msPerBucket));
+            long size = 0;
+            for (int j = 0; j < numberOfBucketsPerBin; j++) {
+                size += buckets[i * numberOfBucketsPerBin + j];
+            }
+            int binHeight = (int)Math.ceil(size * maxBinHeight / totalTxns);
+            for (int j = 0; j < binHeight; j++) {
+                sb.append("|");
+            }
+            sb.append(String.format("]%7.3f%%\n", (double)size / (double)totalTxns * 100));
         }
         return sb.toString();
     }

@@ -89,8 +89,7 @@ function async-benchmark() {
         --entropy=127 \
         --usecompression=false \
         --ratelimit=100000 \
-        --autotune=true \
-        --latencytarget=6
+        --latencyreport=true
 }
 
 # Multi-threaded synchronous benchmark sample

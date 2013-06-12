@@ -93,8 +93,7 @@ function async-benchmark() {
         --contestants=6 \
         --maxvotes=2 \
         --ratelimit=100000 \
-        --autotune=false \
-        --latencytarget=6
+        --latencyreport=true
 }
 
 function simple-benchmark() {
