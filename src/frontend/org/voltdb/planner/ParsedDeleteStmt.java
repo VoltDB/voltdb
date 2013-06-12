@@ -39,16 +39,7 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
 
     @Override
     void parse(VoltXMLElement stmtNode) {
-        String tableName = stmtNode.attributes.get("table");
-        assert(tableName != null);
-        tableName = tableName.trim();
-        Table table = getTableFromDB(tableName);
-        tableList.add(table);
-
-        for (VoltXMLElement child : stmtNode.children) {
-            if (child.name.equalsIgnoreCase("condition"))
-                parseCondition(child);
-        }
+        assert(tableList.size() == 1);
     }
 
 }

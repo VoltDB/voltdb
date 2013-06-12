@@ -17,6 +17,7 @@
 package org.voltdb.compiler;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -80,6 +81,28 @@ public class ClusterConfig
 
         // increase host count
         topo.put("hostcount", config.getHostCount() + newHosts);
+    }
+
+    /**
+     * Add new partitions to the topology.
+     * @param topo          The topology that will be added to.
+     * @param partToHost    A map of new partitions to their corresponding replica host IDs.
+     * @throws JSONException
+     */
+    public static void addPartitions(JSONObject topo, Map<Integer, Collection<Integer>> partToHost)
+        throws JSONException
+    {
+        JSONArray partitions = topo.getJSONArray("partitions");
+        for (Map.Entry<Integer, Collection<Integer>> e : partToHost.entrySet()) {
+            int partition = e.getKey();
+            Collection<Integer> hosts = e.getValue();
+
+            JSONObject partObj = new JSONObject();
+            partObj.put("partition_id", partition);
+            partObj.put("replicas", hosts);
+
+            partitions.put(partObj);
+        }
     }
 
     public ClusterConfig(int hostCount, int sitesPerHost, int replicationFactor)

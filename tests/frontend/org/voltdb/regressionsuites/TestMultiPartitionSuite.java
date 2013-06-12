@@ -32,6 +32,9 @@ import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.UpdateNewOrder;
 import org.voltdb.client.Client;
+import org.voltdb.client.ProcCallException;
+import org.voltdb_testprocs.regressionsuites.multipartitionprocs.MispartitionedInsert;
+import org.voltdb_testprocs.regressionsuites.multipartitionprocs.MispartitionedUpdate;
 import org.voltdb_testprocs.regressionsuites.multipartitionprocs.MultiSiteDelete;
 import org.voltdb_testprocs.regressionsuites.multipartitionprocs.MultiSiteIndexSelect;
 import org.voltdb_testprocs.regressionsuites.multipartitionprocs.MultiSiteSelect;
@@ -50,7 +53,9 @@ public class TestMultiPartitionSuite extends RegressionSuite {
         MultiSiteSelect.class,
         MultiSiteSelectDuped.class,
         MultiSiteIndexSelect.class,
-        MultiSiteDelete.class, UpdateNewOrder.class
+        MultiSiteDelete.class, UpdateNewOrder.class,
+        MispartitionedInsert.class,
+        MispartitionedUpdate.class
     };
 
     /**
@@ -205,6 +210,51 @@ public class TestMultiPartitionSuite extends RegressionSuite {
             assertTrue(false);
         }
         assertTrue(true);
+    }
+
+    public void testWrongPartitioning() throws IOException, ProcCallException {
+        // Restrict to clustered tests (configured with > 1 partition)
+        LocalCluster config = (LocalCluster)this.getServerConfig();
+        int sites = config.m_siteCount;
+        int nodes = config.m_hostCount;
+        int k = config.m_kfactor;
+        int parts = (nodes * sites) / (k + 1);
+        if (parts == 1) {
+            return;
+        }
+
+        Client client = getClient();
+
+        // test mispartitioned insert
+        try {
+            client.callProcedure(MispartitionedInsert.class.getSimpleName(), 0);
+            fail();
+        }
+        catch (Exception e) {
+            System.err.println("==========");
+            System.err.println("Following stacktrace is expected:");
+            e.printStackTrace();
+            System.err.println("==========");
+
+            // check for the expected error
+            assertTrue(e.getMessage().contains("Mispartitioned tuple"));
+        }
+
+        // test mispartitioned update
+        client.callProcedure("NEW_ORDER.insert", 0, 0, 0);
+        try {
+            client.callProcedure(MispartitionedUpdate.class.getSimpleName(), 0);
+            fail();
+        }
+        catch (Exception e) {
+            System.err.println("==========");
+            System.err.println("Following stacktrace is expected:");
+            e.printStackTrace();
+            System.err.println("==========");
+
+            // check for the expected error
+            assertTrue(e.getMessage().contains("An update to a partitioning column"));
+        }
     }
 
     /**

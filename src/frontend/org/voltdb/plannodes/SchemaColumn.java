@@ -33,12 +33,8 @@ import org.voltdb.expressions.TupleValueExpression;
 public class SchemaColumn
 {
     public enum Members {
-        TABLE_NAME,
         COLUMN_NAME,
-        COLUMN_ALIAS,
         EXPRESSION,
-        TYPE,
-        SIZE;
     }
 
     /**
@@ -60,14 +56,7 @@ public class SchemaColumn
         m_tableName = tableName;
         m_columnName = columnName;
         m_columnAlias = columnAlias;
-        try
-        {
-            m_expression = (AbstractExpression) expression.clone();
-        }
-        catch (CloneNotSupportedException e)
-        {
-            throw new RuntimeException(e.getMessage());
-        }
+        m_expression = (AbstractExpression) expression.clone();
     }
 
     /**
@@ -89,14 +78,7 @@ public class SchemaColumn
         TupleValueExpression new_exp = null;
         if (m_expression instanceof TupleValueExpression)
         {
-            try
-            {
-                new_exp = (TupleValueExpression) m_expression.clone();
-            }
-            catch (CloneNotSupportedException e)
-            {
-                throw new RuntimeException(e.getMessage());
-            }
+            new_exp = (TupleValueExpression) m_expression.clone();
         }
         else
         {
@@ -201,14 +183,6 @@ public class SchemaColumn
     public void toJSONString(JSONStringer stringer) throws JSONException
     {
         stringer.object();
-        if (getTableName() != null) {
-            stringer.key(Members.TABLE_NAME.name()).value(getTableName());
-        }
-        else
-        {
-            stringer.key(Members.TABLE_NAME.name()).value("");
-        }
-
         // Tell the EE that the column name is either a valid column
         // alias or the original column name if no alias exists.  This is a
         // bit hacky, but it's the easiest way for the EE to generate
@@ -226,14 +200,6 @@ public class SchemaColumn
             stringer.key(Members.COLUMN_NAME.name()).value("");
         }
 
-        if (getColumnAlias() != null) {
-            stringer.key(Members.COLUMN_ALIAS.name()).value(getColumnAlias());
-        }
-        else
-        {
-            stringer.key(Members.COLUMN_ALIAS.name()).value("");
-        }
-
         if (m_expression != null) {
             stringer.key(Members.EXPRESSION.name());
             stringer.object();
@@ -244,8 +210,6 @@ public class SchemaColumn
         {
             stringer.key(Members.EXPRESSION.name()).value("");
         }
-        stringer.key(Members.TYPE.name()).value(getType().name());
-        stringer.key(Members.SIZE.name()).value(getSize());
 
         stringer.endObject();
     }
@@ -255,14 +219,8 @@ public class SchemaColumn
         String columnName = "";
         String columnAlias = "";
         AbstractExpression expression = null;
-        if( !jobj.isNull( Members.TABLE_NAME.name() ) ) {
-            tableName = jobj.getString( Members.TABLE_NAME.name() );
-        }
         if( !jobj.isNull( Members.COLUMN_NAME.name() ) ){
             columnName = jobj.getString( Members.COLUMN_NAME.name() );
-        }
-        if( !jobj.isNull( Members.COLUMN_ALIAS.name() ) ){
-            columnAlias = jobj.getString( Members.COLUMN_ALIAS.name() );
         }
         if( !jobj.isNull( Members.EXPRESSION.name() ) ) {
             expression = AbstractExpression.fromJSONObject( jobj.getJSONObject( Members.EXPRESSION.name() ), db);

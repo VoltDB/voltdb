@@ -21,7 +21,6 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
-import org.voltdb.planner.PlanStatistics;
 import org.voltdb.types.PlanNodeType;
 
 public class TableCountPlanNode extends AbstractScanPlanNode {
@@ -33,6 +32,7 @@ public class TableCountPlanNode extends AbstractScanPlanNode {
     public TableCountPlanNode(AbstractScanPlanNode child, AggregatePlanNode apn) {
         super();
         m_outputSchema = apn.getOutputSchema().clone();
+        m_hasSignificantOutputSchema = true;
         m_estimatedOutputTupleCount = 1;
         m_targetTableAlias = child.getTargetTableAlias();
         m_targetTableName = child.getTargetTableName();
@@ -51,11 +51,8 @@ public class TableCountPlanNode extends AbstractScanPlanNode {
     public void resolveColumnIndexes(){}
 
     @Override
-    public void computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
-//        Table target = db.getTables().getIgnoreCase(m_targetTableName);
-//        assert(target != null);
-//        DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(target.getTypeName());
-//        stats.incrementStatistic(0, StatsField.TUPLES_READ, tableEstimates.maxTuples);
+    public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+        m_estimatedProcessedTupleCount = 1;
         m_estimatedOutputTupleCount = 1;
     }
 

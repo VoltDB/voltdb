@@ -27,7 +27,7 @@ import org.voltdb.ParameterSet;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.StatsAgent;
-import org.voltdb.SysProcSelector;
+import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
@@ -94,7 +94,7 @@ public class PlannerTool {
                 final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
                 if (statsAgent != null) {
                     m_plannerStats = new PlannerStatsCollector(-1);
-                    statsAgent.registerStatsSource(SysProcSelector.PLANNER, -1, m_plannerStats);
+                    statsAgent.registerStatsSource(StatsSelector.PLANNER, -1, m_plannerStats);
                 }
             }
         }
@@ -204,14 +204,6 @@ public class PlannerTool {
                 (plan.parameters.length > 0))
             {
                 throw new RuntimeException("ERROR: PARAMETERIZATION IN AD HOC QUERY");
-            }
-
-            if (plan.isContentDeterministic() == false) {
-                String potentialErrMsg =
-                    "Statement has a non-deterministic result - statement: \"" +
-                    sql + "\" , reason: " + plan.nondeterminismDetail();
-                // throw new RuntimeException(potentialErrMsg);
-                hostLog.warn(potentialErrMsg);
             }
 
             //////////////////////

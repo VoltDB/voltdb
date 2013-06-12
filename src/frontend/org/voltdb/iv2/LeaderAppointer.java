@@ -56,7 +56,6 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.util.concurrent.MoreExecutors;
 
 /**
  * LeaderAppointer handles centralized appointment of partition leaders across
@@ -274,7 +273,7 @@ public class LeaderAppointer implements Promotable
                         for (String child : children) {
                             int pid = LeaderElector.getPartitionFromElectionDir(child);
                             if (!m_partitionWatchers.containsKey(pid) && pid != MpInitiator.MP_INIT_PID) {
-                                watchPartition(pid, MoreExecutors.sameThreadExecutor());
+                                watchPartition(pid, m_es, false);
                             }
                         }
                         tmLog.info("Done " + m_partitionWatchers.keySet());
@@ -348,7 +347,7 @@ public class LeaderAppointer implements Promotable
                 final int initialPartitionCount = getInitialPartitionCount();
                 for (int i = 0; i < initialPartitionCount; i++) {
                     addPartitionZKNode(m_zk, i);
-                    watchPartition(i, m_es);
+                    watchPartition(i, m_es, true);
                 }
             } catch (IllegalAccessException e) {
                 // This should never happen
@@ -410,19 +409,25 @@ public class LeaderAppointer implements Promotable
      *
      * @param pid The partition ID
      * @param es The executor service to use to construct the baby sitter
+     * @param shouldBlock Whether or not to wait for the initial read of children
      * @throws KeeperException
      * @throws InterruptedException
      * @throws ExecutionException
      */
-    void watchPartition(int pid, ExecutorService es) throws InterruptedException,
-            ExecutionException
+    void watchPartition(int pid, ExecutorService es, boolean shouldBlock)
+        throws InterruptedException, ExecutionException
     {
-        tmLog.info("Start watching partition " + pid);
         String dir = LeaderElector.electionDirForPartition(pid);
         m_callbacks.put(pid, new PartitionCallback(pid));
-        Pair<BabySitter, List<String>> sitterstuff = BabySitter.blockingFactory(m_zk,
-                dir, m_callbacks.get(pid), es);
-        m_partitionWatchers.put(pid, sitterstuff.getFirst());
+        BabySitter babySitter;
+
+        if (shouldBlock) {
+            babySitter = BabySitter.blockingFactory(m_zk, dir, m_callbacks.get(pid), es).getFirst();
+        } else {
+            babySitter = BabySitter.nonblockingFactory(m_zk, dir, m_callbacks.get(pid), es);
+        }
+
+        m_partitionWatchers.put(pid, babySitter);
     }
 
     private long assignLeader(int partitionId, List<Long> children)

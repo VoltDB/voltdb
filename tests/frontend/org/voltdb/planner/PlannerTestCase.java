@@ -28,10 +28,7 @@ import java.util.List;
 
 import junit.framework.TestCase;
 
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.plannodes.AbstractPlanNode;
 
@@ -81,8 +78,33 @@ public class PlannerTestCase extends TestCase {
         return cp;
     }
 
+    final int paramCount = 0;
+    String noJoinOrder = null;
+    /** A helper here where the junit test can assert success */
+    protected List<AbstractPlanNode> compileSinglePartitionToFragments(String sql)
+    {
+        boolean planForSinglePartitionTrue = true;
+        return compileWithJoinOrderToFragments(sql, planForSinglePartitionTrue, noJoinOrder);
+    }
+
     /** A helper here where the junit test can assert success */
     protected List<AbstractPlanNode> compileToFragments(String sql)
+    {
+        boolean planForSinglePartitionFalse = false;
+        return compileWithJoinOrderToFragments(sql, planForSinglePartitionFalse, noJoinOrder);
+    }
+
+    /** A helper here where the junit test can assert success */
+    protected List<AbstractPlanNode> compileWithJoinOrderToFragments(String sql, String joinOrder)
+    {
+        boolean planForSinglePartitionFalse = false;
+        return compileWithJoinOrderToFragments(sql, planForSinglePartitionFalse, joinOrder);
+    }
+
+    /** A helper here where the junit test can assert success */
+    private List<AbstractPlanNode> compileWithJoinOrderToFragments(String sql,
+                                                                   boolean planForSinglePartition,
+                                                                   String joinOrder)
     {
         int paramCount = 0;
         for (int ii = 0; ii < sql.length(); ii++) {
@@ -91,21 +113,15 @@ public class PlannerTestCase extends TestCase {
                 paramCount++;
             }
         }
-        boolean planForSinglePartitionFalse = false;
-        return compileWithJoinOrderToFragments(sql, paramCount, planForSinglePartitionFalse, null);
+        return compileWithJoinOrderToFragments(sql, paramCount, planForSinglePartition, joinOrder);
     }
 
     /** A helper here where the junit test can assert success */
-    protected List<AbstractPlanNode> compileWithJoinOrderToFragments(String sql, int paramCount, boolean planForSinglePartition, String joinOrder)
+    private List<AbstractPlanNode> compileWithJoinOrderToFragments(String sql, int paramCount,
+                                                                   boolean planForSinglePartition,
+                                                                   String joinOrder)
     {
-        List<AbstractPlanNode> pn = null;
-        try {
-            pn = m_aide.compile(sql, paramCount, planForSinglePartition, joinOrder);
-        }
-        catch (Exception ex) {
-            ex.printStackTrace();
-            fail();
-        }
+        List<AbstractPlanNode> pn = m_aide.compile(sql, paramCount, planForSinglePartition, joinOrder);
         assertTrue(pn != null);
         assertFalse(pn.isEmpty());
         if (planForSinglePartition) {
@@ -115,6 +131,24 @@ public class PlannerTestCase extends TestCase {
     }
 
     protected AbstractPlanNode compileWithJoinOrder(String sql, String joinOrder)
+    {
+        try {
+            return compileWithCountedParamsAndJoinOrder(sql, joinOrder);
+        }
+        catch (Exception ex) {
+            ex.printStackTrace();
+            fail();
+            return null;
+        }
+    }
+
+    protected AbstractPlanNode compileWithInvalidJoinOrder(String sql, String joinOrder) throws Exception
+    {
+        return compileWithCountedParamsAndJoinOrder(sql, joinOrder);
+    }
+
+
+    private AbstractPlanNode compileWithCountedParamsAndJoinOrder(String sql, String joinOrder) throws Exception
     {
         int paramCount = 0;
         for (int ii = 0; ii < sql.length(); ii++) {
@@ -126,18 +160,11 @@ public class PlannerTestCase extends TestCase {
         return compileWithJoinOrder(sql, paramCount, joinOrder);
     }
 
-
     /** A helper here where the junit test can assert success */
-    protected AbstractPlanNode compileWithJoinOrder(String sql, int paramCount, String joinOrder)
+    private AbstractPlanNode compileWithJoinOrder(String sql, int paramCount, String joinOrder) throws Exception
     {
-        List<AbstractPlanNode> pn = null;
-        try {
-            pn = compileWithJoinOrderToFragments(sql, paramCount, m_byDefaultPlanForSinglePartition, joinOrder);
-        }
-        catch (Exception ex) {
-            ex.printStackTrace();
-            fail();
-        }
+        List<AbstractPlanNode> pn = compileWithJoinOrderToFragments(sql, paramCount,
+                                                                    m_byDefaultPlanForSinglePartition, joinOrder);
         assertTrue(pn != null);
         assertFalse(pn.isEmpty());
         assertTrue(pn.get(0) != null);
@@ -180,45 +207,8 @@ public class PlannerTestCase extends TestCase {
         m_byDefaultPlanForSinglePartition = planForSinglePartition;
     }
 
-    protected void forceReplication()
-    {
-        // Set all tables to non-replicated.
-        Cluster cluster = m_aide.getCatalog().getClusters().get("cluster");
-        CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
-        for (Table t : tmap) {
-            // t.setIsreplicated(true);
-            assertTrue(t.getIsreplicated());
-        }
-    }
-
-    protected void forceReplicationExceptForOneTable(String table, String column)
-    {
-        // Set all tables to non-replicated.
-        Cluster cluster = m_aide.getCatalog().getClusters().get("cluster");
-        CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
-        for (Table t : tmap) {
-            assertTrue(t.getIsreplicated());
-            if (t.getTypeName().equalsIgnoreCase(table)) {
-                t.setIsreplicated(false);
-                t.setPartitioncolumn(t.getColumns().get(column));
-            }
-        }
-    }
-
-    // TODO: Phase out this functionality, possibly by phasing out PlannerTestAideDeCamp in favor
-    // of some other utility class -- one that supports inline PARTITION statements in the DDL.
-    // It really is a hack because it creates an otherwise unlikely condition of
-    // partitioned tables with no identified partitioning column.
-    protected void forceHackPartitioning() {
-        // Set all tables to non-replicated.
-        Cluster cluster = m_aide.getCatalog().getClusters().get("cluster");
-        CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
-        for (Table t : tmap) {
-            t.setIsreplicated(false);
-        }
-    }
-
     Database getDatabase() {
         return m_aide.getDatabase();
     }
+
 }

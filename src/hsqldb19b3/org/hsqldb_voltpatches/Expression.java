@@ -66,7 +66,9 @@
 
 package org.hsqldb_voltpatches;
 
+import java.lang.reflect.Field;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Vector;
@@ -1447,7 +1449,7 @@ public class Expression {
     static {
         prototypes.put(OpTypes.VALUE,         new VoltXMLElement("value")); // constant value
         prototypes.put(OpTypes.COLUMN,        new VoltXMLElement("columnref")); // reference
-        prototypes.put(OpTypes.COALESCE,      null); // MAY require ExpressionColumn state
+        prototypes.put(OpTypes.COALESCE,      new VoltXMLElement("columnref")); // for now, another reference form?
         prototypes.put(OpTypes.DEFAULT,       new VoltXMLElement("columnref")); // uninteresting!? ExpressionColumn
         prototypes.put(OpTypes.SIMPLE_COLUMN, (new VoltXMLElement("simplecolumn")));
 
@@ -1459,8 +1461,8 @@ public class Expression {
         prototypes.put(OpTypes.SCALAR_SUBQUERY,null); // not yet supported subquery feature, query based row/table
         prototypes.put(OpTypes.ROW_SUBQUERY,  null); // not yet supported subquery feature
         prototypes.put(OpTypes.TABLE_SUBQUERY,null); // not yet supported subquery feature
-        prototypes.put(OpTypes.ROW,           null); // not yet supported subquery feature    // rows
-        prototypes.put(OpTypes.TABLE,         null); // not yet supported subquery feature
+        prototypes.put(OpTypes.ROW,           new VoltXMLElement("row")); // rows
+        prototypes.put(OpTypes.TABLE,         new VoltXMLElement("table")); // not yet supported subquery feature, but needed for "in"
         prototypes.put(OpTypes.FUNCTION,      null); // not used (HSQL user-defined functions).
         prototypes.put(OpTypes.SQL_FUNCTION,  new VoltXMLElement("function"));
         prototypes.put(OpTypes.ROUTINE_FUNCTION, null); // not used
@@ -1654,6 +1656,7 @@ public class Expression {
             return exp;
 
         case OpTypes.COLUMN:
+        case OpTypes.COALESCE:
             ExpressionColumn ec = (ExpressionColumn)this;
             return ec.voltAnnotateColumnXML(exp);
 
@@ -1720,8 +1723,8 @@ public class Expression {
     {
         String opAsString;
         switch (exprOp) {
-        case OpTypes.COALESCE:
-            opAsString = "the COALESCE operator. Consider using DECODE."; break; //MAY require ExpressionColumn state
+        //case OpTypes.COALESCE:
+        //    opAsString = "the COALESCE operator. Consider using DECODE."; break; //MAY require ExpressionColumn state
 
         case OpTypes.VARIABLE:
             opAsString = "HSQL session variables"; break; // Some kind of HSQL session parameter? --paul
@@ -1775,6 +1778,44 @@ public class Expression {
             opAsString = " the unknown operator with numeric code (" + String.valueOf(exprOp) + ")";
         }
         throw new HSQLParseException("VoltDB does not support " + opAsString);
+    }
+
+    /**
+     * VoltDB added method to simplify an expression by eliminating identical subexpressions (same id)
+     * The original expression must be a logical conjunction of form e1 AND e2 AND e3 AND e4.
+     * If subexpression e1 is identical to the subexpression e2 the simplified expression would be
+     * e1 AND e3 AND e4.
+     * @param session The current Session object may be needed to resolve
+     * some names.
+     * @return simplified expression.
+     * @throws HSQLParseException
+     */
+    public Expression eliminateDuplicates(final Session session) {
+        // First build the map of child expressions joined by the logical AND
+        // The key is the expression id and the value is the expression itself
+        Map<String, Expression> subExprMap = new HashMap<String, Expression>();
+        extractAndSubExpressions(session, this, subExprMap);
+        // Reconstruct the expression
+        if (!subExprMap.isEmpty()) {
+            Iterator<Map.Entry<String, Expression>> itExpr = subExprMap.entrySet().iterator();
+            Expression finalExpr = itExpr.next().getValue();
+            while (itExpr.hasNext()) {
+                finalExpr = new ExpressionLogical(OpTypes.AND, finalExpr, itExpr.next().getValue());
+            }
+            return finalExpr;
+        }
+        return this;
+    }
+
+    protected void extractAndSubExpressions(final Session session, Expression expr, Map<String, Expression> subExprMap) {
+        // If it is a logical expression AND then traverse down the tree
+        if (expr instanceof ExpressionLogical && ((ExpressionLogical) expr).opType == OpTypes.AND) {
+            extractAndSubExpressions(session, expr.nodes[LEFT], subExprMap);
+            extractAndSubExpressions(session, expr.nodes[RIGHT], subExprMap);
+        } else {
+            String id = expr.getUniqueId(session);
+            subExprMap.put(id, expr);
+       }
     }
 
     protected String cached_id = null;
@@ -1852,5 +1893,41 @@ public class Expression {
             array_element.setAttributesAsColumn(column, false);
 
         }
+    }
+
+    /**
+     * This ugly code is never called by HSQL or VoltDB
+     * explicitly, but it does make debugging in eclipse
+     * easier because it makes expressions display their
+     * type when you mouse over them.
+     */
+    @Override
+    public String toString() {
+        String type = null;
+
+        // iterate through all optypes, looking for
+        // a match...
+        // sadly do this with reflection
+        Field[] fields = OpTypes.class.getFields();
+        for (Field f : fields) {
+            if (f.getType() != int.class) continue;
+            int value = 0;
+            try {
+                value = f.getInt(null);
+            } catch (Exception e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+
+            // found a match
+            if (value == opType) {
+                type = f.getName();
+                break;
+            }
+        }
+        assert(type != null);
+
+        // return the original default impl + the type
+        return super.toString() + ": " + type;
     }
 }

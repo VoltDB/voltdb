@@ -23,9 +23,11 @@
 
 package txnIdSelfCheck.procedures;
 
+import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
 public class PoisonBaseProc extends VoltProcedure {
+    final SQLStmt insert = new SQLStmt("insert into bigp values (?,?,?);");
 
     public static int SYSTEMDOTEXIT = 0;
     public static int NAVELGAZE = 1;
@@ -36,6 +38,11 @@ public class PoisonBaseProc extends VoltProcedure {
 
     protected long poisonTheWell(int toxinType)
     {
+        // make sure it gets logged to the command log
+        try {
+            Thread.sleep(10 * 1000);
+        } catch (InterruptedException ignoreIt) {}
+
         if (toxinType == SYSTEMDOTEXIT) {
             System.exit(37);
         }

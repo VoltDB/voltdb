@@ -20,6 +20,7 @@ package org.voltdb.jni;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,13 +28,13 @@ import java.util.Map.Entry;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool;
 import org.voltdb.ExecutionSite;
 import org.voltdb.FragmentPlanSource;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.StatsAgent;
-import org.voltdb.SysProcSelector;
+import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
@@ -41,7 +42,9 @@ import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.VoltTableUtil;
 
 /**
  * Wrapper for native Execution Engine library. There are two implementations,
@@ -110,7 +113,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
         if (statsAgent != null) {
             m_plannerStats = new PlannerStatsCollector(siteId);
-            statsAgent.registerStatsSource(SysProcSelector.PLANNER, siteId, m_plannerStats);
+            statsAgent.registerStatsSource(StatsSelector.PLANNER, siteId, m_plannerStats);
         }
         m_planSource = planSource;
     }
@@ -182,7 +185,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                 // to avoid any changes to the WorkUnit's list. But do not
                 // copy the table data.
                 final ArrayDeque<VoltTable> deque = new ArrayDeque<VoltTable>();
-                deque.addAll(e.getValue());
+                for (VoltTable depTable : e.getValue()) {
+                    // A joining node will respond with a table that has this status code
+                    if (depTable.getStatusCode() != VoltTableUtil.NULL_DEPENDENCY_STATUS) {
+                        deque.add(depTable);
+                    }
+                }
                 // intentionally overwrite the previous dependency id.
                 // would a lookup and a clear() be faster?
                 m_depsById.put(e.getKey(), deque);
@@ -306,16 +314,17 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Interface frontend invokes to communicate to CPP execution engine.
      */
 
-    abstract public boolean activateTableStream(final int tableId, TableStreamType type);
+    abstract public boolean activateTableStream(final int tableId, TableStreamType type, SnapshotPredicates predicates);
 
     /**
      * Serialize more tuples from the specified table that already has a stream enabled
-     * @param c Buffer to serialize tuple data too
      * @param tableId Catalog ID of the table to serialize
+     * @param outputBuffers Buffers to receive serialized tuple data
      * @return A positive number indicating the number of bytes serialized or 0 if there is no more data.
      *        -1 is returned if there is an error (such as the table not having the specified stream type activated).
      */
-    public abstract int tableStreamSerializeMore(BBContainer c, int tableId, TableStreamType type);
+    public abstract int[] tableStreamSerializeMore(int tableId, TableStreamType type,
+                                                   List<DBBPool.BBContainer> outputBuffers);
 
     public abstract void processRecoveryMessage( ByteBuffer buffer, long pointer);
 
@@ -401,7 +410,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @return Array of results tables. An array of length 0 indicates there are no results. null indicates failure.
      */
     abstract public VoltTable[] getStats(
-            SysProcSelector selector,
+            StatsSelector selector,
             int locators[],
             boolean interval,
             Long now);
@@ -668,22 +677,23 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param pointer Pointer to an engine instance
      * @param tableId Catalog ID of the table
      * @param streamType type of stream to activate
+     * @param data serialized predicates
      * @return <code>true</code> on success and <code>false</code> on failure
      */
-    protected native boolean nativeActivateTableStream(long pointer, int tableId, int streamType);
+    protected native boolean nativeActivateTableStream(long pointer, int tableId, int streamType, byte[] data);
 
     /**
      * Serialize more tuples from the specified table that has an active stream of the specified type
      * @param pointer Pointer to an engine instance
-     * @param bufferPointer Buffer to serialize data to
-     * @param offset Offset into the buffer to start serializing to
-     * @param length length of the buffer
      * @param tableId Catalog ID of the table to serialize
      * @param streamType type of stream to pull data from
-     * @return A positive number indicating the number of bytes serialized or 0 if there is no more data.
-     *         -1 is returned if there is an error (such as the table not being COW mode).
+     * @param data Serialized buffer count and array
+     * @return remaining tuple count, 0 when done, or -1 for an error.
+     * array of per-buffer byte counts with an extra leading int that is set to
+     *         the count of unstreamed tuples, 0 when done, or -1 indicating an error
+     *         (such as the table not being COW mode).
      */
-    protected native int nativeTableStreamSerializeMore(long pointer, long bufferPointer, int offset, int length, int tableId, int streamType);
+    protected native long nativeTableStreamSerializeMore(long pointer, int tableId, int streamType, byte[] data);
 
     /**
      * Process a recovery message and load the data it contains.

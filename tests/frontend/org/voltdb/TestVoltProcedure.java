@@ -408,7 +408,7 @@ public class TestVoltProcedure extends TestCase {
         ParameterSet params = ParameterSet.fromArrayNoCopy(1L);
         assertNotNull(agent.m_selector);
         assertNotNull(agent.m_source);
-        assertEquals(agent.m_selector, SysProcSelector.PROCEDURE);
+        assertEquals(agent.m_selector, StatsSelector.PROCEDURE);
         assertEquals(agent.m_catalogId,
                      executionSiteId);
         Object statsRow[][] = agent.m_source.getStatsRows(false, 0L);
@@ -460,11 +460,11 @@ public class TestVoltProcedure extends TestCase {
 
     private class MockStatsAgent extends StatsAgent {
         public StatsSource m_source = null;
-        public SysProcSelector m_selector = null;
+        public StatsSelector m_selector = null;
         public long m_catalogId = 0;
 
         @Override
-        public void registerStatsSource(SysProcSelector selector, long catalogId, StatsSource source) {
+        public void registerStatsSource(StatsSelector selector, long catalogId, StatsSource source) {
             m_source = source;
             m_selector = selector;
             m_catalogId = catalogId;

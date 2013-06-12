@@ -44,6 +44,7 @@
 #include "common/types.h"
 #include "common/value_defs.h"
 #include "utf8.h"
+#include "murmur3/MurmurHash3.h"
 
 namespace voltdb {
 
@@ -277,10 +278,10 @@ class NValue {
         // eliminate the potential NValue copy.
 
     /* Read a ValueType from the SerializeInput stream and deserialize
-       a scalar value of the specified type from the provided
+       a scalar value of the specified type into this NValue from the provided
        SerializeInput and perform allocations as necessary. */
-    static const NValue deserializeFromAllocateForStorage(
-        SerializeInput &input, Pool *dataPool);
+    void deserializeFromAllocateForStorage(SerializeInput &input, Pool *dataPool);
+    void deserializeFromAllocateForStorage(ValueType vt, SerializeInput &input, Pool *dataPool);
 
     /* Serialize this NValue to a SerializeOutput */
     void serializeTo(SerializeOutput &output) const;
@@ -338,6 +339,24 @@ class NValue {
      * This NValue is the value and the rhs is the pattern
      */
     NValue like(const NValue rhs) const;
+
+    //TODO: passing NValue arguments by const reference SHOULD be standard practice
+    // for the dozens of NValue "operator" functions. It saves on needless NValue copies.
+    //TODO: returning bool (vs. NValue getTrue()/getFalse()) SHOULD be standard practice
+    // for NValue "logical operator" functions.
+    // It saves on needless NValue copies and makes unit tests more readable.
+    // Cases that need the NValue -- for some actual purpose other than an immediate call to
+    // "isTrue()" -- are rare and getting rarer as optimizations like short-cut eval are introduced.
+    /**
+     * Return true if this NValue is listed as a member of the IN LIST
+     * represented as an NValueList* value cached in rhsList.
+     */
+    bool inList(NValue const& rhsList) const;
+
+    /*
+     * Out must have space for 16 bytes
+     */
+    void murmurHash3(void *out) const;
 
     /*
      * callConstant, callUnary, and call are templates for arbitrary NValue member functions that implement
@@ -478,6 +497,13 @@ class NValue {
     static const uint16_t kMaxDecScale = 12;
     static const int64_t kMaxScaleFactor = 1000000000000;
 
+    // setArrayElements is a const method since it doesn't actually mutate any NValue state, just
+    // the state of the contained NValues which are referenced via the allocated object storage.
+    // For example, it is not intended to ever "grow the array" which would require the NValue's
+    // object reference (in m_data) to be mutable.
+    // The array size is predetermined in allocateANewNValueList.
+    void setArrayElements(std::vector<NValue> &args) const;
+
   private:
     /*
      * Private methods are private for a reason. Don't expose the raw
@@ -489,6 +515,11 @@ class NValue {
     std::string createStringFromDecimal() const;
     NValue opDivideDecimals(const NValue lhs, const NValue rhs) const;
     NValue opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const;
+
+    // Helpers for inList.
+    // These are purposely not inlines to avoid exposure of NValueList details.
+    void deserializeIntoANewNValueList(SerializeInput &input, Pool *dataPool);
+    void allocateANewNValueList(size_t elementCount, ValueType elementType);
 
     // Promotion Rules. Initialized in NValue.cpp
     static ValueType s_intPromotionTable[];
@@ -1915,6 +1946,13 @@ class NValue {
         return retval;
     }
 
+    static NValue getAllocatedArrayValueFromSizeAndType(size_t elementCount, ValueType elementType)
+    {
+        NValue retval(VALUE_TYPE_ARRAY);
+        retval.allocateANewNValueList(elementCount, elementType);
+        return retval;
+    }
+
     static Pool* getTempStringPool();
 
     static NValue getTempStringValue(const char* value, size_t size) {
@@ -1935,20 +1973,23 @@ class NValue {
 
     static NValue getAllocatedValue(ValueType type, const char* value, size_t size, Pool* stringPool) {
         NValue retval(type);
-        retval.initAllocatedValue(value, (int32_t)size, stringPool);
+        char* storage = retval.allocateValueStorage((int32_t)size, stringPool);
+        ::memcpy(storage, value, (int32_t)size);
         return retval;
     }
 
-    void initAllocatedValue(const char* value, int32_t length, Pool* stringPool) {
+    char* allocateValueStorage(int32_t length, Pool* stringPool)
+    {
         const int8_t lengthLength = getAppropriateObjectLengthLength(length);
         const int32_t minLength = length + lengthLength;
         StringRef* sref = StringRef::create(minLength, stringPool);
         char* storage = sref->get();
         setObjectLengthToLocation(length, storage);
-        ::memcpy( storage + lengthLength, value, length);
+        storage += lengthLength;
         setObjectValue(sref);
         setObjectLength(length);
         setObjectLengthLength(lengthLength);
+        return storage;
     }
 
     static NValue getNullStringValue() {
@@ -1988,6 +2029,7 @@ class NValue {
 inline NValue::NValue() {
     ::memset( m_data, 0, 16);
     setValueType(VALUE_TYPE_INVALID);
+    m_sourceInlined = false;
 }
 
 /**
@@ -2087,6 +2129,7 @@ inline void NValue::free() const {
     {
     case VALUE_TYPE_VARCHAR:
     case VALUE_TYPE_VARBINARY:
+    case VALUE_TYPE_ARRAY:
         {
             assert(!m_sourceInlined);
             StringRef* sref = *reinterpret_cast<StringRef* const*>(m_data);
@@ -2519,27 +2562,33 @@ inline void NValue::deserializeFrom(SerializeInput &input, const ValueType type,
  * provided SerializeInput and perform allocations as necessary.
  * This is used to deserialize parameter sets.
  */
-inline const NValue NValue::deserializeFromAllocateForStorage(SerializeInput &input, Pool *dataPool) {
+inline void NValue::deserializeFromAllocateForStorage(SerializeInput &input, Pool *dataPool)
+{
     const ValueType type = static_cast<ValueType>(input.readByte());
-    NValue retval(type);
+    deserializeFromAllocateForStorage(type, input, dataPool);
+}
+
+inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeInput &input, Pool *dataPool)
+{
+    setValueType(type);
     switch (type) {
       case VALUE_TYPE_BIGINT:
-        retval.getBigInt() = input.readLong();
+        getBigInt() = input.readLong();
         break;
       case VALUE_TYPE_TIMESTAMP:
-        retval.getTimestamp() = input.readLong();
+        getTimestamp() = input.readLong();
         break;
       case VALUE_TYPE_TINYINT:
-        retval.getTinyInt() = input.readByte();
+        getTinyInt() = input.readByte();
         break;
       case VALUE_TYPE_SMALLINT:
-        retval.getSmallInt() = input.readShort();
+        getSmallInt() = input.readShort();
         break;
       case VALUE_TYPE_INTEGER:
-        retval.getInteger() = input.readInt();
+        getInteger() = input.readInt();
         break;
       case VALUE_TYPE_DOUBLE:
-        retval.getDouble() = input.readDouble();
+        getDouble() = input.readDouble();
         break;
       case VALUE_TYPE_VARCHAR:
       case VALUE_TYPE_VARBINARY:
@@ -2547,21 +2596,26 @@ inline const NValue NValue::deserializeFromAllocateForStorage(SerializeInput &in
           const int32_t length = input.readInt();
           // the NULL SQL string is a NULL C pointer
           if (length == OBJECTLENGTH_NULL) {
-              retval.setNull();
+              setNull();
               break;
           }
+          char* storage = allocateValueStorage(length, dataPool);
           const char *str = (const char*) input.getRawPointer(length);
-          retval.initAllocatedValue(str, (size_t)length, dataPool);
+          ::memcpy(storage, str, length);
           break;
       }
       case VALUE_TYPE_DECIMAL: {
-          retval.getDecimal().table[1] = input.readLong();
-          retval.getDecimal().table[0] = input.readLong();
+          getDecimal().table[1] = input.readLong();
+          getDecimal().table[0] = input.readLong();
           break;
 
       }
       case VALUE_TYPE_NULL: {
-          retval.setNull();
+          setNull();
+          break;
+      }
+      case VALUE_TYPE_ARRAY: {
+          deserializeIntoANewNValueList(input, dataPool);
           break;
       }
       default:
@@ -2569,7 +2623,6 @@ inline const NValue NValue::deserializeFromAllocateForStorage(SerializeInput &in
                   "NValue::deserializeFromAllocateForStorage() unrecognized type '%s'",
                   getTypeName(type).c_str());
     }
-    return retval;
 }
 
 /**
@@ -2671,6 +2724,7 @@ inline void NValue::serializeToExport(ExportSerializeOutput &io) const
       case VALUE_TYPE_NULL:
       case VALUE_TYPE_BOOLEAN:
       case VALUE_TYPE_ADDRESS:
+      case VALUE_TYPE_ARRAY:
       case VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC:
           char message[128];
           snprintf(message, sizeof(message), "Invalid type in serializeToExport: %s", getTypeName(getValueType()).c_str());
@@ -3109,6 +3163,30 @@ inline NValue NValue::op_divide(const NValue rhs) const {
     throwDynamicSQLException("Promotion of %s and %s failed in op_divide.",
                getValueTypeString().c_str(),
                rhs.getValueTypeString().c_str());
+}
+
+/*
+ * Out must have storage for 16 bytes
+ */
+inline void NValue::murmurHash3(void * out) const {
+    const ValueType type = getValueType();
+    switch(type) {
+    case VALUE_TYPE_TIMESTAMP:
+    case VALUE_TYPE_DOUBLE:
+    case VALUE_TYPE_BIGINT:
+    case VALUE_TYPE_INTEGER:
+    case VALUE_TYPE_SMALLINT:
+    case VALUE_TYPE_TINYINT:
+        MurmurHash3_x64_128( m_data, 8, 0, out);
+        break;
+    case VALUE_TYPE_VARBINARY:
+    case VALUE_TYPE_VARCHAR:
+        MurmurHash3_x64_128( getObjectValue(), getObjectLength(), 0, out);
+        break;
+    default:
+        throwFatalException("Unknown type for murmur hashing %d", type);
+        break;
+    }
 }
 
 /*

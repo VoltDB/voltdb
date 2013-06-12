@@ -142,6 +142,11 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         } catch (InterruptedException e) {
             VoltDB.crashLocalVoltDB("Interrupted while deserializing a parameter set", false, e);
         } catch (ExecutionException e) {
+            // Don't rethrow Errors as RuntimeExceptions because we will eat their
+            // delicious goodness later
+            if (e.getCause() != null && e.getCause() instanceof Error) {
+                throw (Error)e.getCause();
+            }
             throw new RuntimeException(e);
         }
         return null;
@@ -158,7 +163,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
     /** Read into an serialized parameter buffer to extract a single parameter */
     Object getParameterAtIndex(int partitionIndex) {
         try {
-            return ParameterSet.getParameterAtIndex(partitionIndex, serializedParams);
+            return ParameterSet.getParameterAtIndex(partitionIndex, serializedParams.duplicate());
         }
         catch (IOException ex) {
             throw new RuntimeException("Invalid partitionIndex", ex);

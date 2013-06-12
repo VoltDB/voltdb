@@ -38,7 +38,7 @@ public class NullValueExpression extends AbstractValueExpression {
     }
 
     @Override
-    public Object clone() throws CloneNotSupportedException {
+    public Object clone() {
         NullValueExpression clone = (NullValueExpression)super.clone();
         return clone;
     }

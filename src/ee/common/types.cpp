@@ -40,6 +40,7 @@ bool isNumeric(ValueType type) {
       case (VALUE_TYPE_NULL):
       case (VALUE_TYPE_DECIMAL):   // test assumes castAsBigInt() makes sense if isNumeric()
       case (VALUE_TYPE_INVALID):
+      case (VALUE_TYPE_ARRAY):
         return false;
       default:
           throw exception();
@@ -62,6 +63,7 @@ bool isIntegralType(ValueType type) {
       case (VALUE_TYPE_TIMESTAMP):
       case (VALUE_TYPE_NULL):
       case (VALUE_TYPE_DECIMAL):
+      case (VALUE_TYPE_ARRAY):
         return false;
       default:
           throw exception();
@@ -104,6 +106,7 @@ NValue getRandomValue(ValueType type) {
             return ValueFactory::getBinaryValue(bytes, length);
         }
             break;
+        case VALUE_TYPE_ARRAY:
         default: {
             throwFatalException("Attempted to get a random value of unsupported value type %d", type);
         }
@@ -157,6 +160,9 @@ string getTypeName(ValueType type) {
         case (VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC):
             ret = "numeric";
             break;
+        case (VALUE_TYPE_ARRAY):
+            ret = "array";
+            break;
         default: {
             char buffer[32];
             snprintf(buffer, 32, "UNKNOWN[%d]", type);
@@ -206,6 +212,9 @@ string valueToString(ValueType type)
       case VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC: {
           return "NUMERIC";
       }
+      case VALUE_TYPE_ARRAY: {
+          return "ARRAY";
+      }
       default:
           return "INVALID";
     }
@@ -235,6 +244,8 @@ ValueType stringToValue(string str )
         return VALUE_TYPE_TIMESTAMP;
     } else if (str == "DECIMAL") {
         return VALUE_TYPE_DECIMAL;
+    } else if (str == "ARRAY") {
+        return VALUE_TYPE_ARRAY;
     }
     else {
         throwFatalException( "No conversion from string %s.", str.c_str());
@@ -480,6 +491,9 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_COMPARE_LIKE: {
         return "COMPARE_LIKE";
     }
+    case EXPRESSION_TYPE_COMPARE_IN: {
+        return "COMPARE_IN";
+    }
     case EXPRESSION_TYPE_CONJUNCTION_AND: {
         return "CONJUNCTION_AND";
     }
@@ -522,6 +536,12 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_FUNCTION: {
         return "FUNCTION";
     }
+    case EXPRESSION_TYPE_INLISTBUILDER: {
+        return "INLISTBUILDER";
+    }
+    case EXPRESSION_TYPE_HASH_RANGE: {
+        return "HASH_RANGE";
+    }
     }
     return "INVALID";
 }
@@ -562,6 +582,8 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO;
     } else if (str == "COMPARE_LIKE") {
         return EXPRESSION_TYPE_COMPARE_LIKE;
+    } else if (str == "COMPARE_IN") {
+        return EXPRESSION_TYPE_COMPARE_IN;
     } else if (str == "CONJUNCTION_AND") {
         return EXPRESSION_TYPE_CONJUNCTION_AND;
     } else if (str == "CONJUNCTION_OR") {
@@ -590,6 +612,10 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_AGGREGATE_AVG;
     } else if (str == "FUNCTION") {
         return EXPRESSION_TYPE_FUNCTION;
+    } else if (str == "INLISTBUILDER") {
+        return EXPRESSION_TYPE_INLISTBUILDER;
+    } else if (str == "HASH_RANGE") {
+        return EXPRESSION_TYPE_HASH_RANGE;
     }
 
     return EXPRESSION_TYPE_INVALID;
