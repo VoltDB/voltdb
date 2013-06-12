@@ -598,8 +598,6 @@ public abstract class AbstractParsedStmt {
         // temp guard against self-joins.
         Set<Table> visited = new HashSet<Table>(tableList);
 
-        // temp restriction on number of tables for an outer join statement
-        int tableCount = 0;
         for (VoltXMLElement node : tablesNode.children) {
             if (node.name.equalsIgnoreCase("tablescan")) {
 
@@ -614,11 +612,6 @@ public abstract class AbstractParsedStmt {
 
                 parseTable(node);
                 visited.add(table);
-
-                ++tableCount;
-                if (joinTree.m_hasOuterJoin && tableCount > 2) {
-                    throw new PlanningErrorException("VoltDB does not support outer joins with more than two tables involved");
-                }
             }
         }
     }

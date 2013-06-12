@@ -1356,6 +1356,7 @@ TEST CASES
                 <exclude name="**/Test*Replication*.class" />
                 <exclude name="**/Test*Restore*.class" />
                 <exclude name="**/Test*Snapshot*.class" />
+                <exclude name="**/TestMultipleOuterJoinPlans.class" />
             </fileset>
         </tests>
     </run_junit>
