@@ -21,6 +21,7 @@ import java.io.IOException;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.HashMap;
@@ -179,6 +180,12 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                                      AtomicInteger numTables,
                                      SnapshotRegistry.Snapshot snapshotRecord)
     {
+        // Stores the destination partition ID if it has a source to send the replicated table.
+        // This prevents multiple sites on this host send the same replicated table to the same
+        // destination.
+        // TODO: Remove this once non-blocking elastic join is implemented.
+        Set<Integer> handledPartitionsForReplicatedTable = new HashSet<Integer>();
+
         // srcHSId -> tasks
         Multimap<Long, SnapshotTableTask> tasks = ArrayListMultimap.create();
         for (DataTargetInfo targetInfo : dataTargets) {
@@ -191,6 +198,14 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                 if (predicate != null) {
                     deleteTuples = true;
                 }
+            } else {
+                // If no site on this host is sending the replicated table to the destination
+                // yet, do it. Otherwise, skip this destination for the replicated table.
+                // TODO: Remove this once non-blocking elastic join is implemented.
+                if (handledPartitionsForReplicatedTable.contains(targetInfo.stream.partition)) {
+                    continue;
+                }
+                handledPartitionsForReplicatedTable.add(targetInfo.stream.partition);
             }
 
             final Runnable onClose = new TargetStatsClosure(targetInfo.dataTarget,
