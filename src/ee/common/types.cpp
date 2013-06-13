@@ -385,6 +385,9 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_DISTINCT: {
         return "DISTINCT";
     }
+    case PLAN_NODE_TYPE_MATERIALIZEDSCAN: {
+        return "MATERIALIZEDSCAN";
+    }
     }
     return "INVALID";
 }
@@ -433,6 +436,8 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_LIMIT;
     } else if (str == "DISTINCT") {
         return PLAN_NODE_TYPE_DISTINCT;
+    } else if (str == "MATERIALIZEDSCAN") {
+        return PLAN_NODE_TYPE_MATERIALIZEDSCAN;
     }
     return PLAN_NODE_TYPE_INVALID;
 }
