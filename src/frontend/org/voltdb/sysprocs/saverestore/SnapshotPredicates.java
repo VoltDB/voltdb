@@ -91,7 +91,7 @@ public class SnapshotPredicates {
 
     private byte[] serializeEmpty()
     {
-        assert m_predicates.size() == 0 && m_predicates.get(0) == null;
+        assert m_predicates.size() == 0 || m_predicates.get(0) == null;
 
         ByteBuffer buf = ByteBuffer.allocate(4); // predicate count
 
