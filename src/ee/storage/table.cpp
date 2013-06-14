@@ -395,7 +395,7 @@ void Table::loadTuplesFromNoHeader(SerializeInput &serialize_io,
     //If there is no output supplied it will just throw
     size_t lengthPosition = 0;
     int32_t serializedTupleCount = 0;
-    size_t tupleCountPosition = -1;
+    size_t tupleCountPosition = 0;
     if (uniqueViolationOutput != NULL) {
         lengthPosition = uniqueViolationOutput->reserveBytes(4);
     }
