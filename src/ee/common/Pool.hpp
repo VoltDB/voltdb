@@ -308,10 +308,7 @@ public:
     }
 
     ~Pool() {
-        for (std::size_t ii = 0; ii < m_allocations.size(); ii++) {
-            delete [] m_allocations[ii];
-        }
-        m_allocations.clear();
+        purge();
     }
 
     /*
