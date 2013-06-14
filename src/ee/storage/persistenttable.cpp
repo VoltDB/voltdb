@@ -865,7 +865,10 @@ void PersistentTable::onSetColumns() {
  * to do additional processing for views and Export and non-inline
  * memory tracking
  */
-void PersistentTable::processLoadedTuple(TableTuple &tuple) {
+void PersistentTable::processLoadedTuple(TableTuple &tuple,
+                                         ReferenceSerializeOutput *uniqueViolationOutput,
+                                         int32_t &serializedTupleCount,
+                                         size_t &tupleCountPosition) {
 
     // not null checks at first
     FAIL_IF(!checkNulls(tuple)) {
@@ -873,20 +876,32 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple) {
                                          CONSTRAINT_TYPE_NOT_NULL);
     }
 
+    // Account for non-inlined memory allocated via bulk load or recovery
+    // Do this before unique constraints which might roll back the memory
+    if (m_schema->getUninlinedObjectColumnCount() != 0)
+    {
+        increaseStringMemCount(tuple.getNonInlinedMemorySize());
+    }
+
     if (!tryInsertOnAllIndexes(&tuple)) {
-        throw ConstraintFailureException(this, tuple, TableTuple(),
-                                         CONSTRAINT_TYPE_UNIQUE);
+        if (uniqueViolationOutput) {
+            if (serializedTupleCount == 0) {
+                serializeColumnHeaderTo(*uniqueViolationOutput);
+                tupleCountPosition = uniqueViolationOutput->reserveBytes(sizeof(int32_t));
+            }
+            serializedTupleCount++;
+            tuple.serializeTo(*uniqueViolationOutput);
+            deleteTupleStorage(tuple);
+            return;
+        } else {
+            throw ConstraintFailureException(this, tuple, TableTuple(),
+                                             CONSTRAINT_TYPE_UNIQUE);
+        }
     }
 
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
         m_views[i]->processTupleInsert(tuple, true);
-    }
-
-    // Account for non-inlined memory allocated via bulk load or recovery
-    if (m_schema->getUninlinedObjectColumnCount() != 0)
-    {
-        increaseStringMemCount(tuple.getNonInlinedMemorySize());
     }
 }
 

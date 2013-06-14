@@ -345,7 +345,10 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
      * Implemented by persistent table and called by Table::loadTuplesFrom
      * to do additional processing for views and Export
      */
-    virtual void processLoadedTuple(TableTuple &tuple);
+    virtual void processLoadedTuple(TableTuple &tuple,
+                                    ReferenceSerializeOutput *uniqueViolationOutput,
+                                    int32_t &serializedTupleCount,
+                                    size_t &tupleCountPosition);
 
     TBPtr allocateNextBlock();
 

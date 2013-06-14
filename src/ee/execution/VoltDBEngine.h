@@ -195,7 +195,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         */
         bool loadTable(int32_t tableId,
                        ReferenceSerializeInput &serializeIn,
-                       int64_t spHandle, int64_t lastCommittedSpHandle);
+                       int64_t spHandle, int64_t lastCommittedSpHandle,
+                       bool returnUniqueViolations);
 
         void resetReusedResultOutputBuffer(const size_t headerSize = 0);
         inline ReferenceSerializeOutput* getResultOutputSerializer() { return &m_resultOutput; }
