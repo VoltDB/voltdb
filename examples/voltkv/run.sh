@@ -73,10 +73,14 @@ function async-benchmark-help() {
     java -classpath obj:$APPCLASSPATH:obj voltkv.AsyncBenchmark --help
 }
 
+# latencyreport: default is OFF
+# ratelimit: must be a reasonable value if lantencyreport is ON
 function async-benchmark() {
     srccompile
     java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voltkv.AsyncBenchmark \
+        --latencyreport=true \
+        --ratelimit=100000 \
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
@@ -87,9 +91,7 @@ function async-benchmark() {
         --minvaluesize=1024 \
         --maxvaluesize=1024 \
         --entropy=127 \
-        --usecompression=false \
-        --ratelimit=100000 \
-        --latencyreport=true
+        --usecompression=false
 }
 
 # Multi-threaded synchronous benchmark sample

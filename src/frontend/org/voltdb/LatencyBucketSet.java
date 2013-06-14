@@ -30,7 +30,7 @@ public class LatencyBucketSet {
     public long buckets[];
 
     public int maxNumberOfBins = 10;
-    public long maxBinHeight = 80;
+    public long maxBinHeight = 70;
 
     public LatencyBucketSet(int msPerBucket, int numberOfBuckets) {
         this.msPerBucket = msPerBucket;

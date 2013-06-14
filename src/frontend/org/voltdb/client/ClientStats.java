@@ -446,7 +446,8 @@ public class ClientStats {
     public String latencyHistoReport() {
         StringBuilder sb = new StringBuilder();
 
-        int upper = kPercentileLatency(1);
+        // for now, I believe 3 digit accuracy is enough
+        int upper = kPercentileLatency(0.99999);
         int high = kPercentileLatency(0.99);
 
         if(high <= m_latencyBy1ms.numberOfBuckets * m_latencyBy1ms.msPerBucket){

@@ -408,7 +408,7 @@ public class Benchmark {
         }
 
         System.out.print(HORIZONTAL_RULE);
-        System.out.println("Starting Benchmark");
+        System.out.println(" Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
 
         // create/start the requested number of threads

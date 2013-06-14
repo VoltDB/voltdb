@@ -361,7 +361,6 @@ public class AsyncBenchmark {
             System.out.println(HORIZONTAL_RULE);
             System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", stats.getAverageInternalLatency());
 
-            // TODO: latency histogram
             System.out.print("\n" + HORIZONTAL_RULE);
             System.out.println(" Latency Histogram");
             System.out.println(HORIZONTAL_RULE);
@@ -454,7 +453,7 @@ public class AsyncBenchmark {
         }
 
         System.out.print(HORIZONTAL_RULE);
-        System.out.println("Starting Benchmark");
+        System.out.println(" Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
 
         // Run the benchmark loop for the requested warmup time
