@@ -392,7 +392,7 @@ public class VoltDB {
                     m_startAction = StartAction.LIVE_REJOIN;
                 } else if (arg.equals("live") && args.length > i + 1 && args[++i].trim().equals("rejoin")) {
                     m_startAction = StartAction.LIVE_REJOIN;
-                } else if (arg.startsWith("join")) {
+                } else if (arg.startsWith("add")) {
                     m_startAction = StartAction.JOIN;
                 }
 
