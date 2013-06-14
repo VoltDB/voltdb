@@ -2493,7 +2493,7 @@ TEST_F(NValueTest, TestDedupAndSort) {
     vectorValues.push_back(v4);
     v5 = ValueFactory::getNullStringValue();
     vectorValues.push_back(v5);
-    
+
     arrayValue = ValueFactory::getArrayValueFromSizeAndType(6, VALUE_TYPE_VARCHAR);
     arrayValue.setArrayElements(vectorValues);
 
