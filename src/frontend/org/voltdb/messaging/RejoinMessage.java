@@ -43,8 +43,6 @@ public class RejoinMessage extends VoltMessage {
         REPLAY_FINISHED, // sent from a local site to the coordinator
 
         // Elastic join specific message types
-        PARTITION_SNAPSHOT_INITIATION, // sent from the coordinator to local sites
-        SNAPSHOT_DATA, // sent from the coordinator to local sites
         FIRST_FRAGMENT_RECEIVED, // sent from a local site to the coordinator
     }
 
@@ -55,9 +53,6 @@ public class RejoinMessage extends VoltMessage {
     // number of sinks to create on the site, default is 1, elastic join may use more
     private int m_snapshotSinkCount = 1;
     private Set<Long> m_snapshotSinkHSIds = null;
-    private int m_tableId = -1;
-    private ByteBuffer m_tableBlock = null;
-    private boolean m_shouldWaitForSnapshotCompletion = true;
 
     /** Empty constructor for de-serialization */
     public RejoinMessage() {
@@ -83,7 +78,7 @@ public class RejoinMessage extends VoltMessage {
     public RejoinMessage(long sourceHSId, Type type, String snapshotNonce)
     {
         this(sourceHSId, type);
-        assert(type == Type.INITIATION || type == Type.INITIATION_COMMUNITY || type == Type.PARTITION_SNAPSHOT_INITIATION);
+        assert(type == Type.INITIATION || type == Type.INITIATION_COMMUNITY);
         m_snapshotNonce = snapshotNonce;
     }
 
@@ -114,16 +109,6 @@ public class RejoinMessage extends VoltMessage {
     {
         this(sourceHSId, Type.INITIATION_RESPONSE);
         m_snapshotSinkHSIds = ImmutableSet.copyOf(sinkHSIds);
-    }
-
-    /**
-     * For IV2, tee replicated table blocks from the coordinator to each site's producer
-     */
-    public RejoinMessage(long sourceHSId, int tableId, ByteBuffer tableBlock)
-    {
-        this(sourceHSId, Type.SNAPSHOT_DATA);
-        m_tableId = tableId;
-        m_tableBlock = tableBlock;
     }
 
     public Type getType() {
@@ -159,22 +144,6 @@ public class RejoinMessage extends VoltMessage {
 
     public Set<Long> getSnapshotSinkHSIds() {
         return m_snapshotSinkHSIds;
-    }
-
-    public int getTableId() {
-        return m_tableId;
-    }
-
-    public ByteBuffer getTableBlock() {
-        return m_tableBlock.duplicate();
-    }
-
-    public boolean shouldWaitForSnapshotCompletion() {
-        return m_shouldWaitForSnapshotCompletion;
-    }
-
-    public void setShouldWaitForSnapshotCompletion(boolean shouldWait) {
-        m_shouldWaitForSnapshotCompletion = shouldWait;
     }
 
     @Override
