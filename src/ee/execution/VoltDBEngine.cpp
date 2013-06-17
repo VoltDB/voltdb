@@ -78,7 +78,6 @@
 #include "logging/LogManager.h"
 #include "plannodes/abstractplannode.h"
 #include "plannodes/abstractscannode.h"
-#include "plannodes/nodes.h"
 #include "plannodes/plannodeutil.h"
 #include "plannodes/plannodefragment.h"
 #include "executors/executorutil.h"

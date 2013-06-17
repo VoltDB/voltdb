@@ -200,7 +200,6 @@ enum PlanNodeType {
     //
     PLAN_NODE_TYPE_SEND             = 40,
     PLAN_NODE_TYPE_RECEIVE          = 41,
-    PLAN_NODE_TYPE_PRINT            = 42,
 
     //
     // Misc Nodes

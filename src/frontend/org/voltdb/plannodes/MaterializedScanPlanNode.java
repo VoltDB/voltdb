@@ -25,6 +25,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
 import org.voltdb.types.PlanNodeType;
 
@@ -37,7 +38,8 @@ import org.voltdb.types.PlanNodeType;
  */
 public class MaterializedScanPlanNode extends AbstractPlanNode {
 
-    protected AbstractExpression m_rowData;
+    private AbstractExpression m_tableData;
+    private final TupleValueExpression m_outputExpression = new TupleValueExpression();
 
     public enum Members {
         TABLE_DATA;
@@ -52,19 +54,26 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
         return PlanNodeType.MATERIALIZEDSCAN;
     }
 
-    public void setRowData(AbstractExpression rowData) {
-        assert(rowData instanceof VectorValueExpression);
-        m_rowData = rowData;
+    public void setRowData(AbstractExpression tableData) {
+        assert(tableData instanceof VectorValueExpression);
+        m_tableData = tableData;
+        m_outputExpression.setColumnIndex(0);
+        m_outputExpression.setColumnName("list_element");
+        m_outputExpression.setTableName("materialized_temp_table");
+        m_outputExpression.setValueType(m_tableData.getValueType());
+        m_outputExpression.setValueSize(m_tableData.getValueSize());
     }
 
-    public AbstractExpression getTableData() {
-        return m_rowData;
+    // Extract a TVE for the single column of a MaterializedScan for use as a join key for an IndexScan
+    public AbstractExpression getOutputExpression()
+    {
+        return m_outputExpression;
     }
 
     /**
      * Accessor for flag marking the plan as guaranteeing an identical result/effect
      * when "replayed" against the same database state, such as during replication or CL recovery.
-     * @return false
+     * @return true
      */
     @Override
     public boolean isOrderDeterministic() {
@@ -84,6 +93,23 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
     }
 
     @Override
+    public void generateOutputSchema(Database db)
+    {
+        assert(m_children.size() == 0);
+        m_hasSignificantOutputSchema = true;
+        // fill in the table schema if we haven't already
+        if (m_outputSchema == null) {
+            m_outputSchema = new NodeSchema();
+            // must produce a tuple value expression for the one column.
+            m_outputSchema.addColumn(
+                new SchemaColumn(m_outputExpression.getTableName(),
+                                 m_outputExpression.getColumnName(),
+                                 m_outputExpression.getColumnAlias(),
+                                 m_outputExpression));
+        }
+    }
+
+    @Override
     public void resolveColumnIndexes() {
         // MaterializedScanPlanNodes have no children
         assert(m_children.size() == 0);
@@ -95,8 +121,8 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
 
         stringer.key(Members.TABLE_DATA.name());
         stringer.object();
-        assert(m_rowData != null);
-        m_rowData.toJSONString(stringer);
+        assert(m_tableData != null);
+        m_tableData.toJSONString(stringer);
         stringer.endObject();
     }
 
@@ -105,7 +131,8 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
         helpLoadFromJSONObject(obj, db);
 
         assert(!obj.isNull(Members.TABLE_DATA.name()));
-        JSONObject rowDataObj = obj.getJSONObject(Members.TABLE_DATA.name());
-        m_rowData = AbstractExpression.fromJSONObject(rowDataObj, db);
+        JSONObject tableDataObj = obj.getJSONObject(Members.TABLE_DATA.name());
+        m_tableData = AbstractExpression.fromJSONObject(tableDataObj, db);
     }
+
 }
