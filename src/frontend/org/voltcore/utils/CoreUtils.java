@@ -190,6 +190,19 @@ public class CoreUtils {
                         getThreadFactory(null, name, SMALL_STACK_SIZE, threads > 1 ? true : false, coreList)));
     }
 
+    /**
+     * Create a bounded thread pool executor
+     * @param maxPoolSize: the maximum number of threads to allow in the pool.
+     * @param keepAliveTime: when the number of threads is greater than the core, this is the maximum
+     *                       time that excess idle threads will wait for new tasks before terminating.
+     * @param unit: the time unit for the keepAliveTime argument.
+     * @param threadFactory: the factory to use when the executor creates a new thread.
+     */
+    public static ThreadPoolExecutor getBoundedThreadPoolExecutor(int maxPoolSize, long keepAliveTime, TimeUnit unit, ThreadFactory tFactory) {
+        return new ThreadPoolExecutor(0, maxPoolSize, keepAliveTime, unit,
+                                      new LinkedBlockingQueue<Runnable>(), tFactory);
+    }
+
     public static ThreadFactory getThreadFactory(String name) {
         return getThreadFactory(name, SMALL_STACK_SIZE);
     }
