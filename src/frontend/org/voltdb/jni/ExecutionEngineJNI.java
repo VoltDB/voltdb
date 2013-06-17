@@ -446,10 +446,13 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     public int[] tableStreamSerializeMore(int tableId,
                                           TableStreamType streamType,
                                           List<BBContainer> outputBuffers) {
+        byte[] bytes = outputBuffers != null
+                            ? SnapshotUtil.OutputBuffersToBytes(outputBuffers)
+                            : null;
         long remaining = nativeTableStreamSerializeMore(pointer,
                                                         tableId,
                                                         streamType.ordinal(),
-                                                        SnapshotUtil.OutputBuffersToBytes(outputBuffers));
+                                                        bytes);
         int[] positions = null;
         // -1 is end of stream.
         if (remaining == -1) {

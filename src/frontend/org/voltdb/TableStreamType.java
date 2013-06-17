@@ -33,12 +33,7 @@ public enum TableStreamType {
      * An elastic index build stream initiates the capture and ongoing maintenance
      * of a tuple index that supports elastic re-balancing for topology changes.
      */
-    ELASTIC_INDEX_BUILD,
-    /*
-     * An elastic index read stream can be used after building the index to read
-     * tuples based on scanning the index.
-     */
-    ELASTIC_INDEX_READ,
+    ELASTIC_INDEX,
     /*
      * A stream of tuple data that can be used to retrieve the latest state of a table
      * that is actively being modified. The stream starts by transporting all the tuple data

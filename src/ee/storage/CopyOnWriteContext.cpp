@@ -18,7 +18,6 @@
 #include "storage/temptable.h"
 #include "storage/tablefactory.h"
 #include "storage/CopyOnWriteIterator.h"
-#include "storage/TableStreamerHelper.h"
 #include "storage/tableiterator.h"
 #include "common/TupleOutputStream.h"
 #include "common/FatalException.hpp"
@@ -75,9 +74,15 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
         throwFatalException("serializeMore() was called again after streaming completed.")
     }
 
-    // Create streaming helper and open output stream(s).
-    TableStreamerHelperPtr helper = createTableStreamerHelper(outputStreams, retPositions);
-    helper->open();
+    // Need to initialize the output stream list.
+    if (outputStreams.empty()) {
+        throwFatalException("serializeMore() expects at least one output stream.");
+    }
+    outputStreams.open(getTable(),
+                       getMaxTupleLength(),
+                       getPartitionId(),
+                       getPredicates(),
+                       getPredicateDeleteFlags());
 
     //=== Tuple processing loop
 
@@ -104,8 +109,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
              * The returned copy count helps decide when to delete if m_doDelete is true.
              */
             bool deleteTuple = false;
-            yield = helper->write(tuple, deleteTuple);
-
+            yield = outputStreams.writeRow(getSerializer(), tuple, deleteTuple);
             /*
              * May want to delete tuple if processing the actual table.
              */
@@ -201,7 +205,12 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
     // end tuple processing while loop
 
     // Need to close the output streams and insert row counts.
-    helper->close();
+    outputStreams.close();
+    // If more was streamed copy current positions for return.
+    // Can this copy be avoided?
+    for (size_t i = 0; i < outputStreams.size(); i++) {
+        retPositions.push_back((int)outputStreams.at(i).position());
+    }
 
     m_serializationBatches++;
 

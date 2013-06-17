@@ -51,6 +51,7 @@ import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.expressions.HashRangeExpressionBuilder;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 
 /**
@@ -417,6 +418,65 @@ public class TestExecutionEngine extends TestCase {
             assertTrue(tn.equals("WAREHOUSE") || tn.equals("STOCK"));
         }
     }
+
+    public void testStreamIndex() throws Exception {
+        sourceEngine.loadCatalog( 0, m_catalog.serialize());
+
+        // Each EE needs its own thread for correct initialization.
+        final AtomicReference<ExecutionEngine> destinationEngine = new AtomicReference<ExecutionEngine>();
+        final byte configBytes[] = LegacyHashinator.getConfigureBytes(1);
+        Thread destEEThread = new Thread() {
+            @Override
+            public void run() {
+                destinationEngine.set(
+                        new ExecutionEngineJNI(
+                                CLUSTER_ID,
+                                NODE_ID,
+                                0,
+                                0,
+                                "",
+                                100,
+                                HashinatorType.LEGACY,
+                                configBytes,
+                                null));
+            }
+        };
+        destEEThread.start();
+        destEEThread.join();
+
+        destinationEngine.get().loadCatalog( 0, m_catalog.serialize());
+
+        int STOCK_TABLEID = stockTableId(m_catalog);
+
+        loadTestTables( sourceEngine, m_catalog);
+
+        SnapshotPredicates predicates = new SnapshotPredicates();
+        predicates.addPredicate(new HashRangeExpressionBuilder()
+                                        .put(0x0000000000000000L, 0x7fffffffffffffffL)
+                                        .build(0),
+                                true);
+
+        // Build the index
+        sourceEngine.activateTableStream(STOCK_TABLEID, TableStreamType.ELASTIC_INDEX, predicates);
+
+        // Humor serializeMore() by providing a buffer, even though it's not used.
+        BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
+        try {
+            origin.b.clear();
+            long address = org.voltcore.utils.DBBPool.getBufferAddress(origin.b);
+            BBContainer container = new BBContainer(origin.b, address){
+                @Override
+                public void discard() {}
+            };
+            List<BBContainer> output = new ArrayList<BBContainer>();
+            output.add(container);
+            assertEquals(0, sourceEngine.tableStreamSerializeMore(STOCK_TABLEID, TableStreamType.ELASTIC_INDEX, output)[0]);
+        }
+        finally {
+            origin.discard();
+        }
+    }
+
 
     private ExecutionEngine sourceEngine;
     private static final int CLUSTER_ID = 2;

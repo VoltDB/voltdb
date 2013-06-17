@@ -34,17 +34,11 @@ class TableTuple;
 class TupleSerializer;
 class PersistentTable;
 class PersistentTableSurgeon;
-class TableStreamerHelper;
-
-/// Pointer type returned by factory method.
-typedef boost::shared_ptr<TableStreamerHelper> TableStreamerHelperPtr;
 
 /**
  * Abstract class that provides the interface for all table streamer contexts.
  */
 class TableStreamerContext {
-
-    friend class TableStreamerHelper;
 
 public:
 
@@ -126,12 +120,6 @@ public:
     {
         return m_partitionId;
     }
-
-    /**
-     * Create an output processor used in handleStreamMore.
-     */
-    TableStreamerHelperPtr createTableStreamerHelper(TupleOutputStreamProcessor &outputStreams,
-                                                     std::vector<int> &retPositions);
 
 protected:
 

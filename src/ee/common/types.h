@@ -344,8 +344,7 @@ enum IndexLookupType {
 enum TableStreamType {
     // Table stream types that use predicates.
     TABLE_STREAM_SNAPSHOT,
-    TABLE_STREAM_ELASTIC_INDEX_BUILD,
-    TABLE_STREAM_ELASTIC_INDEX_READ,
+    TABLE_STREAM_ELASTIC_INDEX,
 
     // Table stream types that don't use predicates.
     // Add new non-predicate types below TABLE_STREAM_RECOVERY so

@@ -20,7 +20,6 @@
 #include "common/TupleSerializer.h"
 #include "storage/TableStreamerContext.h"
 #include "storage/persistenttable.h"
-#include "storage/TableStreamerHelper.h"
 
 namespace voltdb
 {
@@ -63,16 +62,5 @@ TableStreamerContext::TableStreamerContext(
     m_serializer(serializer),
     m_partitionId(partitionId)
 {}
-
-/**
- * Create an output processor used in handleStreamMore.
- */
-boost::shared_ptr<TableStreamerHelper> TableStreamerContext::createTableStreamerHelper(
-        TupleOutputStreamProcessor &outputStreams,
-        std::vector<int> &retPositions)
-{
-    return boost::shared_ptr<TableStreamerHelper>(
-            new TableStreamerHelper(*this, outputStreams, retPositions));
-}
 
 }

@@ -81,8 +81,7 @@ private:
                    PersistentTableSurgeon &surgeon,
                    int32_t partitionId,
                    TupleSerializer &serializer,
-                   const std::vector<std::string> &predicateStrings,
-                   bool buildIndex);
+                   const std::vector<std::string> &predicateStrings);
 
     /**
      * Scanner for retrieveing rows.
@@ -95,19 +94,9 @@ private:
     ElasticIndex m_index;
 
     /**
-     * True when creating the index.
+     * Set to true after handleStreamMore() was called once after building the index.
      */
-    const bool m_buildIndex;
-
-    /**
-     * Set to remaining tuple count after index is initialized.
-     */
-    int m_remaining;
-
-    /**
-     * Iterator for reading from the index.
-     */
-    ElasticIndex::const_iterator m_iter;
+    bool m_isIndexed;
 };
 
 } // namespace voltdb

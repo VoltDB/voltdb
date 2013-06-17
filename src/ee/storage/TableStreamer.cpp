@@ -87,22 +87,12 @@ bool TableStreamer::activateStream(PersistentTable &table,
                                                         tableId));
                     break;
 
-                case TABLE_STREAM_ELASTIC_INDEX_BUILD:
+                case TABLE_STREAM_ELASTIC_INDEX:
                     m_context.reset(new ElasticContext(table,
                                                        surgeon,
                                                        m_partitionId,
                                                        m_tupleSerializer,
-                                                       m_predicateStrings,
-                                                       true));
-                    break;
-
-                case TABLE_STREAM_ELASTIC_INDEX_READ:
-                    m_context.reset(new ElasticContext(table,
-                                                       surgeon,
-                                                       m_partitionId,
-                                                       m_tupleSerializer,
-                                                       m_predicateStrings,
-                                                       false));
+                                                       m_predicateStrings));
                     break;
 
                 default:
