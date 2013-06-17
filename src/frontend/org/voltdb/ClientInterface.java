@@ -312,9 +312,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         /**
          * Used a cached thread pool to accept new connections.
          */
-        private final ExecutorService m_executor = new ThreadPoolExecutor(0, 128,
-                        60L, TimeUnit.SECONDS,
-                        new SynchronousQueue<Runnable>(),
+        private final ExecutorService m_executor = CoreUtils.getBoundedThreadPoolExecutor(128, 10L, TimeUnit.SECONDS,
                         CoreUtils.getThreadFactory("Client authentication threads", "Client authenticator"));
 
         ClientAcceptor(int port, VoltNetworkPool network, boolean isAdmin)
