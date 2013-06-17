@@ -204,7 +204,7 @@ def usage():
     print "\t", "height in pixels"
 
 def main():
-    if len(sys.argv) < 4:
+    if len(sys.argv) < 3:
         usage()
         exit(-1)
 
