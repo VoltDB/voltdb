@@ -63,7 +63,7 @@ import org.voltdb.iv2.MpInitiator;
  *   It is safe to synchronized on an individual connection and then the distributer, but it is always unsafe
  *   to synchronized on the distributer and then an individual connection.
  */
-class Distributer {
+public class Distributer {
 
     static final long PING_HANDLE = Long.MAX_VALUE;
 
@@ -109,7 +109,7 @@ class Distributer {
     private static final long MINIMUM_LONG_RUNNING_SYSTEM_CALL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
     private final long m_connectionResponseTimeoutMS;
 
-    public final RateLimiter m_rateLimiter = new RateLimiter();
+    public RateLimiter m_rateLimiter = new RateLimiter();
 
     //private final Timer m_timer;
     private final ScheduledExecutorService m_ex =

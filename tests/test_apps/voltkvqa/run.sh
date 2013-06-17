@@ -28,7 +28,8 @@ VOLTDB="$VOLTDB_BIN/voltdb"
 VOLTCOMPILER="$VOLTDB_BIN/voltcompiler"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
-HOST="localhost"
+HOST=xxxx
+SERVERS=volt12b,volt12c
 
 # remove build artifacts
 function clean() {
@@ -38,7 +39,7 @@ function clean() {
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -classpath $CLASSPATH -d obj \
+    javac -Xlint:deprecation -classpath $CLASSPATH -d obj \
         src/voltkvqa/*.java \
         src/voltkvqa/procedures/*.java
     # stop if compilation fails
@@ -62,6 +63,21 @@ function server() {
         license $LICENSE host $HOST
 }
 
+# run the voltdb server locally
+function recover() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB recover catalog $APPNAME.jar deployment deployment.xml \
+        license $LICENSE host $HOST
+}
+function rejoin() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB catalog $APPNAME.jar deployment deployment.xml \
+        license $LICENSE rejoin host $1
+}
 function exportserver() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
@@ -88,21 +104,23 @@ function async-benchmark() {
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voltkvqa.AsyncBenchmark \
         --displayinterval=5 \
-        --duration=60 \
-        --servers=localhost \
-        --poolsize=100000 \
-        --preload=true \
-        --getputratio=0.9 \
+        --duration=86400 \
+        --servers=$SERVERS \
+        --poolsize=50331648 \
+        --preload=false \
+        --getputratio=0.6 \
         --keysize=32 \
         --minvaluesize=1024 \
         --maxvaluesize=1024 \
         --entropy=127 \
         --usecompression=false \
-        --ratelimit=100000 \
-        --autotune=true \
+        --ratelimit=10000 \
+        --autotune=false \
         --multisingleratio=0.1 \
-        --recover=false \
-        --latencytarget=10
+        --recover=true \
+        --latencytarget=1 \
+        --mode=nopreload \
+        --randomizeratelimit=true
 }
 
 # Multi-threaded synchronous benchmark sample
@@ -160,5 +178,6 @@ function help() {
 
 # Run the target passed as the first arg on the command line
 # If no first arg, run server
-if [ $# -gt 1 ]; then help; exit; fi
-if [ $# = 1 ]; then $1; else server; fi
+#if [ $# -gt 1 ]; then help; exit; fi
+#if [ $# = 1 ]; then $1; else server; fi
+"$@"

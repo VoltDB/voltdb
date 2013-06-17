@@ -27,7 +27,7 @@ import java.util.ArrayDeque;
  * server.
  *
  */
-class RateLimiter {
+public class RateLimiter {
 
     final int BLOCK_SIZE = 100; // ms
     final int HISTORY_SIZE = 25;
@@ -35,7 +35,7 @@ class RateLimiter {
     final int MINIMUM_MOVEMENT = 5;
 
     protected boolean m_autoTune = false;
-    protected int m_targetTxnsPerSecond = Integer.MAX_VALUE;
+    public int m_targetTxnsPerSecond = Integer.MAX_VALUE;
     //protected int m_targetTxnsPerBlock = Integer.MAX_VALUE;
     protected int m_latencyTarget = 5;
 

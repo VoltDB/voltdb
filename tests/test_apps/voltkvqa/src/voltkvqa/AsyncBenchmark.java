@@ -42,6 +42,7 @@ package voltkvqa;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.sql.Time;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -50,14 +51,20 @@ import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.lang3.time.DateFormatUtils;
+//import org.apache.tools.ant.taskdefs.Sleep;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
@@ -67,6 +74,12 @@ import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.utils.MiscUtils;
+import sun.misc.Signal;
+import sun.misc.SignalHandler;
+
+import sun.misc.Signal;
+import sun.misc.SignalHandler;
 
 public class AsyncBenchmark {
     boolean slow = false;
@@ -80,7 +93,7 @@ public class AsyncBenchmark {
     // validated command line configuration
     final KVConfig config;
     // Reference to the database connection we will use
-    final Client client;
+    static Client client;
     // Timer for periodic stats printing
     Timer timer;
     // Benchmark start time
@@ -91,8 +104,8 @@ public class AsyncBenchmark {
     // random number generator with constant seed
     final Random rand = new Random(0);
     // Statistics manager objects from the client
-    final ClientStatsContext periodicStatsContext;
-    final ClientStatsContext fullStatsContext;
+    static ClientStatsContext periodicStatsContext;
+    static ClientStatsContext fullStatsContext;
 
     // kv benchmark state
     final AtomicLong successfulGets = new AtomicLong(0);
@@ -118,6 +131,21 @@ public class AsyncBenchmark {
     final AtomicLong successfulPutsMPT = new AtomicLong(0);
     final AtomicLong successfulPutsMPF = new AtomicLong(0);
 
+    final AtomicInteger activeConnections = new AtomicInteger(0);
+    static boolean runBenchmark = true;
+    Thread benchmarkThread;
+
+    static ClientConfig clientConfig;
+
+    // For retry connections
+    private final ExecutorService es = Executors.newCachedThreadPool(new ThreadFactory() {
+        @Override
+        public Thread newThread(Runnable arg0) {
+            Thread thread = new Thread(arg0, "Retry Connection");
+            thread.setDaemon(true);
+            return thread;
+        }
+    });
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -181,6 +209,12 @@ public class AsyncBenchmark {
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
+        @Option(desc = "Mode to run the test, omit for default behavior.")
+        String mode = "";
+
+        @Option(desc = "Change ratelimit periodically during run.")
+        boolean randomizeratelimit = false;
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -200,7 +234,7 @@ public class AsyncBenchmark {
             if (entropy <= 0) exitWithMessageAndUsage("entropy must be > 0");
             if (entropy > 127) exitWithMessageAndUsage("entropy must be <= 127");
 
-            if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
+            if (ratelimit < 0) exitWithMessageAndUsage("ratelimit must be >= 0");
             if (latencytarget <= 0) exitWithMessageAndUsage("latencytarget must be > 0");
         }
     }
@@ -223,24 +257,16 @@ public class AsyncBenchmark {
                     prt(msg);
                 }
                 System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
-                if(connectionsLeft > 0) {
-                    totalConnections.decrementAndGet();
-                    try {
-                        connectThis(hostname, "Retry");
-                    } catch (Exception e) {
-                        // TODO Auto-generated catch block
-                        e.printStackTrace();
+                totalConnections.decrementAndGet();
+                // setup for retry
+                final String server = hostname; //MiscUtils.getHostnameColonPortString(hostname, port);
+                es.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        connectToOneServerWithRetry(server);
                     }
-                }
-                else {
-                    if(debug) {
-                        String msg = "Since we've lost all connections, we're going to explicitely ";
-                        msg += "reset total number of connections to -1";
-                        System.out.println(msg);
-                    }
-                    totalConnections.set(-1);
-                }
-            } // if ((currentTime - benchmarkStartTS) < (config.duration * 1000))
+                });
+            }
         }
     }
 
@@ -253,7 +279,7 @@ public class AsyncBenchmark {
     public AsyncBenchmark(KVConfig config) {
         this.config = config;
 
-        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        clientConfig = new ClientConfig("", "", new StatusListener());
         if (config.autotune) {
             clientConfig.enableAutoTune();
             clientConfig.setAutoTuneTargetInternalLatency(config.latencytarget);
@@ -273,6 +299,7 @@ public class AsyncBenchmark {
         System.out.println(" Command Line Configuration");
         System.out.println(HORIZONTAL_RULE);
         System.out.println(config.getConfigDumpString());
+
     }
 
     /**
@@ -282,7 +309,7 @@ public class AsyncBenchmark {
      *
      * @param server hostname:port or just hostname (hostname can be ip).
      */
-    void connectToOneServerWithRetry(String server, String info) {
+    void connectToOneServerWithRetry(String server) {
         /*
          * Possible exceptions are:
          * 1) Exception: java.net.ConnectException: Connection refused
@@ -308,38 +335,10 @@ public class AsyncBenchmark {
                 break;
             }
             catch (Exception e) {
-                if(debug) {
-                    msg = "\n---------------\n" + info + "\n---------------\n" +
-                        "Failed to connect server: " + server +
-                        ", remaining totalConnections = '" + totalConnections.get() +
-                        "'\nReason for connection failed: '" + e.getMessage() + "'";
-                    prt(msg);
-                }
                 msg = "Connection to " + server + " failed - retrying in " + sleep/1000 + " second(s)";
                 prt(msg);
-                try {
-                    Thread.sleep(sleep);
-                } catch (Exception interruted) {
-                    msg = "A possible hiccup, seriously?? Exception: '" + interruted.getMessage() +
-                          "'.\nStop trying to reconnect to this host: " + server;
-                    prt(msg);
-                    fatalLevel.incrementAndGet();
-                    flag = false;
-                }
-
+                try { Thread.sleep(sleep); } catch (Exception interruted) {}
                 if (sleep < 8000) sleep += sleep;
-                if((e.getMessage().contains("Cluster instance id mismatch"))) {
-                    msg = "A possible bug? Could be a serious exception:" + e.getMessage() +
-                        "\nStop trying to reconnect to this host: " + server;
-                    prt(msg);
-                    fatalLevel.incrementAndGet();
-                    flag = false;
-                }
-                else if((e.getMessage().contains("Client instance is shutdown"))) {
-                    msg = "Dangling client is detected. Stop trying to connect to this host: " + server;
-                    prt(msg);
-                    flag = false;
-                }
             }
         }
     }
@@ -352,28 +351,28 @@ public class AsyncBenchmark {
      * syntax (where :port is optional).
      * @throws InterruptedException if anything bad happens with the threads.
      */
-    void connect(String servers, final String info) throws InterruptedException {
+    void connect(String servers) throws InterruptedException {
         String[] serverArray = servers.split(",");
-        String msg;
         final CountDownLatch connections = new CountDownLatch(serverArray.length);
-        if(debug) {
-            msg = "\n=========\n" + info + "\nIn connect Server counts: " + serverArray.length +
-                    ", Server Names: " + servers;
-            prt(msg);
-        }
-
         // use a new thread to connect to each server
         for (final String server : serverArray) {
             new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    connectToOneServerWithRetry(server, info);
+                    connectToOneServerWithRetry(server);
                     connections.countDown();
                 }
             }).start();
         }
         // block until all have connected
         connections.await();
+    }
+
+    void disconnect(String servers) throws InterruptedException, NoConnectionsException {
+        client.drain();
+        client.close();
+        String[] serverArray = servers.split(",");
+        //totalConnections.set(0);
     }
 
     /**
@@ -396,61 +395,29 @@ public class AsyncBenchmark {
      * periodically during a benchmark.
      */
     public synchronized void printStatistics() {
-        try {
+        if (totalConnections.get() > 0) {
             ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
             long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
-
+            System.out.printf(dateformat(getTime()) + " ");
             System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
             System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
             System.out.printf("Aborts/Failures %d/%d, ",
                     stats.getInvocationAborts(), stats.getInvocationErrors());
             System.out.printf("Avg/95%% Latency %.2f/%dms\n", stats.getAverageLatency(),
                     stats.kPercentileLatency(0.95));
-            if(totalConnections.get() == -1 && stats.getTxnThroughput() == 0) {
-                if(!config.recover) {
-                    String errMsg = "Lost all connections. Exit...";
-                    exitOnError(errMsg);
-                }
+
+            // circuit breaker for not making any progress
+            /*
+            if (stats.getAverageLatency() == 0.0) {
+                // if latency is exactly zero, no tx have been completed in the interval
+                // this should be a easy way to detect not making any progress.
+                System.out.printf("Detected not making any progress, client terminating\n");
+                System.exit(1);
             }
-        } catch (Exception e) {
-            String msg = "In printStatistics. We got an exception: '" + e.getMessage() + "'!!";
-            prt(msg);
+            */
         }
     }
 
-    public void exitOnError(String err) {
-        prt(err);
-
-        // cancel periodic stats printing
-        timer.cancel();
-
-        // block until all outstanding txns return
-        try {
-            client.drain();
-        } catch (NoConnectionsException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (InterruptedException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-
-        // print the summary results
-        try {
-            printResults();
-        } catch (Exception e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-
-        // close down the client connections
-        try {
-            client.close();
-        } catch (InterruptedException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-    }
     /**
      * Prints the results of the voting simulation and statistics
      * about performance.
@@ -573,6 +540,7 @@ public class AsyncBenchmark {
                 }
             }
             else {
+                //System.out.printf ("GetCallback logged a tx failure %s\n", response.getStatusString());
                 failedGets.incrementAndGet();
             }
         }
@@ -607,6 +575,7 @@ public class AsyncBenchmark {
                 hashMap.put(thisPair.Key, counter);
             }
             else {
+                //System.out.printf ("PutCallback logged a tx failure %s\n", response.getStatusString());
                 failedPuts.incrementAndGet();
             }
             networkPutData.addAndGet(storeValueLength);
@@ -635,29 +604,18 @@ public class AsyncBenchmark {
                     if (dbCount < hashMapCount) {
                         missingPutCount.incrementAndGet();
                         incorrectPutCount.addAndGet(hashMapCount - dbCount);
-                        System.out.printf("ERROR: Key %s: count in db '%d' is less than client expected '%d'\n",
-                                          key.replaceAll("\\s", ""), dbCount, hashMapCount);
+                        //System.out.printf("ERROR: Key %s: count in db '%d' is less than client expected '%d'\n",
+                         //                 key.replaceAll("\\s", ""), dbCount, hashMapCount);
                     }
                 }
             }
             else {
-                System.out.print("ERROR: Bad Client response from Volt");
+                //System.out.printf ("SumCallback logged a tx failure %s\n", response.getStatusString());
                 System.exit(1);
             }
         }
     }
 
-    private void connectThis(final String server, final String info) throws InterruptedException, NoConnectionsException, IOException {
-        System.out.println("Trying to reconnect this server: '" + server + "'");
-        Thread t = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                connectToOneServerWithRetry(server, info);
-            }
-        });
-        t.setDaemon(true);
-        t.start();
-    }
     /**
      * Core benchmark code.
      * Connect. Initialize. Run the loop. Cleanup. Print Results.
@@ -665,51 +623,73 @@ public class AsyncBenchmark {
      * @throws Exception if anything unexpected happens.
      */
     public void runBenchmark() throws Exception {
+
+        benchmarkThread = Thread.currentThread();
+
+        // ratelimit = 1 as a special case for debugging heartbeat issues
+        // do no work, then exit normally
+        if (config.ratelimit == 1) {
+            Thread.sleep(config.duration);
+            System.exit(0);
+        }
+
+        Signal.handle(new Signal("TERM"), new SignalHandler() {
+            public void handle(Signal sig) {
+
+                System.err.println("Received SIGUSR1 signal. Will run data verification.");
+                // stop run, it will clean up
+                //runBenchmark = false;
+                timer.cancel();
+                try { client.drain(); } catch (Exception e) {}
+                try { summary4qa(); } catch (Exception e) {} // if an error is detected, this will end the run
+                System.exit(0);
+                // return to the run
+                //benchmarkThread.interrupt();
+            }
+        });
+
+        System.out.printf("Run mode: %s\n", config.mode);
+
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Setup & Initialization");
         System.out.println(HORIZONTAL_RULE);
 
         // preload keys if requested
         System.out.println();
-        if (config.preload) {
+        if (config.mode.equals("preload") || config.preload) {
             System.out.println("Preloading data store...");
             for(int i=0; i < config.poolsize; i++) {
                 client.callProcedure(new NullCallback(),
                                      "Put",
                                      String.format(processor.KeyFormat, i),
                                      processor.generateForStore().getStoreValue());
+                }
+
             }
             client.drain();
             System.out.println("Preloading complete.\n");
+            //if (config.mode.equals("preload")) {
+            //    client.close();
+           //     return;
+           // }
+
+        // ratelimit = 1 as a special case for debugging heartbeat issues
+        // do no work, then exit normally
+        if (config.ratelimit == 20001) {
+            Thread.sleep(config.duration);
+            System.exit(0);
         }
 
         System.out.print(HORIZONTAL_RULE);
         System.out.println("Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
 
-        // Run the benchmark loop for the requested warmup time
-        // The throughput may be throttled depending on client configuration
-//        System.out.println("Warming up...");
-//        final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
-//        while (warmupEndTime > System.currentTimeMillis()) {
-//            // Decide whether to perform a GET or PUT operation
-//            if (rand.nextDouble() < config.getputratio) {
-//                // Get a key/value pair, asynchronously
-//                client.callProcedure(new NullCallback(), "Get", processor.generateRandomKeyForRetrieval());
-//            }
-//            else {
-//                // Put a key/value pair, asynchronously
-//                final PayloadProcessor.Pair pair = processor.generateForStore();
-//                client.callProcedure(new NullCallback(), "Put", pair.Key, pair.getStoreValue());
-//            }
-//        }
-
         // reset the stats after warmup
         fullStatsContext.fetchAndResetBaseline();
         periodicStatsContext.fetchAndResetBaseline();
 
         // print periodic statistics to the console
-        benchmarkStartTS = System.currentTimeMillis();
+        benchmarkStartTS =  System.currentTimeMillis();
         schedulePeriodicStats();
 
         if(totalConnections.get() == 1)
@@ -720,138 +700,118 @@ public class AsyncBenchmark {
         // The throughput may be throttled depending on client configuration
         System.out.println("\nRunning benchmark...");
         final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
-        long currentTime = System.currentTimeMillis();
-        long diff = benchmarkEndTime - currentTime;
-        int i = 1;
-        //throw new SpellException("Cannot spell client");
         double mpRand;
-        String msg = "";
-        while (benchmarkEndTime > currentTime) {
-            if(debug && diff != 0 && diff%5000.00 == 0 && i%5 == 0) {
-                msg = "i = " + i + ", Time remaining in seconds: " + diff/1000l +
-                      ", totalConnections = " + totalConnections.get();
-                prt(msg);
-                i++;
-            }
-            if(totalConnections.get() < 1) {
-                if(debug) {
-                    msg = "i = " + i + ", diff = '" + diff +
-                           ", totalConnections = " + totalConnections.get() + "\n";
-                }
-                msg += "All connections are lost! VoltDB could be down!!";
-                prt(msg);
-            }
+        long sessiontime = benchmarkEndTime;
+        long ix = 0;
 
-            // Decide whether to perform a GET or PUT operation
-            if (rand.nextDouble() < config.getputratio) {
-                // Get a key/value pair, asynchronously
-                mpRand = rand.nextDouble();
-                if(mpRand < config.multisingleratio) {
-                    if(totalConnections.get() > 1 && config.poolsize > 10000) {
-                        slow = true;
-                        debug = true;
+        while (runBenchmark && ( benchmarkEndTime > System.currentTimeMillis())) {
+
+            if (config.randomizeratelimit) {
+                int rn = rand.nextInt(1000);
+                sessiontime = rn * 1000; // in microseconds
+                if ((rn % 10) == 0) { // 10% of the "sessions" are idle.
+                    Thread.sleep(sessiontime);
+                    continue;
+                }
+                int ratelimit = rand.nextInt(config.ratelimit); // in TPS
+                config.multisingleratio = ((rn % 2) == 0) ? 0 : rand.nextDouble(); // 50% session have multipart workloads
+                System.out.printf("session secs %d rate %d msratio %f\n", sessiontime, ratelimit, config.multisingleratio);
+
+                /* save this code for reproducing ENG-4511
+                this.disconnect(config.servers);
+                config.ratelimit = ratelimit;
+                clientConfig.setMaxTransactionsPerSecond(config.ratelimit);
+                client = ClientFactory.createClient(clientConfig);
+                //this.connect(config.servers);
+                */
+
+                /* for this code need make rateLimiter public */
+                ClientImpl ci = (ClientImpl) client;
+                ci.m_distributer.m_rateLimiter.m_targetTxnsPerSecond = ratelimit;
+
+                ix = System.currentTimeMillis();
+            }
+            while (runBenchmark && (ix + sessiontime > System.currentTimeMillis())) {
+                try {
+                    // Decide whether to perform a GET or PUT operation
+                    if (rand.nextDouble() < config.getputratio) {
+                        // Get a key/value pair, asynchronously
+                        mpRand = rand.nextDouble();
+                        if(mpRand < config.multisingleratio) {
+                            if(totalConnections.get() > 1 && config.poolsize > 10000) {
+                                slow = true;
+                                debug = true;
+                            }
+                            else
+                                debug = false;
+                            client.callProcedure(new GetCallback(mpRand), "GetMp", processor.generateRandomKeyForRetrieval());
+                        }
+                        else {
+                            client.callProcedure(new GetCallback(mpRand), "Get", processor.generateRandomKeyForRetrieval());
+                        }
                     }
-                    else
-                        debug = false;
-                    client.callProcedure(new GetCallback(mpRand), "GetMp", processor.generateRandomKeyForRetrieval());
-                }
-                else {
-                    client.callProcedure(new GetCallback(mpRand), "Get", processor.generateRandomKeyForRetrieval());
-                }
-            }
-            else {
-                // Put a key/value pair, asynchronously
-                final PayloadProcessor.Pair pair = processor.generateForStore();
-                mpRand = rand.nextDouble();
-                if(rand.nextDouble() < config.multisingleratio) {
-                    if(totalConnections.get() > 1 && config.poolsize > 10000) {
-                        slow = true;
-                        debug = true;
+                    else {
+                        // Put a key/value pair, asynchronously
+                        final PayloadProcessor.Pair pair = processor.generateForStore();
+                        mpRand = rand.nextDouble();
+                        if(rand.nextDouble() < config.multisingleratio) {
+                            if(totalConnections.get() > 1 && config.poolsize > 10000) {
+                                slow = true;
+                                debug = true;
+                            }
+                            else
+                                debug = false;
+                            client.callProcedure(new PutCallback(pair, mpRand), "PutMp", pair.Key, pair.getStoreValue());
+                        }
+                        else {
+                            client.callProcedure(new PutCallback(pair, mpRand), "Put", pair.Key, pair.getStoreValue());
+                        }
                     }
-                    else
-                        debug = false;
-                    client.callProcedure(new PutCallback(pair, mpRand), "PutMp", pair.Key, pair.getStoreValue());
                 }
-                else {
-                    client.callProcedure(new PutCallback(pair, mpRand), "Put", pair.Key, pair.getStoreValue());
+                catch (NoConnectionsException e) {
+                    if (!config.recover) {
+                        prt("Client got no connections. This is terminal.");
+                        totalConnections.set(0);
+                        break;
+                    }
+                    prt("Client got no connections exception. In recovery mode. go to sleep.");
+                    //construct a new client
+                    client = ClientFactory.createClient(clientConfig);
+                    periodicStatsContext = client.createStatsContext();
+                    fullStatsContext = client.createStatsContext();
+                    do {
+                        try { Thread.sleep(3000); }
+                        catch (Exception e2) {}
+                    // wait here until connection(s) are active
+                        // intentionally wait a connection in this loop even if the duration
+                        // time has elapsed so that when the test summary is run, we have some
+                        // connection to the db.
+                        runBenchmark = (System.currentTimeMillis() < benchmarkEndTime);
+                    } while (totalConnections.get() == 0);
+                }
+                catch (Exception e) {
+                    e.printStackTrace();
+                    System.err.printf("Caught Exception: %s\ntoString: %s\n", e.getMessage(), e.toString());
+                    throw new RuntimeException(e);
                 }
             }
-            currentTime = System.currentTimeMillis();
-            diff = benchmarkEndTime - currentTime;
         }
-    }
-
-    public void closeClient() {
-        // cancel periodic stats printing
-        try {
-            timer.cancel();
-        } catch (Exception e) {
-            String msg = "In closeOldClient exception = '" + e.getMessage() + "'.";
-            prt(msg);
-        }
-        try {
-            client.drain();
-        } catch (NoConnectionsException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (InterruptedException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-        // close down the client connections
-        try {
-            client.close();
-        } catch (InterruptedException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-    }
-
-    public void readyToExit() {
-        // block until all outstanding txns return
-        try {
-            client.drain();
-        } catch (NoConnectionsException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (InterruptedException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-
+        timer.cancel();
+        client.drain();
         summary4qa();
-
-        try {
-            client.drain();
-        } catch (NoConnectionsException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (InterruptedException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-
-        // close down the client connections
-        try {
-            client.close();
-        } catch (InterruptedException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-        System.exit(0);
+        es.shutdownNow();
+        client.close();
     }
 
-    public void summary4qa() {
-        // Put a key/value pair, asynchronously
+    public void summary4qa() throws Exception {
 
-        System.out.printf("Checking put count in the database against expected data");
-        Iterator<String> it = hashMap.keySet().iterator();
-        if(debug) {
-            System.out.printf("HashMap Size: %10d\n", hashMap.size());
-            System.out.println("poolsize = " + config.poolsize);
-        }
+            System.out.println("Checking put count in the database against expected data");
+            Iterator<String> it = hashMap.keySet().iterator();
+            if(debug) {
+                System.out.printf("HashMap Size: %10d\n", hashMap.size());
+                System.out.println("poolsize = " + config.poolsize);
+            }
 
-        try {
             int printInterval = (int)hashMap.size()/5;
             if(hashMap.size() > 10000)
                 if(slow)
@@ -859,48 +819,38 @@ public class AsyncBenchmark {
 
             int c = 0;
             String lastkey = "error";
-            while (it.hasNext()) {
-                String key = it.next().toString();
-
-                if(debug && c%printInterval == 0)
-                    System.out.printf("in summary4qa() count = %d, key = '%s'\n", c, key);
-                client.callProcedure(new SumCallback(key, c, printInterval), "Get", key);
-                lastkey = key;
-                c++;
+            try {
+                while (it.hasNext()) {
+                    String key = it.next().toString();
+                    try { client.callProcedure(new SumCallback(key, c, printInterval), "Get", key); }
+                    catch (Exception e) {}
+                    lastkey = key;
+                    c++;
+                    //if(debug)
+                        //System.out.printf("In summary4qa, count = %d, Last Key = '%s'\n", c, lastkey);
+                    }
             }
-            if(debug)
-                System.out.printf("In summary4qa, count = %d, Last Key = '%s'\n", c, lastkey);
+            catch (Exception e) {
+                System.err.printf("Exception in summary %s", e.getMessage());
+                e.printStackTrace();
+            }
 
-        }
-        catch (Exception x)    {
-            System.out.println("This is not working: " + x + "\n");
-            x.printStackTrace();
-            System.exit(1);
-        }
+            client.drain(); // finish all async work
 
-        try {
-            client.drain();
-        } catch (NoConnectionsException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (InterruptedException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-        System.out.println("\n-------------------\nTest Results:\n-------------------\n");
-        System.out.printf("\n\t%10d\tKV Rows Checked\n", hashMap.size());
-        System.out.printf("\t%10d\tKV Rows Found in database\n", successfulPutCount.get());
-        System.out.printf("\t%10d\tKV Rows Missing in database\n", hashMap.size() - successfulPutCount.get());
-        System.out.printf("\n\t%10d\tKV Rows are Correct\n", successfulPutCount.get() - missingPutCount.get());
-        System.out.printf("\t%10d\tKV Rows are Incorrect (off by %d Puts)\n", missingPutCount.get(), incorrectPutCount.get());
+            System.out.println("\n-------------------\nTest Results:\n-------------------\n");
+            System.out.printf("\n\t%10d\tKV Rows Checked\n", hashMap.size());
+            System.out.printf("\t%10d\tKV Rows Found in database\n", successfulPutCount.get());
+            System.out.printf("\t%10d\tKV Rows Missing in database\n", hashMap.size() - successfulPutCount.get());
+            System.out.printf("\n\t%10d\tKV Rows are Correct\n", successfulPutCount.get() - missingPutCount.get());
+            System.out.printf("\t%10d\tKV Rows are Incorrect (off by %d Puts)\n", missingPutCount.get(), incorrectPutCount.get());
 
-        if (successfulPutCount.get() == hashMap.size() && missingPutCount.get() == 0){
-            System.out.println("\n-------------------\nGood News:  Database Put counts match\n");
-        }
-        else {
-            System.out.println("\n-------------------\nError! Database Put counts don't match!!\n");
-            System.exit(1);
-        }
+            if (successfulPutCount.get() == hashMap.size() && missingPutCount.get() == 0){
+                System.out.println("\n-------------------\nGood News:  Database Put counts match\n");
+            }
+            else {
+                System.out.println("\n-------------------\nError! Database Put counts don't match!!\n");
+                System.exit(1);
+            }
     }
 
     public AtomicInteger get_totalConnections() {
@@ -916,7 +866,7 @@ public class AsyncBenchmark {
     }
 
     public static void prt(String str) {
-        System.out.println(dateformat(getTime()) + "\t" + str + "\n");
+        System.out.printf(dateformat(getTime()) + "\t" + str + "\n");
     }
     /**
      * Main routine creates a benchmark instance and kicks off the run method.
@@ -932,94 +882,8 @@ public class AsyncBenchmark {
         // create a configuration from the arguments
         KVConfig config = new KVConfig();
         config.parse(AsyncBenchmark.class.getName(), args);
-
         AsyncBenchmark benchmark = new AsyncBenchmark(config);
-
-        int numOfHosts = config.servers.split(",").length;
-        benchmark.connect(config.servers, "In Main First Time");
-        AtomicInteger totalConnections;
-        try {
-            totalConnections = benchmark.get_totalConnections();
-            if(benchmark.debug) {
-                msg = "In main..try block before runBenchmark. totalConnections = '" +
-                    totalConnections.get() + "'\n";
-                prt(msg);
-            }
-
-            if(numOfHosts != totalConnections.get() && fatalLevel.get() > 0) {
-                msg = "Error!! We expect to connect " + numOfHosts + " hosts, which are " + config.servers + "\n";
-                msg += "However, the actual total connections are " + totalConnections.get() + "\n";
-                prt(msg);
-            }
-            else
-                benchmark.runBenchmark();
-
-            if(benchmark.debug) {
-                msg = "In main..try block after runBenchmark. totalConnections = '" + totalConnections.get() + "'\n";
-                prt(msg);
-            }
-            benchmark.readyToExit();
-        }
-        catch(org.voltdb.client.NoConnectionsException x) {
-            benchmark.closeClient();
-            if(benchmark.debug) {
-                totalConnections = benchmark.get_totalConnections();
-                msg = "In main..catch block before instanciate benchmark\n" +
-                    "totalConnections = " + totalConnections.get() +
-                    ", hashMap size: " + AsyncBenchmark.hashMap.size();
-                prt(msg);
-            }
-
-            if(config.recover) {
-                benchmark = new AsyncBenchmark(config);
-                totalConnections = benchmark.get_totalConnections();
-                long currentTime = System.currentTimeMillis();
-                if(benchmark.debug) {
-                    msg = "In main..catch block after instanciate benchmark\n" +
-                        "currentTime = " + currentTime +
-                        ", totalConnections = " + totalConnections.get() +
-                        ",hashMap size: " + AsyncBenchmark.hashMap.size();
-                    prt(msg);
-                }
-
-                Thread.sleep(5000); // sleep 5 seconds
-
-                msg = "Reconnecting to these severs: " + config.servers;
-                prt(msg);
-
-                benchmark.connect(config.servers, "In catch Second Time");
-                totalConnections = benchmark.get_totalConnections();
-                msg = "Reconnected to these severs: '" + config.servers +
-                      "', totalConnections = " + totalConnections.get();
-                prt(msg);
-                if(numOfHosts != totalConnections.get() && fatalLevel.get() > 0) {
-                    msg = "Error!! We expect to connect " + numOfHosts + " hosts, which are " + config.servers + "\n";
-                    msg += "However, the actual total connections are " + totalConnections.get() + "\n";
-                    prt(msg);
-                    benchmark.client.close();
-                }
-                else if(fatalLevel.get() > 0) {
-                    msg = "There could be an error during this run which could be caused by a hick-up.";
-                    msg += "\nPlease check the logs for detailed infomation.";
-                    prt(msg);
-                }
-                if(benchmark.debug) {
-                    msg = "In main..catch block, these severs '" + config.servers + "' should be connected.\n";
-                    msg += "totalConnections = '" + totalConnections.get() + "'\n";
-                    prt(msg);
-                }
-                //Thread.sleep(120000);
-                if(benchmark.debug) {
-                    totalConnections = benchmark.get_totalConnections();
-                    msg = "In main..catch block Ready To Exit, totalConnections = " + totalConnections.get();
-                    prt(msg);
-                }
-                benchmark.readyToExit();
-            } // if(config.recover)
-            else {
-                msg = "Lost all connections without recover. Exit...";
-                prt(msg);
-            }
-        } // catch(org.voltdb.client.NoConnectionsException x)
+        benchmark.connect(config.servers);
+        benchmark.runBenchmark();
     }
 }

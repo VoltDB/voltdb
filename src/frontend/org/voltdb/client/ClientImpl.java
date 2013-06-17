@@ -37,7 +37,7 @@ import org.voltdb.utils.Encoder;
  *  and provides methods to call stored procedures and receive
  *  responses.
  */
-public final class ClientImpl implements Client, ReplicaProcCaller {
+public class ClientImpl implements Client, ReplicaProcCaller {
 
     // call initiated by the user use positive handles
     private final AtomicLong m_handle = new AtomicLong(0);
@@ -469,7 +469,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
 
 
     static final Logger LOG = Logger.getLogger(ClientImpl.class.getName());  // Logger shared by client package.
-    private final Distributer m_distributer;                             // de/multiplexes connections to a cluster
+    public Distributer m_distributer;                             // de/multiplexes connections to a cluster
     private final Object m_backpressureLock = new Object();
     private boolean m_backpressure = false;
 
