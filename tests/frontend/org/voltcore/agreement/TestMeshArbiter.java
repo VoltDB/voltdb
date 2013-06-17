@@ -55,7 +55,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
-import org.voltcore.agreement.AgreementSite.FaultMessage;
 import org.voltcore.messaging.FailureSiteUpdateMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.Subject;
@@ -85,6 +84,9 @@ public class TestMeshArbiter {
     MeshArbiter arbiter;
     final static Set<Long> hsids = ImmutableSet.of(0L,1L,2L,3L);
 
+    Maker<FailureSiteUpdateMessage> fsum =
+            a(FailureSiteUpdateMessage, with(fsumSite,1L),with(fsumTxnid,2L));
+
     @Before
     public void testSetup() {
         arbiter = new MeshArbiter(0L, mbox, aide);
@@ -92,14 +94,13 @@ public class TestMeshArbiter {
 
     @Test
     public void testBasicScenario() throws Exception {
-        Maker<FailureSiteUpdateMessage> fsum =
-                a(FailureSiteUpdateMessage, with(fsumSite,1L),with(fsumTxnid,2L));
+        Maker<FailureSiteUpdateMessage> siteOneFsum = fsum.but(with(fsumTxnid,2L));
 
         when(aide.getNewestSafeTransactionForInitiator(anyLong())).thenReturn(2L);
         when(mbox.recvBlocking(any(Subject[].class), eq(5L)))
-            .thenReturn(make(fsum.but(with(fsumSource, 0L))))
-            .thenReturn(make(fsum.but(with(fsumSource, 2L))))
-            .thenReturn(make(fsum.but(with(fsumSource, 3L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource, 0L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource, 2L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource, 3L))))
             ;
 
         Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L, true));
@@ -113,16 +114,18 @@ public class TestMeshArbiter {
 
     @Test
     public void testSubsequentFailures() throws Exception {
-        Maker<FailureSiteUpdateMessage> fsum =
-                a(FailureSiteUpdateMessage, with(fsumSite,1L),with(fsumTxnid,2L));
+        Maker<FailureSiteUpdateMessage> siteOneFsum =
+                fsum.but(with(fsumTxnid,2L));
+        Maker<FailureSiteUpdateMessage> siteTwoFsum =
+                fsum.but(with(fsumSite,2L),with(fsumTxnid,3L));
 
         when(aide.getNewestSafeTransactionForInitiator(1L)).thenReturn(2L);
         when(aide.getNewestSafeTransactionForInitiator(2L)).thenReturn(3L);
 
         when(mbox.recvBlocking(any(Subject[].class), eq(5L)))
-            .thenReturn(make(fsum.but(with(fsumSource, 0L))))
-            .thenReturn(make(fsum.but(with(fsumSource, 2L))))
-            .thenReturn(make(fsum.but(with(fsumSource, 3L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource, 0L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource, 2L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource, 3L))))
             ;
 
         Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L, true));
@@ -135,10 +138,10 @@ public class TestMeshArbiter {
 
         reset(mbox);
         when(mbox.recvBlocking(any(Subject[].class),eq(5L)))
-            .thenReturn(make(fsum.but(with(fsumSource,0L))))
-            .thenReturn(make(fsum.but(with(fsumSource,0L),with(fsumSite,2L),with(fsumTxnid,3L))))
-            .thenReturn(make(fsum.but(with(fsumSource,3L))))
-            .thenReturn(make(fsum.but(with(fsumSource,3L),with(fsumSite,2L),with(fsumTxnid,3L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource,0L))))
+            .thenReturn(make(siteTwoFsum.but(with(fsumSource,0L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource,3L))))
+            .thenReturn(make(siteTwoFsum.but(with(fsumSource,3L))))
         ;
 
         decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(2L, true));
@@ -153,13 +156,15 @@ public class TestMeshArbiter {
 
     @Test
     public void testInterleavedFailures() throws Exception {
-        Maker<FailureSiteUpdateMessage> fsum =
-                a(FailureSiteUpdateMessage, with(fsumSite,1L),with(fsumTxnid,3L));
+        Maker<FailureSiteUpdateMessage> siteOneFsum =
+                fsum.but(with(fsumTxnid,3L));
+        Maker<FailureSiteUpdateMessage> siteTwoFsum =
+                fsum.but(with(fsumSite,2L),with(fsumTxnid,4L));
 
         when(aide.getNewestSafeTransactionForInitiator(1L)).thenReturn(3L);
         when(aide.getNewestSafeTransactionForInitiator(2L)).thenReturn(4L);
         when(mbox.recvBlocking(any(Subject[].class), eq(5L)))
-            .thenReturn(make(fsum.but(with(fsumSource, 0L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource, 0L))))
             .thenReturn(new FaultMessage(2L, true))
             ;
 
@@ -174,10 +179,10 @@ public class TestMeshArbiter {
 
         reset(mbox);
         when(mbox.recvBlocking(any(Subject[].class),eq(5L)))
-            .thenReturn(make(fsum.but(with(fsumSource,0L))))
-            .thenReturn(make(fsum.but(with(fsumSource,0L),with(fsumSite,2L),with(fsumTxnid,4L))))
-            .thenReturn(make(fsum.but(with(fsumSource,3L))))
-            .thenReturn(make(fsum.but(with(fsumSource,3L),with(fsumSite,2L),with(fsumTxnid,4L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource,0L))))
+            .thenReturn(make(siteTwoFsum.but(with(fsumSource,0L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource,3L))))
+            .thenReturn(make(siteTwoFsum.but(with(fsumSource,3L))))
         ;
 
         decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(2L, true));
@@ -193,13 +198,15 @@ public class TestMeshArbiter {
 
     @Test
     public void testDuplicateSiteFaults() throws Exception {
-        Maker<FailureSiteUpdateMessage> fsum =
-                a(FailureSiteUpdateMessage, with(fsumSite,1L),with(fsumTxnid,5L));
+        Maker<FailureSiteUpdateMessage> siteOneFsum  =
+                fsum.but(with(fsumTxnid,5L));
+        Maker<FailureSiteUpdateMessage> siteTwoFsum =
+                fsum.but(with(fsumSite,2L),with(fsumTxnid,6L));
 
         when(aide.getNewestSafeTransactionForInitiator(1L)).thenReturn(5L);
         when(aide.getNewestSafeTransactionForInitiator(2L)).thenReturn(6L);
         when(mbox.recvBlocking(any(Subject[].class), eq(5L)))
-            .thenReturn(make(fsum.but(with(fsumSource, 0L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource, 0L))))
             .thenReturn(new FaultMessage(2L, true))
             ;
 
@@ -223,16 +230,16 @@ public class TestMeshArbiter {
 
         reset(mbox);
         when(mbox.recvBlocking(any(Subject[].class),eq(5L)))
-            .thenReturn(make(fsum.but(with(fsumSource,0L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource,0L))))
             .thenReturn(new FaultMessage(1L, true))
-            .thenReturn(make(fsum.but(with(fsumSource,0L))))
-            .thenReturn(make(fsum.but(with(fsumSource,0L),with(fsumSite,2L),with(fsumTxnid,4L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource,0L))))
+            .thenReturn(make(siteTwoFsum.but(with(fsumSource,0L))))
             .thenReturn(new FaultMessage(2L, true))
-            .thenReturn(make(fsum.but(with(fsumSource,0L),with(fsumSite,2L),with(fsumTxnid,4L))))
-            .thenReturn(make(fsum.but(with(fsumSource,3L))))
-            .thenReturn(make(fsum.but(with(fsumSource,3L))))
-            .thenReturn(make(fsum.but(with(fsumSource,3L),with(fsumSite,2L),with(fsumTxnid,6L))))
-            .thenReturn(make(fsum.but(with(fsumSource,3L),with(fsumSite,2L),with(fsumTxnid,6L))))
+            .thenReturn(make(siteTwoFsum.but(with(fsumSource,0L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource,3L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource,3L))))
+            .thenReturn(make(siteTwoFsum.but(with(fsumSource,3L))))
+            .thenReturn(make(siteTwoFsum.but(with(fsumSource,3L))))
         ;
 
         decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(2L, true));
@@ -257,17 +264,16 @@ public class TestMeshArbiter {
 
     @Test
     public void testPingsOnLongReceives() throws Exception {
-        final Maker<FailureSiteUpdateMessage> fsum =
-                a(FailureSiteUpdateMessage, with(fsumSite,1L),with(fsumTxnid,2L));
+        Maker<FailureSiteUpdateMessage> siteOneFsum = fsum.but(with(fsumTxnid,2L));
 
         when(aide.getNewestSafeTransactionForInitiator(1L)).thenReturn(2L);
         when(mbox.recvBlocking(any(Subject[].class), eq(5L)))
             .thenReturn((VoltMessage)null)
             .thenReturn((VoltMessage)null)
             .thenReturn((VoltMessage)null)
-            .thenReturn(make(fsum.but(with(fsumSource, 0L))))
-            .thenReturn(make(fsum.but(with(fsumSource, 2L))))
-            .thenReturn(make(fsum.but(with(fsumSource, 3L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource, 0L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource, 2L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource, 3L))))
             ;
 
         Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L, true));

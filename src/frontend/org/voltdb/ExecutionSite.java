@@ -1531,6 +1531,11 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                 " survivors with lastKnownGloballyCommitedMultiPartTxnId "
                 + lastKnownGloballyCommitedMultiPartTxnId);
 
+        Map<Long, Boolean> failedSites = new HashMap<Long, Boolean>();
+        for (Long site: m_pendingFailedSites) {
+            failedSites.put(site, true);
+        }
+
         for (Long site : m_pendingFailedSites) {
             /*
              * Check the queue for the data and get it from the ledger if necessary.\
@@ -1540,7 +1545,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             Long txnId = null;
             FailureSiteUpdateMessage srcmsg =
                 new FailureSiteUpdateMessage(
-                        m_pendingFailedSites,
+                        failedSites,
                         site,
                         txnId != null ? txnId : Long.MIN_VALUE,
                         lastKnownGloballyCommitedMultiPartTxnId);
@@ -1619,7 +1624,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             if (fm != null) {
                 hostLog.info("Received failure message from " + CoreUtils.hsIdToString(fm.m_sourceHSId) +
                         " for failed sites " +
-                        CoreUtils.hsIdCollectionToString(fm.m_failedHSIds) + " for initiator id " +
+                        CoreUtils.hsIdCollectionToString(fm.m_failedHSIds.keySet()) + " for initiator id " +
                         CoreUtils.hsIdToString(fm.m_failedHSId) +
                         " with commit point " + fm.m_committedTxnId + " safe txn id " + fm.m_safeTxnId);
             }

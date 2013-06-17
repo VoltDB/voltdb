@@ -19,15 +19,16 @@
 package org.voltcore.messaging;
 
 import java.nio.ByteBuffer;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.Map;
 
 import org.voltcore.utils.CoreUtils;
+
+import com.google.common.collect.ImmutableMap;
 
 public class FailureSiteUpdateMessage extends VoltMessage {
 
     /** Site id of the reported failed sites */
-    public HashSet<Long> m_failedHSIds = new HashSet<Long>();
+    public Map<Long,Boolean> m_failedHSIds = ImmutableMap.of();
 
     /** Site id of the reported failed site **/
     public long m_failedHSId;
@@ -39,12 +40,12 @@ public class FailureSiteUpdateMessage extends VoltMessage {
     public long m_committedTxnId;
 
     public FailureSiteUpdateMessage(
-            Set<Long> failedHSIds,
+            Map<Long,Boolean> failedHSIds,
             long failedHSId,
             long safeTxnId,
             long committedTxnId)
     {
-        m_failedHSIds = new HashSet<Long>(failedHSIds);
+        m_failedHSIds = ImmutableMap.copyOf(failedHSIds);
         m_failedHSId = failedHSId;
         m_safeTxnId = safeTxnId;
         m_committedTxnId = committedTxnId;
@@ -62,37 +63,44 @@ public class FailureSiteUpdateMessage extends VoltMessage {
         int msgsize =
             3 * 8 + // 3 longs (initiatorForSafeTxnId, safeTxnId, committedTxnId)
             4 + // failed host count int
-            (8 * m_failedHSIds.size()); // one long per failed host
+            ((8 + 1) * m_failedHSIds.size()); // one long + 1 byte per failed host
         msgsize += super.getSerializedSize();
         return msgsize;
     }
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) {
-        buf.put(VoltMessageFactory.FAILURE_SITE_UPDATE_ID);
+        flattenToBuffer(buf, VoltMessageFactory.FAILURE_SITE_UPDATE_ID);
+        buf.limit(buf.position());
+        assert(buf.capacity() == buf.position());
+    }
+
+    protected void flattenToBuffer(ByteBuffer buf, byte msgId) {
+        buf.put(msgId);
         buf.putInt(m_failedHSIds.size());
-        for (Long hostId : m_failedHSIds) {
-            buf.putLong(hostId);
+        for (Map.Entry<Long, Boolean> entry : m_failedHSIds.entrySet()) {
+            buf.putLong(entry.getKey());
+            buf.put(entry.getValue() ? (byte)1 : (byte)0);
         }
         buf.putLong(m_failedHSId);
         buf.putLong(m_safeTxnId);
         buf.putLong(m_committedTxnId);
-
-        assert(buf.capacity() == buf.position());
-        buf.limit(buf.position());
     }
 
     @Override
     public void initFromBuffer(ByteBuffer buf) {
         int numIds = buf.getInt();
+        ImmutableMap.Builder<Long, Boolean> builder = ImmutableMap.builder();
         for (int ii = 0; ii < numIds; ii++) {
-            m_failedHSIds.add(buf.getLong());
+            builder.put(buf.getLong(), buf.get() == (byte)0 ? false : true);
         }
+        m_failedHSIds = builder.build();
         m_failedHSId = buf.getLong();
         m_safeTxnId = buf.getLong();
         m_committedTxnId = buf.getLong();
 
-        assert(buf.capacity() == buf.position());
+        assert(m_subject != Subject.FAILURE_SITE_UPDATE.getId()
+            || buf.capacity() == buf.position());
     }
 
 
@@ -103,7 +111,7 @@ public class FailureSiteUpdateMessage extends VoltMessage {
         sb.append(" from site: HOST ");
         sb.append((int)m_sourceHSId).append(" SITE ").append((int)(m_sourceHSId >> 32));
         sb.append(" for failed hosts: ");
-        for (Long hsId : m_failedHSIds) {
+        for (Long hsId : m_failedHSIds.keySet()) {
             sb.append(CoreUtils.hsIdToString(hsId)).append(' ');
         }
         sb.append(" failed site id:").

@@ -51,7 +51,6 @@ import org.voltcore.messaging.HeartbeatResponseMessage;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.RecoveryMessage;
-import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
@@ -109,37 +108,6 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     private final DisconnectFailedHostsCallback m_failedHostsCallback;
     private final MeshArbiter m_meshArbiter;
 
-
-    public static final class FaultMessage extends VoltMessage {
-
-        public final long failedSite;
-        public final boolean witnessed;
-
-        public FaultMessage(long failedSite, boolean witnessed) {
-            this.failedSite = failedSite;
-            this.witnessed = witnessed;
-        }
-
-        @Override
-        public int getSerializedSize() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void flattenToBuffer(ByteBuffer buf) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        protected void initFromBuffer(ByteBuffer buf) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public byte getSubject() {
-            return Subject.FAILURE.getId();
-        }
-    }
 
     public AgreementSite(
             long myAgreementHSId,

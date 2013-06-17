@@ -40,9 +40,10 @@ public class FailureSiteUpdateMatchers {
 
             @Override
             public void describeTo(Description d) {
-                d.appendText("FailureSiteUpdateMessage [ failedSite: ")
-                .appendValue(site).appendText(", txnid: ")
-                .appendValue(txnid).appendText("]");
+                d.appendText("FailureSiteUpdateMessage [ ")
+                .appendText("failedSite: ").appendValue(site)
+                .appendText(", txnid: ").appendValue(txnid)
+                .appendText("]");
             }
 
             @Override

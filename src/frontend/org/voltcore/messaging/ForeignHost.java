@@ -318,7 +318,7 @@ public class ForeignHost {
         // even if it hasn't directly witnessed a node fault.
         if (message instanceof FailureSiteUpdateMessage)
         {
-            for (long failedHostId : ((FailureSiteUpdateMessage)message).m_failedHSIds) {
+            for (long failedHostId : (((FailureSiteUpdateMessage)message).m_failedHSIds).keySet()) {
                 m_hostMessenger.relayForeignHostFailed((int)failedHostId);
             }
         }
