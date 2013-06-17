@@ -1,7 +1,15 @@
 <?xml version="1.0"?>
 <deployment>
-    <cluster hostcount="1" sitesperhost="2" kfactor="0" />
+    <cluster hostcount="3" sitesperhost="6" kfactor="1" />
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
+    <commandlog logsize="1024" enabled="true" synchronous="true">
+        <frequency transactions="2147483647" time="200"/>
+    </commandlog>
+    <paths>
+        <voltdbroot path="/localhome/prosegay/voltdbroot"/>
+        <commandlog path="/localhome/prosegay/command_log"/>
+        <commandlogsnapshot path="/localhome/prosegay/command_log_snapshot"/>
+    </paths>
 </deployment>
