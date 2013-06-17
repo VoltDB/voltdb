@@ -541,8 +541,8 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_FUNCTION: {
         return "FUNCTION";
     }
-    case EXPRESSION_TYPE_INLISTBUILDER: {
-        return "INLISTBUILDER";
+    case EXPRESSION_TYPE_VALUE_VECTOR: {
+        return "VALUE_VECTOR";
     }
     case EXPRESSION_TYPE_HASH_RANGE: {
         return "HASH_RANGE";
@@ -617,8 +617,8 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_AGGREGATE_AVG;
     } else if (str == "FUNCTION") {
         return EXPRESSION_TYPE_FUNCTION;
-    } else if (str == "INLISTBUILDER") {
-        return EXPRESSION_TYPE_INLISTBUILDER;
+    } else if (str == "VALUE_VECTOR") {
+        return EXPRESSION_TYPE_VALUE_VECTOR;
     } else if (str == "HASH_RANGE") {
         return EXPRESSION_TYPE_HASH_RANGE;
     }

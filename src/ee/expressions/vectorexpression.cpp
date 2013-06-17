@@ -27,15 +27,15 @@ namespace voltdb {
  * It is always the rhs of an IN expression like "col IN (0, -1, ?)", especially useful when the
  * IN filter is not index-optimized and when the list element expressions are not all constants.
  */
-class InListBuilderExpression : public AbstractExpression {
+class VectorExpression : public AbstractExpression {
 public:
-    InListBuilderExpression(ValueType elementType, const std::vector<AbstractExpression *>& arguments)
-        : AbstractExpression(EXPRESSION_TYPE_INLISTBUILDER), m_args(arguments)
+    VectorExpression(ValueType elementType, const std::vector<AbstractExpression *>& arguments)
+        : AbstractExpression(EXPRESSION_TYPE_VALUE_VECTOR), m_args(arguments)
     {
         m_inList = ValueFactory::getArrayValueFromSizeAndType(arguments.size(), elementType);
     }
 
-    virtual ~InListBuilderExpression()
+    virtual ~VectorExpression()
     {
         size_t i = m_args.size();
         while (i--) {
@@ -84,7 +84,7 @@ public:
 
     std::string debugInfo(const std::string &spacer) const
     {
-        return spacer + "InListBuilderExpression\n";
+        return spacer + "VectorExpression\n";
     }
 
 private:
@@ -93,10 +93,10 @@ private:
 };
 
 AbstractExpression*
-ExpressionUtil::inListFactory(ValueType elementType, const std::vector<AbstractExpression*>* arguments)
+ExpressionUtil::vectorFactory(ValueType elementType, const std::vector<AbstractExpression*>* arguments)
 {
     assert(arguments);
-    return new InListBuilderExpression(elementType, *arguments);
+    return new VectorExpression(elementType, *arguments);
 }
 
 }

@@ -2262,9 +2262,9 @@ TEST_F(NValueTest, TestInList)
         initConstantArray(*int_constants_rhs2, int_NV_set2);
 
         AbstractExpression* in_list_of_int_constants1 =
-           ExpressionUtil::inListFactory(VALUE_TYPE_INTEGER, int_constants_rhs1);
+           ExpressionUtil::vectorFactory(VALUE_TYPE_INTEGER, int_constants_rhs1);
         AbstractExpression* in_list_of_int_constants2 =
-           ExpressionUtil::inListFactory(VALUE_TYPE_INTEGER, int_constants_rhs2);
+           ExpressionUtil::vectorFactory(VALUE_TYPE_INTEGER, int_constants_rhs2);
 
         in_expression =
             ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
@@ -2289,9 +2289,9 @@ TEST_F(NValueTest, TestInList)
         initConstantArray(*int_constants_rhs2, int_NV_set2);
 
         AbstractExpression* in_list_of_int_constants1 =
-           ExpressionUtil::inListFactory(VALUE_TYPE_INTEGER, int_constants_rhs1);
+           ExpressionUtil::vectorFactory(VALUE_TYPE_INTEGER, int_constants_rhs1);
         AbstractExpression* in_list_of_int_constants2 =
-           ExpressionUtil::inListFactory(VALUE_TYPE_INTEGER, int_constants_rhs2);
+           ExpressionUtil::vectorFactory(VALUE_TYPE_INTEGER, int_constants_rhs2);
 
         in_expression =
             ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
@@ -2355,9 +2355,9 @@ TEST_F(NValueTest, TestInList)
         initConstantArray(*string_constants_rhs2, string_set2);
 
         AbstractExpression* in_list_of_string_constants1 =
-           ExpressionUtil::inListFactory(VALUE_TYPE_VARCHAR, string_constants_rhs1);
+           ExpressionUtil::vectorFactory(VALUE_TYPE_VARCHAR, string_constants_rhs1);
         AbstractExpression* in_list_of_string_constants2 =
-           ExpressionUtil::inListFactory(VALUE_TYPE_VARCHAR, string_constants_rhs2);
+           ExpressionUtil::vectorFactory(VALUE_TYPE_VARCHAR, string_constants_rhs2);
 
         in_expression =
             ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
@@ -2382,9 +2382,9 @@ TEST_F(NValueTest, TestInList)
         initConstantArray(*string_constants_rhs2, string_set2);
 
         AbstractExpression* in_list_of_string_constants1 =
-           ExpressionUtil::inListFactory(VALUE_TYPE_VARCHAR, string_constants_rhs1);
+           ExpressionUtil::vectorFactory(VALUE_TYPE_VARCHAR, string_constants_rhs1);
         AbstractExpression* in_list_of_string_constants2 =
-           ExpressionUtil::inListFactory(VALUE_TYPE_VARCHAR, string_constants_rhs2);
+           ExpressionUtil::vectorFactory(VALUE_TYPE_VARCHAR, string_constants_rhs2);
 
         in_expression =
             ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
