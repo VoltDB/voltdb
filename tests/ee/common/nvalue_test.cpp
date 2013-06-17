@@ -2459,7 +2459,7 @@ TEST_F(NValueTest, TestDedupAndSort) {
             vectorValues.push_back(nvalue);
         }
         arrayValue = ValueFactory::getArrayValueFromSizeAndType(len, VALUE_TYPE_BIGINT);
-        EXPECT_TRUE(vectorValues.size() == len);
+        assert(vectorValues.size() == len);
         arrayValue.setArrayElements(vectorValues);
 
         // dedup, cast and sort

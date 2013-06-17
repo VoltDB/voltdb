@@ -37,7 +37,7 @@ import org.voltdb.types.PlanNodeType;
  */
 public class MaterializedScanPlanNode extends AbstractPlanNode {
 
-    protected AbstractExpression m_rowData;
+    protected AbstractExpression m_tableData;
 
     public enum Members {
         TABLE_DATA;
@@ -52,19 +52,14 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
         return PlanNodeType.MATERIALIZEDSCAN;
     }
 
-    public void setRowData(AbstractExpression rowData) {
+    public void setTableData(AbstractExpression rowData) {
         assert(rowData instanceof VectorValueExpression);
-        m_rowData = rowData;
-    }
-
-    public AbstractExpression getTableData() {
-        return m_rowData;
+        m_tableData = rowData;
     }
 
     /**
      * Accessor for flag marking the plan as guaranteeing an identical result/effect
      * when "replayed" against the same database state, such as during replication or CL recovery.
-     * @return false
      */
     @Override
     public boolean isOrderDeterministic() {
@@ -95,8 +90,8 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
 
         stringer.key(Members.TABLE_DATA.name());
         stringer.object();
-        assert(m_rowData != null);
-        m_rowData.toJSONString(stringer);
+        assert(m_tableData != null);
+        m_tableData.toJSONString(stringer);
         stringer.endObject();
     }
 
@@ -106,6 +101,6 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
 
         assert(!obj.isNull(Members.TABLE_DATA.name()));
         JSONObject rowDataObj = obj.getJSONObject(Members.TABLE_DATA.name());
-        m_rowData = AbstractExpression.fromJSONObject(rowDataObj, db);
+        m_tableData = AbstractExpression.fromJSONObject(rowDataObj, db);
     }
 }

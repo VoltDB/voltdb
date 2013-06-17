@@ -15,8 +15,6 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <iostream>
-#include <set>
 #include "materializedscanexecutor.h"
 #include "common/debuglog.h"
 #include "common/common.h"
@@ -28,8 +26,10 @@
 #include "plannodes/materializedscanplannode.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
-#include "storage/tablefactory.h"
-#include "storage/tableiterator.h"
+#include "boost/foreach.hpp"
+
+#include <iostream>
+#include <set>
 
 using namespace voltdb;
 
@@ -46,7 +46,8 @@ bool MaterializedScanExecutor::p_init(AbstractPlanNode* abstract_node,
     return true;
 }
 
-bool MaterializedScanExecutor::p_execute(const NValueArray &params) {
+bool MaterializedScanExecutor::p_execute(const NValueArray &params)
+{
     MaterializedScanPlanNode* node = dynamic_cast<MaterializedScanPlanNode*>(m_abstractNode);
     assert(node);
 
@@ -58,7 +59,6 @@ bool MaterializedScanExecutor::p_execute(const NValueArray &params) {
 
     // get the output type
     ValueType outputType = output_table->schema()->columnType(0);
-    bool outputCantBeNull = !output_table->schema()->columnAllowNull(0);
 
     AbstractExpression* rowsExpression = node->getTableRowsExpression();
     assert(rowsExpression);
@@ -77,12 +77,8 @@ bool MaterializedScanExecutor::p_execute(const NValueArray &params) {
     arrayNValue.castAndSortAndDedupArrayForInList(outputType, sortedUniques);
 
     // insert all items in the set in order
-    std::vector<NValue>::const_iterator iter;
-    for (iter = sortedUniques.begin(); iter != sortedUniques.end(); iter++) {
-        if ((*iter).isNull() && outputCantBeNull) {
-            continue;
-        }
-        tmptup.setNValue(0, *iter);
+    BOOST_FOREACH(NValue &value, sortedUniques) {
+        tmptup.setNValue(0, value);
         output_table->insertTuple(tmptup);
     }
 
@@ -92,6 +88,7 @@ bool MaterializedScanExecutor::p_execute(const NValueArray &params) {
     return true;
 }
 
-MaterializedScanExecutor::~MaterializedScanExecutor() {
+MaterializedScanExecutor::~MaterializedScanExecutor()
+{
 }
 

@@ -27,9 +27,7 @@ namespace voltdb {
         delete getOutputTable();
         setOutputTable(NULL);
 
-        if (m_tableRowsExpression) {
-            delete m_tableRowsExpression;
-        }
+        delete m_tableRowsExpression;
     }
 
     std::string MaterializedScanPlanNode::debugInfo(const std::string &spacer) const {

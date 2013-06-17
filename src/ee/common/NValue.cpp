@@ -19,6 +19,7 @@
 #include "common/StlFriendlyNValue.h"
 #include "common/executorcontext.hpp"
 #include "logging/LogManager.h"
+#include "boost/foreach.hpp"
 
 #include <cstdio>
 #include <sstream>
@@ -540,9 +541,8 @@ void NValue::castAndSortAndDedupArrayForInList(const ValueType outputType, std::
     }
 
     // insert all items in the set in order
-    std::set<StlFriendlyNValue>::const_iterator iter;
-    for (iter = uniques.begin(); iter != uniques.end(); iter++) {
-        outList.push_back(*iter);
+    BOOST_FOREACH(StlFriendlyNValue value, uniques) {
+        outList.push_back(value);
     }
 }
 
