@@ -232,7 +232,7 @@ private:
     uint32_t m_nextFreeTuple;
     uint32_t m_lastCompactionOffset;
     const double m_tuplesPerBlockDivNumBuckets;
-    
+
     /*
      * queue of offsets to <b>once used and then deleted</b> tuples.
      * Tuples after m_nextFreeTuple are also free, this queue
@@ -244,7 +244,7 @@ private:
 
     TBBucketPtr m_bucket;
     int m_bucketIndex;
-    
+
 };
 
 }
