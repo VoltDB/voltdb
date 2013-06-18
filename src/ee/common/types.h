@@ -286,6 +286,7 @@ enum ExpressionType {
     EXPRESSION_TYPE_VALUE_TUPLE                     = 32,
     EXPRESSION_TYPE_VALUE_TUPLE_ADDRESS             = 33,
     EXPRESSION_TYPE_VALUE_NULL                      = 34,
+    EXPRESSION_TYPE_VALUE_VECTOR                    = 35,
 
     // -----------------------------
     // Aggregates
@@ -301,7 +302,6 @@ enum ExpressionType {
     // Functions
     // -----------------------------
     EXPRESSION_TYPE_FUNCTION                        = 100,
-    EXPRESSION_TYPE_INLISTBUILDER                   = 101, // rhs operand of [ ... IN (...) ]
 
 
     // -----------------------------
