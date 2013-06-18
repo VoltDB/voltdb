@@ -26,26 +26,19 @@ package org.voltdb.planner;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 
 
+
 public class TestPlansIn extends PlannerTestCase {
 
-    public void testPresentlyUnsupportedIn() {
-
-        failToCompile("select * from new_order where no_w_id in (5,7);",
-                "VoltDB does not support SQL IN expressions.");
-        failToCompile("select * from new_order where no_w_id in (?);",
-                "VoltDB does not support SQL IN expressions.");
-        failToCompile("select * from new_order where no_w_id in (?,5,3,?);",
-                "VoltDB does not support SQL IN expressions.");
-        failToCompile("select * from new_order where no_w_id not in (?,5,3,?);",
-                "VoltDB does not support SQL IN expressions.");
-        failToCompile("select * from warehouse where w_name not in (?, 'foo');",
-                "VoltDB does not support SQL IN expressions.");
-        failToCompile("select * from new_order where no_w_id in (no_d_id, no_o_id, ?, 7);",
-                "VoltDB does not support SQL IN expressions.");
-        failToCompile("select * from new_order where no_w_id in (abs(-1), ?, 17761776);",
-                "VoltDB does not support SQL IN expressions.");
-        failToCompile("select * from new_order where no_w_id in (abs(17761776), ?, 17761776) and no_d_id in (abs(-1), ?, 17761776);",
-                "VoltDB does not support SQL IN expressions.");
+    public void testIn()
+    {
+        compile("select * from new_order where no_w_id in (5,7);");
+        compile("select * from new_order where no_w_id in (?);");
+        compile("select * from new_order where no_w_id in (?,5,3,?);");
+        compile("select * from new_order where no_w_id not in (?,5,3,?);");
+        compile("select * from warehouse where w_name not in (?, 'foo');");
+        compile("select * from new_order where no_w_id in (no_d_id, no_o_id, ?, 7);");
+        compile("select * from new_order where no_w_id in (abs(-1), ?, 17761776);");
+        compile("select * from new_order where no_w_id in (abs(17761776), ?, 17761776) and no_d_id in (abs(-1), ?, 17761776);");
     }
 
     public void testNonSupportedIn() {

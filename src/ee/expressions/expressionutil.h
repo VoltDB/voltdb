@@ -82,7 +82,7 @@ public:
     // Implemented in functionexpression.cpp because function expression handling is a system unto itself.
     static AbstractExpression * functionFactory(int functionId, const std::vector<AbstractExpression*>* arguments);
 
-    static AbstractExpression* inListFactory(ValueType vt, const std::vector<AbstractExpression*>* args);
+    static AbstractExpression* vectorFactory(ValueType vt, const std::vector<AbstractExpression*>* args);
 
 };
 

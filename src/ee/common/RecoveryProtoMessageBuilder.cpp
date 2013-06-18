@@ -33,7 +33,9 @@ RecoveryProtoMsgBuilder::RecoveryProtoMsgBuilder(
         TupleSerializer *serializer,
         const TupleSchema *schema) :
     m_out(out),
-    m_tupleCount(0), m_maxSerializedSize(serializer->getMaxSerializedTupleSize(schema)) {
+    m_tupleCount(0),
+    m_maxSerializedSize(serializer->getMaxSerializedTupleSize(schema))
+{
     assert(m_out);
     m_out->writeByte(static_cast<int8_t>(type));
     m_out->writeInt(tableId);

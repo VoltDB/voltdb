@@ -221,9 +221,11 @@ public:
         return m_bucket;
     }
 private:
-    uint32_t m_references;
+#ifdef MEMCHECK
     Table* m_table;
+#endif
     char*   m_storage;
+    uint32_t m_references;
     uint32_t m_tupleLength;
     uint32_t m_tuplesPerBlock;
     uint32_t m_activeTuples;
@@ -240,8 +242,9 @@ private:
      **/
     std::deque<TruncatedInt, FastAllocator<TruncatedInt> > m_freeList;
 
-    int m_bucketIndex;
     TBBucketPtr m_bucket;
+    int m_bucketIndex;
+
 };
 
 }

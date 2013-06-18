@@ -130,15 +130,13 @@ public class TestParsedStatements extends TestCase {
     }
 
     public void testParsedInStatements() {
-        //These pass if the code in AbstractParsedStmt#parseOperationExpression is removed
-
-        /*runSQLTest("1", "select * from new_order where no_w_id in (5,7);");
+        runSQLTest("1", "select * from new_order where no_w_id in (5,7);");
         runSQLTest("2", "select * from new_order where no_w_id in (?);");
         runSQLTest("3", "select * from new_order where no_w_id in (?,5,3,?);");
         runSQLTest("4", "select * from new_order where no_w_id not in (?,5,3,?);");
         runSQLTest("5", "select * from warehouse where w_name not in (?, 'foo');");
         runSQLTest("6", "select * from new_order where no_w_id in (no_d_id, no_o_id, ?, 7);");
         runSQLTest("7", "select * from new_order where no_w_id in (abs(-1), ?, 17761776);");
-        runSQLTest("8", "select * from new_order where no_w_id in (abs(17761776), ?, 17761776) and no_d_id in (abs(-1), ?, 17761776);");*/
+        runSQLTest("8", "select * from new_order where no_w_id in (abs(17761776), ?, 17761776) and no_d_id in (abs(-1), ?, 17761776);");
     }
 }
