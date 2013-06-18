@@ -31,6 +31,7 @@ public class StatsProcProfTable {
     // One row (procedure) of min/max/avg data aggregated across sites and hosts
     static class ProcProfRow implements Comparable<ProcProfRow>
     {
+        long timestamp;
         String procedure;
         long invocations;
         long partition;
@@ -44,10 +45,11 @@ public class StatsProcProfTable {
         // track which partitions have been witnessed.
         private final Set<Long> seenPartitions;
 
-        public ProcProfRow(String procedure, long partition,
+        public ProcProfRow(long timestamp, String procedure, long partition,
                 long timedInvocations, long invocations,
                 long min, long max, long avg, long failures, long aborts)
         {
+            this.timestamp = timestamp;
             this.procedure = procedure;
             this.partition = partition;
             this.invocations = invocations;
@@ -118,11 +120,11 @@ public class StatsProcProfTable {
     }
 
     // Add or update the corresponding row.
-    public void updateTable(String procedure, long partition,
+    public void updateTable(long timestamp, String procedure, long partition,
             long invocations, long timedInvocations,
             long min, long max, long avg, long failures, long aborts)
     {
-        ProcProfRow in = new ProcProfRow(procedure, partition,
+        ProcProfRow in = new ProcProfRow(timestamp, procedure, partition,
                 invocations, timedInvocations,
                 min, max, avg, failures, aborts);
         ProcProfRow exists = m_table.ceiling(in);
@@ -151,10 +153,10 @@ public class StatsProcProfTable {
         }
 
         VoltTable result = TableShorthand.tableFromShorthand(
-                tableName + "(PROCEDURE:VARCHAR, WEIGHTED_PERC:BIGINT, INVOCATIONS:BIGINT," +
+                tableName + "(TIMESTAMP:BIGINT, PROCEDURE:VARCHAR, WEIGHTED_PERC:BIGINT, INVOCATIONS:BIGINT," +
                 "AVG:BIGINT, MIN:BIGINT, MAX:BIGINT, ABORTS:BIGINT, FAILURES:BIGINT)");
         for (ProcProfRow row : sorted ) {
-            result.addRow(row.procedure, calculatePercent(row.avg * row.invocations, sumOfAverage),
+            result.addRow(row.timestamp, row.procedure, calculatePercent(row.avg * row.invocations, sumOfAverage),
                     row.invocations, row.avg, row.min, row.max, row.aborts, row.failures);
         }
 
