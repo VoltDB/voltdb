@@ -84,18 +84,19 @@ function async-benchmark-help() {
 
 # latencyreport: default is OFF
 # ratelimit: must be a reasonable value if lantencyreport is ON
+# Disable the comments to get latency report
 function async-benchmark() {
     srccompile
     java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voter.AsyncBenchmark \
-        --latencyreport=true \
-        --ratelimit=100000 \
         --displayinterval=5 \
         --warmup=5 \
         --duration=120 \
         --servers=localhost:21212 \
         --contestants=6 \
         --maxvotes=2
+#        --latencyreport=true \
+#        --ratelimit=100000
 }
 
 function simple-benchmark() {

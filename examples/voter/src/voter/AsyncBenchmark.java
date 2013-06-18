@@ -180,7 +180,7 @@ public class AsyncBenchmark {
         System.out.println(HORIZONTAL_RULE);
         System.out.println(config.getConfigDumpString());
         if(config.latencyreport) {
-            System.out.println("NOTICE: Option latencyreport is ON for async run, please set a resonable ratelimit.\n");
+            System.out.println("NOTICE: Option latencyreport is ON for async run, please set a reasonable ratelimit.\n");
         }
     }
 

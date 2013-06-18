@@ -469,7 +469,7 @@ public class ClientStats {
             for(int i = 0; i < height; i++) {
                 sb.append("|");
             }
-            sb.append(String.format("]%7.5f%%\n", (double)m_latencyBy100ms.unaccountedTxns / (double)m_latencyBy100ms.totalTxns));
+            sb.append(String.format("]%7.3f%%\n", ((double)m_latencyBy100ms.unaccountedTxns / (double)m_latencyBy100ms.totalTxns * 100)));
             return sb.toString();
         }
     }
