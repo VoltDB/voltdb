@@ -189,8 +189,6 @@ public class SnapshotSiteProcessor {
      */
     private final SiteTaskerQueue m_siteTaskerQueue;
 
-    private final boolean m_isIV2Enabled = VoltDB.instance().isIV2Enabled();
-
     private final Random m_random = new Random();
 
     /*
@@ -242,14 +240,6 @@ public class SnapshotSiteProcessor {
     }
 
     private long m_quietUntil = 0;
-
-    private boolean inQuietPeriod() {
-        if (m_isIV2Enabled) {
-            return false;
-        } else {
-            return org.voltcore.utils.EstTime.currentTimeMillis() < m_quietUntil;
-        }
-    }
 
     public SnapshotSiteProcessor(SiteTaskerQueue siteQueue, int snapshotPriority) {
         this(siteQueue, snapshotPriority, new IdlePredicate() {
@@ -321,7 +311,7 @@ public class SnapshotSiteProcessor {
                  * If snapshot priority is 0 then running the jigger immediately is the specified
                  * policy anyways. 10 would be the largest delay
                  */
-                if (m_isIV2Enabled && m_snapshotPriority > 0) {
+                if (m_snapshotPriority > 0) {
                     final long now = System.currentTimeMillis();
                     //Ask if the site is idle, and if it is queue the work immediately
                     if (m_idlePredicate.idle(now)) {
@@ -437,21 +427,19 @@ public class SnapshotSiteProcessor {
          * requeue themselves as the snapshot progresses. See intializeBufferPool
          * and the discard method of BBContainer for how requeuing works.
          */
-        if (m_isIV2Enabled) {
-            for (int ii = 0; ii < m_availableSnapshotBuffers.size(); ii++) {
-                VoltDB.instance().schedulePriorityWork(
-                        new Runnable() {
-                            @Override
-                            public void run()
-                            {
-                                m_siteTaskerQueue.offer(new SnapshotTask());
-                            }
-                        },
-                        (m_quietUntil + (5 * m_snapshotPriority) - now),
-                        0,
-                        TimeUnit.MILLISECONDS);
-                m_quietUntil += 5 * m_snapshotPriority;
-            }
+        for (int ii = 0; ii < m_availableSnapshotBuffers.size(); ii++) {
+            VoltDB.instance().schedulePriorityWork(
+                    new Runnable() {
+                        @Override
+                        public void run()
+                        {
+                            m_siteTaskerQueue.offer(new SnapshotTask());
+                        }
+                    },
+                    (m_quietUntil + (5 * m_snapshotPriority) - now),
+                    0,
+                    TimeUnit.MILLISECONDS);
+            m_quietUntil += 5 * m_snapshotPriority;
         }
     }
 
@@ -495,12 +483,6 @@ public class SnapshotSiteProcessor {
                 VoltDB.crashLocalVoltDB("Attempted to activate copy on write mode for table "
                                         + table.getTypeName() + " and failed", false, null);
             }
-        }
-    }
-
-    private void quietPeriodSet(boolean ignoreQuietPeriod) {
-        if (!m_isIV2Enabled && !ignoreQuietPeriod && m_snapshotPriority > 0) {
-            m_quietUntil = System.currentTimeMillis() + (5 * m_snapshotPriority) + ((long)(m_random.nextDouble() * 15));
         }
     }
 
@@ -635,7 +617,7 @@ public class SnapshotSiteProcessor {
          * a snapshot is finished. If the snapshot buffer is loaned out that means
          * it is pending I/O somewhere so there is no work to do until it comes back.
          */
-        if (m_snapshotTableTasks == null || (!ignoreQuietPeriod && inQuietPeriod())) {
+        if (m_snapshotTableTasks == null) {
             return retval;
         }
 
@@ -685,7 +667,6 @@ public class SnapshotSiteProcessor {
                 }
             } else {
                 retval = writeSnapshotBlocksToTargets(tableId, outputBuffers, serialized);
-                quietPeriodSet(ignoreQuietPeriod);
                 break;
             }
         }
