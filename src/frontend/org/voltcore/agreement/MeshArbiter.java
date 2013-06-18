@@ -23,7 +23,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.TreeSet;
 
 import org.voltcore.logging.VoltLogger;
@@ -38,19 +37,22 @@ import org.voltdb.VoltDB;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import com.google.common.primitives.Longs;
 
 public class MeshArbiter {
 
     protected static final VoltLogger m_recoveryLog = new VoltLogger("REJOIN");
 
-    protected final Map<Long, Boolean> m_inTrouble = new TreeMap<Long, Boolean>();
+    protected final Map<Long, Boolean> m_inTrouble = Maps.newTreeMap();
     protected final long m_hsId;
     protected final Mailbox m_mailbox;
     protected final MeshAide m_meshAide;
     protected final HashMap<Pair<Long, Long>, Long> m_failureSiteUpdateLedger =
-            new HashMap<Pair<Long, Long>, Long>();
+            Maps.newHashMap();
     protected final Set<Long> m_failedSites = new TreeSet<Long>();
+    protected final AgreementSeeker m_seeker =
+            new AgreementSeeker(ArbitrationStrategy.MATCHING_CARDINALITY);
 
     public MeshArbiter(final long hsId, final Mailbox mailbox,
             final MeshAide meshAide) {
@@ -76,8 +78,11 @@ public class MeshArbiter {
             return ImmutableMap.of();
         }
 
+        // if entry is present and already witnessed then get out
+        // if entry is present and fm.witnessed == alreadyWitnessed then get out
         Boolean alreadyWitnessed = m_inTrouble.get(fm.failedSite);
-        if (alreadyWitnessed != null) {
+        if (   alreadyWitnessed != null
+            && (alreadyWitnessed || alreadyWitnessed == fm.witnessed)) {
 
             if (!alreadyWitnessed && fm.witnessed) {
                 m_inTrouble.put(fm.failedSite, fm.witnessed);
@@ -88,21 +93,21 @@ public class MeshArbiter {
 
             return ImmutableMap.of();
         }
+        // we are here if failed site was not previously recorded
+        // or it was previously recorded but it became witnessed from non
         m_inTrouble.put(fm.failedSite,fm.witnessed);
 
-        AgreementSeeker seeker = new AgreementSeeker(
-                AgreementStrategy.NO_QUARTER,
-                hsIds, m_inTrouble);
+        m_seeker.startSeekingFor(hsIds, m_inTrouble);
 
         m_recoveryLog.info("Agreement, Sending fault data "
                 + CoreUtils.hsIdCollectionToString(m_inTrouble.keySet())
                 + " to "
-                + CoreUtils.hsIdCollectionToString(seeker.getSurvivors()) + " survivors");
+                + CoreUtils.hsIdCollectionToString(m_seeker.getSurvivors()) + " survivors");
 
-        discoverGlobalFaultData_send(seeker);
+        discoverGlobalFaultData_send();
 
-        if (discoverGlobalFaultData_rcv(hsIds, seeker)) {
-            Map<Long,Long> lastTxnIdByFailedSite = extractGlobalFaultData(hsIds, seeker);
+        if (discoverGlobalFaultData_rcv(hsIds)) {
+            Map<Long,Long> lastTxnIdByFailedSite = extractGlobalFaultData(hsIds);
 
             m_failedSites.addAll(lastTxnIdByFailedSite.keySet());
 
@@ -112,6 +117,7 @@ public class MeshArbiter {
                   + " to failed sites history");
 
             m_inTrouble.clear();
+            m_seeker.clear();
 
             return lastTxnIdByFailedSite;
         } else {
@@ -126,8 +132,8 @@ public class MeshArbiter {
      * own partition). Do this once for each failed initiator that we know about.
      * Sends all data all the time to avoid a need for request/response.
      */
-    private int discoverGlobalFaultData_send(AgreementSeeker seeker) {
-        long [] survivors = Longs.toArray(seeker.getSurvivors());
+    private int discoverGlobalFaultData_send() {
+        long [] survivors = Longs.toArray(m_seeker.getSurvivors());
 
         m_recoveryLog.info("Agreement, Sending fault data " + CoreUtils.hsIdCollectionToString(m_inTrouble.keySet())
                 + " to "
@@ -161,7 +167,7 @@ public class MeshArbiter {
      * Concurrent failures can be detected by additional reports from the FaultDistributor
      * or a mismatch in the set of failed hosts reported in a message from another site
      */
-    private boolean discoverGlobalFaultData_rcv(Set<Long> hsIds, AgreementSeeker seeker) {
+    private boolean discoverGlobalFaultData_rcv(Set<Long> hsIds) {
 
         long blockedOnReceiveStart = System.currentTimeMillis();
         long lastReportTime = 0;
@@ -200,9 +206,9 @@ public class MeshArbiter {
                         Pair.of(fsum.m_sourceHSId, fsum.m_failedHSId),
                         fsum.m_safeTxnId);
 
-                seeker.add(fsum);
+                m_seeker.add(fsum);
 
-                Set<Long> forwardTo = seeker.forWhomSiteIsDead(fsum.m_sourceHSId);
+                Set<Long> forwardTo = m_seeker.forWhomSiteIsDead(fsum.m_sourceHSId);
                 if (!forwardTo.isEmpty()) {
                     m_mailbox.send(
                             Longs.toArray(forwardTo),
@@ -220,7 +226,7 @@ public class MeshArbiter {
 
                 FailureSiteForwardMessage fsfm = (FailureSiteForwardMessage)m;
 
-                seeker.add(fsfm);
+                m_seeker.add(fsfm);
 
                 m_recoveryLog.info("Agreement, Received forwarded failure message from " +
                         CoreUtils.hsIdToString(fsfm.m_sourceHSId) + " reporting on behalf of " +
@@ -236,20 +242,15 @@ public class MeshArbiter {
                  */
                 FaultMessage fm = (FaultMessage)m;
 
-                Boolean alreadyWitnessed = m_inTrouble.get(fm.failedSite);
-                if (alreadyWitnessed == null) {
+                if (m_seeker.getSurvivors().contains(fm.failedSite) && fm.witnessed) {
                     m_mailbox.deliverFront(m);
                     m_recoveryLog.info("Agreement, Detected a concurrent failure from FaultDistributor, new failed site "
                             + CoreUtils.hsIdToString(fm.failedSite));
                     return false;
                 }
-
-                if (!alreadyWitnessed && fm.witnessed) {
-                    m_inTrouble.put(fm.failedSite, fm.witnessed);
-                }
             }
 
-        } while(!haveNecessaryFaultInfo(seeker.getSurvivors(), false) || seeker.needForward(m_hsId));
+        } while(!haveNecessaryFaultInfo(m_seeker.getSurvivors(), false) || m_seeker.needForward(m_hsId));
 
         return true;
     }
@@ -283,13 +284,13 @@ public class MeshArbiter {
         return missingMessages.isEmpty();
     }
 
-    private Map<Long,Long> extractGlobalFaultData(Set<Long> hsIds, AgreementSeeker seeker) {
+    private Map<Long,Long> extractGlobalFaultData(Set<Long> hsIds) {
 
-        if (!haveNecessaryFaultInfo(seeker.getSurvivors(), false)) {
+        if (!haveNecessaryFaultInfo(m_seeker.getSurvivors(), false)) {
             VoltDB.crashLocalVoltDB("Error extracting fault data", true, null);
         }
 
-        Set<Long> toBeKilled = seeker.nextKill();
+        Set<Long> toBeKilled = m_seeker.nextKill();
         if (toBeKilled.isEmpty()) {
             VoltDB.crashLocalVoltDB("Could not reach agreement on failed nodes", true, null);
         }

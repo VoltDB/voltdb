@@ -17,7 +17,7 @@
 
 package org.voltcore.agreement;
 
-public enum AgreementStrategy {
+public enum ArbitrationStrategy {
     NO_QUARTER {
         @Override
         public <R, P> R accept(Visitor<R, P> vtor, P param) {

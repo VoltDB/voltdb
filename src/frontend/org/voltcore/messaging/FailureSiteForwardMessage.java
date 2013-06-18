@@ -15,7 +15,7 @@ public class FailureSiteForwardMessage extends FailureSiteUpdateMessage {
         m_safeTxnId = fsum.m_safeTxnId;
     }
 
-    public FailureSiteForwardMessage() {
+    FailureSiteForwardMessage() {
     }
 
     @Override
