@@ -23,13 +23,16 @@
 
 package org.voltcore.agreement.maker;
 
+import static com.natpryce.makeiteasy.MakeItEasy.a;
 import static com.natpryce.makeiteasy.MakeItEasy.an;
 import static com.natpryce.makeiteasy.MakeItEasy.listOf;
+import static com.natpryce.makeiteasy.MakeItEasy.make;
 import static com.natpryce.makeiteasy.MakeItEasy.with;
 import static com.natpryce.makeiteasy.Property.newProperty;
 
 import java.util.List;
 
+import org.voltcore.messaging.FailureSiteForwardMessage;
 import org.voltcore.messaging.FailureSiteUpdateMessage;
 import org.voltcore.utils.Pair;
 
@@ -111,18 +114,20 @@ public class FailureSiteUpdateMessageMaker {
     public final static Property<FailureSiteUpdateMessage,Long> fsumSource = newProperty();
     public final static Property<FailureSiteUpdateMessage,Long> fsumSite = newProperty();
     public final static Property<FailureSiteUpdateMessage,Long> fsumTxnid = newProperty();
-    public final static Property<FailureSiteUpdateMessage, Iterable<Pair<Long,Boolean>>> fsumEntries = newProperty();
+    public final static Property<FailureSiteUpdateMessage, Iterable<Pair<Long,Boolean>>> fsumMap = newProperty();
 
     public final static Instantiator<FailureSiteUpdateMessage> FailureSiteUpdateMessage =
             new Instantiator<FailureSiteUpdateMessage>() {
                 @Override
                 public FailureSiteUpdateMessage instantiate(
                         PropertyLookup<FailureSiteUpdateMessage> lookup) {
+
                     Long source = lookup.valueOf(fsumSource, -1L);
                     Long site = lookup.valueOf(fsumSite, -1L);
                     Long txnId = lookup.valueOf(fsumTxnid, -1L);
+
                     @SuppressWarnings("unchecked")
-                    Iterable<Pair<Long,Boolean>> entries = lookup.valueOf(fsumEntries,
+                    Iterable<Pair<Long,Boolean>> entries = lookup.valueOf(fsumMap,
                             listOf(an(Entry,with(pSite,site),with(pWitnessed,true))));
 
                     ImmutableMap.Builder<Long, Boolean> builder = ImmutableMap.builder();
@@ -139,6 +144,19 @@ public class FailureSiteUpdateMessageMaker {
                     instance.m_sourceHSId = source;
 
                     return instance;
+                }
+            };
+
+    public static final Property<FailureSiteForwardMessage,FailureSiteUpdateMessage> fsfmMsg = newProperty();
+
+    public final static Instantiator<FailureSiteForwardMessage> FailureSiteForwardMessage =
+            new Instantiator<FailureSiteForwardMessage>() {
+                @Override
+                public FailureSiteForwardMessage instantiate(
+                        PropertyLookup<FailureSiteForwardMessage> lookup) {
+                    @SuppressWarnings("unchecked")
+                    FailureSiteUpdateMessage msg = lookup.valueOf(fsfmMsg, make(a(FailureSiteUpdateMessage)));
+                    return new FailureSiteForwardMessage(msg);
                 }
             };
 }

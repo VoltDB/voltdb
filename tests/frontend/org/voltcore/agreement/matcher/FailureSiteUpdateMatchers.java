@@ -26,12 +26,19 @@ package org.voltcore.agreement.matcher;
 import static org.hamcrest.Matchers.arrayContainingInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
 
+import java.util.List;
+import java.util.Map;
+
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeMatcher;
+import org.voltcore.messaging.FailureSiteForwardMessage;
 import org.voltcore.messaging.FailureSiteUpdateMessage;
+import org.voltcore.utils.Pair;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.primitives.Longs;
+import com.natpryce.makeiteasy.Donor;
 
 public class FailureSiteUpdateMatchers {
     static public final Matcher<FailureSiteUpdateMessage> failureUpdateMsgIs(
@@ -51,6 +58,63 @@ public class FailureSiteUpdateMatchers {
                 return equalTo(site).matches(m.m_failedHSId)
                     && equalTo(txnid).matches(m.m_safeTxnId);
 
+            }
+        };
+    }
+
+    static public final Matcher<FailureSiteUpdateMessage> failureUpdateMsgIs(
+            final long site, final long txnid, final Donor<List<Pair<Long, Boolean>>> hsids) {
+        return new TypeSafeMatcher<FailureSiteUpdateMessage>() {
+            final Map<Long,Boolean> m_hsids;
+            {
+                ImmutableMap.Builder<Long, Boolean> imb = ImmutableMap.builder();
+                for (Pair<Long,Boolean> p: hsids.value()) {
+                    imb.put(p.getFirst(),p.getSecond());
+                }
+                m_hsids = imb.build();
+            }
+
+            @Override
+            public void describeTo(Description d) {
+                d.appendText("FailureSiteUpdateMessage [ ")
+                .appendText("failedSite: ").appendValue(site)
+                .appendText(", txnid: ").appendValue(txnid)
+                .appendText(", failed hsids: ").appendValue(m_hsids)
+                .appendText("]");
+            }
+
+            @Override
+            protected boolean matchesSafely(FailureSiteUpdateMessage m) {
+                return equalTo(site).matches(m.m_failedHSId)
+                    && equalTo(txnid).matches(m.m_safeTxnId)
+                    && equalTo(m_hsids).matches(m.m_failedHSIds);
+            }
+        };
+    }
+
+    static public final Matcher<FailureSiteForwardMessage> failureForwardMsgIs(
+            final long reportingHsid,
+            final long site,
+            final long txnid,
+            final Donor<List<Pair<Long, Boolean>>> hsids) {
+
+        return new TypeSafeMatcher<FailureSiteForwardMessage>() {
+
+            final Matcher<FailureSiteUpdateMessage> fsumIs =
+                    failureUpdateMsgIs(site,txnid,hsids);
+
+            @Override
+            public void describeTo(Description d) {
+                d.appendText("FailureSiteForwardMessage [ ")
+                .appendText("reportingSite: ").appendValue(reportingHsid)
+                .appendText(", ").appendDescriptionOf(fsumIs)
+                .appendText(" ]");
+            }
+
+            @Override
+            protected boolean matchesSafely(FailureSiteForwardMessage m) {
+                return fsumIs.matches(m)
+                    && equalTo(reportingHsid).matches(m.m_reportingHSId);
             }
         };
     }

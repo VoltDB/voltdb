@@ -107,7 +107,7 @@ public class FailureSiteUpdateMessage extends VoltMessage {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        sb.append("FAILURE_SITE_UPDATE ");
+        sb.append(Subject.values()[getSubject()]).append(" ");
         sb.append(" from site: HOST ");
         sb.append((int)m_sourceHSId).append(" SITE ").append((int)(m_sourceHSId >> 32));
         sb.append(" for failed hosts: ");

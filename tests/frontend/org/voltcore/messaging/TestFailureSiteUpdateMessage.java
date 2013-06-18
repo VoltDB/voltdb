@@ -27,21 +27,20 @@ import static com.natpryce.makeiteasy.MakeItEasy.a;
 import static com.natpryce.makeiteasy.MakeItEasy.make;
 import static com.natpryce.makeiteasy.MakeItEasy.with;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.voltcore.agreement.maker.FailureSiteUpdateMessageMaker.FailureSiteUpdateMessage;
-import static org.voltcore.agreement.maker.FailureSiteUpdateMessageMaker.fsumEntries;
+import static org.voltcore.agreement.maker.FailureSiteUpdateMessageMaker.fsumMap;
 import static org.voltcore.agreement.maker.FailureSiteUpdateMessageMaker.fsumHsids;
 import static org.voltcore.agreement.maker.FailureSiteUpdateMessageMaker.fsumSite;
 import static org.voltcore.agreement.maker.FailureSiteUpdateMessageMaker.fsumSource;
 import static org.voltcore.agreement.maker.FailureSiteUpdateMessageMaker.fsumTxnid;
+import static org.voltcore.agreement.matcher.FailureSiteUpdateMatchers.failureForwardMsgIs;
 import static org.voltcore.agreement.matcher.FailureSiteUpdateMatchers.failureUpdateMsgIs;
 
 import java.nio.ByteBuffer;
 
 import org.junit.Test;
 
-import com.google.common.collect.ImmutableMap;
 import com.natpryce.makeiteasy.Maker;
 
 public class TestFailureSiteUpdateMessage {
@@ -51,14 +50,14 @@ public class TestFailureSiteUpdateMessage {
             with(fsumSource,1L),
             with(fsumTxnid,123456789012345L),
             with(fsumSite,3L),
-            with(fsumEntries, fsumHsids(3L,false,4L,true))
+            with(fsumMap, fsumHsids(3L,false,4L,true))
             );
     VoltMessageFactory factory = new VoltMessageFactory();
 
     @Test
     public void testRoundTripSerialization() throws Exception {
         FailureSiteUpdateMessage msg = make(fsum);
-        assertThat(msg, failureUpdateMsgIs(3L, 123456789012345L));
+        assertThat(msg, failureUpdateMsgIs(3L, 123456789012345L, fsumHsids(3L,false,4L,true)));
 
         ByteBuffer bb = VoltMessage.toBuffer(msg);
 
@@ -66,15 +65,13 @@ public class TestFailureSiteUpdateMessage {
         assertTrue(vmsg instanceof FailureSiteUpdateMessage);
 
         FailureSiteUpdateMessage gsm = (FailureSiteUpdateMessage)vmsg;
-        assertThat(msg, failureUpdateMsgIs(3L, 123456789012345L));
-
-        assertEquals(ImmutableMap.<Long, Boolean>of(3L,false,4L,true), gsm.m_failedHSIds);
+        assertThat(gsm, failureUpdateMsgIs(3L, 123456789012345L, fsumHsids(3L,false,4L,true)));
     }
 
    @Test
    public void testForwardRoundTripSerialization() throws Exception {
        FailureSiteUpdateMessage msg = make(fsum);
-       assertThat(msg, failureUpdateMsgIs(3L, 123456789012345L));
+       assertThat(msg, failureUpdateMsgIs(3L, 123456789012345L, fsumHsids(3L,false,4L,true)));
 
        ByteBuffer bb = VoltMessage.toBuffer(msg);
 
@@ -82,12 +79,10 @@ public class TestFailureSiteUpdateMessage {
        assertTrue(vmsg instanceof FailureSiteUpdateMessage);
 
        FailureSiteUpdateMessage gsm = (FailureSiteUpdateMessage)vmsg;
-       assertEquals(123456789012345L, gsm.m_safeTxnId);
-       assertEquals(3L, gsm.m_failedHSId);
-
-       assertEquals(ImmutableMap.<Long, Boolean>of(3L,false,4L,true), gsm.m_failedHSIds);
+       assertThat(gsm, failureUpdateMsgIs(3L, 123456789012345L, fsumHsids(3L,false,4L,true)));
 
        FailureSiteForwardMessage fmsg = new FailureSiteForwardMessage(gsm);
+       assertThat(fmsg, failureForwardMsgIs(1L, 3L, 123456789012345L, fsumHsids(3L,false,4L,true)));
 
        bb = VoltMessage.toBuffer(fmsg);
 
@@ -95,11 +90,7 @@ public class TestFailureSiteUpdateMessage {
        assertTrue(vmsg instanceof FailureSiteForwardMessage);
 
        FailureSiteForwardMessage gsmf = (FailureSiteForwardMessage)vmsg;
-       assertEquals(123456789012345L, gsmf.m_safeTxnId);
-       assertEquals(3L, gsmf.m_failedHSId);
-       assertEquals(1L, gsmf.m_reportingHSId);
-
-       assertEquals(ImmutableMap.<Long, Boolean>of(3L,false,4L,true), gsmf.m_failedHSIds);
+       assertThat(gsmf, failureForwardMsgIs(1L, 3L, 123456789012345L, fsumHsids(3L,false,4L,true)));
    }
 
 }
