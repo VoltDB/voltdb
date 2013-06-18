@@ -113,6 +113,9 @@ TTInt NValue::s_minDecimalValue("-9999999999"   //10 digits
                                  "9999999999"   //30 digits
                                  "99999999");    //38 digits
 
+const double NValue::s_gtMaxDecimalAsDouble = 1E26;
+const double NValue::s_ltMinDecimalAsDouble = -1E26;
+
 /*
  * Produce a debugging string describing an NValue.
  */
@@ -428,7 +431,7 @@ struct NValueList {
 
     const size_t m_length;
     const ValueType m_elementType;
-    StlFriendlyNValue m_values[];
+    StlFriendlyNValue m_values[0];
 };
 
 /**
