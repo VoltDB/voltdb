@@ -45,7 +45,7 @@ public class StatsProcProfTable {
         private final Set<Long> seenPartitions;
 
         public ProcProfRow(String procedure, long partition,
-                long invocations, long timedInvocations,
+                long timedInvocations, long invocations,
                 long min, long max, long avg, long failures, long aborts)
         {
             this.procedure = procedure;
