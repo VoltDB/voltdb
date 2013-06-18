@@ -115,7 +115,7 @@ class Plot:
         formatter = matplotlib.dates.DateFormatter("%b %d %y")
         self.ax.xaxis.set_major_formatter(formatter)
         ymin, ymax = plt.ylim()
-        plt.ylim((ymin, ymax * 1.1))
+        plt.ylim((ymin-(ymax-ymin)*0.1, ymax+(ymax-ymin)*0.1))
         xmin, xmax = plt.xlim()
         plt.xlim((xmin-0.3, xmax+0.3))
         plt.legend(prop={'size': 10}, loc=0)
@@ -153,6 +153,15 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, data_type):
         y = v[data_type][-1]
         pl.ax.annotate(str(y), xy=(x,y), xycoords='data', xytext=(5,-5),
             textcoords='offset points', ha='left')
+        xmin, ymin = [(v['time'][i],y) for i,y in enumerate(v[data_type]) if y == min(v[data_type])][-1]
+        xmax, ymax= [(v['time'][i],y) for i,y in enumerate(v[data_type]) if y == max(v[data_type])][-1]
+        if ymax != ymin:
+            if xmax != x:
+                pl.ax.annotate(str(ymax), xy=(xmax,ymax),
+                    textcoords='offset points', ha='center', va='bottom', xytext=(0,5))
+            if xmin != x:
+                pl.ax.annotate(str(ymin), xy=(xmin,ymin),
+                    textcoords='offset points', ha='center', va='top', xytext=(0,-5))
 
     pl.close()
 
