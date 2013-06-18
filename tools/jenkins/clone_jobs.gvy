@@ -102,7 +102,7 @@ for(item in Hudson.instance.items)
   }
 }
 
-if (len(downstream) > 0) {
+if (downstream.length() > 0) {
 // finally, set all projects to be downstream of/triggered-by the kit build job
   kit.getPublishersList().add(new tasks.BuildTrigger(downstream.substring(1), false))
   kit.save()
