@@ -214,6 +214,25 @@ public class CSVLoader {
         }
     }
 
+    private static boolean isProcedureMp(Client csvClient)
+        throws IOException, org.voltdb.client.ProcCallException
+    {
+        boolean procedure_is_mp = false;
+        VoltTable procInfo = csvClient.callProcedure("@SystemCatalog",
+                "PROCEDURES").getResults()[0];
+        while (procInfo.advanceRow()) {
+            if (insertProcedure.matches(procInfo.getString("PROCEDURE_NAME"))) {
+                String remarks = procInfo.getString("REMARKS");
+                if (remarks.contains("\"singlePartition\":false")) {
+                    procedure_is_mp = true;
+                }
+                break;
+            }
+        }
+        return procedure_is_mp;
+    }
+
+
     public static void main(String[] args) throws IOException,
             InterruptedException {
         start = System.currentTimeMillis();
@@ -291,6 +310,17 @@ public class CSVLoader {
             }
             if (isProcExist == false) {
                 m_log.error("No matching insert procedure available");
+                close_cleanup();
+                System.exit(-1);
+            }
+            try {
+                if (isProcedureMp(csvClient)) {
+                    m_log.warn("Using a multi-partitioned procedure to load data will be slow. " +
+                            "If loading a partitioned table, use a single-partitioned procedure " +
+                            "for best performance.");
+                }
+            } catch (Exception e) {
+                m_log.fatal(e.getMessage(), e);
                 close_cleanup();
                 System.exit(-1);
             }
