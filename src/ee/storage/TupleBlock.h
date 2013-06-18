@@ -221,16 +221,18 @@ public:
         return m_bucket;
     }
 private:
-    uint32_t m_references;
+#ifdef MEMCHECK
     Table* m_table;
+#endif
     char*   m_storage;
+    uint32_t m_references;
     uint32_t m_tupleLength;
     uint32_t m_tuplesPerBlock;
     uint32_t m_activeTuples;
     uint32_t m_nextFreeTuple;
     uint32_t m_lastCompactionOffset;
     const double m_tuplesPerBlockDivNumBuckets;
-
+    
     /*
      * queue of offsets to <b>once used and then deleted</b> tuples.
      * Tuples after m_nextFreeTuple are also free, this queue
@@ -240,8 +242,9 @@ private:
      **/
     std::deque<TruncatedInt, FastAllocator<TruncatedInt> > m_freeList;
 
-    int m_bucketIndex;
     TBBucketPtr m_bucket;
+    int m_bucketIndex;
+    
 };
 
 }
