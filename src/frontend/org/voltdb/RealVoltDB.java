@@ -1830,7 +1830,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             } else {
                 logRecoveryCompleted = true;
             }
-            if (logRecoveryCompleted) {
+            // Join creates a truncation snapshot as part of the join process,
+            // so there is no need to wait for the truncation snapshot requested
+            // above to finish.
+            if (logRecoveryCompleted || m_joining) {
                 m_rejoining = false;
                 m_joining = false;
                 consoleLog.info("Node rejoin completed");
