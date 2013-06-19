@@ -178,8 +178,10 @@ enum PlanNodeType {
     PLAN_NODE_TYPE_SEQSCAN          = 10,
     PLAN_NODE_TYPE_INDEXSCAN        = 11,
     // special counting index
-    PLAN_NODE_TYPE_INDEXCOUNT        = 12,
-    PLAN_NODE_TYPE_TABLECOUNT        = 13,
+    PLAN_NODE_TYPE_INDEXCOUNT       = 12,
+    PLAN_NODE_TYPE_TABLECOUNT       = 13,
+    // for sql-in using indexes
+    PLAN_NODE_TYPE_MATERIALIZEDSCAN = 14,
     //
     // Join Nodes
     //

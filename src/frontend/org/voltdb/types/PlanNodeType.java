@@ -31,6 +31,7 @@ import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.MaterializePlanNode;
+import org.voltdb.plannodes.MaterializedScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
@@ -46,46 +47,47 @@ import org.voltdb.plannodes.UpdatePlanNode;
  *
  */
 public enum PlanNodeType {
-    INVALID         (0, null), // for parsing...
+    INVALID          (0, null), // for parsing...
 
     //
     // Scan Nodes
     //
-    SEQSCAN         (10, SeqScanPlanNode.class),
-    INDEXSCAN       (11, IndexScanPlanNode.class),
+    SEQSCAN          (10, SeqScanPlanNode.class),
+    INDEXSCAN        (11, IndexScanPlanNode.class),
     INDEXCOUNT       (12, IndexCountPlanNode.class),
     TABLECOUNT       (13, TableCountPlanNode.class),
+    MATERIALIZEDSCAN (14, MaterializedScanPlanNode.class),
 
     //
     // Join Nodes
     //
-    NESTLOOP        (20, NestLoopPlanNode.class),
-    NESTLOOPINDEX   (21, NestLoopIndexPlanNode.class),
+    NESTLOOP         (20, NestLoopPlanNode.class),
+    NESTLOOPINDEX    (21, NestLoopIndexPlanNode.class),
 
     //
     // Operator Nodes
     //
-    UPDATE          (30, UpdatePlanNode.class),
-    INSERT          (31, InsertPlanNode.class),
-    DELETE          (32, DeletePlanNode.class),
+    UPDATE           (30, UpdatePlanNode.class),
+    INSERT           (31, InsertPlanNode.class),
+    DELETE           (32, DeletePlanNode.class),
 
     //
     // Communication Nodes
     //
-    SEND            (40, SendPlanNode.class),
-    RECEIVE         (41, ReceivePlanNode.class),
+    SEND             (40, SendPlanNode.class),
+    RECEIVE          (41, ReceivePlanNode.class),
 
     //
     // Misc Nodes
     //
-    AGGREGATE       (50, AggregatePlanNode.class),
-    HASHAGGREGATE   (51, HashAggregatePlanNode.class),
-    UNION           (52, UnionPlanNode.class),
-    ORDERBY         (53, OrderByPlanNode.class),
-    PROJECTION      (54, ProjectionPlanNode.class),
-    MATERIALIZE     (55, MaterializePlanNode.class),
-    LIMIT           (56, LimitPlanNode.class),
-    DISTINCT        (57, DistinctPlanNode.class)
+    AGGREGATE        (50, AggregatePlanNode.class),
+    HASHAGGREGATE    (51, HashAggregatePlanNode.class),
+    UNION            (52, UnionPlanNode.class),
+    ORDERBY          (53, OrderByPlanNode.class),
+    PROJECTION       (54, ProjectionPlanNode.class),
+    MATERIALIZE      (55, MaterializePlanNode.class),
+    LIMIT            (56, LimitPlanNode.class),
+    DISTINCT         (57, DistinctPlanNode.class)
 
     ;
 
