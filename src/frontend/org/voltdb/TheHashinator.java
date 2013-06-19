@@ -18,6 +18,8 @@
 package org.voltdb;
 
 import java.lang.reflect.Constructor;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -26,9 +28,6 @@ import org.voltcore.utils.Pair;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Throwables;
-import com.google.common.primitives.Ints;
-import com.google.common.primitives.Longs;
-import com.google.common.primitives.Shorts;
 
 /**
  * Class that maps object values to partitions. It's rather simple
@@ -162,30 +161,33 @@ public abstract class TheHashinator {
      * @return null if the obj is null or is a Volt null type.
      */
     public static byte[] valueToBytes(Object obj) {
+        long value = 0;
+        byte[] retval = null;
+
         if (VoltType.isNullVoltType(obj)) {
             return null;
-        }
-        else if (obj instanceof Long) {
-            return Longs.toByteArray((Long) obj);
-        }
-        else if (obj instanceof String ) {
-            return ((String) obj).getBytes(Charsets.UTF_8);
-        }
-        else if (obj instanceof Integer) {
-            return Ints.toByteArray((Integer) obj);
-        }
-        else if (obj instanceof Short) {
-            return Ints.toByteArray((Integer) obj);
-        }
-        else if (obj instanceof Byte) {
-            return new byte[] { (Byte) obj };
-        }
-        else if (obj instanceof byte[]) {
-            return (byte[]) obj;
+        } else if (obj instanceof Long) {
+            value = ((Long) obj).longValue();
+        } else if (obj instanceof String ) {
+            retval = ((String) obj).getBytes(Charsets.UTF_8);
+        } else if (obj instanceof Integer) {
+            value = ((Integer)obj).intValue();
+        } else if (obj instanceof Short) {
+            value = ((Short)obj).shortValue();
+        } else if (obj instanceof Byte) {
+            value = ((Byte)obj).byteValue();
+        } else if (obj instanceof byte[]) {
+            retval = (byte[]) obj;
         }
 
-        throw new RuntimeException(
-                "TheHashinator#valueToBytes failed to convert a non-partitionable type.");
+        if (retval == null) {
+            ByteBuffer buf = ByteBuffer.allocate(8);
+            buf.order(ByteOrder.LITTLE_ENDIAN);
+            buf.putLong(value);
+            retval = buf.array();
+        }
+
+        return retval;
     }
 
     /**
@@ -196,19 +198,26 @@ public abstract class TheHashinator {
      * @return Java object of the correct type.
      */
     public static Object bytesToValue(VoltType type, byte[] value) {
-        switch (type) {
-        case NULL:
+        if ((type == VoltType.NULL) || (value == null)) {
             return null;
+        }
+
+        ByteBuffer buf = ByteBuffer.wrap(value);
+        buf.order(ByteOrder.LITTLE_ENDIAN);
+
+        switch (type) {
         case BIGINT:
-            return Longs.fromByteArray(value);
+            return buf.getLong();
         case STRING:
             return new String(value, Charsets.UTF_8);
         case INTEGER:
-            return Ints.fromByteArray(value);
+            return buf.getInt();
         case SMALLINT:
-            return Shorts.fromByteArray(value);
+            return buf.getShort();
         case TINYINT:
-            return value[0];
+            return buf.get();
+        case VARBINARY:
+            return value;
         default:
             throw new RuntimeException(
                     "TheHashinator#bytesToValue failed to convert a non-partitionable type.");
