@@ -413,6 +413,6 @@ public class TestMeshArbiter {
         verify(mbox).send(survivorCaptor.capture(), argThat(failureForwardMsgIs(1L,2L,10L,fsumHsids(1L,false,2L,true))));
         verify(mbox).send(survivorCaptor.capture(), argThat(failureForwardMsgIs(2L,1L,10L,fsumHsids(1L,true,2L,false))));
 
-        assertEquals(decision,ImmutableMap.<Long,Long>of(1L,10L));
+        assertEquals(decision,ImmutableMap.<Long,Long>of(2L,10L));
     }
 }
