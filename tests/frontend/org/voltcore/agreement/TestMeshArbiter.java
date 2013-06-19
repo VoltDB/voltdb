@@ -39,10 +39,15 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.voltcore.agreement.maker.FailureSiteUpdateMessageMaker.FailureSiteForwardMessage;
 import static org.voltcore.agreement.maker.FailureSiteUpdateMessageMaker.FailureSiteUpdateMessage;
+import static org.voltcore.agreement.maker.FailureSiteUpdateMessageMaker.fsfmMsg;
+import static org.voltcore.agreement.maker.FailureSiteUpdateMessageMaker.fsumHsids;
+import static org.voltcore.agreement.maker.FailureSiteUpdateMessageMaker.fsumMap;
 import static org.voltcore.agreement.maker.FailureSiteUpdateMessageMaker.fsumSite;
 import static org.voltcore.agreement.maker.FailureSiteUpdateMessageMaker.fsumSource;
 import static org.voltcore.agreement.maker.FailureSiteUpdateMessageMaker.fsumTxnid;
+import static org.voltcore.agreement.matcher.FailureSiteUpdateMatchers.failureForwardMsgIs;
 import static org.voltcore.agreement.matcher.FailureSiteUpdateMatchers.failureUpdateMsgIs;
 
 import java.util.Map;
@@ -55,6 +60,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
+import org.voltcore.messaging.FailureSiteForwardMessage;
 import org.voltcore.messaging.FailureSiteUpdateMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.Subject;
@@ -94,7 +100,7 @@ public class TestMeshArbiter {
 
     @Test
     public void testBasicScenario() throws Exception {
-        Maker<FailureSiteUpdateMessage> siteOneFsum = fsum.but(with(fsumTxnid,2L));
+        Maker<FailureSiteUpdateMessage> siteOneFsum = fsum.but(with(fsumTxnid,2L),with(fsumMap,fsumHsids(1L,true)));
 
         when(aide.getNewestSafeTransactionForInitiator(anyLong())).thenReturn(2L);
         when(mbox.recvBlocking(any(Subject[].class), eq(5L)))
@@ -106,7 +112,7 @@ public class TestMeshArbiter {
         Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L, true));
 
         verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
-        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L, 2L)));
+        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L, 2L,fsumHsids(1L,true))));
         assertThat(Longs.asList(survivorCaptor.getValue()), contains(0L,2L,3L));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of(1L,2L));
@@ -123,32 +129,32 @@ public class TestMeshArbiter {
         when(aide.getNewestSafeTransactionForInitiator(2L)).thenReturn(3L);
 
         when(mbox.recvBlocking(any(Subject[].class), eq(5L)))
-            .thenReturn(make(siteOneFsum.but(with(fsumSource, 0L))))
-            .thenReturn(make(siteOneFsum.but(with(fsumSource, 2L))))
-            .thenReturn(make(siteOneFsum.but(with(fsumSource, 3L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource, 0L),with(fsumMap,fsumHsids(1L,true)))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource, 2L),with(fsumMap,fsumHsids(1L,true)))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource, 3L),with(fsumMap,fsumHsids(1L,true)))))
             ;
 
         Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L, true));
 
         verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
-        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L, 2L)));
+        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L, 2L,fsumHsids(1L,true))));
         assertThat(Longs.asList(survivorCaptor.getValue()), contains(0L,2L,3L));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of(1L,2L));
 
         reset(mbox);
         when(mbox.recvBlocking(any(Subject[].class),eq(5L)))
-            .thenReturn(make(siteOneFsum.but(with(fsumSource,0L))))
-            .thenReturn(make(siteTwoFsum.but(with(fsumSource,0L))))
-            .thenReturn(make(siteOneFsum.but(with(fsumSource,3L))))
-            .thenReturn(make(siteTwoFsum.but(with(fsumSource,3L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource,0L),with(fsumMap,fsumHsids(2L,true)))))
+            .thenReturn(make(siteTwoFsum.but(with(fsumSource,0L),with(fsumMap,fsumHsids(2L,true)))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource,3L),with(fsumMap,fsumHsids(2L,true)))))
+            .thenReturn(make(siteTwoFsum.but(with(fsumSource,3L),with(fsumMap,fsumHsids(2L,true)))))
         ;
 
         decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(2L, true));
 
         verify(mbox,never()).deliverFront(any(VoltMessage.class));
         verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
-        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(2L,3L)));
+        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(2L,3L,fsumHsids(2L,true))));
         assertThat(Longs.asList(survivorCaptor.getValue()), contains(0L,3L));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of(2L,3L));
@@ -164,7 +170,7 @@ public class TestMeshArbiter {
         when(aide.getNewestSafeTransactionForInitiator(1L)).thenReturn(3L);
         when(aide.getNewestSafeTransactionForInitiator(2L)).thenReturn(4L);
         when(mbox.recvBlocking(any(Subject[].class), eq(5L)))
-            .thenReturn(make(siteOneFsum.but(with(fsumSource, 0L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource, 0L),with(fsumMap,fsumHsids(1L,true)))))
             .thenReturn(new FaultMessage(2L, true))
             ;
 
@@ -172,26 +178,26 @@ public class TestMeshArbiter {
 
         verify(mbox,times(1)).deliverFront(any(VoltMessage.class));
         verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
-        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L,3L)));
+        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L,3L,fsumHsids(1L,true))));
         assertThat(Longs.asList(survivorCaptor.getValue()), contains(0L,2L,3L));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of());
 
         reset(mbox);
         when(mbox.recvBlocking(any(Subject[].class),eq(5L)))
-            .thenReturn(make(siteOneFsum.but(with(fsumSource,0L))))
-            .thenReturn(make(siteTwoFsum.but(with(fsumSource,0L))))
-            .thenReturn(make(siteOneFsum.but(with(fsumSource,3L))))
-            .thenReturn(make(siteTwoFsum.but(with(fsumSource,3L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource,0L),with(fsumMap,fsumHsids(1L,true,2L,true)))))
+            .thenReturn(make(siteTwoFsum.but(with(fsumSource,0L),with(fsumMap,fsumHsids(1L,true,2L,true)))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource,3L),with(fsumMap,fsumHsids(1L,true,2L,true)))))
+            .thenReturn(make(siteTwoFsum.but(with(fsumSource,3L),with(fsumMap,fsumHsids(1L,true,2L,true)))))
         ;
 
         decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(2L, true));
 
         verify(mbox,never()).deliverFront(any(VoltMessage.class));
         verify(mbox,times(2)).send(any(long[].class), any(VoltMessage.class));
-        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L,3L)));
+        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L,3L,fsumHsids(1L,true,2L,true))));
         assertThat(Longs.asList(survivorCaptor.getValue()), contains(0L,3L));
-        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(2L,4L)));
+        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(2L,4L,fsumHsids(1L,true,2L,true))));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of(1L,3L,2L,4L));
     }
@@ -206,7 +212,7 @@ public class TestMeshArbiter {
         when(aide.getNewestSafeTransactionForInitiator(1L)).thenReturn(5L);
         when(aide.getNewestSafeTransactionForInitiator(2L)).thenReturn(6L);
         when(mbox.recvBlocking(any(Subject[].class), eq(5L)))
-            .thenReturn(make(siteOneFsum.but(with(fsumSource, 0L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource, 0L),with(fsumMap,fsumHsids(1L,true)))))
             .thenReturn(new FaultMessage(2L, true))
             ;
 
@@ -214,7 +220,7 @@ public class TestMeshArbiter {
 
         verify(mbox,times(1)).deliverFront(any(VoltMessage.class));
         verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
-        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L,5L)));
+        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L,5L,fsumHsids(1L,true))));
         assertThat(Longs.asList(survivorCaptor.getValue()), contains(0L,2L,3L));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of());
@@ -230,25 +236,25 @@ public class TestMeshArbiter {
 
         reset(mbox);
         when(mbox.recvBlocking(any(Subject[].class),eq(5L)))
-            .thenReturn(make(siteOneFsum.but(with(fsumSource,0L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource,0L),with(fsumMap,fsumHsids(1L,true,2L,true)))))
             .thenReturn(new FaultMessage(1L, true))
-            .thenReturn(make(siteOneFsum.but(with(fsumSource,0L))))
-            .thenReturn(make(siteTwoFsum.but(with(fsumSource,0L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource,0L),with(fsumMap,fsumHsids(1L,true,2L,true)))))
+            .thenReturn(make(siteTwoFsum.but(with(fsumSource,0L),with(fsumMap,fsumHsids(1L,true,2L,true)))))
             .thenReturn(new FaultMessage(2L, true))
-            .thenReturn(make(siteTwoFsum.but(with(fsumSource,0L))))
-            .thenReturn(make(siteOneFsum.but(with(fsumSource,3L))))
-            .thenReturn(make(siteOneFsum.but(with(fsumSource,3L))))
-            .thenReturn(make(siteTwoFsum.but(with(fsumSource,3L))))
-            .thenReturn(make(siteTwoFsum.but(with(fsumSource,3L))))
+            .thenReturn(make(siteTwoFsum.but(with(fsumSource,0L),with(fsumMap,fsumHsids(1L,true,2L,true)))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource,3L),with(fsumMap,fsumHsids(1L,true,2L,true)))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource,3L),with(fsumMap,fsumHsids(1L,true,2L,true)))))
+            .thenReturn(make(siteTwoFsum.but(with(fsumSource,3L),with(fsumMap,fsumHsids(1L,true,2L,true)))))
+            .thenReturn(make(siteTwoFsum.but(with(fsumSource,3L),with(fsumMap,fsumHsids(1L,true,2L,true)))))
         ;
 
         decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(2L, true));
 
         verify(mbox,never()).deliverFront(any(VoltMessage.class));
         verify(mbox,times(2)).send(any(long[].class), any(VoltMessage.class));
-        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L,5L)));
+        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L,5L,fsumHsids(1L,true,2L,true))));
         assertThat(Longs.asList(survivorCaptor.getValue()), contains(0L,3L));
-        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(2L,6L)));
+        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(2L,6L,fsumHsids(1L,true,2L,true))));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of(1L,5L,2L,6L));
 
@@ -271,15 +277,15 @@ public class TestMeshArbiter {
             .thenReturn((VoltMessage)null)
             .thenReturn((VoltMessage)null)
             .thenReturn((VoltMessage)null)
-            .thenReturn(make(siteOneFsum.but(with(fsumSource, 0L))))
-            .thenReturn(make(siteOneFsum.but(with(fsumSource, 2L))))
-            .thenReturn(make(siteOneFsum.but(with(fsumSource, 3L))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource, 0L),with(fsumMap,fsumHsids(1L,true)))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource, 2L),with(fsumMap,fsumHsids(1L,true)))))
+            .thenReturn(make(siteOneFsum.but(with(fsumSource, 3L),with(fsumMap,fsumHsids(1L,true)))))
             ;
 
         Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L, true));
 
         verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
-        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L, 2L)));
+        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L, 2L,fsumHsids(1L,true))));
         assertThat(Longs.asList(survivorCaptor.getValue()), contains(0L,2L,3L));
         verify(aide,atLeast(2)).sendHeartbeats(destinationCaptor.capture());
         assertEquals(destinationCaptor.getValue(), hsids);
@@ -287,4 +293,126 @@ public class TestMeshArbiter {
         assertEquals(decision,ImmutableMap.<Long,Long>of(1L,2L));
     }
 
+    @Test
+    public void testMixOfWitnessedAndNon() throws Exception {
+        Maker<FailureSiteUpdateMessage> um = a(FailureSiteUpdateMessage,with(fsumTxnid,2L));
+
+        when(aide.getNewestSafeTransactionForInitiator(1L)).thenReturn(2L);
+
+        when(mbox.recvBlocking(any(Subject[].class), eq(5L)))
+            .thenReturn(make(um.but(with(fsumSite,1L),with(fsumSource, 2L),with(fsumMap,fsumHsids(1L,true)))))
+            .thenReturn(new FaultMessage(1L, true))
+        ;
+        Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L, false));
+
+        verify(mbox,times(1)).deliverFront(any(VoltMessage.class));
+        verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
+        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L,2L,fsumHsids(1L,false))));
+        assertThat(Longs.asList(survivorCaptor.getValue()), contains(0L,1L,2L,3L));
+
+        assertEquals(decision,ImmutableMap.<Long,Long>of());
+
+        reset(mbox);
+        when(mbox.recvBlocking(any(Subject[].class), eq(5L)))
+            .thenReturn(make(um.but(with(fsumSite,1L),with(fsumSource, 0L),with(fsumMap,fsumHsids(1L,true)))))
+            .thenReturn(make(um.but(with(fsumSite,1L),with(fsumSource, 3L),with(fsumMap,fsumHsids(1L,false)))))
+            .thenReturn(make(um.but(with(fsumSite,1L),with(fsumSource, 3L),with(fsumMap,fsumHsids(1L,true)))))
+        ;
+        decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L, true));
+
+        verify(mbox,never()).deliverFront(any(VoltMessage.class));
+        verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
+        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L,2L,fsumHsids(1L,true))));
+        assertThat(Longs.asList(survivorCaptor.getValue()), contains(0L,02L,3L));
+
+        assertEquals(decision,ImmutableMap.<Long,Long>of(1L,2L));
+    }
+
+    @Test
+    public void testOneLinkDownFromThePerspictiveOfAWitness() throws Exception {
+        Maker<FailureSiteUpdateMessage> um = a(FailureSiteUpdateMessage,with(fsumTxnid,10L));
+        Maker<FailureSiteForwardMessage> uf = a(FailureSiteForwardMessage);
+
+        when(aide.getNewestSafeTransactionForInitiator(0L)).thenReturn(10L);
+        when(aide.getNewestSafeTransactionForInitiator(1L)).thenReturn(10L);
+
+        when(mbox.recvBlocking(any(Subject[].class), eq(5L)))
+            .thenReturn(make(um.but(with(fsumSite,0L),with(fsumSource, 2L),with(fsumMap,fsumHsids(0L,false)))))
+            .thenReturn(new FaultMessage(0L, false))
+        ;
+        Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L,true));
+
+        verify(mbox,times(1)).deliverFront(any(VoltMessage.class));
+        verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
+        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L,10L,fsumHsids(1L,true))));
+        assertThat(Longs.asList(survivorCaptor.getValue()), contains(0L,2L,3L));
+
+        assertEquals(decision,ImmutableMap.<Long,Long>of());
+
+        reset(mbox);
+        when(mbox.recvBlocking(any(Subject[].class), eq(5L)))
+            .thenReturn(make(um.but(with(fsumSite,0L),with(fsumSource,0L),with(fsumMap,fsumHsids(0L,false,1L,true)))))
+            .thenReturn(make(um.but(with(fsumSite,0L),with(fsumSource,2L),with(fsumMap,fsumHsids(0L,false,1L,false)))))
+            .thenReturn(make(um.but(with(fsumSite,0L),with(fsumSource,3L),with(fsumMap,fsumHsids(0L,false,1L,false)))))
+            .thenReturn(make(um.but(with(fsumSite,1L),with(fsumSource,0L),with(fsumMap,fsumHsids(1L,true,0L,false)))))
+            .thenReturn(make(um.but(with(fsumSite,1L),with(fsumSource,2L),with(fsumMap,fsumHsids(1L,false,0L,false)))))
+            .thenReturn(make(um.but(with(fsumSite,1L),with(fsumSource,3L),with(fsumMap,fsumHsids(1L,false,0L,false)))))
+            .thenReturn(make(uf.but(with(fsfmMsg,um.but(with(fsumSite,0L),with(fsumSource, 1L),with(fsumMap,fsumHsids(0L,true,1L,false)))))))
+            .thenReturn(make(uf.but(with(fsfmMsg,um.but(with(fsumSite,0L),with(fsumSource, 1L),with(fsumMap,fsumHsids(0L,true,1L,false)))))))
+        ;
+        decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(0L,false));
+
+        verify(mbox,never()).deliverFront(any(VoltMessage.class));
+        verify(mbox,times(2)).send(any(long[].class), any(VoltMessage.class));
+        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(0L,10L,fsumHsids(1L,true,0L,false))));
+        assertThat(Longs.asList(survivorCaptor.getValue()), contains(0L,2L,3L));
+        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L,10L,fsumHsids(1L,true,0L,false))));
+
+        assertEquals(decision,ImmutableMap.<Long,Long>of(1L,10L));
+    }
+
+    @Test
+    public void testOneLinkDownFromThePerspectiveOfNonWitness() throws Exception {
+        Maker<FailureSiteUpdateMessage> um = a(FailureSiteUpdateMessage,with(fsumTxnid,10L));
+        Maker<FailureSiteForwardMessage> uf = a(FailureSiteForwardMessage);
+
+        when(aide.getNewestSafeTransactionForInitiator(1L)).thenReturn(10L);
+        when(aide.getNewestSafeTransactionForInitiator(2L)).thenReturn(10L);
+
+        when(mbox.recvBlocking(any(Subject[].class), eq(5L)))
+            .thenReturn(make(um.but(with(fsumSite,1L),with(fsumSource, 3L),with(fsumMap,fsumHsids(1L,false)))))
+            .thenReturn(new FaultMessage(0L, false))
+        ;
+        Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(2L,false));
+
+        verify(mbox,times(1)).deliverFront(any(VoltMessage.class));
+        verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
+        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(2L,10L,fsumHsids(2L,false))));
+        assertThat(Longs.asList(survivorCaptor.getValue()), contains(0L,1L,2L,3L));
+
+        assertEquals(decision,ImmutableMap.<Long,Long>of());
+
+        reset(mbox);
+        when(mbox.recvBlocking(any(Subject[].class), eq(5L)))
+            .thenReturn(make(um.but(with(fsumSite,1L),with(fsumSource, 0L),with(fsumMap,fsumHsids(1L,false,2L,false)))))
+            .thenReturn(make(um.but(with(fsumSite,1L),with(fsumSource, 1L),with(fsumMap,fsumHsids(1L,false,2L,true)))))
+            .thenReturn(make(um.but(with(fsumSite,1L),with(fsumSource, 2L),with(fsumMap,fsumHsids(1L,true,2L,false)))))
+            .thenReturn(make(um.but(with(fsumSite,1L),with(fsumSource, 3L),with(fsumMap,fsumHsids(1L,false,2L,false)))))
+            .thenReturn(make(um.but(with(fsumSite,2L),with(fsumSource, 0L),with(fsumMap,fsumHsids(1L,false,2L,false)))))
+            .thenReturn(make(um.but(with(fsumSite,2L),with(fsumSource, 1L),with(fsumMap,fsumHsids(1L,false,2L,true)))))
+            .thenReturn(make(um.but(with(fsumSite,2L),with(fsumSource, 2L),with(fsumMap,fsumHsids(1L,true,2L,false)))))
+            .thenReturn(make(um.but(with(fsumSite,2L),with(fsumSource, 3L),with(fsumMap,fsumHsids(1L,false,2L,false)))))
+        ;
+        decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L,false));
+
+        verify(mbox,never()).deliverFront(any(VoltMessage.class));
+        verify(mbox,atLeast(4)).send(any(long[].class), any(VoltMessage.class));
+        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(1L,10L,fsumHsids(1L,false,2L,false))));
+        assertThat(Longs.asList(survivorCaptor.getValue()), contains(0L,01L,2L,3L));
+        verify(mbox).send(survivorCaptor.capture(), argThat(failureUpdateMsgIs(2L,10L,fsumHsids(1L,false,2L,false))));
+        verify(mbox).send(survivorCaptor.capture(), argThat(failureForwardMsgIs(1L,2L,10L,fsumHsids(1L,false,2L,true))));
+        verify(mbox).send(survivorCaptor.capture(), argThat(failureForwardMsgIs(2L,1L,10L,fsumHsids(1L,true,2L,false))));
+
+        assertEquals(decision,ImmutableMap.<Long,Long>of(1L,10L));
+    }
 }

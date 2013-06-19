@@ -38,6 +38,7 @@ import org.voltdb.VoltDB;
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.google.common.primitives.Longs;
 
 public class MeshArbiter {
@@ -97,7 +98,7 @@ public class MeshArbiter {
         // or it was previously recorded but it became witnessed from non
         m_inTrouble.put(fm.failedSite,fm.witnessed);
 
-        m_seeker.startSeekingFor(hsIds, m_inTrouble);
+        m_seeker.startSeekingFor(Sets.difference(hsIds,m_failedSites), m_inTrouble);
 
         m_recoveryLog.info("Agreement, Sending fault data "
                 + CoreUtils.hsIdCollectionToString(m_inTrouble.keySet())
@@ -210,10 +211,8 @@ public class MeshArbiter {
 
                 Set<Long> forwardTo = m_seeker.forWhomSiteIsDead(fsum.m_sourceHSId);
                 if (!forwardTo.isEmpty()) {
-                    m_mailbox.send(
-                            Longs.toArray(forwardTo),
-                            new FailureSiteForwardMessage(fsum)
-                            );
+                    FailureSiteForwardMessage fsfm = new FailureSiteForwardMessage(fsum);
+                    m_mailbox.send(Longs.toArray(forwardTo), fsfm);
                 }
 
                 m_recoveryLog.info("Agreement, Received failure message from " +
@@ -227,6 +226,11 @@ public class MeshArbiter {
                 FailureSiteForwardMessage fsfm = (FailureSiteForwardMessage)m;
 
                 m_seeker.add(fsfm);
+
+                Set<Long> forwardTo = m_seeker.forWhomSiteIsDead(fsfm.m_reportingHSId);
+                if (!forwardTo.isEmpty()) {
+                    m_mailbox.send(Longs.toArray(forwardTo), fsfm);
+                }
 
                 m_recoveryLog.info("Agreement, Received forwarded failure message from " +
                         CoreUtils.hsIdToString(fsfm.m_sourceHSId) + " reporting on behalf of " +
@@ -242,7 +246,8 @@ public class MeshArbiter {
                  */
                 FaultMessage fm = (FaultMessage)m;
 
-                if (m_seeker.getSurvivors().contains(fm.failedSite) && fm.witnessed) {
+                if (   !m_inTrouble.containsKey(fm.failedSite)
+                    || (m_seeker.getSurvivors().contains(fm.failedSite) && fm.witnessed)) {
                     m_mailbox.deliverFront(m);
                     m_recoveryLog.info("Agreement, Detected a concurrent failure from FaultDistributor, new failed site "
                             + CoreUtils.hsIdToString(fm.failedSite));
