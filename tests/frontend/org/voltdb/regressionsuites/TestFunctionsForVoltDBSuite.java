@@ -24,6 +24,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.sql.Timestamp;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
@@ -802,6 +803,80 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(0L,result.getLong(0));
     }
 
+    public void testFunctionSINCE_EPOCH() throws Exception {
+        System.out.println("STARTING SINCE_EPOCH");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P2.insert", 0, new Timestamp(0L));
+        cr = client.callProcedure("P2.insert", 1, new Timestamp(1L));
+        cr = client.callProcedure("P2.insert", 2, new Timestamp(1000L));
+        cr = client.callProcedure("P2.insert", 3, new Timestamp(-1000L));
+
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        String[] procedures = {"SINCE_EPOCH_SECOND", "SINCE_EPOCH_MILLIS", "SINCE_EPOCH_MICROS"};
+
+        for (int i=0; i< procedures.length; i++) {
+        	String proc = procedures[i];
+
+
+        	cr = client.callProcedure(proc, 0);
+        	assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        	result = cr.getResults()[0];
+        	assertEquals(1, result.getRowCount());
+        	assertTrue(result.advanceRow());
+        	if (proc == "SINCE_EPOCH_SECOND") {
+        		assertEquals(0.0, result.getDouble(0));
+        	} else if (proc == "SINCE_EPOCH_MILLIS") {
+        		assertEquals(0.0, result.getDouble(0));
+        	} else if (proc == "SINCE_EPOCH_MICROS") {
+        		assertEquals(0.0, result.getDouble(0));
+        	}
+
+        	cr = client.callProcedure(proc, 1);
+        	assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        	result = cr.getResults()[0];
+        	assertEquals(1, result.getRowCount());
+        	assertTrue(result.advanceRow());
+        	if (proc == "SINCE_EPOCH_SECOND") {
+        		assertEquals(0.001, result.getDouble(0));
+        	} else if (proc == "SINCE_EPOCH_MILLIS") {
+        		assertEquals(1.0, result.getDouble(0));
+        	} else if (proc == "SINCE_EPOCH_MICROS") {
+        		assertEquals(1000.0, result.getDouble(0));
+        	}
+
+        	cr = client.callProcedure(proc, 2);
+        	assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        	result = cr.getResults()[0];
+        	assertEquals(1, result.getRowCount());
+        	assertTrue(result.advanceRow());
+        	if (proc == "SINCE_EPOCH_SECOND") {
+        		assertEquals(1.0, result.getDouble(0));
+        	} else if (proc == "SINCE_EPOCH_MILLIS") {
+        		assertEquals(1000.0, result.getDouble(0));
+        	} else if (proc == "SINCE_EPOCH_MICROS") {
+        		assertEquals(1000000.0, result.getDouble(0));
+        	}
+
+        	cr = client.callProcedure(proc, 3);
+        	assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        	result = cr.getResults()[0];
+        	assertEquals(1, result.getRowCount());
+        	assertTrue(result.advanceRow());
+        	if (proc == "SINCE_EPOCH_SECOND") {
+        		assertEquals(-1.0, result.getDouble(0));
+        	} else if (proc == "SINCE_EPOCH_MILLIS") {
+        		assertEquals(-1000.0, result.getDouble(0));
+        	} else if (proc == "SINCE_EPOCH_MICROS") {
+        		assertEquals(-1000000.0, result.getDouble(0));
+        	}
+
+        }
+    }
+
     public void testFunctionsWithInvalidJSON() throws Exception {
 
         Client client = getClient();
@@ -888,6 +963,10 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "NUM INTEGER, " +
                 "RATIO FLOAT, " +
                 "PRIMARY KEY (ID) ); " +
+                "CREATE TABLE P2 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "TM TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) ); " +
                 "CREATE TABLE JS1 (\n" +
                 "  ID INTEGER NOT NULL, \n" +
                 "  DOC VARCHAR(8192),\n" +
@@ -942,6 +1021,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertFalse(true);
         }
         project.addPartitionInfo("P1", "ID");
+        project.addPartitionInfo("P2", "ID");
         // Test DECODE
         project.addStmtProcedure("DECODE", "select desc,  DECODE (desc,'IBM','zheng'," +
                         "'Microsoft','li'," +
@@ -971,6 +1051,10 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         // Test POSITION and CHAR_LENGTH
         project.addStmtProcedure("POSITION", "select desc, POSITION (? IN desc) from P1 where id = ?");
         project.addStmtProcedure("CHAR_LENGTH", "select desc, CHAR_LENGTH (desc) from P1 where id = ?");
+        // Test SINCE_EPOCH
+        project.addStmtProcedure("SINCE_EPOCH_SECOND", "select SINCE_EPOCH (SECOND, TM) from P2 where id = ?");
+        project.addStmtProcedure("SINCE_EPOCH_MILLIS", "select SINCE_EPOCH (MILLIS, TM) from P2 where id = ?");
+        project.addStmtProcedure("SINCE_EPOCH_MICROS", "select SINCE_EPOCH (MICROS, TM) from P2 where id = ?");
 
         // CONFIG #1: Local Site/Partition running on JNI backend
         config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
