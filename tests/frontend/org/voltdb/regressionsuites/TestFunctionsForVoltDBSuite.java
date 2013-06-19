@@ -819,60 +819,60 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         String[] procedures = {"SINCE_EPOCH_SECOND", "SINCE_EPOCH_MILLIS", "SINCE_EPOCH_MICROS"};
 
         for (int i=0; i< procedures.length; i++) {
-        	String proc = procedures[i];
+            String proc = procedures[i];
 
 
-        	cr = client.callProcedure(proc, 0);
-        	assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        	result = cr.getResults()[0];
-        	assertEquals(1, result.getRowCount());
-        	assertTrue(result.advanceRow());
-        	if (proc == "SINCE_EPOCH_SECOND") {
-        		assertEquals(0.0, result.getDouble(0));
-        	} else if (proc == "SINCE_EPOCH_MILLIS") {
-        		assertEquals(0.0, result.getDouble(0));
-        	} else if (proc == "SINCE_EPOCH_MICROS") {
-        		assertEquals(0.0, result.getDouble(0));
-        	}
+            cr = client.callProcedure(proc, 0);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            if (proc == "SINCE_EPOCH_SECOND") {
+                assertEquals(0.0, result.getDouble(0));
+            } else if (proc == "SINCE_EPOCH_MILLIS") {
+                assertEquals(0.0, result.getDouble(0));
+            } else if (proc == "SINCE_EPOCH_MICROS") {
+                assertEquals(0.0, result.getDouble(0));
+            }
 
-        	cr = client.callProcedure(proc, 1);
-        	assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        	result = cr.getResults()[0];
-        	assertEquals(1, result.getRowCount());
-        	assertTrue(result.advanceRow());
-        	if (proc == "SINCE_EPOCH_SECOND") {
-        		assertEquals(0.001, result.getDouble(0));
-        	} else if (proc == "SINCE_EPOCH_MILLIS") {
-        		assertEquals(1.0, result.getDouble(0));
-        	} else if (proc == "SINCE_EPOCH_MICROS") {
-        		assertEquals(1000.0, result.getDouble(0));
-        	}
+            cr = client.callProcedure(proc, 1);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            if (proc == "SINCE_EPOCH_SECOND") {
+                assertEquals(0.001, result.getDouble(0));
+            } else if (proc == "SINCE_EPOCH_MILLIS") {
+                assertEquals(1.0, result.getDouble(0));
+            } else if (proc == "SINCE_EPOCH_MICROS") {
+                assertEquals(1000.0, result.getDouble(0));
+            }
 
-        	cr = client.callProcedure(proc, 2);
-        	assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        	result = cr.getResults()[0];
-        	assertEquals(1, result.getRowCount());
-        	assertTrue(result.advanceRow());
-        	if (proc == "SINCE_EPOCH_SECOND") {
-        		assertEquals(1.0, result.getDouble(0));
-        	} else if (proc == "SINCE_EPOCH_MILLIS") {
-        		assertEquals(1000.0, result.getDouble(0));
-        	} else if (proc == "SINCE_EPOCH_MICROS") {
-        		assertEquals(1000000.0, result.getDouble(0));
-        	}
+            cr = client.callProcedure(proc, 2);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            if (proc == "SINCE_EPOCH_SECOND") {
+                assertEquals(1.0, result.getDouble(0));
+            } else if (proc == "SINCE_EPOCH_MILLIS") {
+                assertEquals(1000.0, result.getDouble(0));
+            } else if (proc == "SINCE_EPOCH_MICROS") {
+                assertEquals(1000000.0, result.getDouble(0));
+            }
 
-        	cr = client.callProcedure(proc, 3);
-        	assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        	result = cr.getResults()[0];
-        	assertEquals(1, result.getRowCount());
-        	assertTrue(result.advanceRow());
-        	if (proc == "SINCE_EPOCH_SECOND") {
-        		assertEquals(-1.0, result.getDouble(0));
-        	} else if (proc == "SINCE_EPOCH_MILLIS") {
-        		assertEquals(-1000.0, result.getDouble(0));
-        	} else if (proc == "SINCE_EPOCH_MICROS") {
-        		assertEquals(-1000000.0, result.getDouble(0));
-        	}
+            cr = client.callProcedure(proc, 3);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            if (proc == "SINCE_EPOCH_SECOND") {
+                assertEquals(-1.0, result.getDouble(0));
+            } else if (proc == "SINCE_EPOCH_MILLIS") {
+                assertEquals(-1000.0, result.getDouble(0));
+            } else if (proc == "SINCE_EPOCH_MICROS") {
+                assertEquals(-1000000.0, result.getDouble(0));
+            }
 
         }
     }
