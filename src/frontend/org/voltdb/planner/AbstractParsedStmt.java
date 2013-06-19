@@ -744,15 +744,19 @@ public abstract class AbstractParsedStmt {
      */
     void analyzeOuterJoinExpressions(JoinNode joinNode) {
         assert (joinNode != null);
+        if (joinNode.m_table != null) {
+            // Leaf node. Simply uncombine expressions and move them to the inner lists
+            // The expressions will be classified later at the join node level.
+            // If this is a single table select then classification is not required.
+            assert(joinNode.m_leftNode == null && joinNode.m_rightNode == null);
+            joinNode.m_joinInnerList.addAll(ExpressionUtil.uncombineAny(joinNode.m_joinExpr));
+            joinNode.m_whereInnerList.addAll(ExpressionUtil.uncombineAny(joinNode.m_whereExpr));
+            return;
+        }
+
         assert(joinNode.m_leftNode != null && joinNode.m_rightNode != null);
-        if (joinNode.m_leftNode.m_table == null) {
-            // The left node is not the leaf. Descend there
-            analyzeOuterJoinExpressions(joinNode.m_leftNode);
-        }
-        if (joinNode.m_rightNode.m_table == null) {
-            // The right node is not the leaf. Descend there
-            analyzeOuterJoinExpressions(joinNode.m_rightNode);
-        }
+        analyzeOuterJoinExpressions(joinNode.m_leftNode);
+        analyzeOuterJoinExpressions(joinNode.m_rightNode);
 
         // At this moment all RIGHT joins are already converted to the LEFT ones
         assert (joinNode.m_joinType == JoinType.LEFT || joinNode.m_joinType == JoinType.INNER);
@@ -760,13 +764,19 @@ public abstract class AbstractParsedStmt {
         ArrayList<AbstractExpression> joinList = new ArrayList<AbstractExpression>();
         ArrayList<AbstractExpression> whereList = new ArrayList<AbstractExpression>();
 
-        joinList.addAll(ExpressionUtil.uncombineAny(joinNode.m_rightNode.m_joinExpr));
-        joinList.addAll(ExpressionUtil.uncombineAny(joinNode.m_leftNode.m_joinExpr));
+        // Collect children's and node's own join expressions
         joinList.addAll(ExpressionUtil.uncombineAny(joinNode.m_joinExpr));
+        joinList.addAll(joinNode.m_rightNode.m_joinInnerList);
+        joinList.addAll(joinNode.m_leftNode.m_joinInnerList);
+        joinNode.m_rightNode.m_joinInnerList.clear();
+        joinNode.m_leftNode.m_joinInnerList.clear();
 
-        whereList.addAll(ExpressionUtil.uncombineAny(joinNode.m_leftNode.m_whereExpr));
-        whereList.addAll(ExpressionUtil.uncombineAny(joinNode.m_rightNode.m_whereExpr));
+        // Collect children's and node's own where expressions
         whereList.addAll(ExpressionUtil.uncombineAny(joinNode.m_whereExpr));
+        whereList.addAll(joinNode.m_rightNode.m_whereInnerList);
+        whereList.addAll(joinNode.m_leftNode.m_whereInnerList);
+        joinNode.m_rightNode.m_whereInnerList.clear();
+        joinNode.m_leftNode.m_whereInnerList.clear();
 
 
         Collection<Table> innerTables = joinNode.m_rightNode.generateTableJoinOrder();
