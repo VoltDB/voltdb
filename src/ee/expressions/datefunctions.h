@@ -135,4 +135,33 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_SECOND>() const {
     return getDecimalValue(retval);
 }
 
+/** implement the timestamp SINCE_EPOCH in SECONDs function **/
+template<> inline NValue NValue::callUnary<FUNC_SINCE_EPOCH_SECOND>() const {
+    if (isNull()) {
+        return *this;
+    }
+    int64_t epoch_micros = getTimestamp();
+    double epoch_seconds = epoch_micros / 1000000.0;
+    return getDoubleValue(epoch_seconds);
+}
+
+/** implement the timestamp SINCE_EPOCH in MILLISECONDs function **/
+template<> inline NValue NValue::callUnary<FUNC_SINCE_EPOCH_MILLISECOND>() const {
+    if (isNull()) {
+        return *this;
+    }
+    int64_t epoch_micros = getTimestamp();
+    double epoch_milliseconds = epoch_micros / 1000.0;
+    return getDoubleValue(epoch_milliseconds);
+}
+
+/** implement the timestamp SINCE_EPOCH in MICROSECONDs function **/
+template<> inline NValue NValue::callUnary<FUNC_SINCE_EPOCH_MICROSECOND>() const {
+    if (isNull()) {
+        return *this;
+    }
+    int64_t epoch_micros = getTimestamp();
+    return getDoubleValue(epoch_micros * 1.0);
+}
+
 }
