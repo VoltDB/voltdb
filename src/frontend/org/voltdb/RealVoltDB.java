@@ -560,7 +560,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
              * which need logging before the internal file writers are
              * initialized.  Root cause of ENG-4136.
              */
-            if (m_commandLog != null && isRejoin) {
+            if (m_commandLog != null && (isRejoin || m_joining)) {
                 //On rejoin the starting IDs are all 0 so technically it will load any snapshot
                 //but the newest snapshot will always be the truncation snapshot taken after rejoin
                 //completes at which point the node will mark itself as actually recovered.
