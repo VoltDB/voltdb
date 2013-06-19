@@ -315,7 +315,7 @@ public class SnapshotSiteProcessor {
                     final long now = System.currentTimeMillis();
                     //Ask if the site is idle, and if it is queue the work immediately
                     if (m_idlePredicate.idle(now)) {
-                        m_siteTaskerQueue.offer(new SnapshotTask());
+                        m_siteTaskerQueue.offer(new SnapshotTask(false));
                         return;
                     }
 
@@ -333,7 +333,7 @@ public class SnapshotSiteProcessor {
                      * needs to be calculated
                      */
                     if (now > quietUntil) {
-                        m_siteTaskerQueue.offer(new SnapshotTask());
+                        m_siteTaskerQueue.offer(new SnapshotTask(false));
                         //Now push the quiet period further into the future,
                         //generally no threads will be racing to do this
                         //since the execution site only interacts with one snapshot data target at a time
@@ -349,7 +349,7 @@ public class SnapshotSiteProcessor {
                                     @Override
                                     public void run()
                                     {
-                                        m_siteTaskerQueue.offer(new SnapshotTask());
+                                        m_siteTaskerQueue.offer(new SnapshotTask(false));
                                     }
                                 },
                                 quietUntil - now,
@@ -367,7 +367,7 @@ public class SnapshotSiteProcessor {
                                 (5 * m_snapshotPriority) + ((long)(m_random.nextDouble() * 15));
                     }
                 } else {
-                    m_siteTaskerQueue.offer(new SnapshotTask());
+                    m_siteTaskerQueue.offer(new SnapshotTask(false));
                 }
             }
         };
@@ -422,18 +422,29 @@ public class SnapshotSiteProcessor {
         }
         resizeBufferPool(maxTableTaskSize * m_bufferCountMultiplier);
 
-        /*
-         * Kick off the initial snapshot tasks. They will continue to
-         * requeue themselves as the snapshot progresses. See intializeBufferPool
-         * and the discard method of BBContainer for how requeuing works.
-         */
-        for (int ii = 0; ii < m_availableSnapshotBuffers.size(); ii++) {
+        if (tasks.isEmpty()) {
+            // This site has no snapshot work to do, still queue a task to clean up. Otherwise,
+            // the snapshot will never finish.
+            queueInitialSnapshotTasks(1, now);
+        } else {
+            /*
+             * Kick off the initial snapshot tasks. They will continue to
+             * requeue themselves as the snapshot progresses. See intializeBufferPool
+             * and the discard method of BBContainer for how requeuing works.
+             */
+            queueInitialSnapshotTasks(m_availableSnapshotBuffers.size(), now);
+        }
+    }
+
+    private void queueInitialSnapshotTasks(int count, long now)
+    {
+        for (int ii = 0; ii < count; ii++) {
             VoltDB.instance().schedulePriorityWork(
                     new Runnable() {
                         @Override
                         public void run()
                         {
-                            m_siteTaskerQueue.offer(new SnapshotTask());
+                            m_siteTaskerQueue.offer(new SnapshotTask(false));
                         }
                     },
                     (m_quietUntil + (5 * m_snapshotPriority) - now),
@@ -609,8 +620,15 @@ public class SnapshotSiteProcessor {
     }
 
     public Future<?> doSnapshotWork(SystemProcedureExecutionContext context,
-                                    ExecutionEngine ee, boolean ignoreQuietPeriod) {
+                                    ExecutionEngine ee, boolean isCleanupTask) {
         ListenableFuture<?> retval = null;
+
+        if (isCleanupTask) {
+            // A cleanup task is only supposed to be run after all snapshot work is done,
+            // so return here immediately.
+            cleanupAfterTerminatorsFinished();
+            return null;
+        }
 
         /*
          * This thread will null out the reference to m_snapshotTableTasks when
@@ -769,11 +787,34 @@ public class SnapshotSiteProcessor {
                 m_snapshotTargetTerminators.add(terminatorThread);
                 terminatorThread.start();
 
-                // Clean up the buffer pool
-                emptyBufferPool();
+                // Schedule a task to clean up the buffer pool after the terminators are done
+                m_siteTaskerQueue.offer(new SnapshotTask(true));
             }
         }
         return retval;
+    }
+
+    private void cleanupAfterTerminatorsFinished()
+    {
+        /*
+         * If the terminators contains stuff, it means that there is no new snapshot being
+         * initialized, we can safely cleanup the buffer pool is all terminators are done.
+         *
+         * If the terminators is null or empty, a new snapshot is initialized,
+         * the buffer pool is already reset, so don't do anything here.
+         */
+        if (m_snapshotTargetTerminators != null && !m_snapshotTargetTerminators.isEmpty()) {
+            for (Thread terminator : m_snapshotTargetTerminators) {
+                if (terminator.isAlive()) {
+                    // A terminator is still in progress, check later
+                    m_siteTaskerQueue.offer(new SnapshotTask(true));
+
+                    return;
+                }
+            }
+
+            emptyBufferPool();
+        }
     }
 
     public static void runPostSnapshotTasks(SystemProcedureExecutionContext context)
@@ -936,7 +977,7 @@ public class SnapshotSiteProcessor {
         throws InterruptedException {
         HashSet<Exception> retval = new HashSet<Exception>();
         while (m_snapshotTableTasks != null) {
-            Future<?> result = doSnapshotWork(context, ee, true);
+            Future<?> result = doSnapshotWork(context, ee, false);
             if (result != null) {
                 try {
                     result.get();
@@ -960,6 +1001,8 @@ public class SnapshotSiteProcessor {
             }
             m_snapshotTargetTerminators = null;
         }
+
+        emptyBufferPool();
 
         return retval;
     }
