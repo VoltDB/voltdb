@@ -555,10 +555,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_latencyStats = new LatencyStats(m_myHostId);
 
             /*
-             * Initialize the command log on rejoin before configuring the IV2
+             * Initialize the command log on rejoin and join before configuring the IV2
              * initiators.  This will prevent them from receiving transactions
              * which need logging before the internal file writers are
              * initialized.  Root cause of ENG-4136.
+             *
+             * If sync command log is on, not initializing the command log before the initiators
+             * are up would cause deadlock.
              */
             if (m_commandLog != null && (isRejoin || m_joining)) {
                 //On rejoin the starting IDs are all 0 so technically it will load any snapshot
