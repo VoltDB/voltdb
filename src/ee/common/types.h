@@ -178,8 +178,10 @@ enum PlanNodeType {
     PLAN_NODE_TYPE_SEQSCAN          = 10,
     PLAN_NODE_TYPE_INDEXSCAN        = 11,
     // special counting index
-    PLAN_NODE_TYPE_INDEXCOUNT        = 12,
-    PLAN_NODE_TYPE_TABLECOUNT        = 13,
+    PLAN_NODE_TYPE_INDEXCOUNT       = 12,
+    PLAN_NODE_TYPE_TABLECOUNT       = 13,
+    // for sql-in using indexes
+    PLAN_NODE_TYPE_MATERIALIZEDSCAN = 14,
     //
     // Join Nodes
     //
@@ -198,7 +200,6 @@ enum PlanNodeType {
     //
     PLAN_NODE_TYPE_SEND             = 40,
     PLAN_NODE_TYPE_RECEIVE          = 41,
-    PLAN_NODE_TYPE_PRINT            = 42,
 
     //
     // Misc Nodes
@@ -286,6 +287,7 @@ enum ExpressionType {
     EXPRESSION_TYPE_VALUE_TUPLE                     = 32,
     EXPRESSION_TYPE_VALUE_TUPLE_ADDRESS             = 33,
     EXPRESSION_TYPE_VALUE_NULL                      = 34,
+    EXPRESSION_TYPE_VALUE_VECTOR                    = 35,
 
     // -----------------------------
     // Aggregates
@@ -301,7 +303,6 @@ enum ExpressionType {
     // Functions
     // -----------------------------
     EXPRESSION_TYPE_FUNCTION                        = 100,
-    EXPRESSION_TYPE_INLISTBUILDER                   = 101, // rhs operand of [ ... IN (...) ]
 
 
     // -----------------------------

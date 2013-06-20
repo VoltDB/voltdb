@@ -283,14 +283,26 @@ public class Benchmark {
 
         System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
         System.out.printf("Average latency:               %,9.2f ms\n", stats.getAverageLatency());
+        System.out.printf("10th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.1));
+        System.out.printf("25th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.25));
+        System.out.printf("50th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.5));
+        System.out.printf("75th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.75));
+        System.out.printf("90th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.9));
         System.out.printf("95th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.95));
         System.out.printf("99th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.99));
+        System.out.printf("99.5th percentile latency:     %,9d ms\n", stats.kPercentileLatency(.995));
+        System.out.printf("99.9th percentile latency:     %,9d ms\n", stats.kPercentileLatency(.999));
 
         System.out.print("\n" + HORIZONTAL_RULE);
         System.out.println(" System Server Statistics");
         System.out.println(HORIZONTAL_RULE);
 
         System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", stats.getAverageInternalLatency());
+
+        System.out.print("\n" + HORIZONTAL_RULE);
+        System.out.println(" Latency Histogram");
+        System.out.println(HORIZONTAL_RULE);
+        System.out.println(stats.latencyHistoReport());
 
         // 3. Write stats to file if requested
         cache.saveStatistics(stats, config.statsfile);
@@ -396,7 +408,7 @@ public class Benchmark {
         }
 
         System.out.print(HORIZONTAL_RULE);
-        System.out.println("Starting Benchmark");
+        System.out.println(" Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
 
         // create/start the requested number of threads

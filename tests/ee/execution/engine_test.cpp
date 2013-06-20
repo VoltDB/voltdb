@@ -59,7 +59,6 @@
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
 #include "execution/VoltDBEngine.h"
-#include "plannodes/nodes.h"
 #include "plannodes/abstractplannode.h"
 #include "indexes/tableindex.h"
 #include "storage/table.h"

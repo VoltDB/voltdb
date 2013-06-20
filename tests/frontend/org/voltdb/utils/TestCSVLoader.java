@@ -204,11 +204,13 @@ public class TestCSVLoader extends TestCase {
                 "--quotechar=\"",
                 "--escape=\\",
                 "--skip=1",
+                "--limitrows=100",
                 //"--strictquotes",
                 "BlAh"
         };
         String currentTime = new TimestampType().toString();
-        String []myData = { "1,1,1,11111111,first,1.10,1.11,"+currentTime,
+        String []myData = {
+                "1 ,1,1,11111111,first,1.10,1.11,"+currentTime,
                 "2,2,2,222222,second,3.30,NULL,"+currentTime,
                 "3,3,3,333333, third ,NULL, 3.33,"+currentTime,
                 "4,4,4,444444, NULL ,4.40 ,4.44,"+currentTime,
@@ -220,11 +222,13 @@ public class TestCSVLoader extends TestCase {
                 "",
                 //invalid lines below
                 "8, 8",
+                "9, NLL,9,\"1,000\",nine,1.10,1.11,"+currentTime,
                 "10,10,10,10 101 010,second,2.20,2.22"+currentTime,
                 "12,n ull,12,12121212,twelveth,12.12,12.12"
         };
-        int invalidLineCnt = 3;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int invalidLineCnt = 4;
+        int validLineCnt = 7;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     public void testOpenQuote() throws Exception
@@ -259,7 +263,8 @@ public class TestCSVLoader extends TestCase {
                         "1,1,1,\"Jesus\\\"\"loves"+ "\n" +"you\",\"7777-12-25 14:35:26\"",
         };
         int invalidLineCnt = 0;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     public void testOpenQuoteAndStrictQuotes() throws Exception
@@ -295,7 +300,8 @@ public class TestCSVLoader extends TestCase {
                         "\"1\",\"1\",\"1\",\"Jesus\\\"\"loves"+ "\n" +"you\",\"7777-12-25 14:35:26\"",
         };
         int invalidLineCnt = 0;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     public void testUnmatchQuote() throws Exception
@@ -338,7 +344,8 @@ public class TestCSVLoader extends TestCase {
                         "1,1,1,\"Jesus\\\"\"loves"+ "\n" +"you,\"7777-12-25 14:35:26\"",
         };
         int invalidLineCnt = 1;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     public void testNULL() throws Exception
@@ -383,7 +390,8 @@ public class TestCSVLoader extends TestCase {
                 "7,\\" + VoltTable.CSV_NULL        + ",1,11111111,  \"abc\\" + VoltTable.CSV_NULL + "\"  ,1.10,1.11"
         };
         int invalidLineCnt = 0;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     public void testBlankNull() throws Exception
@@ -411,7 +419,8 @@ public class TestCSVLoader extends TestCase {
                 "1,,,,,,,,",
         };
         int invalidLineCnt = 0;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     public void testBlankEmpty() throws Exception
@@ -439,7 +448,8 @@ public class TestCSVLoader extends TestCase {
                 "0,,,,,,,,",
         };
         int invalidLineCnt = 0;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     //SuperCSV treats empty string "" as null
@@ -468,7 +478,8 @@ public class TestCSVLoader extends TestCase {
                 "0,,,,,,,,",
         };
         int invalidLineCnt = 1;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     public void testStrictQuote() throws Exception
@@ -493,7 +504,8 @@ public class TestCSVLoader extends TestCase {
                 "\"4\",\"4\",\"4\"",
         };
         int invalidLineCnt = 2;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     public void testSkip() throws Exception
@@ -546,7 +558,63 @@ public class TestCSVLoader extends TestCase {
                 "12,n ull,12,12121212,twelveth,12.12,12.12"
         };
         int invalidLineCnt = 2;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = 0;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
+    }
+
+    public void testSkipOverFlow() throws Exception
+    {
+        String mySchema =
+                "create table BLAH (" +
+                        "clm_integer integer default 0 not null, " + // column that is partitioned on
+
+                "clm_tinyint tinyint default 0, " +
+                "clm_smallint smallint default 0, " +
+                "clm_bigint bigint default 0, " +
+
+                "clm_string varchar(20) default null, " +
+                "clm_decimal decimal default null, " +
+                "clm_float float default null, "+
+                //"clm_varinary varbinary default null," +
+                "clm_timestamp timestamp default null " +
+                "); ";
+        String []myOptions = {
+                "-f" + path_csv,
+                //"--procedure=blah.insert",
+                "--reportdir=" + reportDir,
+                //"--table=BLAH",
+                "--maxerrors=50",
+                //"-user",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                //Skip the whole file
+                "--skip=10000",
+                //"--strictquotes",
+                "BlAh"
+        };
+        String currentTime = new TimestampType().toString();
+        String []myData = { "1,1,1,11111111,first,1.10,1.11,"+currentTime,
+                "2,2,2,222222,second,3.30,NULL,"+currentTime,
+                "3,3,3,333333, third ,NULL, 3.33,"+currentTime,
+                "4,4,4,444444, NULL ,4.40 ,4.44,"+currentTime,
+                "5,5,5,5555555,  \"abcde\"g, 5.50, 5.55,"+currentTime,
+                "6,6,NULL,666666, sixth, 6.60, 6.66,"+currentTime,
+                "7,NULL,7,7777777, seventh, 7.70, 7.77,"+currentTime,
+                "11, 1,1,\"1,000\",first,1.10,1.11,"+currentTime,
+                //empty line
+                "",
+                //invalid lines below
+                "8, 8",
+                "10,10,10,10 101 010,second,2.20,2.22"+currentTime,
+                "12,n ull,12,12121212,twelveth,12.12,12.12"
+        };
+        int invalidLineCnt = 0;
+        int validLineCnt = 0;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     public void testEmptyFile() throws Exception
@@ -572,7 +640,8 @@ public class TestCSVLoader extends TestCase {
 
         String []myData = null;
         int invalidLineCnt = 0;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = 0;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     public void testEscapeChar() throws Exception
@@ -597,7 +666,8 @@ public class TestCSVLoader extends TestCase {
                 "~'escapeprimesymbol,3,3,3"
         };
         int invalidLineCnt = 0;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     public void testNoWhiteSpace() throws Exception
@@ -623,7 +693,8 @@ public class TestCSVLoader extends TestCase {
                 "\" inquotespace \"   ,4,4,4"
         };
         int invalidLineCnt = 3;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
     public void testColumnLimitSize() throws Exception
@@ -645,13 +716,41 @@ public class TestCSVLoader extends TestCase {
         String []myData = {
                 "\"openquote,1,1,1",
                 "second,2,2,2",
-                "third,3,3,3"
+                "third,3,3,3",
+                "\"fourthfourthfourth\",4,4,4"
         };
         int invalidLineCnt = 1;
-        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
     }
 
-    public void test_Interface( String my_schema, String[] my_options, String[] my_data, int invalidLineCnt ) throws Exception {
+    public void testColumnLimitSize2() throws Exception
+    {
+        String mySchema =
+                "create table BLAH (" +
+                        "clm_integer integer default 0 not null, " + // column that is partitioned on
+                        "clm_string varchar(20), "+
+                        "); ";
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--columnsizelimit=4",
+                "--skip=1",
+                "BLAH"
+        };
+
+        String []myData = {
+                "1,\"Edwr" + "\n" + "Burnam\"",
+                "2,\"Tabatha" + "\n" +
+                "Gehling",
+        };
+        int invalidLineCnt = 3;
+        int validLineCnt = 0;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt, validLineCnt );
+    }
+
+    public void test_Interface( String my_schema, String[] my_options, String[] my_data, int invalidLineCnt,
+            int validLineCnt) throws Exception {
         try{
             BufferedWriter out_csv = new BufferedWriter( new FileWriter( path_csv ) );
             for( int i = 0; i < my_data.length; i++ )
@@ -715,6 +814,8 @@ public class TestCSVLoader extends TestCase {
             }
             System.out.println(String.format("The rows infected: (%d,%s)", lineCount, rowct));
             assertEquals(lineCount, rowct);
+            //assert validLineCnt specified equals the successfully inserted lineCount
+            assertEquals(validLineCnt, lineCount);
             assertEquals(invalidLineCnt, invalidlinecnt);
 
         }

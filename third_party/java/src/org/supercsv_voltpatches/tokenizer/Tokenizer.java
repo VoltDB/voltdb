@@ -55,7 +55,9 @@ public class Tokenizer extends AbstractTokenizer {
 
     private final int escapeChar;
 
-    private final int columnSizeLimit;
+    private final long columnSizeLimit;
+
+    private final long skip;
 
     /**
      * Enumeration of tokenizer states. QUOTE_MODE is activated between quotes.
@@ -74,7 +76,8 @@ public class Tokenizer extends AbstractTokenizer {
      * @throws NullPointerException
      *             if reader or preferences is null
      */
-    public Tokenizer(final Reader reader, final CsvPreference preferences, boolean strictquotes, char escapechar, int columnsizelimit) {
+    public Tokenizer(final Reader reader, final CsvPreference preferences, boolean strictquotes, char escapechar,
+            long columnsizelimit, long skipNum) {
 	super(reader, preferences);
 	this.quoteChar = preferences.getQuoteChar();
 	this.delimeterChar = preferences.getDelimiterChar();
@@ -83,6 +86,7 @@ public class Tokenizer extends AbstractTokenizer {
 	this.strictQuotes = strictquotes;
 	this.escapeChar = escapechar;
 	this.columnSizeLimit = columnsizelimit;
+	this.skip = skipNum;
     }
 
     /**
@@ -108,7 +112,8 @@ public class Tokenizer extends AbstractTokenizer {
 		return false; // EOF
 	    }
 	}
-	while( line.length() == 0 || (commentMatcher != null && commentMatcher.isComment(line)) );
+	while( line.length() == 0 || (commentMatcher != null && commentMatcher.isComment(line))
+	        || skip >= getLineNumber());
 
 	// update the untokenized CSV row
 	currentRow.append(line);
@@ -123,6 +128,7 @@ public class Tokenizer extends AbstractTokenizer {
 	int charIndex = 0;
 	boolean espectQuote = false;
 	boolean isEscape = false;
+	boolean sawNewLineInQuote = false;
 
 	while( true ) {
 
@@ -225,7 +231,17 @@ public class Tokenizer extends AbstractTokenizer {
 		/*
 		 * QUOTE_MODE (within quotes).
 		 */
-
+        if( sawNewLineInQuote ) {
+            if( currentColumn.length() > columnSizeLimit ) {
+                state = TokenizerState.NORMAL;
+                sawNewLineInQuote = false;
+                throw new SuperCsvException(
+                        String
+                        .format(
+                                "oversized column while reading quoted column beginning on line %d and ending on line %d",
+                                quoteScopeStartingLine, getLineNumber()));
+            }
+        }
 		if( c == NEWLINE ) {
 
 		    /*
@@ -238,12 +254,15 @@ public class Tokenizer extends AbstractTokenizer {
 		     * Yes I'll set the limit to be 16*1024*1024B = 16MB by default
 		     */
 		    if( currentColumn.length() > columnSizeLimit ) {
-			throw new SuperCsvException(
-						                                String
-										.format(
-											"oversized column while reading quoted column beginning on line %d and ending on line %d",
-											quoteScopeStartingLine, getLineNumber()));
+		        state = TokenizerState.NORMAL;
+		        sawNewLineInQuote = false;
+		        throw new SuperCsvException(
+		                String
+		                .format(
+		                        "oversized column while reading quoted column beginning on line %d and ending on line %d",
+		                        quoteScopeStartingLine, getLineNumber()));
 		    }
+		    sawNewLineInQuote = true;
 		    currentColumn.append(NEWLINE);
 		    currentRow.append(NEWLINE); // specific line terminator lost, \n will have to suffice
 
@@ -259,7 +278,6 @@ public class Tokenizer extends AbstractTokenizer {
 
 		    currentRow.append(line); // update untokenized CSV row
 		    line += NEWLINE; // add newline to simplify parsing
-
 		} else if( c == quoteChar ) {
 
 		    if( line.charAt(charIndex + 1) == quoteChar ) {
@@ -275,6 +293,7 @@ public class Tokenizer extends AbstractTokenizer {
 			 * A single quote ("). Update to NORMAL (but don't save quote), then continue to next character.
 			 */
 			state = TokenizerState.NORMAL;
+			sawNewLineInQuote = false;
 			quoteScopeStartingLine = -1; // reset ready for next multi-line cell
 		    }
 		} else {

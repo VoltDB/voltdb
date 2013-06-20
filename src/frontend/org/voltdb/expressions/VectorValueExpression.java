@@ -60,8 +60,7 @@ public class VectorValueExpression extends AbstractExpression {
 
     @Override
     public void finalizeValueTypes() {
-        // just make sure the children have the
+        // just make sure the children have valid types.
         finalizeChildValueTypes();
-        // probably need to set them all to the same large type? ugh...
     }
 }
