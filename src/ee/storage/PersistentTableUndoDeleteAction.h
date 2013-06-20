@@ -19,10 +19,10 @@
 #define PERSISTENTTABLEUNDODELETEACTION_H_
 
 #include "common/UndoAction.h"
+#include "storage/persistenttable.h"
 
 namespace voltdb {
 
-class PersistentTable;
 
 class PersistentTableUndoDeleteAction: public UndoAction {
 public:

@@ -57,6 +57,7 @@
 #include "executors/insertexecutor.h"
 #include "executors/limitexecutor.h"
 #include "executors/materializeexecutor.h"
+#include "executors/materializedscanexecutor.h"
 #include "executors/nestloopexecutor.h"
 #include "executors/nestloopindexexecutor.h"
 #include "executors/orderbyexecutor.h"
@@ -76,15 +77,18 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
     PlanNodeType type = abstract_node->getPlanNodeType();
     switch (type) {
     case PLAN_NODE_TYPE_AGGREGATE: return new AggregateSerialExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_HASHAGGREGATE: return new AggregateHashExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_DELETE: return new DeleteExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_DISTINCT: return new DistinctExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_HASHAGGREGATE: return new AggregateHashExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_INDEXSCAN: return new IndexScanExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_INDEXCOUNT: return new IndexCountExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_TABLECOUNT: return new TableCountExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_INSERT: return new InsertExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_INVALID:
+        VOLT_ERROR( "INVALID plan node type %d", (int) type);
+        return NULL;
     case PLAN_NODE_TYPE_LIMIT: return new LimitExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_MATERIALIZE: return new MaterializeExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_MATERIALIZEDSCAN: return new MaterializedScanExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_NESTLOOP: return new NestLoopExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_NESTLOOPINDEX: return new NestLoopIndexExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_ORDERBY: return new OrderByExecutor(engine, abstract_node);
@@ -92,11 +96,12 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
     case PLAN_NODE_TYPE_RECEIVE: return new ReceiveExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_SEND: return new SendExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_SEQSCAN: return new SeqScanExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_TABLECOUNT: return new TableCountExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_UNION: return new UnionExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_UPDATE: return new UpdateExecutor(engine, abstract_node);
-    default:
-        VOLT_ERROR( "Invalid PlannodeType %d", (int) type);
+    // default: Don't provide a default, let the compiler enforce complete coverage.
     }
+    VOLT_ERROR( "Undefined plan node type %d", (int) type);
     return NULL;
 }
 
