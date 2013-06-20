@@ -55,7 +55,7 @@
 #include "expressions/abstractexpression.h"
 
 namespace voltdb {
-class AggregateRow;
+struct AggregateRow;
 
 /**
  * The base class for aggregate executors regardless of the type of grouping that should be performed.

@@ -34,6 +34,7 @@ import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.expressions.VectorValueExpression;
 
 /**
  *
@@ -97,6 +98,7 @@ public enum ExpressionType {
     VALUE_TUPLE                  (TupleValueExpression.class, 32),
     VALUE_TUPLE_ADDRESS        (TupleAddressExpression.class, 33),
     VALUE_NULL                    (NullValueExpression.class, 34),
+    VALUE_VECTOR                (VectorValueExpression.class, 35),
 
     // ----------------------------
     // Aggregate

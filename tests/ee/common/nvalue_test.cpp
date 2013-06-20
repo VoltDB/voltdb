@@ -28,6 +28,8 @@
 #include "common/ThreadLocalPool.h"
 #include "common/executorcontext.hpp"
 #include "expressions/functionexpression.h"
+#include "expressions/expressionutil.h"
+#include "expressions/constantvalueexpression.h"
 
 #include <cfloat>
 #include <limits>
@@ -1169,40 +1171,40 @@ TEST_F(NValueTest, TestComparisonOps)
     NValue integer = ValueFactory::getIntegerValue(1000001);
     NValue bigInt = ValueFactory::getBigIntValue(10000000000001);
     NValue floatVal = ValueFactory::getDoubleValue(12000.456);
-    EXPECT_TRUE(smallInt.op_greaterThan(tinyInt).isTrue());
-    EXPECT_TRUE(integer.op_greaterThan(smallInt).isTrue());
-    EXPECT_TRUE(bigInt.op_greaterThan(integer).isTrue());
-    EXPECT_TRUE(tinyInt.op_lessThan(smallInt).isTrue());
-    EXPECT_TRUE(smallInt.op_lessThan(integer).isTrue());
-    EXPECT_TRUE(integer.op_lessThan(bigInt).isTrue());
-    EXPECT_TRUE(tinyInt.op_lessThan(floatVal).isTrue());
-    EXPECT_TRUE(smallInt.op_lessThan(floatVal).isTrue());
-    EXPECT_TRUE(integer.op_greaterThan(floatVal).isTrue());
-    EXPECT_TRUE(bigInt.op_greaterThan(floatVal).isTrue());
-    EXPECT_TRUE(floatVal.op_lessThan(bigInt).isTrue());
-    EXPECT_TRUE(floatVal.op_lessThan(integer).isTrue());
-    EXPECT_TRUE(floatVal.op_greaterThan(smallInt).isTrue());
-    EXPECT_TRUE(floatVal.op_greaterThan(tinyInt).isTrue());
+    EXPECT_TRUE(smallInt.compare(tinyInt) > 0);
+    EXPECT_TRUE(integer.compare(smallInt) > 0);
+    EXPECT_TRUE(bigInt.compare(integer) > 0);
+    EXPECT_TRUE(tinyInt.compare(smallInt) < 0);
+    EXPECT_TRUE(smallInt.compare(integer) < 0);
+    EXPECT_TRUE(integer.compare(bigInt) < 0);
+    EXPECT_TRUE(tinyInt.compare(floatVal) < 0);
+    EXPECT_TRUE(smallInt.compare(floatVal) < 0);
+    EXPECT_TRUE(integer.compare(floatVal) > 0);
+    EXPECT_TRUE(bigInt.compare(floatVal) > 0);
+    EXPECT_TRUE(floatVal.compare(bigInt) < 0);
+    EXPECT_TRUE(floatVal.compare(integer) < 0);
+    EXPECT_TRUE(floatVal.compare(smallInt) > 0);
+    EXPECT_TRUE(floatVal.compare(tinyInt) > 0);
 
     tinyInt = ValueFactory::getTinyIntValue(-101);
     smallInt = ValueFactory::getSmallIntValue(-1001);
     integer = ValueFactory::getIntegerValue(-1000001);
     bigInt = ValueFactory::getBigIntValue(-10000000000001);
     floatVal = ValueFactory::getDoubleValue(-12000.456);
-    EXPECT_TRUE(smallInt.op_lessThan(tinyInt).isTrue());
-    EXPECT_TRUE(integer.op_lessThan(smallInt).isTrue());
-    EXPECT_TRUE(bigInt.op_lessThan(integer).isTrue());
-    EXPECT_TRUE(tinyInt.op_greaterThan(smallInt).isTrue());
-    EXPECT_TRUE(smallInt.op_greaterThan(integer).isTrue());
-    EXPECT_TRUE(integer.op_greaterThan(bigInt).isTrue());
-    EXPECT_TRUE(tinyInt.op_greaterThan(floatVal).isTrue());
-    EXPECT_TRUE(smallInt.op_greaterThan(floatVal).isTrue());
-    EXPECT_TRUE(integer.op_lessThan(floatVal).isTrue());
-    EXPECT_TRUE(bigInt.op_lessThan(floatVal).isTrue());
-    EXPECT_TRUE(floatVal.op_greaterThan(bigInt).isTrue());
-    EXPECT_TRUE(floatVal.op_greaterThan(integer).isTrue());
-    EXPECT_TRUE(floatVal.op_lessThan(smallInt).isTrue());
-    EXPECT_TRUE(floatVal.op_lessThan(tinyInt).isTrue());
+    EXPECT_TRUE(smallInt.compare(tinyInt) < 0);
+    EXPECT_TRUE(integer.compare(smallInt) < 0);
+    EXPECT_TRUE(bigInt.compare(integer) < 0);
+    EXPECT_TRUE(tinyInt.compare(smallInt) > 0);
+    EXPECT_TRUE(smallInt.compare(integer) > 0);
+    EXPECT_TRUE(integer.compare(bigInt) > 0);
+    EXPECT_TRUE(tinyInt.compare(floatVal) > 0);
+    EXPECT_TRUE(smallInt.compare(floatVal) > 0);
+    EXPECT_TRUE(integer.compare(floatVal) < 0);
+    EXPECT_TRUE(bigInt.compare(floatVal) < 0);
+    EXPECT_TRUE(floatVal.compare(bigInt) > 0);
+    EXPECT_TRUE(floatVal.compare(integer) > 0);
+    EXPECT_TRUE(floatVal.compare(smallInt) < 0);
+    EXPECT_TRUE(floatVal.compare(tinyInt) < 0);
 }
 
 TEST_F(NValueTest, TestNullHandling)
@@ -2152,6 +2154,265 @@ TEST_F(NValueTest, TestExtract)
     const std::string EXPECTED_SECONDS = "40";
     result = midSeptember.callUnary<FUNC_EXTRACT_SECOND>();
     EXPECT_EQ(0, result.compare(ValueFactory::getDecimalValueFromString(EXPECTED_SECONDS)));
+
+    delete poolHolder;
+    delete testPool;
+}
+
+static NValue streamNValueArrayintoInList(ValueType vt, NValue* nvalue, int length, Pool* testPool)
+{
+    char serial_buffer[1024];
+    // This requires intimate knowledge of ARRAY wire protocol
+    ReferenceSerializeOutput setup(serial_buffer, sizeof(serial_buffer));
+    ReferenceSerializeInput input(serial_buffer, sizeof(serial_buffer));
+    setup.writeByte(VALUE_TYPE_ARRAY);
+    setup.writeByte(vt);
+    setup.writeShort((short)length); // number of list elements
+    for (int ii = 0; ii < length; ++ii) {
+        nvalue[ii].serializeTo(setup);
+    }
+    NValue list;
+    list.deserializeFromAllocateForStorage(input, testPool);
+    return list;
+}
+
+static void initNValueArray(NValue* int_NV_set, int* int_set, size_t length)
+{
+    size_t ii = length;
+    while (ii--) {
+        int_NV_set[ii] = ValueFactory::getIntegerValue(int_set[ii]);
+    }
+}
+
+static void initNValueArray(NValue* string_NV_set, const char ** string_set, size_t length)
+{
+    size_t ii = length;
+    while (ii--) {
+        string_NV_set[ii] = ValueFactory::getStringValue(string_set[ii]);
+    }
+}
+
+static void initConstantArray(std::vector<AbstractExpression*>& constants, NValue* int_NV_set)
+{
+    size_t ii = constants.size();
+    while (ii--) {
+        AbstractExpression* cve = new ConstantValueExpression(int_NV_set[ii]);
+        constants[ii] = cve;
+    }
+}
+
+static void initConstantArray(std::vector<AbstractExpression*>& constants, const char** string_set)
+{
+    size_t ii = constants.size();
+    while (ii--) {
+        AbstractExpression* cve =
+            new ConstantValueExpression(ValueFactory::getStringValue(string_set[ii]));
+        constants[ii] = cve;
+    }
+}
+
+static void freeNValueArray(NValue* string_NV_set, size_t length)
+{
+    size_t ii = length;
+    while (ii--) {
+        string_NV_set[ii].free();
+    }
+}
+
+#define SIZE_OF_ARRAY(ARRAY) (sizeof(ARRAY) / sizeof(ARRAY[0]))
+TEST_F(NValueTest, TestInList)
+{
+    assert(ExecutorContext::getExecutorContext() == NULL);
+    Pool* testPool = new Pool();
+    UndoQuantum* wantNoQuantum = NULL;
+    Topend* topless = NULL;
+    ExecutorContext* poolHolder =
+        new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, false, "", 0);
+
+    int int_set1[] = { 10, 2, -3 };
+    int int_set2[] = { 0, 1, 100, 10000, 1000000 };
+
+    const int int_length1 = SIZE_OF_ARRAY(int_set1);
+    const int int_length2 = SIZE_OF_ARRAY(int_set2);
+    NValue int_NV_set1[int_length1];
+    NValue int_NV_set2[int_length2];
+    initNValueArray(int_NV_set1, int_set1, int_length1);
+    initNValueArray(int_NV_set2, int_set2, int_length2);
+
+    NValue int_list1 =
+        streamNValueArrayintoInList(VALUE_TYPE_INTEGER, int_NV_set1, int_length1, testPool);
+    NValue int_list2 =
+        streamNValueArrayintoInList(VALUE_TYPE_INTEGER, int_NV_set2, int_length2, testPool);
+
+    for (size_t ii = 0; ii < int_length1; ++ii) {
+        EXPECT_TRUE(int_NV_set1[ii].inList(int_list1));
+        EXPECT_FALSE(int_NV_set1[ii].inList(int_list2));
+    }
+    for (size_t jj = 0; jj < int_length2; ++jj) {
+        EXPECT_FALSE(int_NV_set2[jj].inList(int_list1));
+        EXPECT_TRUE(int_NV_set2[jj].inList(int_list2));
+    }
+
+    // Repeat through the slow-path interface.
+    // This involves lots of copying because expression trees must be destroyed recursively.
+
+    vector<AbstractExpression*> int_constants_lhs1_1(int_length1);
+    vector<AbstractExpression*> int_constants_lhs2_1(int_length2);
+    vector<AbstractExpression*> int_constants_lhs1_2(int_length1);
+    vector<AbstractExpression*> int_constants_lhs2_2(int_length2);
+    initConstantArray(int_constants_lhs1_1, int_NV_set1);
+    initConstantArray(int_constants_lhs2_1, int_NV_set2);
+    initConstantArray(int_constants_lhs1_2, int_NV_set1);
+    initConstantArray(int_constants_lhs2_2, int_NV_set2);
+
+    AbstractExpression* in_expression = NULL;
+    for (size_t kk = 0; kk < int_length1; ++kk) {
+        vector<AbstractExpression*>* int_constants_rhs1 =
+            new vector<AbstractExpression*>(int_length1);
+        vector<AbstractExpression*>* int_constants_rhs2 =
+            new vector<AbstractExpression*>(int_length2);
+        initConstantArray(*int_constants_rhs1, int_NV_set1);
+        initConstantArray(*int_constants_rhs2, int_NV_set2);
+
+        AbstractExpression* in_list_of_int_constants1 =
+           ExpressionUtil::vectorFactory(VALUE_TYPE_INTEGER, int_constants_rhs1);
+        AbstractExpression* in_list_of_int_constants2 =
+           ExpressionUtil::vectorFactory(VALUE_TYPE_INTEGER, int_constants_rhs2);
+
+        in_expression =
+            ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
+                                              int_constants_lhs1_1[kk],
+                                              in_list_of_int_constants1);
+        EXPECT_TRUE(in_expression->eval(NULL, NULL).isTrue());
+        delete in_expression;
+
+        in_expression =
+            ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
+                                              int_constants_lhs1_2[kk],
+                                              in_list_of_int_constants2);
+        EXPECT_FALSE(in_expression->eval(NULL, NULL).isTrue());
+        delete in_expression;
+    }
+    for (size_t ll = 0; ll < int_length2; ++ll) {
+        vector<AbstractExpression*>* int_constants_rhs1 =
+            new vector<AbstractExpression*>(int_length1);
+        vector<AbstractExpression*>* int_constants_rhs2 =
+            new vector<AbstractExpression*>(int_length2);
+        initConstantArray(*int_constants_rhs1, int_NV_set1);
+        initConstantArray(*int_constants_rhs2, int_NV_set2);
+
+        AbstractExpression* in_list_of_int_constants1 =
+           ExpressionUtil::vectorFactory(VALUE_TYPE_INTEGER, int_constants_rhs1);
+        AbstractExpression* in_list_of_int_constants2 =
+           ExpressionUtil::vectorFactory(VALUE_TYPE_INTEGER, int_constants_rhs2);
+
+        in_expression =
+            ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
+                                              int_constants_lhs2_1[ll],
+                                              in_list_of_int_constants2);
+        EXPECT_TRUE(in_expression->eval(NULL, NULL).isTrue());
+        delete in_expression;
+
+        in_expression =
+            ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
+                                              int_constants_lhs2_2[ll],
+                                              in_list_of_int_constants1);
+        EXPECT_FALSE(in_expression->eval(NULL, NULL).isTrue());
+        delete in_expression;
+    }
+
+    const char* string_set1[] = { "10", "2", "-3" };
+    const char* string_set2[] = { "0", "1", "100", "10000", "1000000" };
+
+    const int string_length1 = SIZE_OF_ARRAY(string_set1);
+    const int string_length2 = SIZE_OF_ARRAY(string_set2);
+    NValue string_NV_set1[string_length1];
+    NValue string_NV_set2[string_length2];
+    initNValueArray(string_NV_set1, string_set1, string_length1);
+    initNValueArray(string_NV_set2, string_set2, string_length2);
+
+    NValue string_list1 =
+        streamNValueArrayintoInList(VALUE_TYPE_VARCHAR, string_NV_set1, string_length1, testPool);
+    NValue string_list2 =
+        streamNValueArrayintoInList(VALUE_TYPE_VARCHAR, string_NV_set2, string_length2, testPool);
+    for (size_t ii = 0; ii < string_length1; ++ii) {
+        EXPECT_TRUE(string_NV_set1[ii].inList(string_list1));
+        EXPECT_FALSE(string_NV_set1[ii].inList(string_list2));
+    }
+    for (size_t jj = 0; jj < string_length2; ++jj) {
+        EXPECT_FALSE(string_NV_set2[jj].inList(string_list1));
+        EXPECT_TRUE(string_NV_set2[jj].inList(string_list2));
+    }
+
+    freeNValueArray(string_NV_set1, string_length1);
+    freeNValueArray(string_NV_set2, string_length2);
+
+    // Repeat through the slow-path interface.
+    // This involves lots of copying because expression trees must be destroyed recursively.
+
+    vector<AbstractExpression*> string_constants_lhs1_1(string_length1);
+    vector<AbstractExpression*> string_constants_lhs2_1(string_length2);
+    vector<AbstractExpression*> string_constants_lhs1_2(string_length1);
+    vector<AbstractExpression*> string_constants_lhs2_2(string_length2);
+    initConstantArray(string_constants_lhs1_1, string_set1);
+    initConstantArray(string_constants_lhs2_1, string_set2);
+    initConstantArray(string_constants_lhs1_2, string_set1);
+    initConstantArray(string_constants_lhs2_2, string_set2);
+
+    for (size_t kk = 0; kk < string_length1; ++kk) {
+        vector<AbstractExpression*>* string_constants_rhs1
+            = new vector<AbstractExpression*>(string_length1);
+        vector<AbstractExpression*>* string_constants_rhs2
+            = new vector<AbstractExpression*>(string_length2);
+        initConstantArray(*string_constants_rhs1, string_set1);
+        initConstantArray(*string_constants_rhs2, string_set2);
+
+        AbstractExpression* in_list_of_string_constants1 =
+           ExpressionUtil::vectorFactory(VALUE_TYPE_VARCHAR, string_constants_rhs1);
+        AbstractExpression* in_list_of_string_constants2 =
+           ExpressionUtil::vectorFactory(VALUE_TYPE_VARCHAR, string_constants_rhs2);
+
+        in_expression =
+            ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
+                                              string_constants_lhs1_1[kk],
+                                              in_list_of_string_constants1);
+        EXPECT_TRUE(in_expression->eval(NULL, NULL).isTrue());
+        delete in_expression;
+
+        in_expression =
+            ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
+                                              string_constants_lhs1_2[kk],
+                                              in_list_of_string_constants2);
+        EXPECT_FALSE(in_expression->eval(NULL, NULL).isTrue());
+        delete in_expression;
+    }
+    for (size_t ll = 0; ll < string_length2; ++ll) {
+        vector<AbstractExpression*>* string_constants_rhs1
+            = new vector<AbstractExpression*>(string_length1);
+        vector<AbstractExpression*>* string_constants_rhs2
+            = new vector<AbstractExpression*>(string_length2);
+        initConstantArray(*string_constants_rhs1, string_set1);
+        initConstantArray(*string_constants_rhs2, string_set2);
+
+        AbstractExpression* in_list_of_string_constants1 =
+           ExpressionUtil::vectorFactory(VALUE_TYPE_VARCHAR, string_constants_rhs1);
+        AbstractExpression* in_list_of_string_constants2 =
+           ExpressionUtil::vectorFactory(VALUE_TYPE_VARCHAR, string_constants_rhs2);
+
+        in_expression =
+            ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
+                                              string_constants_lhs2_1[ll],
+                                              in_list_of_string_constants2);
+        EXPECT_TRUE(in_expression->eval(NULL, NULL).isTrue());
+        delete in_expression;
+
+        in_expression =
+            ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
+                                              string_constants_lhs2_2[ll],
+                                              in_list_of_string_constants1);
+        EXPECT_FALSE(in_expression->eval(NULL, NULL).isTrue());
+        delete in_expression;
+    }
 
     delete poolHolder;
     delete testPool;

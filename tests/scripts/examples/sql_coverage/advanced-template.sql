@@ -4,10 +4,6 @@
 -- DML, generate random data first.
 INSERT INTO _table VALUES (@insert_vals)
 
--- total garbage
-_value[string] _value[string] _value[string] _value[string]
-_value[float] _value[float] _value[float] _value[float]
-_value[int64] _value[int64] _value[int64] _value[int64]
 
 -- alias fun
 -- ticket 231
@@ -123,3 +119,6 @@ SELECT * FROM @from_tables WHERE _variable _like 'abc%'
 SELECT * FROM @from_tables WHERE _variable _like '%'
 SELECT * FROM @from_tables WHERE _variable _like '%' ESCAPE '!' 
 SELECT * FROM @from_tables WHERE _variable _like '!%' ESCAPE '!' 
+
+SELECT * FROM @from_tables WHERE _variable[int] IN (_value[int:1,3], _value[int:1,5])
+SELECT * FROM @from_tables WHERE _variable[string] IN (_value[string], _value[string])

@@ -1235,4 +1235,16 @@ final class RangeVariable {
 
         return scan;
     }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+        String name = "";
+        if (rangeTable != null) {
+            name = ":" + rangeTable.getName().name;
+        }
+        return super.toString() + name;
+    }
 }

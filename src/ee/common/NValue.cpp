@@ -16,13 +16,15 @@
  */
 
 #include "common/NValue.hpp"
+#include "common/StlFriendlyNValue.h"
 #include "common/executorcontext.hpp"
 #include "logging/LogManager.h"
 
 #include <cstdio>
 #include <sstream>
+#include <algorithm>
 
-using namespace voltdb;
+namespace voltdb {
 
 Pool* NValue::getTempStringPool() {
     return ExecutorContext::getTempStringPool();
@@ -110,6 +112,9 @@ TTInt NValue::s_minDecimalValue("-9999999999"   //10 digits
                                  "9999999999"   //20 digits
                                  "9999999999"   //30 digits
                                  "99999999");    //38 digits
+
+const double NValue::s_gtMaxDecimalAsDouble = 1E26;
+const double NValue::s_ltMinDecimalAsDouble = -1E26;
 
 /*
  * Produce a debugging string describing an NValue.
@@ -395,8 +400,106 @@ NValue NValue::opDivideDecimals(const NValue lhs, const NValue rhs) const {
     return getDecimalValue(retval);
 }
 
+struct NValueList {
+    static int allocationSizeForLength(size_t length)
+    {
+        //TODO: May want to consider extra allocation, here,
+        // such as space for a sorted copy of the array.
+        // This allocation has the advantage of getting freed via NValue::free.
+        return (int)(sizeof(NValueList) + length*sizeof(StlFriendlyNValue));
+    }
 
-namespace voltdb {
+    void* operator new(size_t size, char* placement)
+    {
+        return placement;
+    }
+    void operator delete(void*, char*) {}
+    void operator delete(void*) {}
+
+    NValueList(size_t length, ValueType elementType) : m_length(length), m_elementType(elementType)
+    { }
+
+    void deserializeNValues(SerializeInput &input, Pool *dataPool)
+    {
+        for (int ii = 0; ii < m_length; ++ii) {
+            m_values[ii].deserializeFromAllocateForStorage(m_elementType, input, dataPool);
+        }
+    }
+
+    StlFriendlyNValue const* begin() const { return m_values; }
+    StlFriendlyNValue const* end() const { return m_values + m_length; }
+
+    const size_t m_length;
+    const ValueType m_elementType;
+    StlFriendlyNValue m_values[0];
+};
+
+/**
+ * This NValue can be of any scalar value type.
+ * @param rhs  a VALUE_TYPE_ARRAY NValue whose referent must be an NValueList.
+ *             The NValue elements of the NValueList should be comparable to and ideally
+ *             of exactly the same VALUE_TYPE as "this".
+ * The planner and/or deserializer should have taken care of this with checks and
+ * explicit cast operators and and/or constant promotions as needed.
+ * @return a VALUE_TYPE_BOOLEAN NValue.
+ */
+bool NValue::inList(const NValue& rhs) const
+{
+    //TODO: research: does the SQL standard allow a null to match a null list element
+    // vs. returning FALSE or NULL?
+    const bool lhsIsNull = isNull();
+    if (lhsIsNull) {
+        return false;
+    }
+
+    const ValueType rhsType = rhs.getValueType();
+    if (rhsType != VALUE_TYPE_ARRAY) {
+        throwDynamicSQLException("rhs of IN expression is of a non-list type %s", rhs.getValueTypeString().c_str());
+    }
+    const NValueList* listOfNValues = (NValueList*)rhs.getObjectValue();
+    const StlFriendlyNValue& value = *static_cast<const StlFriendlyNValue*>(this);
+    //TODO: An O(ln(length)) implementation vs. the current O(length) implementation
+    // such as binary search would likely require some kind of sorting/re-org of values
+    // post-update/pre-lookup, and would likely require some sortable inequality method
+    // (operator<()?) to be defined on StlFriendlyNValue.
+    return std::find(listOfNValues->begin(), listOfNValues->end(), value) != listOfNValues->end();
+}
+
+void NValue::deserializeIntoANewNValueList(SerializeInput &input, Pool *dataPool)
+{
+    ValueType elementType = (ValueType)input.readByte();
+    size_t length = input.readShort();
+    int trueSize = NValueList::allocationSizeForLength(length);
+    char* storage = allocateValueStorage(trueSize, dataPool);
+    ::memset(storage, 0, trueSize);
+    NValueList* nvset = new (storage) NValueList(length, elementType);
+    nvset->deserializeNValues(input, dataPool);
+    //TODO: An O(ln(length)) implementation vs. the current O(length) implementation of NValue::inList
+    // would likely require some kind of sorting/re-org of values at this point post-update pre-lookup.
+}
+
+void NValue::allocateANewNValueList(size_t length, ValueType elementType)
+{
+    int trueSize = NValueList::allocationSizeForLength(length);
+    char* storage = allocateValueStorage(trueSize, NULL);
+    ::memset(storage, 0, trueSize);
+    new (storage) NValueList(length, elementType);
+}
+
+void NValue::setArrayElements(std::vector<NValue> &args) const
+{
+    assert(m_valueType == VALUE_TYPE_ARRAY);
+    NValueList* listOfNValues = (NValueList*)getObjectValue();
+    // Assign each of the elements.
+    int ii = (int)args.size();
+    assert(ii == listOfNValues->m_length);
+    while (ii--) {
+        listOfNValues->m_values[ii] = args[ii];
+    }
+    //TODO: An O(ln(length)) implementation vs. the current O(length) implementation of NValue::inList
+    // would likely require some kind of sorting/re-org of values at this point post-update pre-lookup.
+}
+
 
 int warn_if(int condition, const char* message)
 {
