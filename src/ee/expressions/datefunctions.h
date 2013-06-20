@@ -190,8 +190,8 @@ template<> inline NValue NValue::callUnary<FUNC_TO_TIMESTAMP_MICROSECOND>() cons
     if (isNull()) {
         return *this;
     }
-    int64_t seconds = getBigInt();
-    return getTimestampValue(seconds);
+    int64_t epoch_micros = getBigInt();
+    return getTimestampValue(epoch_micros);
 }
 
 }
