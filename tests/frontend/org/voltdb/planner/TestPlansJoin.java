@@ -835,15 +835,23 @@ public class TestPlansJoin extends PlannerTestCase {
                      "VoltDB does not support full outer joins");
        failToCompile("select R1.C FROM R1 FULL OUTER JOIN R2 ON R1.C = R2.C",
                      "VoltDB does not support full outer joins");
+       // OUTER JOIN with >5 tables.
+       // Temporary commented out
+       //failToCompile("select R1.C FROM R3,R2, P1, P2, P3 LEFT OUTER JOIN R1 ON R1.C = R2.C WHERE R3.A = R2.A and R2.A = P1.A and P1.A = P2.A and P3.A = P2.A",
+       //              "join of > 5 tables was requested without specifying a join order");
+       // INNER JOIN with >5 tables.
+       failToCompile("select R1.C FROM R3,R2, P1, P2, P3, R1 WHERE R3.A = R2.A and R2.A = P1.A and P1.A = P2.A and P3.A = P2.A and R1.C = R2.C",
+                     "join of > 5 tables was requested without specifying a join order");
+       // Self JOIN . Temporary restriction
+       failToCompile("select R1.C FROM R1 LEFT OUTER JOIN R2 ON R1.C = R2.C RIGHT JOIN R2 ON R2.C = R1.C",
+                     "VoltDB does not support self joins, consider using views instead");
        // OUTER JOIN with more then two tables. Temporary restriction
        failToCompile("select R1.C FROM R1 LEFT OUTER JOIN R2 ON R1.C = R2.C RIGHT JOIN R3 ON R3.C = R1.C",
                      "VoltDB does not support outer joins with more than two tables involved");
        failToCompile("select R1.C FROM R1 LEFT JOIN R2 ON R1.C = R2.C, R3 WHERE R3.C = R1.C",
                      "VoltDB does not support outer joins with more than two tables involved");
-       // Self JOIN . Temporary restriction
-       failToCompile("select R1.C FROM R1 LEFT OUTER JOIN R2 ON R1.C = R2.C RIGHT JOIN R2 ON R2.C = R1.C",
-                     "VoltDB does not support self joins, consider using views instead");
    }
+
 
    public void testOuterJoinSimplification() {
        AbstractPlanNode pn = compile("select * FROM R1 LEFT JOIN R2 ON R1.C = R2.C WHERE R2.C IS NOT NULL");
