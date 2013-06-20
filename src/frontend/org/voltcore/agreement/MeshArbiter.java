@@ -105,7 +105,7 @@ public class MeshArbiter {
 
         if (discoverGlobalFaultData_rcv(hsIds)) {
             Map<Long,Long> lastTxnIdByFailedSite = extractGlobalFaultData(hsIds);
-            if (lastTxnIdByFailedSite.containsKey(m_hsId) || lastTxnIdByFailedSite.isEmpty()) {
+            if (lastTxnIdByFailedSite.isEmpty()) {
                 return ImmutableMap.of();
             }
 
@@ -326,6 +326,8 @@ public class MeshArbiter {
                     Math.max(initiatorSafeInitPoint.get(initiatorId), safeTxnId));
         }
         assert(!initiatorSafeInitPoint.containsValue(Long.MIN_VALUE));
+
+        initiatorSafeInitPoint.remove(m_hsId);
 
         return ImmutableMap.copyOf(initiatorSafeInitPoint);
     }
