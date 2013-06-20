@@ -124,7 +124,7 @@ public class AgreementSeeker {
         Iterator<Map.Entry<Long, Long>> itr = m_alive.entries().iterator();
         while (itr.hasNext()) {
             Map.Entry<Long,Long> e = itr.next();
-            if (e.getValue() == reportingHsid) {
+            if (e.getValue().equals(reportingHsid)) {
                 itr.remove();
             }
         }
@@ -229,7 +229,7 @@ public class AgreementSeeker {
                             if (pick != null) {
                                 int cmp = witnessedBy.size()
                                         - sc.witnessed.get(pick).size();
-                                if (cmp > 0 || (cmp == 0 && s > pick)) {
+                                if (cmp > 0 || (cmp == 0 && s.compareTo(pick) > 0)) {
                                     pick = s;
                                 }
                             } else {
@@ -243,14 +243,14 @@ public class AgreementSeeker {
                                 sc.witnessed.entries().iterator();
                         while (itr.hasNext()) {
                             Map.Entry<Long,Long> e = itr.next();
-                            if (e.getValue() == pick) {
+                            if (e.getValue().equals(pick)) {
                                 itr.remove();
                             }
                         }
                         itr = sc.alive.entries().iterator();
                         while (itr.hasNext()) {
                             Map.Entry<Long,Long> e = itr.next();
-                            if (e.getValue() == pick) {
+                            if (e.getValue().equals(pick)) {
                                 itr.remove();
                             }
                         }

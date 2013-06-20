@@ -105,6 +105,9 @@ public class MeshArbiter {
 
         if (discoverGlobalFaultData_rcv(hsIds)) {
             Map<Long,Long> lastTxnIdByFailedSite = extractGlobalFaultData(hsIds);
+            if (lastTxnIdByFailedSite.containsKey(m_hsId) || lastTxnIdByFailedSite.isEmpty()) {
+                return ImmutableMap.of();
+            }
 
             m_failedSites.addAll(lastTxnIdByFailedSite.keySet());
 
@@ -300,9 +303,6 @@ public class MeshArbiter {
         }
 
         Set<Long> toBeKilled = m_seeker.nextKill();
-        if (toBeKilled.isEmpty()) {
-            VoltDB.crashLocalVoltDB("Could not reach agreement on failed nodes", true, null);
-        }
         Map<Long, Long> initiatorSafeInitPoint = new HashMap<Long, Long>();
 
         Iterator<Map.Entry<Pair<Long, Long>, Long>> iter =
