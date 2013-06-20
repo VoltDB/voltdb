@@ -316,9 +316,11 @@ public class TestClientInterface {
 
         // SP AdHoc should have partitioning parameter serialized in the parameter set
         Object partitionParam = message.getStoredProcedureInvocation().getParameterAtIndex(0);
-        byte[] serializedData = (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(1);
-        AdHocPlannedStatement[] statements = AdHocPlannedStmtBatch.planArrayFromBuffer(ByteBuffer.wrap(serializedData));
         assertTrue(partitionParam instanceof byte[]);
+        VoltType type = VoltType.get((Byte) message.getStoredProcedureInvocation().getParameterAtIndex(1));
+        assertTrue(type.isInteger());
+        byte[] serializedData = (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(2);
+        AdHocPlannedStatement[] statements = AdHocPlannedStmtBatch.planArrayFromBuffer(ByteBuffer.wrap(serializedData));
         assertTrue(Arrays.equals(TheHashinator.valueToBytes(3), (byte[]) partitionParam));
         assertEquals(1, statements.length);
         String sql = new String(statements[0].sql, VoltDB.UTF8ENCODING);
