@@ -114,7 +114,7 @@ public class MeshArbiter {
 
             m_recoveryLog.info(
                     "Adding "
-                  + CoreUtils.hsIdCollectionToString(m_inTrouble.keySet())
+                  + CoreUtils.hsIdCollectionToString(lastTxnIdByFailedSite.keySet())
                   + " to failed sites history");
 
             m_inTrouble.clear();
@@ -177,6 +177,9 @@ public class MeshArbiter {
                 Subject.FAILURE_SITE_UPDATE,
                 Subject.FAILURE_SITE_FORWARD
         };
+        boolean haveEnough = false;
+        Map<Long,FailureSiteForwardMessage> forwardCandidates = Maps.newHashMap();
+
         do {
             VoltMessage m = m_mailbox.recvBlocking(receiveSubjects, 5);
 
@@ -208,12 +211,7 @@ public class MeshArbiter {
                         fsum.m_safeTxnId);
 
                 m_seeker.add(fsum);
-
-                Set<Long> forwardTo = m_seeker.forWhomSiteIsDead(fsum.m_sourceHSId);
-                if (!forwardTo.isEmpty()) {
-                    FailureSiteForwardMessage fsfm = new FailureSiteForwardMessage(fsum);
-                    m_mailbox.send(Longs.toArray(forwardTo), fsfm);
-                }
+                forwardCandidates.put(fsum.m_sourceHSId, new FailureSiteForwardMessage(fsum));
 
                 m_recoveryLog.info("Agreement, Received failure message from " +
                         CoreUtils.hsIdToString(fsum.m_sourceHSId) + " for failed sites " +
@@ -226,11 +224,7 @@ public class MeshArbiter {
                 FailureSiteForwardMessage fsfm = (FailureSiteForwardMessage)m;
 
                 m_seeker.add(fsfm);
-
-                Set<Long> forwardTo = m_seeker.forWhomSiteIsDead(fsfm.m_reportingHSId);
-                if (!forwardTo.isEmpty()) {
-                    m_mailbox.send(Longs.toArray(forwardTo), fsfm);
-                }
+                forwardCandidates.put(fsfm.m_reportingHSId, fsfm);
 
                 m_recoveryLog.info("Agreement, Received forwarded failure message from " +
                         CoreUtils.hsIdToString(fsfm.m_sourceHSId) + " reporting on behalf of " +
@@ -255,7 +249,23 @@ public class MeshArbiter {
                 }
             }
 
-        } while(!haveNecessaryFaultInfo(m_seeker.getSurvivors(), false) || m_seeker.needForward(m_hsId));
+            haveEnough = haveEnough || haveNecessaryFaultInfo(m_seeker.getSurvivors(), false);
+            if (haveEnough) {
+
+                Iterator<Map.Entry<Long, FailureSiteForwardMessage>> itr =
+                        forwardCandidates.entrySet().iterator();
+
+                while (itr.hasNext()) {
+                    Map.Entry<Long, FailureSiteForwardMessage> e = itr.next();
+                    long [] fhsids = Longs.toArray(m_seeker.forWhomSiteIsDead(e.getKey()));
+                    if (fhsids.length > 0) {
+                        m_mailbox.send(fhsids,e.getValue());
+                    }
+                    itr.remove();
+                }
+            }
+
+        } while (!haveEnough || m_seeker.needForward(m_hsId));
 
         return true;
     }

@@ -63,6 +63,34 @@ public class FailureSiteUpdateMatchers {
     }
 
     static public final Matcher<FailureSiteUpdateMessage> failureUpdateMsgIs(
+            final long txnid, final Donor<List<Pair<Long, Boolean>>> hsids) {
+        return new TypeSafeMatcher<FailureSiteUpdateMessage>() {
+            final Map<Long,Boolean> m_hsids;
+            {
+                ImmutableMap.Builder<Long, Boolean> imb = ImmutableMap.builder();
+                for (Pair<Long,Boolean> p: hsids.value()) {
+                    imb.put(p.getFirst(),p.getSecond());
+                }
+                m_hsids = imb.build();
+            }
+
+            @Override
+            public void describeTo(Description d) {
+                d.appendText("FailureSiteUpdateMessage [ ")
+                .appendText(", txnid: ").appendValue(txnid)
+                .appendText(", failed hsids: ").appendValue(m_hsids)
+                .appendText("]");
+            }
+
+            @Override
+            protected boolean matchesSafely(FailureSiteUpdateMessage m) {
+                return equalTo(txnid).matches(m.m_safeTxnId)
+                    && equalTo(m_hsids).matches(m.m_failedHSIds);
+            }
+        };
+    }
+
+    static public final Matcher<FailureSiteUpdateMessage> failureUpdateMsgIs(
             final long site, final long txnid, final Donor<List<Pair<Long, Boolean>>> hsids) {
         return new TypeSafeMatcher<FailureSiteUpdateMessage>() {
             final Map<Long,Boolean> m_hsids;
@@ -94,14 +122,13 @@ public class FailureSiteUpdateMatchers {
 
     static public final Matcher<FailureSiteForwardMessage> failureForwardMsgIs(
             final long reportingHsid,
-            final long site,
             final long txnid,
             final Donor<List<Pair<Long, Boolean>>> hsids) {
 
         return new TypeSafeMatcher<FailureSiteForwardMessage>() {
 
             final Matcher<FailureSiteUpdateMessage> fsumIs =
-                    failureUpdateMsgIs(site,txnid,hsids);
+                    failureUpdateMsgIs(txnid,hsids);
 
             @Override
             public void describeTo(Description d) {

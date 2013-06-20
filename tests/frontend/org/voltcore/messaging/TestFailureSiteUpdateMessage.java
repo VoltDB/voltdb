@@ -29,8 +29,8 @@ import static com.natpryce.makeiteasy.MakeItEasy.with;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.voltcore.agreement.maker.FailureSiteUpdateMessageMaker.FailureSiteUpdateMessage;
-import static org.voltcore.agreement.maker.FailureSiteUpdateMessageMaker.fsumMap;
 import static org.voltcore.agreement.maker.FailureSiteUpdateMessageMaker.fsumHsids;
+import static org.voltcore.agreement.maker.FailureSiteUpdateMessageMaker.fsumMap;
 import static org.voltcore.agreement.maker.FailureSiteUpdateMessageMaker.fsumSite;
 import static org.voltcore.agreement.maker.FailureSiteUpdateMessageMaker.fsumSource;
 import static org.voltcore.agreement.maker.FailureSiteUpdateMessageMaker.fsumTxnid;
@@ -82,7 +82,7 @@ public class TestFailureSiteUpdateMessage {
        assertThat(gsm, failureUpdateMsgIs(3L, 123456789012345L, fsumHsids(3L,false,4L,true)));
 
        FailureSiteForwardMessage fmsg = new FailureSiteForwardMessage(gsm);
-       assertThat(fmsg, failureForwardMsgIs(1L, 3L, 123456789012345L, fsumHsids(3L,false,4L,true)));
+       assertThat(fmsg, failureForwardMsgIs(1L, 123456789012345L, fsumHsids(3L,false,4L,true)));
 
        bb = VoltMessage.toBuffer(fmsg);
 
@@ -90,7 +90,7 @@ public class TestFailureSiteUpdateMessage {
        assertTrue(vmsg instanceof FailureSiteForwardMessage);
 
        FailureSiteForwardMessage gsmf = (FailureSiteForwardMessage)vmsg;
-       assertThat(gsmf, failureForwardMsgIs(1L, 3L, 123456789012345L, fsumHsids(3L,false,4L,true)));
+       assertThat(gsmf, failureForwardMsgIs(1L, 123456789012345L, fsumHsids(3L,false,4L,true)));
    }
 
 }
