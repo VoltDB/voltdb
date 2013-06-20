@@ -136,6 +136,13 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
         return m_nodeState.get();
     }
 
+    synchronized public Set<Long> getConnectedNodes()
+    {
+        Set<Long> HSIds = new HashSet<Long>();
+        HSIds.addAll(m_HSIds);
+        return HSIds;
+    }
+
     @Override
     public void start() {
         setName("MiniNode-" + CoreUtils.hsIdToString(m_HSId));

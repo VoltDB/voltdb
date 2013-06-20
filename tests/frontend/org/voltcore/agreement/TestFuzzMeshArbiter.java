@@ -88,6 +88,26 @@ public class TestFuzzMeshArbiter extends TestCase
         return nodes;
     }
 
+    private boolean checkFullyConnectedGraphs(Set<Long> nodes)
+    {
+        boolean result = true;
+        for (Long node : nodes) {
+            Set<Long> nodeGraph = m_nodes.get(node).getConnectedNodes();
+            if (nodeGraph.size() != nodes.size() ||
+                !(nodes.containsAll(nodeGraph)))
+            {
+                System.out.println("Node: " + CoreUtils.hsIdToString(node) +
+                        " has an unexpected connected set.");
+                System.out.println("Node: " + CoreUtils.hsIdToString(node) +
+                        " Expected to see: " + nodes);
+                System.out.println("Node: " + CoreUtils.hsIdToString(node) +
+                        " says it has: " + nodeGraph);
+                result = false;
+            }
+        }
+        return result;
+    }
+
     public void testNodeFail() throws InterruptedException
     {
         constructCluster(4);
@@ -104,6 +124,11 @@ public class TestFuzzMeshArbiter extends TestCase
         while (!getNodesInState(NodeState.RESOLVE).isEmpty()) {
             Thread.sleep(50);
         }
+        Set<Long> expect = new HashSet<Long>();
+        expect.addAll(m_nodes.keySet());
+        expect.remove(getHSId(0));
+        expect.remove(getHSId(1));
+        assertTrue(checkFullyConnectedGraphs(expect));
     }
 
     public void testLinkFail() throws InterruptedException
@@ -120,5 +145,12 @@ public class TestFuzzMeshArbiter extends TestCase
         while (!getNodesInState(NodeState.RESOLVE).isEmpty()) {
             Thread.sleep(50);
         }
+        // This set should change to include 0 with the
+        // better single-link failure algorithm
+        Set<Long> expect = new HashSet<Long>();
+        expect.addAll(m_nodes.keySet());
+        expect.remove(getHSId(0));
+        expect.remove(getHSId(1));
+        assertTrue(checkFullyConnectedGraphs(expect));
     }
 }
