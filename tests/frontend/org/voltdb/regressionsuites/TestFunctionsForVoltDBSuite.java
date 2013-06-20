@@ -821,18 +821,17 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         for (int i=0; i< procedures.length; i++) {
             String proc = procedures[i];
 
-
             cr = client.callProcedure(proc, 0);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             result = cr.getResults()[0];
             assertEquals(1, result.getRowCount());
             assertTrue(result.advanceRow());
             if (proc == "SINCE_EPOCH_SECOND") {
-                assertEquals(0.0, result.getDouble(0));
+                assertEquals(0, result.getLong(0));
             } else if (proc == "SINCE_EPOCH_MILLIS") {
-                assertEquals(0.0, result.getDouble(0));
+                assertEquals(0, result.getLong(0));
             } else if (proc == "SINCE_EPOCH_MICROS") {
-                assertEquals(0.0, result.getDouble(0));
+                assertEquals(0, result.getLong(0));
             }
 
             cr = client.callProcedure(proc, 1);
@@ -841,11 +840,11 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertEquals(1, result.getRowCount());
             assertTrue(result.advanceRow());
             if (proc == "SINCE_EPOCH_SECOND") {
-                assertEquals(0.001, result.getDouble(0));
+                assertEquals(0, result.getLong(0));
             } else if (proc == "SINCE_EPOCH_MILLIS") {
-                assertEquals(1.0, result.getDouble(0));
+                assertEquals(1, result.getLong(0));
             } else if (proc == "SINCE_EPOCH_MICROS") {
-                assertEquals(1000.0, result.getDouble(0));
+                assertEquals(1000, result.getLong(0));
             }
 
             cr = client.callProcedure(proc, 2);
@@ -854,11 +853,11 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertEquals(1, result.getRowCount());
             assertTrue(result.advanceRow());
             if (proc == "SINCE_EPOCH_SECOND") {
-                assertEquals(1.0, result.getDouble(0));
+                assertEquals(1, result.getLong(0));
             } else if (proc == "SINCE_EPOCH_MILLIS") {
-                assertEquals(1000.0, result.getDouble(0));
+                assertEquals(1000, result.getLong(0));
             } else if (proc == "SINCE_EPOCH_MICROS") {
-                assertEquals(1000000.0, result.getDouble(0));
+                assertEquals(1000000, result.getLong(0));
             }
 
             cr = client.callProcedure(proc, 3);
@@ -867,13 +866,12 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertEquals(1, result.getRowCount());
             assertTrue(result.advanceRow());
             if (proc == "SINCE_EPOCH_SECOND") {
-                assertEquals(-1.0, result.getDouble(0));
+                assertEquals(-1, result.getLong(0));
             } else if (proc == "SINCE_EPOCH_MILLIS") {
-                assertEquals(-1000.0, result.getDouble(0));
+                assertEquals(-1000, result.getLong(0));
             } else if (proc == "SINCE_EPOCH_MICROS") {
-                assertEquals(-1000000.0, result.getDouble(0));
+                assertEquals(-1000000, result.getLong(0));
             }
-
         }
     }
 
