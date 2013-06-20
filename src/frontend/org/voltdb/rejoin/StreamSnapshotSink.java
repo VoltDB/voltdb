@@ -73,7 +73,11 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
     public void close() {
         if (m_in != null) {
             m_in.close();
-            // No need to join in thread, once socket is closed, it will exit
+            // Interrupt the thread in case it's blocked on mailbox recv.
+            m_inThread.interrupt();
+            try {
+                m_inThread.join();
+            } catch (InterruptedException e) {}
         }
 
         if (m_ack != null) {
