@@ -875,6 +875,80 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
+    public void testToTimestamp() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING TO_TIMESTAMP");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P2.insert", 0, new Timestamp(0L));
+        cr = client.callProcedure("P2.insert", 1, new Timestamp(1L));
+        cr = client.callProcedure("P2.insert", 2, new Timestamp(1000L));
+        cr = client.callProcedure("P2.insert", 3, new Timestamp(-1000L));
+
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        String[] procedures = {"TO_TIMESTAMP_SECOND", "TO_TIMESTAMP_MILLIS", "TO_TIMESTAMP_MICROS"};
+
+        for (int i=0; i< procedures.length; i++) {
+            String proc = procedures[i];
+
+            cr = client.callProcedure(proc, 0L , 0);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            if (proc == "TO_TIMESTAMP_SECOND") {
+                assertEquals(0L, result.getTimestampAsLong(0));
+            } else if (proc == "TO_TIMESTAMP_MILLIS") {
+                assertEquals(0L, result.getTimestampAsLong(0));
+            } else if (proc == "TO_TIMESTAMP_MICROS") {
+                assertEquals(0L, result.getTimestampAsLong(0));
+            }
+
+            cr = client.callProcedure(proc, 1L , 1);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            if (proc == "TO_TIMESTAMP_SECOND") {
+                assertEquals(1000000L, result.getTimestampAsLong(0));
+            } else if (proc == "TO_TIMESTAMP_MILLIS") {
+                assertEquals(1000L, result.getTimestampAsLong(0));
+            } else if (proc == "TO_TIMESTAMP_MICROS") {
+                assertEquals(1L, result.getTimestampAsLong(0));
+            }
+
+            cr = client.callProcedure(proc, 1000L , 1);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            if (proc == "TO_TIMESTAMP_SECOND") {
+                assertEquals(1000000000L, result.getTimestampAsLong(0));
+            } else if (proc == "TO_TIMESTAMP_MILLIS") {
+                assertEquals(1000000L, result.getTimestampAsLong(0));
+            } else if (proc == "TO_TIMESTAMP_MICROS") {
+                assertEquals(1000L, result.getTimestampAsLong(0));
+            }
+
+
+            cr = client.callProcedure(proc, -1000L , 1);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            if (proc == "TO_TIMESTAMP_SECOND") {
+                assertEquals(-1000000000L, result.getTimestampAsLong(0));
+            } else if (proc == "TO_TIMESTAMP_MILLIS") {
+                assertEquals(-1000000L, result.getTimestampAsLong(0));
+            } else if (proc == "TO_TIMESTAMP_MICROS") {
+                assertEquals(-1000L, result.getTimestampAsLong(0));
+            }
+        }
+
+    }
+
     public void testFunctionsWithInvalidJSON() throws Exception {
 
         Client client = getClient();
@@ -1053,6 +1127,11 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         project.addStmtProcedure("SINCE_EPOCH_SECOND", "select SINCE_EPOCH (SECOND, TM) from P2 where id = ?");
         project.addStmtProcedure("SINCE_EPOCH_MILLIS", "select SINCE_EPOCH (MILLIS, TM) from P2 where id = ?");
         project.addStmtProcedure("SINCE_EPOCH_MICROS", "select SINCE_EPOCH (MICROS, TM) from P2 where id = ?");
+
+        // Test TO_TIMESTAMP
+        project.addStmtProcedure("TO_TIMESTAMP_SECOND", "select TO_TIMESTAMP (SECOND, ?) from P2 where id = ?");
+        project.addStmtProcedure("TO_TIMESTAMP_MILLIS", "select TO_TIMESTAMP (MILLIS, ?) from P2 where id = ?");
+        project.addStmtProcedure("TO_TIMESTAMP_MICROS", "select TO_TIMESTAMP (MICROS, ?) from P2 where id = ?");
 
         // CONFIG #1: Local Site/Partition running on JNI backend
         config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
