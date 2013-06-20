@@ -69,9 +69,9 @@ public class StatsAgent extends OpsAgent
         baseStats[0].resetRowPosition();
         while (baseStats[0].advanceRow()) {
             timeTable.updateTable(
+                    baseStats[0].getLong("TIMESTAMP"),
                     baseStats[0].getString("PROCEDURE"),
                     baseStats[0].getLong("PARTITION_ID"),
-                    baseStats[0].getLong("TIMED_INVOCATIONS"),
                     baseStats[0].getLong("INVOCATIONS"),
                     baseStats[0].getLong("MIN_EXECUTION_TIME"),
                     baseStats[0].getLong("MAX_EXECUTION_TIME"),

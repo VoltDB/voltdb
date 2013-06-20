@@ -363,12 +363,6 @@ public abstract class AbstractParsedStmt {
         ExpressionType exprType = ExpressionType.get(optype);
         AbstractExpression expr = null;
 
-        // XXX remove this code to enable SQL-IN
-        // also re-enable sql-in tests in TestParsedStatements
-        if (exprType == ExpressionType.COMPARE_IN) {
-            throw new PlanningErrorException("VoltDB does not support SQL IN expressions.");
-        }
-
         if (exprType == ExpressionType.INVALID) {
             throw new PlanningErrorException("Unsupported operation type '" + optype + "'");
         }

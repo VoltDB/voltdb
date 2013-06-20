@@ -801,6 +801,7 @@ JAR BUILDING
             <include name="org/json_voltpatches/**" />
             <include name="org/apache/hadoop_voltpatches/**" />
             <include name="org/apache/cassandra_voltpatches/MurmurHash3.class"/>
+            <include name="org/apache/zookeeper_voltpatches/**"/>
             <include name="vanilla/**" />
             <include name="jsr166y/**" />
         </fileset>
@@ -1829,7 +1830,7 @@ TEST CASES
 </target>
 
 <property name="ptdefaultconfigs"
-         value="json,voter,voltkv,voltcache,cust-report-2012-11-28,ENG-2549,joins,testplans-join,testjoins,aggs,join-order"
+         value="json,voter,voltkv,voltcache,cust-report-2012-11-28,ENG-2549,joins,testplans-join,testjoins,aggs,join-order,inlist,indexes"
    description="default hard-coded set of plannertester configs to run or refresh" />
 
 <target name="plannertester" description="Run plannertester">
