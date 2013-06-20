@@ -27,9 +27,11 @@
 package org.voltcore.agreement;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.logging.VoltLogger;
@@ -56,6 +58,7 @@ public class FakeMesh extends Thread
 
     private Map<Long, Queue<Message>> m_sendQs = new HashMap<Long, Queue<Message>>();
     private Map<Long, Queue<Message>> m_recvQs = new HashMap<Long, Queue<Message>>();
+    private Map<Long, Set<Long>> m_failedLinks = new HashMap<Long, Set<Long>>();
     private AtomicBoolean m_shutdown = new AtomicBoolean(false);
 
     FakeMesh()
@@ -79,9 +82,37 @@ public class FakeMesh extends Thread
         m_recvQs.remove(HSId);
     }
 
+    synchronized void failLink(long src, long dst)
+    {
+        meshLog.info("Failing link between source: " + CoreUtils.hsIdToString(src) +
+                " and destination: " + CoreUtils.hsIdToString(dst));
+        Set<Long> dsts = m_failedLinks.get(src);
+        if (dsts == null) {
+            dsts = new HashSet<Long>();
+            m_failedLinks.put(src, dsts);
+        }
+        dsts.add(dst);
+    }
+
+    private boolean linkFailed(long src, long dst)
+    {
+        Set<Long> dsts = m_failedLinks.get(src);
+        if (dsts == null || !dsts.contains(dst)) {
+            return false;
+        }
+        return true;
+    }
+
     void shutdown()
     {
         m_shutdown.set(true);
+    }
+
+    @Override
+    public void start()
+    {
+        setName("FakeMesh");
+        super.start();
     }
 
     @Override
@@ -93,7 +124,7 @@ public class FakeMesh extends Thread
                 for (Entry<Long, Queue<Message>> sq : m_sendQs.entrySet()) {
                     Message msg = sq.getValue().poll();
                     if (msg != null) {
-                        if (m_recvQs.containsKey(msg.m_dest)) {
+                        if (m_recvQs.containsKey(msg.m_dest) && !linkFailed(msg.m_src, msg.m_dest)) {
                             m_recvQs.get(msg.m_dest).offer(msg);
                         }
                     }

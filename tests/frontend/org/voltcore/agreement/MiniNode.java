@@ -31,18 +31,27 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.agreement.FakeMesh.Message;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.DisconnectFailedHostsCallback;
 import org.voltcore.messaging.FailureSiteUpdateMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 
-class MiniNode extends Thread
+class MiniNode extends Thread implements DisconnectFailedHostsCallback
 {
     final VoltLogger m_nodeLog;
-    final static long TIMEOUT = 30 * 1000; // 30 seconds for now
+    final static long TIMEOUT = 10 * 1000; // 30 seconds for now
+
+    public enum NodeState {
+        START,
+        RUN,
+        RESOLVE,
+        STOP
+    }
 
     static class DeadHostTracker
     {
@@ -88,6 +97,7 @@ class MiniNode extends Thread
     final private Set<Long> m_HSIds = new HashSet<Long>();
     final private FakeMesh m_mesh;
     final private MiniMailbox m_mailbox;
+    private AtomicReference<NodeState> m_nodeState = new AtomicReference<NodeState>(NodeState.START);
     MiniSite m_miniSite;
     DeadHostTracker m_deadTracker;
 
@@ -105,12 +115,13 @@ class MiniNode extends Thread
         m_deadTracker = new DeadHostTracker(TIMEOUT);
         mesh.registerNode(m_HSId, m_sendQ, m_recvQ);
         m_mailbox = new MiniMailbox(m_HSId, m_sendQ);
-        m_miniSite = new MiniSite(m_mailbox, HSIds, m_nodeLog);
+        m_miniSite = new MiniSite(m_mailbox, HSIds, this, m_nodeLog);
     }
 
     void shutdown()
     {
         m_nodeLog.info("Shutting down...");
+        m_nodeState.set(NodeState.STOP);
         m_miniSite.shutdown();
         try {
             m_miniSite.join();
@@ -120,6 +131,17 @@ class MiniNode extends Thread
         m_shouldContinue.set(false);
     }
 
+    public NodeState getNodeState()
+    {
+        return m_nodeState.get();
+    }
+
+    @Override
+    public void start() {
+        setName("MiniNode-" + CoreUtils.hsIdToString(m_HSId));
+        super.start();
+    }
+
     @Override
     public void run()
     {
@@ -127,34 +149,58 @@ class MiniNode extends Thread
         for (long HSId : m_HSIds) {
             m_deadTracker.startTracking(HSId);
         }
+        m_nodeState.set(NodeState.RUN);
         while (m_shouldContinue.get())
         {
             Message msg = m_recvQ.poll();
-            if (msg != null) {
-                m_deadTracker.updateHSId(msg.m_src);
-                // inject actual message into mailbox
-                VoltMessage message = msg.m_msg;
-                m_mailbox.deliver(message);
-                // snoop for FailureSiteUpdateMessages, inject into MiniSite's mailbox
-                if (message instanceof FailureSiteUpdateMessage)
-                {
-                    for (long failedHostId : ((FailureSiteUpdateMessage)message).m_failedHSIds) {
-                        long agreementHSId = CoreUtils.getHSIdFromHostAndSite((int)failedHostId,
-                                HostMessenger.AGREEMENT_SITE_ID);
-                        m_miniSite.reportFault(agreementHSId, false);
+            synchronized(this) {
+                if (msg != null) {
+                    m_deadTracker.updateHSId(msg.m_src);
+                    // inject actual message into mailbox
+                    VoltMessage message = msg.m_msg;
+                    m_mailbox.deliver(message);
+                    // snoop for FailureSiteUpdateMessages, inject into MiniSite's mailbox
+                    if (message instanceof FailureSiteUpdateMessage)
+                    {
+                        for (long failedHostId : ((FailureSiteUpdateMessage)message).m_failedHSIds) {
+                            long agreementHSId = CoreUtils.getHSIdFromHostAndSite((int)failedHostId,
+                                    HostMessenger.AGREEMENT_SITE_ID);
+                            m_miniSite.reportFault(agreementHSId, false);
+                            if (m_HSIds.contains(agreementHSId)) {
+                                m_nodeState.set(NodeState.RESOLVE);
+                            }
+                        }
+                    }
+                }
+                // Do dead host detection.  Need to keep track of receive gaps from the remaining set
+                // of live hosts.
+                Set<Long> deadHosts = m_deadTracker.checkTimeouts();
+                for (long HSId : deadHosts) {
+                    int failedHostId = CoreUtils.getHostIdFromHSId(HSId);
+                    long agreementHSId = CoreUtils.getHSIdFromHostAndSite(failedHostId,
+                            HostMessenger.AGREEMENT_SITE_ID);
+                    m_miniSite.reportFault(agreementHSId, true);
+                    m_deadTracker.stopTracking(HSId);
+                    if (m_HSIds.contains(agreementHSId)) {
+                        m_nodeState.set(NodeState.RESOLVE);
                     }
                 }
             }
-            // Do dead host detection.  Need to keep track of receive gaps from the remaining set
-            // of live hosts.
-            Set<Long> deadHosts = m_deadTracker.checkTimeouts();
-            for (long HSId : deadHosts) {
-                int failedHostId = CoreUtils.getHostIdFromHSId(HSId);
-                long agreementHSId = CoreUtils.getHSIdFromHostAndSite(failedHostId,
-                        HostMessenger.AGREEMENT_SITE_ID);
-                m_miniSite.reportFault(agreementHSId, true);
+        }
+    }
+
+    @Override
+    public void disconnect(Set<Integer> failedHostIds) {
+        synchronized(this) {
+            for (int hostId : failedHostIds) {
+                long HSId = CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.AGREEMENT_SITE_ID);
+                m_HSIds.remove(HSId);
                 m_deadTracker.stopTracking(HSId);
+                // Ghetto way to disconnect ourselves from someone we've decided is dead
+                m_mesh.failLink(m_HSId, HSId);
+                m_mesh.failLink(HSId, m_HSId);
             }
         }
+        m_nodeState.set(NodeState.RUN);
     }
 }

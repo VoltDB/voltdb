@@ -24,9 +24,12 @@
 package org.voltcore.agreement;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
+import org.voltcore.agreement.MiniNode.NodeState;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 
@@ -37,9 +40,14 @@ public class TestFuzzMeshArbiter extends TestCase
     FakeMesh m_fakeMesh;
     Map<Long, MiniNode> m_nodes;
 
+    long getHSId(int i)
+    {
+        return CoreUtils.getHSIdFromHostAndSite(i, HostMessenger.AGREEMENT_SITE_ID);
+    }
+
     MiniNode getNode(int i)
     {
-        long HSId = CoreUtils.getHSIdFromHostAndSite(i, HostMessenger.AGREEMENT_SITE_ID);
+        long HSId = getHSId(i);
         return m_nodes.get(HSId);
     }
 
@@ -49,7 +57,7 @@ public class TestFuzzMeshArbiter extends TestCase
         m_fakeMesh.start();
         m_nodes = new HashMap<Long, MiniNode>();
         for (int i = 0; i < nodeCount; i++) {
-            long HSId = CoreUtils.getHSIdFromHostAndSite(i, HostMessenger.AGREEMENT_SITE_ID);
+            long HSId = getHSId(i);
             m_nodes.put(HSId, null);
         }
         Set<Long> HSIds = m_nodes.keySet();
@@ -69,11 +77,48 @@ public class TestFuzzMeshArbiter extends TestCase
         m_fakeMesh.join();
     }
 
-    public void testNodeFail() throws InterruptedException    {
+    private Set<Long> getNodesInState(NodeState state)
+    {
+        Set<Long> nodes = new HashSet<Long>();
+        for (Entry<Long, MiniNode> node : m_nodes.entrySet()) {
+            if (node.getValue().getNodeState().equals(state)) {
+                nodes.add(node.getKey());
+            }
+        }
+        return nodes;
+    }
+
+    public void testNodeFail() throws InterruptedException
+    {
         constructCluster(4);
-        Thread.sleep(30000);
+        while (!getNodesInState(NodeState.START).isEmpty()) {
+            Thread.sleep(50);
+        }
         MiniNode victim = getNode(0);
         victim.shutdown();
-        while (true) {}
+        victim = getNode(1);
+        victim.shutdown();
+        while (getNodesInState(NodeState.RESOLVE).isEmpty()) {
+            Thread.sleep(50);
+        }
+        while (!getNodesInState(NodeState.RESOLVE).isEmpty()) {
+            Thread.sleep(50);
+        }
+    }
+
+    public void testLinkFail() throws InterruptedException
+    {
+        constructCluster(4);
+        while (!getNodesInState(NodeState.START).isEmpty()) {
+            Thread.sleep(50);
+        }
+        m_fakeMesh.failLink(getHSId(0), getHSId(1));
+        m_fakeMesh.failLink(getHSId(1), getHSId(0));
+        while (getNodesInState(NodeState.RESOLVE).isEmpty()) {
+            Thread.sleep(50);
+        }
+        while (!getNodesInState(NodeState.RESOLVE).isEmpty()) {
+            Thread.sleep(50);
+        }
     }
 }

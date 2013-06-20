@@ -30,9 +30,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.agreement.AgreementSite.FaultMessage;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.DisconnectFailedHostsCallback;
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
+
+import com.google.common.collect.ImmutableSet;
 
 class MiniSite extends Thread implements MeshAide
 {
@@ -40,17 +44,20 @@ class MiniSite extends Thread implements MeshAide
     MeshArbiter m_arbiter;
     Mailbox m_mailbox;
     AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
+    private final DisconnectFailedHostsCallback m_failedHosts;
     Set<Long> m_initialHSIds = new HashSet<Long>();
     Set<Long> m_currentHSIds = new HashSet<Long>();
     Set<Long> m_failedHSIds = new HashSet<Long>();
 
-    MiniSite(Mailbox mbox, Set<Long> HSIds, VoltLogger logger)
+    MiniSite(Mailbox mbox, Set<Long> HSIds, DisconnectFailedHostsCallback callback,
+            VoltLogger logger)
     {
         m_siteLog = logger;
         m_initialHSIds.addAll(HSIds);
         m_currentHSIds.addAll(HSIds);
         m_mailbox = mbox;
         m_arbiter = new MeshArbiter(mbox.getHSId(), mbox, this);
+        m_failedHosts = callback;
     }
 
     void shutdown()
@@ -81,6 +88,12 @@ class MiniSite extends Thread implements MeshAide
     }
 
     @Override
+    public void start() {
+        setName("MiniSite-" + CoreUtils.hsIdToString(m_mailbox.getHSId()));
+        super.start();
+    }
+
+    @Override
     public void run() {
         long lastHeartbeatTime = System.currentTimeMillis();
         while (m_shouldContinue.get()) {
@@ -99,7 +112,7 @@ class MiniSite extends Thread implements MeshAide
     private void processMessage(VoltMessage msg)
     {
         if (!m_currentHSIds.contains(msg.m_sourceHSId)) {
-            m_siteLog.info("Dropping message " + msg + " because it is not from a known up site");
+            m_siteLog.debug("Dropping message " + msg + " because it is not from a known up site");
         }
         // need heartbeat something in here?
         if (msg instanceof FaultMessage) {
@@ -110,13 +123,19 @@ class MiniSite extends Thread implements MeshAide
 
     private void discoverGlobalFaultData(FaultMessage faultMessage)
     {
-        m_siteLog.info("Saw fault: " + faultMessage.failedSite + ", witnessed?: " + faultMessage.witnessed);
+        m_siteLog.info("Saw fault: " + CoreUtils.hsIdToString(faultMessage.failedSite)
+                + ", witnessed?: " + faultMessage.witnessed);
         Map<Long, Long> results = m_arbiter.reconfigureOnFault(m_currentHSIds, faultMessage);
         if (results.isEmpty()) {
             return;
         }
         m_failedHSIds.addAll(results.keySet());
         m_currentHSIds.removeAll(results.keySet());
+        ImmutableSet.Builder<Integer> failedHosts = ImmutableSet.builder();
+        for (long HSId : results.keySet()) {
+            failedHosts.add(CoreUtils.getHostIdFromHSId(HSId));
+        }
+        m_failedHosts.disconnect(failedHosts.build());
         // need to "disconnect" these failed guys somehow?
     }
 }
