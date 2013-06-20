@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.voltcore.agreement.AgreementSite.FaultMessage;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.DisconnectFailedHostsCallback;
 import org.voltcore.messaging.HeartbeatMessage;

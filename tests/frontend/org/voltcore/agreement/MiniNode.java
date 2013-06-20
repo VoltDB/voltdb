@@ -169,7 +169,7 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
                     // snoop for FailureSiteUpdateMessages, inject into MiniSite's mailbox
                     if (message instanceof FailureSiteUpdateMessage)
                     {
-                        for (long failedHostId : ((FailureSiteUpdateMessage)message).m_failedHSIds) {
+                        for (long failedHostId : ((FailureSiteUpdateMessage)message).m_failedHSIds.keySet()) {
                             long agreementHSId = CoreUtils.getHSIdFromHostAndSite((int)failedHostId,
                                     HostMessenger.AGREEMENT_SITE_ID);
                             m_miniSite.reportFault(agreementHSId, false);

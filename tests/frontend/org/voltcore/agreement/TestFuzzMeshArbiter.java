@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Random;
 import java.util.Set;
 
 import org.voltcore.agreement.MiniNode.NodeState;
@@ -151,6 +152,42 @@ public class TestFuzzMeshArbiter extends TestCase
         expect.addAll(m_nodes.keySet());
         expect.remove(getHSId(0));
         expect.remove(getHSId(1));
+        assertTrue(checkFullyConnectedGraphs(expect));
+    }
+
+    public void testNodeFuzz() throws InterruptedException
+    {
+        long seed = System.currentTimeMillis();
+        Random rand = new Random(seed);
+        System.out.println("SEED: " + seed);
+        constructCluster(40);
+        while (!getNodesInState(NodeState.START).isEmpty()) {
+            Thread.sleep(50);
+        }
+        Set<Long> expect = new HashSet<Long>();
+        expect.addAll(m_nodes.keySet());
+
+        for (int i = 0; i < 10; i++) {
+            int nextToDie = rand.nextInt(40);
+            while (!expect.contains(getHSId(nextToDie))) {
+                nextToDie = rand.nextInt(40);
+            }
+            expect.remove(getHSId(nextToDie));
+            System.out.println("Next to die: " + nextToDie);
+            int delay = rand.nextInt(10) + 1;
+            System.out.println("Fuzz delay in ms: " + delay * 5);
+            Thread.sleep(delay * 5);
+            MiniNode victim = m_nodes.get(getHSId(nextToDie));
+            victim.shutdown();
+        }
+
+        while (getNodesInState(NodeState.RESOLVE).isEmpty()) {
+            Thread.sleep(50);
+        }
+        while (!getNodesInState(NodeState.RESOLVE).isEmpty()) {
+            Thread.sleep(50);
+        }
+
         assertTrue(checkFullyConnectedGraphs(expect));
     }
 }
