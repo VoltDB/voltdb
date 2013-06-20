@@ -211,11 +211,9 @@ implements SnapshotDataTarget {
                 }
             } catch (IOException e) {
                 rejoinLog.error("Error writing rejoin snapshot block", e);
-                m_future.setException(e);
                 return false;
             }
 
-            m_future.set(true);
             return true;
         }
 
@@ -237,6 +235,7 @@ implements SnapshotDataTarget {
             } finally {
                 // Always discard the buffer so that they can be reused
                 discard();
+                m_future.set(true);
             }
         }
     }
