@@ -2068,14 +2068,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         assert(buf.hasArray());
         if (isSinglePartition) {
             byte[] param = null;
+            byte type = VoltType.NULL.getValue();
             // replicated table read is single-part without a partitioning param
             if (plannedStmtBatch.partitionParam != null) {
+                type = VoltType.typeFromClass(plannedStmtBatch.partitionParam.getClass()).getValue();
                 param = TheHashinator.valueToBytes(plannedStmtBatch.partitionParam);
             }
 
             // Send the partitioning parameter and its type along so that the site can check if
-            // it's mis-partitioned.
-            task.setParams(param, buf.array());
+            // it's mis-partitioned. Type is needed to re-hashinate for command log re-init.
+            task.setParams(param, type, buf.array());
         } else {
             task.setParams(buf.array());
         }
