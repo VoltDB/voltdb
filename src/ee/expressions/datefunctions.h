@@ -141,8 +141,8 @@ template<> inline NValue NValue::callUnary<FUNC_SINCE_EPOCH_SECOND>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    double epoch_seconds = static_cast<double> (epoch_micros) / 1000000;
-    return getDoubleValue(epoch_seconds);
+    int64_t epoch_seconds = epoch_micros / 1000000;
+    return getBigIntValue(epoch_seconds);
 }
 
 /** implement the timestamp SINCE_EPOCH in MILLISECONDs function **/
@@ -151,8 +151,8 @@ template<> inline NValue NValue::callUnary<FUNC_SINCE_EPOCH_MILLISECOND>() const
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    double epoch_milliseconds = static_cast<double>(epoch_micros) / 1000;
-    return getDoubleValue(epoch_milliseconds);
+    int64_t epoch_milliseconds = epoch_micros / 1000;
+    return getBigIntValue(epoch_milliseconds);
 }
 
 /** implement the timestamp SINCE_EPOCH in MICROSECONDs function **/
@@ -161,7 +161,7 @@ template<> inline NValue NValue::callUnary<FUNC_SINCE_EPOCH_MICROSECOND>() const
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    return getDoubleValue(static_cast<double>(epoch_micros));
+    return getBigIntValue(epoch_micros);
 }
 
 }
