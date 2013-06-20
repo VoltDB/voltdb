@@ -99,11 +99,7 @@ public class MeshArbiter {
         m_inTrouble.put(fm.failedSite,fm.witnessed);
 
         m_seeker.startSeekingFor(Sets.difference(hsIds,m_failedSites), m_inTrouble);
-
-        m_recoveryLog.info("Agreement, Sending fault data "
-                + CoreUtils.hsIdCollectionToString(m_inTrouble.keySet())
-                + " to "
-                + CoreUtils.hsIdCollectionToString(m_seeker.getSurvivors()) + " survivors");
+        m_seeker.add(m_hsId,m_inTrouble);
 
         discoverGlobalFaultData_send();
 
@@ -139,7 +135,6 @@ public class MeshArbiter {
         m_recoveryLog.info("Agreement, Sending fault data " + CoreUtils.hsIdCollectionToString(m_inTrouble.keySet())
                 + " to "
                 + CoreUtils.hsIdCollectionToString(Longs.asList(survivors)) + " survivors");
-
 
         for (Long site : m_inTrouble.keySet()) {
             /*
@@ -224,7 +219,6 @@ public class MeshArbiter {
                 FailureSiteForwardMessage fsfm = (FailureSiteForwardMessage)m;
 
                 m_seeker.add(fsfm);
-                forwardCandidates.put(fsfm.m_reportingHSId, fsfm);
 
                 m_recoveryLog.info("Agreement, Received forwarded failure message from " +
                         CoreUtils.hsIdToString(fsfm.m_sourceHSId) + " reporting on behalf of " +

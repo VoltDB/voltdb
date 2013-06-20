@@ -33,6 +33,7 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import com.google.common.collect.TreeMultimap;
 
@@ -108,11 +109,11 @@ public class AgreementSeeker {
         return m_survivors;
     }
 
-    protected void add(FailureSiteUpdateMessage fsum, Long reportingHsid) {
+    public void add(long reportingHsid, final Map<Long,Boolean> failed) {
         if (!m_hsids.contains(reportingHsid)) return;
         Set<Long> witnessed = Sets.newHashSet();
 
-        for (Map.Entry<Long, Boolean> e: fsum.m_failedHSIds.entrySet()) {
+        for (Map.Entry<Long, Boolean> e: failed.entrySet()) {
             if (!m_hsids.contains(e.getKey())) continue;
             m_reported.put(e.getKey(), reportingHsid);
             if (e.getValue()) {
@@ -130,6 +131,10 @@ public class AgreementSeeker {
         for (Long alive: Sets.difference(m_hsids, witnessed)) {
             m_alive.put(alive, reportingHsid);
         }
+    }
+
+    protected void add(FailureSiteUpdateMessage fsum, Long reportingHsid) {
+        add(reportingHsid,fsum.m_failedHSIds);
     }
 
     public void add(FailureSiteUpdateMessage fsum) {
@@ -185,8 +190,11 @@ public class AgreementSeeker {
         public Boolean visitMatchingCardinality(Long hsid) {
             Set<Long> unreachable = Sets.filter(m_hsids, not(amongSurvivors));
             Set<Long> butAlive = Sets.intersection(m_alive.keySet(), unreachable);
+            Set<Long> seenBySurvivors =
+                    Multimaps.filterValues(m_alive, amongSurvivors).keySet();
 
             return !butAlive.isEmpty()
+                && seenBySurvivors.containsAll(butAlive)
                 && !m_witnessed.get(hsid).containsAll(butAlive);
         }
     };
