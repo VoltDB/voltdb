@@ -430,12 +430,14 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         }
 
         String usageInfo;
+        String predicatePrefix;
         if (keySize == 0) {
             if (m_forDeterminismOnly) {
                 usageInfo = " (for deterministic order only)";
             } else {
                 usageInfo = " (for sort order only)";
             }
+            predicatePrefix = "\n" + indent + " filter by ";
         }
         else {
             String[] asIndexed = new String[indexSize];
@@ -472,26 +474,31 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             String start = explainSearchKeys(asIndexed, keySize);
             if (m_lookupType == IndexLookupType.EQ) {
                 if (m_catalogIndex.getUnique()) {
-                    usageInfo = " uniquely match " + start;
+                    usageInfo = "\n" + indent + " uniquely match " + start;
                 }
                 else {
-                    usageInfo = " scan matches for " + start;
+                    usageInfo = "\n" + indent + " scan matches for " + start;
                 }
             }
             else {
                 if (indexSize == keySize) {
-                    usageInfo = " range-scan covering from " + start;
+                    usageInfo = "\n" + indent + " range-scan covering from " + start;
                 }
                 else {
-                    usageInfo = String.format(" range-scan %d/%d cols from %s", keySize, indexSize, start);
+                    usageInfo = "\n" + indent + String.format(" range-scan on %d of %d cols from %s", keySize, indexSize, start);
                 }
 
                 usageInfo += explainEndKeys(asIndexed);
             }
+            predicatePrefix = ", filter by ";
         }
-        String predicate = explainPredicate();
+        String predicate = explainPredicate(predicatePrefix);
         String retval = "INDEX SCAN of \"" + m_targetTableName + "\"";
-        retval += " using \"" + m_targetIndexName + "\"";
+        String indexDescription = " using \"" + m_targetIndexName + "\"";
+        if (m_targetIndexName.startsWith("SYS_IDX_PK_") || m_targetIndexName.startsWith("MATVIEW_PK_INDEX") ) {
+            indexDescription = " using its primary key index";
+        }
+        retval += indexDescription;
         retval += usageInfo + predicate;
         return retval;
     }

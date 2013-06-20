@@ -347,10 +347,10 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         collected.add(this);
     }
 
-    protected String explainPredicate() {
+    protected String explainPredicate(String prefix) {
         // TODO Auto-generated method stub
         if (m_predicate != null) {
-            return ", filter by " + m_predicate.explain(m_targetTableName);
+            return prefix + m_predicate.explain(m_targetTableName);
         }
         return "";
     }
