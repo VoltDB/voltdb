@@ -33,17 +33,21 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.expressions.VectorValueExpression;
 import org.voltdb.planner.JoinTree.TablePair;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.MaterializedScanPlanNode;
+import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.IndexType;
+import org.voltdb.types.JoinType;
 import org.voltdb.types.SortDirectionType;
 import org.voltdb.utils.CatalogUtil;
 
@@ -312,6 +316,16 @@ public abstract class SubPlanAssembler {
         int nRecoveredSpoilers = 0;
         AbstractExpression coveringExpr = null;
         int coveringColId = -1;
+
+        // Currently, an index can be used with at most one IN LIST filter expression.
+        // Otherwise, MaterializedScans would have to be multi-column and populated by a cross-product
+        // of multiple lists OR multiple MaterializedScans would have to be cross-joined to get a
+        // multi-column LHS for the injected NestLoopIndexJoin used for IN LIST indexing.
+        // So, note the one IN LIST filter when it is found, mostly to remember that one has been found.
+        // This has implications for what kinds of filters on other key components can be included in
+        // the index scan.
+        IndexableExpression inListExpr = null;
+
         for ( ; coveredCount < keyComponentCount; ++coveredCount) {
             if (indexedExprs == null) {
                 coveringColId = indexedColIds[coveredCount];
@@ -319,17 +333,58 @@ public abstract class SubPlanAssembler {
                 coveringExpr = indexedExprs.get(coveredCount);
             }
             // Equality filters get first priority.
+            boolean allowIndexedJoinFilters = (inListExpr == null);
             IndexableExpression eqExpr = getIndexableExpressionFromFilters(
                 ExpressionType.COMPARE_EQUAL, ExpressionType.COMPARE_EQUAL,
-                coveringExpr, coveringColId, table, filtersToCover, EXCLUDE_FROM_POST_FILTERS);
+                coveringExpr, coveringColId, table, filtersToCover,
+                allowIndexedJoinFilters, EXCLUDE_FROM_POST_FILTERS);
+
             if (eqExpr == null) {
-                break;
+                // For now, an IN LIST can only be indexed if any other indexed filters are based
+                // solely on constants or parameters vs. other tables' columns or other IN LISTS.
+                // Otherwise, there would need to be a three-way NLIJ implementation joining the
+                // MaterializedScan, the source table of the other key component values,
+                // and the indexed table.
+                // So, only the first IN LIST filter matching a key component is considered.
+                if (inListExpr == null) {
+                    // Also, it can not be considered if there was a prior key component that has an
+                    // equality filter that is based on another table.
+                    // Accepting an IN LIST filter implies rejecting later any filters based on other
+                    // tables' columns.
+                    inListExpr = getIndexableExpressionFromFilters(
+                        ExpressionType.COMPARE_IN, ExpressionType.COMPARE_IN,
+                        coveringExpr, coveringColId, table, filtersToCover,
+                        false, EXCLUDE_FROM_POST_FILTERS);
+                    if (inListExpr != null) {
+                        // Make sure all prior key component equality filters
+                        // were based on constants and/or parameters.
+                        for (AbstractExpression comparator : retval.indexExprs) {
+                            AbstractExpression otherExpr = comparator.getRight();
+                            if (otherExpr.hasAnySubexpressionOfType(ExpressionType.VALUE_TUPLE)) {
+                                // Can't index this IN LIST filter without some kind of three-way NLIJ,
+                                // so pass it by.
+                                inListExpr = null;
+                                break;
+                            }
+                        }
+                        eqExpr = inListExpr;
+                    }
+                }
+                if (eqExpr == null) {
+                    break;
+                }
             }
             AbstractExpression comparator = eqExpr.getFilter();
             retval.indexExprs.add(comparator);
             retval.bindings.addAll(eqExpr.getBindings());
             // A non-empty endExprs has the later side effect of invalidating descending sort order
             // in all cases except the edge case of full coverage equality comparison.
+            // Even that case must be further qualified to exclude indexed IN-LIST
+            // unless/until the MaterializedScan can be configured to iterate in descending order
+            // (vs. always ascending).
+            // In the case of the IN LIST expression, both the search key and the end condition need
+            // to be rewritten to enforce equality in turn with each list element "row" produced by
+            // the MaterializedScan. This happens in getIndexAccessPlanForTable.
             retval.endExprs.add(comparator);
 
             // If a provisional sort direction has been determined, the equality filter MAY confirm
@@ -338,8 +393,11 @@ public abstract class SubPlanAssembler {
             // In this case, consider the spoiler recovered.
             if (nRecoveredSpoilers < nSpoilers &&
                 orderSpoilers[nRecoveredSpoilers] == coveredCount) {
-                // One recovery closer to confirming the sort order.
-                ++nRecoveredSpoilers;
+                // In the case of IN-LIST equality, the key component will not have a constant value.
+                if (eqExpr != inListExpr) {
+                    // One recovery closer to confirming the sort order.
+                    ++nRecoveredSpoilers;
+                }
             }
         }
 
@@ -413,7 +471,8 @@ public abstract class SubPlanAssembler {
             // into separate upper and lower bound inequalities.
             IndexableExpression doubleBoundExpr = getIndexableExpressionFromFilters(
                 ExpressionType.COMPARE_LIKE, ExpressionType.COMPARE_LIKE,
-                coveringExpr, coveringColId, table, filtersToCover, EXCLUDE_FROM_POST_FILTERS);
+                coveringExpr, coveringColId, table, filtersToCover,
+                false, EXCLUDE_FROM_POST_FILTERS);
 
             // For simplicity of implementation:
             // In some odd edge cases e.g.
@@ -426,15 +485,19 @@ public abstract class SubPlanAssembler {
                 endingBoundExpr = doubleBoundExpr.extractEndFromPrefixLike();
             }
             else {
+                boolean allowIndexedJoinFilters = (inListExpr == null);
+
                 // Look for a lower bound.
                 startingBoundExpr = getIndexableExpressionFromFilters(
                     ExpressionType.COMPARE_GREATERTHAN, ExpressionType.COMPARE_GREATERTHANOREQUALTO,
-                    coveringExpr, coveringColId, table, filtersToCover, EXCLUDE_FROM_POST_FILTERS);
+                    coveringExpr, coveringColId, table, filtersToCover,
+                    allowIndexedJoinFilters, EXCLUDE_FROM_POST_FILTERS);
 
                 // Look for an upper bound.
                 endingBoundExpr = getIndexableExpressionFromFilters(
                     ExpressionType.COMPARE_LESSTHAN, ExpressionType.COMPARE_LESSTHANOREQUALTO,
-                    coveringExpr, coveringColId, table, filtersToCover, EXCLUDE_FROM_POST_FILTERS);
+                    coveringExpr, coveringColId, table, filtersToCover,
+                    allowIndexedJoinFilters, EXCLUDE_FROM_POST_FILTERS);
             }
         }
 
@@ -762,11 +825,15 @@ public abstract class SubPlanAssembler {
             } else {
                 coveringExpr = indexedExprs.get(orderSpoilers[nRecoveredSpoilers]);
             }
+            // A key component filter based on another table's column is enough to maintain ordering
+            // if this index is chosen, regardless of whether an NLIJ is injected for an IN LIST.
+            boolean alwaysAllowConstrainingJoinFilters = true;
+
             List<AbstractExpression> moreBindings = null;
             IndexableExpression eqExpr = getIndexableExpressionFromFilters(
                 ExpressionType.COMPARE_EQUAL, ExpressionType.COMPARE_EQUAL,
                 coveringExpr, coveringColId, table, filtersToCover,
-                KEEP_IN_POST_FILTERS);
+                alwaysAllowConstrainingJoinFilters, KEEP_IN_POST_FILTERS);
             if (eqExpr == null) {
                 return null;
             }
@@ -802,6 +869,7 @@ public abstract class SubPlanAssembler {
      *                      the id of the indexed column might match a query filter.
      * @param table The table on which the indexed expression is based
      * @param filtersToCover the query conditions that may contain the desired filter
+     * @param allowIndexedJoinFilters Whether filters referencing other tables' columns are acceptable
      * @param filterAction the desired disposition of the matched filter,
                            either EXCLUDE_FROM_POST_FILTERS or KEEP_IN_POST_FILTERS
      * @return An IndexableExpression -- really just a pairing of a normalized form of expr with the
@@ -813,7 +881,8 @@ public abstract class SubPlanAssembler {
     private IndexableExpression getIndexableExpressionFromFilters(
         ExpressionType targetComparator, ExpressionType altTargetComparator,
         AbstractExpression coveringExpr, int coveringColId, Table table,
-        List<AbstractExpression> filtersToCover, boolean filterAction)
+        List<AbstractExpression> filtersToCover,
+        boolean allowIndexedJoinFilters, boolean filterAction)
     {
         List<AbstractExpression> binding = null;
         AbstractExpression indexableExpr = null;
@@ -830,6 +899,14 @@ public abstract class SubPlanAssembler {
                 binding = bindingIfValidIndexedFilterOperand(table, indexableExpr, otherExpr,
                                                              coveringExpr, coveringColId);
                 if (binding != null) {
+                    if ( ! allowIndexedJoinFilters) {
+                        if (otherExpr.hasAnySubexpressionOfType(ExpressionType.VALUE_TUPLE)) {
+                            // This filter can not be used with the index, possibly due to interactions
+                            // wih IN LIST processing that would require a three-way NLIJ.
+                            binding = null;
+                            continue;
+                        }
+                    }
                     // Additional restrictions apply to LIKE pattern arguments
                     if (targetComparator == ExpressionType.COMPARE_LIKE) {
                         if (otherExpr instanceof ParameterValueExpression) {
@@ -868,6 +945,43 @@ public abstract class SubPlanAssembler {
                             continue;
                         }
                     }
+                    if (targetComparator == ExpressionType.COMPARE_IN) {
+                        if (otherExpr.hasAnySubexpressionOfType(ExpressionType.VALUE_TUPLE)) {
+                            // This is a fancy edge case where the expression could only be indexed
+                            // if it:
+                            // A) does not reference the indexed table and
+                            // B) has ee support for a three-way NLIJ where the table referenced in
+                            // the list element expression feeds values from its current row to the
+                            // Materialized scan which then re-evaluates its expressions to
+                            // re-populate the temp table that drives the injected NLIJ with
+                            // this index scan.
+                            // This is a slightly more twisted variant of the three-way NLIJ that
+                            // would be needed to support compound key indexing on a combination
+                            // of (fixed) IN LIST elements and join key values from other tables.
+                            // Punt for now on indexing this IN LIST filter.
+                            binding = null; // the filter is not usable, so the binding is invalid
+                            continue;
+                        }
+                        if (otherExpr instanceof ParameterValueExpression) {
+                            // It's OK to use an index for a parameterized IN filter,
+                            // e.g. "T1.column IN ?"
+                            // EVEN if the parameter was -- someday -- artificially substituted
+                            // for an entire user-specified list of constants.
+                            // As of now, that is beyond the capabilities of the ad hoc statement
+                            // parameterizer, so "T1.column IN (3, 4)" can use the plan for
+                            // "T1.column IN (?, ?)" that might have been originally cached for
+                            // "T1.column IN (1, 2)" but "T1.column IN (1, 2, 3)" would need its own
+                            // "T1.column IN (?, ?, ?)" plan, etc. per list element count.
+                        }
+                        //TODO: Some day, there may be an optimization here that allows an entire
+                        // IN LIST of constants to be serialized as a single value instead of a
+                        // VectorValue composed of ConstantValue arguments.
+                        // What's TBD is whether that would get its own AbstractExpression class or
+                        // just be a special case of ConstantValueExpression.
+                        else {
+                            assert (otherExpr instanceof VectorValueExpression);
+                        }
+                    }
                     originalFilter = filter;
                     if (filterAction == EXCLUDE_FROM_POST_FILTERS) {
                         filtersToCover.remove(filter);
@@ -884,6 +998,15 @@ public abstract class SubPlanAssembler {
                 binding = bindingIfValidIndexedFilterOperand(table, indexableExpr, otherExpr,
                                                              coveringExpr, coveringColId);
                 if (binding != null) {
+                    if ( ! allowIndexedJoinFilters) {
+                        if (otherExpr.hasAnySubexpressionOfType(ExpressionType.VALUE_TUPLE)) {
+                            // This filter can not be used with the index, probably due to interactions
+                            // with IN LIST processing of another key component that would require a
+                            // three-way NLIJ to be injected.
+                            binding = null;
+                            continue;
+                        }
+                    }
                     originalFilter = filter;
                     if (filterAction == EXCLUDE_FROM_POST_FILTERS) {
                         filtersToCover.remove(filter);
@@ -991,7 +1114,7 @@ public abstract class SubPlanAssembler {
         assert(table != null);
         assert(path != null);
 
-        AbstractScanPlanNode scanNode = null;
+        AbstractPlanNode scanNode = null;
         // if no path is a sequential scan, call a subroutine for that
         if (path.index == null)
         {
@@ -1000,12 +1123,6 @@ public abstract class SubPlanAssembler {
         else
         {
             scanNode = getIndexAccessPlanForTable(table, path);
-        }
-        // set the scan columns for this scan node based on the parsed SQL,
-        // if any
-        if (m_parsedStmt.scanColumns != null)
-        {
-            scanNode.setScanColumns(m_parsedStmt.scanColumns.get(table.getTypeName()));
         }
         scanNode.generateOutputSchema(m_db);
         return scanNode;
@@ -1025,6 +1142,11 @@ public abstract class SubPlanAssembler {
         // build the scan node
         SeqScanPlanNode scanNode = new SeqScanPlanNode();
         scanNode.setTargetTableName(table.getTypeName());
+        //TODO: push scan column identification into "setTargetTableName"
+        // (on the way to enabling it for DML plans).
+        if (m_parsedStmt.scanColumns != null) {
+            scanNode.setScanColumns(m_parsedStmt.scanColumns.get(table.getTypeName()));
+        }
 
         // build the predicate
         AbstractExpression localWhere = null;
@@ -1043,19 +1165,32 @@ public abstract class SubPlanAssembler {
      *
      * @param table The table to get data from.
      * @param path The access path to access the data in the table (index/scan/etc).
-     * @return An index scan plan node
+     * @return An index scan plan node OR,
+               in one edge case, an NLIJ of a MaterializedScan and an index scan plan node.
      */
-    protected AbstractScanPlanNode getIndexAccessPlanForTable(Table table,
-                                                              AccessPath path)
+    protected AbstractPlanNode getIndexAccessPlanForTable(Table table, AccessPath path)
     {
         // now assume this will be an index scan and get the relevant index
         Index index = path.index;
         IndexScanPlanNode scanNode = new IndexScanPlanNode();
+        AbstractPlanNode resultNode = scanNode;
         // Build the list of search-keys for the index in question
         // They are the rhs expressions of the normalized indexExpr comparisons.
         for (AbstractExpression expr : path.indexExprs) {
             AbstractExpression expr2 = expr.getRight();
             assert(expr2 != null);
+            if (expr.getExpressionType() == ExpressionType.COMPARE_IN) {
+                // Replace this method's result with an injected NLIJ.
+                resultNode = injectIndexedJoinWithMaterializedScan(expr2, scanNode);
+                // Extract a TVE from the LHS MaterializedScan for use by the IndexScan in its new role.
+                MaterializedScanPlanNode matscan = (MaterializedScanPlanNode)resultNode.getChild(0);
+                AbstractExpression elemExpr = matscan.getOutputExpression();
+                // Replace the IN LIST condition in the end expression referencing all the list elements
+                // with a more efficient equality filter referencing the TVE for each element in turn.
+                replaceInListFilterWithEqualityFilter(path.endExprs, expr2, elemExpr);
+                // Set up the similar VectorValue --> TVE replacement of the search key expression.
+                expr2 = elemExpr;
+            }
             scanNode.addSearchKeyExpression(expr2);
         }
         // create the IndexScanNode with all its metadata
@@ -1068,9 +1203,51 @@ public abstract class SubPlanAssembler {
         scanNode.setPredicate(ExpressionUtil.combine(path.otherExprs));
 
         scanNode.setTargetTableName(table.getTypeName());
+        //TODO: push scan column identification into "setTargetTableName"
+        // (on the way to enabling it for DML plans).
+        if (m_parsedStmt.scanColumns != null) {
+            scanNode.setScanColumns(m_parsedStmt.scanColumns.get(table.getTypeName()));
+        }
         scanNode.setTargetTableAlias(table.getTypeName());
         scanNode.setTargetIndexName(index.getTypeName());
-        return scanNode;
+        return resultNode;
+    }
+
+
+    // Generate a plan for an IN-LIST-driven index scan
+    private AbstractPlanNode injectIndexedJoinWithMaterializedScan(AbstractExpression listElements,
+                                                                   IndexScanPlanNode scanNode)
+    {
+        MaterializedScanPlanNode matScan = new MaterializedScanPlanNode();
+        assert(listElements instanceof VectorValueExpression);
+        matScan.setRowData(listElements);
+
+        NestLoopIndexPlanNode nlijNode = new NestLoopIndexPlanNode();
+        nlijNode.setJoinType(JoinType.INNER);
+        nlijNode.addInlinePlanNode(scanNode);
+        nlijNode.addAndLinkChild(matScan);
+        return nlijNode;
+    }
+
+
+    // Replace the IN LIST condition in the end expression referencing the first given rhs
+    // with an equality filter referencing the second given rhs.
+    private void replaceInListFilterWithEqualityFilter(List<AbstractExpression> endExprs,
+                                                       AbstractExpression inListRhs,
+                                                       AbstractExpression equalityRhs)
+    {
+        for (AbstractExpression comparator : endExprs) {
+            AbstractExpression otherExpr = comparator.getRight();
+            if (otherExpr == inListRhs) {
+                endExprs.remove(comparator);
+                AbstractExpression replacement =
+                    new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
+                                             comparator.getLeft(),
+                                             equalityRhs);
+                endExprs.add(replacement);
+                break;
+            }
+        }
     }
 
     /**

@@ -31,6 +31,7 @@ import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.MaterializePlanNode;
+import org.voltdb.plannodes.MaterializedScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
@@ -55,6 +56,7 @@ public enum PlanNodeType {
     INDEXSCAN       (11, IndexScanPlanNode.class),
     INDEXCOUNT       (12, IndexCountPlanNode.class),
     TABLECOUNT       (13, TableCountPlanNode.class),
+    MATERIALIZEDSCAN (14, MaterializedScanPlanNode.class),
 
     //
     // Join Nodes

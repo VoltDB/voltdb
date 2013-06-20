@@ -78,7 +78,6 @@
 #include "logging/LogManager.h"
 #include "plannodes/abstractplannode.h"
 #include "plannodes/abstractscannode.h"
-#include "plannodes/nodes.h"
 #include "plannodes/plannodeutil.h"
 #include "plannodes/plannodefragment.h"
 #include "executors/executorutil.h"
@@ -1432,7 +1431,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
                 results.writeInt(*ipos);
             }
         }
-        VOLT_DEBUG("tableStreamSerializeMore: deserialized %d buffers, %ld remaining",
+        VOLT_DEBUG("tableStreamSerializeMore: deserialized %d buffers, %lld remaining",
                    (int)positions.size(), remaining);
     }
     catch (SerializableEEException &e) {
