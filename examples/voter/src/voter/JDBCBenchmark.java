@@ -282,7 +282,7 @@ public class JDBCBenchmark {
                 stats.getAverageLatency());
         System.out.printf("10th percentile latency:       %,9d ms\n",
                 stats.kPercentileLatency(.1));
-        System.out.printf("25th percentile latency:       %,9d ms\n", 
+        System.out.printf("25th percentile latency:       %,9d ms\n",
                 stats.kPercentileLatency(.25));
         System.out.printf("50th percentile latency:       %,9d ms\n",
                 stats.kPercentileLatency(.5));
