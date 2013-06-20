@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google.common.util.concurrent.SettableFuture;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
@@ -132,26 +133,17 @@ implements SnapshotDataTarget {
         BBContainer m_schema;
         int m_blockIndex;
         long m_ts;
-        AtomicReference<ListenableFuture<Boolean>> m_future = new AtomicReference<ListenableFuture<Boolean>>(null);
 
-        SendWork (int blockIndex, BBContainer schema, BBContainer message) {
+        // A listenable future used to notify a listener when this buffer is discarded
+        final SettableFuture<Boolean> m_future;
+
+        SendWork (int blockIndex, BBContainer schema, BBContainer message,
+                  SettableFuture<Boolean> future) {
             m_blockIndex = blockIndex;
             m_schema = schema;
             m_message = message;
             m_ts = System.currentTimeMillis();
-        }
-
-        @Override
-        protected void finalize() {
-            discard(); // idempotent
-        }
-
-        void setFuture(ListenableFuture<Boolean> future) {
-            m_future.set(future);
-        }
-
-        ListenableFuture<Boolean> getFuture() {
-            return m_future.get();
+            m_future = future;
         }
 
         /**
@@ -159,17 +151,8 @@ implements SnapshotDataTarget {
          * BBContainters held.
          */
         public synchronized void discard() {
-            rejoinLog.trace("Discarding buffer at index " + String.valueOf(m_blockIndex));
-
-            // try to cancel the work if it's not done yet
-            ListenableFuture<Boolean> future = m_future.get();
-            if (future != null) {
-                if (m_future.compareAndSet(future, null)) {
-                    future.cancel(true);
-                }
-                // should be null no matter what the result of the
-                // compare and set above
-                assert(m_future.get() == null);
+            if (rejoinLog.isTraceEnabled()) {
+                rejoinLog.trace("Discarding buffer at index " + String.valueOf(m_blockIndex));
             }
 
             // discard the buffers and null them out
@@ -209,7 +192,9 @@ implements SnapshotDataTarget {
                     m_mb.send(m_destHSId, msg);
                     m_bytesSent.addAndGet(compressedSize);
 
-                    rejoinLog.trace("Sending direct buffer");
+                    if (rejoinLog.isTraceEnabled()) {
+                        rejoinLog.trace("Sending direct buffer");
+                    }
                 } else {
                     byte compressedBytes[] =
                             CompressionService.compressBytes(
@@ -220,12 +205,17 @@ implements SnapshotDataTarget {
                     m_mb.send(m_destHSId, msg);
                     m_bytesSent.addAndGet(compressedBytes.length);
 
-                    rejoinLog.trace("Sending heap buffer");
+                    if (rejoinLog.isTraceEnabled()) {
+                        rejoinLog.trace("Sending heap buffer");
+                    }
                 }
             } catch (IOException e) {
                 rejoinLog.error("Error writing rejoin snapshot block", e);
+                m_future.setException(e);
                 return false;
             }
+
+            m_future.set(true);
             return true;
         }
 
@@ -236,12 +226,18 @@ implements SnapshotDataTarget {
                 return true;
             }
 
-            if (m_schema != null) {
-                if (!send(m_schema)) {
-                    return false;
+            try {
+                if (m_schema != null) {
+                    if (!send(m_schema)) {
+                        return false;
+                    }
                 }
+
+                return send(m_message);
+            } finally {
+                // Always discard the buffer so that they can be reused
+                discard();
             }
-            return send(m_message);
         }
     }
 
@@ -451,11 +447,7 @@ implements SnapshotDataTarget {
             chunk.b.putInt(context.getTableId()); // put table ID
             chunk.b.position(0);
 
-            send(m_blockIndex++, schemaContainer, chunk);
-
-            rejoinLog.trace("Submitted write with index " + String.valueOf(m_blockIndex));
-
-            return null;
+            return send(m_blockIndex++, schemaContainer, chunk);
         }
         finally {
             rejoinLog.trace("Finished call to write");
@@ -470,12 +462,15 @@ implements SnapshotDataTarget {
      * @param blockIndex Index useful for ack tracking and debugging
      * @param schemaContainer Optional schema for table (can be null)
      * @param chunk Snapshot data to send.
+     * @return return a listenable future for the caller to wait until the buffer is sent
      */
-    synchronized void send(int blockIndex, BBContainer schemaContainer, BBContainer chunk) {
-        SendWork sendWork = new SendWork(blockIndex, schemaContainer, chunk);
+    synchronized ListenableFuture<Boolean> send(int blockIndex, BBContainer schemaContainer, BBContainer chunk) {
+        SettableFuture<Boolean> sendFuture = SettableFuture.create();
+        SendWork sendWork = new SendWork(blockIndex, schemaContainer, chunk, sendFuture);
         m_outstandingWork.put(blockIndex, sendWork);
         m_outstandingWorkCount.incrementAndGet();
         m_sendQueue.add(sendWork);
+        return sendFuture;
     }
 
     @Override
