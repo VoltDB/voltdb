@@ -33,6 +33,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -138,7 +139,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * in order to avoid ensure that nothing misses the end of backpressure notification
      */
     private final ReentrantLock m_backpressureLock = new ReentrantLock();
-    private final CopyOnWriteArrayList<Connection> m_connections = new CopyOnWriteArrayList<Connection>();
+    private final ConcurrentHashMap<Connection, Object> m_connections = new ConcurrentHashMap<Connection, Object>();
     private final SnapshotDaemon m_snapshotDaemon = new SnapshotDaemon();
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
 
@@ -160,8 +161,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * serviced by the associated network thread. They are paired so as to only do a single
      * lookup.
      */
-    private final COWMap<Long, ClientInterfaceHandleManager>
-            m_cihm = new COWMap<Long, ClientInterfaceHandleManager>();
+    private final ConcurrentHashMap<Long, ClientInterfaceHandleManager> m_cihm =
+              new ConcurrentHashMap<Long, ClientInterfaceHandleManager>();
     private final Cartographer m_cartographer;
 
     /**
@@ -236,7 +237,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
 
                     m_hasGlobalClientBackPressure = true;
-                    for (Connection c : m_connections) {
+                    for (Connection c : m_connections.keySet()) {
                         c.disableReadSelection();
                     }
                 } else {
@@ -245,7 +246,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
 
                     if (m_hasGlobalClientBackPressure && !m_hasDTXNBackPressure) {
-                        for (Connection c : m_connections) {
+                        for (Connection c : m_connections.keySet()) {
                             if (!c.writeStream().hadBackPressure()) {
                                 /*
                                  * Also synchronize on the individual connection
@@ -444,7 +445,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                     if (!m_hasDTXNBackPressure) {
                                                         c.enableReadSelection();
                                                     }
-                                                    m_connections.add(c);
+                                                    m_connections.put(c, "CONN");
                                                 } finally {
                                                     m_backpressureLock.unlock();
                                                 }
@@ -779,7 +780,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 if (!m_acg.get().hasBackPressure()) {
                     c.enableReadSelection();
                 }
-                m_connections.add(c);
+                m_connections.put(c, "CONN");
             }
         }
 
@@ -1019,7 +1020,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_backpressureLock.lock();
         try {
             m_hasDTXNBackPressure = true;
-            for (final Connection c : m_connections) {
+            for (final Connection c : m_connections.keySet()) {
                 c.disableReadSelection();
             }
         } finally {
@@ -1039,7 +1040,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (m_hasGlobalClientBackPressure) {
                 return;
             }
-            for (final Connection c : m_connections) {
+            for (final Connection c : m_connections.keySet()) {
                 if (!c.writeStream().hadBackPressure()) {
                     /*
                      * Also synchronize on the individual connection
@@ -1266,7 +1267,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             JSONObject jsObj = new JSONObject(new String(message.m_payload, "UTF-8"));
             final int partitionId = jsObj.getInt(Cartographer.JSON_PARTITION_ID);
             final long initiatorHSId = jsObj.getLong(Cartographer.JSON_INITIATOR_HSID);
-            for (final Connection c : m_connections) {
+            for (final Connection c : m_connections.keySet()) {
                 c.queueTask(new Runnable() {
                     @Override
                     public void run() {
@@ -2294,7 +2295,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     private final void checkForDeadConnections(final long now) {
         final ArrayList<Connection> connectionsToRemove = new ArrayList<Connection>();
-        for (final Connection c : m_connections) {
+        for (final Connection c : m_connections.keySet()) {
             final int delta = c.writeStream().calculatePendingWriteDelta(now);
             if (delta > 4000) {
                 connectionsToRemove.add(c);
@@ -2622,10 +2623,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_mailbox.send(initiatorHSId, message);
     }
 
-    public List<Iterator<Map.Entry<String, InvocationInfo>>> getIV2InitiatorStats() {
-        ArrayList<Iterator<Map.Entry<String, InvocationInfo>>> statsIterators =
-                new ArrayList<Iterator<Map.Entry<String, InvocationInfo>>>();
-        for (AdmissionControlGroup acg : m_allACGs) {
+    public List<Iterator<Map.Entry<Long, Map<String, InvocationInfo>>>> getIV2InitiatorStats() {
+        ArrayList<Iterator<Map.Entry<Long, Map<String, InvocationInfo>>>> statsIterators =
+                new ArrayList<Iterator<Map.Entry<Long, Map<String, InvocationInfo>>>>();
+        for(AdmissionControlGroup acg : m_allACGs) {
             statsIterators.add(acg.getInitiationStatsIterator());
         }
         return statsIterators;

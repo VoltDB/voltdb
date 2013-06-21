@@ -124,13 +124,11 @@ public class InitiatorStats extends SiteStatsSource {
     @Override
     protected void updateStatsRow(final Object rowKey, Object rowValues[]) {
         DummyIterator iterator = (DummyIterator)rowKey;
-        Map.Entry<String, InvocationInfo> entry = iterator.next;
-        iterator.next = null;
+        Map.Entry<String, InvocationInfo> entry = iterator.lowerNext;
+        iterator.lowerNext = null;
         final InvocationInfo info = entry.getValue();
-        final String statsKey = entry.getKey();
-        final String statsKeySplit[] = statsKey.split("\\$");
-        final String procName = statsKeySplit[0];
-        final String connectionId = statsKeySplit[1];
+        final String procName = entry.getKey();
+        final Long connectionId = iterator.upperNext.getKey();
 
         long invocationCount = info.invocationCount;
         long totalExecutionTime = info.totalExecutionTime;
@@ -158,7 +156,7 @@ public class InitiatorStats extends SiteStatsSource {
             info.lastFailureCount = info.failureCount;
         }
 
-        rowValues[columnNameToIndex.get("CONNECTION_ID")] = new Long(connectionId);
+        rowValues[columnNameToIndex.get("CONNECTION_ID")] = connectionId;
         rowValues[columnNameToIndex.get("CONNECTION_HOSTNAME")] = info.connectionHostname;
         rowValues[columnNameToIndex.get("PROCEDURE_NAME")] = procName;
         rowValues[columnNameToIndex.get("INVOCATIONS")] = invocationCount;
@@ -170,43 +168,77 @@ public class InitiatorStats extends SiteStatsSource {
         super.updateStatsRow(rowKey, rowValues);
     }
 
-    /**
-     * A dummy iterator that wraps an Iterator<String> and provides the Iterator<Object> necessary
-     * for getStatsRowKeyIterator()
-     *
-     */
     private class DummyIterator implements Iterator<Object> {
-        private final Iterator<Map.Entry<String, InvocationInfo>> i;
-        private Map.Entry<String, InvocationInfo> next = null;
+        private final Iterator<Map.Entry<Long, Map<String, InvocationInfo>>> upperItr;
+        private Iterator<Map.Entry<String, InvocationInfo>> lowerItr = null;
+        private Map.Entry<Long, Map<String, InvocationInfo>> upperNext = null;
+        private Map.Entry<String, InvocationInfo> lowerNext = null;
         private final boolean interval;
-        private DummyIterator(Iterator<Map.Entry<String, InvocationInfo>> i, boolean interval) {
-            this.i = i;
+        private DummyIterator(Iterator<Map.Entry<Long, Map<String, InvocationInfo>>> i, boolean interval) {
+            this.upperItr = i;
             this.interval = interval;
+        }
+
+        private boolean advanceUpper() {
+            if(upperItr.hasNext()) {
+                upperNext = upperItr.next();
+                // reset lowerItr
+                lowerItr = upperNext.getValue().entrySet().iterator();
+                return true;
+            }
+            upperNext = null;
+            return false;
+        }
+
+        private boolean advanceLower() {
+            if(lowerItr.hasNext()) {
+                lowerNext = lowerItr.next();
+                return true;
+            }
+            lowerNext = null;
+            return false;
         }
 
         @Override
         public boolean hasNext() {
             if (!interval) {
-                if (i.hasNext()) {
-                    next = i.next();
-                    return true;
+                if(lowerItr == null) {
+                    if(advanceUpper()) {
+                        return advanceLower();
+                    }
+                    return false;
                 } else {
+                    if(advanceLower()) {
+                        return true;
+                    }
+                    if(advanceUpper()) {
+                        return advanceLower();
+                    }
                     return false;
                 }
             }
-            if (!i.hasNext()) {
+            if (lowerItr == null) {
+                advanceUpper();
+            }
+            if (upperItr == null || lowerItr == null || (!upperItr.hasNext() && !lowerItr.hasNext())) {
                 return false;
             } else {
-                while (next == null && i.hasNext()) {
-                    Map.Entry<String, InvocationInfo> entry = i.next();
-                    InvocationInfo info = entry.getValue();
-                    if (info.invocationCount - info.lastInvocationCount == 0) {
+                while (lowerNext == null && (upperItr.hasNext() || lowerItr.hasNext())) {
+                    InvocationInfo info = null;
+                    // first, look up at lower level map
+                    advanceLower();
+                    // not found, advance upper level map itr, and look up in next lower level map
+                    if(lowerNext == null) {
+                        advanceUpper();
+                        advanceLower();
+                    }
+                    info = lowerNext.getValue();
+                    if(info.invocationCount - info.lastInvocationCount == 0) {
+                        lowerNext = null;
                         continue;
-                    } else {
-                        next = entry;
                     }
                 }
-                if (next == null) {
+                if(lowerNext == null) {
                     return false;
                 }
             }
@@ -224,16 +256,16 @@ public class InitiatorStats extends SiteStatsSource {
         }
     }
 
-    private class AggregatingIterator implements Iterator<Map.Entry<String, InvocationInfo>> {
+    private class AggregatingIterator implements Iterator<Map.Entry<Long, Map<String, InvocationInfo>>> {
 
-        private final Queue<Iterator<Map.Entry<String, InvocationInfo>>> m_sources;
-        private AggregatingIterator(Queue<Iterator<Map.Entry<String, InvocationInfo>>> sources) {
+        private final Queue<Iterator<Map.Entry<Long, Map<String, InvocationInfo>>>> m_sources;
+        private AggregatingIterator(Queue<Iterator<Map.Entry<Long, Map<String, InvocationInfo>>>> sources) {
             m_sources = sources;
         }
 
         @Override
         public boolean hasNext() {
-            Iterator<Map.Entry<String, InvocationInfo>> i = null;
+            Iterator<Map.Entry<Long, Map<String, InvocationInfo>>> i = null;
             while ((i = m_sources.peek()) != null) {
                 if (i.hasNext()) return true;
                 m_sources.remove();
@@ -242,8 +274,8 @@ public class InitiatorStats extends SiteStatsSource {
         }
 
         @Override
-        public Map.Entry<String, InvocationInfo> next() {
-            final Iterator<Map.Entry<String, InvocationInfo>> i = m_sources.peek();
+        public Map.Entry<Long, Map<String, InvocationInfo>> next() {
+            final Iterator<Map.Entry<Long, Map<String, InvocationInfo>>> i = m_sources.peek();
             if (i == null || !i.hasNext()) {
                 throw new NoSuchElementException();
             }
@@ -254,13 +286,12 @@ public class InitiatorStats extends SiteStatsSource {
         public void remove() {
             throw new UnsupportedOperationException();
         }
-
     }
 
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
-        ArrayDeque<Iterator<Map.Entry<String, InvocationInfo>>> d =
-                new ArrayDeque<Iterator<Map.Entry<String, InvocationInfo>>>();
+        ArrayDeque<Iterator<Map.Entry<Long, Map<String, InvocationInfo>>>> d =
+                new ArrayDeque<Iterator<Map.Entry<Long, Map<String, InvocationInfo>>>>();
         for (ClientInterface ci : VoltDB.instance().getClientInterfaces()) {
             d.addAll(ci.getIV2InitiatorStats());
         }
