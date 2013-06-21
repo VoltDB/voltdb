@@ -16,11 +16,11 @@
  */
 package org.voltdb;
 
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.dtxn.InitiatorStats;
@@ -287,7 +287,7 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
             byte status) {
         Map<String, InvocationInfo> procInfoMap = m_connectionStates.get(connectionId);
         if(procInfoMap == null) {
-            procInfoMap = new HashMap<String, InvocationInfo>();
+            procInfoMap = new ConcurrentSkipListMap<String, InvocationInfo>();
             m_connectionStates.put(connectionId, procInfoMap);
         }
         InvocationInfo info = procInfoMap.get(procedureName);
