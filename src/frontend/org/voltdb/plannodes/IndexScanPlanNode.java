@@ -50,6 +50,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         SEARCHKEY_EXPRESSIONS,
         KEY_ITERATE,
         LOOKUP_TYPE,
+        DETERMINISM_ONLY,
         SORT_DIRECTION;
     }
 
@@ -379,6 +380,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         stringer.key(Members.KEY_ITERATE.name()).value(m_keyIterate);
         stringer.key(Members.LOOKUP_TYPE.name()).value(m_lookupType.toString());
         stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirection.toString());
+        stringer.key(Members.DETERMINISM_ONLY.name()).value(m_forDeterminismOnly);
         stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_targetIndexName);
         stringer.key(Members.END_EXPRESSION.name());
         stringer.value(m_endExpression);
@@ -398,6 +400,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         m_keyIterate = jobj.getBoolean( Members.KEY_ITERATE.name() );
         m_lookupType = IndexLookupType.get( jobj.getString( Members.LOOKUP_TYPE.name() ) );
         m_sortDirection = SortDirectionType.get( jobj.getString( Members.SORT_DIRECTION.name() ) );
+        m_forDeterminismOnly = jobj.getBoolean(Members.DETERMINISM_ONLY.name());
         m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
         m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
         JSONObject tempjobj = null;
@@ -432,11 +435,15 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         String usageInfo;
         String predicatePrefix;
         if (keySize == 0) {
+            // The plan is easy to explain if it isn't using indexed expressions.
+            // Just explain why an index scan was chosen
+            // -- either for determinism or for an explicit ORDER BY requirement --
             if (m_forDeterminismOnly) {
                 usageInfo = " (for deterministic order only)";
             } else {
                 usageInfo = " (for sort order only)";
             }
+            // and, on its own indented line, explain any unrelated post-filter applied to the result.
             predicatePrefix = "\n" + indent + " filter by ";
         }
         else {
@@ -460,7 +467,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 try {
                     List<AbstractExpression> indexExpressions =
                         AbstractExpression.fromJSONArrayString(jsonExpr, null);
-                    // From here, only the indexed expressions actually in use need consideration.
                     int ii = 0;
                     for (AbstractExpression ae : indexExpressions) {
                         asIndexed[ii++] = ae.explain(m_targetTableName);
@@ -471,8 +477,13 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 }
             }
 
+            // Explain the search criteria that describe the start of the index scan, like
+            // "(event_type = 1 AND event_start > x.start_time)"
             String start = explainSearchKeys(asIndexed, keySize);
             if (m_lookupType == IndexLookupType.EQ) {
+                // qualify whether the equality matching is for a unique value.
+                // " uniquely match (event_id = 1)" vs.
+                // " scan matches for (event_type = 1) AND (event_location = x.region)"
                 if (m_catalogIndex.getUnique()) {
                     usageInfo = "\n" + indent + " uniquely match " + start;
                 }
@@ -481,31 +492,42 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 }
             }
             else {
+                // qualify whether the inequality matching covers all or only some index key components
+                // " " range-scan covering from (event_type = 1) AND (event_start > x.start_time)" vs
+                // " " range-scan on 1 of 2 cols from event_type = 1"
                 if (indexSize == keySize) {
                     usageInfo = "\n" + indent + " range-scan covering from " + start;
                 }
                 else {
                     usageInfo = "\n" + indent + String.format(" range-scan on %d of %d cols from %s", keySize, indexSize, start);
                 }
-
+                // Explain the criteria for continuinuing the scan such as
+                // "while (event_type = 1 AND event_start < x.start_time+30)"
+                // or label it as a scan "to the end"
                 usageInfo += explainEndKeys(asIndexed);
             }
+            // Note any additional filters not related to the index that could cause rows to be skipped.
             predicatePrefix = ", filter by ";
         }
+        // Describe the table name and either a user-provided name of the index or its user-specified role ("primary key")
         String predicate = explainPredicate(predicatePrefix);
         String retval = "INDEX SCAN of \"" + m_targetTableName + "\"";
         String indexDescription = " using \"" + m_targetIndexName + "\"";
-        // Demangle system-generated index names --
+        // Replace ugly system-generated index name with a description of its user-specified role.
         if (m_targetIndexName.startsWith("SYS_IDX_PK_") ||
             m_targetIndexName.startsWith("SYS_IDX_SYS_PK_") ||
             m_targetIndexName.startsWith("MATVIEW_PK_INDEX") ) {
             indexDescription = " using its primary key index";
         }
+        // Bring all the pieces together describing the index, how it is scanned,
+        // and whatever extra filter processing is done to the result.
         retval += indexDescription;
         retval += usageInfo + predicate;
         return retval;
     }
 
+    /// Explain that this index scan begins at the "start" of the index
+    /// or at a particular key, possibly compound
     private String explainSearchKeys(String[] asIndexed, int nCovered)
     {
         // By default, indexing starts at the start of the index.
@@ -527,6 +549,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         return result;
     }
 
+    /// Explain that this index scans "to end" of the index
+    /// or only while an end expression involving indexed key values remains true.
     private String explainEndKeys(String[] asIndexed)
     {
         // By default, indexing starts at the start of the index.
