@@ -182,7 +182,7 @@ public class InitiatorStats extends SiteStatsSource {
         private boolean advanceUpper() {
             if(outerItr.hasNext()) {
                 outerNext = outerItr.next();
-                // reset lowerItr
+                // reset innerItr
                 innerItr = outerNext.getValue().entrySet().iterator();
                 return true;
             }
@@ -220,7 +220,8 @@ public class InitiatorStats extends SiteStatsSource {
             if (innerItr == null) {
                 advanceUpper();
             }
-            if (outerItr == null || innerItr == null || (!outerItr.hasNext() && !innerItr.hasNext())) {
+            // innerItr can be null if connection created but not doing any procedures
+            if (innerItr == null || !outerItr.hasNext() && !innerItr.hasNext()) {
                 return false;
             } else {
                 while (innerNext == null && (outerItr.hasNext() || innerItr.hasNext())) {

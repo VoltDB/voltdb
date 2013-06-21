@@ -288,7 +288,6 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
         Map<String, InvocationInfo> procInfoMap = m_connectionStates.get(connectionId);
         if(procInfoMap == null) {
             procInfoMap = new ConcurrentSkipListMap<String, InvocationInfo>();
-            m_connectionStates.put(connectionId, procInfoMap);
         }
         InvocationInfo info = procInfoMap.get(procedureName);
         if(info == null){
@@ -296,6 +295,7 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
             procInfoMap.put(procedureName, info);
         }
         info.processInvocation(delta, status);
+        m_connectionStates.put(connectionId, procInfoMap);
         m_latencyInfo.addSample(delta);
     }
 
