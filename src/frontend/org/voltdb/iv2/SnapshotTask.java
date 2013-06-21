@@ -25,17 +25,10 @@ import org.voltdb.SiteProcedureConnection;
 
 public class SnapshotTask extends SiteTasker
 {
-    private final boolean m_isCleanupTask;
-
-    public SnapshotTask(boolean isCleanupTask)
-    {
-        m_isCleanupTask = isCleanupTask;
-    }
-
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
-        siteConnection.doSnapshotWork(m_isCleanupTask);
+        siteConnection.doSnapshotWork();
     }
 
     @Override

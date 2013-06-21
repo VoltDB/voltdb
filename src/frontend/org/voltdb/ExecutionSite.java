@@ -853,8 +853,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                         //Will return null if there is no work, safe to block on the mailbox if there is no work
                         boolean hadWork =
                             (m_snapshotter.doSnapshotWork(m_systemProcedureContext,
-                                    ee,
-                                    EstTime.currentTimeMillis() - lastCommittedTxnTime > 5) != null);
+                                    ee) != null);
 
                         /*
                          * Do rejoin work here before it blocks on the mailbox
@@ -879,7 +878,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                         handleMailboxMessage(message);
                     } else {
                         //idle, do snapshot work
-                        m_snapshotter.doSnapshotWork(m_systemProcedureContext, ee, EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
+                        m_snapshotter.doSnapshotWork(m_systemProcedureContext, ee);
                         // do some rejoin work
                         doRejoinWork();
                     }
@@ -1289,7 +1288,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                                 exportm.m_m.getPartitionId(),
                                 exportm.m_m.getSignature());
         } else if (message instanceof PotentialSnapshotWorkMessage) {
-            m_snapshotter.doSnapshotWork(m_systemProcedureContext, ee, false);
+            m_snapshotter.doSnapshotWork(m_systemProcedureContext, ee);
         }
         else if (message instanceof ExecutionSiteLocalSnapshotMessage) {
             hostLog.info("Executing local snapshot. Completing any on-going snapshots.");
@@ -2049,7 +2048,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
      }
 
     @Override
-    public Future<?> doSnapshotWork(boolean ignoreQuietPeriod)
+    public Future<?> doSnapshotWork()
     {
         throw new RuntimeException("Unsupported IV2-only API.");
     }
