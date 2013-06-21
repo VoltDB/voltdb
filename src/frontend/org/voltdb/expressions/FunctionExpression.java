@@ -134,7 +134,7 @@ public class FunctionExpression extends AbstractExpression {
     }
 
     @Override
-    public Object clone() throws CloneNotSupportedException {
+    public Object clone() {
         FunctionExpression clone = (FunctionExpression)super.clone();
         clone.m_name = m_name;
         clone.m_alias = m_alias;

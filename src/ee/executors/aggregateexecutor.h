@@ -55,7 +55,8 @@
 #include "expressions/abstractexpression.h"
 
 namespace voltdb {
-class AggregateRow;
+struct AggregateRow;
+
 /**
  * The base class for aggregate executors regardless of the type of grouping that should be performed.
  */
@@ -77,7 +78,7 @@ protected:
 
     void executeAggBase(const NValueArray& params);
 
-    void initGroupByKeyTuple(PoolBackedTempTuple &groupByKeyTuple, const TableTuple& nxtTuple);
+    void initGroupByKeyTuple(PoolBackedTupleStorage &groupByKeyTuple, const TableTuple& nxtTuple);
 
     /// Helper method responsible for inserting the results of the
     /// aggregation into a new tuple in the output table as well as passing

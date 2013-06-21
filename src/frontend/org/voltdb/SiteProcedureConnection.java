@@ -93,13 +93,6 @@ public interface SiteProcedureConnection {
             boolean readOnly) throws EEException;
 
     /**
-     * Get the number of partitions so ProcedureRunner can divide
-     * replicated table DML results to get the *real* number of
-     * rows modified
-     */
-    public abstract long getReplicatedDMLDivisor();
-
-    /**
      * For test cases that need to mimic a plan fragment being invoked
      */
     public void simulateExecutePlanFragments(long txnId, boolean readOnly);
@@ -155,7 +148,7 @@ public interface SiteProcedureConnection {
                              Integer partitionId,
                              String tableSignature);
 
-    public VoltTable[] getStats(SysProcSelector selector, int[] locators,
+    public VoltTable[] getStats(StatsSelector selector, int[] locators,
                                 boolean interval, Long now);
 
     // Snapshot services provided by the site

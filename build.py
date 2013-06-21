@@ -40,22 +40,25 @@ CTX = BuildContext(sys.argv)
 # these are the base compile options that get added to every compile step
 # this does not include header/lib search paths or specific flags for
 #  specific targets
-CTX.CPPFLAGS = """-Wall -Wextra -Werror -Woverloaded-virtual
+CTX.CPPFLAGS += """-Wall -Wextra -Werror -Woverloaded-virtual
             -Wpointer-arith -Wcast-qual -Wwrite-strings
             -Winit-self -Wno-sign-compare -Wno-unused-parameter
-            -pthread
             -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK
             -fno-omit-frame-pointer
             -fvisibility=default -DBOOST_SP_DISABLE_THREADS"""
 
-if gcc_major == 4 and gcc_minor >= 3:
+# clang doesn't seem to want this
+if compiler_name == 'gcc':
+    CTX.CPPFLAGS += " -pthread"
+
+if (compiler_name != 'gcc') or (compiler_major == 4 and compiler_minor >= 3):
     CTX.CPPFLAGS += " -Wno-ignored-qualifiers -fno-strict-aliasing"
 
 if CTX.PROFILE:
     CTX.CPPFLAGS += " -fvisibility=default -DPROFILE_ENABLED"
 
 # linker flags
-CTX.LDFLAGS = """ -g3 -rdynamic"""
+CTX.LDFLAGS += """ -g3 -rdynamic"""
 CTX.LASTLDFLAGS = """ -ldl"""
 
 if CTX.COVERAGE:
@@ -212,6 +215,9 @@ CTX.INPUT['common'] = """
  DefaultTupleSerializer.cpp
  executorcontext.cpp
  serializeio.cpp
+ StreamPredicateList.cpp
+ TupleOutputStream.cpp
+ TupleOutputStreamProcessor.cpp
 """
 
 CTX.INPUT['execution'] = """
@@ -232,6 +238,7 @@ CTX.INPUT['executors'] = """
  insertexecutor.cpp
  limitexecutor.cpp
  materializeexecutor.cpp
+ materializedscanexecutor.cpp
  nestloopexecutor.cpp
  nestloopindexexecutor.cpp
  orderbyexecutor.cpp
@@ -246,6 +253,7 @@ CTX.INPUT['executors'] = """
 CTX.INPUT['expressions'] = """
  abstractexpression.cpp
  expressionutil.cpp
+ vectorexpression.cpp
  functionexpression.cpp
  tupleaddressexpression.cpp
 """
@@ -264,6 +272,7 @@ CTX.INPUT['plannodes'] = """
  insertnode.cpp
  limitnode.cpp
  materializenode.cpp
+ materializedscanplannode.cpp
  nestloopindexnode.cpp
  nestloopnode.cpp
  orderbynode.cpp
@@ -298,6 +307,7 @@ CTX.INPUT['storage'] = """
  TableCatalogDelegate.cpp
  tablefactory.cpp
  TableStats.cpp
+ TableStreamer.cpp
  tableutil.cpp
  temptable.cpp
  TempTableLimits.cpp
@@ -330,7 +340,7 @@ CTX.THIRD_PARTY_INPUT['jsoncpp'] = """
 
 CTX.THIRD_PARTY_INPUT['crc'] = """
  crc32c.cc
- crc32ctables.cc 
+ crc32ctables.cc
 """
 
 CTX.THIRD_PARTY_INPUT['murmur3'] = """
@@ -429,7 +439,12 @@ if whichtests in ("${eetestsuite}", "plannodes"):
 
 # this function (in buildtools.py) generates the makefile
 # it's currently a bit ugly but it'll get cleaned up soon
-buildMakefile(CTX)
+if not os.environ.get('EESKIPBUILDMAKEFILE'):
+    print "build.py: Making the makefile"
+    buildMakefile(CTX)
+
+if os.environ.get('EEONLYBUILDMAKEFILE'):
+    sys.exit()
 
 ###############################################################################
 # RUN THE MAKEFILE

@@ -73,6 +73,9 @@ public interface VoltDBInterface
     public HostMessenger getHostMessenger();
     public ArrayList<ClientInterface> getClientInterfaces();
     public Map<Long, ExecutionSite> getLocalSites();
+    public OpsAgent getOpsAgent(OpsSelector selector);
+    // Keep this method to centralize the cast to StatsAgent for
+    // existing code
     public StatsAgent getStatsAgent();
     public MemoryStats getMemoryStatsSource();
     public FaultDistributorInterface getFaultDistributor();

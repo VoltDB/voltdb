@@ -153,6 +153,10 @@ public class SchemaChangeClient {
                     try { Thread.sleep(30 * 1000); } catch (Exception e) {}
                     break;
                 case ClientResponse.GRACEFUL_FAILURE:
+                    //log.error(_F("GRACEFUL_FAILURE response in procedure call for: %s", procName));
+                    //log.error(((ClientResponseImpl)cr).toJSONString());
+                    //logStackTrace(new Throwable());
+                    return cr; // caller should always check return status
                 case ClientResponse.UNEXPECTED_FAILURE:
                 case ClientResponse.USER_ABORT:
                     log.error(_F("Error in procedure call for: %s", procName));
@@ -263,6 +267,7 @@ public class SchemaChangeClient {
             case ClientResponse.SUCCESS:
                 // hooray!
                 success = true;
+                log.info("Catalog update was reported to be successful");
                 break;
             case ClientResponse.CONNECTION_LOST:
             case ClientResponse.CONNECTION_TIMEOUT:
@@ -280,39 +285,39 @@ public class SchemaChangeClient {
         }
 
         // don't actually trust the call... manually verify
-        int versionObserved = verifyAndGetSchemaVersion();
+        int obsCatVersion = verifyAndGetSchemaVersion();
 
-        // did not update
-        if (versionObserved == schemaVersionNo) {
-            // make sure the system didn't say it worked
-            assert(success == false);
+        if (obsCatVersion == schemaVersionNo) {
             if (success == true) {
-                log.info(_F("Catalog update was reported to be successful but is not observable."));
-                System.exit(-1);     // fail test
+                log.error(_F("Catalog update was reported to be successful but did not pass verification: expected V%d, observed V%d", schemaVersionNo+1, obsCatVersion));
+                assert(false);
+                System.exit(-1);
             }
 
-            // signal to the caller this didn't work
+            // UAC didn't work
             return null;
         }
-        // success!
+
+        // UAC worked
+        if (obsCatVersion == schemaVersionNo+1) schemaVersionNo++;
         else {
-            assert(versionObserved == (schemaVersionNo + 1));
-            schemaVersionNo++;
-
-            long end = System.nanoTime();
-            double seconds = (end - start) / 1000000000.0;
-
-            if (newTable) {
-                log.info(_F("Completed catalog update that swapped tables in %.4f seconds",
-                        seconds));
-            }
-            else {
-                log.info(_F("Completed catalog update of %d tuples in %.4f seconds (%d tuples/sec)",
-                        count, seconds, (long) (count / seconds)));
-            }
-
-            return new Pair<VoltTable,TableHelper.ViewRep>(t2, view, false);
+            assert(false);
+            System.exit(-1);
         }
+
+        long end = System.nanoTime();
+        double seconds = (end - start) / 1000000000.0;
+
+        if (newTable) {
+            log.info(_F("Completed catalog update that swapped tables in %.4f seconds",
+                    seconds));
+        }
+        else {
+            log.info(_F("Completed catalog update of %d tuples in %.4f seconds (%d tuples/sec)",
+                    count, seconds, (long) (count / seconds)));
+        }
+
+        return new Pair<VoltTable,TableHelper.ViewRep>(t2, view, false);
     }
 
     private static class Topology {
@@ -335,7 +340,9 @@ public class SchemaChangeClient {
         int sitesPerHost = -1;
         int k = -1;
 
-        VoltTable result = callROProcedureWithRetry("@SystemInformation", "DEPLOYMENT").getResults()[0];
+        ClientResponse cr = callROProcedureWithRetry("@SystemInformation", "DEPLOYMENT");
+        assert(cr.getStatus() == ClientResponse.SUCCESS);
+        VoltTable result = cr.getResults()[0];
         result.resetRowPosition();
         while (result.advanceRow()) {
             String key = result.getString(0);
@@ -359,21 +366,24 @@ public class SchemaChangeClient {
      * is the right one.
      */
     private int verifyAndGetSchemaVersion() {
-        VoltTable result = callROProcedureWithRetry("@Statistics", "TABLE", 0).getResults()[0];
-        result.resetRowPosition();
-        int version = -1;
-        while (result.advanceRow()) {
-            String tableName = result.getString("TABLE_NAME");
-            if (tableName.startsWith("V")) {
-                int rowVersion = Integer.parseInt(tableName.substring(1));
-                if (version >= 0) {
-                    assert(rowVersion == version);
-                }
-                version = rowVersion;
+        // start with the last schema id we thought we had verified
+        int version = schemaVersionNo;
+        if (!isSchemaVersionObservable(version)) {
+            if (!isSchemaVersionObservable(++version)) {
+                // version should be one of these two values
+                log.error("Catalog version is out of range");
+                assert(false);
+                System.exit(-1);
             }
         }
-        assert(version >= 0);
+        //log.info(_F("detected catalog version is: %d", version));
         return version;
+    }
+
+    private boolean isSchemaVersionObservable(int schemaid) {
+        ClientResponse cr = callROProcedureWithRetry("@AdHoc",
+                String.format("select count(*) from V%d;", schemaid));
+        return (cr.getStatus() == ClientResponse.SUCCESS);
     }
 
     /**
@@ -383,8 +393,10 @@ public class SchemaChangeClient {
         if (t == null) {
             return 0;
         }
-        VoltTable result = callROProcedureWithRetry("@AdHoc",
-                String.format("select count(*) from %s;", TableHelper.getTableName(t))).getResults()[0];
+        ClientResponse cr = callROProcedureWithRetry("@AdHoc",
+                String.format("select count(*) from %s;", TableHelper.getTableName(t)));
+        assert(cr.getStatus() == ClientResponse.SUCCESS);
+        VoltTable result = cr.getResults()[0];
         return result.asScalarLong();
     }
 
@@ -395,8 +407,10 @@ public class SchemaChangeClient {
         if (t == null) {
             return 0;
         }
-        VoltTable result = callROProcedureWithRetry("@AdHoc",
-                String.format("select pkey from %s order by pkey desc limit 1;", TableHelper.getTableName(t))).getResults()[0];
+        ClientResponse cr = callROProcedureWithRetry("@AdHoc",
+                String.format("select pkey from %s order by pkey desc limit 1;", TableHelper.getTableName(t)));
+        assert(cr.getStatus() == ClientResponse.SUCCESS);
+        VoltTable result = cr.getResults()[0];
         return result.getRowCount() > 0 ? result.asScalarLong() : 0;
     }
 
@@ -639,8 +653,10 @@ public class SchemaChangeClient {
 
                     // deterministically sample the same rows
                     assert(sampleOffset >= 0);
-                    VoltTable result = callROProcedureWithRetry(
-                            "VerifySchemaChanged" + tableName, sampleOffset, guessT).getResults()[0];
+                    ClientResponse cr = callROProcedureWithRetry(
+                            "VerifySchemaChanged" + tableName, sampleOffset, guessT);
+                    assert(cr.getStatus() == ClientResponse.SUCCESS);
+                    VoltTable result = cr.getResults()[0];
                     boolean success = result.fetchRow(0).getLong(0) == 1;
                     String err = result.fetchRow(0).getString(1);
                     if (!success) {

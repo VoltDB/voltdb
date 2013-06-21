@@ -121,8 +121,8 @@ public class TestMPBasecaseSuite extends RegressionSuite {
             assertFalse("Failed to produce violation", true);
         }
         catch (ProcCallException e) {
-            assertEquals("Client response is error.",
-                    ClientResponse.UNEXPECTED_FAILURE, e.getClientResponse().getStatus());
+            assertEquals("Client response is not graceful failure.",
+                    ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
         }
         // verify initial result is unchanged (transactions!)
         ClientResponse resp = client.callProcedure("SumKey");

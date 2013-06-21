@@ -171,6 +171,10 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
         if (obj.getClass() != getClass())
             return false;
 
+        // Do the identity check
+        if (obj == this)
+            return true;
+
         @SuppressWarnings("unchecked")
         CatalogMap<T> other = (CatalogMap<T>) obj;
 

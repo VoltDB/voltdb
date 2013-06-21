@@ -84,8 +84,8 @@ ReceivePlanNode::debugInfo(const string& spacer) const
         SchemaColumn* col = getOutputSchema()[ctr];
         buffer << spacer << "  [" << ctr << "] ";
         buffer << "name=" << col->getColumnName() << " : ";
-        buffer << "size=" << col->getSize() << " : ";
-        buffer << "type=" << col->getType() << "\n";
+        buffer << "size=" << col->getExpression()->getValueSize() << " : ";
+        buffer << "type=" << col->getExpression()->getValueType() << "\n";
     }
     return (buffer.str());
 }

@@ -33,6 +33,7 @@ import org.voltdb.MemoryStats;
 import org.voltdb.NodeDRGateway;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.Promotable;
+import org.voltdb.StartAction;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
@@ -71,7 +72,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
 
     public SpInitiator(HostMessenger messenger, Integer partition, StatsAgent agent,
             SnapshotCompletionMonitor snapMonitor,
-            VoltDB.START_ACTION startAction)
+            StartAction startAction)
     {
         super(VoltZK.iv2masters, messenger, partition,
                 new SpScheduler(partition, new SiteTaskerQueue(), snapMonitor),
@@ -85,7 +86,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                           CatalogContext catalogContext,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          VoltDB.START_ACTION startAction,
+                          StartAction startAction,
                           StatsAgent agent,
                           MemoryStats memStats,
                           CommandLog cl,

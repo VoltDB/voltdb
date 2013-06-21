@@ -66,18 +66,12 @@ public class PhoneCallGenerator {
     }
 
     private final int contestantCount;
-    private final int maxVoterSuffix;
     private final Random rand = new Random();
     private final int[] votingMap = new int[AREA_CODES.length];
 
-    public PhoneCallGenerator(final int contestantCount, final long maxVoterCount)
+    public PhoneCallGenerator(final int contestantCount)
     {
         this.contestantCount = contestantCount;
-        if (maxVoterCount <= AREA_CODES.length) {
-            this.maxVoterSuffix = 1;
-        } else {
-            this.maxVoterSuffix = (int) (maxVoterCount / AREA_CODES.length);
-        }
 
         // This is a just a small fudge to make the geographical voting map more interesting for the benchmark!
         for(int i = 0; i < votingMap.length; i++) {
@@ -113,7 +107,7 @@ public class PhoneCallGenerator {
         }
 
         // Build the phone number
-        long phoneNumber = AREA_CODES[areaCodeIndex] * 10000000L + rand.nextInt(maxVoterSuffix);
+        long phoneNumber = AREA_CODES[areaCodeIndex] * 10000000L + rand.nextInt(10000000);
 
         // Return the generated phone number
         return new PhoneCall(contestantNumber, phoneNumber);

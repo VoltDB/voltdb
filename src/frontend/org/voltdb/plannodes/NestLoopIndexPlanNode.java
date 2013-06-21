@@ -21,7 +21,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeMap;
 
+import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
+import org.voltdb.compiler.DatabaseEstimates;
+import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
@@ -60,6 +63,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         m_outputSchema =
             m_children.get(0).getOutputSchema().
             join(inlineScan.getOutputSchema()).copyAndReplaceWithTVE();
+        m_hasSignificantOutputSchema = true;
     }
 
     @Override
@@ -165,6 +169,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
             new_output_schema.addColumn(col);
         }
         m_outputSchema = new_output_schema;
+        m_hasSignificantOutputSchema = true;
     }
 
     @Override
@@ -199,9 +204,24 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         return true;
     }
 
+    @Override
+    public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+
+        // Add the cost of the inlined index scan to the cost of processing the input tuples.
+        // This isn't really a fair representation of what's going on, as the index is scanned once
+        // per input tuple, but I think it will still cause the plan selector to pick the join
+        // order with the lowest total access cost.
+
+        IndexScanPlanNode indexScan =
+                (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assert(indexScan != null);
+
+        m_estimatedOutputTupleCount = indexScan.getEstimatedOutputTupleCount() + childOutputTupleCountEstimate;
+        m_estimatedProcessedTupleCount = indexScan.getEstimatedProcessedTupleCount() + childOutputTupleCountEstimate;
+    }
 
     @Override
     protected String explainPlanForNode(String indent) {
-        return "NESTLOOP INDEX JOIN";
+        return "NESTLOOP INDEX " + this.m_joinType.toString() + " JOIN";
     }
 }

@@ -57,6 +57,11 @@ public class LeaderElector {
         public void run() {
             try {
                 leader = watchNextLowerNode();
+            } catch (KeeperException.SessionExpiredException e) {
+                // lost the full connection. some test cases do this...
+                // means zk shutdown without the elector being shutdown.
+                // ignore.
+                e.printStackTrace();
             } catch (KeeperException.ConnectionLossException e) {
                 // lost the full connection. some test cases do this...
                 // means shutdoown without the elector being
@@ -84,6 +89,11 @@ public class LeaderElector {
         public void run() {
             try {
                 checkForChildChanges();
+            } catch (KeeperException.SessionExpiredException e) {
+                // lost the full connection. some test cases do this...
+                // means zk shutdown without the elector being shutdown.
+                // ignore.
+                e.printStackTrace();
             } catch (KeeperException.ConnectionLossException e) {
                 // lost the full connection. some test cases do this...
                 // means shutdoown without the elector being
@@ -167,12 +177,15 @@ public class LeaderElector {
     {
         node = createParticipantNode(zk, dir, prefix, data);
         Future<?> task = es.submit(electionEventHandler);
-        //Only do the extra work for watching children if a callback is registered
-        if (cb != null) {
-            es.submit(childrenEventHandler);
-        }
         if (block) {
             task.get();
+        }
+        //Only do the extra work for watching children if a callback is registered
+        if (cb != null) {
+            task = es.submit(childrenEventHandler);
+            if (block) {
+                task.get();
+            }
         }
     }
 

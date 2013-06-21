@@ -170,14 +170,31 @@ bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node,
     // Create output table based on output schema from the plan
     setTempOutputTable(limits);
 
+    // NULL tuple for outer join
+    if (node->getJoinType() == JOIN_TYPE_LEFT) {
+        Table* inner_table = node->getInputTables()[1];
+        assert(inner_table);
+        m_null_tuple.init(inner_table->schema());
+    }
+
     // for each tuple value expression in the predicate, determine
     // which tuple is being represented. Tuple could come from outer
     // table or inner table. Configure the predicate to use the correct
     // eval() tuple parameter. By convention, eval's first parameter
     // will always be the outer table and its second parameter the inner
-    bool retval = assignTupleValueIndexes(node->getPredicate(),
+    bool retval = assignTupleValueIndexes(node->getPreJoinPredicate(),
                                           node->getInputTables()[0]->name(),
                                           node->getInputTables()[1]->name());
+    if (retval) {
+        retval = assignTupleValueIndexes(node->getJoinPredicate(),
+                                          node->getInputTables()[0]->name(),
+                                          node->getInputTables()[1]->name());
+    }
+    if (retval) {
+        retval = assignTupleValueIndexes(node->getWherePredicate(),
+                                          node->getInputTables()[0]->name(),
+                                          node->getInputTables()[1]->name());
+    }
     return retval;
 }
 
@@ -206,38 +223,81 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     VOLT_TRACE ("input table right:\n %s", inner_table->debug().c_str());
 
     //
+    // Pre Join Expression
+    //
+    AbstractExpression *preJoinPredicate = node->getPreJoinPredicate();
+    if (preJoinPredicate) {
+        preJoinPredicate->substitute(params);
+        VOLT_TRACE ("Pre Join predicate: %s", preJoinPredicate == NULL ?
+                    "NULL" : preJoinPredicate->debug(true).c_str());
+    }
+    //
     // Join Expression
     //
-    AbstractExpression *predicate = node->getPredicate();
-    if (predicate) {
-        predicate->substitute(params);
-        VOLT_TRACE ("predicate: %s", predicate == NULL ?
-                    "NULL" : predicate->debug(true).c_str());
+    AbstractExpression *joinPredicate = node->getJoinPredicate();
+    if (joinPredicate) {
+        joinPredicate->substitute(params);
+        VOLT_TRACE ("Join predicate: %s", joinPredicate == NULL ?
+                    "NULL" : joinPredicate->debug(true).c_str());
     }
+    //
+    // Where Expression
+    //
+    AbstractExpression *wherePredicate = node->getWherePredicate();
+    if (wherePredicate) {
+        wherePredicate->substitute(params);
+        VOLT_TRACE ("Where predicate: %s", wherePredicate == NULL ?
+                    "NULL" : wherePredicate->debug(true).c_str());
+    }
+
+    // Join type
+    JoinType join_type = node->getJoinType();
+    assert(join_type == JOIN_TYPE_INNER || join_type == JOIN_TYPE_LEFT);
 
     int outer_cols = outer_table->columnCount();
     int inner_cols = inner_table->columnCount();
     TableTuple outer_tuple(node->getInputTables()[0]->schema());
     TableTuple inner_tuple(node->getInputTables()[1]->schema());
     TableTuple &joined = output_table->tempTuple();
+    TableTuple null_tuple = m_null_tuple;
 
     TableIterator iterator0 = outer_table->iterator();
     while (iterator0.next(outer_tuple)) {
 
-        // populate output table's temp tuple with outer table's values
-        // probably have to do this at least once - avoid doing it many
-        // times per outer tuple
-        for (int col_ctr = 0; col_ctr < outer_cols; col_ctr++) {
-            joined.setNValue(col_ctr, outer_tuple.getNValue(col_ctr));
-        }
+        // did this loop body find at least one match for this tuple?
+        bool match = false;
+        // For outer joins if outer tuple fails pre-join predicate
+        // (join expression based on the outer table only)
+        // it can't match any of inner tuples
+        if (preJoinPredicate == NULL || preJoinPredicate->eval(&outer_tuple, NULL).isTrue()) {
 
-        TableIterator iterator1 = inner_table->iterator();
-        while (iterator1.next(inner_tuple)) {
-            if (predicate == NULL || predicate->eval(&outer_tuple, &inner_tuple).isTrue()) {
-                // Matched! Complete the joined tuple with the inner column values.
-                for (int col_ctr = 0; col_ctr < inner_cols; col_ctr++) {
-                    joined.setNValue(col_ctr + outer_cols, inner_tuple.getNValue(col_ctr));
+            // populate output table's temp tuple with outer table's values
+            // probably have to do this at least once - avoid doing it many
+            // times per outer tuple
+            joined.setNValues(0, outer_tuple, 0, outer_cols);
+
+            TableIterator iterator1 = inner_table->iterator();
+            while (iterator1.next(inner_tuple)) {
+                // Apply join filter to produce matches for each outer that has them,
+                // then pad unmatched outers, then filter them all
+                if (joinPredicate == NULL || joinPredicate->eval(&outer_tuple, &inner_tuple).isTrue()) {
+                    match = true;
+                    // Filter the joined tuple
+                    if (wherePredicate == NULL || wherePredicate->eval(&outer_tuple, &inner_tuple).isTrue()) {
+                        // Matched! Complete the joined tuple with the inner column values.
+                        joined.setNValues(outer_cols, inner_tuple, 0, inner_cols);
+                        output_table->insertTupleNonVirtual(joined);
+                    }
                 }
+            }
+        }
+        //
+        // Left Outer Join
+        //
+        if (join_type == JOIN_TYPE_LEFT && !match) {
+            // Still needs to pass the filter
+            if (wherePredicate == NULL || wherePredicate->eval(&outer_tuple, &null_tuple).isTrue()) {
+                joined.setNValues(outer_cols, null_tuple, 0, inner_cols);
                 output_table->insertTupleNonVirtual(joined);
             }
         }

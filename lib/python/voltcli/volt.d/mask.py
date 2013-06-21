@@ -33,7 +33,7 @@ CatalogPasswordScrambler = 'org.voltdb.utils.CatalogPasswordScrambler'
 @VOLT.Command(
     # Descriptions for help screen.
     description  = 'Mask user passwords in VoltDB deployment file.',
-    description2 = 'At least one deployemnt file is required.',
+    description2 = 'At least one deployment file is required.',
 
     # Command line arguments.
     arguments = (

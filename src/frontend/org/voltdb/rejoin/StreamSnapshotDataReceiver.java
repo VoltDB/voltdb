@@ -93,6 +93,11 @@ implements Runnable {
 
                 try {
                     VoltMessage msg = m_mb.recvBlocking();
+                    if (msg == null) {
+                        // If interrupted, break
+                        break;
+                    }
+
                     assert(msg instanceof RejoinDataMessage);
                     RejoinDataMessage dataMsg = (RejoinDataMessage) msg;
                     byte[] data = dataMsg.getData();

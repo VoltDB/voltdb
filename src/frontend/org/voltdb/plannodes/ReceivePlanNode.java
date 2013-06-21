@@ -40,6 +40,18 @@ public class ReceivePlanNode extends AbstractPlanNode {
     }
 
     @Override
+    public void generateOutputSchema(Database db)
+    {
+        // default behavior: just copy the input schema
+        // to the output schema
+        super.generateOutputSchema(db);
+        // except, while technically the resulting output schema is just a pass-through,
+        // when the plan gets fragmented, this receive node will be at the bottom of the
+        // fragment and will need its own serialized copy of its (former) child's output schema.
+        m_hasSignificantOutputSchema = true;
+    }
+
+    @Override
     public void resolveColumnIndexes()
     {
         // Need to order and resolve indexes of output columns

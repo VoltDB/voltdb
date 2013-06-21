@@ -67,6 +67,7 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
      *
      * @param ctx
      *            Internal. Not a user-supplied parameter.
+     * @param partitionParam Partitioning parameter
      * @param tableName
      *            Name of persistent table receiving data.
      * @param table
@@ -76,6 +77,7 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
      * @throws VoltAbortException
      */
     public long run(SystemProcedureExecutionContext ctx,
+                    byte[] partitionParam,
             String tableName, VoltTable table)
             throws VoltAbortException {
 
@@ -182,65 +184,7 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
      * @return An object suitable for hashing to a partition with The Hashinator
      * @throws Exception thown on error with a descriptive message
      */
-    public static Object partitionValueFromInvocation(CatalogMap<Table> tables, StoredProcedureInvocation spi) throws Exception {
-        String tableName = null;
-        VoltTable table = null;
-        ByteBuffer buf = spi.getSerializedParams();
-
-        spi.getParams();
-
-        // if the params buffer has been decoded
-        if (buf == null) {
-            Object[] params = spi.getParams().toArray();
-            tableName = (String) params[0];
-            table = (VoltTable) params[1];
-        }
-        // if the params buffer is not decoded
-        else {
-            // THE GOAL OF THIS CODE IS TO READ AS LITTLE AS POSSIBLE OF
-            // WHAT MIGHT BE A BIG PARAMETER SET
-            // i.e. read the name of the table and first row of the data provided
-
-            FastDeserializer fds = new FastDeserializer(buf);
-
-            // read the number of parameters
-            int paramLen = fds.readShort();
-            if (paramLen != 2) {
-                throw new Exception("@LoadSinglepartitionTable requres exactly two parameters.");
-            }
-
-            // read the type of the first param, expecting string
-            byte strType = fds.readByte();
-            if (strType != VoltType.STRING.getValue()) {
-                throw new Exception("@LoadSinglepartitionTable expects a String and a VoltTable for parameters (in order).");
-            }
-
-            // read the name of the table targeted
-            tableName = fds.readString();
-
-            // read the type of the second param, expecting table
-            byte tableType = fds.readByte();
-            if (tableType != VoltType.VOLTTABLE.getValue()) {
-                throw new Exception("@LoadSinglepartitionTable expects a String and a VoltTable for parameters (in order).");
-            }
-
-            // read the size of the table and create a buffer for it
-            int tableSize = fds.readInt();
-            ByteBuffer tbuf = buf.slice();
-            tbuf.limit(tableSize);
-
-            // assume the buffer is pointing to the table
-            table = PrivateVoltTableFactory.createVoltTableFromBuffer(tbuf, true);
-        }
-
-        // get the table from the catalog
-        Table catTable = tables.getIgnoreCase(tableName);
-        if (catTable == null) {
-            throw new Exception(
-                    String.format("Unable to find target table \"%s\" for LoadSinglepartitionTable.",
-                            tableName));
-        }
-
+    public static Object partitionValueFromInvocation(Table catTable, VoltTable table) throws Exception {
         if (catTable.getIsreplicated()) {
             throw new Exception("Target table for LoadSinglepartitionTable is replicated.");
         }

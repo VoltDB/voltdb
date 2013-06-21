@@ -28,13 +28,10 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
-import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
-import org.voltdb.planner.PlanStatistics;
-import org.voltdb.planner.StatsField;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.PlanNodeType;
@@ -104,6 +101,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_bindings = isp.getBindings();
 
         m_outputSchema = apn.getOutputSchema().clone();
+        m_hasSignificantOutputSchema = true;
 
         m_endType = endType;
         m_endkeyExpressions.addAll(endKeys);
@@ -142,16 +140,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             // PlanNodes all need private deep copies of expressions
             // so that the resolveColumnIndexes results
             // don't get bashed by other nodes or subsequent planner runs
-            try
-            {
-                endKeys.add((AbstractExpression)ae.getRight().clone());
-            }
-            catch (CloneNotSupportedException e)
-            {
-                // This shouldn't ever happen
-                e.printStackTrace();
-                throw new RuntimeException(e.toString());
-            }
+            endKeys.add((AbstractExpression)ae.getRight().clone());
         }
 
         // Avoid the cases that would cause undercounts for prefix matches.
@@ -199,22 +188,11 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     public void resolveColumnIndexes(){}
 
     @Override
-    public void computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
-
-        // HOW WE COST INDEXES
-        // unique, covering index always wins
-        // otherwise, pick the index with the most columns covered otherwise
-        // count non-equality scans as -0.5 coverage
-        // prefer array to hash to tree, all else being equal
-
-        // FYI: Index scores should range between 1 and 48898 (I think)
-
-        Table target = db.getTables().getIgnoreCase(m_targetTableName);
-        assert(target != null);
-        DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(target.getTypeName());
-        stats.incrementStatistic(0, StatsField.TREE_INDEX_LEVELS_TRAVERSED, (long)(Math.log(tableEstimates.maxTuples)));
-
-        stats.incrementStatistic(0, StatsField.TUPLES_READ, 1);
+    public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+        // Cost counting index scans as constant, almost negligible work.
+        // This might be unfair, as the tree has O(logn) complexity, but we
+        // really want to pick this kind of search over others.
+        m_estimatedProcessedTupleCount = 1;
         m_estimatedOutputTupleCount = 1;
     }
 

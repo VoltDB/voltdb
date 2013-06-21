@@ -47,6 +47,7 @@ public class MockPlanNode extends AbstractPlanNode
     public void generateOutputSchema(Database db)
     {
         m_outputSchema = new NodeSchema();
+        m_hasSignificantOutputSchema = true;
         for (int i = 0; i < m_columnNames.length; ++i)
         {
             TupleValueExpression tve = new TupleValueExpression();

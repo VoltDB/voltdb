@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -47,6 +48,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListenableFutureTask;
 import jsr166y.LinkedTransferQueue;
 
 import org.voltcore.logging.VoltLogger;
@@ -185,6 +188,19 @@ public class CoreUtils {
                         1L, TimeUnit.MINUTES,
                         queue,
                         getThreadFactory(null, name, SMALL_STACK_SIZE, threads > 1 ? true : false, coreList)));
+    }
+
+    /**
+     * Create a bounded thread pool executor
+     * @param maxPoolSize: the maximum number of threads to allow in the pool.
+     * @param keepAliveTime: when the number of threads is greater than the core, this is the maximum
+     *                       time that excess idle threads will wait for new tasks before terminating.
+     * @param unit: the time unit for the keepAliveTime argument.
+     * @param threadFactory: the factory to use when the executor creates a new thread.
+     */
+    public static ThreadPoolExecutor getBoundedThreadPoolExecutor(int maxPoolSize, long keepAliveTime, TimeUnit unit, ThreadFactory tFactory) {
+        return new ThreadPoolExecutor(0, maxPoolSize, keepAliveTime, unit,
+                                      new LinkedBlockingQueue<Runnable>(), tFactory);
     }
 
     public static ThreadFactory getThreadFactory(String name) {

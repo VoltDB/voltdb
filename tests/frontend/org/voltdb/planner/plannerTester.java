@@ -29,9 +29,9 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -41,11 +41,7 @@ import java.util.Set;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
@@ -54,12 +50,10 @@ import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.types.PlanNodeType;
 
 public class plannerTester {
-    private static PlannerTestAideDeCamp m_aide;
+    private static PlannerTestCase s_singleton = new PlannerTestCase();
     private static String m_workPath = "/tmp/plannertester/";
     private static String m_baselinePath;
     private static String m_fixedBaselinePath = null;
-    private static String m_ddlFilePath;
-    private static Map<String,String> m_partitionColumns = new HashMap<String, String>();
     private static ArrayList<String> m_stmts = new ArrayList<String>();
     private static int m_treeSizeDiff;
     private static boolean m_changedSQL;
@@ -68,6 +62,7 @@ public class plannerTester {
     private static boolean m_isSave = false;
     private static boolean m_isDiff = false;
     private static boolean m_reportExplainedPlan = false;
+    private static boolean m_reportDiffExplainedPlan = false;
     private static boolean m_reportSQLStatement = false;
     private static ArrayList<String> m_config = new ArrayList<String>();
 
@@ -154,7 +149,7 @@ public class plannerTester {
             else if( str.equals("-dv") ) {
                 m_isCompile = true;
                 m_isDiff = true;
-                m_reportExplainedPlan = true;
+                m_reportDiffExplainedPlan = true;
                 m_reportSQLStatement = true;
             }
             else if( str.startsWith("-r=") ){
@@ -166,6 +161,7 @@ public class plannerTester {
             }
             else if( str.equals("-re") ){
                 m_reportExplainedPlan = true;
+                m_reportDiffExplainedPlan = true;
             }
             else if( str.equals("-rs") ){
                 m_reportSQLStatement = true;
@@ -260,9 +256,8 @@ public class plannerTester {
     }
 
     public static boolean setUp( String config ) throws IOException {
-        m_partitionColumns.clear();
         m_baselinePath = (m_fixedBaselinePath != null) ? m_fixedBaselinePath : (config + "/baseline/");
-        m_ddlFilePath = null;
+        String ddlFilePath = null;
         m_stmts.clear();
         BufferedReader reader = new BufferedReader( new FileReader(config + "/config") );
         String line = null;
@@ -274,7 +269,7 @@ public class plannerTester {
                 if ( ( line = reader.readLine() ) == null ) {
                     break;
                 }
-                m_ddlFilePath = new File( line ).getCanonicalPath();
+                ddlFilePath = new File( line ).getCanonicalPath();
             }
             else if( line.equalsIgnoreCase("SQL:")) {
                 boolean atEof = false;
@@ -289,23 +284,22 @@ public class plannerTester {
                     if (line.length() <= 6 ) {
                         break;
                     }
+                    if( line.startsWith("JOIN:") ) {
+                        // These lines have three parts JOIN:<joinOrder>:<query>
+                        if ( line.split(":").length != 3 ) {
+                            System.err.println("Config file syntax error : ignoring line: " + line);
+                        }
+                    }
                     m_stmts.add( line );
                 }
                 if (atEof) {
                     break;
                 }
             }
+            // This section of the config file is optional, deprecated, and ignored.
             else if( line.equalsIgnoreCase("Partition Columns:") ) {
                 if ( ( line = reader.readLine() ) == null ) {
                     break;
-                }
-                String [] cols = line.split(",");
-                for( String col : cols ) {
-                    int index = col.indexOf(".");
-                    if( index == -1 ) {
-                        System.err.println("Config file syntax error : Partition Columns should be in comma-separated table.column format.");
-                    }
-                    m_partitionColumns.put( col.substring(0, index).toLowerCase(), col.substring(index+1).toLowerCase());
                 }
             }
             else if ( ! line.trim().equals("")) {
@@ -313,7 +307,7 @@ public class plannerTester {
             }
         }
         boolean success = true;
-        if (m_ddlFilePath == null ) {
+        if (ddlFilePath == null ) {
             System.err.println("ERROR: syntax error : config file '" + config + "/config' has no 'DDL:' section");
             success = false;
         }
@@ -323,7 +317,9 @@ public class plannerTester {
         }
         try {
             if (success) {
-                setUpSchema(config);
+                File ddlFile = new File(ddlFilePath);
+                URL ddlURL = ddlFile.toURI().toURL();
+                s_singleton.setupSchema(ddlURL, config, false);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -332,36 +328,20 @@ public class plannerTester {
         return success;
     }
 
-    public static void setUpForTest( String pathDDL, String config, String table, String column ) {
-        m_partitionColumns.clear();
-        m_partitionColumns.put( table.toLowerCase(), column.toLowerCase());
-        m_ddlFilePath = pathDDL;
+    public static void setUpForTest(String pathDDL, String config)
+    {
         try {
-            setUpSchema(config);
+            File ddlFile = new File(pathDDL);
+            URL ddlURL = ddlFile.toURI().toURL();
+            s_singleton.setupSchema(ddlURL, config, false);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    public static void setUpSchema(String config) throws Exception {
-        File ddlFile = new File(m_ddlFilePath);
-        m_aide = new PlannerTestAideDeCamp(ddlFile.toURI().toURL(), config);
-        // Set specified tables to non-replicated.
-        Cluster cluster = m_aide.getCatalog().getClusters().get("cluster");
-        CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
-        for( String tableName : m_partitionColumns.keySet() ) {
-            Table t = tmap.getIgnoreCase( tableName );
-            t.setIsreplicated(false);
-            Column column = t.getColumns().getIgnoreCase( m_partitionColumns.get(tableName) );
-            t.setPartitioncolumn(column);
-        }
-    }
-
-    protected void tearDown() throws Exception {
-    }
-
-    public static List<AbstractPlanNode> compile(String sql) throws Exception {
-        return m_aide.compile(sql, 0);
+    public static List<AbstractPlanNode> testCompile(String sql) throws Exception
+    {
+        return s_singleton.compileToFragments(sql);
     }
 
     public static void writePlanToFile( AbstractPlanNode pn, String pathToDir, String fileName, String sql) {
@@ -404,7 +384,7 @@ public class plannerTester {
         try {
             jobj = new JSONObject( prettyJson );
             JSONArray jarray =  jobj.getJSONArray("PLAN_NODES");
-            Database db = m_aide.getDatabase();
+            Database db = s_singleton.getDatabase();
             pnt.loadFromJSONArray(jarray, db);
         } catch (JSONException e) {
             e.printStackTrace();
@@ -430,7 +410,14 @@ public class plannerTester {
         }
         int size = m_stmts.size();
         for( int i = 0; i < size; i++ ) {
-            List<AbstractPlanNode> pnList = compile(m_stmts.get(i));
+            String query = m_stmts.get(i);
+            String joinOrder = null;
+            if( query.startsWith("JOIN:") ) {
+                String[] splitLine = query.split(":");
+                joinOrder = splitLine[1];
+                query = splitLine[2];
+            }
+            List<AbstractPlanNode> pnList = s_singleton.compileWithJoinOrderToFragments(query, joinOrder);
             AbstractPlanNode pn = pnList.get(0);
             if( pnList.size() == 2 ){//multi partition query plan
                 assert( pnList.get(1) instanceof SendPlanNode );
@@ -495,6 +482,10 @@ public class plannerTester {
 
             if( diff( pn1, pn2, false ) ) {
                 m_numPass++;
+                if( m_reportExplainedPlan ) {
+                    m_reportWriter.write( "SQL statement:\n"+m_stmts.get(i)+"\n");
+                    m_reportWriter.write("\nExplained plan:\n"+pn2.toExplainPlanString()+"\n");
+                }
             } else {
                 m_numFail++;
                 m_reportWriter.write( "Statement "+i+" of "+config+": \n" );
@@ -523,7 +514,7 @@ public class plannerTester {
                     m_reportWriter.write( "SQL statement:\n"+baseStmt+"\n==>\n"+m_stmts.get(i)+"\n");
                 }
 
-                if( m_reportExplainedPlan ) {
+                if( m_reportDiffExplainedPlan ) {
                     m_reportWriter.write("\nExplained plan:\n"+pn1.toExplainPlanString()+"\n==>\n"+pn2.toExplainPlanString()+"\n");
                 }
 

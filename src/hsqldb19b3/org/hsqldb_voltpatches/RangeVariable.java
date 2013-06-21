@@ -677,10 +677,12 @@ final class RangeVariable {
             isBeforeFirst      = true;
         }
 
+        @Override
         public boolean isBeforeFirst() {
             return isBeforeFirst;
         }
 
+        @Override
         public boolean next() {
 
             if (isBeforeFirst) {
@@ -702,26 +704,32 @@ final class RangeVariable {
             }
         }
 
+        @Override
         public Row getCurrentRow() {
             return currentRow;
         }
 
+        @Override
         public Object[] getCurrent() {
             return currentData;
         }
 
+        @Override
         public long getRowid() {
             return currentRow == null ? 0
                                       : currentRow.getId();
         }
 
+        @Override
         public Object getRowidObject() {
             return currentRow == null ? null
                                       : Long.valueOf(currentRow.getId());
         }
 
+        @Override
         public void remove() {}
 
+        @Override
         public void reset() {
 
             if (it != null) {
@@ -733,6 +741,7 @@ final class RangeVariable {
             isBeforeFirst = true;
         }
 
+        @Override
         public int getRangePosition() {
             return rangePosition;
         }
@@ -766,10 +775,12 @@ final class RangeVariable {
             }
         }
 
+        @Override
         public boolean isBeforeFirst() {
             return isBeforeFirst;
         }
 
+        @Override
         public boolean next() {
 
             if (isBeforeFirst) {
@@ -785,8 +796,10 @@ final class RangeVariable {
             return findNext();
         }
 
+        @Override
         public void remove() {}
 
+        @Override
         public void reset() {
 
             if (it != null) {
@@ -800,6 +813,7 @@ final class RangeVariable {
             isBeforeFirst = true;
         }
 
+        @Override
         public int getRangePosition() {
             return rangeVar.rangePosition;
         }
@@ -1025,8 +1039,10 @@ final class RangeVariable {
             it                 = rangeVar.rangeIndex.firstRow(session, store);
         }
 
+        @Override
         protected void initialiseIterator() {}
 
+        @Override
         protected boolean findNext() {
 
             boolean result;
@@ -1082,10 +1098,12 @@ final class RangeVariable {
             this.rangeIterators = rangeIterators;
         }
 
+        @Override
         public boolean isBeforeFirst() {
             return isBeforeFirst;
         }
 
+        @Override
         public boolean next() {
 
             while (currentIndex >= 0) {
@@ -1122,6 +1140,7 @@ final class RangeVariable {
             return false;
         }
 
+        @Override
         public void reset() {}
     }
 
@@ -1149,6 +1168,10 @@ final class RangeVariable {
         primaryKey   = rangeTable.getPrimaryKey();
         isSeqScan    = indexCondition == null;
 
+        if (rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
+            throw new HSQLParseException("VoltDB does not support subqueries, consider using views instead");
+        }
+
         // get the index for this scan (/filter)
         // note: ignored if scan if full table scan
         if (index == null)
@@ -1164,17 +1187,64 @@ final class RangeVariable {
         scan.attributes.put("table", rangeTable.getName().name);
 
         if (tableAlias != null && !rangeTable.getName().name.equals(tableAlias)) {
-            scan.attributes.put("alias", tableAlias.name);
+            scan.attributes.put("tablealias", tableAlias.name);
         }
 
-        // TODO: RangeVariables are going to need a more extensive XML structure to support the
-        // likes of self-join and outer join.
-        // The structure that was generated in VoltDB 3.0 and earlier has been abandoned.
-        // It was being ignored by the deserialization process and it seemed to have enough gaps
-        // and inconsistencies to merit a clean start for future feature support.
-        // A better model for LEFT/RIGHT joins is expected to be the first step in developing
-        // the new structure.
+        // note if this is an outer join
+        if (isLeftJoin && isRightJoin) {
+            scan.attributes.put("jointype", "full");
+        } else if (isLeftJoin) {
+            scan.attributes.put("jointype", "left");
+        } else if (isRightJoin) {
+            scan.attributes.put("jointype", "right");
+        } else {
+            scan.attributes.put("jointype", "inner");
+        }
+
+        // start with the indexCondition
+        Expression cond = indexCondition;
+        // then go to the indexEndCondition
+        if (indexEndCondition != null) {
+            if (cond != null) {
+                cond = new ExpressionLogical(OpTypes.AND, cond, indexEndCondition);
+            } else {
+                cond = indexEndCondition;
+            }
+        }
+        // then go to the nonIndexJoinCondition
+        if (nonIndexJoinCondition != null) {
+            if (cond != null) {
+                cond = new ExpressionLogical(OpTypes.AND, cond, nonIndexJoinCondition);
+            } else {
+                cond = nonIndexJoinCondition;
+            }
+        }
+        if (cond != null) {
+            cond = cond.eliminateDuplicates(session);
+            VoltXMLElement joinCond = new VoltXMLElement("joincond");
+            joinCond.children.add(cond.voltGetXML(session));
+            scan.children.add(joinCond);
+        }
+
+        // then go to the nonIndexWhereCondition
+        if (nonIndexWhereCondition != null) {
+            VoltXMLElement whereCond = new VoltXMLElement("wherecond");
+            whereCond.children.add(nonIndexWhereCondition.voltGetXML(session));
+            scan.children.add(whereCond);
+        }
 
         return scan;
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Object#toString()
+     */
+    @Override
+    public String toString() {
+        String name = "";
+        if (rangeTable != null) {
+            name = ":" + rangeTable.getName().name;
+        }
+        return super.toString() + name;
     }
 }

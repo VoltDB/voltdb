@@ -46,13 +46,14 @@ import org.voltdb.MemoryStats;
 import org.voltdb.ParameterSet;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProcedureRunner;
+import org.voltdb.StartAction;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
 import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.StatsAgent;
-import org.voltdb.SysProcSelector;
+import org.voltdb.StatsSelector;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStats;
 import org.voltdb.TheHashinator;
@@ -314,6 +315,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         {
             return Site.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation, false);
         }
+
+        @Override
+        public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config)
+        {
+            Site.this.updateHashinator(config);
+        }
     };
 
     /** Create a new execution site and the corresponding EE */
@@ -326,7 +333,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             long txnId,
             int partitionId,
             int numPartitions,
-            VoltDB.START_ACTION startAction,
+            StartAction startAction,
             int snapshotPriority,
             InitiatorMailbox initiatorMailbox,
             StatsAgent agent,
@@ -341,7 +348,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_numberOfPartitions = numPartitions;
         m_scheduler = scheduler;
         m_backend = backend;
-        m_rejoinState = VoltDB.createForRejoin(startAction) || startAction == VoltDB.START_ACTION
+        m_rejoinState = VoltDB.createForRejoin(startAction) || startAction == StartAction
                 .JOIN ? kStateRejoining :
                 kStateRunning;
         m_snapshotPriority = snapshotPriority;
@@ -357,11 +364,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         if (agent != null) {
             m_tableStats = new TableStats(m_siteId);
-            agent.registerStatsSource(SysProcSelector.TABLE,
+            agent.registerStatsSource(StatsSelector.TABLE,
                                       m_siteId,
                                       m_tableStats);
             m_indexStats = new IndexStats(m_siteId);
-            agent.registerStatsSource(SysProcSelector.INDEX,
+            agent.registerStatsSource(StatsSelector.INDEX,
                                       m_siteId,
                                       m_indexStats);
             m_memStats = memStats;
@@ -396,12 +403,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             m_ee = initializeEE(serializedCatalog, timestamp);
         }
 
-        m_snapshotter = new SnapshotSiteProcessor(new Runnable() {
-            @Override
-            public void run() {
-                m_scheduler.offer(new SnapshotTask());
-            }
-        },
+        m_snapshotter = new SnapshotSiteProcessor(m_scheduler,
         m_snapshotPriority,
         new SnapshotSiteProcessor.IdlePredicate() {
             @Override
@@ -652,7 +654,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      */
     @Override
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException {
-        return m_snapshotter.completeSnapshotWork(m_ee);
+        return m_snapshotter.completeSnapshotWork(m_sysprocContext, m_ee);
     }
 
     //
@@ -708,12 +710,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public void updateBackendLogLevels()
     {
         m_ee.setLogLevels(org.voltdb.jni.EELoggers.getLogLevels());
-    }
-
-    @Override
-    public long getReplicatedDMLDivisor()
-    {
-        return m_numberOfPartitions;
     }
 
     @Override
@@ -822,8 +818,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
             // update table stats
             final VoltTable[] s1 =
-                m_ee.getStats(SysProcSelector.TABLE, tableIds, false, time);
-            if (s1 != null) {
+                m_ee.getStats(StatsSelector.TABLE, tableIds, false, time);
+            if ((s1 != null) && (s1.length > 0)) {
                 VoltTable stats = s1[0];
                 assert(stats != null);
 
@@ -846,7 +842,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
             // update index stats
             final VoltTable[] s2 =
-                m_ee.getStats(SysProcSelector.INDEX, tableIds, false, time);
+                m_ee.getStats(StatsSelector.INDEX, tableIds, false, time);
             if ((s2 != null) && (s2.length > 0)) {
                 VoltTable stats = s2[0];
                 assert(stats != null);
@@ -892,7 +888,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public VoltTable[] getStats(SysProcSelector selector, int[] locators,
+    public VoltTable[] getStats(StatsSelector selector, int[] locators,
                                 boolean interval, Long now)
     {
         return m_ee.getStats(selector, locators, interval, now);
@@ -901,7 +897,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public Future<?> doSnapshotWork(boolean ignoreQuietPeriod)
     {
-        return m_snapshotter.doSnapshotWork(m_ee, ignoreQuietPeriod);
+        return m_snapshotter.doSnapshotWork(m_sysprocContext, m_ee, ignoreQuietPeriod);
     }
 
     @Override
@@ -998,7 +994,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             hostLog.info(String.format("Site %d performing schema change operation must block until snapshot is locally complete.",
                     CoreUtils.getSiteIdFromHSId(m_siteId)));
             try {
-                m_snapshotter.completeSnapshotWork(m_ee);
+                m_snapshotter.completeSnapshotWork(m_sysprocContext, m_ee);
                 hostLog.info(String.format("Site %d locally finished snapshot. Will update catalog now.",
                         CoreUtils.getSiteIdFromHSId(m_siteId)));
             }
@@ -1045,8 +1041,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public void setNumberOfPartitions(int partitionCount)
     {
         m_numberOfPartitions = partitionCount;
-        m_ee.updateHashinator(TheHashinator.getConfiguredHashinatorType(),
-                TheHashinator.getConfigureBytes(m_numberOfPartitions));
+    }
+
+    private void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config)
+    {
+        m_ee.updateHashinator(config.getFirst(), config.getSecond());
     }
 
     /// A plan fragment entry in the cache.

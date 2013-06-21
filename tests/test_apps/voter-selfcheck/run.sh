@@ -48,7 +48,7 @@ function srccompile() {
 # build an application catalog
 function catalog() {
     srccompile
-    $VOLTDB compile --classpath obj -o $APPNAME.jar -p project.xml
+    $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -61,6 +61,27 @@ function server() {
     $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
         license $LICENSE host $HOST
 }
+
+
+# run the voltdb server locally
+function secure-server() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create catalog $APPNAME.jar deployment deployment-secure.xml \
+        license $LICENSE host $HOST
+}
+
+function masked-server() {
+    $VOLTDB mask deployment-secure.xml deployment-masked.xml
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create catalog $APPNAME.jar deployment deployment-masked.xml \
+        license $LICENSE host $HOST
+}
+
+
 
 # run the client that drives the example
 function client() {
@@ -81,14 +102,29 @@ function async-benchmark() {
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
-        --port=21212 \
         --contestants=6 \
-        --voter=905000000 \
         --maxvotes=2 \
         --ratelimit=100000 \
         --autotune=false \
         --latencytarget=10
 }
+
+function secure-benchmark() {
+    srccompile
+    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voter.AsyncBenchmark \
+        --displayinterval=5 \
+        --duration=120 \
+        --servers=localhost \
+        --contestants=6 \
+        --maxvotes=2 \
+        --ratelimit=100000 \
+        --autotune=false \
+        --username=myuser \
+        --password=voltdb \
+        --latencytarget=10
+}
+
 
 # Multi-threaded synchronous benchmark sample
 # Use this target for argument help
@@ -105,7 +141,6 @@ function sync-benchmark() {
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
-        --port=21212 \
         --contestants=6 \
         --maxvotes=2
 }
@@ -125,7 +160,6 @@ function jdbc-benchmark() {
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
-        --port=21212 \
         --contestants=6 \
         --maxvotes=2
 }

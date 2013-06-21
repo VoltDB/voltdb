@@ -38,7 +38,6 @@ public class TestPushDownAggregates extends PlannerTestCase {
     protected void setUp() throws Exception {
         setupSchema(getClass().getResource("testplans-groupby-ddl.sql"),
                     "testpushdownaggregates", false);
-        forceReplicationExceptForOneTable("t1", "PKEY");
     }
 
     @Override
@@ -158,10 +157,7 @@ public class TestPushDownAggregates extends PlannerTestCase {
     //TODO: Not sure what this has to do with PushDownAggregates -- move this test case?
     public void testSinglePartOffset()
     {
-        final int paramCount = 0;
-        final boolean planForSinglePartition = true;
-        String noJoinOrder = null;
-        List<AbstractPlanNode> pn = compileWithJoinOrderToFragments("select PKEY from T1 order by PKEY limit 5 offset 1", paramCount, planForSinglePartition, noJoinOrder);
+        List<AbstractPlanNode> pn = compileSinglePartitionToFragments("select PKEY from T1 order by PKEY limit 5 offset 1");
         assertEquals(1, pn.size());
         assertTrue(pn.get(0).toExplainPlanString().contains("LIMIT"));
     }

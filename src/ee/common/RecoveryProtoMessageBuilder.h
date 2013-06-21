@@ -86,8 +86,6 @@ private:
      */
     int32_t m_tupleCount;
 
-    TupleSerializer *m_serializer;
-
     int32_t m_maxSerializedSize;
 };
 }

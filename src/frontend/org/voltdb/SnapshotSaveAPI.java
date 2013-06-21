@@ -182,6 +182,8 @@ public class SnapshotSaveAPI
             m_partitionLastSeenTransactionIds.put(TxnEgo.getPartitionId(partitionTxnId), partitionTxnId);
         }
 
+        boolean runPostTasks = false;
+        VoltTable earlyResultTable = null;
         try {
             SnapshotSiteProcessor.m_snapshotCreateSetupBarrier.await();
             try {
@@ -203,22 +205,24 @@ public class SnapshotSaveAPI
                         VoltTable finalresult = m_createResult.get();
                         if (finalresult != null) {
                             m_createResult.set(null);
-                            return finalresult;
+                            earlyResultTable = finalresult;
                         }
                         else {
                             // We returned a non-empty NodeResultsTable with the failures in it,
                             // every other site needs to return a NodeResultsTable as well.
-                            return SnapshotSave.constructNodeResultsTable();
+                            earlyResultTable = SnapshotSave.constructNodeResultsTable();
                         }
                     }
                     else if (taskList == null) {
+                        SNAP_LOG.debug("No task for this site, block " + block);
                         // This node is participating in the snapshot but this site has nothing to do.
                         // Send back an appropriate empty table based on the block flag
                         if (block != 0) {
-                            return SnapshotSave.constructPartitionResultsTable();
+                            runPostTasks = true;
+                            earlyResultTable = SnapshotSave.constructPartitionResultsTable();
                         }
                         else {
-                            return SnapshotSave.constructNodeResultsTable();
+                            earlyResultTable = SnapshotSave.constructNodeResultsTable();
                         }
                     }
                     else {
@@ -243,7 +247,7 @@ public class SnapshotSaveAPI
                     "",
                     "FAILURE",
                     CoreUtils.throwableToString(e));
-            return result;
+            earlyResultTable = result;
         } catch (BrokenBarrierException e) {
             result.addRow(
                     context.getHostId(),
@@ -251,7 +255,16 @@ public class SnapshotSaveAPI
                     "",
                     "FAILURE",
                     CoreUtils.throwableToString(e));
-            return result;
+            earlyResultTable = result;
+        }
+
+        // If earlyResultTable is set, return here
+        if (earlyResultTable != null) {
+            if (runPostTasks) {
+                // Need to run post-snapshot tasks before finishing
+                SnapshotSiteProcessor.runPostSnapshotTasks(context);
+            }
+            return earlyResultTable;
         }
 
         if (block != 0) {
@@ -260,6 +273,7 @@ public class SnapshotSaveAPI
             String err = "";
             try {
                 failures = context.getSiteSnapshotConnection().completeSnapshotWork();
+                SnapshotSiteProcessor.runPostSnapshotTasks(context);
             } catch (InterruptedException e) {
                 status = "FAILURE";
                 err = e.toString();

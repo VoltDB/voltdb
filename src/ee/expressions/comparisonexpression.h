@@ -88,6 +88,11 @@ class CmpLike {
 public:
     inline NValue cmp(NValue l, NValue r) const { return l.like(r);}
 };
+class CmpIn {
+public:
+    inline NValue cmp(NValue l, NValue r) const
+    { return l.inList(r) ? NValue::getTrue() : NValue::getFalse(); }
+};
 
 template <typename C>
 class ComparisonExpression : public AbstractExpression {
