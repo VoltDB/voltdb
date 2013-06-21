@@ -567,12 +567,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 //On rejoin the starting IDs are all 0 so technically it will load any snapshot
                 //but the newest snapshot will always be the truncation snapshot taken after rejoin
                 //completes at which point the node will mark itself as actually recovered.
+                //
+                // Use the partition count from the cluster config instead of the cartographer
+                // here. Since the initiators are not started yet, the cartographer still doesn't
+                // know about the new partitions at this point.
                 m_commandLog.initForRejoin(
                         m_catalogContext,
                         Long.MIN_VALUE,
-                        m_iv2InitiatorStartingTxnIds,
+                        clusterConfig.getPartitionCount(),
                         true,
-                        m_config.m_commandLogBinding);
+                        m_config.m_commandLogBinding, m_iv2InitiatorStartingTxnIds);
             }
 
             /*
@@ -1917,7 +1921,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
          */
         if ((m_commandLog != null) && (m_commandLog.needsInitialization())) {
             // Initialize command logger
-            m_commandLog.init(m_catalogContext, txnId, perPartitionTxnIds, m_config.m_commandLogBinding);
+            m_commandLog.init(m_catalogContext, txnId, m_cartographer.getPartitionCount(),
+                              m_config.m_commandLogBinding,
+                              perPartitionTxnIds);
         }
 
         /*
