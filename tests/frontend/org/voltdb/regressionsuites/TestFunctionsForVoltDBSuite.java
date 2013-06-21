@@ -810,11 +810,23 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         VoltTable result;
 
         cr = client.callProcedure("P2.insert", 0, new Timestamp(0L));
-        cr = client.callProcedure("P2.insert", 1, new Timestamp(1L));
-        cr = client.callProcedure("P2.insert", 2, new Timestamp(1000L));
-        cr = client.callProcedure("P2.insert", 3, new Timestamp(-1000L));
-
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("P2.insert", 1, new Timestamp(1L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("P2.insert", 2, new Timestamp(1000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("P2.insert", 3, new Timestamp(-1000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("P2.insert", 4, new Timestamp(1371808830000L));
+
+        // Test AdHoc
+        cr = client.callProcedure("@AdHoc", "select SINCE_EPOCH (SECOND, TM), TM from P2 where id = 4");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(1371808830L, result.getLong(0));
+        assertEquals(1371808830000000L, result.getTimestampAsLong(1));
 
         String[] procedures = {"SINCE_EPOCH_SECOND", "SINCE_EPOCH_MILLIS", "SINCE_EPOCH_MICROS"};
 
@@ -845,6 +857,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 assertEquals(1, result.getLong(0));
             } else if (proc == "SINCE_EPOCH_MICROS") {
                 assertEquals(1000, result.getLong(0));
+            } else {
+                fail();
             }
 
             cr = client.callProcedure(proc, 2);
@@ -858,6 +872,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 assertEquals(1000, result.getLong(0));
             } else if (proc == "SINCE_EPOCH_MICROS") {
                 assertEquals(1000000, result.getLong(0));
+            } else {
+                fail();
             }
 
             cr = client.callProcedure(proc, 3);
@@ -871,6 +887,23 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 assertEquals(-1000, result.getLong(0));
             } else if (proc == "SINCE_EPOCH_MICROS") {
                 assertEquals(-1000000, result.getLong(0));
+            } else {
+               fail();
+            }
+
+            cr = client.callProcedure(proc, 4);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            if (proc == "SINCE_EPOCH_SECOND") {
+                assertEquals(1371808830L, result.getLong(0));
+            } else if (proc == "SINCE_EPOCH_MILLIS") {
+                assertEquals(1371808830000L, result.getLong(0));
+            } else if (proc == "SINCE_EPOCH_MICROS") {
+                assertEquals(1371808830000000L, result.getLong(0));
+            } else {
+               fail();
             }
         }
     }
@@ -904,6 +937,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 assertEquals(0L, result.getTimestampAsLong(0));
             } else if (proc == "TO_TIMESTAMP_MICROS") {
                 assertEquals(0L, result.getTimestampAsLong(0));
+            } else {
+                fail();
             }
 
             cr = client.callProcedure(proc, 1L , 1);
@@ -917,6 +952,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 assertEquals(1000L, result.getTimestampAsLong(0));
             } else if (proc == "TO_TIMESTAMP_MICROS") {
                 assertEquals(1L, result.getTimestampAsLong(0));
+            } else {
+                fail();
             }
 
             cr = client.callProcedure(proc, 1000L , 1);
@@ -930,8 +967,9 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 assertEquals(1000000L, result.getTimestampAsLong(0));
             } else if (proc == "TO_TIMESTAMP_MICROS") {
                 assertEquals(1000L, result.getTimestampAsLong(0));
+            } else {
+                fail();
             }
-
 
             cr = client.callProcedure(proc, -1000L , 1);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -944,6 +982,23 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 assertEquals(-1000000L, result.getTimestampAsLong(0));
             } else if (proc == "TO_TIMESTAMP_MICROS") {
                 assertEquals(-1000L, result.getTimestampAsLong(0));
+            } else {
+                fail();
+            }
+
+            cr = client.callProcedure(proc, 1371808830000L, 1);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            if (proc == "TO_TIMESTAMP_SECOND") {
+                assertEquals(1371808830000000000L, result.getTimestampAsLong(0));
+            } else if (proc == "TO_TIMESTAMP_MILLIS") {
+                assertEquals(1371808830000000L, result.getTimestampAsLong(0));
+            } else if (proc == "TO_TIMESTAMP_MICROS") {
+                assertEquals(1371808830000L, result.getTimestampAsLong(0));
+            } else {
+                fail();
             }
         }
 
