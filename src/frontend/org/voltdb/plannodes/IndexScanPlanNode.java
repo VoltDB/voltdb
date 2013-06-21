@@ -495,7 +495,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         String predicate = explainPredicate(predicatePrefix);
         String retval = "INDEX SCAN of \"" + m_targetTableName + "\"";
         String indexDescription = " using \"" + m_targetIndexName + "\"";
-        if (m_targetIndexName.startsWith("SYS_IDX_PK_") || m_targetIndexName.startsWith("MATVIEW_PK_INDEX") ) {
+        // Demangle system-generated index names --
+        if (m_targetIndexName.startsWith("SYS_IDX_PK_") ||
+            m_targetIndexName.startsWith("SYS_IDX_SYS_PK_") ||
+            m_targetIndexName.startsWith("MATVIEW_PK_INDEX") ) {
             indexDescription = " using its primary key index";
         }
         retval += indexDescription;

@@ -952,7 +952,7 @@ public class PlanAssembler {
         // (primary key or other unique index) on some of the ORDER BY values regardless of whether
         // the associated index is used in the selected plan.
         // If the index scan was used at the top of the plan, and its sort order was valid
-        // -- meaning covering the entire ORDER BY clause -- 
+        // -- meaning covering the entire ORDER BY clause --
         // this function would have already returned without adding an orderByNode.
         // The interesting cases, including issue ENG-3335, are
         // -- when the index scan is in the distributed part of the plan
