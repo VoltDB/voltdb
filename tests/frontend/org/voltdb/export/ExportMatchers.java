@@ -34,7 +34,7 @@ import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeMatcher;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.VoltMessage;
-import org.voltdb.VoltDB;
+import org.voltdb.common.Constants;
 
 import com.google.common.base.Preconditions;
 
@@ -122,7 +122,7 @@ public class ExportMatchers {
             int pSignatureLen = buf.getInt();
             byte [] pSignatureBytes = new byte[pSignatureLen];
             buf.get(pSignatureBytes);
-            signature = new String( pSignatureBytes, VoltDB.UTF8ENCODING);
+            signature = new String( pSignatureBytes, Constants.UTF8ENCODING);
 
             uso = buf.getLong();
         }
@@ -149,7 +149,7 @@ public class ExportMatchers {
         }
 
         VoltMessage asVoltMessage() {
-            byte [] signatureBytes = signature.getBytes(VoltDB.UTF8ENCODING);
+            byte [] signatureBytes = signature.getBytes(Constants.UTF8ENCODING);
             ByteBuffer buf = ByteBuffer.allocate(16 + signatureBytes.length);
             buf.putInt(partitionId);
             buf.putInt(signatureBytes.length);

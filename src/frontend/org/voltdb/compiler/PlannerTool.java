@@ -31,6 +31,7 @@ import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
+import org.voltdb.common.Constants;
 import org.voltdb.planner.BoundPlan;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CorePlan;
@@ -175,7 +176,7 @@ public class PlannerTool {
                             if (core.partitioningParamIndex >= 0) {
                                 partitionKey = paramArray[core.partitioningParamIndex];
                             }
-                            AdHocPlannedStatement ahps = new AdHocPlannedStatement(sql.getBytes(VoltDB.UTF8ENCODING),
+                            AdHocPlannedStatement ahps = new AdHocPlannedStatement(sql.getBytes(Constants.UTF8ENCODING),
                                                                                    core,
                                                                                    params,
                                                                                    extractedLiterals,

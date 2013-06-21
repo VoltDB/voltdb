@@ -80,6 +80,7 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
@@ -1474,7 +1475,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 byte[] collByte = collByteArray.get(i);
                 if( collByte == null ) {
                     //signle partition query plan
-                    String plan = new String( aggByte, VoltDB.UTF8ENCODING);
+                    String plan = new String( aggByte, Constants.UTF8ENCODING);
                     PlanNodeTree pnt = new PlanNodeTree();
                     try {
                         JSONObject jobj = new JSONObject( plan );
@@ -1489,8 +1490,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
                 else {
                     //multi-partition query plan
-                    String aggplan = new String( aggByte, VoltDB.UTF8ENCODING);
-                    String collplan = new String( collByte, VoltDB.UTF8ENCODING);
+                    String aggplan = new String( aggByte, Constants.UTF8ENCODING);
+                    String collplan = new String( collByte, Constants.UTF8ENCODING);
                     PlanNodeTree pnt = new PlanNodeTree();
                     PlanNodeTree collpnt = new PlanNodeTree();
                     try {

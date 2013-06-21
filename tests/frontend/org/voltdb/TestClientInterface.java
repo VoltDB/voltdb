@@ -65,6 +65,7 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
@@ -285,7 +286,7 @@ public class TestClientInterface {
                 "select * from a where i = 3", 3, 0, 0, "localhost", false,
                 ProcedureInvocationType.ORIGINAL, 0, 0, null);
         AdHocPlannedStatement s = new AdHocPlannedStatement("select * from a where i = 3".getBytes
-                (VoltDB.UTF8ENCODING),
+                (Constants.UTF8ENCODING),
                 new CorePlan(new byte[0],
                         null,
                         new byte[20],
@@ -320,7 +321,7 @@ public class TestClientInterface {
         assertTrue(partitionParam instanceof byte[]);
         assertTrue(Arrays.equals(TheHashinator.valueToBytes(3), (byte[]) partitionParam));
         assertEquals(1, statements.length);
-        String sql = new String(statements[0].sql, VoltDB.UTF8ENCODING);
+        String sql = new String(statements[0].sql, Constants.UTF8ENCODING);
         assertEquals("select * from a where i = 3", sql);
     }
 
@@ -333,7 +334,7 @@ public class TestClientInterface {
         // Need a batch and a statement
         AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
                 "select * from a", null, 0, 0, "localhost", false, ProcedureInvocationType.ORIGINAL, 0, 0, null);
-        AdHocPlannedStatement s = new AdHocPlannedStatement("select * from a".getBytes(VoltDB.UTF8ENCODING),
+        AdHocPlannedStatement s = new AdHocPlannedStatement("select * from a".getBytes(Constants.UTF8ENCODING),
                                                             new CorePlan(new byte[0],
                                                                          new byte[0],
                                                                          new byte[20],
@@ -366,7 +367,7 @@ public class TestClientInterface {
         byte[] serializedData = (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(0);
         AdHocPlannedStatement[] statements = AdHocPlannedStmtBatch.planArrayFromBuffer(ByteBuffer.wrap(serializedData));
         assertEquals(1, statements.length);
-        String sql = new String(statements[0].sql, VoltDB.UTF8ENCODING);
+        String sql = new String(statements[0].sql, Constants.UTF8ENCODING);
         assertEquals("select * from a", sql);
     }
 
