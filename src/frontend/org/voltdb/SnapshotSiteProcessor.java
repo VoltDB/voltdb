@@ -785,9 +785,6 @@ public class SnapshotSiteProcessor {
 
                 m_snapshotTargetTerminators.add(terminatorThread);
                 terminatorThread.start();
-
-                // Schedule a task to clean up the buffer pool after the terminators are done
-                m_siteTaskerQueue.offer(new SnapshotTask());
             }
         }
         return retval;
