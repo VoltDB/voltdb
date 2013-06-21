@@ -132,7 +132,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new Type[] { Type.SQL_VARCHAR },
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET}),
 
-            new FunctionId("since_epoch", Type.SQL_INTEGER, FUNC_VOLT_SINCE_EPOCH, -1,
+            new FunctionId("since_epoch", Type.SQL_BIGINT, FUNC_VOLT_SINCE_EPOCH, -1,
                     new Type[] { Type.SQL_VARCHAR, Type.SQL_TIMESTAMP },
                     new short[] {  Tokens.OPENBRACKET, Tokens.X_KEYSET, 3,
                     Tokens.SECOND, Tokens.MILLIS, Tokens.MICROS,
