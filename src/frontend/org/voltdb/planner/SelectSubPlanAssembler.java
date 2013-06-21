@@ -730,10 +730,27 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
         // The inner table can have multiple index access paths based on
         // inner and inner-outer join expressions plus the naive one.
+
+        // If the inner table is partitioned and the outer node is replicated,
+        // the join node will be NLJ and not NLIJ, even for an index access path.
+        if (innerNode.m_table.getIsreplicated() || canDeferSendReceivePairForNode()) {
+            // This case can support either NLIJ -- assuming joinNode.m_joinInnerOuterList
+            // is non-empty AND at least ONE of its clauses can be leveraged in the IndexScan
+            // -- or NLJ, otherwise.
+            return getRelevantAccessPathsForTable(innerNode.m_table,
+                    joinNode.m_joinInnerOuterList,
+                    joinNode.m_joinInnerList,
+                    null);
+        }
+
+        // Only NLJ is supported in this case.
+        // If the join is NLJ, the inner node won't be inlined
+        // which means that it can't use inner-outer join expressions
+        // -- they must be set aside to be processed within the NLJ.
         return getRelevantAccessPathsForTable(innerNode.m_table,
-                joinNode.m_joinInnerOuterList,
+                null,
                 joinNode.m_joinInnerList,
-                null);
+                joinNode.m_joinInnerOuterList);
     }
 
     /**
@@ -748,7 +765,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         if (nodes.size() == 1) {
             for (AccessPath path : joinNode.m_accessPaths) {
                 joinNode.m_currentAccessPath = path;
-                AbstractPlanNode plan = getSelectSubPlanForJoinNode(rootNode, false);
+                AbstractPlanNode plan = getSelectSubPlanForJoinNode(rootNode);
                 /*
                  * If the access plan for the table in the join order was for a
                  * distributed table scan there will be a send/receive pair at the top.
@@ -817,37 +834,29 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * that gives the right tuples.
      *
      * @param joinNode The join node to build the plan for.
-     * @param isInnerNode. True if the joinNode is an inner node in the join
      * @return A completed plan-sub-graph that should match the correct tuples from the
      * correct tables.
      */
-    private AbstractPlanNode getSelectSubPlanForJoinNode(JoinNode joinNode, boolean isInnerNode) {
+    private AbstractPlanNode getSelectSubPlanForJoinNode(JoinNode joinNode) {
         assert(joinNode != null);
         if (joinNode.m_table != null) {
             // End of recursion
             AbstractPlanNode scanNode = getAccessPlanForTable(joinNode.m_table, joinNode.m_currentAccessPath);
-            // Add the send/receive pair to the outer table if required.
-            // For the inner node the pair will be added above the parent join node to give it a chance
-            // to build an NLIJ/inlinde IndexScan plan
-            if (!isInnerNode && !joinNode.m_table.getIsreplicated() && !canDeferSendReceivePairForNode()) {
+            // Add the send/receive pair to the table if required.
+            if (!joinNode.m_table.getIsreplicated() && !canDeferSendReceivePairForNode()) {
                 scanNode = addSendReceivePair(scanNode);
             }
             return scanNode;
         } else {
             assert(joinNode.m_leftNode != null && joinNode.m_rightNode != null);
             // Outer node
-            AbstractPlanNode outerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_leftNode, false);
+            AbstractPlanNode outerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_leftNode);
 
             // Inner Node.
-            AbstractPlanNode innerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_rightNode, true);
+            AbstractPlanNode innerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_rightNode);
 
             // Join Node
-            AbstractPlanNode joinPlan = getSelectSubPlanForOuterAccessPathStep(joinNode, outerScanPlan, innerScanPlan);
-            // if the inner node represents a partitioned table we may need to add a send/receive pair
-            if (joinNode.m_rightNode.m_table != null && !joinNode.m_rightNode.m_table.getIsreplicated() && !canDeferSendReceivePairForNode()) {
-                joinPlan = addSendReceivePair(joinPlan);
-            }
-            return joinPlan;
+            return getSelectSubPlanForOuterAccessPathStep(joinNode, outerScanPlan, innerScanPlan);
         }
     }
 
