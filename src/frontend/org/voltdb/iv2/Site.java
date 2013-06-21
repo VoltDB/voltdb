@@ -897,9 +897,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public Future<?> doSnapshotWork(boolean ignoreQuietPeriod)
+    public Future<?> doSnapshotWork()
     {
-        return m_snapshotter.doSnapshotWork(m_sysprocContext, m_ee, ignoreQuietPeriod);
+        return m_snapshotter.doSnapshotWork(m_sysprocContext, m_ee);
     }
 
     @Override
