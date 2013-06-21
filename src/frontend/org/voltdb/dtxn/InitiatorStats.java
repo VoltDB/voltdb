@@ -124,11 +124,11 @@ public class InitiatorStats extends SiteStatsSource {
     @Override
     protected void updateStatsRow(final Object rowKey, Object rowValues[]) {
         DummyIterator iterator = (DummyIterator)rowKey;
-        Map.Entry<String, InvocationInfo> entry = iterator.lowerNext;
-        iterator.lowerNext = null;
+        Map.Entry<String, InvocationInfo> entry = iterator.innerNext;
+        iterator.innerNext = null;
         final InvocationInfo info = entry.getValue();
         final String procName = entry.getKey();
-        final Long connectionId = iterator.upperNext.getKey();
+        final Long connectionId = iterator.outerNext.getKey();
 
         long invocationCount = info.invocationCount;
         long totalExecutionTime = info.totalExecutionTime;
@@ -169,40 +169,40 @@ public class InitiatorStats extends SiteStatsSource {
     }
 
     private class DummyIterator implements Iterator<Object> {
-        private final Iterator<Map.Entry<Long, Map<String, InvocationInfo>>> upperItr;
-        private Iterator<Map.Entry<String, InvocationInfo>> lowerItr = null;
-        private Map.Entry<Long, Map<String, InvocationInfo>> upperNext = null;
-        private Map.Entry<String, InvocationInfo> lowerNext = null;
+        private final Iterator<Map.Entry<Long, Map<String, InvocationInfo>>> outerItr;
+        private Iterator<Map.Entry<String, InvocationInfo>> innerItr = null;
+        private Map.Entry<Long, Map<String, InvocationInfo>> outerNext = null;
+        private Map.Entry<String, InvocationInfo> innerNext = null;
         private final boolean interval;
         private DummyIterator(Iterator<Map.Entry<Long, Map<String, InvocationInfo>>> i, boolean interval) {
-            this.upperItr = i;
+            this.outerItr = i;
             this.interval = interval;
         }
 
         private boolean advanceUpper() {
-            if(upperItr.hasNext()) {
-                upperNext = upperItr.next();
+            if(outerItr.hasNext()) {
+                outerNext = outerItr.next();
                 // reset lowerItr
-                lowerItr = upperNext.getValue().entrySet().iterator();
+                innerItr = outerNext.getValue().entrySet().iterator();
                 return true;
             }
-            upperNext = null;
+            outerNext = null;
             return false;
         }
 
         private boolean advanceLower() {
-            if(lowerItr.hasNext()) {
-                lowerNext = lowerItr.next();
+            if(innerItr.hasNext()) {
+                innerNext = innerItr.next();
                 return true;
             }
-            lowerNext = null;
+            innerNext = null;
             return false;
         }
 
         @Override
         public boolean hasNext() {
             if (!interval) {
-                if(lowerItr == null) {
+                if(innerItr == null) {
                     if(advanceUpper()) {
                         return advanceLower();
                     }
@@ -217,28 +217,28 @@ public class InitiatorStats extends SiteStatsSource {
                     return false;
                 }
             }
-            if (lowerItr == null) {
+            if (innerItr == null) {
                 advanceUpper();
             }
-            if (upperItr == null || lowerItr == null || (!upperItr.hasNext() && !lowerItr.hasNext())) {
+            if (outerItr == null || innerItr == null || (!outerItr.hasNext() && !innerItr.hasNext())) {
                 return false;
             } else {
-                while (lowerNext == null && (upperItr.hasNext() || lowerItr.hasNext())) {
+                while (innerNext == null && (outerItr.hasNext() || innerItr.hasNext())) {
                     InvocationInfo info = null;
                     // first, look up at lower level map
                     advanceLower();
                     // not found, advance upper level map itr, and look up in next lower level map
-                    if(lowerNext == null) {
+                    if(innerNext == null) {
                         advanceUpper();
                         advanceLower();
                     }
-                    info = lowerNext.getValue();
+                    info = innerNext.getValue();
                     if(info.invocationCount - info.lastInvocationCount == 0) {
-                        lowerNext = null;
+                        innerNext = null;
                         continue;
                     }
                 }
-                if(lowerNext == null) {
+                if(innerNext == null) {
                     return false;
                 }
             }
