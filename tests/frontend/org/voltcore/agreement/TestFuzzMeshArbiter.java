@@ -30,11 +30,11 @@ import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
 
+import junit.framework.TestCase;
+
 import org.voltcore.agreement.MiniNode.NodeState;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
-
-import junit.framework.TestCase;
 
 public class TestFuzzMeshArbiter extends TestCase
 {
@@ -68,6 +68,7 @@ public class TestFuzzMeshArbiter extends TestCase
         }
     }
 
+    @Override
     public void tearDown() throws InterruptedException
     {
         for (MiniNode node : m_nodes.values()) {
@@ -150,7 +151,7 @@ public class TestFuzzMeshArbiter extends TestCase
         // better single-link failure algorithm
         Set<Long> expect = new HashSet<Long>();
         expect.addAll(m_nodes.keySet());
-        expect.remove(getHSId(0));
+        // expect.remove(getHSId(0));
         expect.remove(getHSId(1));
         assertTrue(checkFullyConnectedGraphs(expect));
     }

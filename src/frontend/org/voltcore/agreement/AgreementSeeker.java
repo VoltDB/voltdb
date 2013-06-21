@@ -120,7 +120,7 @@ public class AgreementSeeker {
         for (Map.Entry<Long, Boolean> e: failed.entrySet()) {
             if (!m_hsids.contains(e.getKey())) continue;
             m_reported.put(e.getKey(), reportingHsid);
-            if (e.getValue().booleanValue()) {
+            if (e.getValue()) {
                 m_witnessed.put(e.getKey(), reportingHsid);
                 witnessed.add(e.getKey());
             }
@@ -194,17 +194,15 @@ public class AgreementSeeker {
         public Boolean visitMatchingCardinality(Long hsid) {
             Set<Long> unreachable = Sets.filter(m_hsids, not(amongSurvivors));
             Set<Long> butAlive = Sets.intersection(m_alive.keySet(), unreachable);
-            Set<Long> seenBySurvivors =
-                    Multimaps.filterValues(m_alive, amongSurvivors).keySet();
 
             return !butAlive.isEmpty()
-                && seenBySurvivors.containsAll(butAlive)
+                && seenByInterconnectedPeers(butAlive, Sets.newTreeSet(m_survivors))
                 && !m_witnessed.get(hsid).containsAll(butAlive);
         }
     };
 
-    protected boolean seenByInterconnectedPeers( Scenario sc, Set<Long> who, Set<Long> byWhom) {
-        Set<Long> seers = Multimaps.filterValues(sc.alive, in(byWhom)).keySet();
+    protected boolean seenByInterconnectedPeers( Set<Long> who, Set<Long> byWhom) {
+        Set<Long> seers = Multimaps.filterValues(m_alive, in(byWhom)).keySet();
         int before = byWhom.size();
 
         byWhom.addAll(seers);
@@ -213,7 +211,7 @@ public class AgreementSeeker {
         } else if (byWhom.size() == before) {
             return false;
         }
-        return seenByInterconnectedPeers(sc, who, byWhom);
+        return seenByInterconnectedPeers(who, byWhom);
     }
 
     public Set<Long> nextKill() {
@@ -235,10 +233,13 @@ public class AgreementSeeker {
                 // as (a) can no longer witness
                 @Override
                 public Set<Long> visitMatchingCardinality(Void nada) {
+                    Set<Long> picks = Sets.newHashSet();
                     Scenario sc = new Scenario();
                     while (!haveAgreement(sc)) {
                         Long pick = null;
                         for (Long s: sc.witnessed.keySet()) {
+
+                            if (picks.contains(s)) continue;
 
                             Set<Long> witnessedBy = sc.witnessed.get(s);
                             if (witnessedBy.isEmpty()) continue;
@@ -272,6 +273,7 @@ public class AgreementSeeker {
                             }
                         }
                         sc.witnessed.putAll(pick, sc.alive.removeAll(pick));
+                        picks.add(pick);
                     }
                     return ImmutableSet.copyOf(sc.witnessed.keySet());
                 }

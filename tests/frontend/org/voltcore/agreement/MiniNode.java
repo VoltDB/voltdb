@@ -70,7 +70,9 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
 
         void updateHSId(long HSId)
         {
-            m_lastTimeForHosts.put(HSId, System.currentTimeMillis());
+            if (m_lastTimeForHosts.containsKey(HSId)) {
+                m_lastTimeForHosts.put(HSId, System.currentTimeMillis());
+            }
         }
 
         void stopTracking(long HSId)
@@ -176,7 +178,8 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
                             long agreementHSId = CoreUtils.getHSIdFromHostAndSite((int)failedHostId,
                                     HostMessenger.AGREEMENT_SITE_ID);
                             m_miniSite.reportFault(agreementHSId, false);
-                            if (m_HSIds.contains(agreementHSId)) {
+                            if (  !m_miniSite.reportFault(agreementHSId, false)
+                                && m_HSIds.contains(agreementHSId)) {
                                 m_nodeState.set(NodeState.RESOLVE);
                             }
                         }

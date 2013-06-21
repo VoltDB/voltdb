@@ -79,11 +79,12 @@ class MiniSite extends Thread implements MeshAide
         }
     }
 
-    public void reportFault(long faultingSite, boolean witnessed) {
+    public boolean reportFault(long faultingSite, boolean witnessed) {
         m_siteLog.debug("Reported fault: " + faultingSite + ", witnessed?: " + witnessed);
         FaultMessage fm = new FaultMessage(faultingSite, witnessed);
         fm.m_sourceHSId = m_mailbox.getHSId();
         m_mailbox.deliver(fm);
+        return m_failedHSIds.contains(faultingSite);
     }
 
     @Override

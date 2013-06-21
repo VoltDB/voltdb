@@ -227,6 +227,7 @@ public class MeshArbiter {
                 FailureSiteForwardMessage fsfm = (FailureSiteForwardMessage)m;
 
                 m_seeker.add(fsfm);
+                forwardCandidates.put(fsfm.m_reportingHSId, fsfm);
 
                 m_recoveryLog.info("Agreement, Received forwarded failure message from " +
                         CoreUtils.hsIdToString(fsfm.m_sourceHSId) + " reporting on behalf of " +
