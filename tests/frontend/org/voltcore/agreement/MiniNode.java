@@ -154,7 +154,10 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
     {
         m_miniSite.start();
         for (long HSId : m_HSIds) {
-            m_deadTracker.startTracking(HSId);
+            // Don't track your own death
+            if (HSId != m_HSId) {
+                m_deadTracker.startTracking(HSId);
+            }
         }
         m_nodeState.set(NodeState.RUN);
         while (m_shouldContinue.get())
