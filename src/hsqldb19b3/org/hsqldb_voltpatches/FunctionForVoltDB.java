@@ -92,6 +92,12 @@ public class FunctionForVoltDB extends FunctionSQL {
         private static final int FUNC_VOLT_FIELD         = 20002;
         private static final int FUNC_VOLT_ARRAY_ELEMENT = 20003;
         private static final int FUNC_VOLT_ARRAY_LENGTH  = 20004;
+
+        static final int FUNC_VOLT_SINCE_EPOCH               = 20005;
+        static final int FUNC_VOLT_SINCE_EPOCH_SECOND        = 20006;
+        static final int FUNC_VOLT_SINCE_EPOCH_MILLISECOND   = 20007;
+        static final int FUNC_VOLT_SINCE_EPOCH_MICROSECOND   = 20008;
+
         private static final FunctionId[] instances = {
 
             new FunctionId("sql_error", null, FUNC_VOLT_SQL_ERROR, 0,
@@ -120,6 +126,12 @@ public class FunctionForVoltDB extends FunctionSQL {
             new FunctionId("array_length", Type.SQL_INTEGER, FUNC_VOLT_ARRAY_LENGTH, -1,
                     new Type[] { Type.SQL_VARCHAR },
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET}),
+
+            new FunctionId("since_epoch", Type.SQL_INTEGER, FUNC_VOLT_SINCE_EPOCH, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_TIMESTAMP },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.X_KEYSET, 3,
+                    Tokens.SECOND, Tokens.MILLIS, Tokens.MICROS,
+                    Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();
@@ -141,7 +153,7 @@ public class FunctionForVoltDB extends FunctionSQL {
 
     }
 
-    private FunctionId m_def;
+    private final FunctionId m_def;
 
     public static FunctionSQL newVoltDBFunction(String token, int tokenType) {
         FunctionId def = FunctionId.fn_by_name(token);

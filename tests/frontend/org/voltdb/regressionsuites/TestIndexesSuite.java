@@ -817,18 +817,26 @@ public class TestIndexesSuite extends RegressionSuite {
 
         boolean success;
 
-        // CONFIG #1: HSQL
+        //* CONFIG #1: HSQL -- keep this enabled by default with //
         config = new LocalCluster("testindexes-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
+        // end of easy-to-disable code section */
 
-
-        // CONFIG #2: JNI
+        //* CONFIG #2: JNI -- keep this enabled by default with //
         config = new LocalCluster("testindexes-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
+        // end of easy-to-disable code section */
+
+        /*/ CONFIG #3: IPC -- keep this normally disabled with / * vs. //
+        config = new LocalCluster("testindexes-threesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
+        success = config.compile(project);
+        assertTrue(success);
+        builder.addServerConfig(config);
+        // end of normally disabled section */
 
         // no clustering tests for indexes
 
