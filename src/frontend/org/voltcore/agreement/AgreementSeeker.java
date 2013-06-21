@@ -111,12 +111,16 @@ public class AgreementSeeker {
 
     public void add(long reportingHsid, final Map<Long,Boolean> failed) {
         if (!m_hsids.contains(reportingHsid)) return;
+
+        Boolean harakiri = failed.get(reportingHsid);
+        if (harakiri != null && harakiri.booleanValue()) return;
+
         Set<Long> witnessed = Sets.newHashSet();
 
         for (Map.Entry<Long, Boolean> e: failed.entrySet()) {
             if (!m_hsids.contains(e.getKey())) continue;
             m_reported.put(e.getKey(), reportingHsid);
-            if (e.getValue()) {
+            if (e.getValue().booleanValue()) {
                 m_witnessed.put(e.getKey(), reportingHsid);
                 witnessed.add(e.getKey());
             }
@@ -198,6 +202,19 @@ public class AgreementSeeker {
                 && !m_witnessed.get(hsid).containsAll(butAlive);
         }
     };
+
+    protected boolean seenByInterconnectedPeers( Scenario sc, Set<Long> who, Set<Long> byWhom) {
+        Set<Long> seers = Multimaps.filterValues(sc.alive, in(byWhom)).keySet();
+        int before = byWhom.size();
+
+        byWhom.addAll(seers);
+        if (byWhom.containsAll(who)) {
+            return true;
+        } else if (byWhom.size() == before) {
+            return false;
+        }
+        return seenByInterconnectedPeers(sc, who, byWhom);
+    }
 
     public Set<Long> nextKill() {
         return m_strategy.accept(killPicker, (Void)null);

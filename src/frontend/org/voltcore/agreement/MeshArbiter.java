@@ -73,6 +73,11 @@ public class MeshArbiter {
     }
 
     public Map<Long,Long> reconfigureOnFault(Set<Long> hsIds, FaultMessage fm) {
+        if (fm.failedSite == m_hsId && fm.witnessed) {
+            m_recoveryLog.warn("Received suicide fault message for site " +
+                    CoreUtils.hsIdToString(fm.failedSite) + " ignoring");
+            return ImmutableMap.of();
+        }
         if (m_failedSites.contains(fm.failedSite)) {
             m_recoveryLog.debug("Received fault message for stale failed site " +
                     CoreUtils.hsIdToString(fm.failedSite) + " ignoring");
