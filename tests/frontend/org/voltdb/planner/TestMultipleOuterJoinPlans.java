@@ -226,15 +226,29 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
       AbstractPlanNode c = n.getChild(0);
       assertTrue(c instanceof NestLoopIndexPlanNode);
 
-      // R3.A and P2.A have an index. P2,R1 is NLJ/IndexScan because P2 is distributed
+      // R3.A and P2.A have an index. P2,R1 is NLIJ/inlined IndexScan because it's an inner join even P2 is distributed
       lpn = compileToFragments("select *  FROM P2,R1 LEFT JOIN R3 ON R3.A = P2.A WHERE P2.A=R1.A ");
       assertTrue(lpn.size() == 2);
       n = lpn.get(0).getChild(0).getChild(0);
       assertTrue(n instanceof NestLoopIndexPlanNode);
       assertTrue(JoinType.LEFT == ((NestLoopIndexPlanNode) n).getJoinType());
       c = n.getChild(0);
-      assertTrue(c instanceof NestLoopPlanNode);
-      assertTrue(JoinType.INNER == ((NestLoopPlanNode) c).getJoinType());
+      assertTrue(c instanceof ReceivePlanNode);
+      n = lpn.get(1).getChild(0);
+      assertTrue(n instanceof NestLoopIndexPlanNode);
+
+      // R3.A and P2.A have an index. P2,R1 is NLJ/IndexScan because P2 is distributed and it's an outer join
+      lpn = compileToFragments("select *  FROM R1 LEFT JOIN P2 ON R1.A = P2.A, R3 WHERE R1.A=R3.A ");
+      assertTrue(lpn.size() == 2);
+      n = lpn.get(0).getChild(0).getChild(0);
+      assertTrue(n instanceof NestLoopIndexPlanNode);
+      assertTrue(JoinType.INNER == ((NestLoopIndexPlanNode) n).getJoinType());
+      n = n.getChild(0);
+      assertTrue(n instanceof NestLoopPlanNode);
+      c = n.getChild(0);
+      assertTrue(c instanceof SeqScanPlanNode);
+      c = n.getChild(1);
+      assertTrue(c instanceof ReceivePlanNode);
       n = lpn.get(1).getChild(0);
       assertTrue(n instanceof IndexScanPlanNode);
 
