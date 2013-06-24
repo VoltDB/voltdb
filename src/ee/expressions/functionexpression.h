@@ -197,7 +197,6 @@ static const int FUNC_EXTRACT_INTERVAL_HOUR             = SQL_EXTRACT_VOLT_FUNC_
 static const int FUNC_EXTRACT_INTERVAL_MINUTE           = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_INTERVAL_MINUTE;
 static const int FUNC_EXTRACT_INTERVAL_SECOND           = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_INTERVAL_SECOND;
 
-
 // VoltDB aliases (optimized implementations for existing HSQL functions)
 static const int FUNC_VOLT_SUBSTRING_CHAR_FROM              = 10000;
 
@@ -211,6 +210,11 @@ static const int FUNC_SINCE_EPOCH                      = 20005;
 static const int FUNC_SINCE_EPOCH_SECOND               = 20006;
 static const int FUNC_SINCE_EPOCH_MILLISECOND          = 20007;
 static const int FUNC_SINCE_EPOCH_MICROSECOND          = 20008;
+static const int FUNC_TO_TIMESTAMP                     = 20009;
+static const int FUNC_TO_TIMESTAMP_SECOND              = 20010;
+static const int FUNC_TO_TIMESTAMP_MILLISECOND         = 20011;
+static const int FUNC_TO_TIMESTAMP_MICROSECOND         = 20012;
+
 }
 
 // All of these "...functions.h" files need to be included AFTER the above definitions
