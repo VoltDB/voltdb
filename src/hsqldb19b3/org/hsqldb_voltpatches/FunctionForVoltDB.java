@@ -98,6 +98,11 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_SINCE_EPOCH_MILLISECOND   = 20007;
         static final int FUNC_VOLT_SINCE_EPOCH_MICROSECOND   = 20008;
 
+        static final int FUNC_VOLT_TO_TIMESTAMP              = 20009;
+        static final int FUNC_VOLT_TO_TIMESTAMP_SECOND       = 20010;
+        static final int FUNC_VOLT_TO_TIMESTAMP_MILLISECOND  = 20011;
+        static final int FUNC_VOLT_TO_TIMESTAMP_MICROSECOND  = 20012;
+
         private static final FunctionId[] instances = {
 
             new FunctionId("sql_error", null, FUNC_VOLT_SQL_ERROR, 0,
@@ -127,8 +132,14 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new Type[] { Type.SQL_VARCHAR },
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET}),
 
-            new FunctionId("since_epoch", Type.SQL_INTEGER, FUNC_VOLT_SINCE_EPOCH, -1,
+            new FunctionId("since_epoch", Type.SQL_BIGINT, FUNC_VOLT_SINCE_EPOCH, -1,
                     new Type[] { Type.SQL_VARCHAR, Type.SQL_TIMESTAMP },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.X_KEYSET, 3,
+                    Tokens.SECOND, Tokens.MILLIS, Tokens.MICROS,
+                    Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("to_timestamp", Type.SQL_TIMESTAMP, FUNC_VOLT_TO_TIMESTAMP, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_BIGINT },
                     new short[] {  Tokens.OPENBRACKET, Tokens.X_KEYSET, 3,
                     Tokens.SECOND, Tokens.MILLIS, Tokens.MICROS,
                     Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
