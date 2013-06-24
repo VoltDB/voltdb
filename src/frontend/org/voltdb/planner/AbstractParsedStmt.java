@@ -733,7 +733,6 @@ public abstract class AbstractParsedStmt {
                         exprs = new ArrayList<AbstractExpression>();
                         joinTree.m_tableFilterList.put(table, exprs);
                     }
-                    expr.m_isJoiningClause = false;
                     exprs.add(expr);
                 }
                 else if (tableSet.size() == 2) {
@@ -749,7 +748,6 @@ public abstract class AbstractParsedStmt {
                         exprs = new ArrayList<AbstractExpression>();
                         joinTree.m_joinSelectionList.put(pair, exprs);
                     }
-                    expr.m_isJoiningClause = true;
                     exprs.add(expr);
                 }
                 else if (tableSet.size() > 2) {

@@ -346,4 +346,13 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         visited.add(this);
         collected.add(this);
     }
+
+    protected String explainPredicate(String prefix) {
+        // TODO Auto-generated method stub
+        if (m_predicate != null) {
+            return prefix + m_predicate.explain(m_targetTableName);
+        }
+        return "";
+    }
+
 }
