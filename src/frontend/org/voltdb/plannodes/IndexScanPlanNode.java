@@ -306,6 +306,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         }
         // When there is no start key, count an end-key as a single-column range scan key.
         else if (keyWidth == 0.0 && m_endExpression != null) {
+            // TODO: ( (double) ExpressionUtil.uncombineAny(m_endExpression).size() ) - 0.5
+            // might give a result that is more in line with multi-component start-key-only scans.
             keyWidth = 0.5;
         }
 
@@ -325,46 +327,51 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         }
         assert(tuplesToRead > 0);
 
-        // If not a unique, covering index, favor (discount) the choice with the most columns pre-filteredby the index.
+        // If not a unique, covering index, favor (discount)
+        // the choice with the most columns pre-filtered by the index.
         if (!m_catalogIndex.getUnique() || (colCount > keyWidth)) {
-            // Cost starts at 90% of a comparable seqscan
-            // AND gets scaled down by an additional factor of 0.1 for each fully covered indexed column.
-            // One intentional benchmark is for a single range-covered (i.e. half-covered, keyWidth == 0.5) column
-            // to have less than 1/3 the cost of a "for ordering purposes only" index scan (keyWidth == 0).
+            // Cost starts at 90% of a comparable seqscan AND
+            // gets scaled down by an additional factor of 0.1 for each fully covered indexed column.
+            // One intentional benchmark is for a single range-covered
+            // (i.e. half-covered, keyWidth == 0.5) column to have less than 1/3 the cost of a
+            // "for ordering purposes only" index scan (keyWidth == 0).
             // This is to completely compensate for the up to 3X final cost resulting from
             // the "order by" and non-inlined "projection" nodes that must be added later to the
             // inconveniently ordered scan result.
-            // Using a factor of 0.1 per FULLY covered (equality-filtered) column, the effective scale factor for
-            // a single PARTIALLY covered (range-filtered) comes to SQRT(0.1) which is just under 32% FTW!
+            // Using a factor of 0.1 per FULLY covered (equality-filtered) column,
+            // the effective scale factor for a single PARTIALLY covered (range-filtered) column
+            // comes to SQRT(0.1) which is just under 32% FTW!
             tuplesToRead += (int) (tableEstimates.maxTuples * 0.90 * Math.pow(0.10, keyWidth));
 
-            // With all this discounting, make sure that any non-"covering unique" index scan costs more than
-            // any "covering unique" one, no matter how many indexed column filters get piled on.
+            // With all this discounting, make sure that any non-"covering unique" index scan costs more
+            // than any "covering unique" one, no matter how many indexed column filters get piled on.
             // It's theoretically possible to be wrong here -- that a not-strictly-unique combination of
-            // indexed column filters statistically selects fewer (fractional) rows per scan than a unique index,
-            // but we favor the unique index anyway because:
+            // indexed column filters statistically selects fewer (fractional) rows per scan
+            // than a unique index, but we favor the unique index anyway because:
             // -- the "unique" declaration guarantees a worse-case upper limit of 1 row per scan.
-            // -- the per-indexed-column selectivity factors used above are highly fictionalized -- actual cardinality
-            //    for individual components of compound indexes MIGHT be very low,
-            //    making them much less selective than estimated.
+            // -- the per-indexed-column selectivity factors used above are highly fictionalized
+            //    -- actual cardinality for individual components of compound indexes MIGHT be very low,
+            //       making them much less selective than estimated.
             if (tuplesToRead < 4) {
                 tuplesToRead = 4; // i.e. costing 1 unit more than a covered unique btree.
             }
         }
 
-        // This tuplesToRead value estimates the number of base table tuples fetched from the index scan.
-        // It's a vague measure of the cost of the scan whose accuracy depends a lot on what kind of
-        // post-filtering needs to happen.
+        // This tuplesToRead value estimates the number of base table tuples
+        // fetched from the index scan.
+        // It's a vague measure of the cost of the scan whose accuracy depends a lot
+        // on what kind of post-filtering needs to happen.
         // The tuplesRead value is also used here to estimate the number of RESULT rows.
         // This value is estimated without regard to any post-filtering effect there might be
         // -- as if all rows found in the index passed any additional post-filter conditions.
-        // This ignoring of post-filter effects is at least consistent with the processing in SeqScanPlanNode.
-        // In effect, it gives index scans an "unfair" advantage -- follow-on sorts (etc.) are costed lower
-        // as if they are operating on fewer rows than would have come out of the seqscan, though that's nonsense.
-        // It's just an artifact of how SeqScanPlanNode costing ignores ALL filters but IndexScanPlanNode costing
-        // only ignores post-filters.
-        // In any case, it's important to keep this code roughly in synch with any changes
-        // to SeqScanPlanNode's costing to make sure that SeqScanPlanNode never gains an unfair advantage.
+        // This ignoring of post-filter effects is at least consistent with the SeqScanPlanNode.
+        // In effect, it gives index scans an "unfair" advantage
+        // -- follow-on sorts (etc.) are costed lower as if they are operating on fewer rows
+        // than would have come out of the seqscan, though that's nonsense.
+        // It's just an artifact of how SeqScanPlanNode costing ignores ALL filters but
+        // IndexScanPlanNode costing only ignores post-filters.
+        // In any case, it's important to keep this code roughly in synch with any changes to
+        // SeqScanPlanNode's costing to make sure that SeqScanPlanNode never gains an unfair advantage.
         m_estimatedOutputTupleCount = tuplesToRead;
         m_estimatedProcessedTupleCount = tuplesToRead;
 
@@ -380,7 +387,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         stringer.key(Members.KEY_ITERATE.name()).value(m_keyIterate);
         stringer.key(Members.LOOKUP_TYPE.name()).value(m_lookupType.toString());
         stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirection.toString());
-        stringer.key(Members.DETERMINISM_ONLY.name()).value(m_forDeterminismOnly);
+        if (m_forDeterminismOnly) {
+            stringer.key(Members.DETERMINISM_ONLY.name()).value(true);
+        }
         stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_targetIndexName);
         stringer.key(Members.END_EXPRESSION.name());
         stringer.value(m_endExpression);
@@ -400,7 +409,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         m_keyIterate = jobj.getBoolean( Members.KEY_ITERATE.name() );
         m_lookupType = IndexLookupType.get( jobj.getString( Members.LOOKUP_TYPE.name() ) );
         m_sortDirection = SortDirectionType.get( jobj.getString( Members.SORT_DIRECTION.name() ) );
-        m_forDeterminismOnly = jobj.getBoolean(Members.DETERMINISM_ONLY.name());
+        m_forDeterminismOnly = jobj.optBoolean(Members.DETERMINISM_ONLY.name());
         m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
         m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
         JSONObject tempjobj = null;
@@ -427,9 +436,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         int indexSize = m_catalogIndex.getColumns().size();
         int keySize = m_searchkeyExpressions.size();
 
-        // When there is no start key, count an end-key as a single-column range scan key.
+        // When there is no start key, count a range scan key for each ANDed end condition.
         if (keySize == 0 && m_endExpression != null) {
-            keySize = 1;
+            keySize = ExpressionUtil.uncombineAny(m_endExpression).size();
         }
 
         String usageInfo;
@@ -437,13 +446,14 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         if (keySize == 0) {
             // The plan is easy to explain if it isn't using indexed expressions.
             // Just explain why an index scan was chosen
-            // -- either for determinism or for an explicit ORDER BY requirement --
+            // -- either for determinism or for an explicit ORDER BY requirement.
             if (m_forDeterminismOnly) {
                 usageInfo = " (for deterministic order only)";
             } else {
                 usageInfo = " (for sort order only)";
             }
-            // and, on its own indented line, explain any unrelated post-filter applied to the result.
+            // Introduce on its own indented line, any unrelated post-filter applied to the result.
+            // e.g. " filter by OTHER_COL = 1"
             predicatePrefix = "\n" + indent + " filter by ";
         }
         else {
@@ -499,18 +509,23 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                     usageInfo = "\n" + indent + " range-scan covering from " + start;
                 }
                 else {
-                    usageInfo = "\n" + indent + String.format(" range-scan on %d of %d cols from %s", keySize, indexSize, start);
+                    usageInfo = String.format("\n%s range-scan on %d of %d cols from %s", indent, keySize, indexSize, start);
                 }
                 // Explain the criteria for continuinuing the scan such as
                 // "while (event_type = 1 AND event_start < x.start_time+30)"
                 // or label it as a scan "to the end"
                 usageInfo += explainEndKeys(asIndexed);
             }
-            // Note any additional filters not related to the index that could cause rows to be skipped.
+            // Introduce any additional filters not related to the index
+            // that could cause rows to be skipped.
+            // e.g. "... scan ... from ... while ..., filter by OTHER_COL = 1"
             predicatePrefix = ", filter by ";
         }
-        // Describe the table name and either a user-provided name of the index or its user-specified role ("primary key")
+        // Describe any additional filters not related to the index
+        // e.g. "...filter by OTHER_COL = 1".
         String predicate = explainPredicate(predicatePrefix);
+        // Describe the table name and either a user-provided name of the index or
+        // its user-specified role ("primary key").
         String retval = "INDEX SCAN of \"" + m_targetTableName + "\"";
         String indexDescription = " using \"" + m_targetIndexName + "\"";
         // Replace ugly system-generated index name with a description of its user-specified role.
@@ -527,7 +542,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     /// Explain that this index scan begins at the "start" of the index
-    /// or at a particular key, possibly compound
+    /// or at a particular key, possibly compound.
     private String explainSearchKeys(String[] asIndexed, int nCovered)
     {
         // By default, indexing starts at the start of the index.
@@ -550,7 +565,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     /// Explain that this index scans "to end" of the index
-    /// or only while an end expression involving indexed key values remains true.
+    /// or only "while" an end expression involving indexed key values remains true.
     private String explainEndKeys(String[] asIndexed)
     {
         // By default, indexing starts at the start of the index.
