@@ -39,7 +39,7 @@ import com.google.common.collect.ImmutableSortedMap;
  */
 public class ElasticHashinator extends TheHashinator {
     public static int DEFAULT_TOKENS_PER_PARTITION =
-        Integer.parseInt(System.getProperty("ELASTIC_TOKENS_PER_PARTITION", "8"));
+        Integer.parseInt(System.getProperty("ELASTIC_TOKENS_PER_PARTITION", "256"));
 
     /**
      * Tokens on the ring. A value hashes to a token if the token is the first value <=
