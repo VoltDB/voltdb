@@ -731,9 +731,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         // The inner table can have multiple index access paths based on
         // inner and inner-outer join expressions plus the naive one.
 
-        // If the inner table is partitioned and the outer node is replicated,
-        // the join node will be NLJ and not NLIJ, even for an index access path.
-        if (innerNode.m_table.getIsreplicated() || canDeferSendReceivePairForNode()) {
+        // If the join is INNER or the inner table is replicated or the send/receive pair can be deferred,
+        // the join node can be NLIJ, otherwise it will be NLJ even for an index access path.
+        if (joinNode.m_joinType == JoinType.INNER || innerNode.m_table.getIsreplicated() || canDeferSendReceivePairForNode()) {
             // This case can support either NLIJ -- assuming joinNode.m_joinInnerOuterList
             // is non-empty AND at least ONE of its clauses can be leveraged in the IndexScan
             // -- or NLJ, otherwise.
@@ -765,7 +765,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         if (nodes.size() == 1) {
             for (AccessPath path : joinNode.m_accessPaths) {
                 joinNode.m_currentAccessPath = path;
-                AbstractPlanNode plan = getSelectSubPlanForJoinNode(rootNode);
+                AbstractPlanNode plan = getSelectSubPlanForJoinNode(rootNode, false);
                 /*
                  * If the access plan for the table in the join order was for a
                  * distributed table scan there will be a send/receive pair at the top.
@@ -834,26 +834,32 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * that gives the right tuples.
      *
      * @param joinNode The join node to build the plan for.
+     * @param isInnerTable True if the join node is the inner node in the join
      * @return A completed plan-sub-graph that should match the correct tuples from the
      * correct tables.
      */
-    private AbstractPlanNode getSelectSubPlanForJoinNode(JoinNode joinNode) {
+    private AbstractPlanNode getSelectSubPlanForJoinNode(JoinNode joinNode, boolean isInnerNode) {
         assert(joinNode != null);
         if (joinNode.m_table != null) {
             // End of recursion
             AbstractPlanNode scanNode = getAccessPlanForTable(joinNode.m_table, joinNode.m_currentAccessPath);
-            // Add the send/receive pair to the table if required.
-            if (!joinNode.m_table.getIsreplicated() && !canDeferSendReceivePairForNode()) {
+            // Add the send/receive pair to the outer table only if required.
+            // In case of the inner table, the position of the send/receive pair depends on the join type and
+            // will be be added later (if required) during the join node construction.
+            // For the inner join, it will be placed above the join node to allow for
+            // the NLIJ/inline IndexScan plan. For the outer join, the pair must be added
+            // immediately above the table node.
+            if (!isInnerNode && !joinNode.m_table.getIsreplicated() && !canDeferSendReceivePairForNode()) {
                 scanNode = addSendReceivePair(scanNode);
             }
             return scanNode;
         } else {
             assert(joinNode.m_leftNode != null && joinNode.m_rightNode != null);
             // Outer node
-            AbstractPlanNode outerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_leftNode);
+            AbstractPlanNode outerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_leftNode, false);
 
             // Inner Node.
-            AbstractPlanNode innerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_rightNode);
+            AbstractPlanNode innerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_rightNode, true);
 
             // Join Node
             return getSelectSubPlanForOuterAccessPathStep(joinNode, outerScanPlan, innerScanPlan);
@@ -949,15 +955,26 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
         AccessPath innerAccessPath = joinNode.m_rightNode.m_currentAccessPath;
 
-        AbstractJoinPlanNode retval = null;
+        AbstractJoinPlanNode ajNode = null;
+        AbstractPlanNode retval = null;
+        // We may need to add a send/receive pair to the inner plan. The outer plan should already have it
+        // if it's required.
+        assert(joinNode.m_rightNode != null);
+        boolean needInnerSendReceive = joinNode.m_rightNode.m_table != null &&
+                (!joinNode.m_rightNode.m_table.getIsreplicated() && !canDeferSendReceivePairForNode());
+
         // In case of innerPlan being an IndexScan the NLIJ will have an advantage
         // over the NLJ/IndexScan only if there is at least one inner-outer join expression
         // that is used for the index access. If this is the case then this expression
         // will be missing from the otherExprs list but is in the original joinNode.m_joinInnerOuterList
-        //
-        //If not, NLJ/IndexScan is a better choice
-        if (innerPlan instanceof IndexScanPlanNode &&
-                hasInnerOuterIndexExpression(joinNode.m_joinInnerOuterList, innerAccessPath.otherExprs)) {
+        // An additional requirements for the outer joins is that the inner node should not require
+        // the send/receive pair. Otherwise, the outer table will be joined with the individual
+        // partitions instead of the whole table leading to the erroneous rows in the result set
+        // If not, NLJ/IndexScan is a better choice
+        boolean canHaveNLIJ = innerPlan instanceof IndexScanPlanNode &&
+                hasInnerOuterIndexExpression(joinNode.m_joinInnerOuterList, innerAccessPath.otherExprs) &&
+                (joinNode.m_joinType == JoinType.INNER || !needInnerSendReceive);
+        if (canHaveNLIJ) {
             NestLoopIndexPlanNode nlijNode = new NestLoopIndexPlanNode();
 
             nlijNode.setJoinType(joinNode.m_joinType);
@@ -974,9 +991,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             // now generate the output schema for this join
             nlijNode.generateOutputSchema(m_db);
 
-            retval = nlijNode;
-        }
-        else {
+            ajNode = nlijNode;
+            retval = (needInnerSendReceive) ? addSendReceivePair(ajNode) : ajNode;
+        } else {
             // get all the clauses that join the applicable two tables
             ArrayList<AbstractExpression> joinClauses = innerAccessPath.joinExprs;
             if (innerPlan instanceof IndexScanPlanNode) {
@@ -995,16 +1012,22 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             // combine the tails plan graph with the new head node
             nljNode.addAndLinkChild(outerPlan);
 
+            // Add send/receive pair above the inner plan
+            if (needInnerSendReceive) {
+                innerPlan = addSendReceivePair(innerPlan);
+            }
+
             nljNode.addAndLinkChild(innerPlan);
             // now generate the output schema for this join
             nljNode.generateOutputSchema(m_db);
 
-            retval = nljNode;
+            ajNode = nljNode;
+            retval = ajNode;
         }
 
-        retval.setPreJoinPredicate(ExpressionUtil.combine(joinNode.m_joinOuterList));
+        ajNode.setPreJoinPredicate(ExpressionUtil.combine(joinNode.m_joinOuterList));
 
-        retval.setWherePredicate(ExpressionUtil.combine(whereClauses));
+        ajNode.setWherePredicate(ExpressionUtil.combine(whereClauses));
 
         return retval;
     }
