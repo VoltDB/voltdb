@@ -17,10 +17,12 @@
 
 package org.voltdb;
 
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -56,6 +58,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
+import org.apache.log4j.FileAppender;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -255,6 +260,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     private ListeningExecutorService m_computationService;
 
+    private Thread m_configLogger;
+
     // methods accessed via the singleton
     @Override
     public void startSampler() {
@@ -333,6 +340,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_hostIdWithStartupCatalog = 0;
             m_pathToStartupCatalog = m_config.m_pathToCatalog;
             m_replicationActive = false;
+            m_configLogger = null;
 
             // set up site structure
             m_localSites = new COWMap<Long, ExecutionSite>();
@@ -739,6 +747,81 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_restoreAgent.setCatalogContext(m_catalogContext);
                 m_restoreAgent.setInitiator(new Iv2TransactionCreator(m_clientInterfaces.get(0)));
             }
+
+            m_configLogger = new Thread(new ConfigLogging());
+            m_configLogger.start();
+        }
+    }
+
+    private class ConfigLogging implements Runnable {
+        private void logConfigInfo() {
+            File voltDbRoot = CatalogUtil.getVoltDbRoot(m_deployment.getPaths());
+
+            String pathToConfigInfoDir = voltDbRoot.getPath() + File.separator + "config_log";
+            File configInfoDir = new File(pathToConfigInfoDir);
+            configInfoDir.mkdirs();
+
+            String pathToConfigInfo = pathToConfigInfoDir + File.separator + "config.log";
+            File configInfo = new File(pathToConfigInfo);
+
+            try {
+                BufferedWriter bw = new BufferedWriter(new FileWriter(configInfo));
+
+                // log current working directory
+                bw.write("[WorkingDirectory]\n");
+                bw.write(System.getProperty("user.dir"));
+                bw.newLine();
+
+                // log pid volt started with
+                bw.write("[PID]\n");
+                byte[] bo = new byte[10];
+                String[] cmd = { "bash", "-c", "echo $PPID" };
+                Process p = Runtime.getRuntime().exec(cmd);
+                p.getInputStream().read(bo);
+                bw.write(new String(bo).trim());
+                bw.newLine();
+
+                // log log4j destination
+                bw.write("[Log4jDestination]\n");
+                Logger logger = LogManager.getRootLogger();
+                FileAppender appender = (FileAppender) logger.getAppender("file");
+                String log4jFile = appender.getFile();
+                bw.write(log4jFile);
+                bw.newLine();
+
+                // log deployment
+                bw.write("[Deployment]\n");
+                File deploymentXMLFile = new File(m_config.m_pathToDeployment);
+                BufferedReader br = new BufferedReader(new FileReader(deploymentXMLFile));
+                String line = null;
+                while ((line = br.readLine()) != null) {
+                    bw.write(line);
+                    bw.newLine();
+                }
+                br.close();
+
+                bw.flush();
+                bw.close();
+            } catch (IOException e) {
+                hostLog.error("Failed to log config info: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+
+        private void logCatalog() {
+            File voltDbRoot = CatalogUtil.getVoltDbRoot(m_deployment.getPaths());
+
+            try {
+                m_catalogContext.writeCatalogJarToFile(voltDbRoot.getPath(), "catalog.jar");
+            } catch (IOException e) {
+                hostLog.error("Failed to log catalog: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+
+        public void run() {
+            logConfigInfo();
+            logCatalog();
         }
     }
 
@@ -1450,6 +1533,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     }
                 }
 
+                if (m_configLogger != null) {
+                    m_configLogger.join();
+                }
+
                 // shut down Export and its connectors.
                 ExportManager.instance().shutdown();
 
@@ -1665,6 +1752,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_MPI.updateCatalog(diffCommands, m_catalogContext, csp);
             }
 
+            new ConfigLogging().logCatalog();
 
             return Pair.of(m_catalogContext, csp);
         }
