@@ -208,16 +208,12 @@ static const int FUNC_VOLT_ARRAY_ELEMENT               = 20003;
 static const int FUNC_VOLT_ARRAY_LENGTH                = 20004;
 static const int FUNC_SINCE_EPOCH                      = 20005;
 static const int FUNC_SINCE_EPOCH_SECOND               = 20006;
-static const int FUNC_SINCE_EPOCH_MILLIS               = 20007;    // May not need, but copy it from java for completeness
-static const int FUNC_SINCE_EPOCH_MILLISECOND          = 20008;
-static const int FUNC_SINCE_EPOCH_MICROS               = 20009;    // May not need, but copy it from java for completeness
-static const int FUNC_SINCE_EPOCH_MICROSECOND          = 20010;
-static const int FUNC_TO_TIMESTAMP                     = 20011;
-static const int FUNC_TO_TIMESTAMP_SECOND              = 20012;
-static const int FUNC_TO_TIMESTAMP_MILLIS              = 20013;    // May not need, but copy it from java for completeness
-static const int FUNC_TO_TIMESTAMP_MILLISECOND         = 20014;
-static const int FUNC_TO_TIMESTAMP_MICROS              = 20015;    // May not need, but copy it from java for completeness
-static const int FUNC_TO_TIMESTAMP_MICROSECOND         = 20016;
+static const int FUNC_SINCE_EPOCH_MILLISECOND          = 20007;
+static const int FUNC_SINCE_EPOCH_MICROSECOND          = 20008;
+static const int FUNC_TO_TIMESTAMP                     = 20009;
+static const int FUNC_TO_TIMESTAMP_SECOND              = 20010;
+static const int FUNC_TO_TIMESTAMP_MILLISECOND         = 20011;
+static const int FUNC_TO_TIMESTAMP_MICROSECOND         = 20012;
 
 }
 

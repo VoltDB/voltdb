@@ -274,22 +274,18 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_SINCE_EPOCH_SECOND:
             ret = new UnaryFunctionExpression<FUNC_SINCE_EPOCH_SECOND>((*arguments)[0]);
             break;
-        case FUNC_SINCE_EPOCH_MILLIS:
         case FUNC_SINCE_EPOCH_MILLISECOND:
             ret = new UnaryFunctionExpression<FUNC_SINCE_EPOCH_MILLISECOND>((*arguments)[0]);
             break;
-        case FUNC_SINCE_EPOCH_MICROS:
         case FUNC_SINCE_EPOCH_MICROSECOND:
             ret = new UnaryFunctionExpression<FUNC_SINCE_EPOCH_MICROSECOND>((*arguments)[0]);
             break;
         case FUNC_TO_TIMESTAMP_SECOND:
             ret = new UnaryFunctionExpression<FUNC_TO_TIMESTAMP_SECOND>((*arguments)[0]);
             break;
-        case FUNC_TO_TIMESTAMP_MILLIS:
         case FUNC_TO_TIMESTAMP_MILLISECOND:
             ret = new UnaryFunctionExpression<FUNC_TO_TIMESTAMP_MILLISECOND>((*arguments)[0]);
             break;
-        case FUNC_TO_TIMESTAMP_MICROS:
         case FUNC_TO_TIMESTAMP_MICROSECOND:
             ret = new UnaryFunctionExpression<FUNC_TO_TIMESTAMP_MICROSECOND>((*arguments)[0]);
             break;

@@ -95,17 +95,13 @@ public class FunctionForVoltDB extends FunctionSQL {
 
         static final int FUNC_VOLT_SINCE_EPOCH               = 20005;
         static final int FUNC_VOLT_SINCE_EPOCH_SECOND        = 20006;
-        static final int FUNC_VOLT_SINCE_EPOCH_MILLIS        = 20007;
-        static final int FUNC_VOLT_SINCE_EPOCH_MILLISECOND   = 20008;
-        static final int FUNC_VOLT_SINCE_EPOCH_MICROS        = 20009;
-        static final int FUNC_VOLT_SINCE_EPOCH_MICROSECOND   = 20010;
+        static final int FUNC_VOLT_SINCE_EPOCH_MILLISECOND   = 20007;
+        static final int FUNC_VOLT_SINCE_EPOCH_MICROSECOND   = 20008;
 
-        static final int FUNC_VOLT_TO_TIMESTAMP              = 20011;
-        static final int FUNC_VOLT_TO_TIMESTAMP_SECOND       = 20012;
-        static final int FUNC_VOLT_TO_TIMESTAMP_MILLIS       = 20013;
-        static final int FUNC_VOLT_TO_TIMESTAMP_MILLISECOND  = 20014;
-        static final int FUNC_VOLT_TO_TIMESTAMP_MICROS       = 20015;
-        static final int FUNC_VOLT_TO_TIMESTAMP_MICROSECOND  = 20016;
+        static final int FUNC_VOLT_TO_TIMESTAMP              = 20009;
+        static final int FUNC_VOLT_TO_TIMESTAMP_SECOND       = 20010;
+        static final int FUNC_VOLT_TO_TIMESTAMP_MILLISECOND  = 20011;
+        static final int FUNC_VOLT_TO_TIMESTAMP_MICROSECOND  = 20012;
 
         private static final FunctionId[] instances = {
 
