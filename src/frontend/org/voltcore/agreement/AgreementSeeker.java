@@ -55,21 +55,39 @@ public class AgreementSeeker {
         m_survivors = ImmutableSet.of();
     }
 
-    public void startSeekingFor(final Set<Long> hsids, final Map<Long,Boolean> inTrouble) {
+    public void startSeekingFor(
+            final Set<Long> hsids,
+            final Map<Long,Boolean> inTrouble,
+            final Set<Long> failedSites) {
+
         if (!m_hsids.equals(hsids)) {
-            if (!m_hsids.isEmpty()) clear();
+            if (!m_hsids.isEmpty()) clear(failedSites);
             m_hsids = ImmutableSortedSet.copyOf(hsids);
         }
         m_survivors = m_strategy.accept(survivorPicker, Pair.of(m_hsids, inTrouble));
     }
 
-    public void clear() {
-        m_reported.clear();
+    public void clear(final Set<Long> failedSites) {
+        removeValues(m_reported, failedSites);
+        for (Long failed: failedSites) {
+            m_reported.removeAll(failed);
+        }
+
         m_witnessed.clear();
         m_alive.clear();
 
         m_hsids = ImmutableSet.of();
         m_survivors = ImmutableSet.of();
+    }
+
+    private void removeValues(TreeMultimap<Long, Long> mm, Set<Long> values) {
+        Iterator<Map.Entry<Long, Long>> itr = mm.entries().iterator();
+        while (itr.hasNext()) {
+            Map.Entry<Long, Long> e = itr.next();
+            if (values.contains(e.getValue())) {
+                itr.remove();
+            }
+        }
     }
 
     static protected final ArbitrationStrategy.Visitor<Set<Long>, Pair<Set<Long>, Map<Long,Boolean>>> survivorPicker =
@@ -117,6 +135,10 @@ public class AgreementSeeker {
                 itr.remove();
             }
         }
+    }
+
+    public boolean isUnwitnessedStale(long failedHsid, long self) {
+        return m_reported.get(failedHsid).contains(self);
     }
 
     public void add(long reportingHsid, final Map<Long,Boolean> failed) {

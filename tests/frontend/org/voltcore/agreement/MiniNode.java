@@ -175,11 +175,11 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
                     if (message instanceof FailureSiteUpdateMessage)
                     {
                         for (long failedHostId : ((FailureSiteUpdateMessage)message).m_failedHSIds.keySet()) {
-                            long agreementHSId = CoreUtils.getHSIdFromHostAndSite((int)failedHostId,
-                                    HostMessenger.AGREEMENT_SITE_ID);
-                            m_miniSite.reportFault(agreementHSId, false);
-                            if (  !m_miniSite.reportFault(agreementHSId, false)
-                                && m_HSIds.contains(agreementHSId)) {
+                            m_miniSite.reportFault(failedHostId, false);
+                            if ( m_HSIds.contains(failedHostId)) {
+                                if (m_nodeState.get() == NodeState.RUN) {
+                                    m_nodeLog.info("Flipping from RUN to RESOLVE om a FailureSiteUpdateMessage");
+                                }
                                 m_nodeState.set(NodeState.RESOLVE);
                             }
                         }
@@ -195,6 +195,9 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
                     m_miniSite.reportFault(agreementHSId, true);
                     m_deadTracker.stopTracking(HSId);
                     if (m_HSIds.contains(agreementHSId)) {
+                        if (m_nodeState.get() == NodeState.RUN) {
+                            m_nodeLog.info("Flipping from RUN to RESOLVE om a FailureMessage");
+                        }
                         m_nodeState.set(NodeState.RESOLVE);
                     }
                 }
@@ -215,5 +218,6 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
             }
         }
         m_nodeState.set(NodeState.RUN);
+        m_nodeLog.info("Flipping from RESOLVE to RUN on a DISCONNECT");
     }
 }

@@ -73,20 +73,20 @@ public class MeshArbiter {
     }
 
     public Map<Long,Long> reconfigureOnFault(Set<Long> hsIds, FaultMessage fm) {
+        Boolean alreadyWitnessed = m_inTrouble.get(fm.failedSite);
         if (fm.failedSite == m_hsId && fm.witnessed) {
             m_recoveryLog.warn("Received suicide fault message for site " +
                     CoreUtils.hsIdToString(fm.failedSite) + " ignoring");
             return ImmutableMap.of();
         }
         if (m_failedSites.contains(fm.failedSite)) {
-            m_recoveryLog.debug("Received fault message for stale failed site " +
+            m_recoveryLog.info("Received fault message for stale failed site " +
                     CoreUtils.hsIdToString(fm.failedSite) + " ignoring");
             return ImmutableMap.of();
         }
 
         // if entry is present and already witnessed then get out
         // if entry is present and fm.witnessed == alreadyWitnessed then get out
-        Boolean alreadyWitnessed = m_inTrouble.get(fm.failedSite);
         if (   alreadyWitnessed != null
             && (alreadyWitnessed || alreadyWitnessed == fm.witnessed)) {
 
@@ -94,16 +94,22 @@ public class MeshArbiter {
                 m_inTrouble.put(fm.failedSite, fm.witnessed);
             }
 
-            m_recoveryLog.info("Received fault message for failed site " +
+            m_recoveryLog.info("Received an unwitnessed fault message for failed site " +
                     CoreUtils.hsIdToString(fm.failedSite) + " ignoring");
 
             return ImmutableMap.of();
         }
+        if (!fm.witnessed && m_seeker.isUnwitnessedStale(fm.failedSite, m_hsId)) {
+            m_recoveryLog.info("Received an unwitnessed stale fault message for failed site " +
+                    CoreUtils.hsIdToString(fm.failedSite) + " ignoring");
+            return ImmutableMap.of();
+        }
+
         // we are here if failed site was not previously recorded
         // or it was previously recorded but it became witnessed from non
         m_inTrouble.put(fm.failedSite,fm.witnessed);
 
-        m_seeker.startSeekingFor(Sets.difference(hsIds,m_failedSites), m_inTrouble);
+        m_seeker.startSeekingFor(Sets.difference(hsIds,m_failedSites), m_inTrouble, m_failedSites);
         m_seeker.add(m_hsId,m_inTrouble);
 
         discoverGlobalFaultData_send();
@@ -122,7 +128,7 @@ public class MeshArbiter {
                   + " to failed sites history");
 
             m_inTrouble.clear();
-            m_seeker.clear();
+            m_seeker.clear(m_failedSites);
 
             return lastTxnIdByFailedSite;
         } else {

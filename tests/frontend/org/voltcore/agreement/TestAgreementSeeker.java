@@ -70,9 +70,9 @@ public class TestAgreementSeeker {
                 with(fsumMap,fsumHsids(2L, true)),
                 with(fsumTxnid,10L));
 
-        s1.startSeekingFor(hsids, ImmutableMap.of(2L,true));
-        s3.startSeekingFor(hsids, ImmutableMap.of(2L,true));
-        s4.startSeekingFor(hsids, ImmutableMap.of(2L,true));
+        s1.startSeekingFor(hsids, ImmutableMap.of(2L,true), ImmutableSet.<Long>of());
+        s3.startSeekingFor(hsids, ImmutableMap.of(2L,true), ImmutableSet.<Long>of());
+        s4.startSeekingFor(hsids, ImmutableMap.of(2L,true), ImmutableSet.<Long>of());
 
         s1.add(make(s2fail.but(with(fsumSource,1L))));
         s1.add(make(s2fail.but(with(fsumSource,3L))));
@@ -107,8 +107,8 @@ public class TestAgreementSeeker {
                 with(fsumTxnid,10L));
         Maker<FailureSiteUpdateMessage> s3fail23 = s2fail23.but(with(fsumSite,3L));
 
-        s1.startSeekingFor(hsids, ImmutableMap.of(2L,true,3L,true));
-        s4.startSeekingFor(hsids, ImmutableMap.of(2L,true,3L,true));
+        s1.startSeekingFor(hsids, ImmutableMap.of(2L,true,3L,true), ImmutableSet.<Long>of());
+        s4.startSeekingFor(hsids, ImmutableMap.of(2L,true,3L,true), ImmutableSet.<Long>of());
 
         s1.add(make(s2fail23.but(with(fsumSource,1L))));
         s1.add(make(s3fail23.but(with(fsumSource,1L))));
@@ -136,10 +136,10 @@ public class TestAgreementSeeker {
     public void testOneLinkDownBetweenTwoNodes() throws Exception {
         Maker<FailureSiteUpdateMessage> msg = a(FailureSiteUpdateMessage,with(fsumTxnid,10L));
 
-        s1.startSeekingFor(hsids, ImmutableMap.of(3L,false,4L,false));
-        s2.startSeekingFor(hsids, ImmutableMap.of(3L,false,4L,false));
-        s3.startSeekingFor(hsids, ImmutableMap.of(3L,false,4L,true));
-        s4.startSeekingFor(hsids, ImmutableMap.of(3L,true,4L,false));
+        s1.startSeekingFor(hsids, ImmutableMap.of(3L,false,4L,false), ImmutableSet.<Long>of());
+        s2.startSeekingFor(hsids, ImmutableMap.of(3L,false,4L,false), ImmutableSet.<Long>of());
+        s3.startSeekingFor(hsids, ImmutableMap.of(3L,false,4L,true), ImmutableSet.<Long>of());
+        s4.startSeekingFor(hsids, ImmutableMap.of(3L,true,4L,false), ImmutableSet.<Long>of());
 
         s1.add(make(msg.but(with(fsumSite,3L),with(fsumSource,1L),with(fsumMap,fsumHsids(3L,false,4L,false)))));
         s1.add(make(msg.but(with(fsumSite,4L),with(fsumSource,1L),with(fsumMap,fsumHsids(3L,false,4L,false)))));
