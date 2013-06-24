@@ -2084,10 +2084,12 @@ public class FunctionSQL extends Expression {
                 since_epoch_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_SINCE_EPOCH_SECOND;
                 break;
             case Tokens.MILLIS :
+            case Tokens.MILLISECOND:
                 volt_alias = "since_epoch_millis";
                 since_epoch_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_SINCE_EPOCH_MILLISECOND;
                 break;
             case Tokens.MICROS :
+            case Tokens.MICROSECOND :
                 volt_alias = "since_epoch_micros";
                 since_epoch_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_SINCE_EPOCH_MICROSECOND;
                 break;
@@ -2112,10 +2114,12 @@ public class FunctionSQL extends Expression {
                 to_timestamp_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TO_TIMESTAMP_SECOND;
                 break;
             case Tokens.MILLIS :
+            case Tokens.MILLISECOND :
                 volt_alias = "to_timestamp_millis";
                 to_timestamp_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TO_TIMESTAMP_MILLISECOND;
                 break;
             case Tokens.MICROS :
+            case Tokens.MICROSECOND :
                 volt_alias = "to_timestamp_micros";
                 to_timestamp_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TO_TIMESTAMP_MICROSECOND;
                 break;
