@@ -109,6 +109,16 @@ public class AgreementSeeker {
         return m_survivors;
     }
 
+    private void removeValue(TreeMultimap<Long, Long> mm, long value) {
+        Iterator<Map.Entry<Long, Long>> itr = mm.entries().iterator();
+        while (itr.hasNext()) {
+            Map.Entry<Long,Long> e = itr.next();
+            if (e.getValue().equals(value)) {
+                itr.remove();
+            }
+        }
+    }
+
     public void add(long reportingHsid, final Map<Long,Boolean> failed) {
         if (!m_hsids.contains(reportingHsid)) return;
 
@@ -125,13 +135,9 @@ public class AgreementSeeker {
                 witnessed.add(e.getKey());
             }
         }
-        Iterator<Map.Entry<Long, Long>> itr = m_alive.entries().iterator();
-        while (itr.hasNext()) {
-            Map.Entry<Long,Long> e = itr.next();
-            if (e.getValue().equals(reportingHsid)) {
-                itr.remove();
-            }
-        }
+
+        removeValue(m_alive, reportingHsid);
+
         for (Long alive: Sets.difference(m_hsids, witnessed)) {
             m_alive.put(alive, reportingHsid);
         }
@@ -170,7 +176,7 @@ public class AgreementSeeker {
         @Override
         public Boolean visitMatchingCardinality(Scenario sc) {
             boolean agree = true;
-            Set<Long> quorum = sc.alive.keySet();
+            Set<Long> quorum = Sets.intersection(sc.alive.keySet(),sc.survivors);
             for (Long w: sc.witnessed.keySet()) {
                 agree = agree && quorum.equals(sc.witnessed.get(w));
             }
@@ -214,15 +220,15 @@ public class AgreementSeeker {
         return seenByInterconnectedPeers(who, byWhom);
     }
 
-    public Set<Long> nextKill() {
-        return m_strategy.accept(killPicker, (Void)null);
+    public Set<Long> nextKill(long selfHsid) {
+        return m_strategy.accept(killPicker, selfHsid);
     }
 
-    protected ArbitrationStrategy.Visitor<Set<Long>, Void> killPicker =
-            new ArbitrationStrategy.Visitor<Set<Long>, Void>() {
+    protected ArbitrationStrategy.Visitor<Set<Long>, Long> killPicker =
+            new ArbitrationStrategy.Visitor<Set<Long>, Long>() {
 
                 @Override
-                public Set<Long> visitNoQuarter(Void nada) {
+                public Set<Long> visitNoQuarter(Long self) {
                     return ImmutableSet.copyOf(m_reported.keySet());
                 }
 
@@ -232,14 +238,14 @@ public class AgreementSeeker {
                 // you also have to remove all (a)'s from witnessedBy values,
                 // as (a) can no longer witness
                 @Override
-                public Set<Long> visitMatchingCardinality(Void nada) {
+                public Set<Long> visitMatchingCardinality(Long self) {
                     Set<Long> picks = Sets.newHashSet();
                     Scenario sc = new Scenario();
                     while (!haveAgreement(sc)) {
                         Long pick = null;
                         for (Long s: sc.witnessed.keySet()) {
 
-                            if (picks.contains(s)) continue;
+                            if (s.equals(self) || picks.contains(s)) continue;
 
                             Set<Long> witnessedBy = sc.witnessed.get(s);
                             if (witnessedBy.isEmpty()) continue;
@@ -257,22 +263,12 @@ public class AgreementSeeker {
                         if (pick == null) {
                             return ImmutableSet.of();
                         }
-                        Iterator<Map.Entry<Long, Long>> itr =
-                                sc.witnessed.entries().iterator();
-                        while (itr.hasNext()) {
-                            Map.Entry<Long,Long> e = itr.next();
-                            if (e.getValue().equals(pick)) {
-                                itr.remove();
-                            }
-                        }
-                        itr = sc.alive.entries().iterator();
-                        while (itr.hasNext()) {
-                            Map.Entry<Long,Long> e = itr.next();
-                            if (e.getValue().equals(pick)) {
-                                itr.remove();
-                            }
-                        }
+
+                        removeValue(sc.witnessed,pick);
+                        removeValue(sc.alive, pick);
+
                         sc.witnessed.putAll(pick, sc.alive.removeAll(pick));
+
                         picks.add(pick);
                     }
                     return ImmutableSet.copyOf(sc.witnessed.keySet());

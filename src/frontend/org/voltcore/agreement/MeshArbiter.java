@@ -308,7 +308,7 @@ public class MeshArbiter {
             VoltDB.crashLocalVoltDB("Error extracting fault data", true, null);
         }
 
-        Set<Long> toBeKilled = m_seeker.nextKill();
+        Set<Long> toBeKilled = m_seeker.nextKill(m_hsId);
         Map<Long, Long> initiatorSafeInitPoint = new HashMap<Long, Long>();
 
         Iterator<Map.Entry<Pair<Long, Long>, Long>> iter =

@@ -86,9 +86,9 @@ public class TestAgreementSeeker {
         s4.add(make(s2fail.but(with(fsumSource,3L))));
         s4.add(make(s2fail.but(with(fsumSource,4L))));
 
-        assertThat(s1.nextKill(), contains(2L));
-        assertThat(s3.nextKill(), contains(2L));
-        assertThat(s4.nextKill(), contains(2L));
+        assertThat(s1.nextKill(1), contains(2L));
+        assertThat(s3.nextKill(2), contains(2L));
+        assertThat(s4.nextKill(3), contains(2L));
 
         assertThat(s1.needForward(1L), equalTo(false));
         assertThat(s3.needForward(3L), equalTo(false));
@@ -120,8 +120,8 @@ public class TestAgreementSeeker {
         s4.add(make(s2fail23.but(with(fsumSource,4L))));
         s4.add(make(s3fail23.but(with(fsumSource,4L))));
 
-        assertThat(s1.nextKill(), contains(2L,3L));
-        assertThat(s4.nextKill(), contains(2L,3L));
+        assertThat(s1.nextKill(1), contains(2L,3L));
+        assertThat(s4.nextKill(4), contains(2L,3L));
 
         assertThat(s1.needForward(1L), equalTo(false));
         assertThat(s4.needForward(4L), equalTo(false));
@@ -199,9 +199,9 @@ public class TestAgreementSeeker {
         assertThat(s3.needForward(3L), equalTo(false));
         assertThat(s4.needForward(4L), equalTo(false));
 
-        assertThat(s1.nextKill(), contains(4L));
-        assertThat(s2.nextKill(), contains(4L));
-        assertThat(s3.nextKill(), contains(4L));
-        assertThat(s4.nextKill(), contains(4L));
+        assertThat(s1.nextKill(1), contains(4L));
+        assertThat(s2.nextKill(2), contains(4L));
+        assertThat(s3.nextKill(3), contains(4L));
+        assertThat(s4.nextKill(4), contains(3L));
     }
 }
