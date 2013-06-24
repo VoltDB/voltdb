@@ -29,9 +29,6 @@ import org.voltdb.types.PlanNodeType;
 
 public class SendPlanNode extends AbstractPlanNode {
 
-    // used for planning
-    public boolean isMultiPartition = false;
-
     public SendPlanNode() {
         super();
     }

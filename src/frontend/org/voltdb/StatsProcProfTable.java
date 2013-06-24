@@ -31,10 +31,10 @@ public class StatsProcProfTable {
     // One row (procedure) of min/max/avg data aggregated across sites and hosts
     static class ProcProfRow implements Comparable<ProcProfRow>
     {
+        long timestamp;
         String procedure;
         long invocations;
         long partition;
-        long timedInvocations;
         long min;
         long max;
         long avg;
@@ -44,14 +44,13 @@ public class StatsProcProfTable {
         // track which partitions have been witnessed.
         private final Set<Long> seenPartitions;
 
-        public ProcProfRow(String procedure, long partition,
-                long invocations, long timedInvocations,
-                long min, long max, long avg, long failures, long aborts)
+        public ProcProfRow(long timestamp, String procedure, long partition,
+                long invocations, long min, long max, long avg, long failures, long aborts)
         {
+            this.timestamp = timestamp;
             this.procedure = procedure;
             this.partition = partition;
             this.invocations = invocations;
-            this.timedInvocations = timedInvocations;
             this.min = min;
             this.max = max;
             this.avg = avg;
@@ -66,11 +65,10 @@ public class StatsProcProfTable {
         {
             // adjust the min, max and avg across all replicas.
             this.avg = calculateAverage(
-                    this.avg, this.timedInvocations,
-                    in.avg, in.timedInvocations);
+                    this.avg, this.invocations,
+                    in.avg, in.invocations);
             this.min = Math.min(this.min, in.min);
             this.max = Math.max(this.max, in.max);
-            this.timedInvocations += in.timedInvocations;
 
             // invocations, failures and aborts per-logical-partition
             if (!seenPartitions.contains(in.partition)) {
@@ -118,12 +116,11 @@ public class StatsProcProfTable {
     }
 
     // Add or update the corresponding row.
-    public void updateTable(String procedure, long partition,
-            long invocations, long timedInvocations,
-            long min, long max, long avg, long failures, long aborts)
+    public void updateTable(long timestamp, String procedure, long partition,
+            long invocations, long min, long max, long avg, long failures, long aborts)
     {
-        ProcProfRow in = new ProcProfRow(procedure, partition,
-                invocations, timedInvocations,
+        ProcProfRow in = new ProcProfRow(timestamp, procedure, partition,
+                invocations,
                 min, max, avg, failures, aborts);
         ProcProfRow exists = m_table.ceiling(in);
         if (exists != null && in.procedure.equals(exists.procedure)) {
@@ -151,10 +148,10 @@ public class StatsProcProfTable {
         }
 
         VoltTable result = TableShorthand.tableFromShorthand(
-                tableName + "(PROCEDURE:VARCHAR, WEIGHTED_PERC:BIGINT, INVOCATIONS:BIGINT," +
+                tableName + "(TIMESTAMP:BIGINT, PROCEDURE:VARCHAR, WEIGHTED_PERC:BIGINT, INVOCATIONS:BIGINT," +
                 "AVG:BIGINT, MIN:BIGINT, MAX:BIGINT, ABORTS:BIGINT, FAILURES:BIGINT)");
         for (ProcProfRow row : sorted ) {
-            result.addRow(row.procedure, calculatePercent(row.avg * row.invocations, sumOfAverage),
+            result.addRow(row.timestamp, row.procedure, calculatePercent(row.avg * row.invocations, sumOfAverage),
                     row.invocations, row.avg, row.min, row.max, row.aborts, row.failures);
         }
 
@@ -172,6 +169,7 @@ public class StatsProcProfTable {
             return 0;
         }
     }
+
 }
 
 

@@ -31,11 +31,13 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
+import com.google.common.collect.TreeMultimap;
 import com.google.common.primitives.Longs;
 import org.json_voltpatches.JSONObject;
 
@@ -62,6 +64,7 @@ import org.voltdb.SystemProcedureExecutionContext;
 
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.VoltTable;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * Create a snapshot write plan for snapshots streamed to other sites
@@ -81,10 +84,11 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     {
         assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty());
 
-        final List<Long> localHSIds = Longs.asList(tracker.getLocalSites());
         final StreamSnapshotRequestConfig config =
-            new StreamSnapshotRequestConfig(jsData, context.getDatabase(), localHSIds);
-        final Map<Long, Integer> tokensToAdd = createTokensToAdd(config);
+            new StreamSnapshotRequestConfig(jsData, context.getDatabase());
+        final List<StreamSnapshotRequestConfig.Stream> localStreams =
+            filterRemoteStreams(config.streams, Longs.asList(tracker.getLocalSites()));
+        final Map<Long, Integer> tokensToAdd = createTokensToAdd(localStreams);
 
         // Coalesce a truncation snapshot if shouldTruncate is true
         if (config.shouldTruncate) {
@@ -127,7 +131,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
 
         // Create data target for each source HSID in each stream
         List<DataTargetInfo> sdts = Lists.newArrayList();
-        for (StreamSnapshotRequestConfig.Stream stream : config.streams) {
+        for (StreamSnapshotRequestConfig.Stream stream : localStreams) {
             SNAP_LOG.debug("Sites to stream from: " +
                            CoreUtils.hsIdCollectionToString(stream.streamPairs.keySet()));
             for (Entry<Long, Long> entry : stream.streamPairs.entries()) {
@@ -136,8 +140,16 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
 
                 sdts.add(new DataTargetInfo(stream,
                                             srcHSId,
+                                            destHSId,
                                             new StreamSnapshotDataTarget(destHSId, schemas)));
             }
+        }
+
+        // Pick a pair of source to destination for each stream to ship the replicated table data.
+        Multimap<Long, Long> replicatedSrcToDst = pickOnePairPerStream(config.streams);
+        if (SNAP_LOG.isDebugEnabled()) {
+            SNAP_LOG.debug("Picked the following sites to transfer replicated table: " +
+                           CoreUtils.hsIdEntriesToString(replicatedSrcToDst.entries()));
         }
 
         // If there's no work to do on this host, just claim success, return an empty plan,
@@ -145,7 +157,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
 
         // For each table, create tasks where each task has a data target.
         for (final Table table : config.tables) {
-            createTasksForTable(table, sdts, config, numTables, snapshotRecord);
+            createTasksForTable(table, sdts, replicatedSrcToDst, numTables, snapshotRecord);
             result.addRow(context.getHostId(), hostname, table.getTypeName(), "SUCCESS", "");
         }
 
@@ -170,12 +182,57 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         m_taskListsForHSIds.putAll(plan.m_taskListsForHSIds);
     }
 
+    private List<StreamSnapshotRequestConfig.Stream>
+    filterRemoteStreams(List<StreamSnapshotRequestConfig.Stream> streams, Collection<Long> localHSIds)
+    {
+        List<StreamSnapshotRequestConfig.Stream> localStreams = Lists.newArrayList();
+
+        for (StreamSnapshotRequestConfig.Stream stream : streams) {
+            ArrayListMultimap<Long, Long> streamPairs = ArrayListMultimap.create();
+
+            for (Entry<Long, Long> streamPair : stream.streamPairs.entries()) {
+                // Only include entries where the sourceHSId is a local HSID
+                if (localHSIds.contains(streamPair.getKey())) {
+                    streamPairs.put(streamPair.getKey(), streamPair.getValue());
+                }
+            }
+
+            localStreams.add(new StreamSnapshotRequestConfig.Stream(streamPairs,
+                                                                    stream.partition,
+                                                                    stream.ranges));
+        }
+
+        return localStreams;
+    }
+
+    /**
+     * Pick one (source, destination) pair from each stream for replicated table data transfer.
+     * Picking multiple pairs from each stream will result in duplicated replicated table data.
+     *
+     * @param streams
+     * @return A map of (source, destination)
+     */
+    private Multimap<Long, Long>
+    pickOnePairPerStream(Collection<StreamSnapshotRequestConfig.Stream> streams)
+    {
+        Multimap<Long, Long> replicatedSrcToDst = HashMultimap.create();
+
+        for (StreamSnapshotRequestConfig.Stream stream : streams) {
+            // Use a tree map so that it's deterministic across nodes
+            TreeMultimap<Long, Long> partitionStreamPairs = TreeMultimap.create(stream.streamPairs);
+            Entry<Long, Long> candidate = partitionStreamPairs.entries().iterator().next();
+            replicatedSrcToDst.put(candidate.getKey(), candidate.getValue());
+        }
+
+        return replicatedSrcToDst;
+    }
+
     /**
      * For each site, generate a task for each target it has for this table.
      */
     private void createTasksForTable(Table table,
                                      List<DataTargetInfo> dataTargets,
-                                     StreamSnapshotRequestConfig config,
+                                     Multimap<Long, Long> replicatedSrcToDst,
                                      AtomicInteger numTables,
                                      SnapshotRegistry.Snapshot snapshotRecord)
     {
@@ -190,6 +247,19 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                 // Only delete tuples if there is a predicate, e.g. elastic join
                 if (predicate != null) {
                     deleteTuples = true;
+                }
+            } else {
+                // If the current (source, destination) pair is not in the replicated table source
+                // list, then it shouldn't send any replicated table data.
+                // TODO: Remove this once non-blocking elastic join is implemented.
+                if (!replicatedSrcToDst.containsEntry(targetInfo.srcHSId, targetInfo.dstHSId)) {
+                    if (SNAP_LOG.isDebugEnabled()) {
+                        SNAP_LOG.debug("Skipping replicated table " + table.getTypeName() +
+                                       " for source destination pair " +
+                                       CoreUtils.hsIdToString(targetInfo.srcHSId) + " -> " +
+                                       CoreUtils.hsIdToString(targetInfo.dstHSId));
+                    }
+                    continue;
                 }
             }
 
@@ -247,10 +317,10 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
      * Look at all streams and consolidate the ranges of all streams.
      * @return A map of tokens to partition IDs
      */
-    private static Map<Long, Integer> createTokensToAdd(StreamSnapshotRequestConfig config)
+    private static Map<Long, Integer> createTokensToAdd(Collection<StreamSnapshotRequestConfig.Stream> streams)
     {
         ImmutableMap.Builder<Long, Integer> tokenBuilder = ImmutableMap.builder();
-        for (StreamSnapshotRequestConfig.Stream stream : config.streams) {
+        for (StreamSnapshotRequestConfig.Stream stream : streams) {
             if (stream.partition != null && stream.ranges != null) {
                 for (long token : stream.ranges.keySet()) {
                     tokenBuilder.put(token, stream.partition);
@@ -332,14 +402,17 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     private static class DataTargetInfo {
         public final StreamSnapshotRequestConfig.Stream stream;
         public final long srcHSId;
+        public final long dstHSId;
         public final StreamSnapshotDataTarget dataTarget;
 
         public DataTargetInfo(StreamSnapshotRequestConfig.Stream stream,
                               long srcHSId,
+                              long dstHSId,
                               StreamSnapshotDataTarget dataTarget)
         {
             this.stream = stream;
             this.srcHSId = srcHSId;
+            this.dstHSId = dstHSId;
             this.dataTarget = dataTarget;
         }
     }

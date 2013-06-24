@@ -94,6 +94,11 @@ public:
         return NValue::getDecimalValueFromString(txt);
     }
 
+    static NValue getArrayValueFromSizeAndType(size_t elementCount, ValueType elementType)
+    {
+        return NValue::getAllocatedArrayValueFromSizeAndType(elementCount, elementType);
+    }
+
     static inline NValue getAddressValue(void *address) {
         return NValue::getAddressValue(address);
     }

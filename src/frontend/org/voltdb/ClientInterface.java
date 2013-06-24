@@ -36,7 +36,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -311,8 +310,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         /**
          * Used a cached thread pool to accept new connections.
          */
-        private final ExecutorService m_executor =
-                Executors.newCachedThreadPool(CoreUtils.getThreadFactory("Client authentication threads", "Client authenticator"));
+        private final ExecutorService m_executor = CoreUtils.getBoundedThreadPoolExecutor(128, 10L, TimeUnit.SECONDS,
+                        CoreUtils.getThreadFactory("Client authentication threads", "Client authenticator"));
 
         ClientAcceptor(int port, VoltNetworkPool network, boolean isAdmin)
         {
@@ -2073,14 +2072,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         assert(buf.hasArray());
         if (isSinglePartition) {
             byte[] param = null;
+            byte type = VoltType.NULL.getValue();
             // replicated table read is single-part without a partitioning param
             if (plannedStmtBatch.partitionParam != null) {
+                type = VoltType.typeFromClass(plannedStmtBatch.partitionParam.getClass()).getValue();
                 param = TheHashinator.valueToBytes(plannedStmtBatch.partitionParam);
             }
 
             // Send the partitioning parameter and its type along so that the site can check if
-            // it's mis-partitioned.
-            task.setParams(param, buf.array());
+            // it's mis-partitioned. Type is needed to re-hashinate for command log re-init.
+            task.setParams(param, type, buf.array());
         } else {
             task.setParams(buf.array());
         }

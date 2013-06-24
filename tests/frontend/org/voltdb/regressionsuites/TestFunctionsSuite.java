@@ -160,7 +160,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
 }
 
-    public void UNtestNumericExpressionIndex() throws Exception {
+    public void testNumericExpressionIndex() throws Exception {
         System.out.println("STARTING testNumericExpressionIndex");
         Client client = getClient();
         initialLoad(client, "R1");

@@ -153,7 +153,7 @@ public interface SiteProcedureConnection {
                                 boolean interval, Long now);
 
     // Snapshot services provided by the site
-    public Future<?> doSnapshotWork(boolean ignoreQuietPeriod);
+    public Future<?> doSnapshotWork();
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds);
 
     /**

@@ -86,17 +86,15 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
     }
 
     public StreamSnapshotRequestConfig(JSONObject jsData,
-                                       Database catalogDatabase,
-                                       Collection<Long> localHSIds)
+                                       Database catalogDatabase)
     {
         super(jsData, catalogDatabase);
 
-        this.streams = parseStreams(jsData, localHSIds);
+        this.streams = parseStreams(jsData);
         this.shouldTruncate = jsData.optBoolean("shouldTruncate", false);
     }
 
-    private ImmutableList<Stream> parseStreams(JSONObject jsData,
-                                               Collection<Long> localHSIds)
+    private ImmutableList<Stream> parseStreams(JSONObject jsData)
     {
         ImmutableList.Builder<Stream> builder = ImmutableList.builder();
 
@@ -106,7 +104,7 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
             for (int i = 0; i < streamArray.length(); i++) {
                 JSONObject streamObj = streamArray.getJSONObject(i);
 
-                Stream config = new Stream(parseStreamPairs(streamObj, localHSIds),
+                Stream config = new Stream(parseStreamPairs(streamObj),
                                            streamObj.optInt("partition"),
                                            parsePostSnapshotTasks(streamObj));
 
@@ -148,8 +146,7 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
         return null;
     }
 
-    private static Multimap<Long, Long> parseStreamPairs(JSONObject jsData,
-                                                         Collection<Long> localHSIds)
+    private static Multimap<Long, Long> parseStreamPairs(JSONObject jsData)
     {
         ArrayListMultimap<Long, Long> streamPairs = ArrayListMultimap.create();
 
@@ -161,14 +158,10 @@ public class StreamSnapshotRequestConfig extends SnapshotRequestConfig {
                 while (it.hasNext()) {
                     String key = it.next();
                     long sourceHSId = Long.valueOf(key);
-                    // See whether this source HSID is a local site, if so, we need
-                    // the destination HSID
-                    if (localHSIds.contains(sourceHSId)) {
-                        JSONArray destJSONArray = sp.getJSONArray(key);
-                        for (int i = 0; i < destJSONArray.length(); i++) {
-                            long destHSId = destJSONArray.getLong(i);
-                            streamPairs.put(sourceHSId, destHSId);
-                        }
+                    JSONArray destJSONArray = sp.getJSONArray(key);
+                    for (int i = 0; i < destJSONArray.length(); i++) {
+                        long destHSId = destJSONArray.getLong(i);
+                        streamPairs.put(sourceHSId, destHSId);
                     }
                 }
             } catch (JSONException e) {
