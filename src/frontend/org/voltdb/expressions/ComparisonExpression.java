@@ -154,4 +154,12 @@ public class ComparisonExpression extends AbstractExpression {
         return rangeFilterFromPrefixLike(m_left, rangeComparator, comparand);
     }
 
+    @Override
+    public String explain(String impliedTableName) {
+        ExpressionType type = getExpressionType();
+        return "(" + m_left.explain(impliedTableName) +
+            " " + type.symbol() + " " +
+            m_right.explain(impliedTableName) + ")";
+    }
+
 }

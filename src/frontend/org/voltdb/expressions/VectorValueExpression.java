@@ -63,4 +63,16 @@ public class VectorValueExpression extends AbstractExpression {
         // just make sure the children have valid types.
         finalizeChildValueTypes();
     }
+
+    @Override
+    public String explain(String impliedTableName) {
+        String result = "(";
+        String connector = "";
+        for (AbstractExpression arg : m_args) {
+            result += connector + arg.explain(impliedTableName);
+            connector = ", ";
+        }
+        result += ")";
+        return result;
+    }
 }
