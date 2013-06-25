@@ -860,7 +860,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // still pending durability.
         Queue<TransactionTask> pendingTasks = m_mpsPendingDurability.get(task.getTxnId());
         if (pendingTasks != null) {
-            pendingTasks.add(task);
+            pendingTasks.offer(task);
         } else {
             m_pendingTasks.offer(task);
         }
