@@ -839,6 +839,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final long lastCommittedSpHandle, boolean returnUniqueViolations)
     throws EEException
     {
+        if (returnUniqueViolations) {
+            throw new UnsupportedOperationException("Haven't added IPC support for returning unique violatiosn");
+        }
         m_data.clear();
         m_data.putInt(Commands.LoadTable.m_id);
         m_data.putInt(tableId);

@@ -660,7 +660,7 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
     try {
         ReferenceSerializeInput serialize_in(offset, sz);
 
-        bool success = m_engine->loadTable(tableId, serialize_in, spHandle, lastCommittedSpHandle);
+        bool success = m_engine->loadTable(tableId, serialize_in, spHandle, lastCommittedSpHandle, false);
         if (success) {
             return kErrorCode_Success;
         } else {
