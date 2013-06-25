@@ -1842,7 +1842,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         }
 
-        if (catProc == null && task.procName.startsWith("@")) {
+        if (catProc == null) {
             if( task.procName.equals("@AdHoc") ){
                 // Map @AdHoc... to @AdHoc_RW_MP for validation. In the future if security is
                 // configured differently for @AdHoc... variants this code will have to
