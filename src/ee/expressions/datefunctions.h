@@ -298,7 +298,7 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_SECOND>() const {
     }
     int64_t epoch_micros = getTimestamp();
     printf("input microseconds from Java: %lld\n", epoch_micros);
-    /*
+
     boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
     boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),as_date.month(),as_date.day());
 
@@ -308,21 +308,23 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_SECOND>() const {
     std::tm truncate_ctime =  boost::posix_time::to_tm(truncate_ptime);
     int64_t truncate_epoch_time = static_cast<int64_t>(mktime(&truncate_ctime));
     return getTimestampValue(truncate_epoch_time * 1000000);
-    */
-
-    int64_t epoch_seconds = static_cast<int64_t>(epoch_micros / 1000000);
-    return getTimestampValue(epoch_seconds * 1000000);
-
 }
 
 /** implement the timestamp TRUNCATE to MILLIS function **/
 template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MILLISECOND>() const {
     if (isNull()) {
-        return *this;
-    }
-    int64_t epoch_micros = getTimestamp();
-    int64_t epoch_millis = static_cast<int64_t>(epoch_micros / 1000);
-    return getTimestampValue(epoch_millis * 1000);
+            return *this;
+        }
+        int64_t epoch_micros = getTimestamp();
+        boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+        boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),as_date.month(),as_date.day());
+
+        boost::posix_time::time_duration as_time = time_of_day_from_epoch_micros(epoch_micros);
+        //boost::posix_time::time_duration truncate_time = boost::posix_time::time_duration(as_time.hours(),as_time.minutes(),as_time.seconds(), as_time.fractional_seconds());
+        boost::posix_time::ptime truncate_ptime = boost::posix_time::ptime(truncate_date, as_time);
+        std::tm truncate_ctime =  boost::posix_time::to_tm(truncate_ptime);
+        int64_t truncate_epoch_time = static_cast<int64_t>(mktime(&truncate_ctime));
+        return getTimestampValue(truncate_epoch_time * 1000000);
 }
 
 /** implement the timestamp TRUNCATE to MICROS function **/
