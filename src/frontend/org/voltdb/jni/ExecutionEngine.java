@@ -385,9 +385,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     abstract public long getThreadLocalPoolAllocations();
 
-    abstract public void loadTable(
+    abstract public byte[] loadTable(
         int tableId, VoltTable table, long spHandle,
-        long lastCommittedSpHandle) throws EEException;
+        long lastCommittedSpHandle, boolean returnUniqueViolations) throws EEException;
 
     /**
      * Set the log levels to be used when logging in this engine
@@ -581,9 +581,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param serialized_table the table data to be loaded
      * @param Length of the serialized table
      * @param undoToken token for undo quantum where changes should be logged.
+     * @param returnUniqueViolations If true unique violations won't cause a fatal error and will be returned instead
      */
     protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table,
-            long spHandle, long lastCommittedSpHandle);
+            long spHandle, long lastCommittedSpHandle, boolean returnUniqueViolations);
 
     /**
      * Executes multiple plan fragments with the given parameter sets and gets the results.

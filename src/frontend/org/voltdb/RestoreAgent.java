@@ -54,6 +54,7 @@ import org.voltcore.zk.LeaderElector;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.TransactionCreator;
+import org.voltdb.sysprocs.SnapshotRestore;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.TableFiles;
@@ -193,8 +194,10 @@ SnapshotCompletionInterest
                     if (m_snapshotToRestore != null) {
                         LOG.debug("Initiating snapshot " + m_snapshotToRestore.nonce +
                                 " in " + m_snapshotToRestore.path);
-                        Object[] params = new Object[] {m_snapshotToRestore.path,
-                            m_snapshotToRestore.nonce};
+                        JSONObject jsObj = new JSONObject();
+                        jsObj.put(SnapshotRestore.JSON_PATH, m_snapshotToRestore.path);
+                        jsObj.put(SnapshotRestore.JSON_NONCE, m_snapshotToRestore.nonce);
+                        Object[] params = new Object[] { jsObj.toString() };
                         initSnapshotWork(RESTORE_TXNID,
                                 Pair.of("@SnapshotRestore", params));
                     }

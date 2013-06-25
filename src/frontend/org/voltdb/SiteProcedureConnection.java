@@ -65,18 +65,19 @@ public interface SiteProcedureConnection {
     /**
      * loadTable method used by user-facing voltLoadTable() call in ProcedureRunner
      */
-    public void loadTable(
+    public byte[] loadTable(
             long txnId,
             String clusterName,
             String databaseName,
             String tableName,
-            VoltTable data)
+            VoltTable data,
+            boolean returnUniqueViolations)
     throws VoltAbortException;
 
     /**
      * loadTable method used internally by ExecutionSite/Site clients
      */
-    public void loadTable(long txnId, int tableId, VoltTable data);
+    public byte[] loadTable(long txnId, int tableId, VoltTable data, boolean returnUniqueViolations);
 
     /**
      * Execute a set of plan fragments.

@@ -81,6 +81,7 @@ import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionInitiator;
+import org.voltdb.sysprocs.SnapshotRestore;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
@@ -719,7 +720,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             assertEquals(new Long(1), count);
             assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
             // We'd better have restored the newest snapshot
-            assertEquals("isaidgooddaysir", (String)(initiator.getProcParams().get("@SnapshotRestore").toArray()[1]));
+            assertEquals("isaidgooddaysir", nonceFromInitiator(initiator));
         } else {
             createCheck(initiator);
         }
@@ -755,7 +756,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             Long count = initiator.getProcCounts().get("@SnapshotRestore");
             assertEquals(new Long(1), count);
             assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
-            assertEquals("hello", (String)(initiator.getProcParams().get("@SnapshotRestore").toArray()[1]));
+            assertEquals("hello", nonceFromInitiator(initiator));
         } else {
             createCheck(initiator);
         }
@@ -945,7 +946,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             assertEquals(new Long(1), count);
             assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
             // We'd better have restored the newest snapshot
-            assertEquals("sacrebleu", (String)(initiator.getProcParams().get("@SnapshotRestore").toArray()[1]));
+            assertEquals("sacrebleu", nonceFromInitiator(initiator));
         } else {
             createCheck(initiator);
         }
@@ -988,10 +989,15 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             assertEquals(new Long(1), count);
             assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
             // We'd better have restored the newest snapshot
-            assertEquals("sacrebleu", (String)(initiator.getProcParams().get("@SnapshotRestore").toArray()[1]));
+            assertEquals("sacrebleu", nonceFromInitiator(initiator));
         } else {
             createCheck(initiator);
         }
+    }
+
+    private static String nonceFromInitiator(MockInitiator initiator) throws Exception {
+        JSONObject jsObj = new JSONObject((String)(initiator.getProcParams().get("@SnapshotRestore").toArray()[0]));
+        return jsObj.getString(SnapshotRestore.JSON_NONCE);
     }
 
     @Test
@@ -1031,7 +1037,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             assertEquals(new Long(1), count);
             assertEquals(Long.MIN_VALUE, snapshotTxnId.longValue());
             // We'd better have restored the newest snapshot
-            assertEquals("sacrebleu", (String)(initiator.getProcParams().get("@SnapshotRestore").toArray()[1]));
+            assertEquals("sacrebleu", nonceFromInitiator(initiator));
         } else {
             createCheck(initiator);
         }
