@@ -289,6 +289,18 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_TO_TIMESTAMP_MICROSECOND:
             ret = new UnaryFunctionExpression<FUNC_TO_TIMESTAMP_MICROSECOND>((*arguments)[0]);
             break;
+        case FUNC_TRUNCATE_YEAR:
+            ret = new UnaryFunctionExpression<FUNC_TRUNCATE_YEAR>((*arguments)[0]);
+            break;
+        case FUNC_TRUNCATE_QUARTER:
+            ret = new UnaryFunctionExpression<FUNC_TRUNCATE_QUARTER>((*arguments)[0]);
+            break;
+        case FUNC_TRUNCATE_MONTH:
+            ret = new UnaryFunctionExpression<FUNC_TRUNCATE_MONTH>((*arguments)[0]);
+            break;
+        case FUNC_TRUNCATE_DAY:
+            ret = new UnaryFunctionExpression<FUNC_TRUNCATE_DAY>((*arguments)[0]);
+            break;
         case FUNC_TRUNCATE_HOUR:
             ret = new UnaryFunctionExpression<FUNC_TRUNCATE_HOUR>((*arguments)[0]);
             break;

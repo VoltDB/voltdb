@@ -18,6 +18,8 @@
 #include "boost/date_time/gregorian/greg_date.hpp"
 #include "boost/date_time/posix_time/posix_time_types.hpp"
 #include "boost/date_time/posix_time/posix_time_duration.hpp"
+#include <boost/date_time/posix_time/ptime.hpp>
+#include <boost/date_time/posix_time/posix_time_duration.hpp>
 #include "boost/date_time/posix_time/conversion.hpp"
 #include <ctime>
 
@@ -201,6 +203,58 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_YEAR>() const {
     }
     int64_t epoch_micros = getTimestamp();
     boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),1,1);
+    boost::posix_time::ptime truncate_ptime =
+            boost::posix_time::ptime(truncate_date,boost::posix_time::time_duration(0,0,0));
+    std::tm truncate_ctime =  boost::posix_time::to_tm(truncate_ptime);
+    int64_t truncate_epoch_time = static_cast<int64_t>(mktime(&truncate_ctime));
+    return getTimestampValue(truncate_epoch_time * 1000000);
+}
+
+/** implement the timestamp TRUNCATE to YEAR function **/
+template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_QUARTER>() const {
+    if (isNull()) {
+        return *this;
+    }
+    int64_t epoch_micros = getTimestamp();
+    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    int quater = static_cast<int>(as_date.month() / 4);
+    boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),quater*3+1,1);
+    boost::posix_time::ptime truncate_ptime =
+            boost::posix_time::ptime(truncate_date,boost::posix_time::time_duration(0,0,0));
+    std::tm truncate_ctime =  boost::posix_time::to_tm(truncate_ptime);
+    int64_t truncate_epoch_time = static_cast<int64_t>(mktime(&truncate_ctime));
+    return getTimestampValue(truncate_epoch_time * 1000000);
+}
+
+/** implement the timestamp TRUNCATE to MONTH function **/
+template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MONTH>() const {
+    if (isNull()) {
+        return *this;
+    }
+    int64_t epoch_micros = getTimestamp();
+    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),as_date.month(),1);
+    boost::posix_time::ptime truncate_ptime =
+            boost::posix_time::ptime(truncate_date,boost::posix_time::time_duration(0,0,0));
+    std::tm truncate_ctime =  boost::posix_time::to_tm(truncate_ptime);
+    int64_t truncate_epoch_time = static_cast<int64_t>(mktime(&truncate_ctime));
+    return getTimestampValue(truncate_epoch_time * 1000000);
+}
+
+/** implement the timestamp TRUNCATE to DAY function **/
+template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_DAY>() const {
+    if (isNull()) {
+        return *this;
+    }
+    int64_t epoch_micros = getTimestamp();
+    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),as_date.month(),as_date.day());
+    boost::posix_time::ptime truncate_ptime =
+            boost::posix_time::ptime(truncate_date,boost::posix_time::time_duration(0,0,0));
+    std::tm truncate_ctime =  boost::posix_time::to_tm(truncate_ptime);
+    int64_t truncate_epoch_time = static_cast<int64_t>(mktime(&truncate_ctime));
+    return getTimestampValue(truncate_epoch_time * 1000000);
 }
 
 /** implement the timestamp TRUNCATE to HOUR function **/
@@ -209,12 +263,16 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_HOUR>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    int64_t epoch_seconds = static_cast<int64_t>(epoch_micros / 1000000);
-    int64_t epoch_minutes = static_cast<int64_t>(epoch_seconds / 60);
-    int64_t epoch_hour = static_cast<int64_t>(epoch_minutes / 60);
-    return getTimestampValue(epoch_hour * 60 * 60 * 1000000);
-}
+    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),as_date.month(),as_date.day());
 
+    boost::posix_time::time_duration as_time = time_of_day_from_epoch_micros(epoch_micros);
+    boost::posix_time::time_duration truncate_time = boost::posix_time::time_duration(as_time.hours(),0,0);
+    boost::posix_time::ptime truncate_ptime = boost::posix_time::ptime(truncate_date, truncate_time);
+    std::tm truncate_ctime =  boost::posix_time::to_tm(truncate_ptime);
+    int64_t truncate_epoch_time = static_cast<int64_t>(mktime(&truncate_ctime));
+    return getTimestampValue(truncate_epoch_time * 1000000);
+}
 
 /** implement the timestamp TRUNCATE to MINUTE function **/
 template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MINUTE>() const {
@@ -222,9 +280,15 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MINUTE>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    int64_t epoch_seconds = static_cast<int64_t>(epoch_micros / 1000000);
-    int64_t epoch_minutes = static_cast<int64_t>(epoch_seconds / 60);
-    return getTimestampValue(epoch_minutes * 60 * 1000000);
+    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),as_date.month(),as_date.day());
+
+    boost::posix_time::time_duration as_time = time_of_day_from_epoch_micros(epoch_micros);
+    boost::posix_time::time_duration truncate_time = boost::posix_time::time_duration(as_time.hours(),as_time.minutes(),0);
+    boost::posix_time::ptime truncate_ptime = boost::posix_time::ptime(truncate_date, truncate_time);
+    std::tm truncate_ctime =  boost::posix_time::to_tm(truncate_ptime);
+    int64_t truncate_epoch_time = static_cast<int64_t>(mktime(&truncate_ctime));
+    return getTimestampValue(truncate_epoch_time * 1000000);
 }
 
 /** implement the timestamp TRUNCATE to SECOND function **/
@@ -233,8 +297,22 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_SECOND>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
+    printf("input microseconds from Java: %lld\n", epoch_micros);
+    /*
+    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),as_date.month(),as_date.day());
+
+    boost::posix_time::time_duration as_time = time_of_day_from_epoch_micros(epoch_micros);
+    boost::posix_time::time_duration truncate_time = boost::posix_time::time_duration(as_time.hours(),as_time.minutes(),as_time.seconds());
+    boost::posix_time::ptime truncate_ptime = boost::posix_time::ptime(truncate_date, truncate_time);
+    std::tm truncate_ctime =  boost::posix_time::to_tm(truncate_ptime);
+    int64_t truncate_epoch_time = static_cast<int64_t>(mktime(&truncate_ctime));
+    return getTimestampValue(truncate_epoch_time * 1000000);
+    */
+
     int64_t epoch_seconds = static_cast<int64_t>(epoch_micros / 1000000);
     return getTimestampValue(epoch_seconds * 1000000);
+
 }
 
 /** implement the timestamp TRUNCATE to MILLIS function **/
