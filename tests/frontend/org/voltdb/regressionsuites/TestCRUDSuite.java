@@ -40,6 +40,13 @@ public class TestCRUDSuite extends RegressionSuite {
         super(name);
     }
 
+    public void testNegativeWrongTypeParam() throws Exception {
+        final Client client = this.getClient();
+        ClientResponse resp = client.callProcedure("P5.insert", -1000);
+        assert(resp.getStatus() == ClientResponse.SUCCESS);
+        resp = client.callProcedure("@AdHoc", "select * from p5;");
+    }
+
     public void testPartitionedPkPartitionCol() throws Exception
     {
         final Client client = this.getClient();
@@ -229,6 +236,12 @@ public class TestCRUDSuite extends RegressionSuite {
                     "CREATE TABLE p4(z INTEGER NOT NULL, x VARCHAR(10) NOT NULL, y INTEGER NOT NULL, PRIMARY KEY(y,x,z));"
             );
             project.addPartitionInfo("p4", "y");
+
+            // table with a bigint pkey
+            project.addLiteralSchema(
+                    "CREATE TABLE p5(x BIGINT NOT NULL, PRIMARY KEY(x));"
+            );
+            project.addPartitionInfo("p5", "x");
 
         } catch (IOException error) {
             fail(error.getMessage());
