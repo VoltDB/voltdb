@@ -878,9 +878,9 @@ public class SnapshotRestore extends VoltSystemProcedure
                            String json) throws Exception
             {
         JSONObject jsObj = new JSONObject(json);
-        final String path = jsObj.getString("path");
-        final String nonce = jsObj.getString("nonce");
-        final String dupsPath = jsObj.has(JSON_DUPLICATES_PATH) ? jsObj.getString(JSON_DUPLICATES_PATH) : null;
+        final String path = jsObj.getString(JSON_PATH);
+        final String nonce = jsObj.getString(JSON_NONCE);
+        final String dupsPath = jsObj.optString(JSON_DUPLICATES_PATH, null);
         final long startTime = System.currentTimeMillis();
         if (dupsPath != null) {
             CONSOLE_LOG.info("Restoring from path: " + path + " with nonce: " +
