@@ -1332,6 +1332,8 @@ TEST CASES
                 <exclude name="**/TestRejoinFuzz.class" />
                 <exclude name="**/TestRejoinFuzz2.class" />
                 <exclude name="**/TestMaliciousClientSuite.class" /> <!-- fails legacy -->
+                <!-- Recorded as ENG-3038 -->
+                <exclude name="**/TestMultipleOuterJoinPlans.class" />
             </fileset>
         </tests>
     </run_junit>
@@ -1359,6 +1361,7 @@ TEST CASES
                 <exclude name="**/Test*Replication*.class" />
                 <exclude name="**/Test*Restore*.class" />
                 <exclude name="**/Test*Snapshot*.class" />
+                <exclude name="**/TestMultipleOuterJoinPlans.class" />
             </fileset>
         </tests>
     </run_junit>
