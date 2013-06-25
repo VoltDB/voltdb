@@ -945,22 +945,29 @@ public class PlanAssembler {
         orderByNode.addAndLinkChild(root);
         orderByNode.generateOutputSchema(m_catalogDb);
 
-        // In theory, for a single-table query, there just needs to exist a uniqueness constraint (primary key or other unique index)
-        // on some of the ORDER BY values regardless of whether the associated index is used in the selected plan.
-        // Strictly speaking, if it was used at the top of the plan, this function would have already returned without adding an orderByNode.
-        // The interesting case here, addressing issue ENG-3335, is when the index scan is in the distributed part of the plan.
-        // Then, the orderByNode is required to re-order the results at the coordinator.
+        // get all of the columns in the sort
+        List<AbstractExpression> orderExpressions = orderByNode.getSortExpressions();
+
+        // In theory, for every table in the query, there needs to exist a uniqueness constraint
+        // (primary key or other unique index) on some of the ORDER BY values regardless of whether
+        // the associated index is used in the selected plan.
+        // If the index scan was used at the top of the plan, and its sort order was valid
+        // -- meaning covering the entire ORDER BY clause --
+        // this function would have already returned without adding an orderByNode.
+        // The interesting cases, including issue ENG-3335, are
+        // -- when the index scan is in the distributed part of the plan
+        //    Then, the orderByNode is required to re-order the results at the coordinator.
+        // -- when the index was not the one selected for the plan.
+        // -- when the index is defined on a left-most child of a join the distributed part of the plan
+        //    Then, the orderByNode is required to re-order the results at the coordinator.
 
         // Start by eliminating joins since, in general, a join (one-to-many) may produce multiple joined rows for each unique input row.
         // TODO: In theory, it is possible to analyze the join criteria and/or projected columns
         // to determine whether the particular join preserves the uniqueness of its index-scanned input.
-        if (m_parsedSelect.tableList.size() == 1) {
+        boolean allScansAreDeterministic = true;
+        for (Table table : m_parsedSelect.tableList) {
 
-            Table table = m_parsedSelect.tableList.get(0);
-
-            // get all of the columns in the sort
-            List<AbstractExpression> orderExpressions = orderByNode.getSortExpressions();
-
+            allScansAreDeterministic = false;
             // search indexes for one that makes the order by deterministic
             for (Index index : table.getIndexes()) {
                 // skip non-unique indexes
@@ -998,11 +1005,22 @@ public class PlanAssembler {
                     }
                 }
 
-                // if the sort covers the index, then it's a unique sort
+                // If the sort covers the index, then it's a unique sort.
+                //TODO: The statement's equivalence sets would be handy here to recognize cases like
+                //    WHERE A.unique_id = 1 AND A.b_id = 2 and B.unique_id = A.b_id ORDER BY B.unique_id
                 if (orderExpressions.containsAll(indexExpressions)) {
-                    orderByNode.setOrderingByUniqueColumns();
+                    allScansAreDeterministic = true;
+                    break;
                 }
             }
+
+            if ( ! allScansAreDeterministic) {
+                break;
+            }
+        }
+
+        if (allScansAreDeterministic) {
+            orderByNode.setOrderingByUniqueColumns();
         }
         return orderByNode;
     }

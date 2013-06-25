@@ -85,4 +85,14 @@ public class AggregateExpression extends AbstractExpression {
         }
     }
 
+    @Override
+    public String explain(String impliedTableName) {
+        ExpressionType type = getExpressionType();
+        if (type == ExpressionType.AGGREGATE_COUNT_STAR) {
+            return "COUNT(*)";
+        }
+        return type.symbol() + ( m_distinct ? " DISTINCT(" : "(" ) +
+            m_left.explain(impliedTableName) + ")";
+    }
+
 }

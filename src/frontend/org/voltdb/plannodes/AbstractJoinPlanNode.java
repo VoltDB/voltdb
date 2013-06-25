@@ -261,4 +261,17 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         }
     }
 
+    protected String explainFilters(String indent) {
+        String result = "";
+        String prefix = "\n" + indent + " filter by ";
+        AbstractExpression[] predicates = { m_preJoinPredicate, m_joinPredicate, m_wherePredicate };
+        for (AbstractExpression pred : predicates) {
+            if (pred != null) {
+                result += prefix + pred.explain("!?"); // No default table name prefix for columns.
+                prefix = " AND ";
+            }
+        }
+        return result;
+    }
+
 }
