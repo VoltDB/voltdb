@@ -2102,6 +2102,36 @@ public class FunctionSQL extends Expression {
             exp.children.remove(0);
             return exp;
 
+        case FunctionForVoltDB.FunctionId.FUNC_VOLT_TO_TIMESTAMP :
+            volt_alias = null;
+            keywordConstant = ((Integer) nodes[0].valueData).intValue();
+            int to_timestamp_func = -1;
+            switch (keywordConstant) {
+            case Tokens.SECOND :
+                volt_alias = "to_timestamp_second";
+                to_timestamp_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TO_TIMESTAMP_SECOND;
+                break;
+            case Tokens.MILLIS :
+                volt_alias = "to_timestamp_millis";
+                to_timestamp_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TO_TIMESTAMP_MILLISECOND;
+                break;
+            case Tokens.MICROS :
+                volt_alias = "to_timestamp_micros";
+                to_timestamp_func = FunctionForVoltDB.FunctionId.FUNC_VOLT_TO_TIMESTAMP_MICROSECOND;
+                break;
+            default:
+                throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeTypeForVoltDB: " + String.valueOf(keywordConstant));
+            }
+
+            exp.attributes.put("function_id", String.valueOf(to_timestamp_func));
+            exp.attributes.put("volt_alias", volt_alias);
+
+            // Having accounted for the first argument, remove it from the child expression list.
+            exp.children.remove(0);
+            return exp;
+
+
+
         default :
             if (voltDisabled != null) {
                 exp.attributes.put("disabled", voltDisabled);
