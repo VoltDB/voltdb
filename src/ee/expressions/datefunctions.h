@@ -194,4 +194,66 @@ template<> inline NValue NValue::callUnary<FUNC_TO_TIMESTAMP_MICROSECOND>() cons
     return getTimestampValue(epoch_micros);
 }
 
+/** implement the timestamp TRUNCATE to YEAR function **/
+template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_YEAR>() const {
+    if (isNull()) {
+        return *this;
+    }
+    int64_t epoch_micros = getTimestamp();
+    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+}
+
+/** implement the timestamp TRUNCATE to HOUR function **/
+template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_HOUR>() const {
+    if (isNull()) {
+        return *this;
+    }
+    int64_t epoch_micros = getTimestamp();
+    int64_t epoch_seconds = static_cast<int64_t>(epoch_micros / 1000000);
+    int64_t epoch_minutes = static_cast<int64_t>(epoch_seconds / 60);
+    int64_t epoch_hour = static_cast<int64_t>(epoch_minutes / 60);
+    return getTimestampValue(epoch_hour * 60 * 60 * 1000000);
+}
+
+
+/** implement the timestamp TRUNCATE to MINUTE function **/
+template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MINUTE>() const {
+    if (isNull()) {
+        return *this;
+    }
+    int64_t epoch_micros = getTimestamp();
+    int64_t epoch_seconds = static_cast<int64_t>(epoch_micros / 1000000);
+    int64_t epoch_minutes = static_cast<int64_t>(epoch_seconds / 60);
+    return getTimestampValue(epoch_minutes * 60 * 1000000);
+}
+
+/** implement the timestamp TRUNCATE to SECOND function **/
+template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_SECOND>() const {
+    if (isNull()) {
+        return *this;
+    }
+    int64_t epoch_micros = getTimestamp();
+    int64_t epoch_seconds = static_cast<int64_t>(epoch_micros / 1000000);
+    return getTimestampValue(epoch_seconds * 1000000);
+}
+
+/** implement the timestamp TRUNCATE to MILLIS function **/
+template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MILLISECOND>() const {
+    if (isNull()) {
+        return *this;
+    }
+    int64_t epoch_micros = getTimestamp();
+    int64_t epoch_millis = static_cast<int64_t>(epoch_micros / 1000);
+    return getTimestampValue(epoch_millis * 1000);
+}
+
+/** implement the timestamp TRUNCATE to MICROS function **/
+template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MICROSECOND>() const {
+    if (isNull()) {
+        return *this;
+    }
+    int64_t epoch_micros = getTimestamp();
+    return getTimestampValue(epoch_micros);
+}
+
 }

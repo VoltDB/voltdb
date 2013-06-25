@@ -289,6 +289,21 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_TO_TIMESTAMP_MICROSECOND:
             ret = new UnaryFunctionExpression<FUNC_TO_TIMESTAMP_MICROSECOND>((*arguments)[0]);
             break;
+        case FUNC_TRUNCATE_HOUR:
+            ret = new UnaryFunctionExpression<FUNC_TRUNCATE_HOUR>((*arguments)[0]);
+            break;
+        case FUNC_TRUNCATE_MINUTE:
+            ret = new UnaryFunctionExpression<FUNC_TRUNCATE_MINUTE>((*arguments)[0]);
+            break;
+        case FUNC_TRUNCATE_SECOND:
+            ret = new UnaryFunctionExpression<FUNC_TRUNCATE_SECOND>((*arguments)[0]);
+            break;
+        case FUNC_TRUNCATE_MILLISECOND:
+            ret = new UnaryFunctionExpression<FUNC_TRUNCATE_MILLISECOND>((*arguments)[0]);
+            break;
+        case FUNC_TRUNCATE_MICROSECOND:
+            ret = new UnaryFunctionExpression<FUNC_TRUNCATE_MICROSECOND>((*arguments)[0]);
+            break;
         case FUNC_FLOOR:
             ret = new UnaryFunctionExpression<FUNC_FLOOR>((*arguments)[0]);
             break;
