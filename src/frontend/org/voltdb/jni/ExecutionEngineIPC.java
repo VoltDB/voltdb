@@ -835,8 +835,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
 
     @Override
-    public void loadTable(final int tableId, final VoltTable table, final long spHandle,
-            final long lastCommittedSpHandle)
+    public byte[] loadTable(final int tableId, final VoltTable table, final long spHandle,
+            final long lastCommittedSpHandle, boolean returnUniqueViolations)
     throws EEException
     {
         m_data.clear();
@@ -844,6 +844,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putInt(tableId);
         m_data.putLong(spHandle);
         m_data.putLong(lastCommittedSpHandle);
+        m_data.putInt(returnUniqueViolations ? 1 : 0);
 
         final ByteBuffer tableBytes = table.getTableDataReference();
         if (m_data.remaining() < tableBytes.remaining()) {
@@ -876,6 +877,16 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         if (result != ExecutionEngine.ERRORCODE_SUCCESS) {
             throw new EEException(result);
         }
+
+        ByteBuffer responseBuffer = null;
+        try {
+            responseBuffer = readMessage();
+        } catch (IOException e) {
+            Throwables.propagate(e);
+        }
+
+        if (responseBuffer != null) return responseBuffer.array();
+        return null;
     }
 
     @Override
@@ -915,26 +926,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
         try {
             if (result == ExecutionEngine.ERRORCODE_SUCCESS) {
-                final ByteBuffer messageLengthBuffer = ByteBuffer.allocate(4);
-                while (messageLengthBuffer.hasRemaining()) {
-                    int read = m_connection.m_socketChannel.read(messageLengthBuffer);
-                    if (read == -1) {
-                        throw new EOFException("End of file reading statistics(1)");
-                    }
-                }
-                messageLengthBuffer.rewind();
-                int length = messageLengthBuffer.getInt();
-                if (length == 0) {
-                    return null;
-                }
-                final ByteBuffer messageBuffer = ByteBuffer.allocate(length);
-                while (messageBuffer.hasRemaining()) {
-                    int read = m_connection.m_socketChannel.read(messageBuffer);
-                    if (read == -1) {
-                        throw new EOFException("End of file reading statistics(2)");
-                    }
-                }
-                messageBuffer.rewind();
+
+                final ByteBuffer messageBuffer = readMessage();
+                if (messageBuffer == null) return null;
 
                 final FastDeserializer fds = new FastDeserializer(messageBuffer);
                 final VoltTable results[] = new VoltTable[1];
@@ -947,6 +941,30 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
         }
         return null;
+    }
+
+    private ByteBuffer readMessage() throws IOException {
+        final ByteBuffer messageLengthBuffer = ByteBuffer.allocate(4);
+        while (messageLengthBuffer.hasRemaining()) {
+            int read = m_connection.m_socketChannel.read(messageLengthBuffer);
+            if (read == -1) {
+                throw new EOFException("End of file reading statistics(1)");
+            }
+        }
+        messageLengthBuffer.rewind();
+        int length = messageLengthBuffer.getInt();
+        if (length == 0) {
+            return null;
+        }
+        final ByteBuffer messageBuffer = ByteBuffer.allocate(length);
+        while (messageBuffer.hasRemaining()) {
+            int read = m_connection.m_socketChannel.read(messageBuffer);
+            if (read == -1) {
+                throw new EOFException("End of file reading statistics(2)");
+            }
+        }
+        messageBuffer.rewind();
+        return messageBuffer;
     }
 
     @Override

@@ -56,7 +56,6 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.VoltTableUtil;
 
 public class ProcedureRunner {
 
@@ -652,17 +651,17 @@ public class ProcedureRunner {
         return results;
     }
 
-    public void voltLoadTable(String clusterName, String databaseName,
-                              String tableName, VoltTable data)
+    public byte[] voltLoadTable(String clusterName, String databaseName,
+                              String tableName, VoltTable data, boolean returnUniqueViolations)
     throws VoltAbortException
     {
         if (data == null || data.getRowCount() == 0) {
-            return;
+            return null;
         }
         try {
-            m_site.loadTable(m_txnState.txnId,
+            return m_site.loadTable(m_txnState.txnId,
                              clusterName, databaseName,
-                             tableName, data);
+                             tableName, data, returnUniqueViolations);
         }
         catch (EEException e) {
             throw new VoltAbortException("Failed to load table: " + tableName);
