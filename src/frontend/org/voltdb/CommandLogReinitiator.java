@@ -39,6 +39,8 @@ public interface CommandLogReinitiator {
 
     public void setInitiator(TransactionCreator initiator);
 
+    public void initPartitionTracking();
+
     /**
      * Generate the local replay plan. Call this before starting replay.
      * @param newPartitionCount
