@@ -73,24 +73,13 @@ public class InsertMulti extends VoltProcedure {
             BigDecimal a_decimal
             )
     {
-
-        // these types are converted to instances of Long when processed
-        // from the wire protocol serialization to the stored procedure
-        // run prototype arguments. Convert them back to the underlying
-        // java mappings of the SQL types here to test EE handling of non-long
-        // values.
-
-        byte v_tinyint = new Long(a_tinyint).byteValue();
-        short v_smallint = new Long(a_smallint).shortValue();
-        int v_integer = new Long(a_integer).intValue();
-
         if (tablename.equals("NO_NULLS")) {
-            voltQueueSQL(i_no_nulls, pkey, v_tinyint, v_smallint, v_integer,
+            voltQueueSQL(i_no_nulls, pkey, a_tinyint, a_smallint, a_integer,
                          a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
                          a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
         }
         else if (tablename.equals("ALLOW_NULLS")) {
-            voltQueueSQL(i_allow_nulls, pkey, v_tinyint, v_smallint, v_integer,
+            voltQueueSQL(i_allow_nulls, pkey, a_tinyint, a_smallint, a_integer,
                          a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
                          a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
         }
@@ -101,12 +90,12 @@ public class InsertMulti extends VoltProcedure {
             voltQueueSQL(i_with_null_defaults, pkey);
         }
         else if (tablename.equals("EXPRESSIONS_WITH_NULLS")) {
-            voltQueueSQL(i_expressions_with_nulls, pkey, v_tinyint, v_smallint, v_integer,
+            voltQueueSQL(i_expressions_with_nulls, pkey, a_tinyint, a_smallint, a_integer,
                          a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
                          a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
         }
         else if (tablename.equals("EXPRESSIONS_NO_NULLS")) {
-            voltQueueSQL(i_expressions_no_nulls, pkey, v_tinyint, v_smallint, v_integer,
+            voltQueueSQL(i_expressions_no_nulls, pkey, a_tinyint, a_smallint, a_integer,
                          a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
                          a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
         }

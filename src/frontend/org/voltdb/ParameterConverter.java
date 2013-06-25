@@ -212,6 +212,13 @@ public class ParameterConverter {
     public static Object tryToMakeCompatible(final Class<?> paramType, final Object param)
     throws Exception
     {
+        // uncomment for debugging
+        /*System.err.printf("Converting %s of type %s to type %s\n",
+                String.valueOf(param),
+                param == null ? "NULL" : param.getClass().getName(),
+                paramType.getName());
+        System.err.flush();*/
+
         // Get blatant null out of the way fast, as it avoids some inline checks
         // There are some suble null values that aren't java null coming up, but wait until
         // after the basics to check for those.
@@ -231,25 +238,25 @@ public class ParameterConverter {
 
         if (pclass == Long.class) {
             if (paramType == long.class) return param;
-            if (param == VoltType.BIGINT.getNullValue()) return nullValueForType(paramType);
+            if ((Long) param == VoltType.NULL_BIGINT) return nullValueForType(paramType);
             numberParam = (Number) param;
         }
         else if (pclass == Integer.class) {
             if (paramType == int.class) return param;
-            if (param == VoltType.INTEGER.getNullValue()) return nullValueForType(paramType);
+            if ((Integer) param == VoltType.NULL_INTEGER) return nullValueForType(paramType);
             if (paramType == long.class) return ((Integer) param).longValue();
             numberParam = (Number) param;
         }
         else if (pclass == Short.class) {
             if (paramType == short.class) return param;
-            if (param == VoltType.SMALLINT.getNullValue()) return nullValueForType(paramType);
+            if ((Short) param == VoltType.NULL_SMALLINT) return nullValueForType(paramType);
             if (paramType == long.class) return ((Short) param).longValue();
             if (paramType == int.class) return ((Short) param).intValue();
             numberParam = (Number) param;
         }
         else if (pclass == Byte.class) {
             if (paramType == byte.class) return param;
-            if (param == VoltType.TINYINT.getNullValue()) return nullValueForType(paramType);
+            if ((Byte) param == VoltType.NULL_TINYINT) return nullValueForType(paramType);
             if (paramType == long.class) return ((Byte) param).longValue();
             if (paramType == int.class) return ((Byte) param).intValue();
             if (paramType == short.class) return ((Byte) param).shortValue();
@@ -257,7 +264,7 @@ public class ParameterConverter {
         }
         else if (pclass == Double.class) {
             if (paramType == double.class) return param;
-            if (param == VoltType.FLOAT.getNullValue()) return nullValueForType(paramType);
+            if ((Double) param == VoltType.NULL_FLOAT) return nullValueForType(paramType);
         }
         else if (pclass == String.class) {
             if (((String) param).equals(VoltTable.CSV_NULL)) return nullValueForType(paramType);
@@ -313,6 +320,11 @@ public class ParameterConverter {
 
         if ((paramType == int.class) && (numberParam != null)) {
             long val = numberParam.longValue();
+            if (val == VoltType.NULL_INTEGER) {
+                throw new Exception("tryToMakeCompatible: The provided long value: ("
+                        + param.toString() + ") might be interpreted as integer null. " +
+                                "Try explicitly using a int parameter.");
+            }
             // if it's in the right range, crop the value and return
             if ((val <= Integer.MAX_VALUE) && (val >= Integer.MIN_VALUE))
                 return numberParam.intValue();
@@ -320,6 +332,11 @@ public class ParameterConverter {
         else if ((paramType == short.class) && (numberParam != null)) {
             if ((pclass == Long.class) || (pclass == Integer.class)) {
                 long val = numberParam.longValue();
+                if (val == VoltType.NULL_SMALLINT) {
+                    throw new Exception("tryToMakeCompatible: The provided int or long value: ("
+                            + param.toString() + ") might be interpreted as smallint null. " +
+                                    "Try explicitly using a short parameter.");
+                }
                 // if it's in the right range, crop the value and return
                 if ((val <= Short.MAX_VALUE) && (val >= Short.MIN_VALUE))
                     return numberParam.shortValue();
@@ -328,12 +345,17 @@ public class ParameterConverter {
         else if ((paramType == byte.class) && (numberParam != null)) {
             if ((pclass == Long.class) || (pclass == Integer.class) || (pclass == Short.class)) {
                 long val = numberParam.longValue();
+                if (val == VoltType.NULL_TINYINT) {
+                    throw new Exception("tryToMakeCompatible: The provided short, int or long value: ("
+                            + param.toString() + ") might be interpreted as tinyint null. " +
+                                    "Try explicitly using a byte parameter.");
+                }
                 // if it's in the right range, crop the value and return
                 if ((val <= Byte.MAX_VALUE) && (val >= Byte.MIN_VALUE))
                     return numberParam.byteValue();
             }
         }
-        else if ((paramType == Double.class) && (numberParam != null)) {
+        else if ((paramType == double.class) && (numberParam != null)) {
             return numberParam.doubleValue();
         }
         else if (paramType == TimestampType.class) {
