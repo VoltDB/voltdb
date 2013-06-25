@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
+import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.dtxn.InitiatorStats;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
@@ -98,8 +99,8 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
      * Reads/writes to the actual InvocationInfo are unsynchronized. There is a single writer
      * so no issues there, but the reader is unprotected.
      */
-    private volatile ConcurrentHashMap<Long, Map<String, org.voltdb.dtxn.InitiatorStats.InvocationInfo>> m_connectionStates =
-            new ConcurrentHashMap<Long, Map<String, org.voltdb.dtxn.InitiatorStats.InvocationInfo>>();
+    private volatile NonBlockingHashMap<Long, Map<String, org.voltdb.dtxn.InitiatorStats.InvocationInfo>> m_connectionStates =
+            new NonBlockingHashMap<Long, Map<String, org.voltdb.dtxn.InitiatorStats.InvocationInfo>>();
 
     // Use the same-ish trick for the latency stats.  LatencyInfo keeps
     // volatile ImmutableLists for the buckets and a separate volatile max.
@@ -285,9 +286,11 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
             String procedureName,
             int delta,
             byte status) {
+        boolean needToInsert = false;
         Map<String, InvocationInfo> procInfoMap = m_connectionStates.get(connectionId);
         if(procInfoMap == null) {
             procInfoMap = new ConcurrentSkipListMap<String, InvocationInfo>();
+            needToInsert = true;
         }
         InvocationInfo info = procInfoMap.get(procedureName);
         if(info == null){
@@ -295,7 +298,9 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
             procInfoMap.put(procedureName, info);
         }
         info.processInvocation(delta, status);
-        m_connectionStates.put(connectionId, procInfoMap);
+        if(needToInsert) {
+            m_connectionStates.put(connectionId, procInfoMap);
+        }
         m_latencyInfo.addSample(delta);
     }
 
