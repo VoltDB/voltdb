@@ -392,6 +392,12 @@ public class TestVoltProcedure extends TestCase {
         assertTrue(r.getStatusString().contains("java.lang.NullPointerException"));
     }
 
+    public void testNegativeWiderType() {
+        ClientResponse r = callWithArgs(LongProcedure.class, Integer.valueOf(-1000));
+        assertEquals(-1000L, LongProcedure.arg);
+        assertEquals(ClientResponse.SUCCESS, r.getStatus());
+    }
+
     public void testUnexpectedFailureFour() {
         ClientResponse r = call(UnexpectedFailureFourProcedure.class);
         assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.getStatus());
@@ -428,6 +434,10 @@ public class TestVoltProcedure extends TestCase {
     }
 
     private ClientResponse call(Class<? extends NullProcedureWrapper> procedure) {
+        return callWithArgs(procedure, (Object) null);
+    }
+
+    private ClientResponse callWithArgs(Class<? extends NullProcedureWrapper> procedure, Object... args) {
         NullProcedureWrapper wrapper = null;
         try {
             wrapper = procedure.newInstance();
@@ -443,7 +453,7 @@ public class TestVoltProcedure extends TestCase {
                 site.m_context.database.getProcedures().get(procedure.getName()), null);
 
         runner.setupTransaction(null);
-        return runner.call((Object) null);
+        return runner.call(args);
     }
 
     private class MockExecutionSite extends ExecutionSite {
