@@ -105,6 +105,8 @@ SnapshotCompletionInterest
     private final Runnable m_changeStateFunctor = new Runnable() {
         @Override
         public void run() {
+            //After restore it is safe to initialize partition tracking
+            m_replayAgent.initPartitionTracking();
             changeState();
         }
     };
@@ -125,6 +127,7 @@ SnapshotCompletionInterest
     private final String m_clPath;
     private final String m_clSnapshotPath;
     private final String m_snapshotPath;
+    private final String m_voltdbrootPath;
     private final int[] m_allPartitions;
     private final Set<Integer> m_liveHosts;
 
@@ -197,6 +200,9 @@ SnapshotCompletionInterest
                         JSONObject jsObj = new JSONObject();
                         jsObj.put(SnapshotRestore.JSON_PATH, m_snapshotToRestore.path);
                         jsObj.put(SnapshotRestore.JSON_NONCE, m_snapshotToRestore.nonce);
+                        if (m_action == StartAction.SAFE_RECOVER) {
+                            jsObj.put(SnapshotRestore.JSON_DUPLICATES_PATH, m_voltdbrootPath);
+                        }
                         Object[] params = new Object[] { jsObj.toString() };
                         initSnapshotWork(RESTORE_TXNID,
                                 Pair.of("@SnapshotRestore", params));
@@ -387,7 +393,8 @@ SnapshotCompletionInterest
                         Callback callback, int hostId, StartAction action, boolean clEnabled,
                         String clPath, String clSnapshotPath,
                         String snapshotPath, int[] allPartitions,
-                        Set<Integer> liveHosts)
+                        Set<Integer> liveHosts,
+                        String voltdbrootPath)
     throws IOException {
         m_hostId = hostId;
         m_initiator = null;
@@ -401,6 +408,7 @@ SnapshotCompletionInterest
         m_snapshotPath = snapshotPath;
         m_allPartitions = allPartitions;
         m_liveHosts = liveHosts;
+        m_voltdbrootPath = voltdbrootPath;
 
         initialize();
     }
