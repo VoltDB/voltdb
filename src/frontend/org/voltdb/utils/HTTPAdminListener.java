@@ -192,12 +192,12 @@ public class HTTPAdminListener {
                 return;
             }
 
-            if (baseRequest.getRequestURI().contains("/report/")) {
-                handleReportPage(baseRequest, response);
+            if (baseRequest.getRequestURI().contains("/memory/")) {
+                handleMemoryPage(baseRequest, response);
                 return;
             }
 
-            handleMemoryPage(baseRequest, response);
+            handleReportPage(baseRequest, response);
         }
 
     }
