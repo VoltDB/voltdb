@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -308,8 +309,8 @@ public class SnapshotSaveAPI
     }
 
 
-    private void logSnapshotStartToZK(long txnId,
-            SystemProcedureExecutionContext context, String nonce, String truncReqId) {
+    private void logSnapshotStartToZK(long txnId, SystemProcedureExecutionContext context,
+                                      String path, String nonce, String truncReqId) {
         /*
          * Going to send out the requests async to make snapshot init move faster
          */
@@ -334,29 +335,17 @@ public class SnapshotSaveAPI
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
 
-        String nextTruncationNonce = null;
+        // The snapshot is considered a truncation snapshot if it's in the command log truncation
+        // snapshot directory
         boolean isTruncation = false;
-        try {
-            final byte payloadBytes[] =
-                VoltDB.instance().getHostMessenger().getZK().getData(VoltZK.request_truncation_snapshot, false, null);
-            //request_truncation_snapshot data may be null when initially created. If that is the case
-            //then this snapshot is definitely not a truncation snapshot because
-            //the snapshot daemon hasn't gotten around to asking for a truncation snapshot
-            if (payloadBytes != null) {
-                ByteBuffer payload = ByteBuffer.wrap(payloadBytes);
-                nextTruncationNonce = Long.toString(payload.getLong());
-            }
-        } catch (KeeperException.NoNodeException e) {}
-        catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Getting the nonce should never fail with anything other than no node", true, e);
-        }
-        if (nextTruncationNonce == null) {
-            isTruncation = false;
-        } else {
-            if (nextTruncationNonce.equals(nonce)) {
+        String clSnapshotPathStr = context.getCluster()
+                                          .getLogconfig().get("log")
+                                          .getInternalsnapshotpath();
+        if (clSnapshotPathStr != null) {
+            File clSnapshotPath = new File(clSnapshotPathStr);
+            File thisSnapshotPath = new File(path);
+            if (clSnapshotPath.equals(thisSnapshotPath)) {
                 isTruncation = true;
-            } else {
-                isTruncation = false;
             }
         }
 
@@ -611,7 +600,7 @@ public class SnapshotSaveAPI
                 VoltDB.instance().getSnapshotCompletionMonitor().registerPartitionTxnIdsForSnapshot(
                         txnId, partitionTransactionIds);
                 // Provide the truncation request ID so the monitor can recognize a specific snapshot.
-                logSnapshotStartToZK( txnId, context, file_nonce, truncReqId);
+                logSnapshotStartToZK( txnId, context, file_path, file_nonce, truncReqId);
             }
         }
     }
