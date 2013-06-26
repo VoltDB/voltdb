@@ -220,7 +220,7 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_QUARTER>() const {
     }
     int64_t epoch_micros = getTimestamp();
     boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
-    unsigned short int quater = static_cast<int>(as_date.month() / 4);
+    unsigned short int quater = static_cast<unsigned short int>(as_date.month() / 4);
     boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),quater*3+1,1);
     boost::posix_time::ptime truncate_ptime =
             boost::posix_time::ptime(truncate_date,boost::posix_time::time_duration(0,0,0));
