@@ -220,4 +220,18 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
         m_nodeState.set(NodeState.RUN);
         m_nodeLog.info("Flipping from RESOLVE to RUN on a DISCONNECT");
     }
+
+    @Override
+    public String toString()
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Node: " + CoreUtils.hsIdToString(m_HSId));
+        sb.append("\n\tState: " + getNodeState());
+        if (getNodeState() != NodeState.STOP) {
+            sb.append("\n\tConnected to: " +
+                    CoreUtils.hsIdCollectionToString(getConnectedNodes()));
+        }
+
+        return sb.toString();
+    }
 }

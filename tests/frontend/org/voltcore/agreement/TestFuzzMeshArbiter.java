@@ -33,11 +33,17 @@ import java.util.Set;
 import junit.framework.TestCase;
 
 import org.voltcore.agreement.MiniNode.NodeState;
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.RateLimitedLogger;
 
 public class TestFuzzMeshArbiter extends TestCase
 {
+    public static VoltLogger m_fuzzLog = new VoltLogger("FUZZ");
+    public static RateLimitedLogger m_rateLog = new RateLimitedLogger(20000, m_fuzzLog, Level.INFO);
+
     FakeMesh m_fakeMesh;
     Map<Long, MiniNode> m_nodes;
 
@@ -141,12 +147,24 @@ public class TestFuzzMeshArbiter extends TestCase
         }
         m_fakeMesh.failLink(getHSId(0), getHSId(1));
         m_fakeMesh.failLink(getHSId(1), getHSId(0));
+        long start = System.currentTimeMillis();
         while (getNodesInState(NodeState.RESOLVE).isEmpty()) {
+            long now = System.currentTimeMillis();
+            if (now - start > 30000) {
+                start = now;
+                dumpNodeState();
+            }
             Thread.sleep(50);
         }
         while (!getNodesInState(NodeState.RESOLVE).isEmpty()) {
+            long now = System.currentTimeMillis();
+            if (now - start > 30000) {
+                start = now;
+                dumpNodeState();
+            }
             Thread.sleep(50);
         }
+
         // This set should change to include 0 with the
         // better single-link failure algorithm
         Set<Long> expect = new HashSet<Long>();
@@ -178,6 +196,13 @@ public class TestFuzzMeshArbiter extends TestCase
         }
     }
 
+    private void dumpNodeState()
+    {
+        for (Entry<Long, MiniNode> node : m_nodes.entrySet())
+        {
+            m_fuzzLog.info(node.getValue().toString());
+        }
+    }
 
     void killRandomNode(FuzzTestState state) throws InterruptedException
     {
@@ -227,10 +252,21 @@ public class TestFuzzMeshArbiter extends TestCase
             }
         }
 
+        long start = System.currentTimeMillis();
         while (getNodesInState(NodeState.RESOLVE).isEmpty()) {
+            long now = System.currentTimeMillis();
+            if (now - start > 30000) {
+                start = now;
+                dumpNodeState();
+            }
             Thread.sleep(50);
         }
         while (!getNodesInState(NodeState.RESOLVE).isEmpty()) {
+            long now = System.currentTimeMillis();
+            if (now - start > 30000) {
+                start = now;
+                dumpNodeState();
+            }
             Thread.sleep(50);
         }
 
