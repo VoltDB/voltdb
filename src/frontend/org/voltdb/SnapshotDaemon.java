@@ -1784,6 +1784,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     TruncationSnapshotAttempt snapshotAttempt = m_truncationSnapshotAttempts.get(event.multipartTxnId);
                     if (snapshotAttempt == null) {
                         snapshotAttempt = new TruncationSnapshotAttempt();
+                        snapshotAttempt.path = event.path;
+                        snapshotAttempt.nonce = event.nonce;
                         m_truncationSnapshotAttempts.put(event.multipartTxnId, snapshotAttempt);
                     }
                     snapshotAttempt.finished = true;
