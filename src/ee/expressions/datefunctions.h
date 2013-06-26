@@ -304,8 +304,8 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_SECOND>() const {
 /** implement the timestamp TRUNCATE to MILLIS function **/
 template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MILLISECOND>() const {
     if (isNull()) {
-            return *this;
-        }
+        return *this;
+    }
     int64_t epoch_micros = getTimestamp();
     int64_t epoch_millis = static_cast<int64_t>(epoch_micros / 1000);
     return getTimestampValue(epoch_millis * 1000);
