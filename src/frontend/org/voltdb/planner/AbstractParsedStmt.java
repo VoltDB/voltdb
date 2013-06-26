@@ -580,6 +580,8 @@ public abstract class AbstractParsedStmt {
        Table table = getTableFromDB(tableName);
        assert(table != null);
 
+//// This code could be cleaned up.
+//// JoinType is only used in a particular branch, below.
        JoinType joinType = JoinType.get(tableNode.attributes.get("jointype"));
        assert(joinType != JoinType.INVALID);
        if (joinType == JoinType.FULL) {
@@ -597,6 +599,11 @@ public abstract class AbstractParsedStmt {
        }
        // The join type of the leaf node is always INNER
        // For a new tree its node's ids start with 0 and keep incrementing by 1
+//// Do these joinTree.m_root == null tests ever pass except when joinTree == null tested true, above?
+//// If not, this function should really be divided into a joinTree == null block that deals with a
+//// simple table node and an else block that deals with a join.
+//// Also, the variable naming gets a little strange in the join case. The node referencing
+//// the join is called "node" and the node referencing the table is called joinNode.
        int nodeId = (joinTree.m_root == null) ? 0 : joinTree.m_root.m_id + 1;
        JoinNode joinNode = new JoinNode(table, JoinType.INNER, joinExpr, whereExpr, nodeId);
        if (joinTree.m_root == null) {
