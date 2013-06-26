@@ -649,7 +649,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
                     SiteTracker st = VoltDB.instance().getSiteTrackerForSnapshot();
                     int hostId = SiteTracker.getHostForSite(st.getLocalSites()[0]);
-                    if (!SnapshotSaveAPI.createSnapshotCompletionNode(nonce, snapshotTxnId,
+                    if (!SnapshotSaveAPI.createSnapshotCompletionNode(snapshotPath, nonce,
+                                                                      snapshotTxnId,
                                                                       hostId, true, truncReqId)) {
                         SnapshotSaveAPI.increaseParticipateHost(snapshotTxnId, hostId);
                     }

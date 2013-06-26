@@ -352,7 +352,7 @@ public class SnapshotSaveAPI
         /*
          * Race with the others to create the place where will count down to completing the snapshot
          */
-        if (!createSnapshotCompletionNode(nonce, txnId, context.getHostId(), isTruncation, truncReqId)) {
+        if (!createSnapshotCompletionNode(path, nonce, txnId, context.getHostId(), isTruncation, truncReqId)) {
             // the node already exists, add local host ID to the list
             increaseParticipateHost(txnId, context.getHostId());
         }
@@ -430,11 +430,12 @@ public class SnapshotSaveAPI
      * @param truncReqId Optional unique ID fed back to the monitor for identification
      * @return true if the node is created successfully, false if the node already exists.
      */
-    public static boolean createSnapshotCompletionNode(String nonce,
-                                                          long txnId,
-                                                          int hostId,
-                                                          boolean isTruncation,
-                                                          String truncReqId) {
+    public static boolean createSnapshotCompletionNode(String path,
+                                                       String nonce,
+                                                       long txnId,
+                                                       int hostId,
+                                                       boolean isTruncation,
+                                                       String truncReqId) {
         if (!(txnId > 0)) {
             VoltDB.crashGlobalVoltDB("Txnid must be greather than 0", true, null);
         }
@@ -447,6 +448,7 @@ public class SnapshotSaveAPI
             stringer.key("hosts").array().value(hostId).endArray();
             stringer.key("isTruncation").value(isTruncation);
             stringer.key("hostCount").value(-1);
+            stringer.key("path").value(path);
             stringer.key("nonce").value(nonce);
             stringer.key("truncReqId").value(truncReqId);
             stringer.key("exportSequenceNumbers").object().endObject();
