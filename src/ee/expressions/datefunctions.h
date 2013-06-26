@@ -202,14 +202,13 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_YEAR>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    printf("Input micros: %lld\n", epoch_micros);
+    //printf("Input micros: %lld\n", epoch_micros);
     boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
-    printf("Input year: %d\n", (int)as_date.year());
+    //printf("Input year: %d\n", (int)as_date.year());
     boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),1,1);
     boost::posix_time::ptime truncate_ptime =
             boost::posix_time::ptime(truncate_date,boost::posix_time::time_duration(0,0,0));
     std::tm truncate_ctime =  boost::posix_time::to_tm(truncate_ptime);
-    //printf("Input year: %d\n", tm.t);
     int64_t truncate_epoch_time = static_cast<int64_t>(mktime(&truncate_ctime));
     return getTimestampValue(truncate_epoch_time * 1000000);
 }
