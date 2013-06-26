@@ -621,8 +621,8 @@ public abstract class AbstractParsedStmt {
         // temp guard against self-joins.
         Set<Table> visited = new HashSet<Table>(tableList);
 
-        // temp restriction on number of tables for an outer join statement
-        int tableCount = 0;
+        // temp restriction on number of tables for an outer join statement // 1st of 2 ALLOWED differences between AbstractParsedStmt.java
+        int tableCount = 0;                                                 //                      and AbstractParsedStmt.java_multi_table
         for (VoltXMLElement node : tablesNode.children) {
             if (node.name.equalsIgnoreCase("tablescan")) {
 
@@ -637,11 +637,10 @@ public abstract class AbstractParsedStmt {
 
                 parseTable(node);
                 visited.add(table);
-
-                ++tableCount;
-                if (joinTree.m_hasOuterJoin && tableCount > 2) {
-                    throw new PlanningErrorException("VoltDB does not support outer joins with more than two tables involved");
-                }
+                ++tableCount;                                                                   //        2nd of 2 ALLOWED differences
+                if (joinTree.m_hasOuterJoin && tableCount > 2) {                                //     between AbstractParsedStmt.java
+                    throw new PlanningErrorException("VoltDB does not support outer joins with more than two tables involved"); // and
+                }                                                                               // AbstractParsedStmt.java_multi_table
             }
         }
     }
@@ -763,6 +762,9 @@ public abstract class AbstractParsedStmt {
     /**
      * Analyze outer join expressions
      */
+//// drop "Outer" from the name? If we need or want to retain the legacy code path,
+//// maybe the legacy functions should be called Legacy instead of Inner so that these
+//// new/outer-friendly routines can even now be given simple unqualified names.
     void analyzeOuterJoinExpressions(JoinNode joinNode) {
         assert (joinNode != null);
         if (joinNode.m_table != null) {
@@ -787,6 +789,10 @@ public abstract class AbstractParsedStmt {
 
         // Collect children's and node's own join expressions
         joinList.addAll(ExpressionUtil.uncombineAny(joinNode.m_joinExpr));
+//// Except where there is an actual order dependency, which would deserve a comment,
+//// we should try to follow a consistent convention
+//// of operating in left-to-right outer-then-inner order.
+//// This suggestion probably applies to several places in the new and long-existing code.
         joinList.addAll(joinNode.m_rightNode.m_joinInnerList);
         joinList.addAll(joinNode.m_leftNode.m_joinInnerList);
         joinNode.m_rightNode.m_joinInnerList.clear();
@@ -860,6 +866,7 @@ public abstract class AbstractParsedStmt {
      * @param innerList expressions with inner table only
      * @param innerOuterList with inner and outer tables
      */
+    //// remove "Outer" from the name
     void classifyOuterJoinExpressions(Collection<AbstractExpression> exprList,
             Collection<Table> outerTables, Collection<Table> innerTables,
             List<AbstractExpression> outerList, List<AbstractExpression> innerList,
@@ -912,6 +919,9 @@ public abstract class AbstractParsedStmt {
      * @param outerTableExprs outer table expressions
      * @param innerOuterTableExprs inner-outer tables expressions
      */
+    //// This function should not contradict the convention of passing arguments
+    //// in the order ( outer-related, inner-related, innerOuter-related ) without
+    //// a well-commented reason.
     private void applyTransitiveEquivalence(List<AbstractExpression> innerTableExprs,
             List<AbstractExpression> outerTableExprs,
             List<AbstractExpression> innerOuterTableExprs) {
@@ -964,12 +974,15 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
-     * Push down outer expressions for a given node to its children.
+     * Push down each WHERE expression on a given join node to the most specific child join
+     * or table the expression applies to.
      *  1. The OUTER WHERE expressions can be pushed down to the outer (left) child for all joins
      *    (INNER and LEFT).
      *  2. The INNER WHERE expressions can be pushed down to the inner (right) child for the INNER joins.
      * @param joinNode JoinNode
      */
+//// If these functions were called pushDown instead of reclassify, it would cause less confusion
+//// with the "horizontal" (re)classification done by classify...JoinExpressions.
     private void reclassifyExpressions(JoinNode joinNode) {
         assert (joinNode != null && joinNode.m_leftNode != null && joinNode.m_rightNode != null);
         JoinNode outerNode = joinNode.m_leftNode;
