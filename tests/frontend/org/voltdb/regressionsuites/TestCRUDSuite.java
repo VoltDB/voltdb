@@ -43,8 +43,14 @@ public class TestCRUDSuite extends RegressionSuite {
     public void testNegativeWrongTypeParam() throws Exception {
         final Client client = this.getClient();
         ClientResponse resp = client.callProcedure("P5.insert", -1000);
-        assert(resp.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         resp = client.callProcedure("@AdHoc", "select * from p5;");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        assertEquals(1, resp.getResults().length);
+        VoltTable results = resp.getResults()[0];
+        assertEquals(1, results.getRowCount());
+        assertEquals(1, results.getColumnCount());
+        assertEquals(-1000, results.fetchRow(0).getLong(0));
     }
 
     public void testPartitionedPkPartitionCol() throws Exception
