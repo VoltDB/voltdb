@@ -2086,6 +2086,7 @@ TEST_F(NValueTest, TestSubstring)
             EXPECT_TRUE(((int)nextStart) > maxStart);
             maxStart = (int)nextStart;
         }
+        testString.free();
     }
     delete poolHolder;
     delete testPool;
@@ -2472,6 +2473,7 @@ TEST_F(NValueTest, TestDedupAndSort) {
         // verify
         EXPECT_TRUE(checkValueVector(vectorValues));
         vectorValues.clear();
+        arrayValue.free();
     }
 
     /////////////////////////////////////////////////////////////
@@ -2505,6 +2507,12 @@ TEST_F(NValueTest, TestDedupAndSort) {
     // verify
     EXPECT_TRUE(checkValueVector(vectorValues));
     vectorValues.clear();
+    v0.free();
+    v1.free();
+    v2.free();
+    v3.free();
+    v4.free();
+    arrayValue.free();
 
     /////////////////////////////////////////////////////////////
     // Manual Test with Floats
@@ -2536,6 +2544,7 @@ TEST_F(NValueTest, TestDedupAndSort) {
     // verify
     EXPECT_TRUE(checkValueVector(vectorValues));
     vectorValues.clear();
+    arrayValue.free();
 
     /////////////////////////////////////////////////////////////
     // Manual Test with Decimals
@@ -2567,6 +2576,7 @@ TEST_F(NValueTest, TestDedupAndSort) {
     // verify
     EXPECT_TRUE(checkValueVector(vectorValues));
     vectorValues.clear();
+    arrayValue.free();
 
     /////////////////////////////////////////////////////////////
     // Manual Test with Binary
@@ -2598,6 +2608,12 @@ TEST_F(NValueTest, TestDedupAndSort) {
     // verify
     EXPECT_TRUE(checkValueVector(vectorValues));
     vectorValues.clear();
+    v0.free();
+    v1.free();
+    v2.free();
+    v3.free();
+    v4.free();
+    arrayValue.free();
 
     /////////////////////////////////////////////////////////////
     // Cleanup

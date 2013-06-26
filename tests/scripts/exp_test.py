@@ -290,7 +290,6 @@ def assertVoltkv_Voltcache(mod, logC):
 "Starting Benchmark":1,
 "KV Store Results":1,
 "Client Workload Statistics":1,
-"System Server Statistics":1,
     }
 
     dynamicKeyStr = {}

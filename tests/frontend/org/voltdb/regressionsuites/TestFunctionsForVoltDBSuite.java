@@ -977,7 +977,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 fail();
             }
 
-            cr = client.callProcedure(proc, -1000L , 1);
+            cr = client.callProcedure(proc, -1000 , 1);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             result = cr.getResults()[0];
             assertEquals(1, result.getRowCount());

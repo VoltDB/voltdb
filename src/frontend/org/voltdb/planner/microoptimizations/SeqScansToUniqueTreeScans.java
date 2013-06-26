@@ -148,6 +148,7 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
         indexScanNode.setLookupType(IndexLookupType.GTE);
         indexScanNode.setSortDirection(SortDirectionType.ASC);
         indexScanNode.setPredicate(scanNode.getPredicate());
+        indexScanNode.setForDeterminismOnly();
         for (AbstractPlanNode inlineNode : scanNode.getInlinePlanNodes().values()) {
             indexScanNode.addInlinePlanNode(inlineNode);
         }
