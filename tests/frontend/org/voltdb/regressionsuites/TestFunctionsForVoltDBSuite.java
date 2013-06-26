@@ -1156,7 +1156,6 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         expected_time_microsecond = "1212-11-24 13:56:40.123456";
         time = dateFormat.parse(expected_time_microsecond);
         assertEquals(1000000000035123L, result.getTimestampAsLong(10));
-
     }
 
     public void testFunctionsWithInvalidJSON() throws Exception {

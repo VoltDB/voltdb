@@ -202,11 +202,14 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_YEAR>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
+    printf("Input micros: %lld\n", epoch_micros);
     boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    printf("Input year: %d\n", (int)as_date.year());
     boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),1,1);
     boost::posix_time::ptime truncate_ptime =
             boost::posix_time::ptime(truncate_date,boost::posix_time::time_duration(0,0,0));
     std::tm truncate_ctime =  boost::posix_time::to_tm(truncate_ptime);
+    //printf("Input year: %d\n", tm.t);
     int64_t truncate_epoch_time = static_cast<int64_t>(mktime(&truncate_ctime));
     return getTimestampValue(truncate_epoch_time * 1000000);
 }
@@ -218,7 +221,7 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_QUARTER>() const {
     }
     int64_t epoch_micros = getTimestamp();
     boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
-    int quater = static_cast<int>(as_date.month() / 4);
+    unsigned short int quater = static_cast<int>(as_date.month() / 4);
     boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),quater*3+1,1);
     boost::posix_time::ptime truncate_ptime =
             boost::posix_time::ptime(truncate_date,boost::posix_time::time_duration(0,0,0));
@@ -265,7 +268,6 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_HOUR>() const {
     int64_t epoch_micros = getTimestamp();
     boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
     boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),as_date.month(),as_date.day());
-
     boost::posix_time::time_duration as_time = time_of_day_from_epoch_micros(epoch_micros);
     boost::posix_time::time_duration truncate_time = boost::posix_time::time_duration(as_time.hours(),0,0);
     boost::posix_time::ptime truncate_ptime = boost::posix_time::ptime(truncate_date, truncate_time);
@@ -282,7 +284,6 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MINUTE>() const {
     int64_t epoch_micros = getTimestamp();
     boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
     boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),as_date.month(),as_date.day());
-
     boost::posix_time::time_duration as_time = time_of_day_from_epoch_micros(epoch_micros);
     boost::posix_time::time_duration truncate_time = boost::posix_time::time_duration(as_time.hours(),as_time.minutes(),0);
     boost::posix_time::ptime truncate_ptime = boost::posix_time::ptime(truncate_date, truncate_time);
