@@ -422,7 +422,15 @@ public class SnapshotSiteProcessor {
         for (Collection<SnapshotTableTask> perTableTasks : m_snapshotTableTasks.asMap().values()) {
             maxTableTaskSize = Math.max(maxTableTaskSize, perTableTasks.size());
         }
-        resizeBufferPool(maxTableTaskSize * m_bufferCountMultiplier);
+
+        // Only use the multiplier for 1 snapshot target now. In the case of join,
+        // which has multiple targets, using the multiplier uses a lot of direct byte buffers
+        // which may exhaust the java heap.
+        if (maxTableTaskSize == 1) {
+            resizeBufferPool(m_bufferCountMultiplier);
+        } else {
+            resizeBufferPool(maxTableTaskSize);
+        }
 
         if (tasks.isEmpty()) {
             // This site has no snapshot work to do, still queue a task to clean up. Otherwise,
