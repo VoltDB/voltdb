@@ -2060,6 +2060,9 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             fail("SnapshotRestore exception: " + ex.getMessage());
         }
 
+        // because stats are not synchronous :(
+        Thread.sleep(5000);
+
         // XXX consider adding a check that the newly materialized table is
         // not loaded
         results = client.callProcedure("@Statistics", "table", 0).getResults();
