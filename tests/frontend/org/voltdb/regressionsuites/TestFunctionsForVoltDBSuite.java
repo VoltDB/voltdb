@@ -25,8 +25,12 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 import java.sql.Timestamp;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -1006,6 +1010,82 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
     }
 
+    public void testTRUNCATE() throws NoConnectionsException, IOException, ProcCallException, ParseException {
+        System.out.println("STARTING TRUNCATE with timestamp");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        VoltDB.setDefaultTimezone();
+        cr = client.callProcedure("P2.insert", 0, Timestamp.valueOf("2001-09-09 01:46:40.035123"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        Exception ex = null;
+        try {
+            cr = client.callProcedure("@AdHoc", "select TRUNCATE (1.2, 1), TM from P2 where id = 0");
+        } catch (Exception e) {
+            ex = e;
+        } finally {
+            assertNotNull(ex);
+        }
+
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+        //System.out.println(dateFormat.getTimeZone());
+        Date time = null;
+
+        cr = client.callProcedure("TRUNCATE", 0);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+
+
+        String expected_time_year = "2001-01-01 00:00:00.000";
+        time = dateFormat.parse(expected_time_year);
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(0));
+
+        String expected_time_quarter = "2001-07-01 00:00:00.000";
+        time = dateFormat.parse(expected_time_quarter);
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(1));
+
+        String expected_time_month = "2001-09-01 00:00:00.000";
+        time = dateFormat.parse(expected_time_month);
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(2));
+
+        String expected_time_day = "2001-09-09 00:00:00.000";
+        time = dateFormat.parse(expected_time_day);
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(3));
+
+        String expected_time_hour = "2001-09-09 01:00:00.000";
+        time = dateFormat.parse(expected_time_hour);
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(4));
+
+        String expected_time_minute = "2001-09-09 01:46:00.000";
+        time = dateFormat.parse(expected_time_minute);
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(5));
+
+        String expected_time_second = "2001-09-09 01:46:40.000";
+        time = dateFormat.parse(expected_time_second);
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(6));
+
+        String expected_time_millis = "2001-09-09 01:46:40.035";
+        time = dateFormat.parse(expected_time_millis);
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(7));
+
+        String expected_time_millisecond = "2001-09-09 01:46:40.035";
+        time = dateFormat.parse(expected_time_millisecond);
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(8));
+
+        String expected_time_micros = "2001-09-09 01:46:40.035123";
+        time = dateFormat.parse(expected_time_micros);
+        assertEquals(1000000000035123L, result.getTimestampAsLong(9));
+
+        String expected_time_microsecond = "2001-09-09 01:46:40.035123";
+        time = dateFormat.parse(expected_time_microsecond);
+        assertEquals(1000000000035123L, result.getTimestampAsLong(10));
+    }
+
+
     public void testFunctionsWithInvalidJSON() throws Exception {
 
         Client client = getClient();
@@ -1192,6 +1272,10 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         project.addStmtProcedure("TO_TIMESTAMP_MILLISECOND", "select TO_TIMESTAMP (MILLISECOND, ?) from P2 where id = ?");
         project.addStmtProcedure("TO_TIMESTAMP_MICROS", "select TO_TIMESTAMP (MICROS, ?) from P2 where id = ?");
         project.addStmtProcedure("TO_TIMESTAMP_MICROSECOND", "select TO_TIMESTAMP (MICROSECOND, ?) from P2 where id = ?");
+
+        project.addStmtProcedure("TRUNCATE", "select TRUNCATE(YEAR, TM), TRUNCATE(QUARTER, TM), TRUNCATE(MONTH, TM), " +
+                "TRUNCATE(DAY, TM), TRUNCATE(HOUR, TM),TRUNCATE(MINUTE, TM),TRUNCATE(SECOND, TM), TRUNCATE(MILLIS, TM), " +
+                "TRUNCATE(MILLISECOND, TM), TRUNCATE(MICROS, TM), TRUNCATE(MICROSECOND, TM) from P2 where id = ?");
 
         // CONFIG #1: Local Site/Partition running on JNI backend
         config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
