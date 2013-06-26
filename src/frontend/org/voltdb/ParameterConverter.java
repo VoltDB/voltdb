@@ -148,11 +148,10 @@ public class ParameterConverter {
      */
     private static Object tryToMakeCompatibleArray(
             final Class<?> expectedComponentClz,
-            final Class<?> inputClz,
+            final Class<?> inputComponentClz,
             Object param)
     throws Exception
     {
-        Class<?> inputComponentClz = inputClz.getComponentType();
         int inputLength = Array.getLength(param);
 
         if (inputComponentClz == expectedComponentClz) {
@@ -304,7 +303,7 @@ public class ParameterConverter {
 
         // handle arrays in a factored-out method
         if (expectedClz.isArray()) {
-            return tryToMakeCompatibleArray(expectedClz.getComponentType(), inputClz, param);
+            return tryToMakeCompatibleArray(expectedClz.getComponentType(), inputClz.getComponentType(), param);
         }
 
         // The following block switches on the type of the paramter desired.
