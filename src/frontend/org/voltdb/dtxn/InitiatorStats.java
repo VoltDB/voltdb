@@ -179,7 +179,7 @@ public class InitiatorStats extends SiteStatsSource {
             this.interval = interval;
         }
 
-        private boolean advanceUpper() {
+        private boolean advanceOuter() {
             if(outerItr.hasNext()) {
                 outerNext = outerItr.next();
                 // reset innerItr
@@ -190,7 +190,7 @@ public class InitiatorStats extends SiteStatsSource {
             return false;
         }
 
-        private boolean advanceLower() {
+        private boolean advanceInner() {
             if(innerItr.hasNext()) {
                 innerNext = innerItr.next();
                 return true;
@@ -203,22 +203,22 @@ public class InitiatorStats extends SiteStatsSource {
         public boolean hasNext() {
             if (!interval) {
                 if(innerItr == null) {
-                    if(advanceUpper()) {
-                        return advanceLower();
+                    if(advanceOuter()) {
+                        return advanceInner();
                     }
                     return false;
                 } else {
-                    if(advanceLower()) {
+                    if(advanceInner()) {
                         return true;
                     }
-                    if(advanceUpper()) {
-                        return advanceLower();
+                    if(advanceOuter()) {
+                        return advanceInner();
                     }
                     return false;
                 }
             }
             if (innerItr == null) {
-                advanceUpper();
+                advanceOuter();
             }
             // innerItr can be null if connection created but not doing any procedures
             if (innerItr == null || !outerItr.hasNext() && !innerItr.hasNext()) {
@@ -227,11 +227,11 @@ public class InitiatorStats extends SiteStatsSource {
                 while (innerNext == null && (outerItr.hasNext() || innerItr.hasNext())) {
                     InvocationInfo info = null;
                     // first, look up at lower level map
-                    advanceLower();
+                    advanceInner();
                     // not found, advance upper level map itr, and look up in next lower level map
                     if(innerNext == null) {
-                        advanceUpper();
-                        advanceLower();
+                        advanceOuter();
+                        advanceInner();
                     }
                     info = innerNext.getValue();
                     if(info.invocationCount - info.lastInvocationCount == 0) {
