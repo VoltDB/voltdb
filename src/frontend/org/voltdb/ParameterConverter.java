@@ -40,22 +40,22 @@ public class ParameterConverter {
      * Get the appropriate and compatible null value for a given
      * parameter type.
      */
-    private static Object nullValueForType(final Class<?> paramType)
+    private static Object nullValueForType(final Class<?> expectedClz)
     {
-        if (paramType == long.class) {
-            return VoltType.BIGINT.getNullValue();
+        if (expectedClz == long.class) {
+            return VoltType.NULL_BIGINT;
         }
-        else if (paramType == int.class) {
-            return VoltType.INTEGER.getNullValue();
+        else if (expectedClz == int.class) {
+            return VoltType.NULL_INTEGER;
         }
-        else if (paramType == short.class) {
-            return VoltType.SMALLINT.getNullValue();
+        else if (expectedClz == short.class) {
+            return VoltType.NULL_SMALLINT;
         }
-        else if (paramType == byte.class) {
-            return VoltType.TINYINT.getNullValue();
+        else if (expectedClz == byte.class) {
+            return VoltType.NULL_TINYINT;
         }
-        else if (paramType == double.class) {
-            return VoltType.FLOAT.getNullValue();
+        else if (expectedClz == double.class) {
+            return VoltType.NULL_FLOAT;
         }
 
         // all non-primitive types can handle null
@@ -68,71 +68,67 @@ public class ParameterConverter {
      */
     public static boolean verifyParameterConversion(
             Object value,
-            final Class<?> paramType)
+            final Class<?> expectedClz)
     {
         // skip this (used for sysprocs)
         if (value instanceof SystemProcedureExecutionContext)
             return true;
 
-        if (paramType == long.class) {
+        if (expectedClz == long.class) {
             assert(value != null);
             assert(value.getClass() == Long.class);
         }
-        else if (paramType == int.class) {
+        else if (expectedClz == int.class) {
             assert(value != null);
             assert(value.getClass() == Integer.class);
         }
-        else if (paramType == short.class) {
+        else if (expectedClz == short.class) {
             assert(value != null);
             assert(value.getClass() == Short.class);
         }
-        else if (paramType == byte.class) {
+        else if (expectedClz == byte.class) {
             assert(value != null);
             assert(value.getClass() == Byte.class);
         }
-        else if (paramType == double.class) {
+        else if (expectedClz == double.class) {
             assert(value != null);
             assert(value.getClass() == Double.class);
         }
         else if (value != null) {
-            assert(value.getClass() == paramType);
-            if (paramType.isArray()) {
-                assert(value.getClass().getComponentType() == paramType.getComponentType());
+            assert(value.getClass() == expectedClz);
+            if (expectedClz.isArray()) {
+                assert(value.getClass().getComponentType() == expectedClz.getComponentType());
             }
         }
         return true;
     }
 
     /**
-     *
-     * @param value
-     * @param paramType
-     * @return
-     * @throws Exception
+     * Given a string, covert it to a primitive type or return null.
      */
-    private static Object convertStringToPrimitive(String value, final Class<?> paramType)
+    private static Object convertStringToPrimitive(String value, final Class<?> expectedClz)
     throws Exception
     {
         value = value.trim();
         // detect CSV null
-        if (value.equals(VoltTable.CSV_NULL)) return null;
+        if (value.equals(VoltTable.CSV_NULL)) return nullValueForType(expectedClz);
         // remove commas and escape chars
         value = value.replaceAll("\\,","");
 
         try {
-            if (paramType == long.class) {
+            if (expectedClz == long.class) {
                 return Long.parseLong(value);
             }
-            if (paramType == int.class) {
+            if (expectedClz == int.class) {
                 return Integer.parseInt(value);
             }
-            if (paramType == short.class) {
+            if (expectedClz == short.class) {
                 return Short.parseShort(value);
             }
-            if (paramType == byte.class) {
+            if (expectedClz == byte.class) {
                 return Byte.parseByte(value);
             }
-            if (paramType == double.class) {
+            if (expectedClz == double.class) {
                 return Double.parseDouble(value);
             }
         }
@@ -141,7 +137,7 @@ public class ParameterConverter {
 
         throw new Exception(
                 "tryToMakeCompatible: Unable to convert string "
-                + value + " to "  + paramType.getName()
+                + value + " to "  + expectedClz.getName()
                 + " value for target parameter.");
     }
 
@@ -151,16 +147,15 @@ public class ParameterConverter {
      * @throws Exception with a message describing why the types are incompatible.
      */
     private static Object tryToMakeCompatibleArray(
-            final Class<?> paramTypeComponentType,
-            final Class<?> pclass,
+            final Class<?> expectedComponentClz,
+            final Class<?> inputClz,
             Object param)
     throws Exception
     {
-        Class<?> pSubCls = pclass.getComponentType();
-        Class<?> sSubCls = paramTypeComponentType;
+        Class<?> inputComponentClz = inputClz.getComponentType();
         int inputLength = Array.getLength(param);
 
-        if (pSubCls == sSubCls) {
+        if (inputComponentClz == expectedComponentClz) {
             return param;
         }
         // if it's an empty array, let it through
@@ -168,10 +163,10 @@ public class ParameterConverter {
         //  arrays of the wrong type, but it "does the right thing"
         //  more often that not I guess...
         else if (inputLength == 0) {
-            return Array.newInstance(sSubCls, 0);
+            return Array.newInstance(expectedComponentClz, 0);
         }
         // hack to make strings work with input as bytes
-        else if ((pSubCls == byte[].class) && (sSubCls == String.class)) {
+        else if ((inputComponentClz == byte[].class) && (expectedComponentClz == String.class)) {
             String[] values = new String[inputLength];
             for (int i = 0; i < inputLength; i++) {
                 values[i] = new String((byte[]) Array.get(param, i), "UTF-8");
@@ -179,7 +174,7 @@ public class ParameterConverter {
             return values;
         }
         // hack to make varbinary work with input as hex string
-        else if ((pSubCls == String.class) && (sSubCls == byte[].class)) {
+        else if ((inputComponentClz == String.class) && (expectedComponentClz == byte[].class)) {
             byte[][] values = new byte[inputLength][];
             for (int i = 0; i < inputLength; i++) {
                 values[i] = Encoder.hexDecode((String) Array.get(param, i));
@@ -194,7 +189,7 @@ public class ParameterConverter {
              */
             throw new Exception(
                     "tryScalarMakeCompatible: Unable to match parameter array:"
-                    + sSubCls.getName() + " to provided " + pSubCls.getName());
+                    + expectedComponentClz.getName() + " to provided " + inputComponentClz.getName());
         }
     }
 
@@ -209,7 +204,7 @@ public class ParameterConverter {
      *
      * @throws Exception with a message describing why the types are incompatible.
      */
-    public static Object tryToMakeCompatible(final Class<?> paramType, final Object param)
+    public static Object tryToMakeCompatible(final Class<?> expectedClz, final Object param)
     throws Exception
     {
         // uncomment for debugging
@@ -223,78 +218,78 @@ public class ParameterConverter {
         // There are some suble null values that aren't java null coming up, but wait until
         // after the basics to check for those.
         if (param == null) {
-            return nullValueForType(paramType);
+            return nullValueForType(expectedClz);
         }
 
-        Class<?> pclass = param.getClass();
+        Class<?> inputClz = param.getClass();
 
         // If we make it through this first block, memoize a number value for some range checks later
         Number numberParam = null;
 
         // This first code block tries to hit as many common cases as possible
         // Specifically, it does primitive types and strings, which are the most common param types.
-        // Downconversions (e.g. long to short) happen later, but can use the memoized numberParam value.
+        // Downconversions (e.g. long => short) happen later, but can use the memoized numberParam value.
         // Notice this block switches on the type of the given value (different later).
 
-        if (pclass == Long.class) {
-            if (paramType == long.class) return param;
-            if ((Long) param == VoltType.NULL_BIGINT) return nullValueForType(paramType);
+        if (inputClz == Long.class) {
+            if (expectedClz == long.class) return param;
+            if ((Long) param == VoltType.NULL_BIGINT) return nullValueForType(expectedClz);
             numberParam = (Number) param;
         }
-        else if (pclass == Integer.class) {
-            if (paramType == int.class) return param;
-            if ((Integer) param == VoltType.NULL_INTEGER) return nullValueForType(paramType);
-            if (paramType == long.class) return ((Integer) param).longValue();
+        else if (inputClz == Integer.class) {
+            if (expectedClz == int.class) return param;
+            if ((Integer) param == VoltType.NULL_INTEGER) return nullValueForType(expectedClz);
+            if (expectedClz == long.class) return ((Integer) param).longValue();
             numberParam = (Number) param;
         }
-        else if (pclass == Short.class) {
-            if (paramType == short.class) return param;
-            if ((Short) param == VoltType.NULL_SMALLINT) return nullValueForType(paramType);
-            if (paramType == long.class) return ((Short) param).longValue();
-            if (paramType == int.class) return ((Short) param).intValue();
+        else if (inputClz == Short.class) {
+            if (expectedClz == short.class) return param;
+            if ((Short) param == VoltType.NULL_SMALLINT) return nullValueForType(expectedClz);
+            if (expectedClz == long.class) return ((Short) param).longValue();
+            if (expectedClz == int.class) return ((Short) param).intValue();
             numberParam = (Number) param;
         }
-        else if (pclass == Byte.class) {
-            if (paramType == byte.class) return param;
-            if ((Byte) param == VoltType.NULL_TINYINT) return nullValueForType(paramType);
-            if (paramType == long.class) return ((Byte) param).longValue();
-            if (paramType == int.class) return ((Byte) param).intValue();
-            if (paramType == short.class) return ((Byte) param).shortValue();
+        else if (inputClz == Byte.class) {
+            if (expectedClz == byte.class) return param;
+            if ((Byte) param == VoltType.NULL_TINYINT) return nullValueForType(expectedClz);
+            if (expectedClz == long.class) return ((Byte) param).longValue();
+            if (expectedClz == int.class) return ((Byte) param).intValue();
+            if (expectedClz == short.class) return ((Byte) param).shortValue();
             numberParam = (Number) param;
         }
-        else if (pclass == Double.class) {
-            if (paramType == double.class) return param;
-            if ((Double) param == VoltType.NULL_FLOAT) return nullValueForType(paramType);
+        else if (inputClz == Double.class) {
+            if (expectedClz == double.class) return param;
+            if ((Double) param == VoltType.NULL_FLOAT) return nullValueForType(expectedClz);
         }
-        else if (pclass == String.class) {
-            if (((String) param).equals(VoltTable.CSV_NULL)) return nullValueForType(paramType);
-            else if (paramType == String.class) return param;
+        else if (inputClz == String.class) {
+            if (((String) param).equals(VoltTable.CSV_NULL)) return nullValueForType(expectedClz);
+            else if (expectedClz == String.class) return param;
             // Hack allows hex-encoded strings to be passed into byte[] params
-            else if (paramType == byte[].class) {
+            else if (expectedClz == byte[].class) {
                 return Encoder.hexDecode((String) param);
             }
             // We allow all values to be passed as strings for csv loading, json, etc...
             // This code handles primitive types. Complex types come later.
-            if (paramType.isPrimitive()) {
-                return convertStringToPrimitive((String) param, paramType);
+            if (expectedClz.isPrimitive()) {
+                return convertStringToPrimitive((String) param, expectedClz);
             }
         }
-        else if (pclass == byte[].class) {
-            if (paramType == byte[].class) return param;
+        else if (inputClz == byte[].class) {
+            if (expectedClz == byte[].class) return param;
             // allow byte arrays to be passed into string parameters
-            else if (paramType == String.class) {
+            else if (expectedClz == String.class) {
                 String value = new String((byte[]) param, Charsets.UTF_8);
-                if (value.equals(VoltTable.CSV_NULL)) return nullValueForType(paramType);
+                if (value.equals(VoltTable.CSV_NULL)) return nullValueForType(expectedClz);
                 else return value;
             }
         }
         // null sigil
         else if (param == VoltType.NULL_STRING_OR_VARBINARY) {
-            return nullValueForType(paramType);
+            return nullValueForType(expectedClz);
         }
         // null sigil
         else if (param == VoltType.NULL_DECIMAL) {
-            return nullValueForType(paramType);
+            return nullValueForType(expectedClz);
         }
         // these are used by system procedures and are ignored here
         else if (param instanceof SystemProcedureExecutionContext) {
@@ -302,14 +297,14 @@ public class ParameterConverter {
         }
 
         // make sure we get the array/scalar match
-        if (paramType.isArray() != pclass.isArray()) {
+        if (expectedClz.isArray() != inputClz.isArray()) {
             throw new Exception(String.format("Array / Scalar parameter mismatch (%s to %s)",
-                    pclass.getName(), paramType.getName()));
+                    inputClz.getName(), expectedClz.getName()));
         }
 
         // handle arrays in a factored-out method
-        if (paramType.isArray()) {
-            return tryToMakeCompatibleArray(paramType.getComponentType(), pclass, param);
+        if (expectedClz.isArray()) {
+            return tryToMakeCompatibleArray(expectedClz.getComponentType(), inputClz, param);
         }
 
         // The following block switches on the type of the paramter desired.
@@ -318,7 +313,7 @@ public class ParameterConverter {
         // Downcasting is handled here (e.g. long => short).
         // Time (in many forms) and Decimal are also handled below.
 
-        if ((paramType == int.class) && (numberParam != null)) {
+        if ((expectedClz == int.class) && (numberParam != null)) {
             long val = numberParam.longValue();
             if (val == VoltType.NULL_INTEGER) {
                 throw new Exception("tryToMakeCompatible: The provided long value: ("
@@ -329,8 +324,8 @@ public class ParameterConverter {
             if ((val <= Integer.MAX_VALUE) && (val >= Integer.MIN_VALUE))
                 return numberParam.intValue();
         }
-        else if ((paramType == short.class) && (numberParam != null)) {
-            if ((pclass == Long.class) || (pclass == Integer.class)) {
+        else if ((expectedClz == short.class) && (numberParam != null)) {
+            if ((inputClz == Long.class) || (inputClz == Integer.class)) {
                 long val = numberParam.longValue();
                 if (val == VoltType.NULL_SMALLINT) {
                     throw new Exception("tryToMakeCompatible: The provided int or long value: ("
@@ -342,8 +337,8 @@ public class ParameterConverter {
                     return numberParam.shortValue();
             }
         }
-        else if ((paramType == byte.class) && (numberParam != null)) {
-            if ((pclass == Long.class) || (pclass == Integer.class) || (pclass == Short.class)) {
+        else if ((expectedClz == byte.class) && (numberParam != null)) {
+            if ((inputClz == Long.class) || (inputClz == Integer.class) || (inputClz == Short.class)) {
                 long val = numberParam.longValue();
                 if (val == VoltType.NULL_TINYINT) {
                     throw new Exception("tryToMakeCompatible: The provided short, int or long value: ("
@@ -355,15 +350,15 @@ public class ParameterConverter {
                     return numberParam.byteValue();
             }
         }
-        else if ((paramType == double.class) && (numberParam != null)) {
+        else if ((expectedClz == double.class) && (numberParam != null)) {
             return numberParam.doubleValue();
         }
-        else if (paramType == TimestampType.class) {
-            if (pclass == Long.class) return new TimestampType((Long)param); // null values safe
-            if (pclass == TimestampType.class) return param;
-            if (pclass == Date.class) return new TimestampType((Date) param);
+        else if (expectedClz == TimestampType.class) {
+            if (inputClz == Long.class) return new TimestampType((Long)param); // null values safe
+            if (inputClz == TimestampType.class) return param;
+            if (inputClz == Date.class) return new TimestampType((Date) param);
             // if a string is given for a date, use java's JDBC parsing
-            if (pclass == String.class) {
+            if (inputClz == String.class) {
                 String longtime = ((String) param).trim();
                 try {
                     return new TimestampType(Long.parseLong(longtime));
@@ -378,12 +373,12 @@ public class ParameterConverter {
                 }
             }
         }
-        else if (paramType == java.sql.Timestamp.class) {
+        else if (expectedClz == java.sql.Timestamp.class) {
             if (param instanceof java.sql.Timestamp) return param;
             if (param instanceof java.util.Date) return new java.sql.Timestamp(((java.util.Date) param).getTime());
             if (param instanceof TimestampType) return ((TimestampType) param).asJavaTimestamp();
             // If a string is given for a date, use java's JDBC parsing.
-            if (pclass == String.class) {
+            if (inputClz == String.class) {
                 String longtime = ((String) param).trim();
                 try {
                     return new java.sql.Timestamp(Long.parseLong(longtime));
@@ -399,12 +394,12 @@ public class ParameterConverter {
 
             }
         }
-        else if (paramType == java.sql.Date.class) {
+        else if (expectedClz == java.sql.Date.class) {
             if (param instanceof java.sql.Date) return param; // covers java.sql.Date and java.sql.Timestamp
             if (param instanceof java.util.Date) return new java.sql.Date(((java.util.Date) param).getTime());
             if (param instanceof TimestampType) return ((TimestampType) param).asExactJavaSqlDate();
             // If a string is given for a date, use java's JDBC parsing.
-            if (pclass == String.class) {
+            if (inputClz == String.class) {
                 try {
                     return new java.sql.Date(TimestampType.millisFromJDBCformat((String) param));
                 }
@@ -413,11 +408,11 @@ public class ParameterConverter {
                 }
             }
         }
-        else if (paramType == java.util.Date.class) {
+        else if (expectedClz == java.util.Date.class) {
             if (param instanceof java.util.Date) return param; // covers java.sql.Date and java.sql.Timestamp
             if (param instanceof TimestampType) return ((TimestampType) param).asExactJavaDate();
             // If a string is given for a date, use the default format parser for the default locale.
-            if (pclass == String.class) {
+            if (inputClz == String.class) {
                 try {
                     return new java.util.Date(TimestampType.millisFromJDBCformat((String) param));
                 }
@@ -426,29 +421,29 @@ public class ParameterConverter {
                 }
             }
         }
-        else if (paramType == BigDecimal.class) {
+        else if (expectedClz == BigDecimal.class) {
             if (numberParam != null) {
                 BigInteger bi = new BigInteger(param.toString());
                 BigDecimal bd = new BigDecimal(bi);
                 bd = bd.setScale(12, BigDecimal.ROUND_HALF_EVEN);
                 return bd;
             }
-            if (pclass == BigDecimal.class) {
+            if (inputClz == BigDecimal.class) {
                 BigDecimal bd = (BigDecimal) param;
                 bd = bd.setScale(12 ,BigDecimal.ROUND_HALF_EVEN);
                 return bd;
             }
-            if (paramType == BigDecimal.class) {
+            if (expectedClz == BigDecimal.class) {
                 return VoltDecimalHelper.deserializeBigDecimalFromString((String) param);
             }
         }
-        else if (paramType == VoltTable.class && pclass == VoltTable.class) {
+        else if (expectedClz == VoltTable.class && inputClz == VoltTable.class) {
             return param;
         }
 
         throw new Exception(
-                "tryToMakeCompatible: The provided value: (" + param.toString() + ") of type: " + pclass.getName() +
-                " is not a match or is out of range for the target parameter type: " + paramType.getName());
+                "tryToMakeCompatible: The provided value: (" + param.toString() + ") of type: " + inputClz.getName() +
+                " is not a match or is out of range for the target parameter type: " + expectedClz.getName());
     }
 
 
