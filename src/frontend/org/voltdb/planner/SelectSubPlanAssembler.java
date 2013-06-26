@@ -235,6 +235,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         }
         JoinNode[] children = {root.m_leftNode, root.m_rightNode};
         for (JoinNode child : children) {
+//// Leaf nodes don't have a significant join type, so it seems like it would be simpler to
+//// test for them first and never attempt to start a new tree at a leaf.
             if (child.m_joinType == root.m_joinType) {
                 // The join type for this node is the same as the root's one
                 extractSubTree(child, leafNodes);
@@ -262,6 +264,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             JoinTree joinTree = new JoinTree();
             joinTree.m_hasOuterJoin = true;
             // Reconstruct the tree. The first element is the first sub-tree and so on
+// Would this be simpler as an iteration rather than a tail recursion?
+// At least, it seems that we should avoid the sublist constructions by operating on the original list
+// but passing an incremented counter to "get" instead of 0 to get the effective current head
+// -- see queueInnerSubJoinOrdersRecursively which does something like this.
             joinTree.m_root = reassembleJoinTree(
                     currentJoinOrder.get(0), currentJoinOrder.subList(1, currentJoinOrder.size()));
             m_joinOrders.add(joinTree);
@@ -306,6 +312,11 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             return false;
         }
 
+// There's little gained from this loop -- it seems no less complex than processing left and right explicitly.
+// Also, if the loop is unrolled, left and right could be checked for equality before recursing down
+// either, which seems simpler.
+// Finally, since we're sometimes tentatively recursing down a wrong child tree before recursing down
+// the correct one, the assert(false) seems overly aggressive.
         JoinNode[] children = {root.m_leftNode, root.m_rightNode};
         for (JoinNode child : children) {
             if (child.m_id == node.m_id) {
@@ -371,6 +382,14 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * Recursively add all join orders (permutations) for the input node list.
      * @TODO ENG_3038 This is a cut-and-paste copy of the queueInnerSubJoinOrdersRecursively for tables
      * After the inner and outer join paths will be merged the original version can be retired
+     * TODO: This code is a candidate for some major simplification.
+     * The process of generating all permutations of the list seems like it should be broken out and
+     * delegated.
+     * Is there no library function that will generate all the permutations of the integers from 0 to N
+     * as int[]s?
+     * With that, it would be easy to use the result to indirectly index into the original node list
+     * to initialize corresponding Node[]s without lots of custom deduplication logic.
+     * And from there it would be easy to generate a join tree from each Node[].
      *
      * @param inputTables An array of tables to order.
      * @param outputTables A scratch space for recursion for an array of tables. Making this a parameter
@@ -651,6 +670,15 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @param parentNode A parent node to the node to generate paths to.
      * @param childNode A node to generate paths to.
      */
+//// This code could be simpler.
+//// First, factor out a recursive function that asserts parentNode != null and includes only the
+//// (parentNode != null) code path.
+//// This assert is always safe in the recursive call and never safe when called at the top level.
+//// So, you COULD also have a top-level version of this function that didn't bother
+//// with a parentNode and just implemented the (parentNode == null) code path.
+//// BUT since that top-level function would only have the one point of call in
+//// generateMorePlansForOuterJoinOrder, you could rather move those ~12 lines of code
+//// from the (parentNode == null) code path to be inline code there.
     private void generateAccessPaths(JoinNode parentNode, JoinNode childNode) {
         assert(childNode != null);
         if (childNode.m_leftNode != null) {
@@ -689,6 +717,26 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             } else {
                 assert(parentNode.m_rightNode == childNode);
                 // This is the inner node
+//// It bothers me a little that there is such a lack of left/right symmetry here.
+//// Maybe when the parentNode == null case gets factored out, this function will be simple
+//// enough that it can bear the weight of getRelevantAccessPathsForInnerNode getting pulled inline.
+//// Alternatively, symmetry could be served by factoring OUT a parallel getRelevantAccessPathsForOuterNode.
+//// In any case, I would find it reassuring if the getRelevantAccessPathsForInnerNode didn't
+//// contain so many cosmetic differences, so that it's actual logic differences stood
+//// out more clearly -- little things like keeping the names parentNode and childNode, handling
+//// m_table != null in the "if" clause rather than in the "else", collecting up the access paths in
+//// an allocated arraylist rather than immediately adding to childNode.m_accessPaths, etc.
+//// Actually, factoring out getRelevantAccessPathsForOuterNode may end up trivializing this function so
+//// that most of what it's doing is asking the question "is this the left or right child?", but
+//// that's something the (recursive) caller already knew at the point of call, so maybe the
+//// right approach is to replace this function with two mutually recursive versions of this code
+//// that accept just the parentNode as argument and each operate exclusively on the left or right child
+//// (after recursing left AND right).
+//// In other words, push more of this function's logic into getRelevantAccessPathsForInnerNode
+//// and a twin function getRelevantAccessPathsForOuterNode so that they can be called directly,
+//// so this middle-man function gets eliminated.
+//// Actually, when the smoke clears, getRelevantAccessPathsForOuterNode would then
+//// end up looking very much like a streamlined version of the main code path through this function.
                 childNode.m_accessPaths.addAll(getRelevantAccessPathsForInnerNode(parentNode, childNode));
             }
         } else if (childNode.m_table != null) {
@@ -698,6 +746,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                     childNode.m_whereInnerList,
                     null));
         } else {
+            //// Without filters, this is effectively just childNode.m_accessPaths.add(new AccessPath());
+            //// Would it be clearer just to inline it like that?
             childNode.m_accessPaths.add(getRelevantNaivePathForTable(null, null));
         }
         assert(childNode.m_accessPaths.size() > 0);
@@ -945,6 +995,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         return retval;
     }
 
+//// The code seems to have evolved sufficiently that it's really not clear what "version" is
+//// being referenced here -- is this comment completely obsolete?
     // @TODO ENG_3038 just for now. Can be merged with the above version for inner joins
     // if the order of inner/outer tables for NLJ can be reversed
     private AbstractPlanNode getSelectSubPlanForOuterAccessPathStep(JoinNode joinNode, AbstractPlanNode outerPlan, AbstractPlanNode innerPlan) {
@@ -967,10 +1019,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         // over the NLJ/IndexScan only if there is at least one inner-outer join expression
         // that is used for the index access. If this is the case then this expression
         // will be missing from the otherExprs list but is in the original joinNode.m_joinInnerOuterList
-        // An additional requirements for the outer joins is that the inner node should not require
+        // If not, NLJ/IndexScan is a better choice.
+        // An additional requirement for the outer joins is that the inner node should not require
         // the send/receive pair. Otherwise, the outer table will be joined with the individual
-        // partitions instead of the whole table leading to the erroneous rows in the result set
-        // If not, NLJ/IndexScan is a better choice
+        // partitions instead of the whole table leading to the erroneous rows in the result set.
         boolean canHaveNLIJ = innerPlan instanceof IndexScanPlanNode &&
                 hasInnerOuterIndexExpression(joinNode.m_joinInnerOuterList, innerAccessPath.otherExprs) &&
                 (joinNode.m_joinType == JoinType.INNER || !needInnerSendReceive);

@@ -176,11 +176,12 @@ public abstract class SubPlanAssembler {
     /**
      * Generate the naive (scan) pass for the table
      *
-     * @param table Table to generate naive pass for
      * @param joinExprs join expressions this table is part of
      * @param filterExprs filter expressions this table is part of
      * @return Naive access path
      */
+//// FIXME: This function is misleadingly named, at least for how it is called in
+//// SelectSubPlanAssmbler, mostly for cases where there is no "table", just a join.
     protected AccessPath getRelevantNaivePathForTable(List<AbstractExpression> joinExprs, List<AbstractExpression> filterExprs) {
         AccessPath naivePath = new AccessPath();
 

@@ -33,7 +33,9 @@ import org.voltdb.types.JoinType;
  * JoinTree class captures the hierarchical data model of a given SQl join.
  * @TODO ENG_3038
  * Once the inner and outer join evaluation paths are merged the whole JoinTree and
- * all its methods/attributes will be obsolete and will be replaced with the JoinNode class
+ * all its methods/attributes will be obsolete and will be replaced with the JoinNode class.
+ * At that point, JoinNode should be cleaned up with private/final members where possible
+ * and accessors as needed.
  *
  */
 public class JoinTree implements Cloneable {
@@ -128,6 +130,14 @@ public class JoinTree implements Cloneable {
         /**
          * Construct an empty join node
          */
+//// Does there need to be a constructor specifically for use by clone().
+//// If so, it should be private.
+//// Also, it should arguably take on more of the member initialization, especially
+//// if that means that members can be declared final.
+//// Consider: to what extent are the public constructors useful for the purposes of clone()?
+//// Consider: otherwise, can the public constructors and clone both delegate to common private
+//// constructors leveraging how java (like C++11) allows lateral constructor-to-constructor
+//// delegation?
         JoinNode(int id) {
             m_id = id;
         }
