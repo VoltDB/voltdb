@@ -28,6 +28,8 @@
 #include "common/ThreadLocalPool.h"
 #include "common/executorcontext.hpp"
 #include "expressions/functionexpression.h"
+#include "expressions/expressionutil.h"
+#include "expressions/constantvalueexpression.h"
 
 #include <cfloat>
 #include <limits>
@@ -253,10 +255,10 @@ TEST_F(NValueTest, TestCastToBigInt) {
     }
     EXPECT_TRUE(caught);
 
-    /*
-     * Now run a series of tests to make sure that out of range casts fail
-     * For BigInt only a double can be out of range.
-     */
+    //
+    // Now run a series of tests to make sure that out of range casts fail
+    // For BigInt only a double can be out of range.
+    //
     NValue doubleOutOfRangeH = ValueFactory::getDoubleValue(92233720368547075809.0);
     NValue doubleOutOfRangeL = ValueFactory::getDoubleValue(-92233720368547075809.0);
 
@@ -325,10 +327,10 @@ TEST_F(NValueTest, TestCastToInteger) {
     }
     EXPECT_TRUE(caught);
 
-    /*
-     * Now run a series of tests to make sure that out of range casts fail
-     * For Integer only a double and BigInt can be out of range.
-     */
+    //
+    // Now run a series of tests to make sure that out of range casts fail
+    // For Integer only a double and BigInt can be out of range.
+    //
     NValue doubleOutOfRangeH = ValueFactory::getDoubleValue(92233720368547075809.0);
     NValue doubleOutOfRangeL = ValueFactory::getDoubleValue(-92233720368547075809.0);
     caught = false;
@@ -421,10 +423,10 @@ TEST_F(NValueTest, TestCastToSmallInt) {
     }
     EXPECT_TRUE(caught);
 
-    /*
-     * Now run a series of tests to make sure that out of range casts fail
-     * For SmallInt only a double, BigInt, and Integer can be out of range.
-     */
+    //
+    // Now run a series of tests to make sure that out of range casts fail
+    // For SmallInt only a double, BigInt, and Integer can be out of range.
+    //
     NValue doubleOutOfRangeH = ValueFactory::getDoubleValue(92233720368547075809.0);
     NValue doubleOutOfRangeL = ValueFactory::getDoubleValue(-92233720368547075809.0);
     caught = false;
@@ -542,10 +544,10 @@ TEST_F(NValueTest, TestCastToTinyInt) {
     }
     EXPECT_TRUE(caught);
 
-    /*
-     * Now run a series of tests to make sure that out of range casts fail
-     * For TinyInt only a double, BigInt, Integer, and SmallInt can be out of range.
-     */
+    //
+    // Now run a series of tests to make sure that out of range casts fail
+    // For TinyInt only a double, BigInt, Integer, and SmallInt can be out of range.
+    //
     NValue doubleOutOfRangeH = ValueFactory::getDoubleValue(92233720368547075809.0);
     NValue doubleOutOfRangeL = ValueFactory::getDoubleValue(-92233720368547075809.0);
     caught = false;
@@ -743,12 +745,6 @@ TEST_F(NValueTest, TestCastToString) {
     EXPECT_EQ(strcmp(stringPeekedString.c_str(), "dude"), 0);
 
     // Make valgrind happy
-    bigIntCastToString.free();
-    integerCastToString.free();
-    smallIntCastToString.free();
-    tinyIntCastToString.free();
-    doubleCastToString.free();
-    decimalCastToString.free();
     stringValue.free();
     delete poolHolder;
     delete testPool;
@@ -791,10 +787,10 @@ TEST_F(NValueTest, TestCastToDecimal) {
     // Make valgrind happy
     stringValue.free();
 
-    /*
-     * Now run a series of tests to make sure that out of range casts fail
-     * For Decimal, only a double can be out of range.
-     */
+    //
+    // Now run a series of tests to make sure that out of range casts fail
+    // For Decimal, only a double can be out of range.
+    //
     NValue doubleOutOfRangeH = ValueFactory::getDoubleValue(100000000000000000000000000.0);
     NValue doubleOutOfRangeL = ValueFactory::getDoubleValue(-100000000000000000000000000.0);
     caught = false;
@@ -820,9 +816,9 @@ TEST_F(NValueTest, TestCastToDecimal) {
     EXPECT_TRUE(caught);
 }
 
-/**
- * Adding can only overflow BigInt since they are all cast to BigInt before addition takes place.
- */
+//
+// Adding can only overflow BigInt since they are all cast to BigInt before addition takes place.
+//
 TEST_F(NValueTest, TestBigIntOpAddOverflow) {
     NValue lhs = ValueFactory::getBigIntValue(INT64_MAX - 10);
     NValue rhs = ValueFactory::getBigIntValue(INT32_MAX);
@@ -846,18 +842,18 @@ TEST_F(NValueTest, TestBigIntOpAddOverflow) {
     }
     EXPECT_TRUE(caught);
 
-    /**
-     * Sanity check that yes indeed regular addition doesn't throw...
-     */
+    //
+    // Sanity check that yes indeed regular addition doesn't throw...
+    //
     lhs = ValueFactory::getBigIntValue(1);
     rhs = ValueFactory::getBigIntValue(4);
     NValue result = lhs.op_add(rhs);
     result.debug(); // A harmless way to avoid unused variable warnings.
 }
 
-/**
- * Subtraction can only overflow BigInt since they are all cast to BigInt before addition takes place.
- */
+//
+// Subtraction can only overflow BigInt since they are all cast to BigInt before addition takes place.
+//
 TEST_F(NValueTest, TestBigIntOpSubtractOverflow) {
     NValue lhs = ValueFactory::getBigIntValue(INT64_MAX - 10);
     NValue rhs = ValueFactory::getBigIntValue(-INT32_MAX);
@@ -881,18 +877,18 @@ TEST_F(NValueTest, TestBigIntOpSubtractOverflow) {
     }
     EXPECT_TRUE(caught);
 
-    /**
-     * Sanity check that yes indeed regular subtraction doesn't throw...
-     */
+    //
+    // Sanity check that yes indeed regular subtraction doesn't throw...
+    //
     lhs = ValueFactory::getBigIntValue(1);
     rhs = ValueFactory::getBigIntValue(4);
     NValue result = lhs.op_subtract(rhs);
     result.debug(); // This is a harmless way to avoid unused variable warnings.
 }
 
-/**
- * Multiplication can only overflow BigInt since they are all cast to BigInt before addition takes place.
- */
+//
+// Multiplication can only overflow BigInt since they are all cast to BigInt before addition takes place.
+//
 TEST_F(NValueTest, TestBigIntOpMultiplyOverflow) {
     NValue lhs = ValueFactory::getBigIntValue(INT64_MAX);
     NValue rhs = ValueFactory::getBigIntValue(INT32_MAX);
@@ -938,9 +934,9 @@ TEST_F(NValueTest, TestBigIntOpMultiplyOverflow) {
     }
     EXPECT_TRUE(caught);
 
-    /**
-     * Sanity check that yes indeed regular multiplication doesn't throw...
-     */
+    //
+    // Sanity check that yes indeed regular multiplication doesn't throw...
+    //
     lhs = ValueFactory::getBigIntValue(1);
     rhs = ValueFactory::getBigIntValue(4);
     NValue result = lhs.op_multiply(rhs);
@@ -973,9 +969,9 @@ TEST_F(NValueTest, TestDoubleOpAddOverflow) {
     }
     EXPECT_TRUE(caught);
 
-    /**
-     * Sanity check that yes indeed regular addition doesn't throw...
-     */
+    //
+    // Sanity check that yes indeed regular addition doesn't throw...
+    //
     lhs = ValueFactory::getDoubleValue(1);
     rhs = ValueFactory::getDoubleValue(4);
     NValue result = lhs.op_add(rhs);
@@ -1007,9 +1003,9 @@ TEST_F(NValueTest, TestDoubleOpSubtractOverflow) {
     }
     EXPECT_TRUE(caught);
 
-    /**
-     * Sanity check that yes indeed regular subtraction doesn't throw...
-     */
+    //
+    // Sanity check that yes indeed regular subtraction doesn't throw...
+    //
     lhs = ValueFactory::getDoubleValue(1.23);
     rhs = ValueFactory::getDoubleValue(4.2345346);
     NValue result = lhs.op_subtract(rhs);
@@ -1041,9 +1037,9 @@ TEST_F(NValueTest, TestDoubleOpMultiplyOverflow) {
     }
     EXPECT_TRUE(caught);
 
-    /**
-     * Sanity check that yes indeed regular multiplication doesn't throw...
-     */
+    //
+    // Sanity check that yes indeed regular multiplication doesn't throw...
+    //
     lhs = ValueFactory::getDoubleValue(1.23);
     rhs = ValueFactory::getDoubleValue(4.2345346);
     NValue result = lhs.op_multiply(rhs);
@@ -1075,9 +1071,9 @@ TEST_F(NValueTest, TestDoubleOpDivideOverflow) {
     }
     EXPECT_TRUE(caught);
 
-    /**
-     * Sanity check that yes indeed regular division doesn't throw...
-     */
+    //
+    // Sanity check that yes indeed regular division doesn't throw...
+    //
     lhs = ValueFactory::getDoubleValue(1.23);
     rhs = ValueFactory::getDoubleValue(4.2345346);
     NValue result = lhs.op_divide(rhs);
@@ -1169,40 +1165,40 @@ TEST_F(NValueTest, TestComparisonOps)
     NValue integer = ValueFactory::getIntegerValue(1000001);
     NValue bigInt = ValueFactory::getBigIntValue(10000000000001);
     NValue floatVal = ValueFactory::getDoubleValue(12000.456);
-    EXPECT_TRUE(smallInt.op_greaterThan(tinyInt).isTrue());
-    EXPECT_TRUE(integer.op_greaterThan(smallInt).isTrue());
-    EXPECT_TRUE(bigInt.op_greaterThan(integer).isTrue());
-    EXPECT_TRUE(tinyInt.op_lessThan(smallInt).isTrue());
-    EXPECT_TRUE(smallInt.op_lessThan(integer).isTrue());
-    EXPECT_TRUE(integer.op_lessThan(bigInt).isTrue());
-    EXPECT_TRUE(tinyInt.op_lessThan(floatVal).isTrue());
-    EXPECT_TRUE(smallInt.op_lessThan(floatVal).isTrue());
-    EXPECT_TRUE(integer.op_greaterThan(floatVal).isTrue());
-    EXPECT_TRUE(bigInt.op_greaterThan(floatVal).isTrue());
-    EXPECT_TRUE(floatVal.op_lessThan(bigInt).isTrue());
-    EXPECT_TRUE(floatVal.op_lessThan(integer).isTrue());
-    EXPECT_TRUE(floatVal.op_greaterThan(smallInt).isTrue());
-    EXPECT_TRUE(floatVal.op_greaterThan(tinyInt).isTrue());
+    EXPECT_TRUE(smallInt.compare(tinyInt) > 0);
+    EXPECT_TRUE(integer.compare(smallInt) > 0);
+    EXPECT_TRUE(bigInt.compare(integer) > 0);
+    EXPECT_TRUE(tinyInt.compare(smallInt) < 0);
+    EXPECT_TRUE(smallInt.compare(integer) < 0);
+    EXPECT_TRUE(integer.compare(bigInt) < 0);
+    EXPECT_TRUE(tinyInt.compare(floatVal) < 0);
+    EXPECT_TRUE(smallInt.compare(floatVal) < 0);
+    EXPECT_TRUE(integer.compare(floatVal) > 0);
+    EXPECT_TRUE(bigInt.compare(floatVal) > 0);
+    EXPECT_TRUE(floatVal.compare(bigInt) < 0);
+    EXPECT_TRUE(floatVal.compare(integer) < 0);
+    EXPECT_TRUE(floatVal.compare(smallInt) > 0);
+    EXPECT_TRUE(floatVal.compare(tinyInt) > 0);
 
     tinyInt = ValueFactory::getTinyIntValue(-101);
     smallInt = ValueFactory::getSmallIntValue(-1001);
     integer = ValueFactory::getIntegerValue(-1000001);
     bigInt = ValueFactory::getBigIntValue(-10000000000001);
     floatVal = ValueFactory::getDoubleValue(-12000.456);
-    EXPECT_TRUE(smallInt.op_lessThan(tinyInt).isTrue());
-    EXPECT_TRUE(integer.op_lessThan(smallInt).isTrue());
-    EXPECT_TRUE(bigInt.op_lessThan(integer).isTrue());
-    EXPECT_TRUE(tinyInt.op_greaterThan(smallInt).isTrue());
-    EXPECT_TRUE(smallInt.op_greaterThan(integer).isTrue());
-    EXPECT_TRUE(integer.op_greaterThan(bigInt).isTrue());
-    EXPECT_TRUE(tinyInt.op_greaterThan(floatVal).isTrue());
-    EXPECT_TRUE(smallInt.op_greaterThan(floatVal).isTrue());
-    EXPECT_TRUE(integer.op_lessThan(floatVal).isTrue());
-    EXPECT_TRUE(bigInt.op_lessThan(floatVal).isTrue());
-    EXPECT_TRUE(floatVal.op_greaterThan(bigInt).isTrue());
-    EXPECT_TRUE(floatVal.op_greaterThan(integer).isTrue());
-    EXPECT_TRUE(floatVal.op_lessThan(smallInt).isTrue());
-    EXPECT_TRUE(floatVal.op_lessThan(tinyInt).isTrue());
+    EXPECT_TRUE(smallInt.compare(tinyInt) < 0);
+    EXPECT_TRUE(integer.compare(smallInt) < 0);
+    EXPECT_TRUE(bigInt.compare(integer) < 0);
+    EXPECT_TRUE(tinyInt.compare(smallInt) > 0);
+    EXPECT_TRUE(smallInt.compare(integer) > 0);
+    EXPECT_TRUE(integer.compare(bigInt) > 0);
+    EXPECT_TRUE(tinyInt.compare(floatVal) > 0);
+    EXPECT_TRUE(smallInt.compare(floatVal) > 0);
+    EXPECT_TRUE(integer.compare(floatVal) < 0);
+    EXPECT_TRUE(bigInt.compare(floatVal) < 0);
+    EXPECT_TRUE(floatVal.compare(bigInt) > 0);
+    EXPECT_TRUE(floatVal.compare(integer) > 0);
+    EXPECT_TRUE(floatVal.compare(smallInt) < 0);
+    EXPECT_TRUE(floatVal.compare(tinyInt) < 0);
 }
 
 TEST_F(NValueTest, TestNullHandling)
@@ -1990,10 +1986,10 @@ TEST_F(NValueTest, TestLike)
         EXPECT_EQ( foundMatches, testMatch);
     }
 
-    /*
-     * Test an edge case Paul noticed during his review
-     * https://github.com/VoltDB/voltdb/pull/33#discussion_r926110
-     */
+    //
+    // Test an edge case Paul noticed during his review
+    // https://github.com/VoltDB/voltdb/pull/33#discussion_r926110
+    //
     NValue value = voltdb::ValueFactory::getStringValue("XY");
     NValue pattern1 = voltdb::ValueFactory::getStringValue("X%_");
     NValue pattern2 = voltdb::ValueFactory::getStringValue("X%%");
@@ -2085,12 +2081,6 @@ TEST_F(NValueTest, TestSubstring)
                     EXPECT_TRUE(minEnd == 0 || minEnd > nextEnd);
                     minEnd = nextEnd;
                 }
-
-                rightDefaultStringValue.free();
-                rightSureStringValue.free();
-                rightExactStringValue.free();
-                midStringValue.free();
-                leftStringValue.free();
             }
             // The offset for a given value of start should increase (at least by 1) as start increases.
             EXPECT_TRUE(((int)nextStart) > maxStart);
@@ -2152,6 +2142,482 @@ TEST_F(NValueTest, TestExtract)
     const std::string EXPECTED_SECONDS = "40";
     result = midSeptember.callUnary<FUNC_EXTRACT_SECOND>();
     EXPECT_EQ(0, result.compare(ValueFactory::getDecimalValueFromString(EXPECTED_SECONDS)));
+
+    delete poolHolder;
+    delete testPool;
+}
+
+static NValue streamNValueArrayintoInList(ValueType vt, NValue* nvalue, int length, Pool* testPool)
+{
+    char serial_buffer[1024];
+    // This requires intimate knowledge of ARRAY wire protocol
+    ReferenceSerializeOutput setup(serial_buffer, sizeof(serial_buffer));
+    ReferenceSerializeInput input(serial_buffer, sizeof(serial_buffer));
+    setup.writeByte(VALUE_TYPE_ARRAY);
+    setup.writeByte(vt);
+    setup.writeShort((short)length); // number of list elements
+    for (int ii = 0; ii < length; ++ii) {
+        nvalue[ii].serializeTo(setup);
+    }
+    NValue list;
+    list.deserializeFromAllocateForStorage(input, testPool);
+    return list;
+}
+
+static void initNValueArray(NValue* int_NV_set, int* int_set, size_t length)
+{
+    size_t ii = length;
+    while (ii--) {
+        int_NV_set[ii] = ValueFactory::getIntegerValue(int_set[ii]);
+    }
+}
+
+static void initNValueArray(NValue* string_NV_set, const char ** string_set, size_t length)
+{
+    size_t ii = length;
+    while (ii--) {
+        string_NV_set[ii] = ValueFactory::getStringValue(string_set[ii]);
+    }
+}
+
+static void initConstantArray(std::vector<AbstractExpression*>& constants, NValue* int_NV_set)
+{
+    size_t ii = constants.size();
+    while (ii--) {
+        AbstractExpression* cve = new ConstantValueExpression(int_NV_set[ii]);
+        constants[ii] = cve;
+    }
+}
+
+static void initConstantArray(std::vector<AbstractExpression*>& constants, const char** string_set)
+{
+    size_t ii = constants.size();
+    while (ii--) {
+        AbstractExpression* cve =
+            new ConstantValueExpression(ValueFactory::getStringValue(string_set[ii]));
+        constants[ii] = cve;
+    }
+}
+
+static void freeNValueArray(NValue* string_NV_set, size_t length)
+{
+    size_t ii = length;
+    while (ii--) {
+        string_NV_set[ii].free();
+    }
+}
+
+#define SIZE_OF_ARRAY(ARRAY) (sizeof(ARRAY) / sizeof(ARRAY[0]))
+TEST_F(NValueTest, TestInList)
+{
+    assert(ExecutorContext::getExecutorContext() == NULL);
+    Pool* testPool = new Pool();
+    UndoQuantum* wantNoQuantum = NULL;
+    Topend* topless = NULL;
+    ExecutorContext* poolHolder =
+        new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, false, "", 0);
+
+    int int_set1[] = { 10, 2, -3 };
+    int int_set2[] = { 0, 1, 100, 10000, 1000000 };
+
+    const int int_length1 = SIZE_OF_ARRAY(int_set1);
+    const int int_length2 = SIZE_OF_ARRAY(int_set2);
+    NValue int_NV_set1[int_length1];
+    NValue int_NV_set2[int_length2];
+    initNValueArray(int_NV_set1, int_set1, int_length1);
+    initNValueArray(int_NV_set2, int_set2, int_length2);
+
+    NValue int_list1 =
+        streamNValueArrayintoInList(VALUE_TYPE_INTEGER, int_NV_set1, int_length1, testPool);
+    NValue int_list2 =
+        streamNValueArrayintoInList(VALUE_TYPE_INTEGER, int_NV_set2, int_length2, testPool);
+
+    for (size_t ii = 0; ii < int_length1; ++ii) {
+        EXPECT_TRUE(int_NV_set1[ii].inList(int_list1));
+        EXPECT_FALSE(int_NV_set1[ii].inList(int_list2));
+    }
+    for (size_t jj = 0; jj < int_length2; ++jj) {
+        EXPECT_FALSE(int_NV_set2[jj].inList(int_list1));
+        EXPECT_TRUE(int_NV_set2[jj].inList(int_list2));
+    }
+
+    // Repeat through the slow-path interface.
+    // This involves lots of copying because expression trees must be destroyed recursively.
+
+    vector<AbstractExpression*> int_constants_lhs1_1(int_length1);
+    vector<AbstractExpression*> int_constants_lhs2_1(int_length2);
+    vector<AbstractExpression*> int_constants_lhs1_2(int_length1);
+    vector<AbstractExpression*> int_constants_lhs2_2(int_length2);
+    initConstantArray(int_constants_lhs1_1, int_NV_set1);
+    initConstantArray(int_constants_lhs2_1, int_NV_set2);
+    initConstantArray(int_constants_lhs1_2, int_NV_set1);
+    initConstantArray(int_constants_lhs2_2, int_NV_set2);
+
+    AbstractExpression* in_expression = NULL;
+    for (size_t kk = 0; kk < int_length1; ++kk) {
+        vector<AbstractExpression*>* int_constants_rhs1 =
+            new vector<AbstractExpression*>(int_length1);
+        vector<AbstractExpression*>* int_constants_rhs2 =
+            new vector<AbstractExpression*>(int_length2);
+        initConstantArray(*int_constants_rhs1, int_NV_set1);
+        initConstantArray(*int_constants_rhs2, int_NV_set2);
+
+        AbstractExpression* in_list_of_int_constants1 =
+           ExpressionUtil::vectorFactory(VALUE_TYPE_INTEGER, int_constants_rhs1);
+        AbstractExpression* in_list_of_int_constants2 =
+           ExpressionUtil::vectorFactory(VALUE_TYPE_INTEGER, int_constants_rhs2);
+
+        in_expression =
+            ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
+                                              int_constants_lhs1_1[kk],
+                                              in_list_of_int_constants1);
+        EXPECT_TRUE(in_expression->eval(NULL, NULL).isTrue());
+        delete in_expression;
+
+        in_expression =
+            ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
+                                              int_constants_lhs1_2[kk],
+                                              in_list_of_int_constants2);
+        EXPECT_FALSE(in_expression->eval(NULL, NULL).isTrue());
+        delete in_expression;
+    }
+    for (size_t ll = 0; ll < int_length2; ++ll) {
+        vector<AbstractExpression*>* int_constants_rhs1 =
+            new vector<AbstractExpression*>(int_length1);
+        vector<AbstractExpression*>* int_constants_rhs2 =
+            new vector<AbstractExpression*>(int_length2);
+        initConstantArray(*int_constants_rhs1, int_NV_set1);
+        initConstantArray(*int_constants_rhs2, int_NV_set2);
+
+        AbstractExpression* in_list_of_int_constants1 =
+           ExpressionUtil::vectorFactory(VALUE_TYPE_INTEGER, int_constants_rhs1);
+        AbstractExpression* in_list_of_int_constants2 =
+           ExpressionUtil::vectorFactory(VALUE_TYPE_INTEGER, int_constants_rhs2);
+
+        in_expression =
+            ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
+                                              int_constants_lhs2_1[ll],
+                                              in_list_of_int_constants2);
+        EXPECT_TRUE(in_expression->eval(NULL, NULL).isTrue());
+        delete in_expression;
+
+        in_expression =
+            ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
+                                              int_constants_lhs2_2[ll],
+                                              in_list_of_int_constants1);
+        EXPECT_FALSE(in_expression->eval(NULL, NULL).isTrue());
+        delete in_expression;
+    }
+
+    const char* string_set1[] = { "10", "2", "-3" };
+    const char* string_set2[] = { "0", "1", "100", "10000", "1000000" };
+
+    const int string_length1 = SIZE_OF_ARRAY(string_set1);
+    const int string_length2 = SIZE_OF_ARRAY(string_set2);
+    NValue string_NV_set1[string_length1];
+    NValue string_NV_set2[string_length2];
+    initNValueArray(string_NV_set1, string_set1, string_length1);
+    initNValueArray(string_NV_set2, string_set2, string_length2);
+
+    NValue string_list1 =
+        streamNValueArrayintoInList(VALUE_TYPE_VARCHAR, string_NV_set1, string_length1, testPool);
+    NValue string_list2 =
+        streamNValueArrayintoInList(VALUE_TYPE_VARCHAR, string_NV_set2, string_length2, testPool);
+    for (size_t ii = 0; ii < string_length1; ++ii) {
+        EXPECT_TRUE(string_NV_set1[ii].inList(string_list1));
+        EXPECT_FALSE(string_NV_set1[ii].inList(string_list2));
+    }
+    for (size_t jj = 0; jj < string_length2; ++jj) {
+        EXPECT_FALSE(string_NV_set2[jj].inList(string_list1));
+        EXPECT_TRUE(string_NV_set2[jj].inList(string_list2));
+    }
+
+    freeNValueArray(string_NV_set1, string_length1);
+    freeNValueArray(string_NV_set2, string_length2);
+
+    // Repeat through the slow-path interface.
+    // This involves lots of copying because expression trees must be destroyed recursively.
+
+    vector<AbstractExpression*> string_constants_lhs1_1(string_length1);
+    vector<AbstractExpression*> string_constants_lhs2_1(string_length2);
+    vector<AbstractExpression*> string_constants_lhs1_2(string_length1);
+    vector<AbstractExpression*> string_constants_lhs2_2(string_length2);
+    initConstantArray(string_constants_lhs1_1, string_set1);
+    initConstantArray(string_constants_lhs2_1, string_set2);
+    initConstantArray(string_constants_lhs1_2, string_set1);
+    initConstantArray(string_constants_lhs2_2, string_set2);
+
+    for (size_t kk = 0; kk < string_length1; ++kk) {
+        vector<AbstractExpression*>* string_constants_rhs1
+            = new vector<AbstractExpression*>(string_length1);
+        vector<AbstractExpression*>* string_constants_rhs2
+            = new vector<AbstractExpression*>(string_length2);
+        initConstantArray(*string_constants_rhs1, string_set1);
+        initConstantArray(*string_constants_rhs2, string_set2);
+
+        AbstractExpression* in_list_of_string_constants1 =
+           ExpressionUtil::vectorFactory(VALUE_TYPE_VARCHAR, string_constants_rhs1);
+        AbstractExpression* in_list_of_string_constants2 =
+           ExpressionUtil::vectorFactory(VALUE_TYPE_VARCHAR, string_constants_rhs2);
+
+        in_expression =
+            ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
+                                              string_constants_lhs1_1[kk],
+                                              in_list_of_string_constants1);
+        EXPECT_TRUE(in_expression->eval(NULL, NULL).isTrue());
+        delete in_expression;
+
+        in_expression =
+            ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
+                                              string_constants_lhs1_2[kk],
+                                              in_list_of_string_constants2);
+        EXPECT_FALSE(in_expression->eval(NULL, NULL).isTrue());
+        delete in_expression;
+    }
+    for (size_t ll = 0; ll < string_length2; ++ll) {
+        vector<AbstractExpression*>* string_constants_rhs1
+            = new vector<AbstractExpression*>(string_length1);
+        vector<AbstractExpression*>* string_constants_rhs2
+            = new vector<AbstractExpression*>(string_length2);
+        initConstantArray(*string_constants_rhs1, string_set1);
+        initConstantArray(*string_constants_rhs2, string_set2);
+
+        AbstractExpression* in_list_of_string_constants1 =
+           ExpressionUtil::vectorFactory(VALUE_TYPE_VARCHAR, string_constants_rhs1);
+        AbstractExpression* in_list_of_string_constants2 =
+           ExpressionUtil::vectorFactory(VALUE_TYPE_VARCHAR, string_constants_rhs2);
+
+        in_expression =
+            ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
+                                              string_constants_lhs2_1[ll],
+                                              in_list_of_string_constants2);
+        EXPECT_TRUE(in_expression->eval(NULL, NULL).isTrue());
+        delete in_expression;
+
+        in_expression =
+            ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_IN,
+                                              string_constants_lhs2_2[ll],
+                                              in_list_of_string_constants1);
+        EXPECT_FALSE(in_expression->eval(NULL, NULL).isTrue());
+        delete in_expression;
+    }
+
+    delete poolHolder;
+    delete testPool;
+}
+
+bool checkValueVector(vector<NValue> &values) {
+    // check the array by verifying all values are larger than the previous value
+    // this checks order and the lack of duplicates
+    for (int j = 0; j < (values.size() - 1); j++) {
+        if (values[j].compare(values[j+1]) >= 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
+TEST_F(NValueTest, TestDedupAndSort) {
+    assert(ExecutorContext::getExecutorContext() == NULL);
+    Pool* testPool = new Pool();
+    UndoQuantum* wantNoQuantum = NULL;
+    Topend* topless = NULL;
+    ExecutorContext* poolHolder =
+    new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, false, "", 0);
+
+    std::vector<NValue> vectorValues;
+    NValue arrayValue;
+    NValue nvalue;
+    bool coinFlip;
+
+    /////////////////////////////////////////////////////////////
+    // Automatic Test with Integers
+    /////////////////////////////////////////////////////////////
+
+    // run 20 random tests (can be increased for stress tests)
+    for (int i = 0; i < 20; i++) {
+        // pick a vector length
+        int len = rand() % 1000;
+        // pick a max integer value to use for about half of the values
+        // this number is low to encourage duplicates and to ensure most
+        // values will cast to tinyint
+        int maxValue = rand() % 100;
+
+        // get a random NValue array thingy
+        for (int j = 0; j < len; j++) {
+            // 1/50 are null
+            if ((rand() % 50) == 0) {
+                nvalue = ValueFactory::getNullValue();
+            }
+            // 49/50 not null
+            else {
+                coinFlip = (rand() % 2) == 0;
+                // half the values are smallish, others half is random
+                int64_t localMaxValue = coinFlip ? maxValue : INT_MAX;
+                int64_t value = rand() % localMaxValue;
+                nvalue = ValueFactory::getBigIntValue(value);
+            }
+            vectorValues.push_back(nvalue);
+        }
+        arrayValue = ValueFactory::getArrayValueFromSizeAndType(len, VALUE_TYPE_BIGINT);
+        EXPECT_TRUE(vectorValues.size() == len);
+        arrayValue.setArrayElements(vectorValues);
+
+        // dedup, cast and sort
+        vectorValues.clear();
+        coinFlip = (rand() % 2) == 0;
+        // 50% are cast down... 50% are not
+        ValueType type = coinFlip ? VALUE_TYPE_BIGINT : VALUE_TYPE_SMALLINT;
+        arrayValue.castAndSortAndDedupArrayForInList(type, vectorValues);
+
+        // verify
+        EXPECT_TRUE(checkValueVector(vectorValues));
+        vectorValues.clear();
+        arrayValue.free();
+    }
+
+    /////////////////////////////////////////////////////////////
+    // Manual Test with Strings
+    /////////////////////////////////////////////////////////////
+
+    NValue v0, v1, v2, v3, v4, v5;
+    vectorValues.clear();
+
+    v0 = ValueFactory::getStringValue("b");
+    vectorValues.push_back(v0);
+    v1 = ValueFactory::getStringValue("");
+    vectorValues.push_back(v1);
+    v2 = ValueFactory::getStringValue("a");
+    vectorValues.push_back(v2);
+    v3 = ValueFactory::getStringValue("A");
+    vectorValues.push_back(v3);
+    v4 = ValueFactory::getStringValue("");
+    vectorValues.push_back(v4);
+    v5 = ValueFactory::getNullStringValue();
+    vectorValues.push_back(v5);
+
+    arrayValue = ValueFactory::getArrayValueFromSizeAndType(6, VALUE_TYPE_VARCHAR);
+    arrayValue.setArrayElements(vectorValues);
+
+    // dedup, cast and sort
+    vectorValues.clear();
+    arrayValue.castAndSortAndDedupArrayForInList(VALUE_TYPE_VARCHAR, vectorValues);
+    EXPECT_TRUE(vectorValues.size() == 5);
+
+    // verify
+    EXPECT_TRUE(checkValueVector(vectorValues));
+    vectorValues.clear();
+    v0.free();
+    v1.free();
+    v2.free();
+    v3.free();
+    v4.free();
+    arrayValue.free();
+
+    /////////////////////////////////////////////////////////////
+    // Manual Test with Floats
+    /////////////////////////////////////////////////////////////
+
+    vectorValues.clear();
+
+    v0 = ValueFactory::getDoubleValue(1.5);
+    vectorValues.push_back(v0);
+    v1 = ValueFactory::getDoubleValue(1.1E10);
+    vectorValues.push_back(v1);
+    v2 = ValueFactory::getDoubleValue(2.2);
+    vectorValues.push_back(v2);
+    v3 = ValueFactory::getDoubleValue(2.21);
+    vectorValues.push_back(v3);
+    v4 = ValueFactory::getDoubleValue(2.2);
+    vectorValues.push_back(v4);
+    v5 = ValueFactory::getNullValue();
+    vectorValues.push_back(v5);
+
+    arrayValue = ValueFactory::getArrayValueFromSizeAndType(6, VALUE_TYPE_DOUBLE);
+    arrayValue.setArrayElements(vectorValues);
+
+    // dedup, cast and sort
+    vectorValues.clear();
+    arrayValue.castAndSortAndDedupArrayForInList(VALUE_TYPE_DOUBLE, vectorValues);
+    EXPECT_TRUE(vectorValues.size() == 5);
+
+    // verify
+    EXPECT_TRUE(checkValueVector(vectorValues));
+    vectorValues.clear();
+    arrayValue.free();
+
+    /////////////////////////////////////////////////////////////
+    // Manual Test with Decimals
+    /////////////////////////////////////////////////////////////
+
+    vectorValues.clear();
+
+    v0 = ValueFactory::getDecimalValueFromString("1.5");
+    vectorValues.push_back(v0);
+    v1 = ValueFactory::getDecimalValueFromString("111111.11111");
+    vectorValues.push_back(v1);
+    v2 = ValueFactory::getDecimalValueFromString("2.2");
+    vectorValues.push_back(v2);
+    v3 = ValueFactory::getDecimalValueFromString("2.21");
+    vectorValues.push_back(v3);
+    v4 = ValueFactory::getDecimalValueFromString("2.2");
+    vectorValues.push_back(v4);
+    v5 = ValueFactory::getNullValue();
+    vectorValues.push_back(v5);
+
+    arrayValue = ValueFactory::getArrayValueFromSizeAndType(6, VALUE_TYPE_DECIMAL);
+    arrayValue.setArrayElements(vectorValues);
+
+    // dedup, cast and sort
+    vectorValues.clear();
+    arrayValue.castAndSortAndDedupArrayForInList(VALUE_TYPE_DECIMAL, vectorValues);
+    EXPECT_TRUE(vectorValues.size() == 5);
+
+    // verify
+    EXPECT_TRUE(checkValueVector(vectorValues));
+    vectorValues.clear();
+    arrayValue.free();
+
+    /////////////////////////////////////////////////////////////
+    // Manual Test with Binary
+    /////////////////////////////////////////////////////////////
+
+    vectorValues.clear();
+
+    v0 = ValueFactory::getBinaryValue("AA");
+    vectorValues.push_back(v0);
+    v1 = ValueFactory::getBinaryValue("BCDE");
+    vectorValues.push_back(v1);
+    v2 = ValueFactory::getBinaryValue("1F");
+    vectorValues.push_back(v2);
+    v3 = ValueFactory::getBinaryValue("1F55");
+    vectorValues.push_back(v3);
+    v4 = ValueFactory::getBinaryValue("1F");
+    vectorValues.push_back(v4);
+    v5 = ValueFactory::getNullBinaryValue();
+    vectorValues.push_back(v5);
+
+    arrayValue = ValueFactory::getArrayValueFromSizeAndType(6, VALUE_TYPE_VARBINARY);
+    arrayValue.setArrayElements(vectorValues);
+
+    // dedup, cast and sort
+    vectorValues.clear();
+    arrayValue.castAndSortAndDedupArrayForInList(VALUE_TYPE_VARBINARY, vectorValues);
+    EXPECT_TRUE(vectorValues.size() == 5);
+
+    // verify
+    EXPECT_TRUE(checkValueVector(vectorValues));
+    vectorValues.clear();
+    v0.free();
+    v1.free();
+    v2.free();
+    v3.free();
+    v4.free();
+    arrayValue.free();
+
+    /////////////////////////////////////////////////////////////
+    // Cleanup
+    /////////////////////////////////////////////////////////////
 
     delete poolHolder;
     delete testPool;

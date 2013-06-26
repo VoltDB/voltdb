@@ -124,7 +124,8 @@ public class TestClientInterface {
          */
         VoltDB.replaceVoltDBInstanceForTest(m_volt);
         doReturn(m_statsAgent).when(m_volt).getStatsAgent();
-        doReturn(m_sysinfoAgent).when(m_volt).getSystemInformationAgent();
+        doReturn(m_statsAgent).when(m_volt).getOpsAgent(OpsSelector.STATISTICS);
+        doReturn(m_sysinfoAgent).when(m_volt).getOpsAgent(OpsSelector.SYSTEMINFORMATION);
         doReturn(mock(SnapshotCompletionMonitor.class)).when(m_volt).getSnapshotCompletionMonitor();
         doReturn(m_messenger).when(m_volt).getHostMessenger();
         doReturn(mock(VoltNetworkPool.class)).when(m_messenger).getNetwork();
@@ -315,9 +316,11 @@ public class TestClientInterface {
 
         // SP AdHoc should have partitioning parameter serialized in the parameter set
         Object partitionParam = message.getStoredProcedureInvocation().getParameterAtIndex(0);
-        byte[] serializedData = (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(1);
-        AdHocPlannedStatement[] statements = AdHocPlannedStmtBatch.planArrayFromBuffer(ByteBuffer.wrap(serializedData));
         assertTrue(partitionParam instanceof byte[]);
+        VoltType type = VoltType.get((Byte) message.getStoredProcedureInvocation().getParameterAtIndex(1));
+        assertTrue(type.isInteger());
+        byte[] serializedData = (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(2);
+        AdHocPlannedStatement[] statements = AdHocPlannedStmtBatch.planArrayFromBuffer(ByteBuffer.wrap(serializedData));
         assertTrue(Arrays.equals(TheHashinator.valueToBytes(3), (byte[]) partitionParam));
         assertEquals(1, statements.length);
         String sql = new String(statements[0].sql, VoltDB.UTF8ENCODING);

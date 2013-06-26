@@ -25,7 +25,10 @@ package org.voltdb_testprocs.regressionsuites.aggregates;
 
 import java.math.BigDecimal;
 
-import org.voltdb.*;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
 @ProcInfo (
     singlePartition = false
@@ -49,19 +52,19 @@ public class Insert extends VoltProcedure {
     {
         if (tablename.equals("P1"))
         {
-            voltQueueSQL(i_p1, (int)id, desc, cash, (int)num, ratio);
+            voltQueueSQL(i_p1, (int)id, desc, cash, num, ratio);
         }
         else if (tablename.equals("R1"))
         {
-            voltQueueSQL(i_r1, (int)id, desc, cash, (int)num, ratio);
+            voltQueueSQL(i_r1, (int)id, desc, cash, num, ratio);
         }
         else if (tablename.equals("P2"))
         {
-            voltQueueSQL(i_p2, (int)id, desc, cash, (int)num, ratio);
+            voltQueueSQL(i_p2, (int)id, desc, cash, num, ratio);
         }
         else if (tablename.equals("R2"))
         {
-            voltQueueSQL(i_r2, (int)id, desc, cash, (int)num, ratio);
+            voltQueueSQL(i_r2, (int)id, desc, cash, num, ratio);
         }
 
 

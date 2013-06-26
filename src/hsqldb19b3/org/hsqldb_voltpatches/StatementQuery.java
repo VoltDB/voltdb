@@ -500,9 +500,17 @@ public class StatementQuery extends StatementDMQL {
             }
         }
 
+        // query condition should be covered by table scans, but can un-comment
+        // this to see if anything is missed
+        /*if (select.queryCondition != null) {
+            VoltXMLElement queryCond = new VoltXMLElement("querycondition");
+            query.children.add(queryCond);
+            queryCond.children.add(select.queryCondition.voltGetXML(session));
+        }*/
+
         return query;
     }
-    
+
     /**
      * Columns from USING expression are unqualified. In case of INNER join, it doesn't matter
      * we can pick the first table which contains the input column. In case of OUTER joins, we must

@@ -339,9 +339,9 @@ public class SystemInformation extends VoltSystemProcedure
             addr = InetAddress.getByName(iface);
             clientPort = jsObj.getInt("clientPort");
         } catch (JSONException e) {
-            hostLog.error("Failed to get local metadata", e);
+            hostLog.info("Failed to get local metadata, falling back to first resolvable IP address.");
         } catch (UnknownHostException e) {
-            hostLog.error("Failed to determine hostname", e);
+            hostLog.info("Failed to determine hostname, falling back to first resolvable IP address.");
         }
 
         // host name and IP address.
@@ -360,13 +360,13 @@ public class SystemInformation extends VoltSystemProcedure
 
         // catalog path
         String path = VoltDB.instance().getConfig().m_pathToCatalog;
-        if (!path.startsWith("http"))
+        if (path != null && !path.startsWith("http"))
             path = (new File(path)).getAbsolutePath();
         vt.addRow(hostId, "CATALOG", path);
 
         // deployment path
         path = VoltDB.instance().getConfig().m_pathToDeployment;
-        if (!path.startsWith("http"))
+        if (path != null && !path.startsWith("http"))
             path = (new File(path)).getAbsolutePath();
         vt.addRow(hostId, "DEPLOYMENT", path);
 

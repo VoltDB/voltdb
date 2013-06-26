@@ -36,7 +36,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -310,8 +309,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         /**
          * Used a cached thread pool to accept new connections.
          */
-        private final ExecutorService m_executor =
-                Executors.newCachedThreadPool(CoreUtils.getThreadFactory("Client authentication threads", "Client authenticator"));
+        private final ExecutorService m_executor = CoreUtils.getBoundedThreadPoolExecutor(128, 10L, TimeUnit.SECONDS,
+                        CoreUtils.getThreadFactory("Client authentication threads", "Client authenticator"));
 
         ClientAcceptor(int port, VoltNetworkPool network, boolean isAdmin)
         {
@@ -1758,17 +1757,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     ClientResponseImpl dispatchStatistics(OpsSelector selector, StoredProcedureInvocation task, Connection ccxn)
     {
         try {
-            if (selector == OpsSelector.STATISTICS) {
-                VoltDB.instance().getStatsAgent().performOpsAction(ccxn, task.clientHandle, selector,
-                        task.getParams());
-            }
-            else if (selector == OpsSelector.SYSTEMCATALOG) {
-                VoltDB.instance().getSystemCatalogAgent().performOpsAction(ccxn, task.clientHandle, selector,
-                        task.getParams());
-            }
-            else if (selector == OpsSelector.SYSTEMINFORMATION) {
-                VoltDB.instance().getSystemInformationAgent().performOpsAction(ccxn, task.clientHandle, selector,
-                        task.getParams());
+            OpsAgent agent = VoltDB.instance().getOpsAgent(selector);
+            if (agent != null) {
+                agent.performOpsAction(ccxn, task.clientHandle, selector, task.getParams());
             }
             else {
                 return errorResponse(ccxn, task.clientHandle, ClientResponse.GRACEFUL_FAILURE,
@@ -1937,6 +1928,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             else if (task.procName.equals("@SystemInformation")) {
                 return dispatchStatistics(OpsSelector.SYSTEMINFORMATION, task, ccxn);
             }
+            else if (task.procName.equals("@SnapshotScan")) {
+                return dispatchStatistics(OpsSelector.SNAPSHOTSCAN, task, ccxn);
+            }
+            else if (task.procName.equals("@SnapshotDelete")) {
+                return dispatchStatistics(OpsSelector.SNAPSHOTDELETE, task, ccxn);
+            }
+
 
             // If you're going to copy and paste something, CnP the pattern
             // up above.  -rtb.
@@ -2070,14 +2068,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         assert(buf.hasArray());
         if (isSinglePartition) {
             byte[] param = null;
+            byte type = VoltType.NULL.getValue();
             // replicated table read is single-part without a partitioning param
             if (plannedStmtBatch.partitionParam != null) {
+                type = VoltType.typeFromClass(plannedStmtBatch.partitionParam.getClass()).getValue();
                 param = TheHashinator.valueToBytes(plannedStmtBatch.partitionParam);
             }
 
             // Send the partitioning parameter and its type along so that the site can check if
-            // it's mis-partitioned.
-            task.setParams(param, buf.array());
+            // it's mis-partitioned. Type is needed to re-hashinate for command log re-init.
+            task.setParams(param, type, buf.array());
         } else {
             task.setParams(buf.array());
         }
@@ -2421,6 +2421,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         });
         spi.clientHandle = clientData;
+        // Ugh, need to consolidate this with handleRead() somehow but not feeling it at the moment
+        if (procedureName.equals("@SnapshotScan")) {
+            dispatchStatistics(OpsSelector.SNAPSHOTSCAN, spi, m_snapshotDaemonAdapter);
+            return;
+        }
+        else if (procedureName.equals("@SnapshotDelete")) {
+            dispatchStatistics(OpsSelector.SNAPSHOTDELETE, spi, m_snapshotDaemonAdapter);
+            return;
+        }
         // initiate the transaction
         createTransaction(m_snapshotDaemonAdapter.connectionId(),
                 "SnapshotDaemon",

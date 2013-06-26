@@ -30,6 +30,7 @@ public class TestStatsProcProfTable {
 
     // result row in java form for test
     static class ResultRow {
+        long timestamp;
         String procedure;
         long weighted_perc;
         long invocations;
@@ -39,9 +40,10 @@ public class TestStatsProcProfTable {
         long aborts;
         long failures;
 
-        public ResultRow(String procedure, long weighted_perc,
+        public ResultRow(long timestamp, String procedure, long weighted_perc,
                 long invocations, long avg, long min, long max, long aborts,
                 long failures) {
+            this.timestamp = timestamp;
             this.procedure = procedure;
             this.weighted_perc = weighted_perc;
             this.invocations = invocations;
@@ -57,10 +59,10 @@ public class TestStatsProcProfTable {
     void loadEmUp(StatsProcProfTable dut, ProcProfRow[] data) {
         for (int ii = 0; ii < data.length; ++ii) {
             dut.updateTable(
+                    data[ii].timestamp,
                     data[ii].procedure,
                     data[ii].partition,
                     data[ii].invocations,
-                    data[ii].timedInvocations,
                     data[ii].min,
                     data[ii].max,
                     data[ii].avg,
@@ -77,6 +79,7 @@ public class TestStatsProcProfTable {
         int ii = 0;
         while (vt.advanceRow()) {
             System.out.printf("%s: validating row %d\n", testname, ii);
+            assertEquals(data[ii].timestamp, vt.getLong("TIMESTAMP"));
             assertEquals(data[ii].procedure, vt.getString("PROCEDURE"));
             assertEquals(data[ii].weighted_perc, vt.getLong("WEIGHTED_PERC"));
             assertEquals(data[ii].invocations, vt.getLong("INVOCATIONS"));
@@ -93,11 +96,11 @@ public class TestStatsProcProfTable {
     public void testBaseCase() throws Exception {
         // validate sensical round-trip of one row.
         ProcProfRow[] data = {
-            new ProcProfRow("A", 0L, 100L, 33L, 1L, 2L, 3L, 4L, 5L)
+            new ProcProfRow(1371587140278L, "A", 0L, 100L, 1L, 2L, 3L, 4L, 5L)
         };
 
         ResultRow[] result = {
-            new ResultRow("A", 100L, 100L, 3L, 1L, 2L, 5L, 4L)
+            new ResultRow(1371587140278L, "A", 100L, 100L, 3L, 1L, 2L, 5L, 4L)
         };
 
         StatsProcProfTable dut = new StatsProcProfTable();
@@ -109,10 +112,10 @@ public class TestStatsProcProfTable {
     public void testAllZeros() throws Exception {
         // validate paranoia about an all zero row - just in case.
         ProcProfRow data[] = {
-            new ProcProfRow("B", 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L)
+            new ProcProfRow(1371587140278L, "B", 0L, 0L, 0L, 0L, 0L, 0L, 0L)
         };
         ResultRow result[] = {
-            new ResultRow("B", 100L, 0L, 0L, 0L, 0L, 0L, 0L)
+            new ResultRow(1371587140278L, "B", 100L, 0L, 0L, 0L, 0L, 0L, 0L)
         };
         StatsProcProfTable dut = new StatsProcProfTable();
         loadEmUp(dut, data);
@@ -120,22 +123,43 @@ public class TestStatsProcProfTable {
     }
 
     @Test
-    public void testSiteDedupe() throws Exception {
-        // need to not double count invocations at replicas.
+    public void testMultipleProcs() throws Exception {
+        // 2 procs, 2 partitions - make sure min,max,avg,wtd works
         ProcProfRow data[] = {
-            //              Proc/Part/##/timed/min/max/avg/fail/abort
-            new ProcProfRow("B", 0L, 100L, 10L, 1L, 2L, 3L, 17L, 18L),
-            new ProcProfRow("A", 1L, 1L, 11L, 10L, 20L, 30L, 0L, 18L),
-            new ProcProfRow("B", 0L, 100L, 10L, 1L, 2L, 3L, 17L, 18L),
-            new ProcProfRow("B", 1L, 100L, 10L, 1L, 2L, 3L, 17L, 18L)
+            //                          TS/Proc/Part/invok/min/max/avg/fail/abort
+            new ProcProfRow(1371587140278L, "B", 0L, 100L, 2L, 5L, 4L, 17L, 18L),
+            new ProcProfRow(1371587140278L, "A", 1L, 1L,  10L, 20L, 30L, 0L, 18L),
+            new ProcProfRow(1371587140278L, "B", 1L, 100L,  1L, 2L, 3L, 17L, 18L)
         };
         ResultRow result[] = {
-            new ResultRow("B", 95L, 200L, 3L, 1L, 2L, 36L, 34L),
-            new ResultRow("A", 4L, 1L, 30L, 10L, 20L, 18L, 0L)
+            //                         TS/Proc/wtd/invok/avg/min/max/abort/fail
+            new ResultRow(1371587140278L, "B", 95L, 200L, 3L, 1L, 5L, 36L, 34L),
+            new ResultRow(1371587140278L, "A", 4L, 1L, 30L, 10L, 20L, 18L, 0L)
         };
         StatsProcProfTable dut = new StatsProcProfTable();
         loadEmUp(dut, data);
         validateEmGood("testAllZeros", dut, result);
     }
 
+
+    @Test
+    public void testSiteDedupe() throws Exception {
+        // need to not double count invocations at replicas, but do look at
+        // min, max, avg, fail, abort
+        ProcProfRow data[] = {
+            //                          TS/Proc/Part/invok/min/max/avg/fail/abort
+            new ProcProfRow(1371587140278L, "B", 0L, 100L, 2L, 5L, 4L, 17L, 18L),
+            new ProcProfRow(1371587140278L, "A", 1L, 1L,  10L, 20L, 30L, 0L, 18L),
+            new ProcProfRow(1371587140278L, "B", 0L, 100L, 1L, 2L, 2L, 17L, 18L),
+            new ProcProfRow(1371587140278L, "B", 1L, 100L,  4L, 4L, 3L, 17L, 18L)
+        };
+        ResultRow result[] = {
+            //                         TS/Proc/wtd/invok/avg/min/max/abort/fail
+            new ResultRow(1371587140278L, "B", 95L, 200L, 3L, 1L, 5L, 36L, 34L),
+            new ResultRow(1371587140278L, "A", 4L, 1L, 30L, 10L, 20L, 18L, 0L)
+        };
+        StatsProcProfTable dut = new StatsProcProfTable();
+        loadEmUp(dut, data);
+        validateEmGood("testAllZeros", dut, result);
+    }
 }

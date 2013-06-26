@@ -443,6 +443,37 @@ public class ClientStats {
         return m_latencyBy100ms.msPerBucket * m_latencyBy100ms.numberOfBuckets * 2;
     }
 
+    public String latencyHistoReport() {
+        StringBuilder sb = new StringBuilder();
+
+        // for now, I believe 3 digit accuracy is enough
+        int upper = kPercentileLatency(0.99999);
+        int high = kPercentileLatency(0.99);
+
+        if(high <= m_latencyBy1ms.numberOfBuckets * m_latencyBy1ms.msPerBucket){
+            if(upper <= m_latencyBy1ms.numberOfBuckets * m_latencyBy1ms.msPerBucket) {
+                return m_latencyBy1ms.latencyHistoReport(upper);
+            } else {
+                // 99% are within the range, ignore 1% outliners for more accurate result
+                return m_latencyBy1ms.latencyHistoReport(high);
+            }
+        } else if(upper <= m_latencyBy10ms.numberOfBuckets * m_latencyBy10ms.msPerBucket) {
+           return m_latencyBy10ms.latencyHistoReport(upper);
+        } else if(upper <= m_latencyBy100ms.numberOfBuckets * m_latencyBy100ms.msPerBucket) {
+            return m_latencyBy100ms.latencyHistoReport(upper);
+        } else {
+            // rare case; add one more bin to calculate percentile for txns with latency over 1000ms
+            sb.append(m_latencyBy100ms.latencyHistoReport(m_latencyBy100ms.msPerBucket * m_latencyBy100ms.numberOfBuckets));
+            sb.append(String.format(">%1-10sms:", m_latencyBy100ms.msPerBucket * m_latencyBy100ms.numberOfBuckets));
+            int height = (int)Math.ceil(m_latencyBy100ms.unaccountedTxns * m_latencyBy100ms.maxBinHeight / m_latencyBy100ms.totalTxns);
+            for(int i = 0; i < height; i++) {
+                sb.append("|");
+            }
+            sb.append(String.format("]%7.3f%%\n", ((double)m_latencyBy100ms.unaccountedTxns / (double)m_latencyBy100ms.totalTxns * 100)));
+            return sb.toString();
+        }
+    }
+
     /**
      * <p>Return an average throughput of transactions acknowledged per
      * second for the duration covered by this stats instance.</p>
