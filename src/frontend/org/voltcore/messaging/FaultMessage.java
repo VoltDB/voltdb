@@ -15,12 +15,10 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltcore.agreement;
+package org.voltcore.messaging;
 
 import java.nio.ByteBuffer;
 
-import org.voltcore.messaging.Subject;
-import org.voltcore.messaging.VoltMessage;
 
 public final class FaultMessage extends VoltMessage {
 

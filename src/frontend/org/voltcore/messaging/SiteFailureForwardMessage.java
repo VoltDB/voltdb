@@ -2,20 +2,21 @@ package org.voltcore.messaging;
 
 import java.nio.ByteBuffer;
 
-import com.google.common.collect.ImmutableMap;
+import org.voltcore.utils.CoreUtils;
 
-public class FailureSiteForwardMessage extends FailureSiteUpdateMessage {
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+
+public class SiteFailureForwardMessage extends SiteFailureMessage {
     public long m_reportingHSId;
 
-    public FailureSiteForwardMessage(FailureSiteUpdateMessage fsum) {
-        m_reportingHSId = fsum.m_sourceHSId;
-        m_committedTxnId = fsum.m_committedTxnId;
-        m_failedHSId = fsum.m_failedHSId;
-        m_failedHSIds = ImmutableMap.copyOf(fsum.m_failedHSIds);
-        m_safeTxnId = fsum.m_safeTxnId;
+    public SiteFailureForwardMessage(SiteFailureMessage sfm) {
+        m_reportingHSId = sfm.m_sourceHSId;
+        m_survivors = ImmutableSet.copyOf(sfm.m_survivors);
+        m_safeTxnIds = ImmutableMap.copyOf(sfm.m_safeTxnIds);
     }
 
-    FailureSiteForwardMessage() {
+    SiteFailureForwardMessage() {
     }
 
     @Override
@@ -25,7 +26,7 @@ public class FailureSiteForwardMessage extends FailureSiteUpdateMessage {
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) {
-        super.flattenToBuffer(buf, VoltMessageFactory.FAILURE_SITE_FORWARD_ID);
+        super.flattenToBuffer(buf, VoltMessageFactory.SITE_FAILURE_FORWARD_ID);
         buf.putLong(m_reportingHSId);
 
         assert(buf.capacity() == buf.position());
@@ -36,22 +37,20 @@ public class FailureSiteForwardMessage extends FailureSiteUpdateMessage {
     public void initFromBuffer(ByteBuffer buf) {
         super.initFromBuffer(buf);
         m_reportingHSId = buf.getLong();
-        assert(m_subject != Subject.FAILURE_SITE_FORWARD.getId()
+        assert(m_subject != Subject.SITE_FAILURE_FORWARD.getId()
                 || buf.capacity() == buf.position());
 
     }
 
-
     @Override
     public String toString() {
         return super.toString()
-                   + " reporting site: HOST "
-                   + (int)m_reportingHSId + " SITE "
-                   + (int)(m_reportingHSId >> 32);
+                   + " reporting site: "
+                   + CoreUtils.hsIdToString(m_reportingHSId);
     }
 
     @Override
     public byte getSubject() {
-        return Subject.FAILURE_SITE_FORWARD.getId();
+        return Subject.SITE_FAILURE_FORWARD.getId();
     }
 }

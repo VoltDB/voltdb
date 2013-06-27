@@ -26,9 +26,10 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.FailureSiteForwardMessage;
-import org.voltcore.messaging.FailureSiteUpdateMessage;
+import org.voltcore.messaging.SiteFailureForwardMessage;
+import org.voltcore.messaging.FaultMessage;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.SiteFailureMessage;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
@@ -51,9 +52,9 @@ public class MeshArbiter {
     protected final MeshAide m_meshAide;
     protected final HashMap<Pair<Long, Long>, Long> m_failureSiteUpdateLedger =
             Maps.newHashMap();
-    protected final Set<Long> m_failedSites = new TreeSet<Long>();
-    protected final AgreementSeeker m_seeker =
-            new AgreementSeeker(ArbitrationStrategy.MATCHING_CARDINALITY);
+    protected final Set<Long> m_failedSites = Sets.newTreeSet();
+    protected final Set<Long> m_staleUnwitnessed = Sets.newTreeSet();
+    protected final AgreementSeeker m_seeker;
 
     public MeshArbiter(final long hsId, final Mailbox mailbox,
             final MeshAide meshAide) {
@@ -61,6 +62,7 @@ public class MeshArbiter {
         m_hsId  = hsId;
         m_mailbox = mailbox;
         m_meshAide = meshAide;
+        m_seeker = new AgreementSeeker(ArbitrationStrategy.MATCHING_CARDINALITY, m_hsId);
     }
 
     protected Predicate<Long> in(final Set<Long> hsids) {
@@ -72,45 +74,43 @@ public class MeshArbiter {
         };
     }
 
-    public Map<Long,Long> reconfigureOnFault(Set<Long> hsIds, FaultMessage fm) {
+    protected boolean mayIgnore(FaultMessage fm) {
         Boolean alreadyWitnessed = m_inTrouble.get(fm.failedSite);
-        if (fm.failedSite == m_hsId && fm.witnessed) {
-            m_recoveryLog.warn("Received suicide fault message for site " +
-                    CoreUtils.hsIdToString(fm.failedSite) + " ignoring");
-            return ImmutableMap.of();
-        }
-        if (m_failedSites.contains(fm.failedSite)) {
-            m_recoveryLog.info("Received fault message for stale failed site " +
-                    CoreUtils.hsIdToString(fm.failedSite) + " ignoring");
-            return ImmutableMap.of();
-        }
 
-        // if entry is present and already witnessed then get out
-        // if entry is present and fm.witnessed == alreadyWitnessed then get out
-        if (   alreadyWitnessed != null
-            && (alreadyWitnessed || alreadyWitnessed == fm.witnessed)) {
+               // implausible suicide
+        return (fm.failedSite == m_hsId)
+               // stale failed site
+            || m_failedSites.contains(fm.failedSite)
+               // already witnessed
+            || (   alreadyWitnessed != null
+                && (alreadyWitnessed || alreadyWitnessed == fm.witnessed))
+               // stale unwitnessed
+            || (   !fm.witnessed && m_inTrouble.isEmpty()
+                && m_staleUnwitnessed.contains(fm.failedSite));
+    }
 
-            if (!alreadyWitnessed && fm.witnessed) {
-                m_inTrouble.put(fm.failedSite, fm.witnessed);
+    public Map<Long,Long> reconfigureOnFault(Set<Long> hsIds, FaultMessage fm) {
+        final Subject [] justFailures = new Subject [] { Subject.FAILURE };
+        boolean proceed = false;
+        do {
+            if (mayIgnore(fm)) {
+                m_recoveryLog.info("Received stale fault message for site " +
+                        CoreUtils.hsIdToString(fm.failedSite) + " ignoring");
+            } else {
+                m_inTrouble.put(fm.failedSite,fm.witnessed);
+                proceed = true;
             }
 
-            m_recoveryLog.info("Received an unwitnessed fault message for failed site " +
-                    CoreUtils.hsIdToString(fm.failedSite) + " ignoring");
+            fm = (FaultMessage)m_mailbox.recv(justFailures);
+        } while (fm != null);
 
-            return ImmutableMap.of();
-        }
-        if (!fm.witnessed && m_seeker.isUnwitnessedStale(fm.failedSite, m_hsId)) {
-            m_recoveryLog.info("Received an unwitnessed stale fault message for failed site " +
-                    CoreUtils.hsIdToString(fm.failedSite) + " ignoring");
+        if (!proceed) {
             return ImmutableMap.of();
         }
 
         // we are here if failed site was not previously recorded
-        // or it was previously recorded but it became witnessed from non
-        m_inTrouble.put(fm.failedSite,fm.witnessed);
-
-        m_seeker.startSeekingFor(Sets.difference(hsIds,m_failedSites), m_inTrouble, m_failedSites);
-        m_seeker.add(m_hsId,m_inTrouble);
+        // or it was previously recorded but it became witnessed from unwitnessed
+        m_seeker.startSeekingFor(Sets.difference(hsIds, m_failedSites), m_inTrouble);
 
         discoverGlobalFaultData_send();
 
@@ -120,19 +120,47 @@ public class MeshArbiter {
                 return ImmutableMap.of();
             }
 
-            m_failedSites.addAll(lastTxnIdByFailedSite.keySet());
+            m_failedSites.addAll( lastTxnIdByFailedSite.keySet());
 
             m_recoveryLog.info(
                     "Adding "
                   + CoreUtils.hsIdCollectionToString(lastTxnIdByFailedSite.keySet())
                   + " to failed sites history");
 
-            m_inTrouble.clear();
-            m_seeker.clear(m_failedSites);
+            clearInTrouble();
+            m_seeker.clear();
 
             return lastTxnIdByFailedSite;
         } else {
             return ImmutableMap.of();
+        }
+    }
+
+    protected void clearInTrouble() {
+        m_staleUnwitnessed.clear();
+
+        TreeSet<Long> ledgerStales = Sets.newTreeSet();
+        Iterator<Map.Entry<Long, Boolean>> itr = m_inTrouble.entrySet().iterator();
+
+        while (itr.hasNext()) {
+            Map.Entry<Long, Boolean> e = itr.next();
+            if (!e.getValue() && !m_failedSites.contains(e.getKey())) {
+                m_staleUnwitnessed.add(e.getKey());
+                ledgerStales.add(e.getKey());
+            }
+            itr.remove();
+        }
+
+        Iterator<Map.Entry<Pair<Long,Long>, Long>> ltr =
+                m_failureSiteUpdateLedger.entrySet().iterator();
+
+        while (ltr.hasNext()) {
+            Map.Entry<Pair<Long,Long>, Long> e = ltr.next();
+            Pair<Long,Long> p = e.getKey();
+            if (   ledgerStales.contains(p.getSecond())
+                || p.getFirst().equals(p.getSecond())) {
+                ltr.remove();
+            }
         }
     }
 
@@ -146,27 +174,26 @@ public class MeshArbiter {
     private int discoverGlobalFaultData_send() {
         long [] survivors = Longs.toArray(m_seeker.getSurvivors());
 
-        m_recoveryLog.info("Agreement, Sending fault data " + CoreUtils.hsIdCollectionToString(m_inTrouble.keySet())
-                + " to "
-                + CoreUtils.hsIdCollectionToString(Longs.asList(survivors)) + " survivors");
+        m_recoveryLog.info("Agreement, Sending survivor set "
+                + CoreUtils.hsIdCollectionToString(m_seeker.getSurvivors()));
 
-        for (Long site : m_inTrouble.keySet()) {
+        SiteFailureMessage.Builder msgBuilder = SiteFailureMessage.builder();
+        msgBuilder.addSurvivors(m_seeker.getSurvivors());
+        for (long troubled: m_inTrouble.keySet()) {
+            if (troubled == m_hsId) continue;
             /*
              * Check the queue for the data and get it from the ledger if necessary.\
              * It might not even be in the ledger if the site has been failed
              * since recovery of this node began.
              */
-            Long txnId = m_meshAide.getNewestSafeTransactionForInitiator(site);
-            FailureSiteUpdateMessage srcmsg =
-                new FailureSiteUpdateMessage(m_inTrouble,
-                        site,
-                        txnId != null ? txnId : Long.MIN_VALUE,
-                        site);
-
-            m_mailbox.send(survivors, srcmsg);
+            Long txnId = m_meshAide.getNewestSafeTransactionForInitiator(troubled);
+            msgBuilder.addSafeTxnId(troubled, txnId != null ? txnId : Long.MIN_VALUE);
         }
-        m_recoveryLog.info("Agreement, Sent fault data. Expecting " + (survivors.length * m_inTrouble.size()) + " responses.");
-        return (survivors.length * m_inTrouble.size());
+
+        m_mailbox.send(survivors, msgBuilder.build());
+
+        m_recoveryLog.info("Agreement, Sent fault data. Expecting " + survivors.length + " responses.");
+        return (survivors.length);
     }
 
     /**
@@ -183,11 +210,11 @@ public class MeshArbiter {
         long lastReportTime = 0;
         final Subject [] receiveSubjects = new Subject [] {
                 Subject.FAILURE,
-                Subject.FAILURE_SITE_UPDATE,
-                Subject.FAILURE_SITE_FORWARD
+                Subject.SITE_FAILURE_UPDATE,
+                Subject.SITE_FAILURE_FORWARD
         };
         boolean haveEnough = false;
-        Map<Long,FailureSiteForwardMessage> forwardCandidates = Maps.newHashMap();
+        Map<Long,SiteFailureForwardMessage> forwardCandidates = Maps.newHashMap();
 
         do {
             VoltMessage m = m_mailbox.recvBlocking(receiveSubjects, 5);
@@ -210,37 +237,36 @@ public class MeshArbiter {
                 continue;
             }
 
-            if (m.getSubject() == Subject.FAILURE_SITE_UPDATE.getId()) {
+            if (m.getSubject() == Subject.SITE_FAILURE_UPDATE.getId()) {
                 if (!hsIds.contains(m.m_sourceHSId)) continue;
 
-                FailureSiteUpdateMessage fsum = (FailureSiteUpdateMessage)m;
+                SiteFailureMessage sfm = (SiteFailureMessage)m;
 
-                m_failureSiteUpdateLedger.put(
-                        Pair.of(fsum.m_sourceHSId, fsum.m_failedHSId),
-                        fsum.m_safeTxnId);
+                for (Map.Entry<Long, Long> e: sfm.m_safeTxnIds.entrySet()) {
 
-                m_seeker.add(fsum);
-                forwardCandidates.put(fsum.m_sourceHSId, new FailureSiteForwardMessage(fsum));
+                    if(!hsIds.contains(e.getKey()) || m_hsId == e.getKey()) continue;
 
-                m_recoveryLog.info("Agreement, Received failure message from " +
-                        CoreUtils.hsIdToString(fsum.m_sourceHSId) + " for failed sites " +
-                        CoreUtils.hsIdCollectionToString(fsum.m_failedHSIds.keySet()) +
-                        " safe txn id " + fsum.m_safeTxnId + " failed site " +
-                        CoreUtils.hsIdToString(fsum.m_failedHSId));
+                    m_failureSiteUpdateLedger.put(
+                            Pair.of(sfm.m_sourceHSId, e.getKey()),
+                            e.getValue());
+                }
 
-            } else if (m.getSubject() == Subject.FAILURE_SITE_FORWARD.getId()) {
+                m_seeker.add(sfm);
+                forwardCandidates.put(sfm.m_sourceHSId, new SiteFailureForwardMessage(sfm));
 
-                FailureSiteForwardMessage fsfm = (FailureSiteForwardMessage)m;
+                m_recoveryLog.info("Agreement, Received failure message: " + sfm);
 
-                m_seeker.add(fsfm);
+            } else if (m.getSubject() == Subject.SITE_FAILURE_FORWARD.getId()) {
+                SiteFailureForwardMessage fsfm = (SiteFailureForwardMessage)m;
+
                 forwardCandidates.put(fsfm.m_reportingHSId, fsfm);
 
-                m_recoveryLog.info("Agreement, Received forwarded failure message from " +
-                        CoreUtils.hsIdToString(fsfm.m_sourceHSId) + " reporting on behalf of " +
-                        CoreUtils.hsIdToString(fsfm.m_reportingHSId) + " for failed sites " +
-                        CoreUtils.hsIdCollectionToString(fsfm.m_failedHSIds.keySet()) +
-                        " safe txn id " + fsfm.m_safeTxnId + " failed site " +
-                        CoreUtils.hsIdToString(fsfm.m_failedHSId));
+                if (   !hsIds.contains(fsfm.m_sourceHSId)
+                    || m_seeker.getSurvivors().contains(fsfm.m_reportingHSId)) continue;
+
+                m_seeker.add(fsfm);
+
+                m_recoveryLog.info("Agreement, Received forwarded failure message: " + fsfm);
 
             } else if (m.getSubject() == Subject.FAILURE.getId()) {
                 /*
@@ -249,8 +275,7 @@ public class MeshArbiter {
                  */
                 FaultMessage fm = (FaultMessage)m;
 
-                if (   !m_inTrouble.containsKey(fm.failedSite)
-                    || (m_seeker.getSurvivors().contains(fm.failedSite) && fm.witnessed)) {
+                if (!mayIgnore(fm)) {
                     m_mailbox.deliverFront(m);
                     m_recoveryLog.info("Agreement, Detected a concurrent failure from FaultDistributor, new failed site "
                             + CoreUtils.hsIdToString(fm.failedSite));
@@ -261,11 +286,11 @@ public class MeshArbiter {
             haveEnough = haveEnough || haveNecessaryFaultInfo(m_seeker.getSurvivors(), false);
             if (haveEnough) {
 
-                Iterator<Map.Entry<Long, FailureSiteForwardMessage>> itr =
+                Iterator<Map.Entry<Long, SiteFailureForwardMessage>> itr =
                         forwardCandidates.entrySet().iterator();
 
                 while (itr.hasNext()) {
-                    Map.Entry<Long, FailureSiteForwardMessage> e = itr.next();
+                    Map.Entry<Long, SiteFailureForwardMessage> e = itr.next();
                     long [] fhsids = Longs.toArray(m_seeker.forWhomSiteIsDead(e.getKey()));
                     if (fhsids.length > 0) {
                         m_mailbox.send(fhsids,e.getValue());
@@ -284,7 +309,8 @@ public class MeshArbiter {
         for (long survivingSite : survivors) {
             for (Long failingSite : m_inTrouble.keySet()) {
                 Pair<Long, Long> key = Pair.of( survivingSite, failingSite);
-                if (!m_failureSiteUpdateLedger.containsKey(key)) {
+                if (   survivingSite != failingSite
+                    && !m_failureSiteUpdateLedger.containsKey(key)) {
                     missingMessages.add(key);
                 }
             }
@@ -314,7 +340,7 @@ public class MeshArbiter {
             VoltDB.crashLocalVoltDB("Error extracting fault data", true, null);
         }
 
-        Set<Long> toBeKilled = m_seeker.nextKill(m_hsId);
+        Set<Long> toBeKilled = m_seeker.nextKill();
         Map<Long, Long> initiatorSafeInitPoint = new HashMap<Long, Long>();
 
         Iterator<Map.Entry<Pair<Long, Long>, Long>> iter =

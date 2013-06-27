@@ -95,7 +95,7 @@ public class MockMailbox implements Mailbox {
         throw new UnsupportedOperationException();
     }
 
-    private static final Subject m_defaultSubjects[] = new Subject[] { Subject.FAILURE_SITE_UPDATE, Subject.DEFAULT };
+    private static final Subject m_defaultSubjects[] = new Subject[] { Subject.SITE_FAILURE_UPDATE, Subject.DEFAULT };
 
     @Override
     public VoltMessage recv() {

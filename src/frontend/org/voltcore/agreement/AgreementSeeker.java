@@ -25,8 +25,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import org.voltcore.messaging.FailureSiteForwardMessage;
-import org.voltcore.messaging.FailureSiteUpdateMessage;
+import org.voltcore.messaging.SiteFailureForwardMessage;
+import org.voltcore.messaging.SiteFailureMessage;
 import org.voltcore.utils.Pair;
 
 import com.google.common.base.Predicate;
@@ -40,47 +40,44 @@ import com.google.common.collect.TreeMultimap;
 public class AgreementSeeker {
 
     protected final ArbitrationStrategy m_strategy;
+    protected final long m_selfHsid;
 
     protected Set<Long> m_hsids;
     protected Set<Long> m_survivors;
 
     protected final TreeMultimap<Long, Long> m_reported = TreeMultimap.create();
-    protected final TreeMultimap<Long, Long> m_witnessed = TreeMultimap.create();
+    protected final TreeMultimap<Long, Long> m_dead = TreeMultimap.create();
     protected final TreeMultimap<Long, Long> m_alive = TreeMultimap.create();
 
-    public AgreementSeeker(final ArbitrationStrategy strategy) {
+    public AgreementSeeker(final ArbitrationStrategy strategy, long selfHsid) {
         m_strategy = strategy;
+        m_selfHsid = selfHsid;
 
         m_hsids = ImmutableSet.of();
         m_survivors = ImmutableSet.of();
     }
 
     public void startSeekingFor(
-            final Set<Long> hsids,
-            final Map<Long,Boolean> inTrouble,
-            final Set<Long> failedSites) {
+            final Set<Long> hsids, final Map<Long,Boolean> inTrouble) {
 
         if (!m_hsids.equals(hsids)) {
-            if (!m_hsids.isEmpty()) clear(failedSites);
+            if (!m_hsids.isEmpty()) clear();
             m_hsids = ImmutableSortedSet.copyOf(hsids);
         }
         m_survivors = m_strategy.accept(survivorPicker, Pair.of(m_hsids, inTrouble));
+        add(m_selfHsid, inTrouble);
     }
 
-    public void clear(final Set<Long> failedSites) {
-        removeValues(m_reported, failedSites);
-        for (Long failed: failedSites) {
-            m_reported.removeAll(failed);
-        }
-
-        m_witnessed.clear();
+    public void clear() {
+        m_reported.clear();
+        m_dead.clear();
         m_alive.clear();
 
         m_hsids = ImmutableSet.of();
         m_survivors = ImmutableSet.of();
     }
 
-    private void removeValues(TreeMultimap<Long, Long> mm, Set<Long> values) {
+    static protected void removeValues(TreeMultimap<Long, Long> mm, Set<Long> values) {
         Iterator<Map.Entry<Long, Long>> itr = mm.entries().iterator();
         while (itr.hasNext()) {
             Map.Entry<Long, Long> e = itr.next();
@@ -95,9 +92,9 @@ public class AgreementSeeker {
 
         @Override
         public Set<Long> visitMatchingCardinality(Pair<Set<Long>, Map<Long, Boolean>> p) {
-            Set<Long> witnessed =
-                    Maps.filterEntries(p.getSecond(), amongWitnessedHsids(p.getFirst())).keySet();
-            return ImmutableSortedSet.copyOf(Sets.difference(p.getFirst(), witnessed));
+            Set<Long> dead =
+                    Maps.filterEntries(p.getSecond(), amongDeadHsids(p.getFirst())).keySet();
+            return ImmutableSortedSet.copyOf(Sets.difference(p.getFirst(), dead));
         }
 
         @Override
@@ -107,7 +104,7 @@ public class AgreementSeeker {
         }
     };
 
-    public static Predicate<Map.Entry<Long, Boolean>> amongWitnessedHsids(final Set<Long> hsids) {
+    public static Predicate<Map.Entry<Long, Boolean>> amongDeadHsids(final Set<Long> hsids) {
         return new Predicate<Map.Entry<Long,Boolean>>() {
             @Override
             public boolean apply(Entry<Long, Boolean> e) {
@@ -137,44 +134,60 @@ public class AgreementSeeker {
         }
     }
 
-    public boolean isUnwitnessedStale(long failedHsid, long self) {
-        return m_reported.get(failedHsid).contains(self);
-    }
-
     public void add(long reportingHsid, final Map<Long,Boolean> failed) {
         if (!m_hsids.contains(reportingHsid)) return;
 
         Boolean harakiri = failed.get(reportingHsid);
         if (harakiri != null && harakiri.booleanValue()) return;
 
-        Set<Long> witnessed = Sets.newHashSet();
+        Set<Long> dead = Sets.newHashSet();
 
         for (Map.Entry<Long, Boolean> e: failed.entrySet()) {
             if (!m_hsids.contains(e.getKey())) continue;
             m_reported.put(e.getKey(), reportingHsid);
             if (e.getValue()) {
-                m_witnessed.put(e.getKey(), reportingHsid);
-                witnessed.add(e.getKey());
+                m_dead.put(e.getKey(), reportingHsid);
+                dead.add(e.getKey());
             }
         }
 
         removeValue(m_alive, reportingHsid);
 
-        for (Long alive: Sets.difference(m_hsids, witnessed)) {
+        for (Long alive: Sets.difference(m_hsids, dead)) {
             m_alive.put(alive, reportingHsid);
         }
     }
 
-    protected void add(FailureSiteUpdateMessage fsum, Long reportingHsid) {
-        add(reportingHsid,fsum.m_failedHSIds);
+    public void add(long reportingHsid, SiteFailureMessage sfm) {
+        if (   !m_hsids.contains(reportingHsid)
+            || !sfm.m_survivors.contains(reportingHsid)) return;
+
+        Set<Long> dead = Sets.difference(m_hsids, sfm.m_survivors);
+
+        for (long w: dead) {
+            if (!m_hsids.contains(w)) continue;
+            m_dead.put(w,reportingHsid);
+        }
+
+        removeValue(m_alive, reportingHsid);
+
+        for (long s: sfm.m_survivors) {
+            if (!m_hsids.contains(s)) continue;
+            m_alive.put(s, reportingHsid);
+        }
+
+        for (long s: sfm.m_safeTxnIds.keySet()) {
+            if (!m_hsids.contains(s)) continue;
+            m_reported.put(s, reportingHsid);
+        }
     }
 
-    public void add(FailureSiteUpdateMessage fsum) {
-        add(fsum, fsum.m_sourceHSId);
+    public void add(SiteFailureMessage sfm) {
+        add(sfm.m_sourceHSId, sfm);
     }
 
-    public void add(FailureSiteForwardMessage fsfm) {
-        add(fsfm, fsfm.m_reportingHSId);
+    public void add(SiteFailureForwardMessage fsfm) {
+        add(fsfm.m_reportingHSId,fsfm);
     }
 
     protected Boolean haveAgreement(Scenario sc) {
@@ -194,13 +207,13 @@ public class AgreementSeeker {
             return agree;
         }
 
-        // it matches if witnessed sets are the same ad contain all alives
+        // it matches if dead sets are contain all alives
         @Override
         public Boolean visitMatchingCardinality(Scenario sc) {
             boolean agree = true;
             Set<Long> quorum = Sets.intersection(sc.alive.keySet(),sc.survivors);
-            for (Long w: sc.witnessed.keySet()) {
-                agree = agree && quorum.equals(sc.witnessed.get(w));
+            for (Long w: sc.dead.keySet()) {
+                agree = agree && quorum.equals(sc.dead.get(w));
             }
             return agree;
         }
@@ -225,7 +238,7 @@ public class AgreementSeeker {
 
             return !butAlive.isEmpty()
                 && seenByInterconnectedPeers(butAlive, Sets.newTreeSet(m_survivors))
-                && !m_witnessed.get(hsid).containsAll(butAlive);
+                && !m_dead.get(hsid).containsAll(butAlive);
         }
     };
 
@@ -242,8 +255,8 @@ public class AgreementSeeker {
         return seenByInterconnectedPeers(who, byWhom);
     }
 
-    public Set<Long> nextKill(long selfHsid) {
-        return m_strategy.accept(killPicker, selfHsid);
+    public Set<Long> nextKill() {
+        return m_strategy.accept(killPicker, m_selfHsid);
     }
 
     protected ArbitrationStrategy.Visitor<Set<Long>, Long> killPicker =
@@ -255,9 +268,9 @@ public class AgreementSeeker {
                 }
 
                 // When recomputing you need to remove all alive by (a)
-                // and add them to witnessed
-                // alive(a) is c,d,e,f now witnessed(a) += alive(a)
-                // you also have to remove all (a)'s from witnessedBy values,
+                // and add them to dead
+                // alive(a) is c,d,e,f now dead(a) += alive(a)
+                // you also have to remove all (a)'s from deadBy values,
                 // as (a) can no longer witness
                 @Override
                 public Set<Long> visitMatchingCardinality(Long self) {
@@ -265,16 +278,16 @@ public class AgreementSeeker {
                     Scenario sc = new Scenario();
                     while (!haveAgreement(sc)) {
                         Long pick = null;
-                        for (Long s: sc.witnessed.keySet()) {
+                        for (Long s: sc.dead.keySet()) {
 
                             if (s.equals(self) || picks.contains(s)) continue;
 
-                            Set<Long> witnessedBy = sc.witnessed.get(s);
-                            if (witnessedBy.isEmpty()) continue;
+                            Set<Long> deadBy = sc.dead.get(s);
+                            if (deadBy.isEmpty()) continue;
 
                             if (pick != null) {
-                                int cmp = witnessedBy.size()
-                                        - sc.witnessed.get(pick).size();
+                                int cmp = deadBy.size()
+                                        - sc.dead.get(pick).size();
                                 if (cmp > 0 || (cmp == 0 && s.compareTo(pick) > 0)) {
                                     pick = s;
                                 }
@@ -286,24 +299,24 @@ public class AgreementSeeker {
                             return ImmutableSet.of();
                         }
 
-                        removeValue(sc.witnessed,pick);
+                        removeValue(sc.dead,pick);
                         removeValue(sc.alive, pick);
 
-                        sc.witnessed.putAll(pick, sc.alive.removeAll(pick));
+                        sc.dead.putAll(pick, sc.alive.removeAll(pick));
 
                         picks.add(pick);
                     }
-                    return ImmutableSet.copyOf(sc.witnessed.keySet());
+                    return ImmutableSet.copyOf(sc.dead.keySet());
                 }
             };
 
     public Set<Long> forWhomSiteIsDead(long hsid) {
         ImmutableSet.Builder<Long> isb = ImmutableSet.builder();
-        Set<Long> witnessedBy = m_witnessed.get(hsid);
-        if (   !witnessedBy.isEmpty()
+        Set<Long> deadBy = m_dead.get(hsid);
+        if (   !deadBy.isEmpty()
             && m_survivors.contains(hsid)
             && m_strategy == ArbitrationStrategy.MATCHING_CARDINALITY) {
-            isb.addAll(Sets.filter(witnessedBy, amongSurvivors));
+            isb.addAll(Sets.filter(deadBy, amongSurvivors));
         }
         return isb.build();
     }
@@ -311,13 +324,13 @@ public class AgreementSeeker {
     protected class Scenario {
 
         protected TreeMultimap<Long, Long> reported;
-        protected TreeMultimap<Long, Long> witnessed;
+        protected TreeMultimap<Long, Long> dead;
         protected TreeMultimap<Long, Long> alive;
         protected Set<Long> survivors;
 
         protected Scenario() {
             reported = TreeMultimap.create(m_reported);
-            witnessed = TreeMultimap.create(m_witnessed);
+            dead = TreeMultimap.create(m_dead);
             survivors = Sets.newTreeSet(m_survivors);
             alive = TreeMultimap.create(m_alive);
         }

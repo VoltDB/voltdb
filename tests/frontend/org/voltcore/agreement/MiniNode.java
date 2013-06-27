@@ -36,8 +36,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.voltcore.agreement.FakeMesh.Message;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.DisconnectFailedHostsCallback;
-import org.voltcore.messaging.FailureSiteUpdateMessage;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.SiteFailureMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 
@@ -171,10 +171,12 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
                     // inject actual message into mailbox
                     VoltMessage message = msg.m_msg;
                     m_mailbox.deliver(message);
-                    // snoop for FailureSiteUpdateMessages, inject into MiniSite's mailbox
-                    if (message instanceof FailureSiteUpdateMessage)
-                    {
-                        for (long failedHostId : ((FailureSiteUpdateMessage)message).m_failedHSIds.keySet()) {
+
+                    // snoop for SiteFailureMessage, inject into MiniSite's mailbox
+                    if (message instanceof SiteFailureMessage) {
+                        SiteFailureMessage sfm = (SiteFailureMessage)message;
+
+                        for (long failedHostId : sfm.m_safeTxnIds.keySet()) {
                             m_miniSite.reportFault(failedHostId, false);
                             if ( m_HSIds.contains(failedHostId)) {
                                 if (m_nodeState.get() == NodeState.RUN) {

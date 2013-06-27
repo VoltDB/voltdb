@@ -46,6 +46,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.AgreementTaskMessage;
 import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.DisconnectFailedHostsCallback;
+import org.voltcore.messaging.FaultMessage;
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HeartbeatResponseMessage;
 import org.voltcore.messaging.LocalObjectMessage;

@@ -30,6 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.DisconnectFailedHostsCallback;
+import org.voltcore.messaging.FaultMessage;
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;

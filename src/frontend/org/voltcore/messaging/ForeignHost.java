@@ -313,12 +313,12 @@ public class ForeignHost {
         //m_lastMessageMillis = System.currentTimeMillis();
         m_lastMessageMillis.lazySet(EstTime.currentTimeMillis());
 
-        // ENG-1608.  We sniff for FailureSiteUpdateMessages here so
+        // ENG-1608.  We sniff for SiteFailureMessage here so
         // that a node will participate in the failure resolution protocol
         // even if it hasn't directly witnessed a node fault.
-        if (message instanceof FailureSiteUpdateMessage)
+        if (message instanceof SiteFailureMessage)
         {
-            for (long failedHostId : (((FailureSiteUpdateMessage)message).m_failedHSIds).keySet()) {
+            for (long failedHostId : (((SiteFailureMessage)message).m_safeTxnIds).keySet()) {
                 m_hostMessenger.relayForeignHostFailed((int)failedHostId);
             }
         }
