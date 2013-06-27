@@ -41,6 +41,7 @@ public class SQLConsoleReader extends jline.console.ConsoleReader
      */
     public SQLConsoleReader(InputStream in, OutputStream out) throws IOException {
         super(in, out);
+        setExpandEvents(false);  // don't process shell ! and !!
     }
 
     /* (non-Javadoc)
