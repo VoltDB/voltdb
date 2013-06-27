@@ -66,7 +66,13 @@ public class FixedDBBPool {
         return m_buffers;
     }
 
-    public void clear()
+    /**
+     * Discard all allocated buffers in the pool. Must call this after using the pool to free the
+     * memory.
+     *
+     * This method is idempotent.
+     */
+    public synchronized void clear()
     {
         for (DBBPool.BBContainer originContainer : m_bufferToOriginMap.values()) {
             originContainer.discard();
