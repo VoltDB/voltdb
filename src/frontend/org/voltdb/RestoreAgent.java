@@ -53,6 +53,7 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.common.Constants;
 import org.voltdb.dtxn.TransactionCreator;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
@@ -807,7 +808,7 @@ SnapshotCompletionInterest
         String jsonData = toRestore != null ? toRestore.toJSONObject().toString() : "{}";
         LOG.debug("Sending snapshot ID " + txnId + " for restore to other nodes");
         try {
-            m_zk.create(VoltZK.restore_snapshot_id, jsonData.getBytes(VoltDB.UTF8ENCODING),
+            m_zk.create(VoltZK.restore_snapshot_id, jsonData.getBytes(Constants.UTF8ENCODING),
                         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         } catch (Exception e) {
             VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
@@ -826,7 +827,7 @@ SnapshotCompletionInterest
         try {
             byte[] data = m_zk.getData(VoltZK.restore_snapshot_id, false, null);
 
-            String jsonData = new String(data, VoltDB.UTF8ENCODING);
+            String jsonData = new String(data, Constants.UTF8ENCODING);
             if (!jsonData.equals("{}")) {
                 m_hasRestored = true;
                 JSONObject jo = new JSONObject(jsonData);
@@ -859,7 +860,7 @@ SnapshotCompletionInterest
         String jsonData = serializeRestoreInformation(max, snapshots);
         String zkNode = VoltZK.restore + "/" + m_hostId;
         try {
-            m_zk.create(zkNode, jsonData.getBytes(VoltDB.UTF8ENCODING),
+            m_zk.create(zkNode, jsonData.getBytes(Constants.UTF8ENCODING),
                         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         } catch (Exception e) {
             throw new RuntimeException("Failed to create Zookeeper node: " +
