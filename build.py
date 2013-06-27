@@ -387,8 +387,8 @@ if whichtests in ("${eetestsuite}", "execution"):
 
 if whichtests in ("${eetestsuite}", "expressions"):
     CTX.TESTS['expressions'] = """
+     expression_test
     """
-#removed expression_test from above for now
 
 if whichtests in ("${eetestsuite}", "indexes"):
     CTX.TESTS['indexes'] = """
@@ -402,6 +402,7 @@ if whichtests in ("${eetestsuite}", "storage"):
     CTX.TESTS['storage'] = """
      CompactionTest
      constraint_test
+     CopyOnWriteTest
      filter_test
      persistent_table_log_test
      PersistentTableMemStatsTest
@@ -413,8 +414,6 @@ if whichtests in ("${eetestsuite}", "storage"):
      TempTableLimitsTest
      TupleStreamWrapper_test
     """
-
-#removed CopyOnWriteTest from above for now
 
 if whichtests in ("${eetestsuite}", "structures"):
     CTX.TESTS['structures'] = """

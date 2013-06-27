@@ -40,6 +40,7 @@
 #include "storage/CopyOnWriteIterator.h"
 #include "stx/btree_set.h"
 #include "common/DefaultTupleSerializer.h"
+#include "jsoncpp/jsoncpp.h"
 #include <vector>
 #include <string>
 #include <iostream>
@@ -47,8 +48,6 @@
 #include <stdarg.h>
 #include <boost/foreach.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
-#include <json_spirit/json_spirit.h>
-#include <json_spirit/json_spirit_writer.h>
 
 using namespace voltdb;
 
@@ -690,46 +689,54 @@ public:
     // Assume non-ridiculous copy semantics for Object.
     // Structured JSON-building for readibility, not efficiency.
 
-    static json_spirit::Object expr_value(const std::string& type, const json_spirit::Pair& valuePair) {
-        json_spirit::Object o;
-        o.push_back(json_spirit::Pair("TYPE", "VALUE_CONSTANT"));
-        o.push_back(json_spirit::Pair("VALUE_TYPE", type));
-        o.push_back(json_spirit::Pair("VALUE_SIZE", 0));
-        o.push_back(json_spirit::Pair("ISNULL", false));
-        o.push_back(valuePair);
-        return o;
+    static Json::Value expr_value_base(const std::string& type) {
+        Json::Value value;
+        value["TYPE"] = "VALUE_CONSTANT";
+        value["VALUE_TYPE"] = type;
+        value["VALUE_SIZE"] = 0;
+        value["ISNULL"] = false;
+        return value;
     }
 
-    static json_spirit::Object expr_value(const std::string& type, int ivalue) {
-        return expr_value(type, json_spirit::Pair("VALUE", ivalue));
+    static Json::Value expr_value(const std::string& type, std::string& key, int data) {
+        Json::Value value = expr_value_base(type);
+        value[key.c_str()] = data;
+        return value;
     }
 
-    static json_spirit::Object expr_value_tuple(const std::string& type,
-                                                const std::string& tblname,
-                                                int32_t colidx,
-                                                const std::string& colname) {
-        json_spirit::Object o;
-        o.push_back(json_spirit::Pair("TYPE", "VALUE_TUPLE"));
-        o.push_back(json_spirit::Pair("VALUE_TYPE", type));
-        o.push_back(json_spirit::Pair("VALUE_SIZE", 0));
-        o.push_back(json_spirit::Pair("TABLE_NAME", tblname));
-        o.push_back(json_spirit::Pair("COLUMN_IDX", colidx));
-        o.push_back(json_spirit::Pair("COLUMN_NAME", colname));
-        o.push_back(json_spirit::Pair("COLUMN_ALIAS", json_spirit::Value())); // null
-        return o;
+    static Json::Value expr_value(const std::string& type, int ivalue) {
+        std::string key = "VALUE";
+        return expr_value(type, key, ivalue);
     }
 
-    static json_spirit::Object expr_binary_op(const std::string& op,
-                                              const std::string& type,
-                                              const json_spirit::Object& left,
-                                              const json_spirit::Object& right) {
-        json_spirit::Object o;
-        o.push_back(json_spirit::Pair("TYPE", op));
-        o.push_back(json_spirit::Pair("VALUE_TYPE", type));
-        o.push_back(json_spirit::Pair("VALUE_SIZE", 0));
-        o.push_back(json_spirit::Pair("LEFT", left));
-        o.push_back(json_spirit::Pair("RIGHT", right));
-        return o;
+    static Json::Value expr_value_tuple(const std::string& type,
+                                        const std::string& tblname,
+                                        int32_t colidx,
+                                        const std::string& colname)
+    {
+        Json::Value value;
+        value["TYPE"] = "VALUE_TUPLE";
+        value["VALUE_TYPE"] = type;
+        value["VALUE_SIZE"] = 0;
+        value["TABLE_NAME"] = tblname;
+        value["COLUMN_IDX"] = colidx;
+        value["COLUMN_NAME"] = colname;
+        value["COLUMN_ALIAS"] = Json::nullValue; // null
+        return value;
+    }
+
+    static Json::Value expr_binary_op(const std::string& op,
+                                      const std::string& type,
+                                      const Json::Value& left,
+                                      const Json::Value& right)
+    {
+        Json::Value value;
+        value["TYPE"] = op;
+        value["VALUE_TYPE"] = type;
+        value["VALUE_SIZE"] = 0;
+        value["LEFT"] = left;
+        value["RIGHT"] = right;
+        return value;
     }
 
     // Work around unsupported modulus operator with other integer operators:
@@ -739,8 +746,8 @@ public:
         std::string tblname = table.name();
         int colidx = table.partitionColumn();
         std::string colname = table.columnName(colidx);
-        json_spirit::Object jsonTuple = expr_value_tuple("INTEGER", tblname, colidx, colname);
-        json_spirit::Object json =
+        Json::Value jsonTuple = expr_value_tuple("INTEGER", tblname, colidx, colname);
+        Json::Value json =
         expr_binary_op("COMPARE_EQUAL", "INTEGER",
                        expr_binary_op("OPERATOR_MINUS", "INTEGER",
                                       jsonTuple,
@@ -754,9 +761,8 @@ public:
                        expr_value("INTEGER", (int)ipart)
                        );
 
-        std::ostringstream os;
-        json_spirit::write(json, os);
-        return os.str();
+        Json::FastWriter writer;
+        return writer.write(json);
     }
 
     PersistentTable& table;
