@@ -101,4 +101,7 @@ public class DefaultCommandLogReinitiator implements CommandLogReinitiator
         // check to get skipped entirely in RestoreAgent.generatePlans()
         return null;
     }
+
+    @Override
+    public void initPartitionTracking() {}
 };
