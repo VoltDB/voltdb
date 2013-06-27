@@ -77,6 +77,7 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.dtxn.SiteTracker;
@@ -903,8 +904,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                                                       11, 11, 4321L, 13, id);
         dut.partitionToTxnId.put(1, 7000L);
         dut.partitionToTxnId.put(7, 1000L);
-        byte[] serial = dut.toJSONObject().toString().getBytes(VoltDB.UTF8ENCODING);
-        SnapshotInfo rt = new SnapshotInfo(new JSONObject(new String(serial, VoltDB.UTF8ENCODING)));
+        byte[] serial = dut.toJSONObject().toString().getBytes(Constants.UTF8ENCODING);
+        SnapshotInfo rt = new SnapshotInfo(new JSONObject(new String(serial, Constants.UTF8ENCODING)));
         System.out.println("Got: " + rt.toJSONObject().toString());
         assertEquals(dut.partitionToTxnId.get(1), rt.partitionToTxnId.get(1));
         assertEquals(id, rt.instanceId);

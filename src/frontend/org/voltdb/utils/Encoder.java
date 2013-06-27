@@ -22,7 +22,7 @@ import java.io.ByteArrayOutputStream;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.InflaterInputStream;
 
-import org.voltdb.VoltDB;
+import org.voltdb.common.Constants;
 
 import com.google.common.base.Charsets;
 
@@ -98,7 +98,7 @@ public class Encoder {
      */
     public static String hexDecodeToString(String hexString) {
         byte[] decodedValue = hexDecode(hexString);
-        return new String(decodedValue, VoltDB.UTF8ENCODING);
+        return new String(decodedValue, Constants.UTF8ENCODING);
     }
 
     public static boolean isHexEncodedString(String hexString) {
@@ -167,6 +167,6 @@ public class Encoder {
 
     public static String base64DecodeToString(String string) {
         byte[] decodedValue = base64Decode(string);
-        return new String(decodedValue, VoltDB.UTF8ENCODING);
+        return new String(decodedValue, Constants.UTF8ENCODING);
     }
 }

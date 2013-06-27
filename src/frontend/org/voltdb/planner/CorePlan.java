@@ -23,8 +23,8 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 
-import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.AdHocPlannedStatement;
 
 /**
@@ -144,9 +144,9 @@ public class CorePlan {
         StringBuilder sb = new StringBuilder();
         sb.append("COMPILED PLAN {\n");
         sb.append("  ONE: ").append(aggregatorFragment == null ?
-                "null" : new String(aggregatorFragment, VoltDB.UTF8ENCODING)).append("\n");
+                "null" : new String(aggregatorFragment, Constants.UTF8ENCODING)).append("\n");
         sb.append("  ALL: ").append(collectorFragment == null ?
-                "null" : new String(collectorFragment, VoltDB.UTF8ENCODING)).append("\n");
+                "null" : new String(collectorFragment, Constants.UTF8ENCODING)).append("\n");
         sb.append("  RTD: ").append(isReplicatedTableDML ? "true" : "false").append("\n");
         sb.append("}");
         return sb.toString();
