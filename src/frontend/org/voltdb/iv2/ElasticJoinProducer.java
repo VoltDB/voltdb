@@ -79,7 +79,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         for (int i = 0; i < message.getSnapshotSinkCount(); i++) {
             StreamSnapshotSink sink = new StreamSnapshotSink();
             m_dataSinks.add(sink);
-            sinkHSIds.add(sink.initialize());
+            sinkHSIds.add(sink.initialize(message.getSnapshotBufferPool()));
         }
 
         // respond to the coordinator with the sink HSIDs

@@ -171,7 +171,8 @@ public class TestIv2RejoinCoordinator {
         List<Long> hsids = new ArrayList<Long>();
         hsids.add(1l);
         hsids.add(2l);
-        RejoinMessage msg = new RejoinMessage(10000l, RejoinMessage.Type.INITIATION_COMMUNITY, "Rejoin_3");
+        RejoinMessage msg = new RejoinMessage(10000l, RejoinMessage.Type.INITIATION_COMMUNITY, "Rejoin_3",
+                                              null);
         verifySent(hsids, msg);
 
         verify(m_volt, never()).onExecutionSiteRejoinCompletion(anyLong());
