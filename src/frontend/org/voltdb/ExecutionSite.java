@@ -82,7 +82,6 @@ import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
-import org.voltdb.rejoin.RejoinSiteProcessor;
 import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -180,7 +179,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
     private RecoverySiteProcessor m_recoveryProcessor = null;
     // The following variables are used for new rejoin
-    private RejoinSiteProcessor m_rejoinSnapshotProcessor = null;
+    private StreamSnapshotSink m_rejoinSnapshotProcessor = null;
     private volatile long m_rejoinSnapshotTxnId = -1;
     // The snapshot completion handler will set this to true
     private volatile boolean m_rejoinSnapshotFinished = false;
@@ -1009,7 +1008,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         // Construct a snapshot stream receiver
         m_rejoinSnapshotProcessor = new StreamSnapshotSink();
 
-        long hsId = m_rejoinSnapshotProcessor.initialize();
+        long hsId = m_rejoinSnapshotProcessor.initialize(null);
 
         // Construct task log and start logging task messages
         int partition = getCorrespondingPartitionId();

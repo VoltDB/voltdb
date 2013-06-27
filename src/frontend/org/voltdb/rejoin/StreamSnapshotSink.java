@@ -18,6 +18,7 @@
 package org.voltdb.rejoin;
 
 import java.nio.ByteBuffer;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
@@ -33,7 +34,7 @@ import org.voltdb.VoltDB;
  *
  * This class is not thread-safe.
  */
-public class StreamSnapshotSink implements RejoinSiteProcessor {
+public class StreamSnapshotSink {
     private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
 
     private Mailbox m_mb = null;
@@ -48,12 +49,11 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
     private ByteBuffer m_buffer = null;
     private long m_bytesReceived = 0;
 
-    @Override
-    public long initialize() {
+    public long initialize(LinkedBlockingQueue<BBContainer> bufQueue) {
         // Mailbox used to transfer snapshot data
         m_mb = VoltDB.instance().getHostMessenger().createMailbox();
 
-        m_in = new StreamSnapshotDataReceiver(m_mb);
+        m_in = new StreamSnapshotDataReceiver(m_mb, bufQueue);
         m_inThread = new Thread(m_in, "Snapshot data receiver");
         m_inThread.setDaemon(true);
         m_ack = new StreamSnapshotAckSender(m_mb);
@@ -64,12 +64,10 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
         return m_mb.getHSId();
     }
 
-    @Override
     public boolean isEOF() {
         return m_EOF;
     }
 
-    @Override
     public void close() {
         if (m_in != null) {
             m_in.close();
@@ -122,7 +120,6 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
         return outputBuffer;
     }
 
-    @Override
     public Pair<Integer, ByteBuffer> take() throws InterruptedException {
         if (m_in == null || m_ack == null) {
             // terminated already
@@ -141,7 +138,6 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
         return result;
     }
 
-    @Override
     public Pair<Integer, ByteBuffer> poll() {
         if (m_in == null || m_ack == null) {
             // not initialized yet or terminated already
@@ -218,7 +214,6 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
         }
     }
 
-    @Override
     public long bytesTransferred() {
         return m_bytesReceived;
     }
