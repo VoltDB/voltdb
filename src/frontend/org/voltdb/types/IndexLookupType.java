@@ -25,18 +25,17 @@ import java.util.Map;
  * Specifies how to lookup on Table Index.
  */
 public enum IndexLookupType {
-    INVALID (0),
-    EQ      (1),
-    GT      (2),
-    GTE     (3),
-    LT      (4),
-    LTE     (5),
-    GT_LT   (6),
-    GTE_LT  (7),
-    GTL_TE  (8),
-    GTE_LTE (9);
+    INVALID (0, "?"),
+    EQ      (1, "="),
+    GT      (2, ">"),
+    GTE     (3, ">="),
+    LT      (4, "<"),
+    LTE     (5, "<=");
 
-    IndexLookupType(int val) {
+    private final String m_symbol;
+
+    IndexLookupType(int val, String symbol) {
+        m_symbol = symbol;
         assert (this.ordinal() == val) :
             "Enum element " + this.name() +
             " in position " + this.ordinal() +
@@ -45,6 +44,10 @@ public enum IndexLookupType {
 
     public int getValue() {
         return this.ordinal();
+    }
+
+    public String getSymbol() {
+        return m_symbol;
     }
 
     protected static final Map<Integer, IndexLookupType> idx_lookup = new HashMap<Integer, IndexLookupType>();

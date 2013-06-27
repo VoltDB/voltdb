@@ -31,6 +31,7 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
+import org.voltdb.common.Constants;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
@@ -57,7 +58,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             e.printStackTrace();
             System.exit(-1); // this means the jvm is broke
         }
-        md.update("".getBytes(VoltDB.UTF8ENCODING));
+        md.update("".getBytes(Constants.UTF8ENCODING));
         EMPTY_HASH = md.digest();
     }
 

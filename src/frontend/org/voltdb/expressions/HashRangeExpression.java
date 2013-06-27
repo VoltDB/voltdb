@@ -19,17 +19,15 @@ package org.voltdb.expressions;
 
 import java.util.Map;
 
-import com.google.common.collect.ImmutableSortedMap;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.types.ExpressionType;
 
-import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSortedMap;
 
 /**
  *
@@ -167,5 +165,10 @@ public class HashRangeExpression extends AbstractValueExpression {
             b.put(range.getLong(Members.RANGE_START.name()), range.getLong(Members.RANGE_END.name()));
         }
         m_ranges = b.build();
+    }
+
+    @Override
+    public String explain(String impliedTableName) {
+        return "hash range";
     }
 }
