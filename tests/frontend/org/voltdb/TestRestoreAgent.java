@@ -133,6 +133,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                                 i.snapshotCompleted(
                                                         new SnapshotCompletionEvent(
                                                                 "",
+                                                                "",
                                                                 0,
                                                                 Collections.<Integer, Long>emptyMap(),
                                                                 true,
