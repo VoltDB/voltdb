@@ -98,8 +98,8 @@ class ProcedureStatsCollector extends SiteStatsSource {
     /**
      * Total result size for calculating averages
      */
-    private int m_totalResultSize = 0;
-    private int m_lastTotalResultSize = 0;
+    private long m_totalResultSize = 0;
+    private long m_lastTotalResultSize = 0;
 
     /**
      * Smallest parameter set size
@@ -230,7 +230,7 @@ class ProcedureStatsCollector extends SiteStatsSource {
         long failureCount = m_failureCount;
         int minResultSize = m_minResultSize;
         int maxResultSize = m_maxResultSize;
-        int totalResultSize = m_totalResultSize;
+        long totalResultSize = m_totalResultSize;
         long minParameterSetSize = m_minParameterSetSize;
         long maxParameterSetSize = m_maxParameterSetSize;
         long totalParameterSetSize = m_totalParameterSetSize;
