@@ -43,6 +43,7 @@ import org.voltcore.messaging.VoltMessage;
 
 import org.voltcore.network.Connection;
 
+import org.voltdb.RealVoltDB;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.ClientInterface;
 import org.voltdb.ClientResponseImpl;
@@ -76,6 +77,7 @@ public class TestIv2RejoinCoordinator {
     @BeforeClass
     public static void setUpOnce() throws IOException {
         m_volt = mock(VoltDBInterface.class);
+        doReturn(RealVoltDB.extractBuildInfo()[0]).when(m_volt).getVersionString();
         VoltDB.replaceVoltDBInstanceForTest(m_volt);
         VoltDB.ignoreCrash = true;
     }
