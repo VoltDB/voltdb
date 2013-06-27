@@ -80,12 +80,11 @@ class MiniSite extends Thread implements MeshAide
         }
     }
 
-    public boolean reportFault(long faultingSite, boolean witnessed) {
+    public void reportFault(long faultingSite, boolean witnessed) {
         m_siteLog.debug("Reported fault: " + faultingSite + ", witnessed?: " + witnessed);
         FaultMessage fm = new FaultMessage(faultingSite, witnessed);
         fm.m_sourceHSId = m_mailbox.getHSId();
         m_mailbox.deliver(fm);
-        return m_failedHSIds.contains(faultingSite);
     }
 
     @Override
@@ -108,6 +107,10 @@ class MiniSite extends Thread implements MeshAide
                 lastHeartbeatTime = now;
             }
         }
+    }
+
+    public boolean isInArbitration() {
+        return m_arbiter.isInArbitration();
     }
 
     private void processMessage(VoltMessage msg)

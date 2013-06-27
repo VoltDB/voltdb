@@ -135,6 +135,10 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
 
     public NodeState getNodeState()
     {
+        NodeState state = m_nodeState.get();
+        if (state == NodeState.RESOLVE && !m_miniSite.isInArbitration()) {
+            m_nodeState.compareAndSet(state, NodeState.RUN);
+        }
         return m_nodeState.get();
     }
 

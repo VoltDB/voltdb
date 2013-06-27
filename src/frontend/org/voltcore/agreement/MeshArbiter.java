@@ -26,9 +26,9 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.SiteFailureForwardMessage;
 import org.voltcore.messaging.FaultMessage;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.SiteFailureForwardMessage;
 import org.voltcore.messaging.SiteFailureMessage;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
@@ -56,6 +56,8 @@ public class MeshArbiter {
     protected final Set<Long> m_staleUnwitnessed = Sets.newTreeSet();
     protected final AgreementSeeker m_seeker;
 
+    protected volatile int m_inTroubleCount = 0;
+
     public MeshArbiter(final long hsId, final Mailbox mailbox,
             final MeshAide meshAide) {
 
@@ -72,6 +74,10 @@ public class MeshArbiter {
                 return hsids.contains(l);
             }
         };
+    }
+
+    public boolean isInArbitration() {
+        return m_inTroubleCount > 0;
     }
 
     protected boolean mayIgnore(FaultMessage fm) {
@@ -107,6 +113,8 @@ public class MeshArbiter {
         if (!proceed) {
             return ImmutableMap.of();
         }
+
+        m_inTroubleCount = m_inTrouble.size();
 
         // we are here if failed site was not previously recorded
         // or it was previously recorded but it became witnessed from unwitnessed
@@ -150,6 +158,7 @@ public class MeshArbiter {
             }
             itr.remove();
         }
+        m_inTroubleCount = 0;
 
         Iterator<Map.Entry<Pair<Long,Long>, Long>> ltr =
                 m_failureSiteUpdateLedger.entrySet().iterator();
