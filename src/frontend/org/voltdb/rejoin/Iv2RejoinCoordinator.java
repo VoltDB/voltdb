@@ -199,9 +199,6 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         }
         if (nextSite != null) {
             initiateRejoinOnSites(nextSite);
-        } else {
-            // All sites have finished snapshot streaming, clear buffer pool
-            m_snapshotBufPool.clear();
         }
     }
 
@@ -228,6 +225,9 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         }
 
         if (allDone) {
+            // All sites have finished snapshot streaming, clear buffer pool
+            m_snapshotBufPool.clear();
+
             long delta = (System.currentTimeMillis() - m_startTime) / 1000;
             REJOINLOG.info("" + (m_liveRejoin ? "Live" : "Blocking") + " rejoin data transfer completed in " +
                     delta + " seconds.");
