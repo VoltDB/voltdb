@@ -102,8 +102,11 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             clearOverflowDir(voltroot);
 
             // The buffer pool capacity is min(numOfSites to rejoin times 3, 16)
+            // or any user specified value.
+            Integer userPoolSize = Integer.getInteger("REJOIN_RECEIVE_BUFFER_POOL_SIZE");
+            int poolSize = userPoolSize != null ? userPoolSize : Math.min(sites.size() * 3, 16);
             m_snapshotBufPool = new FixedDBBPool(SnapshotSiteProcessor.m_snapshotBufferLength,
-                                                 Math.min(sites.size() * 3, 16));
+                                                 poolSize);
         }
     }
 
