@@ -43,11 +43,13 @@ implements Runnable {
             new LinkedBlockingQueue<Pair<Long, BBContainer>>();
 
     private final Mailbox m_mb;
+    private final LinkedBlockingQueue<BBContainer> m_buffers;
     private volatile boolean m_closed = false;
 
-    public StreamSnapshotDataReceiver(Mailbox mb) {
+    public StreamSnapshotDataReceiver(Mailbox mb, LinkedBlockingQueue<BBContainer> bufQueue) {
         super();
         m_mb = mb;
+        m_buffers = bufQueue;
     }
 
     public void close() {
