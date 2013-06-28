@@ -1430,7 +1430,7 @@ TEST CASES
     </run_junit>
 </target>
 
-<target name="memcheck_lite" description="lightweighted memcheck">
+<target name="junit_lite_sql" description="lightweight junit tests for sql">
 	<run_junit>
 		<tests>
 			<fileset dir='${build.test.dir}'>
