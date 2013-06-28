@@ -52,7 +52,8 @@ public:
     void open(PersistentTable &table,
               std::size_t maxTupleLength,
               int32_t partitionId,
-              StreamPredicateList &predicates);
+              StreamPredicateList &predicates,
+              std::vector<bool> &predicateDeletes);
 
     /** Stop serializing. */
     void close();
@@ -65,7 +66,7 @@ public:
      */
     bool writeRow(TupleSerializer &tupleSerializer,
                   TableTuple &tuple,
-                  int32_t &numCopiesMade);
+                  bool &deleteRow);
 
 private:
 
@@ -80,6 +81,9 @@ private:
 
     /** Predicates for filtering. May remain non-NULL after open() if empty. */
     StreamPredicateList *m_predicates;
+
+    /** Vector of booleans that indicates whether the predicate return true means the row should be deleted */
+    std::vector<bool> *m_predicateDeletes;
 
     /** Private method used by constructors, etc. to clear state. */
     void clearState();

@@ -102,6 +102,7 @@ import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.plannodes.SendPlanNode;
+import org.voltdb.sysprocs.SnapshotRestore;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
@@ -1934,6 +1935,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
             else if (task.procName.equals("@SnapshotDelete")) {
                 return dispatchStatistics(OpsSelector.SNAPSHOTDELETE, task, ccxn);
+            } else if (task.procName.equals("@SnapshotRestore")) {
+                ClientResponseImpl retval = SnapshotRestore.transformRestoreParamsToJSON(task);
+                if (retval != null) return retval;
             }
 
 

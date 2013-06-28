@@ -38,7 +38,7 @@ namespace voltdb {
 void CopyOnWriteContext::checkRemainingTuples(const std::string &label) {
     assert(!m_finishedTableScan);
     intmax_t count1 = static_cast<CopyOnWriteIterator*>(m_iterator.get())->countRemaining();
-    TableTuple tuple(m_table.schema());
+    TableTuple tuple(getTable().schema());
     boost::scoped_ptr<TupleIterator> iter(m_backedUpTuples.get()->makeIterator());
     intmax_t count2 = 0;
     while (iter->next(tuple)) {
@@ -49,7 +49,7 @@ void CopyOnWriteContext::checkRemainingTuples(const std::string &label) {
                    "table=%s partcol=%d count=%jd count1=%jd count2=%jd "
                    "expected=%jd compacted=%jd batch=%jd "
                    "inserts=%jd updates=%jd",
-                   label.c_str(), m_table.name().c_str(), m_table.partitionColumn(),
+                   label.c_str(), getTable().name().c_str(), getTable().partitionColumn(),
                    count1 + count2, count1, count2, (intmax_t)m_tuplesRemaining,
                    (intmax_t)m_blocksCompacted, (intmax_t)m_serializationBatches,
                    (intmax_t)m_inserts, (intmax_t)m_updates);
@@ -61,15 +61,14 @@ CopyOnWriteContext::CopyOnWriteContext(
         TupleSerializer &serializer,
         int32_t partitionId,
         const std::vector<std::string> &predicateStrings,
-        int64_t totalTuples,
-        bool doDelete) :
-             m_table(table),
+        int64_t totalTuples) :
+             TableStreamerContext(table, predicateStrings),
              m_backedUpTuples(TableFactory::getCopiedTempTable(table.databaseId(),
                                                                "COW of " + table.name(),
                                                                &table, NULL)),
              m_serializer(serializer),
              m_pool(2097152, 320),
-             m_blocks(m_table.m_data),
+             m_blocks(getTable().m_data),
              m_iterator(new CopyOnWriteIterator(&table, m_blocks.begin(), m_blocks.end())),
              m_maxTupleLength(serializer.getMaxSerializedTupleSize(table.schema())),
              m_tuple(table.schema()),
@@ -80,17 +79,8 @@ CopyOnWriteContext::CopyOnWriteContext(
              m_blocksCompacted(0),
              m_serializationBatches(0),
              m_inserts(0),
-             m_updates(0),
-             m_doDelete(doDelete)
-{
-    // Parse predicate strings. The factory type determines the kind of
-    // predicates that get generated.
-    // Throws an exception to be handled by caller on errors.
-    std::ostringstream errmsg;
-    if (!m_predicates.parseStrings(predicateStrings, errmsg)) {
-        throwFatalException("CopyOnWriteContext() failed to parse predicate strings.");
-    }
-}
+             m_updates(0)
+{}
 
 /*
  * Serialize to multiple output streams.
@@ -106,11 +96,13 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
     if (outputStreams.empty()) {
         throwFatalException("serializeMore() expects at least one output stream.");
     }
-    outputStreams.open(m_table, m_maxTupleLength, m_partitionId, m_predicates);
+    outputStreams.open(getTable(), m_maxTupleLength, m_partitionId, getPredicates(),
+                       getPredicateDeleteFlags());
 
     //=== Tuple processing loop
 
-    TableTuple tuple(m_table.schema());
+    PersistentTable &table = getTable();
+    TableTuple tuple(table.schema());
 
     // Set to true to break out of the loop after the tuples dry up
     // or the byte count threshold is hit.
@@ -131,8 +123,8 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
              * Done if any of the buffers filled up.
              * The returned copy count helps decide when to delete if m_doDelete is true.
              */
-            int32_t numCopiesMade = 0;
-            yield = outputStreams.writeRow(m_serializer, tuple, numCopiesMade);
+            bool deleteTuple = false;
+            yield = outputStreams.writeRow(m_serializer, tuple, deleteTuple);
 
             /*
              * May want to delete tuple if processing the actual table.
@@ -146,7 +138,7 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
                     assert(!tuple.isPendingDeleteOnUndoRelease());
                     CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
                     //Save the extra lookup if possible
-                    m_table.deleteTupleStorage(tuple, iter->m_currentBlock);
+                    table.deleteTupleStorage(tuple, iter->m_currentBlock);
                 }
 
                 /*
@@ -154,8 +146,8 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
                  * This is used for Elastic rebalancing, which is wrapped in a transaction.
                  * The delete for undo is generic enough to support this operation.
                  */
-                else if (m_doDelete && numCopiesMade > 0) {
-                    m_table.deleteTupleForUndo(tuple.address(), true);
+                else if (deleteTuple) {
+                    table.deleteTupleForUndo(tuple.address(), true);
                 }
             }
 
@@ -173,49 +165,32 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
              * persistent table.
              */
             if (m_tuplesRemaining > 0) {
-#ifdef DEBUG
-                throwFatalException("serializeMore(): tuple count > 0 after streaming:\n"
-                                    "Table name: %s\n"
-                                    "Table type: %s\n"
-                                    "Original tuple count: %jd\n"
-                                    "Active tuple count: %jd\n"
-                                    "Remaining tuple count: %jd\n"
-                                    "Compacted block count: %jd\n"
-                                    "Dirty insert count: %jd\n"
-                                    "Dirty update count: %jd\n"
-                                    "Partition column: %d\n",
-                                    m_table.name().c_str(),
-                                    m_table.tableType().c_str(),
-                                    (intmax_t)m_totalTuples,
-                                    (intmax_t)m_table.activeTupleCount(),
-                                    (intmax_t)m_tuplesRemaining,
-                                    (intmax_t)m_blocksCompacted,
-                                    (intmax_t)m_inserts,
-                                    (intmax_t)m_updates,
-                                    m_table.partitionColumn());
-#else
                 char message[1024 * 16];
                 snprintf(message, 1024 * 16,
-                        "serializeMore(): tuple count > 0 after streaming:\n"
-                        "Table name: %s\n"
-                        "Table type: %s\n"
-                        "Original tuple count: %jd\n"
-                        "Active tuple count: %jd\n"
-                        "Remaining tuple count: %jd\n"
-                        "Compacted block count: %jd\n"
-                        "Dirty insert count: %jd\n"
-                        "Dirty update count: %jd\n"
-                        "Partition column: %d\n",
-                        m_table.name().c_str(),
-                        m_table.tableType().c_str(),
-                        (intmax_t)m_totalTuples,
-                        (intmax_t)m_table.activeTupleCount(),
-                        (intmax_t)m_tuplesRemaining,
-                        (intmax_t)m_blocksCompacted,
-                        (intmax_t)m_inserts,
-                        (intmax_t)m_updates,
-                        m_table.partitionColumn());
-             LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, message);
+                         "serializeMore(): tuple count > 0 after streaming:\n"
+                         "Table name: %s\n"
+                         "Table type: %s\n"
+                         "Original tuple count: %jd\n"
+                         "Active tuple count: %jd\n"
+                         "Remaining tuple count: %jd\n"
+                         "Compacted block count: %jd\n"
+                         "Dirty insert count: %jd\n"
+                         "Dirty update count: %jd\n"
+                         "Partition column: %d\n",
+                         table.name().c_str(),
+                         table.tableType().c_str(),
+                         (intmax_t)m_totalTuples,
+                         (intmax_t)table.activeTupleCount(),
+                         (intmax_t)m_tuplesRemaining,
+                         (intmax_t)m_blocksCompacted,
+                         (intmax_t)m_inserts,
+                         (intmax_t)m_updates,
+                         table.partitionColumn());
+#ifdef DEBUG
+                // Use a format string to prevent overzealous compiler warnings.
+                throwFatalException("%s", message);
+#else
+                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, message);
 #endif
             }
             // -1 is used for tests when we don't bother counting. Need to force it to 0 here.
@@ -279,14 +254,14 @@ bool CopyOnWriteContext::canSafelyFreeTuple(TableTuple tuple) {
     }
     if (i == m_blocks.end()) {
         i--;
-        if (i.key() + m_table.m_tableAllocationSize < address) {
+        if (i.key() + getTable().m_tableAllocationSize < address) {
             return true;
         }
         //OK it is in the very last block
     } else {
         if (i.key() != address) {
             i--;
-            if (i.key() + m_table.m_tableAllocationSize < address) {
+            if (i.key() + getTable().m_tableAllocationSize < address) {
                 return true;
             }
             //OK... this is in this particular block
@@ -339,7 +314,7 @@ void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
     }
     if (i == m_blocks.end()) {
         i--;
-        if (i.key() + m_table.m_tableAllocationSize < address) {
+        if (i.key() + getTable().m_tableAllocationSize < address) {
             tuple.setDirtyFalse();
             return;
         }
@@ -347,7 +322,7 @@ void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
     } else {
         if (i.key() != address) {
             i--;
-            if (i.key() + m_table.m_tableAllocationSize < address) {
+            if (i.key() + getTable().m_tableAllocationSize < address) {
                 tuple.setDirtyFalse();
                 return;
             }
@@ -410,6 +385,28 @@ void CopyOnWriteContext::notifyBlockWasCompactedAway(TBPtr block) {
     }
 }
 
-CopyOnWriteContext::~CopyOnWriteContext() {}
+CopyOnWriteContext::~CopyOnWriteContext()
+{}
+
+int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputStreams,
+                                             std::vector<int> &retPositions) {
+    int64_t remaining = serializeMore(outputStreams);
+    // If more was streamed copy current positions for return.
+    // Can this copy be avoided?
+    for (size_t i = 0; i < outputStreams.size(); i++) {
+        retPositions.push_back((int)outputStreams.at(i).position());
+    }
+    return remaining;
+}
+
+bool CopyOnWriteContext::notifyTupleInsert(TableTuple &tuple) {
+    markTupleDirty(tuple, true);
+    return true;
+}
+
+bool CopyOnWriteContext::notifyTupleUpdate(TableTuple &tuple) {
+    markTupleDirty(tuple, false);
+    return true;
+}
 
 }

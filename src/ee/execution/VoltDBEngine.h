@@ -195,7 +195,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         */
         bool loadTable(int32_t tableId,
                        ReferenceSerializeInput &serializeIn,
-                       int64_t spHandle, int64_t lastCommittedSpHandle);
+                       int64_t spHandle, int64_t lastCommittedSpHandle,
+                       bool returnUniqueViolations);
 
         void resetReusedResultOutputBuffer(const size_t headerSize = 0);
         inline ReferenceSerializeOutput* getResultOutputSerializer() { return &m_resultOutput; }
@@ -390,7 +391,17 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void updateHashinator(HashinatorType type, const char *config);
 
+        /*
+         * Execute an arbitrary task represented by the task id and serialized parameters.
+         * Returns serialized representation of the results
+         */
+        void executeTask(TaskType taskType, const char* taskParams);
     private:
+
+        /*
+         * Tasks dispatched by executeTask
+         */
+        void dispatchValidatePartitioningTask(const char *taskParams);
 
         void setCurrentUndoQuantum(voltdb::UndoQuantum* undoQuantum);
 

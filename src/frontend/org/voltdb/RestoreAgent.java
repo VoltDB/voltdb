@@ -55,6 +55,7 @@ import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.common.Constants;
 import org.voltdb.dtxn.TransactionCreator;
+import org.voltdb.sysprocs.SnapshotRestore;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.TableFiles;
@@ -105,6 +106,8 @@ SnapshotCompletionInterest
     private final Runnable m_changeStateFunctor = new Runnable() {
         @Override
         public void run() {
+            //After restore it is safe to initialize partition tracking
+            m_replayAgent.initPartitionTracking();
             changeState();
         }
     };
@@ -125,6 +128,7 @@ SnapshotCompletionInterest
     private final String m_clPath;
     private final String m_clSnapshotPath;
     private final String m_snapshotPath;
+    private final String m_voltdbrootPath;
     private final int[] m_allPartitions;
     private final Set<Integer> m_liveHosts;
 
@@ -194,8 +198,13 @@ SnapshotCompletionInterest
                     if (m_snapshotToRestore != null) {
                         LOG.debug("Initiating snapshot " + m_snapshotToRestore.nonce +
                                 " in " + m_snapshotToRestore.path);
-                        Object[] params = new Object[] {m_snapshotToRestore.path,
-                            m_snapshotToRestore.nonce};
+                        JSONObject jsObj = new JSONObject();
+                        jsObj.put(SnapshotRestore.JSON_PATH, m_snapshotToRestore.path);
+                        jsObj.put(SnapshotRestore.JSON_NONCE, m_snapshotToRestore.nonce);
+                        if (m_action == StartAction.SAFE_RECOVER) {
+                            jsObj.put(SnapshotRestore.JSON_DUPLICATES_PATH, m_voltdbrootPath);
+                        }
+                        Object[] params = new Object[] { jsObj.toString() };
                         initSnapshotWork(RESTORE_TXNID,
                                 Pair.of("@SnapshotRestore", params));
                     }
@@ -224,6 +233,10 @@ SnapshotCompletionInterest
         public final String path;
         public final String nonce;
         public final int partitionCount;
+        // If this is a truncation snapshot that is on the boundary of partition count change
+        // newPartitionCount will record the partition count after the topology change,
+        // otherwise it's the same as partitionCount
+        public final int newPartitionCount;
         public final long catalogCrc;
         // All the partitions for partitioned tables in the local snapshot file
         public final Map<String, Set<Integer>> partitions = new TreeMap<String, Set<Integer>>();
@@ -236,13 +249,15 @@ SnapshotCompletionInterest
             partitionToTxnId.putAll(map);
         }
 
-        public SnapshotInfo(long txnId, String path, String nonce, int partitions,
+        public SnapshotInfo(long txnId, String path, String nonce,
+                            int partitions, int newPartitionCount,
                             long catalogCrc, int hostId, InstanceId instanceId)
         {
             this.txnId = txnId;
             this.path = path;
             this.nonce = nonce;
             this.partitionCount = partitions;
+            this.newPartitionCount = newPartitionCount;
             this.catalogCrc = catalogCrc;
             this.hostId = hostId;
             this.instanceId = instanceId;
@@ -254,6 +269,7 @@ SnapshotCompletionInterest
             path = jo.getString("path");
             nonce = jo.getString("nonce");
             partitionCount = jo.getInt("partitionCount");
+            newPartitionCount = jo.getInt("newPartitionCount");
             catalogCrc = jo.getLong("catalogCrc");
             hostId = jo.getInt("hostId");
             instanceId = new InstanceId(jo.getJSONObject("instanceId"));
@@ -291,6 +307,7 @@ SnapshotCompletionInterest
                 stringer.key("path").value(path);
                 stringer.key("nonce").value(nonce);
                 stringer.key("partitionCount").value(partitionCount);
+                stringer.key("newPartitionCount").value(newPartitionCount);
                 stringer.key("catalogCrc").value(catalogCrc);
                 stringer.key("hostId").value(hostId);
                 stringer.key("tables").array();
@@ -377,7 +394,8 @@ SnapshotCompletionInterest
                         Callback callback, int hostId, StartAction action, boolean clEnabled,
                         String clPath, String clSnapshotPath,
                         String snapshotPath, int[] allPartitions,
-                        Set<Integer> liveHosts)
+                        Set<Integer> liveHosts,
+                        String voltdbrootPath)
     throws IOException {
         m_hostId = hostId;
         m_initiator = null;
@@ -391,6 +409,7 @@ SnapshotCompletionInterest
         m_snapshotPath = snapshotPath;
         m_allPartitions = allPartitions;
         m_liveHosts = liveHosts;
+        m_voltdbrootPath = voltdbrootPath;
 
         initialize();
     }
@@ -405,7 +424,6 @@ SnapshotCompletionInterest
                     replayClass.getConstructor(int.class,
                                                StartAction.class,
                                                ZooKeeper.class,
-                                               int.class,
                                                String.class,
                                                int[].class,
                                                Set.class,
@@ -415,7 +433,6 @@ SnapshotCompletionInterest
                     (CommandLogReinitiator) constructor.newInstance(m_hostId,
                                                                     m_action,
                                                                     m_zk,
-                                                                    m_allPartitions.length,
                                                                     m_clPath,
                                                                     m_allPartitions,
                                                                     m_liveHosts,
@@ -456,7 +473,7 @@ SnapshotCompletionInterest
         try {
             m_snapshotToRestore = generatePlans();
         } catch (Exception e) {
-            VoltDB.crashGlobalVoltDB(e.getMessage(), false, e);
+            VoltDB.crashGlobalVoltDB(e.getMessage(), true, e);
         }
 
         if (m_snapshotToRestore != null) {
@@ -629,12 +646,20 @@ SnapshotCompletionInterest
         // Negotiate with other hosts about which snapshot to restore
         SnapshotInfo infoWithMinHostId = getRestorePlan();
 
+        // The expected partition count could be determined by the partition count in the current
+        // cluster or the new partition count recorded in the truncation snapshot,
+        // whichever is larger. Truncation snapshot taken at the end of the join process actually
+        // records the new partition count in the digest.
+        final int newPartitionCount =
+            (infoWithMinHostId == null ? 0 : infoWithMinHostId.newPartitionCount);
+        final int expectedPartitionCount = Math.max(m_allPartitions.length, newPartitionCount);
+
         /*
          * Generate the replay plan here so that we don't have to wait until the
          * snapshot restore finishes.
          */
         if (m_action.doesRecover()) {
-            m_replayAgent.generateReplayPlan();
+            m_replayAgent.generateReplayPlan(expectedPartitionCount);
         }
 
         m_planned = true;
@@ -676,6 +701,7 @@ SnapshotCompletionInterest
         Map<Integer,Long> pidToTxnMap = new TreeMap<Integer,Long>();
         // Create a valid but meaningless InstanceId to support pre-instanceId checking versions
         InstanceId instanceId = new InstanceId(0, 0);
+        int newParitionCount = -1;
         try
         {
             JSONObject digest_detail = SnapshotUtil.CRCCheck(digest, LOG);
@@ -695,6 +721,10 @@ SnapshotCompletionInterest
 
             if (digest_detail.has("instanceId")) {
                 instanceId = new InstanceId(digest_detail.getJSONObject("instanceId"));
+            }
+
+            if (digest_detail.has("newPartitionCount")) {
+                newParitionCount = digest_detail.getInt("newPartitionCount");
             }
         }
         catch (IOException ioe)
@@ -753,7 +783,7 @@ SnapshotCompletionInterest
         SnapshotInfo info =
             new SnapshotInfo(key, digest.getParent(),
                     SnapshotUtil.parseNonceFromDigestFilename(digest.getName()),
-                    partitionCount, catalog_crc, m_hostId, instanceId);
+                    partitionCount, newParitionCount, catalog_crc, m_hostId, instanceId);
         // populate table to partition map.
         for (Entry<String, TableFiles> te : s.m_tableFiles.entrySet()) {
             TableFiles tableFile = te.getValue();

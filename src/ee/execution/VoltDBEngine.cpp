@@ -901,7 +901,8 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const string &catalogPayloa
 bool
 VoltDBEngine::loadTable(int32_t tableId,
                         ReferenceSerializeInput &serializeIn,
-                        int64_t spHandle, int64_t lastCommittedSpHandle)
+                        int64_t spHandle, int64_t lastCommittedSpHandle,
+                        bool returnUniqueViolations)
 {
     //Not going to thread the unique id through.
     //The spHandle and lastCommittedSpHandle aren't really used in load table
@@ -928,7 +929,7 @@ VoltDBEngine::loadTable(int32_t tableId,
     }
 
     try {
-        table->loadTuplesFrom(serializeIn);
+        table->loadTuplesFrom(serializeIn, NULL, returnUniqueViolations ? getResultOutputSerializer() : NULL);
     } catch (const SerializableEEException &e) {
         throwFatalException("%s", e.message().c_str());
     }
@@ -1606,5 +1607,58 @@ void VoltDBEngine::updateHashinator(HashinatorType type, const char *config) {
         break;
     }
 }
+
+void VoltDBEngine::dispatchValidatePartitioningTask(const char *taskParams) {
+    ReferenceSerializeInput taskInfo(taskParams, std::numeric_limits<std::size_t>::max());
+    std::vector<CatalogId> tableIds;
+    const int32_t numTables = taskInfo.readInt();
+    for (int ii = 0; ii < numTables; ii++) {
+        tableIds.push_back(static_cast<int32_t>(taskInfo.readLong()));
+    }
+
+    HashinatorType type = static_cast<HashinatorType>(taskInfo.readInt());
+    const char *config = taskParams + (sizeof(int32_t) * 2) +  (sizeof(int64_t) * tableIds.size());
+    boost::scoped_ptr<TheHashinator> hashinator;
+    switch(type) {
+        case HASHINATOR_LEGACY:
+            hashinator.reset(LegacyHashinator::newInstance(config));
+            break;
+        case HASHINATOR_ELASTIC:
+            hashinator.reset(ElasticHashinator::newInstance(config));
+            break;
+        default:
+            throwFatalException("Unknown hashinator type %d", type);
+            break;
+    }
+
+    std::vector<int64_t> mispartitionedRowCounts;
+
+    BOOST_FOREACH( CatalogId tableId, tableIds) {
+        std::map<CatalogId, Table*>::iterator table = m_tables.find(tableId);
+        if (table == m_tables.end()) {
+            throwFatalException("Unknown table id %d", tableId);
+        } else {
+            mispartitionedRowCounts.push_back(m_tables[tableId]->validatePartitioning(hashinator.get(), m_partitionId));
+        }
+    }
+
+    ReferenceSerializeOutput *output = getResultOutputSerializer();
+    output->writeInt(static_cast<int32_t>(sizeof(int64_t) * numTables));
+
+    BOOST_FOREACH( int64_t mispartitionedRowCount, mispartitionedRowCounts) {
+        output->writeLong(mispartitionedRowCount);
+    }
+}
+
+void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
+    switch (taskType) {
+    case TASK_TYPE_VALIDATE_PARTITIONING:
+        dispatchValidatePartitioningTask(taskParams);
+        break;
+    default:
+        throwFatalException("Unknown task type %d", taskType);
+    }
+}
+
 
 }
