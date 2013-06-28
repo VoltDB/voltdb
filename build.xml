@@ -1430,6 +1430,16 @@ TEST CASES
     </run_junit>
 </target>
 
+<target name="memcheck_lite" description="lightweighted memcheck">
+	<run_junit>
+		<tests>
+			<fileset dir='${build.test.dir}'>
+		    	<include name="org/voltdb/regressionsuites/TestSQLFeaturesSuite.class"/>
+			</fileset>
+		</tests>
+	</run_junit>
+</target>
+	
 <target name="junit_quarantine" description="Run testcases which fail unpredictably.">
     <run_junit>
         <tests>
