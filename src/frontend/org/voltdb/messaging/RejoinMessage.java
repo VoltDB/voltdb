@@ -21,10 +21,12 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Set;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import com.google.common.collect.ImmutableSet;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.DBBPool;
 
 /**
  * Rejoin message used to drive the whole rejoin process. It is only sent between
@@ -50,6 +52,7 @@ public class RejoinMessage extends VoltMessage {
     private long m_snapshotTxnId = -1; // snapshot txnId
     private long m_masterHSId = -1;
     private String m_snapshotNonce = null;
+    private LinkedBlockingQueue<DBBPool.BBContainer> m_bufferPool = null;
     // number of sinks to create on the site, default is 1, elastic join may use more
     private int m_snapshotSinkCount = 1;
     private Set<Long> m_snapshotSinkHSIds = null;
@@ -72,22 +75,24 @@ public class RejoinMessage extends VoltMessage {
     }
 
     /**
-     * INITIATION, INITIATION_COMMUNITY and PARTITION_SNAPSHOT_INITIATION pass the
-     * nonce used by the coordinator to the site.
+     * INITIATION, INITIATION_COMMUNITY pass the nonce used by the coordinator to the site.
      */
-    public RejoinMessage(long sourceHSId, Type type, String snapshotNonce)
+    public RejoinMessage(long sourceHSId, Type type, String snapshotNonce,
+                         LinkedBlockingQueue<DBBPool.BBContainer> bufferPool)
     {
         this(sourceHSId, type);
         assert(type == Type.INITIATION || type == Type.INITIATION_COMMUNITY);
         m_snapshotNonce = snapshotNonce;
+        m_bufferPool = bufferPool;
     }
 
     /**
      * For elastic join, the coordinator tells the producer how many snapshot sinks to create.
      */
-    public RejoinMessage(long sourceHSId, Type type, String snapshotNonce, int sinkCount)
+    public RejoinMessage(long sourceHSId, Type type, String snapshotNonce, int sinkCount,
+                         LinkedBlockingQueue<DBBPool.BBContainer> bufferPool)
     {
-        this(sourceHSId, type, snapshotNonce);
+        this(sourceHSId, type, snapshotNonce, bufferPool);
         m_snapshotSinkCount = sinkCount;
     }
 
@@ -129,6 +134,11 @@ public class RejoinMessage extends VoltMessage {
 
     public int getSnapshotSinkCount() {
         return m_snapshotSinkCount;
+    }
+
+    public LinkedBlockingQueue<DBBPool.BBContainer> getSnapshotBufferPool()
+    {
+        return m_bufferPool;
     }
 
     /**
