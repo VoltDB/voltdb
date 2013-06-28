@@ -124,13 +124,11 @@ public class InitiatorStats extends SiteStatsSource {
     @Override
     protected void updateStatsRow(final Object rowKey, Object rowValues[]) {
         DummyIterator iterator = (DummyIterator)rowKey;
-        Map.Entry<String, InvocationInfo> entry = iterator.next;
-        iterator.next = null;
+        Map.Entry<String, InvocationInfo> entry = iterator.innerNext;
+        iterator.innerNext = null;
         final InvocationInfo info = entry.getValue();
-        final String statsKey = entry.getKey();
-        final String statsKeySplit[] = statsKey.split("\\$");
-        final String procName = statsKeySplit[0];
-        final String connectionId = statsKeySplit[1];
+        final String procName = entry.getKey();
+        final Long connectionId = iterator.outerNext.getKey();
 
         long invocationCount = info.invocationCount;
         long totalExecutionTime = info.totalExecutionTime;
@@ -158,7 +156,7 @@ public class InitiatorStats extends SiteStatsSource {
             info.lastFailureCount = info.failureCount;
         }
 
-        rowValues[columnNameToIndex.get("CONNECTION_ID")] = new Long(connectionId);
+        rowValues[columnNameToIndex.get("CONNECTION_ID")] = connectionId;
         rowValues[columnNameToIndex.get("CONNECTION_HOSTNAME")] = info.connectionHostname;
         rowValues[columnNameToIndex.get("PROCEDURE_NAME")] = procName;
         rowValues[columnNameToIndex.get("INVOCATIONS")] = invocationCount;
@@ -170,43 +168,78 @@ public class InitiatorStats extends SiteStatsSource {
         super.updateStatsRow(rowKey, rowValues);
     }
 
-    /**
-     * A dummy iterator that wraps an Iterator<String> and provides the Iterator<Object> necessary
-     * for getStatsRowKeyIterator()
-     *
-     */
     private class DummyIterator implements Iterator<Object> {
-        private final Iterator<Map.Entry<String, InvocationInfo>> i;
-        private Map.Entry<String, InvocationInfo> next = null;
+        private final Iterator<Map.Entry<Long, Map<String, InvocationInfo>>> outerItr;
+        private Iterator<Map.Entry<String, InvocationInfo>> innerItr = null;
+        private Map.Entry<Long, Map<String, InvocationInfo>> outerNext = null;
+        private Map.Entry<String, InvocationInfo> innerNext = null;
         private final boolean interval;
-        private DummyIterator(Iterator<Map.Entry<String, InvocationInfo>> i, boolean interval) {
-            this.i = i;
+        private DummyIterator(Iterator<Map.Entry<Long, Map<String, InvocationInfo>>> i, boolean interval) {
+            this.outerItr = i;
             this.interval = interval;
+        }
+
+        private boolean advanceOuter() {
+            if(outerItr.hasNext()) {
+                outerNext = outerItr.next();
+                // reset innerItr
+                innerItr = outerNext.getValue().entrySet().iterator();
+                return true;
+            }
+            outerNext = null;
+            return false;
+        }
+
+        private boolean advanceInner() {
+            if(innerItr.hasNext()) {
+                innerNext = innerItr.next();
+                return true;
+            }
+            innerNext = null;
+            return false;
         }
 
         @Override
         public boolean hasNext() {
             if (!interval) {
-                if (i.hasNext()) {
-                    next = i.next();
-                    return true;
+                if(innerItr == null) {
+                    if(advanceOuter()) {
+                        return advanceInner();
+                    }
+                    return false;
                 } else {
+                    if(advanceInner()) {
+                        return true;
+                    }
+                    if(advanceOuter()) {
+                        return advanceInner();
+                    }
                     return false;
                 }
             }
-            if (!i.hasNext()) {
+            if (innerItr == null) {
+                advanceOuter();
+            }
+            // innerItr can be null if connection created but not doing any procedures
+            if (innerItr == null || !outerItr.hasNext() && !innerItr.hasNext()) {
                 return false;
             } else {
-                while (next == null && i.hasNext()) {
-                    Map.Entry<String, InvocationInfo> entry = i.next();
-                    InvocationInfo info = entry.getValue();
-                    if (info.invocationCount - info.lastInvocationCount == 0) {
+                while (innerNext == null && (outerItr.hasNext() || innerItr.hasNext())) {
+                    InvocationInfo info = null;
+                    // first, look up at lower level map
+                    advanceInner();
+                    // not found, advance upper level map itr, and look up in next lower level map
+                    if(innerNext == null) {
+                        advanceOuter();
+                        advanceInner();
+                    }
+                    info = innerNext.getValue();
+                    if(info.invocationCount - info.lastInvocationCount == 0) {
+                        innerNext = null;
                         continue;
-                    } else {
-                        next = entry;
                     }
                 }
-                if (next == null) {
+                if(innerNext == null) {
                     return false;
                 }
             }
@@ -224,16 +257,16 @@ public class InitiatorStats extends SiteStatsSource {
         }
     }
 
-    private class AggregatingIterator implements Iterator<Map.Entry<String, InvocationInfo>> {
+    private class AggregatingIterator implements Iterator<Map.Entry<Long, Map<String, InvocationInfo>>> {
 
-        private final Queue<Iterator<Map.Entry<String, InvocationInfo>>> m_sources;
-        private AggregatingIterator(Queue<Iterator<Map.Entry<String, InvocationInfo>>> sources) {
+        private final Queue<Iterator<Map.Entry<Long, Map<String, InvocationInfo>>>> m_sources;
+        private AggregatingIterator(Queue<Iterator<Map.Entry<Long, Map<String, InvocationInfo>>>> sources) {
             m_sources = sources;
         }
 
         @Override
         public boolean hasNext() {
-            Iterator<Map.Entry<String, InvocationInfo>> i = null;
+            Iterator<Map.Entry<Long, Map<String, InvocationInfo>>> i = null;
             while ((i = m_sources.peek()) != null) {
                 if (i.hasNext()) return true;
                 m_sources.remove();
@@ -242,8 +275,8 @@ public class InitiatorStats extends SiteStatsSource {
         }
 
         @Override
-        public Map.Entry<String, InvocationInfo> next() {
-            final Iterator<Map.Entry<String, InvocationInfo>> i = m_sources.peek();
+        public Map.Entry<Long, Map<String, InvocationInfo>> next() {
+            final Iterator<Map.Entry<Long, Map<String, InvocationInfo>>> i = m_sources.peek();
             if (i == null || !i.hasNext()) {
                 throw new NoSuchElementException();
             }
@@ -254,13 +287,12 @@ public class InitiatorStats extends SiteStatsSource {
         public void remove() {
             throw new UnsupportedOperationException();
         }
-
     }
 
     @Override
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
-        ArrayDeque<Iterator<Map.Entry<String, InvocationInfo>>> d =
-                new ArrayDeque<Iterator<Map.Entry<String, InvocationInfo>>>();
+        ArrayDeque<Iterator<Map.Entry<Long, Map<String, InvocationInfo>>>> d =
+                new ArrayDeque<Iterator<Map.Entry<Long, Map<String, InvocationInfo>>>>();
         for (ClientInterface ci : VoltDB.instance().getClientInterfaces()) {
             d.addAll(ci.getIV2InitiatorStats());
         }
