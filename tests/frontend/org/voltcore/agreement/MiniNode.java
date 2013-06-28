@@ -136,8 +136,14 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
     public NodeState getNodeState()
     {
         NodeState state = m_nodeState.get();
-        if (state == NodeState.RESOLVE && !m_miniSite.isInArbitration()) {
-            m_nodeState.compareAndSet(state, NodeState.RUN);
+        if (state == NodeState.START || state == NodeState.STOP) {
+            return state;
+        }
+        if (m_miniSite.isInArbitration()) {
+            m_nodeState.set(NodeState.RESOLVE);
+        }
+        else {
+            m_nodeState.set(NodeState.RUN);
         }
         return m_nodeState.get();
     }
@@ -182,12 +188,6 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
 
                         for (long failedHostId : sfm.m_safeTxnIds.keySet()) {
                             m_miniSite.reportFault(failedHostId, sfm.m_survivors);
-                            if ( m_HSIds.contains(failedHostId)) {
-                                if (m_nodeState.get() == NodeState.RUN) {
-                                    m_nodeLog.info("Flipping from RUN to RESOLVE om a FailureSiteUpdateMessage");
-                                }
-                                m_nodeState.set(NodeState.RESOLVE);
-                            }
                         }
                     }
                 }
@@ -200,12 +200,6 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
                             HostMessenger.AGREEMENT_SITE_ID);
                     m_miniSite.reportFault(agreementHSId);
                     m_deadTracker.stopTracking(HSId);
-                    if (m_HSIds.contains(agreementHSId)) {
-                        if (m_nodeState.get() == NodeState.RUN) {
-                            m_nodeLog.info("Flipping from RUN to RESOLVE om a FailureMessage");
-                        }
-                        m_nodeState.set(NodeState.RESOLVE);
-                    }
                 }
             }
         }
@@ -223,8 +217,6 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
                 m_mesh.failLink(HSId, m_HSId);
             }
         }
-        m_nodeState.set(NodeState.RUN);
-        m_nodeLog.info("Flipping from RESOLVE to RUN on a DISCONNECT");
     }
 
     @Override
