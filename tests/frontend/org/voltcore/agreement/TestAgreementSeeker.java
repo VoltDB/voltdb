@@ -89,9 +89,9 @@ public class TestAgreementSeeker {
         assertThat(s3.nextKill(), contains(2L));
         assertThat(s4.nextKill(), contains(2L));
 
-        assertThat(s1.needForward(1L), equalTo(false));
-        assertThat(s3.needForward(3L), equalTo(false));
-        assertThat(s4.needForward(4L), equalTo(false));
+        assertThat(s1.needForward(), equalTo(false));
+        assertThat(s3.needForward(), equalTo(false));
+        assertThat(s4.needForward(), equalTo(false));
 
         assertThat(s1.forWhomSiteIsDead(2L),empty());
         assertThat(s3.forWhomSiteIsDead(2L),empty());
@@ -116,8 +116,8 @@ public class TestAgreementSeeker {
         assertThat(s1.nextKill(), contains(2L,3L));
         assertThat(s4.nextKill(), contains(2L,3L));
 
-        assertThat(s1.needForward(1L), equalTo(false));
-        assertThat(s4.needForward(4L), equalTo(false));
+        assertThat(s1.needForward(), equalTo(false));
+        assertThat(s4.needForward(), equalTo(false));
 
         assertThat(s1.forWhomSiteIsDead(2L),empty());
         assertThat(s1.forWhomSiteIsDead(3L),empty());
@@ -155,10 +155,10 @@ public class TestAgreementSeeker {
         s4.add(make(msg.but(with(sfmSource,2L))));
         s4.add(make(msg.but(with(sfmSource,3L),with(sfmSurvivors,Longs.asList(1,2,4)))));
 
-        assertThat(s1.needForward(1L), equalTo(false));
-        assertThat(s2.needForward(2L), equalTo(false));
-        assertThat(s3.needForward(3L), equalTo(true));
-        assertThat(s4.needForward(4L), equalTo(true));
+        assertThat(s1.needForward(), equalTo(false));
+        assertThat(s2.needForward(), equalTo(false));
+        assertThat(s3.needForward(), equalTo(true));
+        assertThat(s4.needForward(), equalTo(true));
 
         assertThat(s1.forWhomSiteIsDead(4L),contains(3L));
         assertThat(s1.forWhomSiteIsDead(3L),contains(4L));
@@ -174,8 +174,8 @@ public class TestAgreementSeeker {
         s4.add(make(a(FailureSiteForwardMessage,
                 with(fsfmMsg, msg.but(with(sfmSource,3L),with(sfmSurvivors,Longs.asList(1,2,3)))))));
 
-        assertThat(s3.needForward(3L), equalTo(false));
-        assertThat(s4.needForward(4L), equalTo(false));
+        assertThat(s3.needForward(), equalTo(false));
+        assertThat(s4.needForward(), equalTo(false));
 
         assertThat(s1.nextKill(), contains(4L));
         assertThat(s2.nextKill(), contains(4L));

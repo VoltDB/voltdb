@@ -58,9 +58,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
-import org.voltcore.messaging.SiteFailureForwardMessage;
 import org.voltcore.messaging.FaultMessage;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.SiteFailureForwardMessage;
 import org.voltcore.messaging.SiteFailureMessage;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
@@ -105,7 +105,7 @@ public class TestMeshArbiter {
             .thenReturn(make(siteOneSfm.but(with(sfmSource, 3L))))
             ;
 
-        Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L, true));
+        Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L));
 
         verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
         verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(1,11), 0,2,3)));
@@ -135,7 +135,7 @@ public class TestMeshArbiter {
             .thenReturn(make(siteOneSfm.but(with(sfmSource, 3L))))
             ;
 
-        Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L, true));
+        Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L));
 
         verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
         verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(1,11), 0,2,3)));
@@ -148,7 +148,7 @@ public class TestMeshArbiter {
             .thenReturn(make(siteTwoSfm.but(with(sfmSource,3L))))
         ;
 
-        decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(2L, true));
+        decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(2L));
 
         verify(mbox,never()).deliverFront(any(VoltMessage.class));
         verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
@@ -169,14 +169,14 @@ public class TestMeshArbiter {
         when(aide.getNewestSafeTransactionForInitiator(2L)).thenReturn(22L);
 
         when(mbox.recv(any(Subject[].class)))
-            .thenReturn(new FaultMessage(2, true))
+            .thenReturn(new FaultMessage(2))
             .thenReturn((VoltMessage)null);
         when(mbox.recvBlocking(any(Subject[].class), eq(5L)))
             .thenReturn(make(site12Sfm.but(with(sfmSource, 0L))))
             .thenReturn(make(site12Sfm.but(with(sfmSource, 3L))))
             ;
 
-        Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L, true));
+        Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L));
 
         verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
         verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(1,11,2,22), 0,3)));
@@ -200,10 +200,10 @@ public class TestMeshArbiter {
         when(aide.getNewestSafeTransactionForInitiator(2L)).thenReturn(22L);
         when(mbox.recvBlocking(any(Subject[].class), eq(5L)))
             .thenReturn(make(siteOneSfm.but(with(sfmSource, 0L))))
-            .thenReturn(new FaultMessage(2L, true))
+            .thenReturn(new FaultMessage(2L))
             ;
 
-        Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L, true));
+        Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L));
 
         verify(mbox,times(1)).deliverFront(any(VoltMessage.class));
         verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
@@ -218,7 +218,7 @@ public class TestMeshArbiter {
             .thenReturn(make(siteTwoSfm.but(with(sfmSource,3L))))
         ;
 
-        decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(2L, true));
+        decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(2L));
 
         verify(mbox,never()).deliverFront(any(VoltMessage.class));
         verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
@@ -244,7 +244,7 @@ public class TestMeshArbiter {
             .thenReturn(make(siteOneSfm.but(with(sfmSource, 3L))))
             ;
 
-        Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L, true));
+        Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L));
 
         verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
         verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(1,11), 0,2,3)));
@@ -265,9 +265,10 @@ public class TestMeshArbiter {
 
         when(mbox.recvBlocking(any(Subject[].class), eq(5L)))
             .thenReturn(make(um.but(with(sfmSource, 2L))))
-            .thenReturn(new FaultMessage(1L, true))
+            .thenReturn(new FaultMessage(1L))
         ;
-        Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L, false));
+        Map<Long,Long> decision =
+                arbiter.reconfigureOnFault(hsids, new FaultMessage(1L,ImmutableSet.of(0L,2L,3L)));
 
         verify(mbox,times(1)).deliverFront(any(VoltMessage.class));
         verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
@@ -280,7 +281,7 @@ public class TestMeshArbiter {
             .thenReturn(make(um.but(with(sfmSource, 0L))))
             .thenReturn(make(um.but(with(sfmSource, 3L))))
         ;
-        decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L, true));
+        decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L));
 
         verify(mbox,never()).deliverFront(any(VoltMessage.class));
         verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
@@ -311,14 +312,14 @@ public class TestMeshArbiter {
 
         when(mbox.recvBlocking(any(Subject[].class), eq(5L)))
             .thenReturn(make(s23f.but(with(sfmSource,2L),with(sfmSafeTxns,sfmSafe(0,10)))))
-            .thenReturn(new FaultMessage(0L, false))
+            .thenReturn(new FaultMessage(0L, ImmutableSet.of(1L,2L,3L)))
             .thenReturn(make(s1f.but(with(sfmSource,0L))))
             .thenReturn(make(s23f.but(with(sfmSource,2L))))
             .thenReturn(make(s23f.but(with(sfmSource,3L))))
             .thenReturn(make(uf.but(with(fsfmSource,2L),with(fsfmMsg,s0f))))
             .thenReturn(make(uf.but(with(fsfmSource,3L),with(fsfmMsg,s0f))))
         ;
-        Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L,true));
+        Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L));
 
         verify(mbox,times(0)).deliverFront(any(VoltMessage.class));
         verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
@@ -349,10 +350,10 @@ public class TestMeshArbiter {
         when(mbox.recvBlocking(any(Subject[].class), eq(5L)))
             .thenReturn(make(s2f.but(with(sfmSource,1L))))
             .thenReturn(make(s03f.but(with(sfmSource,3L),with(sfmSafeTxns,sfmSafe(1,11)))))
-            .thenReturn(new FaultMessage(2L, false))
+            .thenReturn(new FaultMessage(2L, ImmutableSet.of(0L,1L,3L)))
         ;
 
-        Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L,false));
+        Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1L,ImmutableSet.of(0L,2L,3L)));
 
         verify(mbox,times(1)).deliverFront(any(VoltMessage.class));
         verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
@@ -367,7 +368,7 @@ public class TestMeshArbiter {
             .thenReturn(make(s03f.but(with(sfmSource,3L))))
         ;
 
-        decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(2L,false));
+        decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(2L,ImmutableSet.of(0L,1L,3L)));
 
         verify(mbox,times(0)).deliverFront(any(VoltMessage.class));
         verify(mbox,atLeast(2)).send(any(long[].class), any(VoltMessage.class));

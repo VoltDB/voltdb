@@ -318,8 +318,10 @@ public class ForeignHost {
         // even if it hasn't directly witnessed a node fault.
         if (message instanceof SiteFailureMessage)
         {
-            for (long failedHostId : (((SiteFailureMessage)message).m_safeTxnIds).keySet()) {
-                m_hostMessenger.relayForeignHostFailed((int)failedHostId);
+            SiteFailureMessage sfm = (SiteFailureMessage)message;
+
+            for (long failedHostId : sfm.m_safeTxnIds.keySet()) {
+                m_hostMessenger.relayForeignHostFailed((int)failedHostId, sfm.m_survivors);
             }
         }
     }

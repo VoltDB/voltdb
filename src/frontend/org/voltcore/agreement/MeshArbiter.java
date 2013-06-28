@@ -91,8 +91,10 @@ public class MeshArbiter {
             || (   alreadyWitnessed != null
                 && (alreadyWitnessed || alreadyWitnessed == fm.witnessed))
                // stale unwitnessed
-            || (   !fm.witnessed && m_inTrouble.isEmpty()
-                && m_staleUnwitnessed.contains(fm.failedSite));
+            || (   !fm.witnessed
+                && m_inTrouble.isEmpty()
+                && m_staleUnwitnessed.contains(fm.failedSite)
+                && Sets.filter(fm.survivors, in(m_failedSites)).size() > 0);
     }
 
     public Map<Long,Long> reconfigureOnFault(Set<Long> hsIds, FaultMessage fm) {
@@ -308,7 +310,7 @@ public class MeshArbiter {
                 }
             }
 
-        } while (!haveEnough || m_seeker.needForward(m_hsId));
+        } while (!haveEnough || m_seeker.needForward());
 
         return true;
     }

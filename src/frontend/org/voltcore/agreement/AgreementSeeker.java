@@ -40,13 +40,29 @@ import com.google.common.collect.TreeMultimap;
 public class AgreementSeeker {
 
     protected final ArbitrationStrategy m_strategy;
-    protected final long m_selfHsid;
+    /** hsid of the site holding this instance */
 
+    protected final long m_selfHsid;
+    /** mesh hsids before agreement is sought */
     protected Set<Long> m_hsids;
+
+    /** the set of hsids which this site can see */
     protected Set<Long> m_survivors;
 
+    /**
+     * graph where each key is a site, and their corresponding values are sites
+     * that have reported it
+     */
     protected final TreeMultimap<Long, Long> m_reported = TreeMultimap.create();
+    /**
+     * graph were each key denotes a site, and their corresponding values are sites
+     * that see it dead
+     */
     protected final TreeMultimap<Long, Long> m_dead = TreeMultimap.create();
+    /**
+     * graph were each key denotes a site, and their corresponding values are sites
+     * that see it alive
+     */
     protected final TreeMultimap<Long, Long> m_alive = TreeMultimap.create();
 
     public AgreementSeeker(final ArbitrationStrategy strategy, long selfHsid) {
@@ -57,14 +73,26 @@ public class AgreementSeeker {
         m_survivors = ImmutableSet.of();
     }
 
+    /**
+     * Start accumulate site links graphing information
+     *
+     * @param hsids
+     * pre-failure mesh hsids
+     * @param inTrouble a map where each key is a failed site, and its value is
+     *   a boolean that indicates whether or not the failure was witnessed directly
+     *   or reported by some other site
+     */
     public void startSeekingFor(
             final Set<Long> hsids, final Map<Long,Boolean> inTrouble) {
 
+        // if the mesh hsids change we need to reset
         if (!m_hsids.equals(hsids)) {
             if (!m_hsids.isEmpty()) clear();
             m_hsids = ImmutableSortedSet.copyOf(hsids);
         }
+        // determine the survivors
         m_survivors = m_strategy.accept(survivorPicker, Pair.of(m_hsids, inTrouble));
+        // start accumulating link failure graphing info
         add(m_selfHsid, inTrouble);
     }
 
@@ -77,6 +105,12 @@ public class AgreementSeeker {
         m_survivors = ImmutableSet.of();
     }
 
+    /**
+     * Convenience method that remove all instances of the given values
+     * from the given map
+     * @param mm a multimap
+     * @param values a set of values that need to be removed
+     */
     static protected void removeValues(TreeMultimap<Long, Long> mm, Set<Long> values) {
         Iterator<Map.Entry<Long, Long>> itr = mm.entries().iterator();
         while (itr.hasNext()) {
@@ -87,6 +121,10 @@ public class AgreementSeeker {
         }
     }
 
+    /**
+     * a visitor that accepts a pair consisting of pre-failure mesh hsids,
+     * and its failed sites map, and returns a set of survivors
+     */
     static protected final ArbitrationStrategy.Visitor<Set<Long>, Pair<Set<Long>, Map<Long,Boolean>>> survivorPicker =
             new ArbitrationStrategy.Visitor<Set<Long>, Pair<Set<Long>,Map<Long,Boolean>>>() {
 
@@ -104,6 +142,12 @@ public class AgreementSeeker {
         }
     };
 
+    /**
+     * returns a map entry predicate that tests whether or not the given
+     * map entry describes a dead site
+     * @param hsids pre-failure mesh hsids
+     * @return
+     */
     public static Predicate<Map.Entry<Long, Boolean>> amongDeadHsids(final Set<Long> hsids) {
         return new Predicate<Map.Entry<Long,Boolean>>() {
             @Override
@@ -113,6 +157,10 @@ public class AgreementSeeker {
         };
     }
 
+    /**
+     * a site predicate that tests whether or not a site is
+     * among the set of survivors
+     */
     public final Predicate<Long> amongSurvivors = new Predicate<Long>() {
         @Override
         public boolean apply(Long site) {
@@ -120,10 +168,20 @@ public class AgreementSeeker {
         }
     };
 
+    /**
+     * returns the current set of survivors
+     * @return the current set of survivors
+     */
     public Set<Long> getSurvivors() {
         return m_survivors;
     }
 
+    /**
+     * Convenience method that remove all instances of the given value
+     * from the given map
+     * @param mm a multimap
+     * @param value a value that needs to be removed
+     */
     private void removeValue(TreeMultimap<Long, Long> mm, long value) {
         Iterator<Map.Entry<Long, Long>> itr = mm.entries().iterator();
         while (itr.hasNext()) {
@@ -134,23 +192,38 @@ public class AgreementSeeker {
         }
     }
 
-    public void add(long reportingHsid, final Map<Long,Boolean> failed) {
+    /**
+     *  Adds alive and dead graph information
+     *  @param reportingHsid site reporting failures
+     *  @param failures seen by the reporting site
+     */
+    void add(long reportingHsid, final Map<Long,Boolean> failed) {
+        // skip if the reporting site did not belong to the pre
+        // failure mesh
         if (!m_hsids.contains(reportingHsid)) return;
 
+        // ship if the reporting site is reporting itself dead
         Boolean harakiri = failed.get(reportingHsid);
         if (harakiri != null && harakiri.booleanValue()) return;
 
         Set<Long> dead = Sets.newHashSet();
 
         for (Map.Entry<Long, Boolean> e: failed.entrySet()) {
+            // skip if the failed site did not belong to the
+            // pre failure mesh
             if (!m_hsids.contains(e.getKey())) continue;
+
             m_reported.put(e.getKey(), reportingHsid);
+            // if the failure is witnessed add it to the dead graph
             if (e.getValue()) {
                 m_dead.put(e.getKey(), reportingHsid);
                 dead.add(e.getKey());
             }
         }
-
+        // once you are witnessed dead you cannot become undead,
+        // but it is not the case for alive nodes, as they can
+        // die. So remove all what the reporting site thought
+        // was alive before this invocation
         removeValue(m_alive, reportingHsid);
 
         for (Long alive: Sets.difference(m_hsids, dead)) {
@@ -158,19 +231,36 @@ public class AgreementSeeker {
         }
     }
 
+    /**
+     *  Adds alive and dead graph information from a reporting
+     *  site survivor set
+     *  @param reportingHsid the reporting site
+     *  @param sfm a {@link SiteFailureMessage} containing that
+     *      site's survivor set
+     */
     public void add(long reportingHsid, SiteFailureMessage sfm) {
+        // skip if the reporting site did not belong to the pre
+        // failure mesh, or the reporting site is reporting itself
+        // dead
         if (   !m_hsids.contains(reportingHsid)
             || !sfm.m_survivors.contains(reportingHsid)) return;
 
+        // dead = pre failure mesh - survivors
         Set<Long> dead = Sets.difference(m_hsids, sfm.m_survivors);
 
+        // add dead graph nodes
         for (long w: dead) {
             if (!m_hsids.contains(w)) continue;
             m_dead.put(w,reportingHsid);
         }
 
+        // once you are witnessed dead you cannot become undead,
+        // but it is not the case for alive nodes, as they can
+        // die. So remove all what the reporting site thought
+        // was alive before this invocation
         removeValue(m_alive, reportingHsid);
 
+        // add alive graph nodes
         for (long s: sfm.m_survivors) {
             if (!m_hsids.contains(s)) continue;
             m_alive.put(s, reportingHsid);
@@ -182,18 +272,40 @@ public class AgreementSeeker {
         }
     }
 
+    /**
+     *  Adds alive and dead graph information from a reporting
+     *  site survivor set
+     *  @param sfm a {@link SiteFailureMessage} containing that
+     *      site's survivor set
+     */
     public void add(SiteFailureMessage sfm) {
         add(sfm.m_sourceHSId, sfm);
     }
 
+    /**
+     *  Adds alive and dead graph information from a reporting
+     *  site survivor set
+     *  @param reportingHsid the reporting site
+     *  @param sfm a {@link SiteFailureForwardMessage} containing that
+     *      site's survivor set
+     */
     public void add(SiteFailureForwardMessage fsfm) {
         add(fsfm.m_reportingHSId,fsfm);
     }
 
+    /**
+     * Does the given graph scenario meet the criteria of
+     * having reached an agreement?
+     * @param sc a graph scenario
+     */
     protected Boolean haveAgreement(Scenario sc) {
         return m_strategy.accept(agreementSeeker, sc);
     }
 
+    /**
+     * a visitor that accepts a graph scenario and returns whether or not
+     * the graph scenario has reached an agreement
+     */
     protected final ArbitrationStrategy.Visitor<Boolean, Scenario> agreementSeeker =
             new ArbitrationStrategy.Visitor<Boolean, Scenario>() {
 
@@ -207,38 +319,47 @@ public class AgreementSeeker {
             return agree;
         }
 
-        // it matches if dead sets are contain all alives
+        /**
+         * a quorum is comprised of sites that the given scenario
+         * has left alive. This returns true if each dead node in
+         * the scenario is seen dead by all in the quorum
+         */
         @Override
         public Boolean visitMatchingCardinality(Scenario sc) {
             boolean agree = true;
             Set<Long> quorum = Sets.intersection(sc.alive.keySet(),sc.survivors);
-            for (Long w: sc.dead.keySet()) {
-                agree = agree && quorum.equals(sc.dead.get(w));
+            for (Long dead: sc.dead.keySet()) {
+                agree = agree && quorum.equals(sc.dead.get(dead));
             }
             return agree;
         }
     };
 
-    public boolean needForward(long hsid) {
-        return m_strategy.accept(forwardDemander, hsid);
+    /**
+     * Is anyone in the mesh alive and connected to sites I consider
+     * dead?
+     * @param hsid
+     */
+    public boolean needForward() {
+        return m_strategy.accept(forwardDemander, (Void)null);
     }
 
-    protected ArbitrationStrategy.Visitor<Boolean, Long> forwardDemander =
-            new ArbitrationStrategy.Visitor<Boolean, Long>() {
+    protected ArbitrationStrategy.Visitor<Boolean, Void> forwardDemander =
+            new ArbitrationStrategy.Visitor<Boolean, Void>() {
 
         @Override
-        public Boolean visitNoQuarter(Long hsid) {
+        public Boolean visitNoQuarter(Void nads) {
             return false;
         }
 
         @Override
-        public Boolean visitMatchingCardinality(Long hsid) {
+        public Boolean visitMatchingCardinality(Void nada) {
             Set<Long> unreachable = Sets.filter(m_hsids, not(amongSurvivors));
             Set<Long> butAlive = Sets.intersection(m_alive.keySet(), unreachable);
 
             return !butAlive.isEmpty()
                 && seenByInterconnectedPeers(butAlive, Sets.newTreeSet(m_survivors))
-                && !m_dead.get(hsid).containsAll(butAlive);
+                && !m_dead.get(m_selfHsid).containsAll(butAlive);
         }
     };
 

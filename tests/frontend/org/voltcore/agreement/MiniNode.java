@@ -181,7 +181,7 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
                         SiteFailureMessage sfm = (SiteFailureMessage)message;
 
                         for (long failedHostId : sfm.m_safeTxnIds.keySet()) {
-                            m_miniSite.reportFault(failedHostId, false);
+                            m_miniSite.reportFault(failedHostId, sfm.m_survivors);
                             if ( m_HSIds.contains(failedHostId)) {
                                 if (m_nodeState.get() == NodeState.RUN) {
                                     m_nodeLog.info("Flipping from RUN to RESOLVE om a FailureSiteUpdateMessage");
@@ -198,7 +198,7 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
                     int failedHostId = CoreUtils.getHostIdFromHSId(HSId);
                     long agreementHSId = CoreUtils.getHSIdFromHostAndSite(failedHostId,
                             HostMessenger.AGREEMENT_SITE_ID);
-                    m_miniSite.reportFault(agreementHSId, true);
+                    m_miniSite.reportFault(agreementHSId);
                     m_deadTracker.stopTracking(HSId);
                     if (m_HSIds.contains(agreementHSId)) {
                         if (m_nodeState.get() == NodeState.RUN) {

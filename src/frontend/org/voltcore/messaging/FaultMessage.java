@@ -18,16 +18,27 @@
 package org.voltcore.messaging;
 
 import java.nio.ByteBuffer;
+import java.util.Set;
+
+import com.google.common.collect.ImmutableSet;
 
 
 public final class FaultMessage extends VoltMessage {
 
     public final long failedSite;
     public final boolean witnessed;
+    public final Set<Long> survivors;
 
-    public FaultMessage(long failedSite, boolean witnessed) {
+    public FaultMessage(final long failedSite) {
         this.failedSite = failedSite;
-        this.witnessed = witnessed;
+        this.witnessed = true;
+        this.survivors = ImmutableSet.of();
+    }
+
+    public FaultMessage(final long failedSite, final Set<Long> survivors) {
+        this.failedSite = failedSite;
+        this.witnessed = false;
+        this.survivors = ImmutableSet.copyOf(survivors);
     }
 
     @Override

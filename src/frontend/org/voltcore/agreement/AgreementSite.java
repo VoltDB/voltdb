@@ -657,8 +657,14 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         return sem;
     }
 
-    public void reportFault(long faultingSite, boolean witnessed) {
-        FaultMessage fm = new FaultMessage(faultingSite, witnessed);
+    public void reportFault(long faultingSite) {
+        FaultMessage fm = new FaultMessage(faultingSite);
+        fm.m_sourceHSId = m_hsId;
+        m_mailbox.deliver(fm);
+    }
+
+    public void reportFault(long faultingSite, Set<Long> survivors) {
+        FaultMessage fm = new FaultMessage(faultingSite, survivors);
         fm.m_sourceHSId = m_hsId;
         m_mailbox.deliver(fm);
     }

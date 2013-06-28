@@ -16,8 +16,10 @@
  */
 package org.voltcore.agreement;
 
+import java.util.Set;
+
 public interface InterfaceToMessenger {
     public void reportForeignHostFailed(int hostId);
-    public void relayForeignHostFailed(int hostId);
+    public void relayForeignHostFailed(int hostId, Set<Long> survivors);
     public String getHostnameForHostID(int hostId);
 }
