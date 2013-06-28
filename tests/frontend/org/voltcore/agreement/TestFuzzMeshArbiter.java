@@ -221,7 +221,7 @@ public class TestFuzzMeshArbiter extends TestCase
         int end1 = state.getRandomLiveNode();
         int end2 = state.getRandomLiveNode();
         while (end1 == end2) {
-            end2 = state.m_rand.nextInt(m_nodes.size());
+            end2 = state.getRandomLiveNode();
         }
         int max = Math.max(end1, end2);
         state.m_expectedLive.remove(getHSId(max));
