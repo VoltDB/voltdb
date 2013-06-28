@@ -14,6 +14,15 @@
         padding-top: 60px;
         padding-bottom: 40px;
       }
+      .invert {
+        background-color: #0079BB;
+      }
+      td.invert>p {
+        color: white;
+      }
+      td.invert>p>a {
+        color: #eeeeee;
+      }
     </style>
     <link href="http://assets.voltdb.com/b/css/bootstrap-responsive.css" rel="stylesheet">
     <link href="http://assets.voltdb.com/t/css/theme.bootstrap.css" rel="stylesheet">
@@ -229,31 +238,21 @@
                 },
                 cssChildRow: "tablesorter-childRow"
             });
-            $(".tableL2").tablesorter({
-                theme : 'bootstrap',
-                widthFixed: true,
-                headerTemplate : '{content} {icon}',
-                widgets : [ "uitheme" ],
-                cssChildRow: "tablesorter2-childRow"
-            });
 
             $('.tableL1').delegate('.togglex', 'click' ,function(){
                 var iconid = "#" + $(this).attr('id') + "--icon";
                 var dropdownid = "#" + $(this).attr('id') + "--dropdown";
                 var tbody = $(this).parentsUntil("tbody", 'tr').parent()
                 var rows = tbody.children('tr.primaryrow');
+
+                $('.primaryrow').css('background-color', '#ffffff');
+                $('.icon-chevron-down').removeClass('icon-chevron-down').addClass('icon-chevron-right');
                 $(dropdownid).toggle();
                 if ($(dropdownid).is(":visible")) {
                     tbody.children('.tablesorter-childRow').children('td').hide();
-                    $('.primaryrow').css('background-color', '#ffffff');
                     $(dropdownid).show();
                     $(this).parentsUntil("tbody", 'tr').css('background-color', '#eeeeee');
-                    $('.icon-chevron-down').removeClass('icon-chevron-down').addClass('icon-chevron-right');
                     $(iconid).removeClass('icon-chevron-right').addClass('icon-chevron-down');
-                }
-                else {
-                    $('.primaryrow').css('background-color', '#ffffff');
-                    $('.icon-chevron-down').removeClass('icon-chevron-down').addClass('icon-chevron-right');
                 }
                 history.replaceState(null, null, "#" + $(this).attr('id'));
                 return false;
@@ -274,6 +273,7 @@
 
             // hide child rows
             $('.tablesorter-childRow>td').hide();
+            $('.dropdown2>td').hide();
             $('.primaryrow>td').show();
             $('.primaryrow2>td').show();
             // make arrows point the right way

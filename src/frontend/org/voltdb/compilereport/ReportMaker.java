@@ -104,7 +104,7 @@ public class ReportMaker {
         sb.append("</tr>\n");
 
         // BUILD THE DROPDOWN FOR THE PLAN/DETAIL TABLE
-        sb.append("<tr class='tablesorter2-childRow tablesorter-childRow'><td colspan='5' id='s-"+ table.getTypeName().toLowerCase() +
+        sb.append("<tr class='dropdown'><td colspan='5' id='s-"+ table.getTypeName().toLowerCase() +
                 "-" + index.getTypeName().toLowerCase() + "--dropdown'>\n");
 
         IndexAnnotation annotation = (IndexAnnotation) index.getAnnotation();
@@ -127,7 +127,7 @@ public class ReportMaker {
 
     static String generateIndexesTable(Table table) {
         StringBuilder sb = new StringBuilder();
-        sb.append("    <table class='table tableL2 tablesorter table-condensed'>\n    <thead><tr>" +
+        sb.append("    <table class='table tableL2 table-condensed'>\n    <thead><tr>" +
                   "<th>Index Name</th>" +
                   "<th>Type</th>" +
                   "<th>Columns</th>" +
@@ -204,7 +204,7 @@ public class ReportMaker {
 
         // BUILD THE DROPDOWN FOR THE DDL / INDEXES DETAIL
 
-        sb.append("<tr class='tablesorter-childRow'><td colspan='6' id='s-"+ table.getTypeName().toLowerCase() + "--dropdown'>\n");
+        sb.append("<tr class='tablesorter-childRow'><td class='invert' colspan='6' id='s-"+ table.getTypeName().toLowerCase() + "--dropdown'>\n");
 
         TableAnnotation annotation = (TableAnnotation) table.getAnnotation();
         if (annotation != null) {
@@ -262,7 +262,7 @@ public class ReportMaker {
 
     static String genrateStatementRow(Procedure procedure, Statement statement) {
         StringBuilder sb = new StringBuilder();
-        sb.append("        <tr class='primaryrow2 tablesorter-childRow'>");
+        sb.append("        <tr class='primaryrow2'>");
 
         // name column
         String anchor = (procedure.getTypeName() + "-" + statement.getTypeName()).toLowerCase();
@@ -315,7 +315,7 @@ public class ReportMaker {
         sb.append("</tr>\n");
 
         // BUILD THE DROPDOWN FOR THE PLAN/DETAIL TABLE
-        sb.append("<tr class='tablesorter2-childRow tablesorter-childRow'><td colspan='5' id='p-"+ procedure.getTypeName().toLowerCase() +
+        sb.append("<tr class='dropdown2'><td colspan='5' id='p-"+ procedure.getTypeName().toLowerCase() +
                 "-" + statement.getTypeName().toLowerCase() + "--dropdown'>\n");
 
         sb.append("<div class='well well-small'><h4>Explain Plan:</h4>\n");
@@ -356,7 +356,7 @@ public class ReportMaker {
 
     static String generateStatementsTable(Procedure procedure) {
         StringBuilder sb = new StringBuilder();
-        sb.append("    <table class='table tableL2 tablesorter table-condensed'>\n    <thead><tr>" +
+        sb.append("    <table class='table tableL2 table-condensed'>\n    <thead><tr>" +
                   "<th><span style='white-space: nowrap;'>Statement Name</span></th>" +
                   "<th>Statement SQL</th>" +
                   "<th>Params</th>" +
@@ -456,7 +456,7 @@ public class ReportMaker {
 
         // BUILD THE DROPDOWN FOR THE STATEMENT/DETAIL TABLE
 
-        sb.append("<tr class='tablesorter-childRow'><td colspan='6' id='p-"+ procedure.getTypeName().toLowerCase() + "--dropdown'>\n");
+        sb.append("<tr class='tablesorter-childRow'><td class='invert' colspan='6' id='p-"+ procedure.getTypeName().toLowerCase() + "--dropdown'>\n");
 
         // output partitioning parameter info
         if (procedure.getSinglepartition()) {
@@ -465,7 +465,7 @@ public class ReportMaker {
             int pIndex = procedure.getPartitionparameter();
 
             sb.append(String.format("<p>Partitioned on parameter %d which maps to column %s" +
-                                    " of table <a href='#s-%s'>%s</a>.</p>",
+                                    " of table <a class='invert' href='#s-%s'>%s</a>.</p>",
                                     pIndex, pColumn, pTable, pTable));
         }
 
