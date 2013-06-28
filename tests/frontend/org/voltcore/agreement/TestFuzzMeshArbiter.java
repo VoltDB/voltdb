@@ -33,16 +33,13 @@ import java.util.Set;
 import junit.framework.TestCase;
 
 import org.voltcore.agreement.MiniNode.NodeState;
-import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.RateLimitedLogger;
 
 public class TestFuzzMeshArbiter extends TestCase
 {
     public static VoltLogger m_fuzzLog = new VoltLogger("FUZZ");
-    public static RateLimitedLogger m_rateLog = new RateLimitedLogger(20000, m_fuzzLog, Level.INFO);
 
     FakeMesh m_fakeMesh;
     Map<Long, MiniNode> m_nodes;
@@ -271,5 +268,67 @@ public class TestFuzzMeshArbiter extends TestCase
         }
 
         assertTrue(checkFullyConnectedGraphs(state.m_expectedLive));
+    }
+
+    // Partition the nodes in subset out of the nodes in nodes
+    private void partitionGraph(Set<Long> nodes, Set<Long> subset)
+    {
+        Set<Long> otherSet = new HashSet<Long>();
+        otherSet.addAll(nodes);
+        otherSet.removeAll(subset);
+        // For every node in one set, kill every link to every node
+        // in the other set
+        for (Long node : subset) {
+            for (Long otherNode : otherSet) {
+                m_fakeMesh.failLink(node, otherNode);
+                m_fakeMesh.failLink(otherNode, node);
+            }
+        }
+    }
+
+    public void testPartition() throws InterruptedException
+    {
+        long seed = System.currentTimeMillis();
+        System.out.println("SEED: " + seed);
+        constructCluster(10);
+        while (!getNodesInState(NodeState.START).isEmpty()) {
+            Thread.sleep(50);
+        }
+        FuzzTestState state = new FuzzTestState(seed, m_nodes.keySet());
+        // pick a subset of nodes and partition them out
+        Set<Long> subset = new HashSet<Long>();
+        int subsize = state.m_rand.nextInt((m_nodes.size() / 2) + 1);
+        for (int i = 0; i < subsize; i++) {
+            long nextNode = getHSId(state.getRandomLiveNode());
+            while (subset.contains(nextNode)) {
+                nextNode = getHSId(state.getRandomLiveNode());
+            }
+            subset.add(nextNode);
+        }
+        partitionGraph(m_nodes.keySet(), subset);
+
+        long start = System.currentTimeMillis();
+        while (getNodesInState(NodeState.RESOLVE).isEmpty()) {
+            long now = System.currentTimeMillis();
+            if (now - start > 30000) {
+                start = now;
+                dumpNodeState();
+            }
+            Thread.sleep(50);
+        }
+        while (!getNodesInState(NodeState.RESOLVE).isEmpty()) {
+            long now = System.currentTimeMillis();
+            if (now - start > 30000) {
+                start = now;
+                dumpNodeState();
+            }
+            Thread.sleep(50);
+        }
+
+        Set<Long> otherSet = new HashSet<Long>();
+        otherSet.addAll(m_nodes.keySet());
+        otherSet.removeAll(subset);
+        assertTrue(checkFullyConnectedGraphs(subset));
+        assertTrue(checkFullyConnectedGraphs(otherSet));
     }
 }
