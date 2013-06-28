@@ -46,7 +46,7 @@ CTX.CPPFLAGS += """-Wall -Wextra -Werror -Woverloaded-virtual
             -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK
             -fno-omit-frame-pointer
             -fvisibility=default 
-            -DBOOST_SP_DISABLE_THREADS -DBOOST_DISABLE_THREADS"""
+            -DBOOST_SP_DISABLE_THREADS -DBOOST_DISABLE_THREADS -DBOOST_ALL_NO_LIB"""
 
 # clang doesn't seem to want this
 if compiler_name == 'gcc':

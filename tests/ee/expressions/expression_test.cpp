@@ -165,7 +165,7 @@ class CV : public AE {
         if (m_jsontype == 0)
             json["VALUE"] = m_stringValue;
         else if (m_jsontype == 1)
-            json["VALUE"] = m_intValue;
+            json["VALUE"] = static_cast<Json::Int64>(m_intValue);
         else if (m_jsontype == 2)
             json["VALUE"] = m_doubleValue;
         json["ISNULL"] = false;
@@ -243,8 +243,8 @@ public:
         Json::Value array;
         for (int ii = 0; ii < m_numRanges; ii++) {
             Json::Value range;
-            range["RANGE_START"] = m_ranges[ii][0];
-            range["RANGE_END"] = m_ranges[ii][1];
+            range["RANGE_START"] = static_cast<Json::Int64>(m_ranges[ii][0]);
+            range["RANGE_END"] = static_cast<Json::Int64>(m_ranges[ii][1]);
             array.append(range);
         }
         json["RANGES"] = array;
