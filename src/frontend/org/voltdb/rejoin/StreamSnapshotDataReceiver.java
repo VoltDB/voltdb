@@ -87,9 +87,7 @@ implements Runnable {
                     ByteBuffer.allocateDirect(
                             CompressionService.maxCompressedLength(1024 * 1024 * 2 + (1024 * 256)));
             while (true) {
-                BBContainer container = m_buffers.take();
-                ByteBuffer messageBuffer = container.b;
-                messageBuffer.clear();
+                BBContainer container = null;
                 compressionBuffer.clear();
                 boolean success = false;
 
@@ -104,6 +102,14 @@ implements Runnable {
                     RejoinDataMessage dataMsg = (RejoinDataMessage) msg;
                     byte[] data = dataMsg.getData();
 
+                    // Only grab the buffer from the pool after receiving a message from the
+                    // mailbox. If the buffer is grabbed before receiving the message,
+                    // this thread could hold on to a buffer it may not need and other receivers
+                    // will be blocked if the pool has no more buffers left.
+                    container = m_buffers.take();
+                    ByteBuffer messageBuffer = container.b;
+                    messageBuffer.clear();
+
                     compressionBuffer.limit(data.length);
                     compressionBuffer.put(data);
                     compressionBuffer.flip();
@@ -115,7 +121,7 @@ implements Runnable {
                     m_queue.offer(Pair.of(dataMsg.m_sourceHSId, container));
                     success = true;
                 } finally {
-                    if (!success) {
+                    if (!success && container != null) {
                         container.discard();
                     }
                 }
