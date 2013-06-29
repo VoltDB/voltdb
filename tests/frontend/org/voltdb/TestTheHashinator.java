@@ -155,7 +155,7 @@ public class TestTheHashinator {
         }
     }
 
-    private static void getRangesAndCheck(int partitionCount, int partitionToCheck)
+    private static Map<Long, Long> getRangesAndCheck(int partitionCount, int partitionToCheck)
     {
         ElasticHashinator hashinator =
             new ElasticHashinator(ElasticHashinator.getConfigureBytes(partitionCount,
@@ -175,6 +175,24 @@ public class TestTheHashinator {
 
         // non-existing partition should have an empty range
         assertTrue(hashinator.pGetRanges(partitionCount + 1).isEmpty());
+
+        return range1;
+    }
+
+    /**
+     * Compare the tokens of the covered partitions before and after adding new partitions to
+     * the hashinator. The tokens should match.
+     * @param beforePartitionCount    Partition count before adding new partitions
+     * @param afterPartitionCount     Partition count after adding new partitions
+     */
+    private static void checkRangesAfterExpansion(int beforePartitionCount, int afterPartitionCount) {
+        for (int i = 0; i < beforePartitionCount; i++) {
+            Map<Long, Long> oldrange = getRangesAndCheck(beforePartitionCount, i);
+            Map<Long, Long> newrange = getRangesAndCheck(afterPartitionCount, i);
+
+            // Only compare the begin tokens, end tokens are determined by the successors
+            assertEquals(oldrange.keySet(), newrange.keySet());
+        }
     }
 
     /*
@@ -785,6 +803,16 @@ public class TestTheHashinator {
 
         getRangesAndCheck(/* partitionCount = */ 2,  /* partitionToCheck = */ 1);
         getRangesAndCheck(/* partitionCount = */ 24, /* partitionToCheck = */ 15);
+    }
+
+    @Test
+    public void testElasticExpansionDeterminism()
+    {
+        if (hashinatorType == HashinatorType.LEGACY) return;
+
+        checkRangesAfterExpansion(/* beforePartitionCount = */ 2, /* afterPartitionCount = */ 6);
+        checkRangesAfterExpansion(/* beforePartitionCount = */ 21, /* afterPartitionCount = */ 28);
+        checkRangesAfterExpansion(/* beforePartitionCount = */ 24, /* afterPartitionCount = */ 48);
     }
 }
 

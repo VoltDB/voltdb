@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 import com.google.common.collect.UnmodifiableIterator;
 import org.apache.cassandra_voltpatches.MurmurHash3;
@@ -166,7 +167,7 @@ public class ElasticHashinator extends TheHashinator {
         Preconditions.checkArgument(partitionCount > 0);
         Preconditions.checkArgument(tokensPerPartition > 0);
         ElasticHashinator emptyHashinator = new ElasticHashinator(new HashMap<Long, Integer>());
-        Set<Integer> partitions = new HashSet<Integer>();
+        Set<Integer> partitions = new TreeSet<Integer>();
 
         for (int ii = 0; ii < partitionCount; ii++) {
             partitions.add(ii);
