@@ -22,7 +22,6 @@ import org.voltdb.EELibraryLoader;
 import org.voltdb.VoltDB;
 
 import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class FixedDBBPool {
@@ -33,45 +32,38 @@ public class FixedDBBPool {
      */
     protected final HashMap<DBBPool.BBContainer, DBBPool.BBContainer> m_bufferToOriginMap =
         new HashMap<DBBPool.BBContainer, DBBPool.BBContainer>();
-    // Key is the size of the buffers in the correcponding queue
-    protected final Map<Integer, LinkedBlockingQueue<DBBPool.BBContainer>> m_buffers =
-        new HashMap<Integer, LinkedBlockingQueue<DBBPool.BBContainer>>();
+    protected final LinkedBlockingQueue<DBBPool.BBContainer> m_buffers =
+        new LinkedBlockingQueue<DBBPool.BBContainer>();
 
-    public FixedDBBPool()
+    public FixedDBBPool(int bufLenInBytes, int capacity)
     {
         if (!VoltDB.getLoadLibVOLTDB()) {
             throw new RuntimeException("Unable to load native library to allocate direct byte buffers");
         }
 
         EELibraryLoader.loadExecutionEngineLibrary(true);
+        initializePool(bufLenInBytes, capacity);
     }
 
-    public synchronized void allocate(int bufLenInBytes, int capacity)
+    private void initializePool(int bufLenInBytes, int capacity)
     {
-        LinkedBlockingQueue<DBBPool.BBContainer> bufQueue = m_buffers.get(bufLenInBytes);
-        if (bufQueue == null) {
-            bufQueue = new LinkedBlockingQueue<DBBPool.BBContainer>(capacity);
-            m_buffers.put(bufLenInBytes, bufQueue);
-        }
-
-        final LinkedBlockingQueue<DBBPool.BBContainer> finalBufQueue = bufQueue;
         for (int ii = 0; ii < capacity; ii++) {
             final DBBPool.BBContainer origin = DBBPool.allocateDirect(bufLenInBytes);
             final long bufferAddress = DBBPool.getBufferAddress(origin.b);
             final DBBPool.BBContainer buffer = new DBBPool.BBContainer(origin.b, bufferAddress) {
                 @Override
                 public void discard() {
-                    finalBufQueue.offer(this);
+                    m_buffers.offer(this);
                 }
             };
             m_bufferToOriginMap.put(buffer, origin);
-            bufQueue.offer(buffer);
+            m_buffers.offer(buffer);
         }
     }
 
-    public synchronized LinkedBlockingQueue<DBBPool.BBContainer> getQueue(int bufLenInBytes)
+    public LinkedBlockingQueue<DBBPool.BBContainer> getQueue()
     {
-        return m_buffers.get(bufLenInBytes);
+        return m_buffers;
     }
 
     /**
@@ -86,6 +78,5 @@ public class FixedDBBPool {
             originContainer.discard();
         }
         m_bufferToOriginMap.clear();
-        m_buffers.clear();
     }
 }
