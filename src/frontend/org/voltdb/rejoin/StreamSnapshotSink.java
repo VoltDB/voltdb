@@ -25,6 +25,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
+import org.voltdb.utils.FixedDBBPool;
 
 /**
  * Takes the decompressed snapshot blocks and pass them to EE. Once constructed,
@@ -49,11 +50,11 @@ public class StreamSnapshotSink {
     private ByteBuffer m_buffer = null;
     private long m_bytesReceived = 0;
 
-    public long initialize(LinkedBlockingQueue<BBContainer> bufQueue) {
+    public long initialize(FixedDBBPool bufferPool) {
         // Mailbox used to transfer snapshot data
         m_mb = VoltDB.instance().getHostMessenger().createMailbox();
 
-        m_in = new StreamSnapshotDataReceiver(m_mb, bufQueue);
+        m_in = new StreamSnapshotDataReceiver(m_mb, bufferPool);
         m_inThread = new Thread(m_in, "Snapshot data receiver");
         m_inThread.setDaemon(true);
         m_ack = new StreamSnapshotAckSender(m_mb);
