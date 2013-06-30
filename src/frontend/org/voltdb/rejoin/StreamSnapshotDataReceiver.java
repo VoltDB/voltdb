@@ -26,6 +26,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
+import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.utils.CompressionService;
 
 /**
@@ -82,13 +83,8 @@ implements Runnable {
     @Override
     public void run() {
         try {
-
-            final ByteBuffer compressionBuffer =
-                    ByteBuffer.allocateDirect(
-                            CompressionService.maxCompressedLength(1024 * 1024 * 2 + (1024 * 256)));
             while (true) {
                 BBContainer container = null;
-                compressionBuffer.clear();
                 boolean success = false;
 
                 try {
@@ -110,6 +106,9 @@ implements Runnable {
                     ByteBuffer messageBuffer = container.b;
                     messageBuffer.clear();
 
+                    final ByteBuffer compressionBuffer =
+                        ByteBuffer.allocateDirect(SnapshotSiteProcessor.m_snapshotBufferCompressedLen);
+                    compressionBuffer.clear();
                     compressionBuffer.limit(data.length);
                     compressionBuffer.put(data);
                     compressionBuffer.flip();
