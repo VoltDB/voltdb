@@ -40,6 +40,7 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotFormat;
+import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.CompressionService;
@@ -83,8 +84,7 @@ implements SnapshotDataTarget {
 
     // a scratch buffer for compression work
     private final ByteBuffer m_compressionBuffer =
-            ByteBuffer.allocateDirect(
-                    CompressionService.maxCompressedLength(1024 * 1024 * 2 + (1024 * 256)));
+            ByteBuffer.allocateDirect(SnapshotSiteProcessor.m_snapshotBufferCompressedLen);
 
     private final AtomicLong m_bytesSent = new AtomicLong();
 
