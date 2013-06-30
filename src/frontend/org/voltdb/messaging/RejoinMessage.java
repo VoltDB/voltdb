@@ -27,6 +27,7 @@ import com.google.common.collect.ImmutableSet;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.DBBPool;
+import org.voltdb.utils.FixedDBBPool;
 
 /**
  * Rejoin message used to drive the whole rejoin process. It is only sent between
@@ -52,7 +53,7 @@ public class RejoinMessage extends VoltMessage {
     private long m_snapshotTxnId = -1; // snapshot txnId
     private long m_masterHSId = -1;
     private String m_snapshotNonce = null;
-    private LinkedBlockingQueue<DBBPool.BBContainer> m_bufferPool = null;
+    private FixedDBBPool m_bufferPool = null;
     // number of sinks to create on the site, default is 1, elastic join may use more
     private int m_snapshotSinkCount = 1;
     private Set<Long> m_snapshotSinkHSIds = null;
@@ -77,8 +78,7 @@ public class RejoinMessage extends VoltMessage {
     /**
      * INITIATION, INITIATION_COMMUNITY pass the nonce used by the coordinator to the site.
      */
-    public RejoinMessage(long sourceHSId, Type type, String snapshotNonce,
-                         LinkedBlockingQueue<DBBPool.BBContainer> bufferPool)
+    public RejoinMessage(long sourceHSId, Type type, String snapshotNonce, FixedDBBPool bufferPool)
     {
         this(sourceHSId, type);
         assert(type == Type.INITIATION || type == Type.INITIATION_COMMUNITY);
@@ -90,7 +90,7 @@ public class RejoinMessage extends VoltMessage {
      * For elastic join, the coordinator tells the producer how many snapshot sinks to create.
      */
     public RejoinMessage(long sourceHSId, Type type, String snapshotNonce, int sinkCount,
-                         LinkedBlockingQueue<DBBPool.BBContainer> bufferPool)
+                         FixedDBBPool bufferPool)
     {
         this(sourceHSId, type, snapshotNonce, bufferPool);
         m_snapshotSinkCount = sinkCount;
@@ -136,7 +136,7 @@ public class RejoinMessage extends VoltMessage {
         return m_snapshotSinkCount;
     }
 
-    public LinkedBlockingQueue<DBBPool.BBContainer> getSnapshotBufferPool()
+    public FixedDBBPool getSnapshotBufferPool()
     {
         return m_bufferPool;
     }

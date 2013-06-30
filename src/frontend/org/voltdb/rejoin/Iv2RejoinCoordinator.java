@@ -105,8 +105,11 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
             // or any user specified value.
             Integer userPoolSize = Integer.getInteger("REJOIN_RECEIVE_BUFFER_POOL_SIZE");
             int poolSize = userPoolSize != null ? userPoolSize : Math.min(sites.size() * 3, 16);
-            m_snapshotBufPool = new FixedDBBPool(SnapshotSiteProcessor.m_snapshotBufferLength,
-                                                 poolSize);
+            m_snapshotBufPool = new FixedDBBPool();
+            // Create a buffer pool for uncompressed stream snapshot data
+            m_snapshotBufPool.allocate(SnapshotSiteProcessor.m_snapshotBufferLength, poolSize);
+            // Create a buffer pool for compressed stream snapshot data
+            m_snapshotBufPool.allocate(SnapshotSiteProcessor.m_snapshotBufferCompressedLen, poolSize);
         }
     }
 
@@ -137,7 +140,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
                                               m_liveRejoin ? RejoinMessage.Type.INITIATION :
                                               RejoinMessage.Type.INITIATION_COMMUNITY,
                                               nonce,
-                                              m_snapshotBufPool.getQueue());
+                                              m_snapshotBufPool);
         send(com.google.common.primitives.Longs.toArray(HSIds), msg);
 
         // For testing, exit if only one property is set...
