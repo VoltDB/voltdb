@@ -251,7 +251,7 @@
                 if ($(dropdownid).is(":visible")) {
                     tbody.children('.tablesorter-childRow').children('td').hide();
                     $(dropdownid).show();
-                    $(this).parentsUntil("tbody", 'tr').css('background-color', '#eeeeee');
+                    $(this).parentsUntil("tbody", 'tr').css('background-color', '#dddddd');
                     $(iconid).removeClass('icon-chevron-right').addClass('icon-chevron-down');
                 }
                 history.replaceState(null, null, "#" + $(this).attr('id'));

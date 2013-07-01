@@ -529,7 +529,7 @@ public class ReportMaker {
      */
     static String getStatsHTML(Database db) {
         StringBuilder sb = new StringBuilder();
-        sb.append("<p><tt>\n");
+        sb.append("<table class='table table-condensed'>\n");
 
         // count things
         int indexes = 0, views = 0, statements = 0;
@@ -557,36 +557,36 @@ public class ReportMaker {
         }
 
         // version
-        sb.append("Compiled by VoltDB Version: ");
-        sb.append(VoltDB.instance().getVersionString()).append("<br/>\n");
+        sb.append("<tr><td>Compiled by VoltDB Version</td><td>");
+        sb.append(VoltDB.instance().getVersionString()).append("</td></tr>\n");
 
         // timestamp
-        sb.append("Compile Timestamp: ");
-        sb.append(SimpleDateFormat.getInstance().format(m_timestamp)).append("<br/>\n");
+        sb.append("<tr><td>Compile Timestamp</td><td>");
+        sb.append(SimpleDateFormat.getInstance().format(m_timestamp)).append("</td></tr>\n");
 
         // tables
-        sb.append("Table Count: ");
+        sb.append("<tr><td>Table Count</td><td>");
         sb.append(String.format("%d (%d partitioned / %d replicated)",
                 partitionedTables + replicatedTables, partitionedTables, replicatedTables));
-        sb.append("<br/>\n");
+        sb.append("</td></tr>\n");
 
         // views
-        sb.append("Materialized View Count: ").append(views).append("<br/>\n");
+        sb.append("<tr><td>Materialized View Count</td><td>").append(views).append("</td></tr>\n");
 
         // indexes
-        sb.append("Index Count: ").append(indexes).append("<br/>\n");
+        sb.append("<tr><td>Index Count</td><td>").append(indexes).append("</td></tr>\n");
 
         // procedures
-        sb.append("Procedure Count: ");
+        sb.append("<tr><td>Procedure Count</td><td>");
         sb.append(String.format("%d (%d partitioned / %d replicated) (%d read-only / %d read-write)",
                 partitionedProcs + replicatedProcs, partitionedProcs, replicatedProcs,
                 readProcs, writeProcs));
-        sb.append("<br/>\n");
+        sb.append("</td></tr>\n");
 
         // statements
-        sb.append("SQL Statement Count: ").append(statements).append("<br/>\n");
+        sb.append("<tr><td>SQL Statement Count</td><td>").append(statements).append("</td></tr>\n");
 
-        sb.append("</tt></p>\n");
+        sb.append("</table>\n");
         return sb.toString();
     }
 
