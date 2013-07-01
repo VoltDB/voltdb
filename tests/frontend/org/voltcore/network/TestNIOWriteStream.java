@@ -351,10 +351,7 @@ public class TestNIOWriteStream extends TestCase {
          */
         final ByteBuffer b = ByteBuffer.allocate(5);
         wstream.enqueue(b.duplicate());
-//        assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
-        assertTrue(wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5) <= 5);
-        assertTrue(wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5) >=
-                            (EstTime.currentTimeMillis() - System.currentTimeMillis() + 5));
+        assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
         wstream.swapAndSerializeQueuedWrites(pool);
         wstream.drainTo( channel);
         assertEquals( 0, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
@@ -363,22 +360,13 @@ public class TestNIOWriteStream extends TestCase {
         EstTimeUpdater.update(System.currentTimeMillis());
 
         wstream.enqueue(b.duplicate());
-//        assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
-        assertTrue(wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5) <= 5);
-        assertTrue(wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5) >=
-                            (EstTime.currentTimeMillis() - System.currentTimeMillis() + 5));
+        assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
         wstream.enqueue(b.duplicate());
-//        assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
-        assertTrue(wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5) <= 5);
-        assertTrue(wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5) >=
-                            (EstTime.currentTimeMillis() - System.currentTimeMillis() + 5));
+        assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
         channel.m_behavior = MockChannel.PARTIAL;
         wstream.swapAndSerializeQueuedWrites(pool);
         wstream.drainTo( channel );
-//        assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
-        assertTrue(wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5) <= 5);
-        assertTrue(wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5) >=
-                            (EstTime.currentTimeMillis() - System.currentTimeMillis() + 5));
+        assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
         wstream.shutdown();
     }
 

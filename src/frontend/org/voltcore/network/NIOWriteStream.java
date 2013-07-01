@@ -26,6 +26,7 @@ import java.util.ArrayDeque;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.EstTime;
 
 /**
 *
@@ -250,7 +251,7 @@ public class NIOWriteStream implements WriteStream {
 
         if (!isEmpty()) {
             if (bytesWritten > 0) {
-                m_lastPendingWriteTime = System.currentTimeMillis();
+                m_lastPendingWriteTime = EstTime.currentTimeMillis();
             }
         } else {
             m_lastPendingWriteTime = -1;
@@ -407,7 +408,7 @@ public class NIOWriteStream implements WriteStream {
 
     private void updateLastPendingWriteTimeAndQueueBackpressure() {
         if (m_lastPendingWriteTime == -1) {
-            m_lastPendingWriteTime = System.currentTimeMillis();
+            m_lastPendingWriteTime = EstTime.currentTimeMillis();
         }
         if (m_queuedWrites.size() > m_maxQueuedWritesBeforeBackpressure && !m_hadBackPressure) {
             backpressureStarted();
