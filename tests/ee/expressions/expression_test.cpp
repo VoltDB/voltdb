@@ -442,7 +442,7 @@ TEST_F(ExpressionTest, Timestamp) {
     ASSERT_EQ(as_time.hours(), 9);
     ASSERT_EQ(as_time.minutes(), 32);
     ASSERT_EQ(as_time.seconds(), 12);
-    
+
 }
 
 int main() {
