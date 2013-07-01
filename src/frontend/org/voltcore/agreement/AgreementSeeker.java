@@ -76,8 +76,7 @@ public class AgreementSeeker {
     /**
      * Start accumulate site links graphing information
      *
-     * @param hsids
-     * pre-failure mesh hsids
+     * @param hsids pre-failure mesh hsids
      * @param inTrouble a map where each key is a failed site, and its value is
      *   a boolean that indicates whether or not the failure was witnessed directly
      *   or reported by some other site
@@ -336,14 +335,16 @@ public class AgreementSeeker {
     };
 
     /**
-     * Is anyone in the mesh alive and connected to sites I consider
-     * dead?
-     * @param hsid
+     * Is anyone in the mesh alive and connected to sites I consider dead?
      */
     public boolean needForward() {
         return m_strategy.accept(forwardDemander, (Void)null);
     }
 
+    /**
+     * a visitor that tests whether or not there is a connected path
+     * between myself and any site I consider dead
+     */
     protected ArbitrationStrategy.Visitor<Boolean, Void> forwardDemander =
             new ArbitrationStrategy.Visitor<Boolean, Void>() {
 
@@ -352,6 +353,13 @@ public class AgreementSeeker {
             return false;
         }
 
+        /**
+         * Tests whether or not there is a connected path between myself,
+         * and any site I consider dead
+         * @param nada
+         * @return true if there are peer sites that can tell me about
+         *    sites that I consider dead
+         */
         @Override
         public Boolean visitMatchingCardinality(Void nada) {
             Set<Long> unreachable = Sets.filter(m_hsids, not(amongSurvivors));
@@ -363,19 +371,31 @@ public class AgreementSeeker {
         }
     };
 
-    protected boolean seenByInterconnectedPeers( Set<Long> who, Set<Long> byWhom) {
-        Set<Long> seers = Multimaps.filterValues(m_alive, in(byWhom)).keySet();
-        int before = byWhom.size();
+    /**
+     * Walk the alive graph to see if there is a connected path between origins,
+     * and destinations
+     * @param destinations set of sites that we are looking a path to
+     * @param origins set of sites that we are looking a path from
+     * @return true origins have path to destinations
+     */
+    protected boolean seenByInterconnectedPeers( Set<Long> destinations, Set<Long> origins) {
+        Set<Long> seers = Multimaps.filterValues(m_alive, in(origins)).keySet();
+        int before = origins.size();
 
-        byWhom.addAll(seers);
-        if (byWhom.containsAll(who)) {
+        origins.addAll(seers);
+        if (origins.containsAll(destinations)) {
             return true;
-        } else if (byWhom.size() == before) {
+        } else if (origins.size() == before) {
             return false;
         }
-        return seenByInterconnectedPeers(who, byWhom);
+        return seenByInterconnectedPeers(destinations, origins);
     }
 
+    /**
+     * Determine the set of nodes to kill to accomplish a fully connected
+     * mesh with the remaining sites
+     * @return a set of nodes to kill
+     */
     public Set<Long> nextKill() {
         return m_strategy.accept(killPicker, m_selfHsid);
     }
@@ -388,11 +408,18 @@ public class AgreementSeeker {
                     return ImmutableSet.copyOf(m_reported.keySet());
                 }
 
-                // When recomputing you need to remove all alive by (a)
+                // if a is picked then you need to remove all alive by (a)
                 // and add them to dead
                 // alive(a) is c,d,e,f now dead(a) += alive(a)
                 // you also have to remove all (a)'s from deadBy values,
-                // as (a) can no longer witness
+                // as (a) can no longer see anyone dead or alive
+                /**
+                 * This strategy picks first the sites that are considered
+                 * dead by most of the remaining sites, and for ties breakers
+                 * it picks the sites with highest hsids
+                 * @param self the invoking site hsid
+                 * @return a set of nodes to kill
+                 */
                 @Override
                 public Set<Long> visitMatchingCardinality(Long self) {
                     Set<Long> picks = Sets.newHashSet();
@@ -401,6 +428,7 @@ public class AgreementSeeker {
                         Long pick = null;
                         for (Long s: sc.dead.keySet()) {
 
+                            // cannot pick self or the ones already picked
                             if (s.equals(self) || picks.contains(s)) continue;
 
                             Set<Long> deadBy = sc.dead.get(s);
@@ -420,6 +448,7 @@ public class AgreementSeeker {
                             return ImmutableSet.of();
                         }
 
+                        // pick can no longer see anyone dead or alive
                         removeValue(sc.dead,pick);
                         removeValue(sc.alive, pick);
 
@@ -431,6 +460,12 @@ public class AgreementSeeker {
                 }
             };
 
+
+    /**
+     * Is the given hsid considered dead by anyone in my survivor set?
+     * @param hsid a site hsid
+     * @return a subset of my survivor set that considers the given site dead
+     */
     public Set<Long> forWhomSiteIsDead(long hsid) {
         ImmutableSet.Builder<Long> isb = ImmutableSet.builder();
         Set<Long> deadBy = m_dead.get(hsid);

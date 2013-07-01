@@ -175,21 +175,82 @@ public class TestFuzzMeshArbiter extends TestCase
     {
         Random m_rand;
         Set<Long> m_expectedLive;
+        Set<Integer> m_alreadyPicked;
+        Set<Long> m_killSet;
+        Map<Long,Integer> m_expectations;
 
         FuzzTestState(long seed, Set<Long> startingNodes)
         {
             m_expectedLive = new HashSet<Long>();
+            m_alreadyPicked = new HashSet<Integer>();
+            m_killSet = new HashSet<Long>();
             m_expectedLive.addAll(startingNodes);
+            m_expectations = new HashMap<Long, Integer>();
             m_rand = new Random(seed);
+            for (Map.Entry<Long, MiniNode> e: m_nodes.entrySet()) {
+                e.getValue().m_miniSite.stamp();
+            }
         }
 
         int getRandomLiveNode()
         {
             int node = m_rand.nextInt(m_nodes.size());
-            while (!m_expectedLive.contains(getHSId(node))) {
+            while (   !m_expectedLive.contains(getHSId(node))
+                    || m_alreadyPicked.contains(node)) {
                 node = m_rand.nextInt(m_nodes.size());
             }
+            m_alreadyPicked.add(node);
             return node;
+        }
+
+        void killRandomNode() throws InterruptedException
+        {
+            int nextToDie = getRandomLiveNode();
+            m_expectedLive.remove(getHSId(nextToDie));
+            m_killSet.add(getHSId(nextToDie));
+            System.out.println("Next to die: " + nextToDie);
+            int delay = m_rand.nextInt(10) + 1;
+            System.out.println("Fuzz delay in ms: " + delay * 5);
+            Thread.sleep(delay * 5);
+            MiniNode victim = m_nodes.get(getHSId(nextToDie));
+            victim.shutdown();
+        }
+
+        void killRandomLink() throws InterruptedException
+        {
+            int end1 = getRandomLiveNode();
+            int end2 = getRandomLiveNode();
+            int max = Math.max(end1, end2);
+            m_expectedLive.remove(getHSId(max));
+            m_killSet.add(getHSId(max));
+            System.out.println("Next link to die: " + end1 + ":" + end2);
+            int delay = m_rand.nextInt(10) + 1;
+            System.out.println("Fuzz delay in ms: " + delay * 5);
+            m_fakeMesh.failLink(getHSId(end1), getHSId(end2));
+            Thread.sleep(delay * 5);
+            m_fakeMesh.failLink(getHSId(end2), getHSId(end1));
+        }
+
+        void setUpExpectations() {
+            for (Long alive: m_expectedLive) {
+                m_expectations.put(alive, m_killSet.size());
+            }
+            for (Long dead: m_killSet) {
+                m_expectations.put(dead, m_nodes.size() - 1);
+            }
+        }
+
+        boolean hasMetExpectations() {
+            boolean met = true;
+            for (Map.Entry<Long, MiniNode> e: m_nodes.entrySet()) {
+                if (e.getValue().getNodeState() == NodeState.STOP) continue;
+
+                MiniSite st = e.getValue().m_miniSite;
+                met = met
+                   && (  !st.isInArbitration()
+                       && st.hasProgressedBy() >= m_expectations.get(e.getKey()));
+            }
+            return met;
         }
     }
 
@@ -201,64 +262,27 @@ public class TestFuzzMeshArbiter extends TestCase
         }
     }
 
-    void killRandomNode(FuzzTestState state) throws InterruptedException
-    {
-        int nextToDie = state.getRandomLiveNode();
-        state.m_expectedLive.remove(getHSId(nextToDie));
-        System.out.println("Next to die: " + nextToDie);
-        int delay = state.m_rand.nextInt(10) + 1;
-        System.out.println("Fuzz delay in ms: " + delay * 5);
-        Thread.sleep(delay * 5);
-        MiniNode victim = m_nodes.get(getHSId(nextToDie));
-        victim.shutdown();
-    }
-
-    void killRandomLink(FuzzTestState state) throws InterruptedException
-    {
-        int end1 = state.getRandomLiveNode();
-        int end2 = state.getRandomLiveNode();
-        while (end1 == end2) {
-            end2 = state.getRandomLiveNode();
-        }
-        int max = Math.max(end1, end2);
-        state.m_expectedLive.remove(getHSId(max));
-        System.out.println("Next link to die: " + end1 + ":" + end2);
-        int delay = state.m_rand.nextInt(10) + 1;
-        System.out.println("Fuzz delay in ms: " + delay * 5);
-        m_fakeMesh.failLink(getHSId(end1), getHSId(end2));
-        Thread.sleep(delay * 5);
-        m_fakeMesh.failLink(getHSId(end2), getHSId(end1));
-    }
-
     public void testFuzz() throws InterruptedException
     {
         long seed = System.currentTimeMillis();
         System.out.println("SEED: " + seed);
-        constructCluster(10);
+        constructCluster(15);
         while (!getNodesInState(NodeState.START).isEmpty()) {
             Thread.sleep(50);
         }
         FuzzTestState state = new FuzzTestState(seed, m_nodes.keySet());
 
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < 4; i++) {
             if (state.m_rand.nextInt(100) < 50) {
-                killRandomNode(state);
+                state.killRandomNode();
             }
             else {
-                killRandomLink(state);
+                state.killRandomLink();
             }
         }
-
+        state.setUpExpectations();
         long start = System.currentTimeMillis();
-        while (getNodesInState(NodeState.RESOLVE).isEmpty()) {
-            long now = System.currentTimeMillis();
-            if (now - start > 30000) {
-                start = now;
-                dumpNodeState();
-            }
-            Thread.sleep(50);
-        }
-        while (!getNodesInState(NodeState.RESOLVE).isEmpty()) {
+        while (!state.hasMetExpectations()) {
             long now = System.currentTimeMillis();
             if (now - start > 30000) {
                 start = now;

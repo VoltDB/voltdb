@@ -49,6 +49,8 @@ class MiniSite extends Thread implements MeshAide
     Set<Long> m_currentHSIds = new HashSet<Long>();
     Set<Long> m_failedHSIds = new HashSet<Long>();
 
+    private volatile int m_failedCountStamp;
+
     MiniSite(Mailbox mbox, Set<Long> HSIds, DisconnectFailedHostsCallback callback,
             VoltLogger logger)
     {
@@ -57,7 +59,17 @@ class MiniSite extends Thread implements MeshAide
         m_currentHSIds.addAll(HSIds);
         m_mailbox = mbox;
         m_arbiter = new MeshArbiter(mbox.getHSId(), mbox, this);
+        m_failedCountStamp = m_arbiter.getFailedSitesCount();
         m_failedHosts = callback;
+    }
+
+    public int stamp() {
+        m_failedCountStamp = m_arbiter.getFailedSitesCount();
+        return m_failedCountStamp;
+    }
+
+    public int hasProgressedBy() {
+        return m_arbiter.getFailedSitesCount() - m_failedCountStamp;
     }
 
     void shutdown()
@@ -119,6 +131,10 @@ class MiniSite extends Thread implements MeshAide
 
     public boolean isInArbitration() {
         return m_arbiter.isInArbitration();
+    }
+
+    public int getFailedSitesCount() {
+        return m_arbiter.getFailedSitesCount();
     }
 
     private void processMessage(VoltMessage msg)

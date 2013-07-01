@@ -17,6 +17,8 @@
 
 package org.voltcore.agreement;
 
+import static com.google.common.base.Predicates.in;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -36,7 +38,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 
-import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -46,17 +47,54 @@ public class MeshArbiter {
 
     protected static final VoltLogger m_recoveryLog = new VoltLogger("REJOIN");
 
+    /**
+     * During arbitration this map keys contain failed sites we are seeking
+     * resolution for, and the values indicate whether or not the fault was
+     * witnessed directly or relayed by others
+     */
     protected final Map<Long, Boolean> m_inTrouble = Maps.newTreeMap();
+    /**
+     * The invoking agreement site hsid
+     */
     protected final long m_hsId;
     protected final Mailbox m_mailbox;
+    /**
+     * Companion interface that aides in pinging, and getting safe site zookeeper
+     * transaction ids
+     */
     protected final MeshAide m_meshAide;
+    /**
+     * A map whree the keys describe graph links between alive sites and
+     * sites listed in the {@link #m_inTrouble} map, and the values are
+     * the safe zookeeper transaction ids reported by alive sites
+     */
     protected final HashMap<Pair<Long, Long>, Long> m_failureSiteUpdateLedger =
             Maps.newHashMap();
+    /**
+     * Historic list of failed sites
+     */
     protected final Set<Long> m_failedSites = Sets.newTreeSet();
+    /**
+     * in single link failures some sites in {@link #m_inTrouble} remain
+     * alive after arbitration resolution. This set aides in the determination
+     * of which incoming message are deemed stale
+     */
     protected final Set<Long> m_staleUnwitnessed = Sets.newTreeSet();
+    /**
+     * it builds mesh graphs, and determines the the kill set to resolve
+     * an arbitration
+     */
     protected final AgreementSeeker m_seeker;
 
+    /**
+     * useful when probing the state of this mesh arbiter
+     */
     protected volatile int m_inTroubleCount = 0;
+    /**
+     * useful when probing the state of this mesh arbiter. Each
+     * resolved arbitration increments this counter
+     */
+    protected volatile int m_failedSitesCount = 0;
 
     public MeshArbiter(final long hsId, final Mailbox mailbox,
             final MeshAide meshAide) {
@@ -67,17 +105,12 @@ public class MeshArbiter {
         m_seeker = new AgreementSeeker(ArbitrationStrategy.MATCHING_CARDINALITY, m_hsId);
     }
 
-    protected Predicate<Long> in(final Set<Long> hsids) {
-        return new Predicate<Long>() {
-            @Override
-            public boolean apply(Long l) {
-                return hsids.contains(l);
-            }
-        };
-    }
-
     public boolean isInArbitration() {
         return m_inTroubleCount > 0;
+    }
+
+    public int getFailedSitesCount() {
+        return m_failedSitesCount;
     }
 
     protected boolean mayIgnore(FaultMessage fm) {
@@ -97,6 +130,17 @@ public class MeshArbiter {
                 && Sets.filter(fm.survivors, in(m_failedSites)).size() > 0);
     }
 
+    /**
+     * Process the fault message, and if necessary start arbitration.
+     * @param hsIds pre-failure mesh ids
+     * @param fm a {@link FaultMessage}
+     * @return a map where the keys are the sites we need to disconnect from, and
+     *   the values the last know safe zookeeper transaction ids for the sites
+     *   we need to disconnect from. A map with entries indicate that an
+     *   arbitration resolutions has been reached, while a map without entries
+     *   indicate either a stale message, or that an agreement has not been
+     *   reached
+     */
     public Map<Long,Long> reconfigureOnFault(Set<Long> hsIds, FaultMessage fm) {
         final Subject [] justFailures = new Subject [] { Subject.FAILURE };
         boolean proceed = false;
@@ -131,6 +175,7 @@ public class MeshArbiter {
             }
 
             m_failedSites.addAll( lastTxnIdByFailedSite.keySet());
+            m_failedSitesCount = m_failedSites.size();
 
             m_recoveryLog.info(
                     "Adding "
