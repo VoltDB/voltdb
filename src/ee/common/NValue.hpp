@@ -31,7 +31,7 @@
 #include <vector>
 
 #include "boost/scoped_ptr.hpp"
-#include "boost/unordered_map.hpp"
+#include "boost/functional/hash.hpp"
 #include "ttmath/ttmathint.h"
 
 #include "common/ExportSerializeIo.h"

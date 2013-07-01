@@ -56,7 +56,7 @@ namespace boost {
                 // Copy the beginning of the sequence
                 Output = std::copy( ::boost::begin(Input), ::boost::begin(M), Output );
                 // Format find result
-                // Copy formated result
+                // Copy formatted result
                 Output = std::copy( ::boost::begin(M.format_result()), ::boost::end(M.format_result()), Output );
                 // Copy the rest of the sequence
                 Output = std::copy( M.end(), ::boost::end(Input), Output );
@@ -74,17 +74,17 @@ namespace boost {
                 const InputT& Input,
                 FormatterT Formatter,
                 const FindResultT& FindResult )
-            {       
+            {   
                 if( ::boost::algorithm::detail::check_find_result(Input, FindResult) ) {
-                return ::boost::algorithm::detail::find_format_copy_impl2( 
-                    Output,
-                    Input,
-                    Formatter,
-                    FindResult,
-                    Formatter(FindResult) );
+                    return ::boost::algorithm::detail::find_format_copy_impl2( 
+                        Output,
+                        Input,
+                        Formatter,
+                        FindResult,
+                        Formatter(FindResult) );
                 } else {
                     return std::copy( ::boost::begin(Input), ::boost::end(Input), Output );
-            }
+                }
             }
 
  
@@ -118,11 +118,11 @@ namespace boost {
 
                 InputT Output;
                 // Copy the beginning of the sequence
-                insert( Output, ::boost::end(Output), ::boost::begin(Input), M.begin() );
-                // Copy formated result
-                insert( Output, ::boost::end(Output), M.format_result() );
+                boost::algorithm::detail::insert( Output, ::boost::end(Output), ::boost::begin(Input), M.begin() );
+                // Copy formatted result
+                boost::algorithm::detail::insert( Output, ::boost::end(Output), M.format_result() );
                 // Copy the rest of the sequence
-                insert( Output, ::boost::end(Output), M.end(), ::boost::end(Input) );
+                boost::algorithm::detail::insert( Output, ::boost::end(Output), M.end(), ::boost::end(Input) );
 
                 return Output;
             }
@@ -137,14 +137,14 @@ namespace boost {
                 const FindResultT& FindResult)
             {
                 if( ::boost::algorithm::detail::check_find_result(Input, FindResult) ) {
-                return ::boost::algorithm::detail::find_format_copy_impl2(
-                    Input,
-                    Formatter,
-                    FindResult,
-                    Formatter(FindResult) );
+                    return ::boost::algorithm::detail::find_format_copy_impl2(
+                        Input,
+                        Formatter,
+                        FindResult,
+                        Formatter(FindResult) );
                 } else {
                     return Input;
-            }
+                }
             }
 
  // replace implementation ----------------------------------------------------//
@@ -189,12 +189,12 @@ namespace boost {
                 const FindResultT& FindResult)
             {
                 if( ::boost::algorithm::detail::check_find_result(Input, FindResult) ) {
-                ::boost::algorithm::detail::find_format_impl2(
-                    Input,
-                    Formatter,
-                    FindResult,
-                    Formatter(FindResult) );
-            }
+                    ::boost::algorithm::detail::find_format_impl2(
+                        Input,
+                        Formatter,
+                        FindResult,
+                        Formatter(FindResult) );
+                }
             }
 
         } // namespace detail

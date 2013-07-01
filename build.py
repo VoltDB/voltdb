@@ -45,7 +45,8 @@ CTX.CPPFLAGS += """-Wall -Wextra -Werror -Woverloaded-virtual
             -Winit-self -Wno-sign-compare -Wno-unused-parameter
             -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK
             -fno-omit-frame-pointer
-            -fvisibility=default -DBOOST_SP_DISABLE_THREADS"""
+            -fvisibility=default 
+            -DBOOST_SP_DISABLE_THREADS -DBOOST_DISABLE_THREADS -DBOOST_ALL_NO_LIB"""
 
 # clang doesn't seem to want this
 if compiler_name == 'gcc':
@@ -328,12 +329,6 @@ CTX.INPUT['logging'] = """
 
 # specify the third party input
 
-CTX.THIRD_PARTY_INPUT['json_spirit'] = """
- json_spirit_reader.cpp
- json_spirit_value.cpp
- json_spirit_writer.cpp
-"""
-
 CTX.THIRD_PARTY_INPUT['jsoncpp'] = """
  jsoncpp.cpp
 """
@@ -406,8 +401,8 @@ if whichtests in ("${eetestsuite}", "indexes"):
 if whichtests in ("${eetestsuite}", "storage"):
     CTX.TESTS['storage'] = """
      CompactionTest
-     CopyOnWriteTest
      constraint_test
+     CopyOnWriteTest
      filter_test
      persistent_table_log_test
      PersistentTableMemStatsTest
