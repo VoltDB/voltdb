@@ -22,6 +22,7 @@
 #include <boost/date_time/posix_time/posix_time_duration.hpp>
 #include "boost/date_time/posix_time/conversion.hpp"
 #include <ctime>
+#include "common/SQLException.h"
 
 static inline boost::gregorian::date date_from_epoch_micros(int64_t epoch_micros) {
     time_t epoch_seconds = epoch_micros / 1000000;
@@ -32,6 +33,8 @@ static inline boost::posix_time::time_duration time_of_day_from_epoch_micros(int
     time_t epoch_seconds = epoch_micros / 1000000;
     return boost::posix_time::from_time_t(epoch_seconds).time_of_day();
 }
+
+static boost::posix_time::ptime EPOCH(boost::gregorian::date(1970,1,1));
 
 namespace voltdb {
 
@@ -202,31 +205,42 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_YEAR>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    //printf("Input micros: %lld\n", epoch_micros);
-    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
-    //printf("Input year: %d\n", (int)as_date.year());
+    if (epoch_micros < -12212553600000000) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                "Gregorian calendar beginning from year 1583");
+    }
+
+    boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros);
+    boost::gregorian::date as_date = input_ptime.date();
     boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),1,1);
     boost::posix_time::ptime truncate_ptime =
             boost::posix_time::ptime(truncate_date,boost::posix_time::time_duration(0,0,0));
-    std::tm truncate_ctime =  boost::posix_time::to_tm(truncate_ptime);
-    int64_t truncate_epoch_time = static_cast<int64_t>(mktime(&truncate_ctime));
-    return getTimestampValue(truncate_epoch_time * 1000000);
+    boost::posix_time::time_period goal_period (EPOCH, truncate_ptime);
+    boost::posix_time::time_duration goal_duration = goal_period.length();
+    int64_t truncate_epoch_seconds = goal_duration.ticks() / goal_duration.ticks_per_second();
+    return getTimestampValue(truncate_epoch_seconds * 1000000);
 }
 
-/** implement the timestamp TRUNCATE to YEAR function **/
+/** implement the timestamp TRUNCATE to QUARTER function **/
 template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_QUARTER>() const {
     if (isNull()) {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
-    int quater = static_cast<int>(as_date.month() / 4) * 3 + 1;
+    if (epoch_micros < -12212553600000000) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                "Gregorian calendar beginning from year 1583");
+    }
+    boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros);
+    boost::gregorian::date as_date = input_ptime.date();
+    int quater = (static_cast<int>(ceil(as_date.month() / 3.0))-1) * 3 + 1;
     boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),(int8_t)quater,1);
     boost::posix_time::ptime truncate_ptime =
             boost::posix_time::ptime(truncate_date,boost::posix_time::time_duration(0,0,0));
-    std::tm truncate_ctime =  boost::posix_time::to_tm(truncate_ptime);
-    int64_t truncate_epoch_time = static_cast<int64_t>(mktime(&truncate_ctime));
-    return getTimestampValue(truncate_epoch_time * 1000000);
+    boost::posix_time::time_period goal_period (EPOCH, truncate_ptime);
+    boost::posix_time::time_duration goal_duration = goal_period.length();
+    int64_t truncate_epoch_seconds = goal_duration.ticks() / goal_duration.ticks_per_second();
+    return getTimestampValue(truncate_epoch_seconds * 1000000);
 }
 
 /** implement the timestamp TRUNCATE to MONTH function **/
@@ -235,13 +249,19 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MONTH>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    if (epoch_micros < -12212553600000000) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                "Gregorian calendar beginning from year 1583");
+    }
+    boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros);
+    boost::gregorian::date as_date = input_ptime.date();
     boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),as_date.month(),1);
     boost::posix_time::ptime truncate_ptime =
             boost::posix_time::ptime(truncate_date,boost::posix_time::time_duration(0,0,0));
-    std::tm truncate_ctime =  boost::posix_time::to_tm(truncate_ptime);
-    int64_t truncate_epoch_time = static_cast<int64_t>(mktime(&truncate_ctime));
-    return getTimestampValue(truncate_epoch_time * 1000000);
+    boost::posix_time::time_period goal_period (EPOCH, truncate_ptime);
+    boost::posix_time::time_duration goal_duration = goal_period.length();
+    int64_t truncate_epoch_seconds = goal_duration.ticks() / goal_duration.ticks_per_second();
+    return getTimestampValue(truncate_epoch_seconds * 1000000);
 }
 
 /** implement the timestamp TRUNCATE to DAY function **/
@@ -250,13 +270,19 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_DAY>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    if (epoch_micros < -12212553600000000) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                "Gregorian calendar beginning from year 1583");
+    }
+    boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros);
+    boost::gregorian::date as_date = input_ptime.date();
     boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),as_date.month(),as_date.day());
     boost::posix_time::ptime truncate_ptime =
             boost::posix_time::ptime(truncate_date,boost::posix_time::time_duration(0,0,0));
-    std::tm truncate_ctime =  boost::posix_time::to_tm(truncate_ptime);
-    int64_t truncate_epoch_time = static_cast<int64_t>(mktime(&truncate_ctime));
-    return getTimestampValue(truncate_epoch_time * 1000000);
+    boost::posix_time::time_period goal_period (EPOCH, truncate_ptime);
+    boost::posix_time::time_duration goal_duration = goal_period.length();
+    int64_t truncate_epoch_seconds = goal_duration.ticks() / goal_duration.ticks_per_second();
+    return getTimestampValue(truncate_epoch_seconds * 1000000);
 }
 
 /** implement the timestamp TRUNCATE to HOUR function **/
@@ -265,14 +291,20 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_HOUR>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    if (epoch_micros < -12212553600000000) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                "Gregorian calendar beginning from year 1583");
+    }
+    boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros);
+    boost::gregorian::date as_date = input_ptime.date();
     boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),as_date.month(),as_date.day());
-    boost::posix_time::time_duration as_time = time_of_day_from_epoch_micros(epoch_micros);
-    boost::posix_time::time_duration truncate_time = boost::posix_time::time_duration(as_time.hours(),0,0);
-    boost::posix_time::ptime truncate_ptime = boost::posix_time::ptime(truncate_date, truncate_time);
-    std::tm truncate_ctime =  boost::posix_time::to_tm(truncate_ptime);
-    int64_t truncate_epoch_time = static_cast<int64_t>(mktime(&truncate_ctime));
-    return getTimestampValue(truncate_epoch_time * 1000000);
+    boost::posix_time::time_duration as_time = input_ptime.time_of_day();
+    boost::posix_time::ptime truncate_ptime =
+            boost::posix_time::ptime(truncate_date,boost::posix_time::time_duration(as_time.hours(),0,0));
+    boost::posix_time::time_period goal_period (EPOCH, truncate_ptime);
+    boost::posix_time::time_duration goal_duration = goal_period.length();
+    int64_t truncate_epoch_seconds = goal_duration.ticks() / goal_duration.ticks_per_second();
+    return getTimestampValue(truncate_epoch_seconds * 1000000);
 }
 
 /** implement the timestamp TRUNCATE to MINUTE function **/
@@ -281,14 +313,20 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MINUTE>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    if (epoch_micros < -12212553600000000) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                "Gregorian calendar beginning from year 1583");
+    }
+    boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros);
+    boost::gregorian::date as_date = input_ptime.date();
     boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),as_date.month(),as_date.day());
-    boost::posix_time::time_duration as_time = time_of_day_from_epoch_micros(epoch_micros);
-    boost::posix_time::time_duration truncate_time = boost::posix_time::time_duration(as_time.hours(),as_time.minutes(),0);
-    boost::posix_time::ptime truncate_ptime = boost::posix_time::ptime(truncate_date, truncate_time);
-    std::tm truncate_ctime =  boost::posix_time::to_tm(truncate_ptime);
-    int64_t truncate_epoch_time = static_cast<int64_t>(mktime(&truncate_ctime));
-    return getTimestampValue(truncate_epoch_time * 1000000);
+    boost::posix_time::time_duration as_time = input_ptime.time_of_day();
+    boost::posix_time::ptime truncate_ptime =
+            boost::posix_time::ptime(truncate_date,boost::posix_time::time_duration(as_time.hours(),as_time.minutes(),0));
+    boost::posix_time::time_period goal_period (EPOCH, truncate_ptime);
+    boost::posix_time::time_duration goal_duration = goal_period.length();
+    int64_t truncate_epoch_seconds = goal_duration.ticks() / goal_duration.ticks_per_second();
+    return getTimestampValue(truncate_epoch_seconds * 1000000);
 }
 
 /** implement the timestamp TRUNCATE to SECOND function **/
@@ -297,8 +335,20 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_SECOND>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    int64_t epoch_seconds = static_cast<int64_t>(epoch_micros / 1000000);
-    return getTimestampValue(epoch_seconds * 1000000);
+    if (epoch_micros < -12212553600000000) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                "Gregorian calendar beginning from year 1583");
+    }
+    boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros);
+    boost::gregorian::date as_date = input_ptime.date();
+    boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),as_date.month(),as_date.day());
+    boost::posix_time::time_duration as_time = input_ptime.time_of_day();
+    boost::posix_time::ptime truncate_ptime =
+            boost::posix_time::ptime(truncate_date,boost::posix_time::time_duration(as_time.hours(),as_time.minutes(),as_time.seconds()));
+    boost::posix_time::time_period goal_period (EPOCH, truncate_ptime);
+    boost::posix_time::time_duration goal_duration = goal_period.length();
+    int64_t truncate_epoch_seconds = goal_duration.ticks() / goal_duration.ticks_per_second();
+    return getTimestampValue(truncate_epoch_seconds * 1000000);
 }
 
 /** implement the timestamp TRUNCATE to MILLIS function **/
@@ -307,6 +357,7 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MILLISECOND>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
+    //printf("Input mircros: %lld\n", epoch_micros);
     int64_t epoch_millis = static_cast<int64_t>(epoch_micros / 1000);
     return getTimestampValue(epoch_millis * 1000);
 }

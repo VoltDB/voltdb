@@ -1017,6 +1017,10 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         VoltTable result;
         VoltDB.setDefaultTimezone();
 
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+        //System.out.println(dateFormat.getTimeZone());
+        Date time = null;
+
         // Test Standard TRUNCATE function for floating numbers
         Exception ex = null;
         try {
@@ -1027,11 +1031,25 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertNotNull(ex);
         }
 
-        // Test Timestamp Null value
-        cr = client.callProcedure("P2.insert", 0, null);
+        // Test date before Gregorian calendar beginning.
+        cr = client.callProcedure("P2.insert", 0, Timestamp.valueOf("1582-03-06 13:56:40.123456"));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        cr = client.callProcedure("TRUNCATE", 0);
+        ex = null;
+        try {
+            cr = client.callProcedure("TRUNCATE", 0);
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            ex = e;
+        } finally {
+            assertTrue((ex.getMessage().contains("SQL ERROR")));
+        }
+
+        // Test Timestamp Null value
+        cr = client.callProcedure("P2.insert", 1, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("TRUNCATE", 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -1041,124 +1059,127 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
 
         // Test normal TRUNCATE functionalities
-        cr = client.callProcedure("P2.insert", 1, Timestamp.valueOf("2001-09-09 01:46:40.035123"));
+        cr = client.callProcedure("P2.insert", 2, Timestamp.valueOf("2001-09-09 01:46:40.035123"));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("TRUNCATE", 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-
-        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
-        //System.out.println(dateFormat.getTimeZone());
-        Date time = null;
-
-        cr = client.callProcedure("TRUNCATE", 1);
+        cr = client.callProcedure("TRUNCATE", 2);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
 
-        String expected_time_year = "2001-01-01 00:00:00.000";
-        time = dateFormat.parse(expected_time_year);
+        cr = client.callProcedure("TRUNCATE", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+
+        time = dateFormat.parse("2001-01-01 00:00:00.000");
         assertEquals(time.getTime() * 1000, result.getTimestampAsLong(0));
 
-        String expected_time_quarter = "2001-07-01 00:00:00.000";
-        time = dateFormat.parse(expected_time_quarter);
+        time = dateFormat.parse("2001-07-01 00:00:00.000");
         assertEquals(time.getTime() * 1000, result.getTimestampAsLong(1));
 
-        String expected_time_month = "2001-09-01 00:00:00.000";
-        time = dateFormat.parse(expected_time_month);
+        time = dateFormat.parse("2001-09-01 00:00:00.000");
         assertEquals(time.getTime() * 1000, result.getTimestampAsLong(2));
 
-        String expected_time_day = "2001-09-09 00:00:00.000";
-        time = dateFormat.parse(expected_time_day);
+        time = dateFormat.parse("2001-09-09 00:00:00.000");
         assertEquals(time.getTime() * 1000, result.getTimestampAsLong(3));
 
-        String expected_time_hour = "2001-09-09 01:00:00.000";
-        time = dateFormat.parse(expected_time_hour);
+        time = dateFormat.parse("2001-09-09 01:00:00.000");
         assertEquals(time.getTime() * 1000, result.getTimestampAsLong(4));
 
-        String expected_time_minute = "2001-09-09 01:46:00.000";
-        time = dateFormat.parse(expected_time_minute);
+        time = dateFormat.parse("2001-09-09 01:46:00.000");
         assertEquals(time.getTime() * 1000, result.getTimestampAsLong(5));
 
-        String expected_time_second = "2001-09-09 01:46:40.000";
-        time = dateFormat.parse(expected_time_second);
+        time = dateFormat.parse("2001-09-09 01:46:40.000");
         assertEquals(time.getTime() * 1000, result.getTimestampAsLong(6));
 
-        String expected_time_millis = "2001-09-09 01:46:40.035";
-        time = dateFormat.parse(expected_time_millis);
+        time = dateFormat.parse("2001-09-09 01:46:40.035");
         assertEquals(time.getTime() * 1000, result.getTimestampAsLong(7));
 
-        String expected_time_millisecond = "2001-09-09 01:46:40.035";
-        time = dateFormat.parse(expected_time_millisecond);
+        time = dateFormat.parse("2001-09-09 01:46:40.035");
         assertEquals(time.getTime() * 1000, result.getTimestampAsLong(8));
 
-        String expected_time_micros = "2001-09-09 01:46:40.035123";
-        time = dateFormat.parse(expected_time_micros);
         assertEquals(1000000000035123L, result.getTimestampAsLong(9));
-
-        String expected_time_microsecond = "2001-09-09 01:46:40.035123";
-        time = dateFormat.parse(expected_time_microsecond);
         assertEquals(1000000000035123L, result.getTimestampAsLong(10));
-
 
         // Test time before EPOCH
-        // This test is not working for the boost library 32bits problem. Comment it out right now
-        /*
-        cr = client.callProcedure("P2.insert", 2, Timestamp.valueOf("1212-11-24 13:56:40.123456"));
+        cr = client.callProcedure("P2.insert", 3, Timestamp.valueOf("1583-11-24 13:56:40.123456"));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("TRUNCATE", 1);
+        cr = client.callProcedure("TRUNCATE", 3);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
 
-        expected_time_year = "1212-01-01 00:00:00.000";
-        time = dateFormat.parse(expected_time_year);
+        time = dateFormat.parse("1583-01-01 00:00:00.000");
         assertEquals(time.getTime() * 1000, result.getTimestampAsLong(0));
 
-        expected_time_quarter = "1212-10-01 00:00:00.000";
-        time = dateFormat.parse(expected_time_quarter);
+        time = dateFormat.parse("1583-10-01 00:00:00.000");
         assertEquals(time.getTime() * 1000, result.getTimestampAsLong(1));
 
-        expected_time_month = "1212-11-00 00:00:00.000";
-        time = dateFormat.parse(expected_time_month);
+        time = dateFormat.parse("1583-11-01 00:00:00.000");
         assertEquals(time.getTime() * 1000, result.getTimestampAsLong(2));
 
-        expected_time_day = "1212-11-24 00:00:00.000";
-        time = dateFormat.parse(expected_time_day);
+        time = dateFormat.parse("1583-11-24 00:00:00.000");
         assertEquals(time.getTime() * 1000, result.getTimestampAsLong(3));
 
-        expected_time_hour = "1212-11-24 13:00:00.000";
-        time = dateFormat.parse(expected_time_hour);
+        time = dateFormat.parse("1583-11-24 13:00:00.000");
         assertEquals(time.getTime() * 1000, result.getTimestampAsLong(4));
 
-        expected_time_minute = "1212-11-24 13:56:00.000";
-        time = dateFormat.parse(expected_time_minute);
+        time = dateFormat.parse("1583-11-24 13:56:00.000");
         assertEquals(time.getTime() * 1000, result.getTimestampAsLong(5));
 
-        expected_time_second = "1212-11-24 13:56:40.000";
-        time = dateFormat.parse(expected_time_second);
+        time = dateFormat.parse("1583-11-24 13:56:40.000");
         assertEquals(time.getTime() * 1000, result.getTimestampAsLong(6));
 
-        expected_time_millis = "1212-11-24 13:56:40.123";
-        time = dateFormat.parse(expected_time_millis);
-        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(7));
+        time = dateFormat.parse("1583-11-24 13:56:40.123");
+        assertTrue(Math.abs(time.getTime() * 1000 - result.getTimestampAsLong(7)) < 1001);
 
-        expected_time_millisecond = "1212-11-24 13:56:40.123";
-        time = dateFormat.parse(expected_time_millisecond);
-        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(8));
+        time = dateFormat.parse("1583-11-24 13:56:40.123");
+        assertTrue(Math.abs(time.getTime() * 1000 - result.getTimestampAsLong(7)) < 1001);
 
-        expected_time_micros = "1212-11-24 13:56:40.123456";
-        time = dateFormat.parse(expected_time_micros);
-        assertEquals(1000000000035123L, result.getTimestampAsLong(9));
+        assertEquals(-12184250599876544L, result.getTimestampAsLong(9));
+        assertEquals(-12184250599876544L, result.getTimestampAsLong(10));
 
-        expected_time_microsecond = "1212-11-24 13:56:40.123456";
-        time = dateFormat.parse(expected_time_microsecond);
-        assertEquals(1000000000035123L, result.getTimestampAsLong(10));
-        */
+        // Test date in far future
+        cr = client.callProcedure("P2.insert", 4, Timestamp.valueOf("2608-03-06 13:56:40.123456"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("TRUNCATE", 4);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+
+        time = dateFormat.parse("2608-01-01 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(0));
+
+        time = dateFormat.parse("2608-01-01 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(1));
+
+        time = dateFormat.parse("2608-03-01 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(2));
+
+        time = dateFormat.parse("2608-03-06 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(3));
+
+        time = dateFormat.parse("2608-03-06 13:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(4));
+
+        time = dateFormat.parse("2608-03-06 13:56:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(5));
+
+        time = dateFormat.parse("2608-03-06 13:56:40.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(6));
+
+        time = dateFormat.parse("2608-03-06 13:56:40.123");
+        assertTrue(Math.abs(time.getTime() * 1000 - result.getTimestampAsLong(7)) < 1001);
+
+        time = dateFormat.parse("2608-03-06 13:56:40.123");
+        assertTrue(Math.abs(time.getTime() * 1000 - result.getTimestampAsLong(7)) < 1001);
+
+        assertEquals(20138939800123456L, result.getTimestampAsLong(9));
+        assertEquals(20138939800123456L, result.getTimestampAsLong(10));
     }
 
     public void testFunctionsWithInvalidJSON() throws Exception {
