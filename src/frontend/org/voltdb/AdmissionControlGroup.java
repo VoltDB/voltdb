@@ -19,16 +19,11 @@ package org.voltdb;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListMap;
 
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.dtxn.InitiatorStats;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.dtxn.LatencyStats.LatencyInfo;
-
-import com.google.common.collect.ImmutableMap;
 
 /**
  * Manage admission control for incoming requests by tracking the size of outstanding requests
@@ -289,7 +284,7 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
         boolean needToInsert = false;
         Map<String, InvocationInfo> procInfoMap = m_connectionStates.get(connectionId);
         if(procInfoMap == null) {
-            procInfoMap = new ConcurrentSkipListMap<String, InvocationInfo>();
+            procInfoMap = new NonBlockingHashMap<String, InvocationInfo>();
             needToInsert = true;
         }
         InvocationInfo info = procInfoMap.get(procedureName);
