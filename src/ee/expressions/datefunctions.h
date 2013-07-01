@@ -175,7 +175,6 @@ template<> inline NValue NValue::callUnary<FUNC_TO_TIMESTAMP_SECOND>() const {
         return *this;
     }
     int64_t seconds = getBigInt();
-    //printf("input Seconds from Java: %lld\n", seconds);
     int64_t epoch_micros = seconds * 1000000;
     return getTimestampValue(epoch_micros);
 }
