@@ -112,6 +112,16 @@ public class SysProcFragmentId
     public static final long PF_restoreAsyncRunLoop = 75;
     public static final long PF_restoreAsyncRunLoopResults = 76;
 
+    // partitioned table to replicated table
+    public static final long PF_restoreLoadPartitionedTable = 901;
+    public static final long PF_restoreLoadPartitionedTableResult = 902;
+    public static final long PF_restoreDistributeSendPartitionedTable = 904;
+    public static final long PF_restoreDistributeSendPartitionedTableResult = 905;
+
+    // replicated table to partitioned table
+    public static final long PF_restoreDispatchReplicatedTable = 906;
+    public static final long PF_restoreDispatchReplicatedTableResult = 907;
+
     // @StartSampler
     public static final long PF_startSampler = 80;
 

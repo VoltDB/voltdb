@@ -58,6 +58,11 @@ public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
         }
     }
 
+    public void addPartitioning(String tableName, String partitionColumnName)
+    {
+        addPartitionInfo(tableName, partitionColumnName);
+    }
+
     public void addDefaultSchema()
     {
         addSchema(ddlURL);

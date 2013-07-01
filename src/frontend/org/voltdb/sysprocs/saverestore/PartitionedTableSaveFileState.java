@@ -118,9 +118,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
         }
         else
         {
-            // XXX Not implemented until we're going to support catalog changes
-            SNAP_LOG.error("Unable to convert partitioned table " + getTableName() + " to replicated because " +
-                "the conversion is currently unsupported.");
+            restore_plan = generatePartitionedToReplicatedPlan(st);
         }
         return restore_plan;
     }
@@ -146,6 +144,87 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
             m_consistencyResult = error;
             throw new IOException(error);
         }
+    }
+
+    private SynthesizedPlanFragment[] generatePartitionedToReplicatedPlan(SiteTracker st) {
+        ArrayList<SynthesizedPlanFragment> restorePlan = new ArrayList<SynthesizedPlanFragment>();
+        Set<Integer> coveredPartitions = new HashSet<Integer>();
+
+        for (Integer host : m_partitionsAtHost.keySet()) {
+            List<Integer> loadPartitions = new ArrayList<Integer>();
+            List<Integer> loadOrigHosts = new ArrayList<Integer>();
+            Set<Pair<Integer, Integer>> partitionAndOrigHostSet = m_partitionsAtHost.get(host);
+            Iterator<Pair<Integer, Integer>> itr = partitionAndOrigHostSet.iterator();
+            while(itr.hasNext()) {
+                Pair<Integer, Integer> pair = itr.next();
+                if(!coveredPartitions.contains(pair.getFirst())) {
+                    loadPartitions.add(pair.getFirst());
+                    loadOrigHosts.add(pair.getSecond());
+                    coveredPartitions.add(pair.getFirst());
+                }
+            }
+
+            if(loadPartitions.size() > 0){
+                int[] relevantPartitionIds = new int[loadPartitions.size()];
+                int[] originalHosts = new int[loadOrigHosts.size()];
+                List<Long> sitesAtHost = st.getSitesForHost(host);
+
+                int index = 0;
+                for(Integer p : loadPartitions) {
+                    relevantPartitionIds[index++] = p;
+                }
+                index = 0;
+                for(Integer h : loadOrigHosts) {
+                    originalHosts[index++] = h;
+                }
+
+                for(Long site : sitesAtHost) {
+                    restorePlan.add(constructLoadPartitionedTableFragment(
+                            site, relevantPartitionIds, originalHosts));
+                }
+            }
+        }
+        restorePlan.add(constructLoadPartitionedTableAggregatorFragment());
+        assert(coveredPartitions.size() == m_partitionsSeen.size());
+        return restorePlan.toArray(new SynthesizedPlanFragment[0]);
+    }
+
+    private SynthesizedPlanFragment
+    constructLoadPartitionedTableFragment(
+            long distributorSiteId,
+            int uncoveredPartitionsAtHost[],
+            int originalHostsArray[])
+    {
+        int result_dependency_id = getNextDependencyId();
+        SynthesizedPlanFragment plan_fragment = new SynthesizedPlanFragment();
+        plan_fragment.fragmentId =
+            SysProcFragmentId.PF_restoreLoadPartitionedTable;
+        plan_fragment.multipartition = false;
+        plan_fragment.siteId = distributorSiteId;
+        plan_fragment.outputDepId = result_dependency_id;
+        plan_fragment.inputDepIds = new int[] {};
+        addPlanDependencyId(result_dependency_id);
+        plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
+                getTableName(),
+                originalHostsArray,
+                uncoveredPartitionsAtHost,
+                result_dependency_id);
+        return plan_fragment;
+    }
+
+    private SynthesizedPlanFragment
+    constructLoadPartitionedTableAggregatorFragment()
+    {
+        int result_dependency_id = getNextDependencyId();
+        SynthesizedPlanFragment plan_fragment = new SynthesizedPlanFragment();
+        plan_fragment.fragmentId =
+            SysProcFragmentId.PF_restoreLoadPartitionedTableResult;
+        plan_fragment.multipartition = false;
+        plan_fragment.outputDepId = result_dependency_id;
+        plan_fragment.inputDepIds = getPlanDependencyIds();
+        setRootDependencyId(result_dependency_id);
+        plan_fragment.parameters = ParameterSet.fromArrayNoCopy(result_dependency_id);
+        return plan_fragment;
     }
 
     private SynthesizedPlanFragment[] generatePartitionedToPartitionedPlan(SiteTracker st) {

@@ -78,9 +78,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         }
         else
         {
-            // Not implemented until we're going to support catalog changes
-            SNAP_LOG.error("Unable to convert replicated table " + getTableName() + " to partitioned because " +
-                    "the conversion is currently unsupported.");
+            restore_plan = generateReplicatedToPartitionedPlan(st);
         }
         return restore_plan;
     }
@@ -95,6 +93,59 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
             m_consistencyResult = error;
             throw new IOException(error);
         }
+    }
+
+    private SynthesizedPlanFragment[]
+    generateReplicatedToPartitionedPlan(SiteTracker st)
+    {
+        SynthesizedPlanFragment[] restore_plan = null;
+
+        assert(!m_hostsWithThisTable.isEmpty());
+        Integer host = m_hostsWithThisTable.iterator().next();
+
+        // replicated table is small enough for only one site to distribute the task
+        restore_plan = new SynthesizedPlanFragment[2];
+        int restore_plan_index = 0;
+        assert(st.getSitesForHost(host).size() > 0);
+        long site = st.getSitesForHost(host).get(0);
+        restore_plan[restore_plan_index] = constructDispatchReplicatedTableFragment(site);
+        ++restore_plan_index;
+        restore_plan[restore_plan_index] = constructDispatchReplicatedTableAggregatorFragment();
+
+        return restore_plan;
+    }
+
+    private SynthesizedPlanFragment
+    constructDispatchReplicatedTableFragment(long siteId)
+    {
+        int result_dependency_id = getNextDependencyId();
+        SynthesizedPlanFragment plan_fragment = new SynthesizedPlanFragment();
+        plan_fragment.fragmentId =
+            SysProcFragmentId.PF_restoreDispatchReplicatedTable;
+        plan_fragment.multipartition = false;
+        plan_fragment.siteId = siteId;
+        plan_fragment.outputDepId = result_dependency_id;
+        plan_fragment.inputDepIds = new int[] {};
+        addPlanDependencyId(result_dependency_id);
+        plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
+                getTableName(),
+                result_dependency_id);
+        return plan_fragment;
+    }
+
+    private SynthesizedPlanFragment
+    constructDispatchReplicatedTableAggregatorFragment()
+    {
+        int result_dependency_id = getNextDependencyId();
+        SynthesizedPlanFragment plan_fragment = new SynthesizedPlanFragment();
+        plan_fragment.fragmentId =
+            SysProcFragmentId.PF_restoreDispatchReplicatedTableResult;
+        plan_fragment.multipartition = false;
+        plan_fragment.outputDepId = result_dependency_id;
+        plan_fragment.inputDepIds = getPlanDependencyIds();
+        setRootDependencyId(result_dependency_id);
+        plan_fragment.parameters = ParameterSet.fromArrayNoCopy(result_dependency_id);
+        return plan_fragment;
     }
 
     private SynthesizedPlanFragment[]
