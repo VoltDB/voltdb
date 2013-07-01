@@ -93,16 +93,10 @@ public class CoreUtils {
         return MoreExecutors.listeningDecorator(ste);
     }
 
-    public static ListeningExecutorService getSingleThreadExecutor(String name, boolean mediumStack) {
-        if (mediumStack) {
-            ExecutorService ste =
-                    Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory(null, name, MEDIUM_STACK_SIZE, false, null));
-            return MoreExecutors.listeningDecorator(ste);
-        } else {
-            ExecutorService ste =
-                    Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null));
-            return MoreExecutors.listeningDecorator(ste);
-        }
+    public static ListeningExecutorService getSingleThreadExecutor(String name, int size) {
+        ExecutorService ste =
+                Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory(null, name, size, false, null));
+        return MoreExecutors.listeningDecorator(ste);
     }
 
     /**
