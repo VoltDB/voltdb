@@ -207,9 +207,8 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_YEAR>() const {
     int64_t epoch_micros = getTimestamp();
     if (epoch_micros < -12212553600000000) {
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                "Gregorian calendar beginning from year 1583");
+                "Value out of range. Cannot convert dates prior to the year 1583");
     }
-
     boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros);
     boost::gregorian::date as_date = input_ptime.date();
     boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),1,1);
@@ -229,7 +228,7 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_QUARTER>() const {
     int64_t epoch_micros = getTimestamp();
     if (epoch_micros < -12212553600000000) {
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                "Gregorian calendar beginning from year 1583");
+                "Value out of range. Cannot convert dates prior to the year 1583");
     }
     boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros);
     boost::gregorian::date as_date = input_ptime.date();
@@ -251,7 +250,7 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MONTH>() const {
     int64_t epoch_micros = getTimestamp();
     if (epoch_micros < -12212553600000000) {
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                "Gregorian calendar beginning from year 1583");
+                "Value out of range. Cannot convert dates prior to the year 1583");
     }
     boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros);
     boost::gregorian::date as_date = input_ptime.date();
@@ -272,7 +271,7 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_DAY>() const {
     int64_t epoch_micros = getTimestamp();
     if (epoch_micros < -12212553600000000) {
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                "Gregorian calendar beginning from year 1583");
+                "Value out of range. Cannot convert dates prior to the year 1583");
     }
     boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros);
     boost::gregorian::date as_date = input_ptime.date();
@@ -293,7 +292,7 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_HOUR>() const {
     int64_t epoch_micros = getTimestamp();
     if (epoch_micros < -12212553600000000) {
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                "Gregorian calendar beginning from year 1583");
+                "Value out of range. Cannot convert dates prior to the year 1583");
     }
     boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros);
     boost::gregorian::date as_date = input_ptime.date();
@@ -315,7 +314,7 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MINUTE>() const {
     int64_t epoch_micros = getTimestamp();
     if (epoch_micros < -12212553600000000) {
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                "Gregorian calendar beginning from year 1583");
+                "Value out of range. Cannot convert dates prior to the year 1583");
     }
     boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros);
     boost::gregorian::date as_date = input_ptime.date();
@@ -337,7 +336,7 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_SECOND>() const {
     int64_t epoch_micros = getTimestamp();
     if (epoch_micros < -12212553600000000) {
         throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                "Gregorian calendar beginning from year 1583");
+                "Value out of range. Cannot convert dates prior to the year 1583");
     }
     boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros);
     boost::gregorian::date as_date = input_ptime.date();
@@ -357,7 +356,10 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MILLISECOND>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    //printf("Input mircros: %lld\n", epoch_micros);
+    if (epoch_micros < -12212553600000000) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                "Value out of range. Cannot convert dates prior to the year 1583");
+    }
     int64_t epoch_millis = static_cast<int64_t>(epoch_micros / 1000);
     return getTimestampValue(epoch_millis * 1000);
 }
@@ -368,6 +370,10 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MICROSECOND>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
+    if (epoch_micros < -12212553600000000) {
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
+                "Value out of range. Cannot convert dates prior to the year 1583");
+    }
     return getTimestampValue(epoch_micros);
 }
 
