@@ -450,6 +450,20 @@ public class CoreUtils {
         return sb.toString();
     }
 
+    public static String hsIdEntriesToString(Collection<Map.Entry<Long, Long>> entries) {
+        StringBuilder sb = new StringBuilder();
+        sb.append('{');
+        boolean first = true;
+        for (Map.Entry<Long, Long> entry : entries) {
+            if (!first) sb.append(", ");
+            first = false;
+            sb.append(CoreUtils.hsIdToString(entry.getKey())).append(" -> ");
+            sb.append(CoreUtils.hsIdToString(entry.getValue()));
+        }
+        sb.append('}');
+        return sb.toString();
+    }
+
     public static int availableProcessors() {
         return Math.max(1, Runtime.getRuntime().availableProcessors());
     }

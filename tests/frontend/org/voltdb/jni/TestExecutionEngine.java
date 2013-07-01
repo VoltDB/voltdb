@@ -23,6 +23,7 @@
 
 package org.voltdb.jni;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -39,6 +40,7 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.LegacyHashinator;
+import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.RecoverySiteProcessorDestination;
 import org.voltdb.RecoverySiteProcessorSource;
@@ -103,7 +105,13 @@ public class TestExecutionEngine extends TestCase {
         }
 
         System.out.println(warehousedata.toString());
-        engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0);
+        engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, false);
+
+        //Check that we can detect and handle the dups when loading the data twice
+        byte results[] = engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, true);
+        System.out.println("Printing dups");
+        System.out.println(PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(results), true));
+
 
         VoltTable stockdata = new VoltTable(
                 new VoltTable.ColumnInfo("S_I_ID", VoltType.INTEGER),
@@ -129,7 +137,7 @@ public class TestExecutionEngine extends TestCase {
                              "sdist4", "sdist5", "sdist6", "sdist7", "sdist8",
                              "sdist9", "sdist10", 0, 0, 0, "sdata");
         }
-        engine.loadTable(STOCK_TABLEID, stockdata, 0, 0);
+        engine.loadTable(STOCK_TABLEID, stockdata, 0, 0, false);
     }
 
     public void testLoadTable() throws Exception {
