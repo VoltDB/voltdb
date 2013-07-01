@@ -64,7 +64,8 @@ Table* TableFactory::getPersistentTable(
             const std::vector<std::string> &columnNames,
             int partitionColumn,
             bool exportEnabled,
-            bool exportOnly)
+            bool exportOnly,
+            int tableAllocationTargetSize)
 {
     Table *table = NULL;
 
@@ -72,7 +73,7 @@ Table* TableFactory::getPersistentTable(
         table = new StreamedTable(exportEnabled);
     }
     else {
-        table = new PersistentTable(partitionColumn);
+        table = new PersistentTable(partitionColumn, tableAllocationTargetSize);
     }
 
     initCommon(databaseId, table, name, schema, columnNames, true);

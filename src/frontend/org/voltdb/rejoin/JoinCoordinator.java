@@ -100,7 +100,9 @@ public abstract class JoinCoordinator extends LocalMailbox {
     /**
      * Starts the rejoin process.
      */
-    public abstract boolean startJoin(Database catalog, Cartographer cartographer)
+    public abstract boolean startJoin(Database catalog,
+                                      Cartographer cartographer,
+                                      String clSnapshotPath)
             throws KeeperException, InterruptedException, JSONException;
 
     /**

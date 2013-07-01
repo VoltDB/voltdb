@@ -411,7 +411,7 @@ public enum VoltType {
         }
     }
 
-    static boolean isNullVoltType(Object obj)
+    public static boolean isNullVoltType(Object obj)
     {
         boolean retval = false;
         if (obj == null)

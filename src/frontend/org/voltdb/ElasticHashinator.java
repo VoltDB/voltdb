@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 import com.google.common.collect.UnmodifiableIterator;
 import org.apache.cassandra_voltpatches.MurmurHash3;
@@ -39,7 +40,7 @@ import com.google.common.collect.ImmutableSortedMap;
  */
 public class ElasticHashinator extends TheHashinator {
     public static int DEFAULT_TOKENS_PER_PARTITION =
-        Integer.parseInt(System.getProperty("ELASTIC_TOKENS_PER_PARTITION", "8"));
+        Integer.parseInt(System.getProperty("ELASTIC_TOKENS_PER_PARTITION", "256"));
 
     /**
      * Tokens on the ring. A value hashes to a token if the token is the first value <=
@@ -166,7 +167,7 @@ public class ElasticHashinator extends TheHashinator {
         Preconditions.checkArgument(partitionCount > 0);
         Preconditions.checkArgument(tokensPerPartition > 0);
         ElasticHashinator emptyHashinator = new ElasticHashinator(new HashMap<Long, Integer>());
-        Set<Integer> partitions = new HashSet<Integer>();
+        Set<Integer> partitions = new TreeSet<Integer>();
 
         for (int ii = 0; ii < partitionCount; ii++) {
             partitions.add(ii);
@@ -323,21 +324,17 @@ public class ElasticHashinator extends TheHashinator {
                 first = token;
             }
 
+            // if start is not null, there's an open range, now is
+            // the time to close it.
+            // else there is no open range, keep on going.
+            if (start != null) {
+                ranges.put(start, token);
+                start = null;
+            }
+
             if (pid == partition) {
                 // if start is null, there's no open range, start one.
-                // else there is already an open range, leave it open.
-                if (start == null) {
-                    start = token;
-                }
-            } else {
-                // hit a token that belongs to a different partition.
-                // if start is not null, there's an open range, now is
-                // the time to close it.
-                // else there is no open range, keep on going.
-                if (start != null) {
-                    ranges.put(start, token);
-                    start = null;
-                }
+                start = token;
             }
         }
 
@@ -351,5 +348,16 @@ public class ElasticHashinator extends TheHashinator {
         }
 
         return ranges;
+    }
+
+    @Override
+    public String toString()
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append(" Token               ").append("   Partition\n");
+        for (Map.Entry<Long, Integer> entry : tokens.entrySet()) {
+            sb.append(String.format("[%20d => %8d]\n", entry.getKey(), entry.getValue()));
+        }
+        return sb.toString();
     }
 }
