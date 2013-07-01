@@ -18,8 +18,10 @@ def build = thr.executable
 
 def resolver = build.buildVariableResolver;
 def param_slavelist = resolver.resolve("slavelist")
-def param_dryRun = resolver.resolve("dryRun")
 def slavelist = param_slavelist.tokenize(',')
+
+def param_dryRun = resolver.resolve("dryRun")
+def dryRun = false
 
 if (slavelist) {
   println "-" * 80
