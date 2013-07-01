@@ -26,7 +26,9 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
+import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.utils.CompressionService;
+import org.voltdb.utils.FixedDBBPool;
 
 /**
  * Receives snapshot data from a replica. This is used on a rejoining partition.
@@ -43,13 +45,13 @@ implements Runnable {
             new LinkedBlockingQueue<Pair<Long, BBContainer>>();
 
     private final Mailbox m_mb;
-    private final LinkedBlockingQueue<BBContainer> m_buffers;
+    private final FixedDBBPool m_bufferPool;
     private volatile boolean m_closed = false;
 
-    public StreamSnapshotDataReceiver(Mailbox mb, LinkedBlockingQueue<BBContainer> bufQueue) {
+    public StreamSnapshotDataReceiver(Mailbox mb, FixedDBBPool bufferPool) {
         super();
         m_mb = mb;
-        m_buffers = bufQueue;
+        m_bufferPool = bufferPool;
     }
 
     public void close() {
@@ -81,16 +83,15 @@ implements Runnable {
 
     @Override
     public void run() {
-        try {
+        LinkedBlockingQueue<BBContainer> bufferQueue =
+            m_bufferPool.getQueue(SnapshotSiteProcessor.m_snapshotBufferLength);
+        LinkedBlockingQueue<BBContainer> compressionBufferQueue =
+            m_bufferPool.getQueue(SnapshotSiteProcessor.m_snapshotBufferCompressedLen);
 
-            final ByteBuffer compressionBuffer =
-                    ByteBuffer.allocateDirect(
-                            CompressionService.maxCompressedLength(1024 * 1024 * 2 + (1024 * 256)));
+        try {
             while (true) {
-                BBContainer container = m_buffers.take();
-                ByteBuffer messageBuffer = container.b;
-                messageBuffer.clear();
-                compressionBuffer.clear();
+                BBContainer container = null;
+                BBContainer compressionBuffer = null;
                 boolean success = false;
 
                 try {
@@ -104,19 +105,32 @@ implements Runnable {
                     RejoinDataMessage dataMsg = (RejoinDataMessage) msg;
                     byte[] data = dataMsg.getData();
 
-                    compressionBuffer.limit(data.length);
-                    compressionBuffer.put(data);
-                    compressionBuffer.flip();
+                    // Only grab the buffer from the pool after receiving a message from the
+                    // mailbox. If the buffer is grabbed before receiving the message,
+                    // this thread could hold on to a buffer it may not need and other receivers
+                    // will be blocked if the pool has no more buffers left.
+                    container = bufferQueue.take();
+                    ByteBuffer messageBuffer = container.b;
+                    messageBuffer.clear();
+
+                    compressionBuffer = compressionBufferQueue.take();
+                    compressionBuffer.b.clear();
+                    compressionBuffer.b.limit(data.length);
+                    compressionBuffer.b.put(data);
+                    compressionBuffer.b.flip();
                     int uncompressedSize =
                             CompressionService.decompressBuffer(
-                                    compressionBuffer,
+                                    compressionBuffer.b,
                                     messageBuffer);
                     messageBuffer.limit(uncompressedSize);
                     m_queue.offer(Pair.of(dataMsg.m_sourceHSId, container));
                     success = true;
                 } finally {
-                    if (!success) {
+                    if (!success && container != null) {
                         container.discard();
+                    }
+                    if (compressionBuffer != null) {
+                        compressionBuffer.discard();
                     }
                 }
             }
