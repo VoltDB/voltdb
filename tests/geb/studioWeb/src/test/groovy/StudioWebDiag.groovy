@@ -6,7 +6,6 @@ import spock.lang.*
 
 class StudioWebPage extends Page {
 
-   
     static url = 'file://localhost/' + new File("../../../obj/release/dist/tools/studio.web/index.htm").getCanonicalPath()
     static at = { title == "VoltDB Web Studio" }
 }
@@ -18,13 +17,15 @@ class StudioWebDiag extends GebReportingSpec {
     def studioweb = "${dist}/tools/studio.web"
 
     ///// Server MUST have been initiated/////
-        def "To StudioWeb"() {
+
+    def "To StudioWeb"() {
 
         setup: "Open Studio web"
         to StudioWebPage
 
         expect: "to be on studio web page"
         at StudioWebPage
+
     }
 
     def "Contains important elements"(){
@@ -39,7 +40,8 @@ class StudioWebDiag extends GebReportingSpec {
         def result = chkElements(chk, eleFile)
 
         expect: "them to be the same"
-        assert result
+        assert !result
+        //on failure there are result - 1 elements missing from page.
         
     }
 
@@ -102,7 +104,7 @@ class StudioWebDiag extends GebReportingSpec {
     }
 
     def "Disconnect from server"(){
-
+        
         setup: "Actions interface to enable right click"
         def actions = new Actions(this.getDriver())
 
@@ -138,7 +140,7 @@ class StudioWebDiag extends GebReportingSpec {
 
     def getEles(){
 
-        def count = 0; def attributes = {"${ it.attr("id") }"}
+        def attributes = {"${ it.attr("id") }"}
         def all = $('[id]:not(canvas)')
         def returnMe = []
         returnMe = all.collect(attributes)
@@ -151,10 +153,13 @@ class StudioWebDiag extends GebReportingSpec {
         /*right now this generates a new list of procedures if none exits.  This functionality will be moved to 
         a separate method that will also replace readme file and list of stored procedures on test failure  */
         if(file.size() == 0){file.withWriter {out -> eles.each() {out.writeLine(it)} } }
+
         file.eachLine() {line -> correct.add(line)}
-        if(correct == eles){return true
-        }else{correct.removeAll(eles) // if correct is not empty, then there are elements mssing from the page
-        if (correct.size != 0){ return !(correct.size()) } //groovy coerces nonzero ints to true
-        }
+        if(correct == eles){return false
+        /* if correct is not empty, then there are elements mssing from the page.
+        If it is empty, there are excess elements, and test should fail */
+        }else{correct.removeAll(eles) 
+        return (correct.size() + 1) } //groovy coerces nonzero ints to true
+        
     }
 }
