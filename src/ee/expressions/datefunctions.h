@@ -135,4 +135,63 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_SECOND>() const {
     return getDecimalValue(retval);
 }
 
+/** implement the timestamp SINCE_EPOCH in SECONDs function **/
+template<> inline NValue NValue::callUnary<FUNC_SINCE_EPOCH_SECOND>() const {
+    if (isNull()) {
+        return *this;
+    }
+    int64_t epoch_micros = getTimestamp();
+    int64_t epoch_seconds = epoch_micros / 1000000;
+    return getBigIntValue(epoch_seconds);
+}
+
+/** implement the timestamp SINCE_EPOCH in MILLISECONDs function **/
+template<> inline NValue NValue::callUnary<FUNC_SINCE_EPOCH_MILLISECOND>() const {
+    if (isNull()) {
+        return *this;
+    }
+    int64_t epoch_micros = getTimestamp();
+    int64_t epoch_milliseconds = epoch_micros / 1000;
+    return getBigIntValue(epoch_milliseconds);
+}
+
+/** implement the timestamp SINCE_EPOCH in MICROSECONDs function **/
+template<> inline NValue NValue::callUnary<FUNC_SINCE_EPOCH_MICROSECOND>() const {
+    if (isNull()) {
+        return *this;
+    }
+    int64_t epoch_micros = getTimestamp();
+    return getBigIntValue(epoch_micros);
+}
+
+/** implement the timestamp TO_TIMESTAMP from SECONDs function **/
+template<> inline NValue NValue::callUnary<FUNC_TO_TIMESTAMP_SECOND>() const {
+    if (isNull()) {
+        return *this;
+    }
+    int64_t seconds = getBigInt();
+    //printf("input Seconds from Java: %lld\n", seconds);
+    int64_t epoch_micros = seconds * 1000000;
+    return getTimestampValue(epoch_micros);
+}
+
+/** implement the timestamp TO_TIMESTAMP from MILLISECONDs function **/
+template<> inline NValue NValue::callUnary<FUNC_TO_TIMESTAMP_MILLISECOND>() const {
+    if (isNull()) {
+        return *this;
+    }
+    int64_t millis = getBigInt();
+    int64_t epoch_micros = millis * 1000;
+    return getTimestampValue(epoch_micros);
+}
+
+/** implement the timestamp TO_TIMESTAMP from MICROSECONDs function **/
+template<> inline NValue NValue::callUnary<FUNC_TO_TIMESTAMP_MICROSECOND>() const {
+    if (isNull()) {
+        return *this;
+    }
+    int64_t epoch_micros = getBigInt();
+    return getTimestampValue(epoch_micros);
+}
+
 }

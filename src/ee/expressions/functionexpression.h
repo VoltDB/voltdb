@@ -206,6 +206,15 @@ static const int FUNC_DECODE                           = 20001;
 static const int FUNC_VOLT_FIELD                       = 20002;
 static const int FUNC_VOLT_ARRAY_ELEMENT               = 20003;
 static const int FUNC_VOLT_ARRAY_LENGTH                = 20004;
+static const int FUNC_SINCE_EPOCH                      = 20005;
+static const int FUNC_SINCE_EPOCH_SECOND               = 20006;
+static const int FUNC_SINCE_EPOCH_MILLISECOND          = 20007;
+static const int FUNC_SINCE_EPOCH_MICROSECOND          = 20008;
+static const int FUNC_TO_TIMESTAMP                     = 20009;
+static const int FUNC_TO_TIMESTAMP_SECOND              = 20010;
+static const int FUNC_TO_TIMESTAMP_MILLISECOND         = 20011;
+static const int FUNC_TO_TIMESTAMP_MICROSECOND         = 20012;
+
 }
 
 // All of these "...functions.h" files need to be included AFTER the above definitions

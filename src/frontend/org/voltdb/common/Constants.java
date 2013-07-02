@@ -15,28 +15,11 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "storage/PersistentTableUndoInsertAction.h"
+package org.voltdb.common;
 
-namespace voltdb {
+import java.nio.charset.Charset;
 
-/*
- * Undo whatever this undo action was created to undo
- */
-void PersistentTableUndoInsertAction::undo() {
-    m_table->deleteTupleForUndo(m_tuple);
-}
-
-/*
- * Release any resources held by the undo action. It will not need to be undone in the future.
- */
-void PersistentTableUndoInsertAction::release() {
-    /*
-     * Do nothing. Tuple stays inserted so no memory needs to be released.
-     */
-}
-
-PersistentTableUndoInsertAction::~PersistentTableUndoInsertAction() {
-    // TODO Auto-generated destructor stub
-}
-
+public class Constants
+{
+    public static final Charset UTF8ENCODING = Charset.forName("UTF-8");
 }

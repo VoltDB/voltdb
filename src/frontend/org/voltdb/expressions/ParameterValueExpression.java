@@ -161,4 +161,9 @@ public class ParameterValueExpression extends AbstractValueExpression {
         return result;
     }
 
+    @Override
+    public String explain(String unused) {
+        return "?" + m_paramIndex;
+    }
+
 }

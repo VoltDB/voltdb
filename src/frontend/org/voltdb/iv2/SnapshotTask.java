@@ -25,14 +25,10 @@ import org.voltdb.SiteProcedureConnection;
 
 public class SnapshotTask extends SiteTasker
 {
-    public SnapshotTask()
-    {
-    }
-
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
-        siteConnection.doSnapshotWork(true);
+        siteConnection.doSnapshotWork();
     }
 
     @Override

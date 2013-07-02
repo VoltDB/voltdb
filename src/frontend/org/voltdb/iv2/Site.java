@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -46,12 +47,12 @@ import org.voltdb.MemoryStats;
 import org.voltdb.ParameterSet;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProcedureRunner;
-import org.voltdb.StartAction;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
 import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
+import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.SystemProcedureExecutionContext;
@@ -68,6 +69,7 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.jni.ExecutionEngine.TaskType;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.jni.MockExecutionEngine;
@@ -679,8 +681,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void loadTable(long txnId, String clusterName, String databaseName,
-            String tableName, VoltTable data) throws VoltAbortException
+    public byte[] loadTable(long txnId, String clusterName, String databaseName,
+            String tableName, VoltTable data, boolean returnUniqueViolations) throws VoltAbortException
     {
         Cluster cluster = m_context.cluster;
         if (cluster == null) {
@@ -695,15 +697,15 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
         }
 
-        loadTable(txnId, table.getRelativeIndex(), data);
+        return loadTable(txnId, table.getRelativeIndex(), data, returnUniqueViolations);
     }
 
     @Override
-    public void loadTable(long spHandle, int tableId, VoltTable data)
+    public byte[] loadTable(long spHandle, int tableId, VoltTable data, boolean returnUniqueViolations)
     {
-        m_ee.loadTable(tableId, data,
+        return m_ee.loadTable(tableId, data,
                 spHandle,
-                m_lastCommittedSpHandle);
+                m_lastCommittedSpHandle, returnUniqueViolations);
     }
 
     @Override
@@ -895,9 +897,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public Future<?> doSnapshotWork(boolean ignoreQuietPeriod)
+    public Future<?> doSnapshotWork()
     {
-        return m_snapshotter.doSnapshotWork(m_sysprocContext, m_ee, ignoreQuietPeriod);
+        return m_snapshotter.doSnapshotWork(m_sysprocContext, m_ee);
     }
 
     @Override
@@ -1209,5 +1211,27 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
         assert(frag != null);
         return frag.plan;
+    }
+
+    /**
+     * For the specified list of table ids, return the number of mispartitioned rows using
+     * the provided hashinator and hashinator config
+     */
+    @Override
+    public long[] validatePartitioning(long[] tableIds, int hashinatorType, byte[] hashinatorConfig) {
+        ByteBuffer paramBuffer = ByteBuffer.allocate(4 + (8 * tableIds.length) + 4 + 4 + hashinatorConfig.length);
+        paramBuffer.putInt(tableIds.length);
+        for (long tableId : tableIds) {
+            paramBuffer.putLong(tableId);
+        }
+        paramBuffer.putInt(hashinatorType);
+        paramBuffer.put(hashinatorConfig);
+
+        ByteBuffer resultBuffer = ByteBuffer.wrap(m_ee.executeTask( TaskType.VALIDATE_PARTITIONING, paramBuffer.array()));
+        long mispartitionedRows[] = new long[tableIds.length];
+        for (int ii = 0; ii < tableIds.length; ii++) {
+            mispartitionedRows[ii] = resultBuffer.getLong();
+        }
+        return mispartitionedRows;
     }
 }

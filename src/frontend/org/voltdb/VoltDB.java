@@ -21,7 +21,6 @@ import java.io.File;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
-import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -103,8 +102,6 @@ public class VoltDB {
     {
         return startAction.doesRejoin();
     }
-
-    public static final Charset UTF8ENCODING = Charset.forName("UTF-8");
 
     //The GMT time zone you know and love
     public static final TimeZone GMT_TIMEZONE = TimeZone.getTimeZone("GMT+0");

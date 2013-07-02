@@ -28,6 +28,7 @@
 #include <stdint.h>
 #include <string>
 #include <algorithm>
+#include <vector>
 
 #include "boost/scoped_ptr.hpp"
 #include "boost/unordered_map.hpp"
@@ -352,6 +353,29 @@ class NValue {
      * represented as an NValueList* value cached in rhsList.
      */
     bool inList(NValue const& rhsList) const;
+
+    /**
+     * If this NValue is an array value, get it's length.
+     * Undefined behavior if not an array (cassert fail in debug).
+     */
+    int arrayLength() const;
+
+    /**
+     * If this NValue is an array value, get a value.
+     * Undefined behavior if not an array or if oob (cassert fail in debug).
+     */
+    NValue itemAtIndex(int index) const;
+
+    /**
+     * Used for SQL-IN-LIST to cast all array values to a specific type,
+     * then sort an dedup them. Returns in a parameter vector, mostly for memory
+     * management reasons. Dedup is important for index-accelerated plans, as
+     * they might return duplicate rows from the inner join.
+     * See MaterializedScanPlanNode & MaterializedScanExecutor
+     *
+     * Undefined behavior if not an array (cassert fail in debug).
+     */
+    void castAndSortAndDedupArrayForInList(const ValueType outputType, std::vector<NValue> &outList) const;
 
     /*
      * Out must have space for 16 bytes

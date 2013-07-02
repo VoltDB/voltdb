@@ -30,6 +30,7 @@ import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
@@ -39,6 +40,8 @@ import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FastSerializer.BufferGrowCallback;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+
+import com.google.common.base.Throwables;
 
 /**
  * Wrapper for native Execution Engine library.
@@ -339,8 +342,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public void loadTable(final int tableId, final VoltTable table,
-        final long txnId, final long lastCommittedTxnId) throws EEException
+    public byte[] loadTable(final int tableId, final VoltTable table,
+        final long txnId, final long lastCommittedTxnId, boolean returnUniqueViolations) throws EEException
     {
         if (LOG.isTraceEnabled()) {
             LOG.trace("loading table id=" + tableId + "...");
@@ -351,8 +354,24 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
 
         final int errorCode = nativeLoadTable(pointer, tableId, serialized_table,
-                                              txnId, lastCommittedTxnId);
+                                              txnId, lastCommittedTxnId, returnUniqueViolations);
         checkErrorCode(errorCode);
+
+        deserializer.clear();
+
+        try {
+            int length = deserializer.readInt();
+            if (length == 0) return null;
+            if (length < 0) VoltDB.crashLocalVoltDB("Length shouldn't be < 0", true, null);
+
+            byte uniqueViolations[] = new byte[length];
+            deserializer.readFully(uniqueViolations);
+
+            return uniqueViolations;
+        } catch (final IOException ex) {
+            LOG.error("Failed to retrieve unique violations: " + tableId, ex);
+            throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
+        }
     }
 
     /**
@@ -556,5 +575,22 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         assert(buffer != null);
         assert(fallbackBuffer == null);
         fallbackBuffer = buffer;
+    }
+
+    @Override
+    public byte[] executeTask(TaskType taskType, byte[] task) {
+        fsForParameterSet.clear();
+        byte retval[] = null;
+        try {
+            fsForParameterSet.writeLong(taskType.taskId);
+            fsForParameterSet.write(task);
+
+            deserializer.clear();
+            nativeExecuteTask(pointer);
+            return (byte[])deserializer.readArray(byte.class);
+        } catch (IOException e) {
+            Throwables.propagate(e);
+        }
+        return retval;
     }
 }
