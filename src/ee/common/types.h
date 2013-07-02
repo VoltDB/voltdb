@@ -341,7 +341,9 @@ enum IndexLookupType {
 // ------------------------------------------------------------------
 enum TableStreamType {
    TABLE_STREAM_SNAPSHOT,
-   TABLE_STREAM_RECOVERY
+   TABLE_STREAM_RECOVERY,
+   TABLE_STREAM_ELASTIC,
+   TABLE_STREAM_NONE = -1
 };
 
 // ------------------------------------------------------------------
@@ -377,6 +379,13 @@ enum RecoveryMsgType {
      * Generated when all recovery data for a table has been generated
      */
     RECOVERY_MSG_TYPE_COMPLETE = 4
+};
+
+// ------------------------------------------------------------------
+// Types of generic tasks that can be submitted to the EE
+// ------------------------------------------------------------------
+enum TaskType {
+    TASK_TYPE_VALIDATE_PARTITIONING = 0
 };
 
 // ------------------------------------------------------------------

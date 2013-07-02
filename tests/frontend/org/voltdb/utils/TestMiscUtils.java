@@ -23,6 +23,7 @@
 
 package org.voltdb.utils;
 
+import com.google.common.collect.Multimap;
 import com.google.common.primitives.Ints;
 import org.junit.Test;
 
@@ -78,8 +79,8 @@ public class TestMiscUtils {
 
     private static void zipKeysAndValuesAndCheck(int[] keys, int[] values)
     {
-        Map<Integer, Collection<Integer>> map = MiscUtils.zipToMap(Ints.asList(keys),
-                                                                   Ints.asList(values));
+        Multimap<Integer, Integer> map = MiscUtils.zipToMap(Ints.asList(keys),
+                                                            Ints.asList(values));
 
         if (keys.length == 0 || values.length == 0) {
             assertNull(map);

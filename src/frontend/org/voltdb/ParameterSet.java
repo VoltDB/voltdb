@@ -29,6 +29,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.common.Constants;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.types.TimestampType;
@@ -195,7 +196,7 @@ public class ParameterSet implements JSONString {
                     size += 8;
                     break;
                 case STRING:
-                    byte encodedString[] = ((String)obj).getBytes(VoltDB.UTF8ENCODING);
+                    byte encodedString[] = ((String)obj).getBytes(Constants.UTF8ENCODING);
                     size += 4 + encodedString.length;
                     encodedStrings[ii] = encodedString;
                     break;
@@ -626,7 +627,7 @@ public class ParameterSet implements JSONString {
                         sval[i] = null;
                     }
                     else {
-                        sval[i] = new String(encodedStringArray[i], VoltDB.UTF8ENCODING);
+                        sval[i] = new String(encodedStringArray[i], Constants.UTF8ENCODING);
                     }
                 }
                 value = sval;
@@ -662,7 +663,7 @@ public class ParameterSet implements JSONString {
                         value = VoltType.NULL_STRING_OR_VARBINARY;
                     }
                     else {
-                        value = new String(encodedString, VoltDB.UTF8ENCODING);
+                        value = new String(encodedString, Constants.UTF8ENCODING);
                     }
                     break;
                 case VARBINARY:

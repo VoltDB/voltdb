@@ -46,7 +46,9 @@ public:
     {}
 
     /** Parse expression strings and add generated predicate objects to list. */
-    bool parseStrings(const std::vector<std::string> &predicateStrings, std::ostringstream& errmsg);
+    bool parseStrings(const std::vector<std::string> &predicateStrings,
+                      std::ostringstream& errmsg,
+                      std::vector<bool> &predicateDeleteFlags);
 };
 
 } // namespace voltdb

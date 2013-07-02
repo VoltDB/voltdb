@@ -96,7 +96,7 @@ public class TestSequentialRejoinCoordinator {
 
     @Test
     public void testBasic() {
-        m_coordinator.startJoin(null, null);
+        m_coordinator.startJoin(null, null, null);
         RejoinMessage msg = new RejoinMessage(1000, RejoinMessage.Type.INITIATION);
         verifySent(1l, msg);
         verify(m_volt, never()).onExecutionSiteRejoinCompletion(anyLong());
@@ -139,7 +139,7 @@ public class TestSequentialRejoinCoordinator {
 
     @Test
     public void testReplayFinishedBeforeSnapshot() {
-        m_coordinator.startJoin(null, null);
+        m_coordinator.startJoin(null, null, null);
 
         // fake a replay finished response for site 2 before snapshot stream finishes
         RejoinMessage msg3 = new RejoinMessage(2l, RejoinMessage.Type.REPLAY_FINISHED);

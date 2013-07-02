@@ -26,7 +26,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.WeakHashMap;
 
-import org.voltdb.VoltDB;
+import org.voltdb.common.Constants;
 import org.voltdb.planner.BoundPlan;
 
 /**
@@ -213,7 +213,7 @@ public class AdHocCompilerCache implements Serializable {
         assert(parsedToken != null);
         assert(planIn != null);
         AdHocPlannedStatement plan = planIn;
-        assert(new String(plan.sql, VoltDB.UTF8ENCODING).equals(sql));
+        assert(new String(plan.sql, Constants.UTF8ENCODING).equals(sql));
 
         // uncomment this to get some raw stdout cache performance stats every 5s
         //startPeriodicStatsPrinting();

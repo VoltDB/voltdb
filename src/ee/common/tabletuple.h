@@ -69,6 +69,8 @@ namespace voltdb {
 #define PENDING_DELETE_ON_UNDO_RELEASE_MASK 8
 
 class TableColumn;
+class TupleIterator;
+class ElasticScanner;
 class StandAloneTupleStorage;
 
 class TableTuple {
@@ -76,6 +78,7 @@ class TableTuple {
     friend class Table;
     friend class TempTable;
     friend class PersistentTable;
+    friend class ElasticScanner;
     friend class PoolBackedTupleStorage;
     friend class CopyOnWriteIterator;
     friend class CopyOnWriteContext;

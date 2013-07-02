@@ -143,14 +143,32 @@ public:
 #define TEST(suite_name, test_name) MAGIC_TEST_MACRO(Test, suite_name, test_name, TestSuite::globalInstance())
 
 /*
- * Macros for easily disabling tests. Use by prepending macro names with "NO".
- * IMPORTANT: The build will intentionally fail if STUPIDUNIT_TWEAK is not defined.
+ * Define STUPID_UNIT_TWEAK to allow selective test disabling by prepending the
+ * TEST* macros with "NO", e.g. NOTEST_F(...).
+ * Define STUPID_UNIT_SOLO to disable all tests except for the one prepended
+ * with "SOLO", e.g. SOLOTEST_F(...).
+ * IMPORTANT: The build will intentionally fail if STUPIDUNIT_TWEAK is not
+ * defined while there are NOTEST* macros in code. Similarly, it will fail if
+ * STUPID_UNIT_SOLO is not defined while there are SOLOTEST* macros in code.
  * This prevents accidentally leaving tests disabled.
- *** DO NOT PUT a STUPIDUNIT_TWEAK #define in the code! ***
+ *** DO NOT PUT a STUPIDUNIT_TWEAK #define in the code, or tests may be
+ *** accidentally disabled in the real build! Only define it in an IDE
+ *** configuration or use it manually in a special command line build.
  */
 #ifdef STUPIDUNIT_TWEAK
 #define NOTEST_F(harness_name, test_name) MAGIC_TEST_MACRO(harness_name, harness_name, test_name, NULL)
 #define NOTEST(suite_name, test_name) MAGIC_TEST_MACRO(Test, suite_name, test_name, NULL)
+#endif
+#ifdef STUPIDUNIT_SOLO
+#ifndef STUPIDUNIT_TWEAK
+#error STUPIDUNIT_SOLO is defined without STUPIDUNIT_TWEAK. Do not leave either #define in code!
+#endif
+#undef TEST_F
+#undef TEST
+#define TEST_F(harness_name, test_name) MAGIC_TEST_MACRO(harness_name, harness_name, test_name, NULL)
+#define TEST(suite_name, test_name) MAGIC_TEST_MACRO(Test, suite_name, test_name, NULL)
+#define SOLOTEST_F(harness_name, test_name) MAGIC_TEST_MACRO(harness_name, harness_name, test_name, TestSuite::globalInstance())
+#define SOLOTEST(suite_name, test_name) MAGIC_TEST_MACRO(Test, suite_name, test_name, TestSuite::globalInstance())
 #endif
 
 // Abuse macros to easily define all the EXPECT and ASSERT variants

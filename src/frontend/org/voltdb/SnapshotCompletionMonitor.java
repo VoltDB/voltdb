@@ -157,6 +157,7 @@ public class SnapshotCompletionMonitor {
         JSONObject jsonObj = new JSONObject(new String(data, "UTF-8"));
         long txnId = jsonObj.getLong("txnId");
         int hostCount = jsonObj.getInt("hostCount");
+        String path = jsonObj.getString("path");
         String nonce = jsonObj.getString("nonce");
         boolean truncation = jsonObj.getBoolean("isTruncation");
         // A truncation request ID is not always provided. It's used for
@@ -207,6 +208,7 @@ public class SnapshotCompletionMonitor {
                 try {
                     interest.snapshotCompleted(
                             new SnapshotCompletionEvent(
+                                path,
                                 nonce,
                                 txnId,
                                 partitionTxnIdsMap,
