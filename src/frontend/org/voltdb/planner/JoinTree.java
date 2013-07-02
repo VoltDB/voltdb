@@ -99,47 +99,39 @@ public class JoinTree implements Cloneable {
 
         /**
          * Construct a leaf node
-         * @param table - join table
+         * @param id - node unique id
          * @param joinType - join type
+         * @param table - join table
          * @param joinExpr - join expression
          * @param whereExpr - filter expression
          * @param id - node id
          */
-        JoinNode(Table table, JoinType joinType, AbstractExpression joinExpr, AbstractExpression  whereExpr, int id) {
+        JoinNode(int id, JoinType joinType, Table table, AbstractExpression joinExpr, AbstractExpression  whereExpr) {
+            this(id, joinType);
             m_table = table;
-            m_joinType = joinType;
             m_joinExpr = joinExpr;
             m_whereExpr = whereExpr;
-            m_id = id;
         }
 
         /**
          * Construct a join node
+         * @param id - node unique id
          * @param joinType - join type
          * @param leftNode - left node
          * @param rightNode - right node
-         * @param id - node id
          */
-        JoinNode(JoinType joinType, JoinNode leftNode, JoinNode rightNode, int id) {
-            m_joinType = joinType;
+        JoinNode(int id, JoinType joinType, JoinNode leftNode, JoinNode rightNode) {
+            this(id, joinType);
             m_leftNode = leftNode;
             m_rightNode = rightNode;
-            m_id = id;
         }
 
         /**
          * Construct an empty join node
          */
-//// Does there need to be a constructor specifically for use by clone().
-//// If so, it should be private.
-//// Also, it should arguably take on more of the member initialization, especially
-//// if that means that members can be declared final.
-//// Consider: to what extent are the public constructors useful for the purposes of clone()?
-//// Consider: otherwise, can the public constructors and clone both delegate to common private
-//// constructors leveraging how java (like C++11) allows lateral constructor-to-constructor
-//// delegation?
-        JoinNode(int id) {
+        private JoinNode(int id, JoinType joinType) {
             m_id = id;
+            m_joinType = joinType;
         }
 
         /**
@@ -147,8 +139,7 @@ public class JoinTree implements Cloneable {
          */
         @Override
         public Object clone() {
-            JoinNode newNode = new JoinNode(m_id);
-            newNode.m_joinType = m_joinType;
+            JoinNode newNode = new JoinNode(m_id, m_joinType);
             if (m_joinExpr != null) {
                 newNode.m_joinExpr = (AbstractExpression) m_joinExpr.clone();
             }

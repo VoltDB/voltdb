@@ -155,7 +155,7 @@ public abstract class SubPlanAssembler {
             allExprs.addAll(filterExprs);
         }
 
-        AccessPath naivePath = getRelevantNaivePathForTable(allJoinExprs, filterExprs);
+        AccessPath naivePath = getRelevantNaivePath(allJoinExprs, filterExprs);
         paths.add(naivePath);
 
         CatalogMap<Index> indexes = table.getIndexes();
@@ -174,15 +174,13 @@ public abstract class SubPlanAssembler {
     }
 
     /**
-     * Generate the naive (scan) pass for the table
+     * Generate the naive (scan) pass given a join and filter expressions
      *
-     * @param joinExprs join expressions this table is part of
-     * @param filterExprs filter expressions this table is part of
+     * @param joinExprs join expressions
+     * @param filterExprs filter expressions
      * @return Naive access path
      */
-//// FIXME: This function is misleadingly named, at least for how it is called in
-//// SelectSubPlanAssmbler, mostly for cases where there is no "table", just a join.
-    protected AccessPath getRelevantNaivePathForTable(List<AbstractExpression> joinExprs, List<AbstractExpression> filterExprs) {
+    protected AccessPath getRelevantNaivePath(List<AbstractExpression> joinExprs, List<AbstractExpression> filterExprs) {
         AccessPath naivePath = new AccessPath();
 
         if (filterExprs != null) {

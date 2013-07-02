@@ -66,7 +66,7 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
     AbstractPlanNode nextPlan() {
         if (!m_generatedPlans) {
             // Analyze join conditions
-            m_parsedStmt.analyzeTreeExpressions(m_parsedStmt.joinTree);
+            m_parsedStmt.analyzeJoinExpressions(m_parsedStmt.joinTree);
 
             m_generatedPlans = true;
             Table nextTables[] = new Table[0];
