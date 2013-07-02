@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -150,10 +151,15 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
         ArrayList<SynthesizedPlanFragment> restorePlan = new ArrayList<SynthesizedPlanFragment>();
         Set<Integer> coveredPartitions = new HashSet<Integer>();
 
-        for (Integer host : m_partitionsAtHost.keySet()) {
+        Iterator<Entry<Integer, Set<Pair<Integer, Integer>>>> partitionAtHostItr =
+                m_partitionsAtHost.entrySet().iterator();
+
+        while(partitionAtHostItr.hasNext()) {
+            Entry<Integer, Set<Pair<Integer, Integer>>> partitionAtHost = partitionAtHostItr.next();
+            Integer host = partitionAtHost.getKey();
             List<Integer> loadPartitions = new ArrayList<Integer>();
             List<Integer> loadOrigHosts = new ArrayList<Integer>();
-            Set<Pair<Integer, Integer>> partitionAndOrigHostSet = m_partitionsAtHost.get(host);
+            Set<Pair<Integer, Integer>> partitionAndOrigHostSet = partitionAtHost.getValue();
             Iterator<Pair<Integer, Integer>> itr = partitionAndOrigHostSet.iterator();
             while(itr.hasNext()) {
                 Pair<Integer, Integer> pair = itr.next();

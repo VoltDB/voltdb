@@ -838,7 +838,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                                                     .decompressBytes(compressedTable)),
                                     true);
                     voltLoadTable(context.getCluster().getTypeName(), context
-                            .getDatabase().getTypeName(), table_name, table);
+                            .getDatabase().getTypeName(), table_name, table, false);
             } catch (Exception e) {
                 result_str = "FAILURE";
                 error_msg = e.getMessage();

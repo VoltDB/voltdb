@@ -115,12 +115,12 @@ public class SysProcFragmentId
     // partitioned table to replicated table
     public static final long PF_restoreLoadPartitionedTable = 901;
     public static final long PF_restoreLoadPartitionedTableResult = 902;
-    public static final long PF_restoreDistributeSendPartitionedTable = 904;
-    public static final long PF_restoreDistributeSendPartitionedTableResult = 905;
+    public static final long PF_restoreDistributeSendPartitionedTable = 903;
+    public static final long PF_restoreDistributeSendPartitionedTableResult = 904;
 
     // replicated table to partitioned table
-    public static final long PF_restoreDispatchReplicatedTable = 906;
-    public static final long PF_restoreDispatchReplicatedTableResult = 907;
+    public static final long PF_restoreDispatchReplicatedTable = 905;
+    public static final long PF_restoreDispatchReplicatedTableResult = 906;
 
     // @StartSampler
     public static final long PF_startSampler = 80;

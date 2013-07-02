@@ -22,7 +22,6 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.TreeSet;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
 import org.voltdb.VoltTableRow;
@@ -32,8 +31,6 @@ import org.voltdb.sysprocs.SysProcFragmentId;
 
 public class ReplicatedTableSaveFileState extends TableSaveFileState
 {
-    private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
-
     ReplicatedTableSaveFileState(String tableName, long txnId)
     {
         super(tableName, txnId);
@@ -100,7 +97,6 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
     {
         SynthesizedPlanFragment[] restore_plan = null;
 
-        assert(!m_hostsWithThisTable.isEmpty());
         Integer host = m_hostsWithThisTable.iterator().next();
 
         // replicated table is small enough for only one site to distribute the task
