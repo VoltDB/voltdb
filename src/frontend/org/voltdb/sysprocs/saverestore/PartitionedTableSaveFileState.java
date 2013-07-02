@@ -171,18 +171,9 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
             }
 
             if(loadPartitions.size() > 0){
-                int[] relevantPartitionIds = new int[loadPartitions.size()];
-                int[] originalHosts = new int[loadOrigHosts.size()];
+                int[] relevantPartitionIds = com.google.common.primitives.Ints.toArray(loadPartitions);
+                int[] originalHosts = com.google.common.primitives.Ints.toArray(loadOrigHosts);
                 List<Long> sitesAtHost = st.getSitesForHost(host);
-
-                int index = 0;
-                for(Integer p : loadPartitions) {
-                    relevantPartitionIds[index++] = p;
-                }
-                index = 0;
-                for(Integer h : loadOrigHosts) {
-                    originalHosts[index++] = h;
-                }
 
                 for(Long site : sitesAtHost) {
                     restorePlan.add(constructLoadPartitionedTableFragment(
