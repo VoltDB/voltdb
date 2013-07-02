@@ -25,7 +25,6 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 import java.sql.Timestamp;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
@@ -1010,7 +1009,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
     }
 
-    public void testTRUNCATE() throws NoConnectionsException, IOException, ProcCallException, ParseException {
+    public void testTRUNCATE() throws Exception {
         System.out.println("STARTING TRUNCATE with timestamp");
         Client client = getClient();
         ClientResponse cr;
@@ -1026,9 +1025,12 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         try {
             cr = client.callProcedure("@AdHoc", "select TRUNCATE (1.2, 1), TM from P2 where id = 0");
         } catch (Exception e) {
+            System.out.println(e.getMessage());
             ex = e;
         } finally {
             assertNotNull(ex);
+            assertTrue((ex.getMessage().contains("Error compiling query")));
+            assertTrue((ex.getMessage().contains("PlanningErrorException")));
         }
 
         // Test date before Gregorian calendar beginning.
@@ -1042,6 +1044,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             System.out.println(e.getMessage());
             ex = e;
         } finally {
+            assertNotNull(ex);
             assertTrue((ex.getMessage().contains("SQL ERROR")));
         }
 

@@ -18,8 +18,7 @@
 #include "boost/date_time/gregorian/greg_date.hpp"
 #include "boost/date_time/posix_time/posix_time_types.hpp"
 #include "boost/date_time/posix_time/posix_time_duration.hpp"
-#include <boost/date_time/posix_time/ptime.hpp>
-#include <boost/date_time/posix_time/posix_time_duration.hpp>
+#include "boost/date_time/posix_time/ptime.hpp"
 #include "boost/date_time/posix_time/conversion.hpp"
 #include <ctime>
 #include "common/SQLException.h"
@@ -34,7 +33,46 @@ static inline boost::posix_time::time_duration time_of_day_from_epoch_micros(int
     return boost::posix_time::from_time_t(epoch_seconds).time_of_day();
 }
 
-static boost::posix_time::ptime EPOCH(boost::gregorian::date(1970,1,1));
+static const boost::posix_time::ptime EPOCH(boost::gregorian::date(1970,1,1));
+static const int64_t GREGORIAN_EPOCH = -12212553600000000;  // 1583-01-01 00:00:00
+static const int8_t QUARTER_START_MONTH_BY_MONTH[] = {
+        /*[0] not used*/-1,  1, 1, 1,  4, 4, 4,  7, 7, 7,  10, 10, 10 };
+
+/** Convert from epoch_micros to date **/
+static void micros_to_date(int64_t epoch_micros_in, boost::gregorian::date& date_out) {
+    if (epoch_micros_in < GREGORIAN_EPOCH) {
+        throw voltdb::SQLException(voltdb::SQLException::data_exception_numeric_value_out_of_range,
+                "Value out of range. Cannot convert dates prior to the year 1583");
+    }
+    boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros_in);
+    date_out = input_ptime.date();
+
+}
+
+/** Convert from epoch_micros to date and time **/
+static void micros_to_date_and_time(int64_t epoch_micros_in, boost::gregorian::date& date_out,
+        boost::posix_time::time_duration& time_out) {
+    if (epoch_micros_in < GREGORIAN_EPOCH) {
+        throw voltdb::SQLException(voltdb::SQLException::data_exception_numeric_value_out_of_range,
+                "Value out of range. Cannot convert dates prior to the year 1583");
+    }
+    boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros_in);
+    date_out = input_ptime.date();
+    time_out = input_ptime.time_of_day();
+}
+
+/** Convert from timestamp to micros since epoch **/
+static int64_t epoch_microseconds_from_components(int year, int month = 1, int day = 1, int hour = 0,
+        int minute = 0, int second = 0) {
+
+    boost::gregorian::date goal_date = boost::gregorian::date(year, month, day);
+    boost::posix_time::ptime goal_ptime =
+            boost::posix_time::ptime(goal_date,boost::posix_time::time_duration(hour,minute,second));
+    boost::posix_time::time_period goal_period (EPOCH, goal_ptime);
+    boost::posix_time::time_duration goal_duration = goal_period.length();
+    int64_t epoch_seconds = goal_duration.ticks() / goal_duration.ticks_per_second();
+    return epoch_seconds * 1000000;
+}
 
 namespace voltdb {
 
@@ -204,19 +242,10 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_YEAR>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    if (epoch_micros < -12212553600000000) {
-        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                "Value out of range. Cannot convert dates prior to the year 1583");
-    }
-    boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros);
-    boost::gregorian::date as_date = input_ptime.date();
-    boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),1,1);
-    boost::posix_time::ptime truncate_ptime =
-            boost::posix_time::ptime(truncate_date,boost::posix_time::time_duration(0,0,0));
-    boost::posix_time::time_period goal_period (EPOCH, truncate_ptime);
-    boost::posix_time::time_duration goal_duration = goal_period.length();
-    int64_t truncate_epoch_seconds = goal_duration.ticks() / goal_duration.ticks_per_second();
-    return getTimestampValue(truncate_epoch_seconds * 1000000);
+    boost::gregorian::date as_date;
+    micros_to_date(epoch_micros, as_date);
+    int64_t truncate_epoch_micros = epoch_microseconds_from_components(as_date.year());
+    return getTimestampValue(truncate_epoch_micros);
 }
 
 /** implement the timestamp TRUNCATE to QUARTER function **/
@@ -225,20 +254,11 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_QUARTER>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    if (epoch_micros < -12212553600000000) {
-        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                "Value out of range. Cannot convert dates prior to the year 1583");
-    }
-    boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros);
-    boost::gregorian::date as_date = input_ptime.date();
-    int quater = (static_cast<int>(ceil(as_date.month() / 3.0))-1) * 3 + 1;
-    boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),(int8_t)quater,1);
-    boost::posix_time::ptime truncate_ptime =
-            boost::posix_time::ptime(truncate_date,boost::posix_time::time_duration(0,0,0));
-    boost::posix_time::time_period goal_period (EPOCH, truncate_ptime);
-    boost::posix_time::time_duration goal_duration = goal_period.length();
-    int64_t truncate_epoch_seconds = goal_duration.ticks() / goal_duration.ticks_per_second();
-    return getTimestampValue(truncate_epoch_seconds * 1000000);
+    boost::gregorian::date as_date;
+    micros_to_date(epoch_micros, as_date);
+    int8_t quarter_start_month = QUARTER_START_MONTH_BY_MONTH[as_date.month()];
+    int64_t truncate_epoch_micros = epoch_microseconds_from_components(as_date.year(), (int)quarter_start_month);
+    return getTimestampValue(truncate_epoch_micros);
 }
 
 /** implement the timestamp TRUNCATE to MONTH function **/
@@ -247,19 +267,10 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MONTH>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    if (epoch_micros < -12212553600000000) {
-        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                "Value out of range. Cannot convert dates prior to the year 1583");
-    }
-    boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros);
-    boost::gregorian::date as_date = input_ptime.date();
-    boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),as_date.month(),1);
-    boost::posix_time::ptime truncate_ptime =
-            boost::posix_time::ptime(truncate_date,boost::posix_time::time_duration(0,0,0));
-    boost::posix_time::time_period goal_period (EPOCH, truncate_ptime);
-    boost::posix_time::time_duration goal_duration = goal_period.length();
-    int64_t truncate_epoch_seconds = goal_duration.ticks() / goal_duration.ticks_per_second();
-    return getTimestampValue(truncate_epoch_seconds * 1000000);
+    boost::gregorian::date as_date;
+    micros_to_date(epoch_micros, as_date);
+    int64_t truncate_epoch_micros = epoch_microseconds_from_components(as_date.year(),as_date.month());
+    return getTimestampValue(truncate_epoch_micros);
 }
 
 /** implement the timestamp TRUNCATE to DAY function **/
@@ -268,19 +279,11 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_DAY>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    if (epoch_micros < -12212553600000000) {
-        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                "Value out of range. Cannot convert dates prior to the year 1583");
-    }
-    boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros);
-    boost::gregorian::date as_date = input_ptime.date();
-    boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),as_date.month(),as_date.day());
-    boost::posix_time::ptime truncate_ptime =
-            boost::posix_time::ptime(truncate_date,boost::posix_time::time_duration(0,0,0));
-    boost::posix_time::time_period goal_period (EPOCH, truncate_ptime);
-    boost::posix_time::time_duration goal_duration = goal_period.length();
-    int64_t truncate_epoch_seconds = goal_duration.ticks() / goal_duration.ticks_per_second();
-    return getTimestampValue(truncate_epoch_seconds * 1000000);
+    boost::gregorian::date as_date;
+    micros_to_date(epoch_micros, as_date);
+    int64_t truncate_epoch_micros =
+            epoch_microseconds_from_components(as_date.year(),as_date.month(), as_date.day());
+    return getTimestampValue(truncate_epoch_micros);
 }
 
 /** implement the timestamp TRUNCATE to HOUR function **/
@@ -289,20 +292,12 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_HOUR>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    if (epoch_micros < -12212553600000000) {
-        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                "Value out of range. Cannot convert dates prior to the year 1583");
-    }
-    boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros);
-    boost::gregorian::date as_date = input_ptime.date();
-    boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),as_date.month(),as_date.day());
-    boost::posix_time::time_duration as_time = input_ptime.time_of_day();
-    boost::posix_time::ptime truncate_ptime =
-            boost::posix_time::ptime(truncate_date,boost::posix_time::time_duration(as_time.hours(),0,0));
-    boost::posix_time::time_period goal_period (EPOCH, truncate_ptime);
-    boost::posix_time::time_duration goal_duration = goal_period.length();
-    int64_t truncate_epoch_seconds = goal_duration.ticks() / goal_duration.ticks_per_second();
-    return getTimestampValue(truncate_epoch_seconds * 1000000);
+    boost::gregorian::date as_date;
+    boost::posix_time::time_duration as_time;
+    micros_to_date_and_time(epoch_micros, as_date, as_time);
+    int64_t truncate_epoch_micros = epoch_microseconds_from_components(as_date.year(),as_date.month(),
+            as_date.day(), as_time.hours());
+    return getTimestampValue(truncate_epoch_micros);
 }
 
 /** implement the timestamp TRUNCATE to MINUTE function **/
@@ -311,20 +306,12 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MINUTE>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    if (epoch_micros < -12212553600000000) {
-        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                "Value out of range. Cannot convert dates prior to the year 1583");
-    }
-    boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros);
-    boost::gregorian::date as_date = input_ptime.date();
-    boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),as_date.month(),as_date.day());
-    boost::posix_time::time_duration as_time = input_ptime.time_of_day();
-    boost::posix_time::ptime truncate_ptime =
-            boost::posix_time::ptime(truncate_date,boost::posix_time::time_duration(as_time.hours(),as_time.minutes(),0));
-    boost::posix_time::time_period goal_period (EPOCH, truncate_ptime);
-    boost::posix_time::time_duration goal_duration = goal_period.length();
-    int64_t truncate_epoch_seconds = goal_duration.ticks() / goal_duration.ticks_per_second();
-    return getTimestampValue(truncate_epoch_seconds * 1000000);
+    boost::gregorian::date as_date;
+    boost::posix_time::time_duration as_time;
+    micros_to_date_and_time(epoch_micros, as_date, as_time);
+    int64_t truncate_epoch_micros = epoch_microseconds_from_components(as_date.year(),as_date.month(),
+            as_date.day(), as_time.hours(), as_time.minutes());
+    return getTimestampValue(truncate_epoch_micros);
 }
 
 /** implement the timestamp TRUNCATE to SECOND function **/
@@ -333,20 +320,12 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_SECOND>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    if (epoch_micros < -12212553600000000) {
-        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                "Value out of range. Cannot convert dates prior to the year 1583");
-    }
-    boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros);
-    boost::gregorian::date as_date = input_ptime.date();
-    boost::gregorian::date truncate_date = boost::gregorian::date(as_date.year(),as_date.month(),as_date.day());
-    boost::posix_time::time_duration as_time = input_ptime.time_of_day();
-    boost::posix_time::ptime truncate_ptime =
-            boost::posix_time::ptime(truncate_date,boost::posix_time::time_duration(as_time.hours(),as_time.minutes(),as_time.seconds()));
-    boost::posix_time::time_period goal_period (EPOCH, truncate_ptime);
-    boost::posix_time::time_duration goal_duration = goal_period.length();
-    int64_t truncate_epoch_seconds = goal_duration.ticks() / goal_duration.ticks_per_second();
-    return getTimestampValue(truncate_epoch_seconds * 1000000);
+    boost::gregorian::date as_date;
+    boost::posix_time::time_duration as_time;
+    micros_to_date_and_time(epoch_micros, as_date, as_time);
+    int64_t truncate_epoch_micros = epoch_microseconds_from_components(as_date.year(),as_date.month(),
+            as_date.day(), as_time.hours(), as_time.minutes(),as_time.seconds());
+    return getTimestampValue(truncate_epoch_micros);
 }
 
 /** implement the timestamp TRUNCATE to MILLIS function **/
@@ -355,10 +334,6 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MILLISECOND>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    if (epoch_micros < -12212553600000000) {
-        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                "Value out of range. Cannot convert dates prior to the year 1583");
-    }
     int64_t epoch_millis = static_cast<int64_t>(epoch_micros / 1000);
     return getTimestampValue(epoch_millis * 1000);
 }
@@ -369,10 +344,6 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MICROSECOND>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    if (epoch_micros < -12212553600000000) {
-        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                "Value out of range. Cannot convert dates prior to the year 1583");
-    }
     return getTimestampValue(epoch_micros);
 }
 
