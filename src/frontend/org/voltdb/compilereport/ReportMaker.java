@@ -104,7 +104,7 @@ public class ReportMaker {
         sb.append("</tr>\n");
 
         // BUILD THE DROPDOWN FOR THE PLAN/DETAIL TABLE
-        sb.append("<tr class='dropdown'><td colspan='5' id='s-"+ table.getTypeName().toLowerCase() +
+        sb.append("<tr class='dropdown2'><td colspan='5' id='s-"+ table.getTypeName().toLowerCase() +
                 "-" + index.getTypeName().toLowerCase() + "--dropdown'>\n");
 
         IndexAnnotation annotation = (IndexAnnotation) index.getAnnotation();

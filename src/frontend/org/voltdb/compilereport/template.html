@@ -183,6 +183,16 @@
             var anchor = hash.substring(1);
             var parts = anchor.split('-');
             var toppage = parts[0];
+
+            // reset everything
+            $('.tablesorter-childRow>td').hide();
+            $('.dropdown2>td').hide();
+            $('.primaryrow>td').show();
+            $('.primaryrow2>td').show();
+            // make arrows point the right way
+            $('.icon-chevron-down').removeClass('icon-chevron-down').addClass('icon-chevron-right');
+            $('.primaryrow').css('background-color', '#ffffff');
+
             $('.nav-collapse ul li').removeClass('active');
             $('div.reportpage').hide();
             $('#' + toppage + '-nav').addClass('active');
@@ -192,14 +202,22 @@
                 var primary = parts[1];
                 console.log("primary = " + primary);
 
+                var iconid = "#" + toppage + "-" + primary + "--icon";
+                var dropdownid = "#" + toppage + "-" + primary + "--dropdown";
+
+                $(dropdownid).show();
+                $(iconid).parentsUntil("tbody", 'tr').css('background-color', '#dddddd');
+                $(iconid).removeClass('icon-chevron-right').addClass('icon-chevron-down');
+
                 if (parts.length > 2) {
                     var secondary = parts[2];
                     console.log("secondary = " + secondary);
 
-                    var iconid = "#" + toppage + "-" + primary + "--icon";
-                    var dropdownid = "#" + toppage + "-" + primary + "--dropdown";
-                    $(dropdownid).show();
-                    $(iconid).removeClass('icon-chevron-right').addClass('icon-chevron-down');
+                    var iconid2 = "#" + toppage + "-" + primary + "-" + secondary + "--icon";
+                    var dropdownid2 = "#" + toppage + "-" + primary + "-" + secondary + "--dropdown";
+
+                    $(dropdownid2).show();
+                    $(iconid2).removeClass('icon-chevron-right').addClass('icon-chevron-down');
                 }
             }
 
@@ -240,44 +258,40 @@
             });
 
             $('.tableL1').delegate('.togglex', 'click' ,function(){
-                var iconid = "#" + $(this).attr('id') + "--icon";
-                var dropdownid = "#" + $(this).attr('id') + "--dropdown";
-                var tbody = $(this).parentsUntil("tbody", 'tr').parent()
-                var rows = tbody.children('tr.primaryrow');
+                var id = $(this).attr('id');
+                var toppage = id.split('-')[0];
+                var dropdownid = "#" + id + "--dropdown";
 
-                $('.primaryrow').css('background-color', '#ffffff');
-                $('.icon-chevron-down').removeClass('icon-chevron-down').addClass('icon-chevron-right');
-                $(dropdownid).toggle();
+                var hash = "#" + id;
                 if ($(dropdownid).is(":visible")) {
-                    tbody.children('.tablesorter-childRow').children('td').hide();
-                    $(dropdownid).show();
-                    $(this).parentsUntil("tbody", 'tr').css('background-color', '#dddddd');
-                    $(iconid).removeClass('icon-chevron-right').addClass('icon-chevron-down');
+                    hash = "#" + toppage;
                 }
-                history.replaceState(null, null, "#" + $(this).attr('id'));
+                history.replaceState(null, null, hash);
+                navigate(hash);
                 return false;
             });
             $('.tableL2').delegate('.togglex', 'click' ,function(){
-                var iconid = "#" + $(this).attr('id') + "--icon";
-                var dropdownid = "#" + $(this).attr('id') + "--dropdown";
-                $(dropdownid).toggle();
+                var id = $(this).attr('id');
+
+                console.log("l2click: " + id);
+
+                var parts = id.split('-');
+                var toppage = parts[0];
+                var primary = parts[1];
+                var dropdownid = "#" + id + "--dropdown";
+
+                var hash = "#" + id;
                 if ($(dropdownid).is(":visible")) {
-                    $(iconid).removeClass('icon-chevron-right').addClass('icon-chevron-down');
+                    console.log("l2clickVISIBLE");
+                    hash = "#" + toppage + "-" + primary;
                 }
                 else {
-                    $(iconid).removeClass('icon-chevron-down').addClass('icon-chevron-right');
+                    console.log("not visible");
                 }
-                history.replaceState(null, null, "#" + $(this).attr('id'));
+                history.replaceState(null, null, hash);
+                navigate(hash);
                 return false;
             });
-
-            // hide child rows
-            $('.tablesorter-childRow>td').hide();
-            $('.dropdown2>td').hide();
-            $('.primaryrow>td').show();
-            $('.primaryrow2>td').show();
-            // make arrows point the right way
-            $('.icon-chevron-down').removeClass('icon-chevron-down').addClass('icon-chevron-right');
 
             navigate($(location).attr('hash'));
 
