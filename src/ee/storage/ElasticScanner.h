@@ -73,10 +73,8 @@ class ElasticScanner : public TupleIterator
      */
     bool continueScan();
 
-#ifdef DEBUG
     /// Table being iterated.
     PersistentTable &m_table;
-#endif
 
     /// Block map.
     TBMap m_blockMap;

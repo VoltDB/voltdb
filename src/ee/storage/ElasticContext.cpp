@@ -83,7 +83,9 @@ bool ElasticContext::notifyTupleDelete(TableTuple &tuple)
         bool removed =
 #endif
         m_index.remove(table, tuple);
+#ifdef DEBUG
         assert(removed);
+#endif
     }
     return true;
 }
@@ -102,14 +104,18 @@ void ElasticContext::notifyTupleMovement(TBPtr sourceBlock,
         bool removed =
 #endif
         m_index.remove(getTable(), sourceTuple);
+#ifdef DEBUG
         assert(removed);
+#endif
     }
     if (getPredicates()[0].eval(&targetTuple).isTrue()) {
 #ifdef DEBUG
         bool added =
 #endif
         m_index.add(getTable(), targetTuple);
+#ifdef DEBUG
         assert(added);
+#endif
     }
 }
 
