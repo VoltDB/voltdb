@@ -235,6 +235,9 @@ def main():
 
     # show all the history
     branches = get_branches(STATS_SERVER, 21212, ndays)
+    if 'master' in branches:
+        branches.remove('master')
+        branches.insert(0,'master')
     root_path = path
     filenames = []              # (appname, latency, throughput)
     iorder = 0
