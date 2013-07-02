@@ -33,7 +33,7 @@ def get_branches(hostname, port, days):
 
     mydate = datetime.datetime.today()-datetime.timedelta(days=days)
 
-    query = "select distinct branch, count(*) from app_stats where ts >= '%s' group by branch order by 2 desc" % \
+    query = "select branch, count(*) from app_stats where ts >= '%s' group by branch order by 2 desc" % \
                     mydate.strftime('%Y-%m-%d 00:00:00')
 
     conn = FastSerializer(hostname, port)
