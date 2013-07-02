@@ -24,6 +24,8 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.VoltTable;
+import org.voltdb.client.ClientResponse;
 
 /**
  * Message from an execution site to initiator with the final response for
@@ -151,7 +153,7 @@ public class InitiateResponseMessage extends VoltMessage {
         m_mispartitioned = mispartitioned;
         m_invocation = invocation;
         m_commit = false;
-        m_response = null;
+        m_response = new ClientResponseImpl(ClientResponse.TXN_RESTART, new VoltTable[]{}, "Mispartitioned");
     }
 
     public ClientResponseImpl getClientResponseData() {
