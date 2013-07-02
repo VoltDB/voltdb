@@ -48,6 +48,7 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.PlatformProperties;
 
+import com.google.common.base.Charsets;
 import com.google.common.io.Resources;
 
 public class ReportMaker {
@@ -604,7 +605,7 @@ public class ReportMaker {
 
 
         URL url = Resources.getResource(ReportMaker.class, "template.html");
-        String contents = Resources.toString(url, VoltDB.UTF8ENCODING);
+        String contents = Resources.toString(url, Charsets.UTF_8);
 
         Cluster cluster = catalog.getClusters().get("cluster");
         assert(cluster != null);
@@ -641,7 +642,7 @@ public class ReportMaker {
      */
     public static String liveReport() {
         byte[] reportbytes = VoltDB.instance().getCatalogContext().getFileInJar("catalog-report.html");
-        String report = new String(reportbytes, VoltDB.UTF8ENCODING);
+        String report = new String(reportbytes, Charsets.UTF_8);
 
         // remove commented out code
         report = report.replace("<!--##RESOURCES", "");

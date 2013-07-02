@@ -25,7 +25,9 @@ namespace voltdb
  * Constructor.
  */
 ElasticScanner::ElasticScanner(PersistentTable &table) :
+#ifdef DEBUG
     m_table(table),
+#endif
     m_blockMap(table.m_data),
     m_tupleSize(table.getTupleLength()),
     m_blockIterator(m_blockMap.begin()),

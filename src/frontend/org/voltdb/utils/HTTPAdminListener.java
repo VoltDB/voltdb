@@ -50,6 +50,7 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.compilereport.ReportMaker;
 import org.voltdb.dtxn.SiteTracker;
 
+import com.google.common.base.Charsets;
 import com.google.common.io.Resources;
 
 public class HTTPAdminListener {
@@ -330,7 +331,7 @@ public class HTTPAdminListener {
 
     private void loadTemplate(Class<?> clz, String name) throws Exception {
         URL url = Resources.getResource(clz, name);
-        String contents = Resources.toString(url, VoltDB.UTF8ENCODING);
+        String contents = Resources.toString(url, Charsets.UTF_8);
         m_htmlTemplates.put(name, contents);
     }
 

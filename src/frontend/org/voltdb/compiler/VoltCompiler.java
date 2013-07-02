@@ -59,7 +59,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.ProcInfoData;
 import org.voltdb.RealVoltDB;
 import org.voltdb.TransactionIdManager;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
@@ -73,6 +72,7 @@ import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.projectfile.ClassdependenciesType.Classdependency;
 import org.voltdb.compiler.projectfile.DatabaseType;
 import org.voltdb.compiler.projectfile.ExportType;
@@ -427,7 +427,7 @@ public class VoltCompiler {
             for (final Entry<String, String> e : m_ddlFilePaths.entrySet())
                 m_jarOutput.put(e.getKey(), new File(e.getValue()));
             // put the compiler report into the jarfile
-            m_jarOutput.put("catalog-report.html", m_report.getBytes(VoltDB.UTF8ENCODING));
+            m_jarOutput.put("catalog-report.html", m_report.getBytes(Constants.UTF8ENCODING));
             m_jarOutput.writeToFile(new File(jarOutputPath)).run();
         }
         catch (final Exception e) {
