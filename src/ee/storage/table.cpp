@@ -71,7 +71,6 @@ Table::Table(int tableAllocationTargetSize) :
     m_columnHeaderData(NULL),
     m_columnHeaderSize(-1),
     m_tupleCount(0),
-    m_usedTupleCount(0),
     m_tuplesPinnedByUndo(0),
     m_columnCount(0),
     m_tuplesPerBlock(0),
@@ -101,7 +100,6 @@ Table::~Table() {
     }
 
     m_schema = NULL;
-    m_tempTuple.m_data = NULL;
 
     // clear any cached column serializations
     if (m_columnHeaderData)
@@ -157,19 +155,7 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string>
     // set the data to be empty
     m_tupleCount = 0;
 
-    m_tmpTarget1 = TableTuple(m_schema);
-    m_tmpTarget2 = TableTuple(m_schema);
-
     onSetColumns(); // for more initialization
-}
-
-// ------------------------------------------------------------------
-// OPERATIONS
-// ------------------------------------------------------------------
-
-bool Table::updateTuple(TableTuple &targetTupleToUpdate, TableTuple &sourceTupleWithNewValues) {
-    std::vector<TableIndex*> indexes = allIndexes();
-    return updateTupleWithSpecificIndexes(targetTupleToUpdate, sourceTupleWithNewValues, indexes);
 }
 
 // ------------------------------------------------------------------
@@ -397,32 +383,51 @@ bool Table::equals(voltdb::Table *other) {
     return true;
 }
 
-voltdb::TableStats* Table::getTableStats() {
-    return NULL;
-}
-
 void Table::loadTuplesFromNoHeader(SerializeInput &serialize_io,
-                                   Pool *stringPool) {
+                                   Pool *stringPool,
+                                   ReferenceSerializeOutput *uniqueViolationOutput) {
     int tupleCount = serialize_io.readInt();
     assert(tupleCount >= 0);
 
-    for (int i = 0; i < tupleCount; ++i) {
-        nextFreeTuple(&m_tmpTarget1);
-        m_tmpTarget1.setActiveTrue();
-        m_tmpTarget1.setDirtyFalse();
-        m_tmpTarget1.setPendingDeleteFalse();
-        m_tmpTarget1.setPendingDeleteOnUndoReleaseFalse();
-        m_tmpTarget1.deserializeFrom(serialize_io, stringPool);
+    TableTuple target(m_schema);
 
-        processLoadedTuple(m_tmpTarget1);
+    //Reserve space for a length prefix for rows that violate unique constraints
+    //If there is no output supplied it will just throw
+    size_t lengthPosition = 0;
+    int32_t serializedTupleCount = 0;
+    size_t tupleCountPosition = 0;
+    if (uniqueViolationOutput != NULL) {
+        lengthPosition = uniqueViolationOutput->reserveBytes(4);
     }
 
-    m_tupleCount += tupleCount;
-    m_usedTupleCount += tupleCount;
+    for (int i = 0; i < tupleCount; ++i) {
+        nextFreeTuple(&target);
+        target.setActiveTrue();
+        target.setDirtyFalse();
+        target.setPendingDeleteFalse();
+        target.setPendingDeleteOnUndoReleaseFalse();
+
+        target.deserializeFrom(serialize_io, stringPool);
+
+        processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition);
+    }
+
+    //If unique constraints are being handled, write the length/size of constraints that occured
+    if (uniqueViolationOutput != NULL) {
+        if (serializedTupleCount == 0) {
+            uniqueViolationOutput->writeIntAt(lengthPosition, 0);
+        } else {
+            uniqueViolationOutput->writeIntAt(lengthPosition,
+                                              static_cast<int32_t>(uniqueViolationOutput->position() - lengthPosition - sizeof(int32_t)));
+            uniqueViolationOutput->writeIntAt(tupleCountPosition,
+                                              serializedTupleCount);
+        }
+    }
 }
 
 void Table::loadTuplesFrom(SerializeInput &serialize_io,
-                           Pool *stringPool) {
+                           Pool *stringPool,
+                           ReferenceSerializeOutput *uniqueViolationOutput) {
     /*
      * directly receives a VoltTable buffer.
      * [00 01]   [02 03]   [04 .. 0x]
@@ -479,7 +484,7 @@ void Table::loadTuplesFrom(SerializeInput &serialize_io,
                                       message.str().c_str());
     }
 
-    loadTuplesFromNoHeader(serialize_io, stringPool);
+    loadTuplesFromNoHeader(serialize_io, stringPool, uniqueViolationOutput);
 }
 
 bool isExistingTableIndex(std::vector<TableIndex*> &indexes, TableIndex* index) {
@@ -515,12 +520,6 @@ void Table::addIndex(TableIndex *index) {
     }
 
     assert(!isExistingTableIndex(m_indexes, index));
-
-    // can't yet add a unique index to a non-emtpy table
-    // the problem is that there's no way to roll back this change if it fails
-    if (index->isUniqueIndex() && activeTupleCount() > 0) {
-        throwFatalException("Adding unique indexes to non-empty tables is unsupported.");
-    }
 
     // fill the index with tuples... potentially the slow bit
     TableTuple tuple(m_schema);

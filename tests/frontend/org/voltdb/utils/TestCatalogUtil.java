@@ -413,6 +413,42 @@ public class TestCatalogUtil extends TestCase {
         assertNull(jane.getGroups().get("lotre"));
     }
 
+    public void testScrambledPasswords() throws Exception {
+        final String depRole = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "<security enabled=\"true\"/>" +
+            "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+            "<paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+            "<httpd port='0'>" +
+            "<jsonapi enabled='true'/>" +
+            "</httpd>" +
+            "<users> " +
+            "<user name=\"joe\" password=\"1E4E888AC66F8DD41E00C5A7AC36A32A9950D271\" plaintext=\"false\" roles=\"louno\"/>" +
+            "<user name=\"jane\" password=\"AAF4C61DDCC5E8A2DABEDE0F3B482CD9AEA9434D\" plaintext=\"false\" roles=\"launo\"/>" +
+            "</users>" +
+            "</deployment>";
+
+        catalog_db.getGroups().add("louno");
+        catalog_db.getGroups().add("launo");
+
+        final File tmpRole = VoltProjectBuilder.writeStringToTempFile(depRole);
+
+        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpRole.getPath(), true);
+
+        Database db = catalog.getClusters().get("cluster")
+                .getDatabases().get("database");
+
+        User joe = db.getUsers().get("joe");
+        assertNotNull(joe);
+        assertNotNull(joe.getGroups().get("louno"));
+        assertNotNull(joe.getShadowpassword());
+
+        User jane = db.getUsers().get("jane");
+        assertNotNull(jane);
+        assertNotNull(jane.getGroups().get("launo"));
+        assertNotNull(joe.getShadowpassword());
+    }
+
     public void testSystemSettingsMaxTempTableSize() throws Exception
     {
         final String depOff =

@@ -53,7 +53,7 @@ public:
               std::size_t maxTupleLength,
               int32_t partitionId,
               StreamPredicateList &predicates,
-              int32_t totalPartitions);
+              std::vector<bool> &predicateDeletes);
 
     /** Stop serializing. */
     void close();
@@ -61,9 +61,12 @@ public:
     /**
      * Write a tuple to the output streams.
      * Expects buffer space was already checked.
+     * numCopiesMade helps deletion logic decide when something is being moved.
      * Returns true when the caller should yield to allow other work to proceed.
      */
-    bool writeRow(TupleSerializer &serializer, TableTuple &tuple);
+    bool writeRow(TupleSerializer &tupleSerializer,
+                  TableTuple &tuple,
+                  bool &deleteRow);
 
 private:
 
@@ -76,11 +79,11 @@ private:
     /** Table receiving tuples. */
     PersistentTable *m_table;
 
-    /** Total number of partitions (for hashing). */
-    int32_t m_totalPartitions;
-
     /** Predicates for filtering. May remain non-NULL after open() if empty. */
     StreamPredicateList *m_predicates;
+
+    /** Vector of booleans that indicates whether the predicate return true means the row should be deleted */
+    std::vector<bool> *m_predicateDeletes;
 
     /** Private method used by constructors, etc. to clear state. */
     void clearState();

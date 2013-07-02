@@ -66,7 +66,7 @@ void TupleOutputStreamProcessor::open(PersistentTable &table,
                                       std::size_t maxTupleLength,
                                       int32_t partitionId,
                                       StreamPredicateList &predicates,
-                                      int32_t totalPartitions)
+                                      std::vector<bool> &predicateDeletes)
 {
     m_table = &table;
     m_maxTupleLength = maxTupleLength;
@@ -76,7 +76,7 @@ void TupleOutputStreamProcessor::open(PersistentTable &table,
         throwFatalException("serializeMore() expects either no predicates or one per output stream.");
     }
     m_predicates = &predicates;
-    m_totalPartitions = totalPartitions;
+    m_predicateDeletes = &predicateDeletes;
     for (TupleOutputStreamProcessor::iterator iter = begin(); iter != end(); ++iter) {
         iter->startRows(partitionId);
     }
@@ -96,7 +96,9 @@ void TupleOutputStreamProcessor::close()
  * Expects buffer space was already checked.
  * Returns true when the caller should yield to allow other work to proceed.
  */
-bool TupleOutputStreamProcessor::writeRow(TupleSerializer &serializer, TableTuple &tuple)
+bool TupleOutputStreamProcessor::writeRow(TupleSerializer &tupleSerializer,
+                                          TableTuple &tuple,
+                                          bool &deleteRow)
 {
     if (m_table == NULL) {
         throwFatalException("TupleOutputStreamProcessor::writeRow() was called before open().");
@@ -104,10 +106,12 @@ bool TupleOutputStreamProcessor::writeRow(TupleSerializer &serializer, TableTupl
 
     // Predicates, if supplied, are one per output stream (previously asserted).
     StreamPredicateList::iterator ipredicate;
+    std::vector<bool>::iterator iDeleteFlag;
     assert(m_predicates != NULL);
 
     if (!m_predicates->empty()) {
         ipredicate = m_predicates->begin();
+        iDeleteFlag = m_predicateDeletes->begin();
     }
 
     bool yield = false;
@@ -120,14 +124,20 @@ bool TupleOutputStreamProcessor::writeRow(TupleSerializer &serializer, TableTupl
             // As with first() we expect a predicate to be available for each and every stream.
             // It was already checked, so just assert here.
             assert(ipredicate != m_predicates->end());
+            if (accepted) {
+                deleteRow = deleteRow || *iDeleteFlag;
+            }
             ++ipredicate;
+            ++iDeleteFlag;
         }
+
         if (accepted) {
             if (!iter->canFit(m_maxTupleLength)) {
                 throwFatalException(
                     "TupleOutputStreamProcessor::writeRow() failed because buffer has no space.");
             }
-            iter->writeRow(serializer, tuple);
+            iter->writeRow(tupleSerializer, tuple);
+
             // Check if we'll need to yield after handling this row.
             if (!yield) {
                 // Yield when the buffer is not capable of handling another tuple

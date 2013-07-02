@@ -19,13 +19,13 @@ package org.voltdb;
 
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Semaphore;
 
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class DummyCommandLog implements CommandLog {
     @Override
-    public void init(CatalogContext context, long txnId, Map<Integer, Long> perPartitionTxnId, String affinity) {}
+    public void init(CatalogContext context, long txnId, int partitionCount,
+                     String affinity, Map<Integer, Long> perPartitionTxnId) {}
 
     @Override
     public boolean needsInitialization() {
@@ -36,21 +36,9 @@ public class DummyCommandLog implements CommandLog {
     public void shutdown() throws InterruptedException {}
 
     @Override
-    public Semaphore logFault(Set<Long> failedInitiators,
-                              Set<Long> faultedTxns) {
-        return new Semaphore(1);
-    }
-
-    @Override
-    public void logHeartbeat(final long txnId) {}
-
-    @Override
-    public long getFaultSequenceNumber() {
-        return 0;
-    }
-
-    @Override
-    public void initForRejoin(CatalogContext context, long txnId, Map<Integer, Long> perPartitionTxnId, boolean isRejoin, String affinity) {}
+    public void initForRejoin(CatalogContext context, long txnId, int partitionCount,
+                              boolean isRejoin, String affinity,
+                              Map<Integer, Long> perPartitionTxnId) {}
 
     @Override
     public boolean log(

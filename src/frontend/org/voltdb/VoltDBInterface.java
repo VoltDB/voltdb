@@ -73,6 +73,9 @@ public interface VoltDBInterface
     public HostMessenger getHostMessenger();
     public ArrayList<ClientInterface> getClientInterfaces();
     public Map<Long, ExecutionSite> getLocalSites();
+    public OpsAgent getOpsAgent(OpsSelector selector);
+    // Keep this method to centralize the cast to StatsAgent for
+    // existing code
     public StatsAgent getStatsAgent();
     public MemoryStats getMemoryStatsSource();
     public FaultDistributorInterface getFaultDistributor();
@@ -98,8 +101,9 @@ public interface VoltDBInterface
      * @param currentTxnId  The transaction ID at which this method is called
      * @param deploymentCRC The CRC of the deployment file
      */
-    public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands, byte[] newCatalogBytes,
-           int expectedCatalogVersion, long currentTxnId, long currentTxnTimestamp, long deploymentCRC);
+    public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands,
+            byte[] newCatalogBytes, byte[] catalogBytesHash, int expectedCatalogVersion,
+            long currentTxnId, long currentTxnTimestamp, long deploymentCRC);
 
    /**
      * Tells if the VoltDB is running. m_isRunning needs to be set to true

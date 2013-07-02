@@ -58,7 +58,7 @@ TableCatalogDelegate::~TableCatalogDelegate()
     }
 }
 
-TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Table &catalogTable) {
+TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Table const &catalogTable) {
     // Columns:
     // Column is stored as map<String, Column*> in Catalog. We have to
     // sort it by Column index to preserve column order.
@@ -87,8 +87,8 @@ TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Table &catalogTabl
                                           columnAllowNull, true);
 }
 
-bool TableCatalogDelegate::getIndexScheme(catalog::Table &catalogTable,
-                                          catalog::Index &catalogIndex,
+bool TableCatalogDelegate::getIndexScheme(catalog::Table const &catalogTable,
+                                          catalog::Index const &catalogIndex,
                                           const TupleSchema *schema,
                                           TableIndexScheme *scheme)
 {
@@ -233,8 +233,8 @@ TableCatalogDelegate::getIndexIdString(const TableIndexScheme &indexScheme)
 }
 
 
-Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database &catalogDatabase,
-                                                       catalog::Table &catalogTable)
+Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &catalogDatabase,
+                                                       catalog::Table const &catalogTable)
 {
     // Create a persistent table for this table in our catalog
     int32_t table_id = catalogTable.relativeIndex();
@@ -381,8 +381,8 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database &catalo
 }
 
 int
-TableCatalogDelegate::init(catalog::Database &catalogDatabase,
-                           catalog::Table &catalogTable)
+TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
+                           catalog::Table const &catalogTable)
 {
     m_table = constructTableFromCatalog(catalogDatabase,
                                         catalogTable);
@@ -400,28 +400,123 @@ TableCatalogDelegate::init(catalog::Database &catalogDatabase,
     return 0;
 }
 
-int
-TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
-                                           catalog::Table &catalogTable)
+
+
+void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & views,
+                  PersistentTable *existingTable, PersistentTable *newTable,
+                  std::map<std::string, CatalogDelegate*> const &delegatesByName)
+{
+    std::vector<catalog::MaterializedViewInfo*> survivingInfos;
+    std::vector<catalog::MaterializedViewInfo*> changingInfos;
+    std::vector<MaterializedViewMetadata*> survivingViews;
+    std::vector<MaterializedViewMetadata*> changingViews;
+    std::vector<MaterializedViewMetadata*> obsoleteViews;
+
+    // Now, it's safe to transfer the wholesale state of the surviving dependent materialized views.
+    existingTable->segregateMaterializedViews(views.begin(), views.end(),
+                                              survivingInfos, survivingViews,
+                                              changingInfos, changingViews,
+                                              obsoleteViews);
+
+    // This process temporarily duplicates the materialized view definitions and their
+    // target table reference counts for all the right materialized view tables,
+    // leaving the others to go away with the existingTable.
+    // Since this is happening "mid-stream" in the redefinition of all of the source and target tables,
+    // there needs to be a way to handle cases where the target table HAS been redefined already and
+    // cases where it HAS NOT YET been redefined (and cases where it just survives intact).
+    // At this point, the materialized view makes a best effort to use the
+    // current/latest version of the table -- particularly, because it will have made off with the
+    // "old" version's primary key index, which is used in the MaterializedViewMetadata constructor.
+    // Once ALL tables have been added/(re)defined, any materialized view definitions that still use
+    // an obsolete target table needs to be brought forward to reference the replacement table.
+    // See initMaterializedViews
+
+    for (int ii = 0; ii < survivingInfos.size(); ++ii) {
+        catalog::MaterializedViewInfo * currInfo = survivingInfos[ii];
+        PersistentTable* oldTargetTable = survivingViews[ii]->targetTable();
+        // Use the now-current definiton of the target table, to be updated later, if needed.
+        TableCatalogDelegate* targetDelegate =
+            dynamic_cast<TableCatalogDelegate*>(findInMapOrNull(oldTargetTable->name(),
+                                                                delegatesByName));
+        PersistentTable* targetTable = oldTargetTable; // fallback value if not (yet) redefined.
+        if (targetDelegate) {
+            PersistentTable* newTargetTable =
+                dynamic_cast<PersistentTable*>(targetDelegate->getTable());
+            if (newTargetTable) {
+                targetTable = newTargetTable;
+            }
+            else {
+                DEBUG_STREAM_HERE("ERROR? Found non-PersistentTable delegate for view target table");
+            }
+        }
+        else {
+            DEBUG_STREAM_HERE("ERROR? Found no delegate for view target table");
+        }
+        // This is not a leak -- the materialized view metadata is self-installing into the new table.
+        // Also, it guards its targetTable from accidental deletion with a refcount bump.
+        new MaterializedViewMetadata(newTable, targetTable, currInfo);
+    }
+}
+
+
+void
+TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatabase,
+                                           catalog::Table const &catalogTable,
+                                           std::map<std::string, CatalogDelegate*> const &delegatesByName)
 {
     ///////////////////////////////////////////////
     // Create a new table so two tables exist
     ///////////////////////////////////////////////
 
-    PersistentTable *newTable = dynamic_cast<PersistentTable*>(constructTableFromCatalog(catalogDatabase,
-                                                                                         catalogTable));
+    PersistentTable *newTable =
+        dynamic_cast<PersistentTable*>(constructTableFromCatalog(catalogDatabase, catalogTable));
+    assert(newTable);
+    PersistentTable *existingTable = dynamic_cast<PersistentTable*>(m_table);
 
     ///////////////////////////////////////////////
     // Move tuples from one table to the other
     ///////////////////////////////////////////////
+    migrateChangedTuples(catalogTable, existingTable, newTable);
 
-    PersistentTable *existingTable = dynamic_cast<PersistentTable*>(m_table);
+    migrateViews(catalogTable.views(), existingTable, newTable, delegatesByName);
 
-    // remove all indexes from the current table
+    ///////////////////////////////////////////////
+    // Drop the old table
+    ///////////////////////////////////////////////
+    deleteCommand();
+
+    ///////////////////////////////////////////////
+    // Patch up the new table as a replacement
+    ///////////////////////////////////////////////
+
+    // configure for stats tables
+    newTable->configureIndexStats(catalogDatabase.relativeIndex());
+    newTable->incrementRefcount();
+    m_table = newTable;
+}
+
+void
+TableCatalogDelegate::migrateChangedTuples(catalog::Table const &catalogTable,
+                                           PersistentTable* existingTable,
+                                           PersistentTable* newTable)
+{
+    int64_t existingTupleCount = existingTable->activeTupleCount();
+
+    // remove all indexes from the existing table
     vector<TableIndex*> currentIndexes = existingTable->allIndexes();
     for (int i = 0; i < currentIndexes.size(); i++) {
         existingTable->removeIndex(currentIndexes[i]);
     }
+
+    // All the (surviving) materialized views depending on the existing table will need to be "transfered"
+    // to the new table -- BUT there's no rush.
+    // The "deleteTupleForSchemaChange" variant of deleteTuple used here on the existing table
+    // leaves any dependent materialized view tables untouched/intact
+    // (technically, temporarily out of synch with the shrinking table).
+    // But the normal "insertPersistentTuple" used here on the new table tries to populate any dependent
+    // serialized views.
+    // Rather than empty the surviving view tables, and transfer them to the new table to be re-populated "retail",
+    // transfer them "wholesale" post-migration.
 
     // figure out what goes in each columns of the new table
 
@@ -465,20 +560,22 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
         for (int oldIndex = 0; oldIndex < oldColumnNames.size(); oldIndex++) {
             if (oldColumnNames[oldIndex].compare(colName) == 0) {
                 columnSourceMap[newIndex] = oldIndex;
-                columnExploded[newIndex] = (m_table->schema()->columnIsInlined(oldIndex) &&
+                columnExploded[newIndex] = (existingTable->schema()->columnIsInlined(oldIndex) &&
                                             ! newTable->schema()->columnIsInlined(newIndex));
                 break;
             }
         }
     }
 
-    TableTuple scannedTuple(m_table->schema());
+    TableTuple scannedTuple(existingTable->schema());
+
+    int64_t tuplesMigrated = 0;
 
     // going to run until the source table has no allocated blocks
     size_t blocksLeft = existingTable->allocatedBlockCount();
     while (blocksLeft) {
 
-        TableIterator &iterator = m_table->iterator();
+        TableIterator &iterator = existingTable->iterator();
         TableTuple &tupleToInsert = newTable->tempTuple();
 
         while (iterator.next(scannedTuple)) {
@@ -500,10 +597,13 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
             }
 
             // insert into the new table
-            newTable->insertTuple(tupleToInsert, false);
+            newTable->insertPersistentTuple(tupleToInsert, false);
 
             // delete from the old table
             existingTable->deleteTupleForSchemaChange(scannedTuple);
+
+            // note one tuple moved
+            ++tuplesMigrated;
 
             // if a block was just deleted, start the iterator again on the next block
             // this avoids using the block iterator over a changing set of blocks
@@ -522,24 +622,12 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
         defaults[i].free();
     }
 
-    ///////////////////////////////////////////////
-    // Drop the old table
-    ///////////////////////////////////////////////
-
-    deleteCommand();
-
-    ///////////////////////////////////////////////
-    // Patch up the new table as a replacement
-    ///////////////////////////////////////////////
-
-    m_table = newTable;
-
-    // configure for stats tables
-    m_table->configureIndexStats(catalogDatabase.relativeIndex());
-
-    m_table->incrementRefcount();
-
-    return 0;
+    // check tuple counts are sane
+    assert(newTable->activeTupleCount() == existingTupleCount);
+    // dumb way to structure an assert avoids unused variable warning (lame)
+    if (tuplesMigrated != existingTupleCount) {
+        assert(tuplesMigrated == existingTupleCount);
+    }
 }
 
 void TableCatalogDelegate::deleteCommand()

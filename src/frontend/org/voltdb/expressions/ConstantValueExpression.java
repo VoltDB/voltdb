@@ -42,7 +42,7 @@ public class ConstantValueExpression extends AbstractValueExpression {
     }
 
     @Override
-    public Object clone() throws CloneNotSupportedException {
+    public Object clone() {
         ConstantValueExpression clone = (ConstantValueExpression)super.clone();
         clone.m_value = m_value;
         clone.m_isNull = m_isNull;
@@ -286,6 +286,14 @@ public class ConstantValueExpression extends AbstractValueExpression {
             return false;
         }
         return true;
+    }
+
+    @Override
+    public String explain(String unused) {
+        if (m_valueType == VoltType.STRING) {
+            return "'" + m_value + "'";
+        }
+        return m_value;
     }
 
 }

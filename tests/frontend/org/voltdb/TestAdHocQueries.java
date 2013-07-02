@@ -45,10 +45,6 @@ public class TestAdHocQueries extends AdHocQueryTester {
     Client m_client;
     private final static boolean m_debug = false;
 
-    // IMPORTANT SAFETY TIP
-    // The use of junit parameters to toggle between iv2 and non-iv2 cases
-    // means that all test cases MUST BE annotated with @Test or THEY WILL NOT RUN.
-
     @Test
     public void testProcedureAdhoc() throws Exception {
         VoltDB.Configuration config = setUpSPDB();
@@ -502,6 +498,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("did not fail on selfjoin");
             }
             catch (ProcCallException pcex) {
+                System.out.println("DEBUG what?" + pcex.getMessage());
                 assertTrue(pcex.getMessage().indexOf("not support self joins") > 0);
             }
             adHocQuery = "SELECT PNAME \n" +
@@ -794,7 +791,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                                          BackendTarget.NATIVE_EE_JNI,
                                          LocalCluster.FailureState.ALL_RUNNING,
                                          m_debug);
-            m_cluster.setHasLocalServer(false);
+            m_cluster.setHasLocalServer(true);
             boolean success = m_cluster.compile(m_builder);
             assert(success);
 

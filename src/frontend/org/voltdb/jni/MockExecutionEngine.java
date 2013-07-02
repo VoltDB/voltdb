@@ -17,12 +17,16 @@
 
 package org.voltdb.jni;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
-import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool;
+import org.voltdb.FragmentPlanSource;
 import org.voltdb.ParameterSet;
-import org.voltdb.SysProcSelector;
+import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltTable;
@@ -30,11 +34,12 @@ import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.export.ExportProtoMessage;
+import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 
 public class MockExecutionEngine extends ExecutionEngine {
 
-    public MockExecutionEngine() {
-        super();
+    public MockExecutionEngine(FragmentPlanSource planSource) {
+        super(planSource);
     }
 
     @Override
@@ -45,16 +50,11 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public long loadPlanFragment(byte[] plan) throws EEException {
-        return -1;
-    }
-
-    @Override
-    public VoltTable[] executePlanFragments(
+    protected VoltTable[] coreExecutePlanFragments(
             final int numFragmentIds,
             final long[] planFragmentIds,
             final long[] inputDepIds,
-            final ParameterSet[] parameterSets,
+            final Object[] parameterSets,
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
@@ -79,7 +79,16 @@ public class MockExecutionEngine extends ExecutionEngine {
 
         ArrayList<Object> params = new ArrayList<Object>();
 
-        for (Object param : parameterSets[0].toArray())
+        // de-serialize all parameter sets
+        if (parameterSets[0] instanceof ByteBuffer) {
+            try {
+                parameterSets[0] = ParameterSet.fromByteBuffer((ByteBuffer) parameterSets[0]);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        for (Object param : ((ParameterSet) parameterSets[0]).toArray())
         {
             params.add(param);
         }
@@ -116,7 +125,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public VoltTable[] getStats(final SysProcSelector selector, final int[] locators, boolean interval, Long now) {
+    public VoltTable[] getStats(final StatsSelector selector, final int[] locators, boolean interval, Long now) {
         return null;
     }
 
@@ -129,10 +138,11 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void loadTable(final int tableId, final VoltTable table, final long txnId,
-        final long lastCommittedTxnId)
+    public byte[] loadTable(final int tableId, final VoltTable table, final long txnId,
+        final long lastCommittedTxnId, boolean returnUniqueViolations)
     throws EEException
     {
+        return null;
     }
 
     @Override
@@ -174,13 +184,14 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateTableStream(int tableId, TableStreamType type) {
+    public boolean activateTableStream(int tableId, TableStreamType type, SnapshotPredicates predicates) {
         return false;
     }
 
     @Override
-    public int tableStreamSerializeMore(BBContainer c, int tableId, TableStreamType type) {
-        return 0;
+    public int[] tableStreamSerializeMore(int tableId, TableStreamType type,
+                                          List<DBBPool.BBContainer> outputBuffers) {
+        return new int[] {0};
     }
 
     @Override
@@ -217,5 +228,10 @@ public class MockExecutionEngine extends ExecutionEngine {
     @Override
     public long getThreadLocalPoolAllocations() {
         return 0L;
+    }
+
+    @Override
+    public byte[] executeTask(TaskType taskType, byte[] task) {
+        throw new UnsupportedOperationException();
     }
 }

@@ -24,15 +24,16 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.BackendTarget;
+import org.voltdb.FragmentPlanSource;
 import org.voltdb.ParameterSet;
-import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PrivateVoltTableFactory;
-import org.voltdb.SysProcSelector;
+import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltTable;
@@ -42,8 +43,11 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
+import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 import com.google.common.base.Charsets;
+import com.google.common.base.Throwables;
 
 /* Serializes data over a connection that presumably is being read
  * by a voltdb execution engine. The serialization is currently a
@@ -120,8 +124,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         Hashinate(23),
         GetPoolAllocations(24),
         GetUSOs(25),
-        LoadFragment(26),
-        updateHashinator(27);
+        updateHashinator(27),
+        executeTask(28);
         Commands(final int id) {
             m_id = id;
         }
@@ -516,8 +520,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final BackendTarget target,
             final int port,
             final HashinatorType type,
-            final byte config[]) {
-        super(siteId, partitionId);
+            final byte config[],
+            FragmentPlanSource planSource) {
+        super(siteId, partitionId, planSource);
 
         // m_counter = 0;
         m_clusterIndex = clusterIndex;
@@ -709,7 +714,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int numFragmentIds,
             final long[] planFragmentIds,
             long[] inputDepIdsIn,
-            final ParameterSet[] parameterSets,
+            final Object[] parameterSets,
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
@@ -719,7 +724,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         final FastSerializer fser = new FastSerializer();
         try {
             for (int i = 0; i < numFragmentIds; ++i) {
-                parameterSets[i].writeExternal(fser);
+                // pset can be ByteBuffer or ParameterSet instance
+                if (parameterSets[i] instanceof ByteBuffer) {
+                    fser.write((ByteBuffer) parameterSets[i]);
+                }
+                else {
+                    ((ParameterSet) parameterSets[i]).writeExternal(fser);
+                }
             }
         } catch (final IOException exception) {
             throw new RuntimeException(exception);
@@ -759,61 +770,11 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public long loadPlanFragment(byte[] plan) throws EEException
-    {
-        m_data.clear();
-        m_data.putInt(Commands.LoadFragment.m_id);
-        m_data.putInt(plan.length);
-        m_data.put(plan);
-
-        try {
-            m_data.flip();
-            m_connection.write();
-        } catch (final Exception e) {
-            System.out.println("Exception: " + e.getMessage());
-            throw new RuntimeException(e);
-        }
-
-        int result = ExecutionEngine.ERRORCODE_ERROR;
-        long planFragId = 0;
-        long cacheSize = 0;
-        PlannerStatsCollector.CacheUse cacheUse = PlannerStatsCollector.CacheUse.FAIL;
-
-        // Start collecting statistics
-        startStatsCollection();
-
-        try {
-            try {
-                result = m_connection.readStatusByte();
-                planFragId = m_connection.readLong();
-                cacheSize = m_connection.readLong();
-                if (m_connection.readLong() != 0) {
-                    cacheUse = PlannerStatsCollector.CacheUse.HIT1;
-                }
-                else {
-                    cacheUse = PlannerStatsCollector.CacheUse.MISS;
-                }
-            } catch (final IOException e) {
-                System.out.println("Exception: " + e.getMessage());
-                throw new RuntimeException(e);
-            }
-            if (result != ExecutionEngine.ERRORCODE_SUCCESS) {
-                throw new EEException(ExecutionEngine.ERRORCODE_ERROR);
-            }
-        }
-        finally {
-            // Stop collecting statistics.
-            endStatsCollection(cacheSize, cacheUse);
-        }
-        return planFragId;
-    }
-
-    @Override
-    public VoltTable[] executePlanFragments(
+    protected VoltTable[] coreExecutePlanFragments(
             final int numFragmentIds,
             final long[] planFragmentIds,
             final long[] inputDepIds,
-            final ParameterSet[] parameterSets,
+            final Object[] parameterSets,
             final long spHandle,
             final long lastCommittedSpHandle,
             final long uniqueId,
@@ -822,26 +783,41 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 numFragmentIds, planFragmentIds, inputDepIds, parameterSets,
                 spHandle, lastCommittedSpHandle, uniqueId, undoToken);
         int result = ExecutionEngine.ERRORCODE_ERROR;
-        try {
-            result = m_connection.readStatusByte();
-        } catch (final IOException e) {
-            System.out.println("Exception: " + e.getMessage());
-            throw new RuntimeException(e);
-        }
-        if (result == ExecutionEngine.ERRORCODE_SUCCESS) {
-            final VoltTable resultTables[] = new VoltTable[numFragmentIds];
-            for (int ii = 0; ii < numFragmentIds; ii++) {
-                resultTables[ii] = PrivateVoltTableFactory.createUninitializedVoltTable();
-            }
+
+        while (true) {
             try {
-                m_connection.readResultTables(resultTables);
+                result = m_connection.readStatusByte();
+
+                if (result == ExecutionEngine.ERRORCODE_NEED_PLAN) {
+                    long fragmentId = m_connection.readLong();
+                    byte[] plan = planForFragmentId(fragmentId);
+                    m_data.clear();
+                    m_data.put(plan);
+                    m_data.flip();
+                    m_connection.write();
+                }
+                else if (result == ExecutionEngine.ERRORCODE_SUCCESS) {
+                    final VoltTable resultTables[] = new VoltTable[numFragmentIds];
+                    for (int ii = 0; ii < numFragmentIds; ii++) {
+                        resultTables[ii] = PrivateVoltTableFactory.createUninitializedVoltTable();
+                    }
+                    try {
+                        m_connection.readResultTables(resultTables);
+                    } catch (final IOException e) {
+                        throw new EEException(
+                                ExecutionEngine.ERRORCODE_WRONG_SERIALIZED_BYTES);
+                    }
+                    return resultTables;
+                }
+                else {
+                    // failure
+                    return null;
+                }
             } catch (final IOException e) {
-                throw new EEException(
-                        ExecutionEngine.ERRORCODE_WRONG_SERIALIZED_BYTES);
+                System.out.println("Exception: " + e.getMessage());
+                throw new RuntimeException(e);
             }
-            return resultTables;
         }
-        return null;
     }
 
     @Override
@@ -859,15 +835,19 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
 
     @Override
-    public void loadTable(final int tableId, final VoltTable table, final long spHandle,
-            final long lastCommittedSpHandle)
+    public byte[] loadTable(final int tableId, final VoltTable table, final long spHandle,
+            final long lastCommittedSpHandle, boolean returnUniqueViolations)
     throws EEException
     {
+        if (returnUniqueViolations) {
+            throw new UnsupportedOperationException("Haven't added IPC support for returning unique violatiosn");
+        }
         m_data.clear();
         m_data.putInt(Commands.LoadTable.m_id);
         m_data.putInt(tableId);
         m_data.putLong(spHandle);
         m_data.putLong(lastCommittedSpHandle);
+        m_data.putInt(returnUniqueViolations ? 1 : 0);
 
         final ByteBuffer tableBytes = table.getTableDataReference();
         if (m_data.remaining() < tableBytes.remaining()) {
@@ -900,11 +880,21 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         if (result != ExecutionEngine.ERRORCODE_SUCCESS) {
             throw new EEException(result);
         }
+
+        ByteBuffer responseBuffer = null;
+        try {
+            responseBuffer = readMessage();
+        } catch (IOException e) {
+            Throwables.propagate(e);
+        }
+
+        if (responseBuffer != null) return responseBuffer.array();
+        return null;
     }
 
     @Override
     public VoltTable[] getStats(
-            final SysProcSelector selector,
+            final StatsSelector selector,
             final int[] locators,
             final boolean interval,
             final Long now) {
@@ -939,22 +929,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
         try {
             if (result == ExecutionEngine.ERRORCODE_SUCCESS) {
-                final ByteBuffer messageLengthBuffer = ByteBuffer.allocate(4);
-                while (messageLengthBuffer.hasRemaining()) {
-                    int read = m_connection.m_socketChannel.read(messageLengthBuffer);
-                    if (read == -1) {
-                        throw new EOFException("End of file reading statistics(1)");
-                    }
-                }
-                messageLengthBuffer.rewind();
-                final ByteBuffer messageBuffer = ByteBuffer.allocate(messageLengthBuffer.getInt());
-                while (messageBuffer.hasRemaining()) {
-                    int read = m_connection.m_socketChannel.read(messageBuffer);
-                    if (read == -1) {
-                        throw new EOFException("End of file reading statistics(2)");
-                    }
-                }
-                messageBuffer.rewind();
+
+                final ByteBuffer messageBuffer = readMessage();
+                if (messageBuffer == null) return null;
 
                 final FastDeserializer fds = new FastDeserializer(messageBuffer);
                 final VoltTable results[] = new VoltTable[1];
@@ -967,6 +944,30 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
         }
         return null;
+    }
+
+    private ByteBuffer readMessage() throws IOException {
+        final ByteBuffer messageLengthBuffer = ByteBuffer.allocate(4);
+        while (messageLengthBuffer.hasRemaining()) {
+            int read = m_connection.m_socketChannel.read(messageLengthBuffer);
+            if (read == -1) {
+                throw new EOFException("End of file reading statistics(1)");
+            }
+        }
+        messageLengthBuffer.rewind();
+        int length = messageLengthBuffer.getInt();
+        if (length == 0) {
+            return null;
+        }
+        final ByteBuffer messageBuffer = ByteBuffer.allocate(length);
+        while (messageBuffer.hasRemaining()) {
+            int read = m_connection.m_socketChannel.read(messageBuffer);
+            if (read == -1) {
+                throw new EOFException("End of file reading statistics(2)");
+            }
+        }
+        messageBuffer.rewind();
+        return messageBuffer;
     }
 
     @Override
@@ -1086,12 +1087,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateTableStream(int tableId, TableStreamType streamType) {
+    public boolean activateTableStream(int tableId, TableStreamType streamType, SnapshotPredicates predicates) {
         m_data.clear();
         m_data.putInt(Commands.ActivateTableStream.m_id);
         m_data.putInt(tableId);
         m_data.putInt(streamType.ordinal());
-        m_data.putInt(0);       // Predicate count
+        m_data.put(predicates.toBytes()); // predicates
 
         try {
             m_data.flip();
@@ -1116,16 +1117,14 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public int tableStreamSerializeMore(BBContainer c, int tableId, TableStreamType streamType) {
-        int bytesReturned = -1;
-        ByteBuffer view = c.b.duplicate();
+    public int[] tableStreamSerializeMore(int tableId, TableStreamType streamType,
+                                          List<BBContainer> outputBuffers) {
         try {
             m_data.clear();
             m_data.putInt(Commands.TableStreamSerializeMore.m_id);
             m_data.putInt(tableId);
             m_data.putInt(streamType.ordinal());
-            m_data.putInt(1);                   // Number of buffers
-            m_data.putInt(c.b.remaining());     // Byte limit
+            m_data.put(SnapshotUtil.OutputBuffersToBytes(outputBuffers));
 
             m_data.flip();
             m_connection.write();
@@ -1142,13 +1141,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
             countBuffer.flip();
             final int count = countBuffer.getInt();
-
-            /*
-             * Error or no more tuple data for this table.
-             */
-            if (count == -1 || count == 0) {
-                return count;
-            }
+            assert count == outputBuffers.size();
 
             // Get the remaining tuple count.
             ByteBuffer remainingBuffer = ByteBuffer.allocate(8);
@@ -1159,31 +1152,39 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 }
             }
             remainingBuffer.flip();
-            //TODO: Do something useful with the remaining count.
-            /*final long remaining = */ remainingBuffer.getLong();
+            final long remaining = remainingBuffer.getLong();
 
-            // Get the first length.
-            ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
-            while (lengthBuffer.hasRemaining()) {
-                int read = m_connection.m_socketChannel.read(lengthBuffer);
-                if (read == -1) {
-                    throw new EOFException();
+            /*
+             * Error or no more tuple data for this table.
+             */
+            if (remaining == -1 || remaining == -2) {
+                return new int[] {(int) remaining + 1};
+            }
+
+            final int[] serialized = new int[count];
+            for (int i = 0; i < count; i++) {
+                ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
+                while (lengthBuffer.hasRemaining()) {
+                    int read = m_connection.m_socketChannel.read(lengthBuffer);
+                    if (read == -1) {
+                        throw new EOFException();
+                    }
+                }
+                lengthBuffer.flip();
+                serialized[i] = lengthBuffer.getInt();
+
+                ByteBuffer view = outputBuffers.get(i).b.duplicate();
+                view.limit(view.position() + serialized[i]);
+                while (view.hasRemaining()) {
+                    m_connection.m_socketChannel.read(view);
                 }
             }
-            lengthBuffer.flip();
-            final int length = lengthBuffer.getInt();
 
-            bytesReturned = length;
-            view.limit(view.position() + length);
-            while (view.hasRemaining()) {
-                m_connection.m_socketChannel.read(view);
-            }
+            return serialized;
         } catch (final IOException e) {
             System.out.println("Exception: " + e.getMessage());
             throw new RuntimeException(e);
         }
-
-        return bytesReturned;
     }
 
     @Override
@@ -1303,8 +1304,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     @Override
     public int hashinate(Object value, HashinatorType type, byte config[])
     {
-        ParameterSet parameterSet = new ParameterSet();
-        parameterSet.setParameters(value);
+        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(value);
 
         final FastSerializer fser = new FastSerializer();
         try {
@@ -1378,5 +1378,39 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             System.out.println("Exception: " + e.getMessage());
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public byte[] executeTask(TaskType taskType, byte[] task) {
+        m_data.clear();
+        m_data.putInt(Commands.executeTask.m_id);
+        m_data.putLong(taskType.taskId);
+        m_data.put(task);
+        try {
+            m_data.flip();
+            m_connection.write();
+
+            m_connection.readStatusByte();
+            ByteBuffer length = ByteBuffer.allocate(4);
+            while (length.hasRemaining()) {
+                int read = m_connection.m_socketChannel.read(length);
+                if (read <= 0) {
+                    throw new EOFException();
+                }
+            }
+            length.flip();
+
+            ByteBuffer retval = ByteBuffer.allocate(length.getInt());
+            while (retval.hasRemaining()) {
+                int read = m_connection.m_socketChannel.read(retval);
+                if (read <= 0) {
+                    throw new EOFException();
+                }
+            }
+            return  retval.array();
+        } catch (IOException e) {
+            Throwables.propagate(e);
+        }
+        throw new RuntimeException("Failed to executeTask in IPC client");
     }
 }

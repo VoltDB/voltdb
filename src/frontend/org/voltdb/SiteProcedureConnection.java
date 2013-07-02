@@ -65,24 +65,19 @@ public interface SiteProcedureConnection {
     /**
      * loadTable method used by user-facing voltLoadTable() call in ProcedureRunner
      */
-    public void loadTable(
+    public byte[] loadTable(
             long txnId,
             String clusterName,
             String databaseName,
             String tableName,
-            VoltTable data)
+            VoltTable data,
+            boolean returnUniqueViolations)
     throws VoltAbortException;
 
     /**
      * loadTable method used internally by ExecutionSite/Site clients
      */
-    public void loadTable(long txnId, int tableId, VoltTable data);
-
-    /**
-     * Get the EE's plan fragment ID for a given JSON plan.
-     * May pull from cache or load on the spot.
-     */
-    public long loadPlanFragment(byte[] plan) throws EEException;
+    public byte[] loadTable(long txnId, int tableId, VoltTable data, boolean returnUniqueViolations);
 
     /**
      * Execute a set of plan fragments.
@@ -93,17 +88,10 @@ public interface SiteProcedureConnection {
             int numFragmentIds,
             long[] planFragmentIds,
             long[] inputDepIds,
-            ParameterSet[] parameterSets,
+            Object[] parameterSets,
             long spHandle,
             long uniqueId,
             boolean readOnly) throws EEException;
-
-    /**
-     * Get the number of partitions so ProcedureRunner can divide
-     * replicated table DML results to get the *real* number of
-     * rows modified
-     */
-    public abstract long getReplicatedDMLDivisor();
 
     /**
      * For test cases that need to mimic a plan fragment being invoked
@@ -161,10 +149,34 @@ public interface SiteProcedureConnection {
                              Integer partitionId,
                              String tableSignature);
 
-    public VoltTable[] getStats(SysProcSelector selector, int[] locators,
+    public VoltTable[] getStats(StatsSelector selector, int[] locators,
                                 boolean interval, Long now);
 
     // Snapshot services provided by the site
-    public Future<?> doSnapshotWork(boolean ignoreQuietPeriod);
+    public Future<?> doSnapshotWork();
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds);
+
+    /**
+     * Get the site-local fragment id for a given plan identified by 20-byte sha-1 hash
+     */
+    public long getFragmentIdForPlanHash(byte[] planHash);
+
+    /**
+     * Get the site-local fragment id for a given plan identified by 20-byte sha-1 hash
+     * If the plan isn't known to this SPC, load it up. Otherwise addref it.
+     */
+    public long loadOrAddRefPlanFragment(byte[] planHash, byte[] plan);
+
+    /**
+     * Decref the plan associated with this site-local fragment id. If the refcount
+     * goes to 0, the plan may be removed (depending on caching policy).
+     */
+    public void decrefPlanFragmentById(long fragmentId);
+
+    /**
+     * Get the full JSON plan associated with a given site-local fragment id.
+     */
+    public byte[] planForFragmentId(long fragmentId);
+
+    public long[] validatePartitioning(long tableIds[], int hashinatorType, byte hashinatorConfig[]);
 }

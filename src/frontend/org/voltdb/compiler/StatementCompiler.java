@@ -17,6 +17,9 @@
 
 package org.voltdb.compiler;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
@@ -25,8 +28,8 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
-import org.voltdb.messaging.FastSerializer;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.planner.PlanningErrorException;
@@ -158,20 +161,39 @@ public abstract class StatementCompiler {
         // set the explain plan output into the catalog (in hex)
         catalogStmt.setExplainplan(Encoder.hexEncode(plan.explainedPlan));
 
+        // compute a hash of the plan
+        MessageDigest md = null;
+        try {
+            md = MessageDigest.getInstance("SHA-1");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+            assert(false);
+            System.exit(-1); // should never happen with healthy jvm
+        }
+
         // Now update our catalog information
         PlanFragment planFragment = catalogStmt.getFragments().add("0");
         planFragment.setHasdependencies(plan.subPlanGraph != null);
         // mark a fragment as non-transactional if it never touches a persistent table
         planFragment.setNontransactional(!fragmentReferencesPersistentTable(plan.rootPlanGraph));
         planFragment.setMultipartition(plan.subPlanGraph != null);
-        writePlanBytes(compiler, planFragment, plan.rootPlanGraph);
+        byte[] planBytes = writePlanBytes(compiler, planFragment, plan.rootPlanGraph);
+        md.update(planBytes, 0, planBytes.length);
+        // compute the 40 bytes of hex from the 20 byte sha1 hash of the plans
+        md.reset();
+        md.update(planBytes);
+        planFragment.setPlanhash(Encoder.hexEncode(md.digest()));
 
         if (plan.subPlanGraph != null) {
             planFragment = catalogStmt.getFragments().add("1");
             planFragment.setHasdependencies(false);
             planFragment.setNontransactional(false);
             planFragment.setMultipartition(true);
-            writePlanBytes(compiler, planFragment, plan.subPlanGraph);
+            byte[] subBytes = writePlanBytes(compiler, planFragment, plan.subPlanGraph);
+            // compute the 40 bytes of hex from the 20 byte sha1 hash of the plans
+            md.reset();
+            md.update(subBytes);
+            planFragment.setPlanhash(Encoder.hexEncode(md.digest()));
         }
 
         // Planner should have rejected with an exception any statement with an unrecognized type.
@@ -179,22 +201,20 @@ public abstract class StatementCompiler {
         assert(validType != QueryType.INVALID.getValue());
     }
 
-    static void writePlanBytes(VoltCompiler compiler, PlanFragment fragment, AbstractPlanNode planGraph)
+    /**
+     * Update the plan fragment and return the bytes of the plan
+     */
+    static byte[] writePlanBytes(VoltCompiler compiler, PlanFragment fragment, AbstractPlanNode planGraph)
     throws VoltCompilerException {
         // get the plan bytes
         PlanNodeList node_list = new PlanNodeList(planGraph);
         String json = node_list.toJSONString();
         compiler.captureDiagnosticJsonFragment(json);
         // Place serialized version of PlanNodeTree into a PlanFragment
-        try {
-            FastSerializer fs = new FastSerializer(true, false);
-            fs.write(json.getBytes());
-            String hexString = fs.getHexEncodedBytes();
-            fragment.setPlannodetree(hexString);
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw compiler.new VoltCompilerException(e.getMessage());
-        }
+        byte[] jsonBytes = json.getBytes(Constants.UTF8ENCODING);
+        String bin64String = Encoder.base64Encode(jsonBytes);
+        fragment.setPlannodetree(bin64String);
+        return jsonBytes;
     }
 
     /**

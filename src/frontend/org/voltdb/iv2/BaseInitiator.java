@@ -31,9 +31,10 @@ import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProcedureRunnerFactory;
+import org.voltdb.StartAction;
 import org.voltdb.StarvationTracker;
 import org.voltdb.StatsAgent;
-import org.voltdb.SysProcSelector;
+import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.rejoin.TaskLog;
 
@@ -61,17 +62,17 @@ public abstract class BaseInitiator implements Initiator
     protected final RepairLog m_repairLog = new RepairLog();
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
             Scheduler scheduler, String whoamiPrefix, StatsAgent agent,
-            VoltDB.START_ACTION startAction)
+            StartAction startAction)
     {
         m_zkMailboxNode = zkMailboxNode;
         m_messenger = messenger;
         m_partitionId = partition;
         m_scheduler = scheduler;
-        boolean isLiveRejoin = startAction == VoltDB.START_ACTION.LIVE_REJOIN;
+        boolean isLiveRejoin = startAction == StartAction.LIVE_REJOIN;
         JoinProducerBase joinProducer;
 
-        if (startAction == VoltDB.START_ACTION.JOIN) {
-            joinProducer = new JoinProducer(m_partitionId, scheduler.m_tasks);
+        if (startAction == StartAction.JOIN) {
+            joinProducer = new ElasticJoinProducer(m_partitionId, scheduler.m_tasks);
         } else if (VoltDB.createForRejoin(startAction)) {
             joinProducer = new RejoinProducer(m_partitionId, scheduler.m_tasks, isLiveRejoin);
         } else {
@@ -103,7 +104,7 @@ public abstract class BaseInitiator implements Initiator
         StarvationTracker st = new StarvationTracker(getInitiatorHSId());
         m_scheduler.setStarvationTracker(st);
         m_scheduler.setLock(m_initiatorMailbox);
-        agent.registerStatsSource(SysProcSelector.STARVATION,
+        agent.registerStatsSource(StatsSelector.STARVATION,
                                   getInitiatorHSId(),
                                   st);
 
@@ -119,7 +120,7 @@ public abstract class BaseInitiator implements Initiator
                           CatalogContext catalogContext,
                           CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          VoltDB.START_ACTION startAction,
+                          StartAction startAction,
                           StatsAgent agent,
                           MemoryStats memStats,
                           CommandLog cl,
@@ -135,7 +136,7 @@ public abstract class BaseInitiator implements Initiator
 
             // demote rejoin to create for initiators that aren't rejoinable.
             if (VoltDB.createForRejoin(startAction) && !isRejoinable()) {
-                startAction = VoltDB.START_ACTION.CREATE;
+                startAction = StartAction.CREATE;
             }
 
             TaskLog taskLog = null;
@@ -204,6 +205,12 @@ public abstract class BaseInitiator implements Initiator
                 tmLog.info("Interrupted during shutdown", e);
             }
         }
+    }
+
+    @Override
+    public int getPartitionId()
+    {
+        return m_partitionId;
     }
 
     @Override

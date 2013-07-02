@@ -22,8 +22,8 @@ import java.util.BitSet;
 import java.util.List;
 
 import org.voltdb.ParameterSet;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
+import org.voltdb.common.Constants;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -69,7 +69,7 @@ public class CompiledPlan {
     public VoltType[] parameters = null;
 
     /** Parameter values, if the planner pulled constants out of the plan */
-    public ParameterSet extractedParamValues = new ParameterSet();
+    public ParameterSet extractedParamValues = ParameterSet.emptyParameterSet();
 
     /** A list of output column ids, indexes and types */
     public NodeSchema columns = new NodeSchema();
@@ -213,7 +213,7 @@ public class CompiledPlan {
         }
 
         PlanNodeList planList = new PlanNodeList(planGraph);
-        return planList.toJSONString().getBytes(VoltDB.UTF8ENCODING);
+        return planList.toJSONString().getBytes(Constants.UTF8ENCODING);
     }
 
     // A reusable step extracted from boundParamIndexes so it can be applied to two different

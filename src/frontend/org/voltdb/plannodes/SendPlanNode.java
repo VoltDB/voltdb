@@ -24,14 +24,10 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
-import org.voltdb.planner.PlanStatistics;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 
 public class SendPlanNode extends AbstractPlanNode {
-
-    // used for planning
-    public boolean isMultiPartition = false;
 
     public SendPlanNode() {
         super();
@@ -62,20 +58,16 @@ public class SendPlanNode extends AbstractPlanNode {
 
 
     @Override
-    public void computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
         assert(estimates != null);
 
-        m_outputColumnHints.clear();
         // Recursively compute and collect stats from the child node, but don't add any costs for this Send node.
         // Let the parent "RecievePlanNode" account for any (theoretical) cost differences due to how much data
         // different plans must distribute as intermediate results.
         // Don't bother accounting for how much data is sent as the FINAL result -- when there is no RecivePlanNode --
         // that cost is constant for a given query, so it would be a wash when comparing any two plans for that query.
-        assert(m_children.size() == 1);
-        AbstractPlanNode child = m_children.get(0);
-        child.computeEstimatesRecursively(stats, cluster, db, estimates, paramHints);
-        m_outputColumnHints.addAll(child.m_outputColumnHints);
-        m_estimatedOutputTupleCount = child.m_estimatedOutputTupleCount;
+        m_estimatedOutputTupleCount = childOutputTupleCountEstimate;
+        m_estimatedProcessedTupleCount = 0;
     }
 
     @Override

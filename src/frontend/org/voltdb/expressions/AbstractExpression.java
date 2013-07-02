@@ -57,9 +57,6 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     protected VoltType m_valueType = null;
     protected int m_valueSize = 0;
 
-    // used by the planner internally (not needed in the EE)
-    public boolean m_isJoiningClause = false;
-
     public AbstractExpression(ExpressionType type) {
         m_type = type;
     }
@@ -117,10 +114,15 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     @Override
-    public Object clone() throws CloneNotSupportedException {
-        AbstractExpression clone = (AbstractExpression)super.clone();
+    public Object clone() {
+        AbstractExpression clone = null;
+        try {
+            clone = (AbstractExpression)super.clone();
+        } catch (CloneNotSupportedException e) {
+            // umpossible
+            return null;
+        }
         clone.m_id = m_id;
-        clone.m_isJoiningClause = m_isJoiningClause;
         clone.m_type = m_type;
         clone.m_valueType = m_valueType;
         clone.m_valueSize = m_valueSize;
@@ -802,5 +804,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             }
         }
     }
+
+    public abstract String explain(String impliedTableName);
 
 }

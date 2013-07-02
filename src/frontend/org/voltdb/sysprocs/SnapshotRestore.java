@@ -57,10 +57,13 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.zk.ZKUtil.StringCallback;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.ProcInfo;
+import org.voltdb.StartAction;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
@@ -78,6 +81,7 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.sysprocs.saverestore.ClusterSaveFileState;
+import org.voltdb.sysprocs.saverestore.DuplicateRowHandler;
 import org.voltdb.sysprocs.saverestore.SavedTableConverter;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
@@ -87,6 +91,7 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltTableUtil;
 
+import com.google.common.base.Throwables;
 import com.google.common.primitives.Longs;
 
 @ProcInfo (
@@ -140,6 +145,8 @@ public class SnapshotRestore extends VoltSystemProcedure
 
     private static HashSet<String>  m_initializedTableSaveFileNames = new HashSet<String>();
     private static ArrayDeque<TableSaveFile> m_saveFiles = new ArrayDeque<TableSaveFile>();
+
+    private static volatile DuplicateRowHandler m_duplicateRowHandler = null;
 
     private static synchronized void initializeTableSaveFiles(
             String filePath,
@@ -397,6 +404,17 @@ public class SnapshotRestore extends VoltSystemProcedure
             // All other sites should just return empty results tables.
             if (context.isLowestSiteId())
             {
+                /*
+                 * Initialize a duplicate row handling policy for this restore
+                 */
+                m_duplicateRowHandler = null;
+                if (params.toArray()[2] != null) {
+                    m_duplicateRowHandler =
+                            new DuplicateRowHandler(
+                                    (String)params.toArray()[2],
+                                    getTransactionTime());
+                }
+
                 // implicitly synchronized by the way restore operates.
                 // this scan must complete on every site and return results
                 // to the coordinator for aggregation before it will send out
@@ -543,7 +561,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                     {
                         voltLoadTable(context.getCluster().getTypeName(),
                                 context.getDatabase().getTypeName(),
-                                table_name, table);
+                                table_name, table, false);
                     }
                     catch (VoltAbortException e)
                     {
@@ -620,7 +638,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                                         true);
                 voltLoadTable(context.getCluster().getTypeName(),
                         context.getDatabase().getTypeName(),
-                        table_name, table);
+                        table_name, table, false);
             }
             catch (Exception e)
             {
@@ -729,9 +747,12 @@ public class SnapshotRestore extends VoltSystemProcedure
                                 ByteBuffer.wrap(
                                         CompressionService.decompressBytes(compressedTable)),
                                         true);
-                voltLoadTable(context.getCluster().getTypeName(),
+                byte uniqueViolations[] = voltLoadTable(context.getCluster().getTypeName(),
                         context.getDatabase().getTypeName(),
-                        table_name, table);
+                        table_name, table, m_duplicateRowHandler != null);
+                if (uniqueViolations != null && m_duplicateRowHandler != null) {
+                    m_duplicateRowHandler.handleDuplicates(table_name, uniqueViolations);
+                }
             }
             catch (Exception e)
             {
@@ -815,17 +836,26 @@ public class SnapshotRestore extends VoltSystemProcedure
                     FragmentTaskMessage ftm = (FragmentTaskMessage)vm;
                     TRACE_LOG.trace(
                             CoreUtils.hsIdToString(context.getSiteId()) + " received fragment id " +
-                    ftm.getFragmentId(0));
+                    VoltSystemProcedure.hashToFragId(ftm.getPlanHash(0)));
                     DependencyPair dp =
-                            m_runner.executePlanFragment(
+                            m_runner.executeSysProcPlanFragment(
                                     m_runner.getTxnState(),
                                     null,
-                                    ftm.getFragmentId(0),
+                                    VoltSystemProcedure.hashToFragId(ftm.getPlanHash(0)),
                                     ftm.getParameterSetForFragment(0));
                     FragmentResponseMessage frm = new FragmentResponseMessage(ftm, m.getHSId());
                     frm.addDependency(dp.depId, dp.dependency);
                     m.send(ftm.getCoordinatorHSId(), frm);
                 } else if (vm instanceof BinaryPayloadMessage) {
+                    if (context.isLowestSiteId() && m_duplicateRowHandler != null) {
+                        try {
+                            m_duplicateRowHandler.close();
+                        } catch (Exception e) {
+                            VoltDB.crashLocalVoltDB("Error closing duplicate row handler during snapshot restore",
+                                                     true,
+                                                     e);
+                        }
+                    }
                     //Null result table is intentional
                     //The results of the process are propagated through a future in performTableRestoreWork
                     return new DependencyPair( DEP_restoreAsyncRunLoop, constructResultsTable());
@@ -840,15 +870,28 @@ public class SnapshotRestore extends VoltSystemProcedure
         return null;
     }
 
+    public static final String JSON_PATH = "path";
+    public static final String JSON_NONCE = "nonce";
+    public static final String JSON_DUPLICATES_PATH = "duplicatesPath";
+
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
-            String path, String nonce) throws Exception
+                           String json) throws Exception
             {
+        JSONObject jsObj = new JSONObject(json);
+        final String path = jsObj.getString(JSON_PATH);
+        final String nonce = jsObj.getString(JSON_NONCE);
+        final String dupsPath = jsObj.optString(JSON_DUPLICATES_PATH, null);
         final long startTime = System.currentTimeMillis();
-        CONSOLE_LOG.info("Restoring from path: " + path + " with nonce: " + nonce);
+        if (dupsPath != null) {
+            CONSOLE_LOG.info("Restoring from path: " + path + " with nonce: " +
+                             nonce + " and duplicate rows will be output to " + dupsPath);
+        } else {
+            CONSOLE_LOG.info("Restoring from path: " + path + " with nonce: " + nonce);
+        }
 
         // Fetch all the savefile metadata from the cluster
         VoltTable[] savefile_data;
-        savefile_data = performRestoreScanWork(path, nonce);
+        savefile_data = performRestoreScanWork(path, nonce, dupsPath);
 
         List<JSONObject> digests;
         Map<String, Map<Integer, Long>> exportSequenceNumbers;
@@ -1058,7 +1101,7 @@ public class SnapshotRestore extends VoltSystemProcedure
          * the command logging is enabled and the database start action
          * was create
          */
-        final VoltDB.START_ACTION startAction = VoltDB.instance().getConfig().m_startAction;
+        final StartAction startAction = VoltDB.instance().getConfig().m_startAction;
         final org.voltdb.OperationMode mode = VoltDB.instance().getMode();
 
         /*
@@ -1067,12 +1110,12 @@ public class SnapshotRestore extends VoltSystemProcedure
          * we do want a truncation snapshot if CL is enabled.
          */
         final boolean isStartWithNoAutomatedRestore =
-            startAction == VoltDB.START_ACTION.CREATE && mode != org.voltdb.OperationMode.INITIALIZING;
+            startAction == StartAction.CREATE && mode != org.voltdb.OperationMode.INITIALIZING;
 
         final boolean isCLEnabled =
             VoltDB.instance().getCommandLog().getClass().getSimpleName().equals("CommandLogImpl");
 
-        final boolean isStartedWithCreateAction = startAction == VoltDB.START_ACTION.CREATE;
+        final boolean isStartedWithCreateAction = startAction == StartAction.CREATE;
 
         if ( isCLEnabled && (isStartedWithCreateAction || isStartWithNoAutomatedRestore)) {
 
@@ -1114,9 +1157,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         pfs[0].outputDepId = DEP_restoreDistributeExportAndPartitionSequenceNumbers;
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
-        ParameterSet params = new ParameterSet();
-        params.setParameters(exportSequenceNumberBytes, txnId, perPartitionTxnIds);
-        pfs[0].parameters = params;
+        pfs[0].parameters = ParameterSet.fromArrayNoCopy(exportSequenceNumberBytes, txnId, perPartitionTxnIds);
 
         // This fragment aggregates the save-to-disk sanity check results
         pfs[1] = new SynthesizedPlanFragment();
@@ -1124,7 +1165,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         pfs[1].outputDepId = DEP_restoreDistributeExportAndPartitionSequenceNumbersResults;
         pfs[1].inputDepIds = new int[] { DEP_restoreDistributeExportAndPartitionSequenceNumbers };
         pfs[1].multipartition = false;
-        pfs[1].parameters = new ParameterSet();
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
 
         VoltTable[] results;
         results = executeSysProcPlanFragments(pfs, DEP_restoreDistributeExportAndPartitionSequenceNumbersResults);
@@ -1174,6 +1215,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             int readAheadChunks,
             Integer relevantPartitionIds[]) throws IOException
             {
+        @SuppressWarnings("resource")
         FileInputStream savefile_input = new FileInputStream(saveFile);
         TableSaveFile savefile =
                 new TableSaveFile(
@@ -1198,9 +1240,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         pfs[0].outputDepId = DEP_restoreAsyncRunLoop;
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
-        ParameterSet params = new ParameterSet();
-        params.setParameters( coordinatorHSId );
-        pfs[0].parameters = params;
+        pfs[0].parameters = ParameterSet.fromArrayNoCopy(coordinatorHSId);
 
         // This fragment aggregates the save-to-disk sanity check results
         pfs[1] = new SynthesizedPlanFragment();
@@ -1208,13 +1248,14 @@ public class SnapshotRestore extends VoltSystemProcedure
         pfs[1].outputDepId = DEP_restoreAsyncRunLoopResults;
         pfs[1].inputDepIds = new int[] { DEP_restoreAsyncRunLoop };
         pfs[1].multipartition = false;
-        pfs[1].parameters = new ParameterSet();
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
 
         return executeSysProcPlanFragments(pfs, DEP_restoreAsyncRunLoopResults);
     }
 
     private final VoltTable[] performRestoreScanWork(String filePath,
-            String fileNonce)
+            String fileNonce,
+            String dupsPath)
     {
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
 
@@ -1225,9 +1266,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         pfs[0].outputDepId = DEP_restoreScan;
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
-        ParameterSet params = new ParameterSet();
-        params.setParameters(filePath, fileNonce);
-        pfs[0].parameters = params;
+        pfs[0].parameters = ParameterSet.fromArrayNoCopy(filePath, fileNonce, dupsPath);
 
         // This fragment aggregates the save-to-disk sanity check results
         pfs[1] = new SynthesizedPlanFragment();
@@ -1235,7 +1274,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         pfs[1].outputDepId = DEP_restoreScanResults;
         pfs[1].inputDepIds = new int[] { DEP_restoreScan };
         pfs[1].multipartition = false;
-        pfs[1].parameters = new ParameterSet();
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
 
         VoltTable[] results;
         results = executeSysProcPlanFragments(pfs, DEP_restoreScanResults);
@@ -1259,7 +1298,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         pfs[0].outputDepId = DEP_restoreDigestScan;
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
-        pfs[0].parameters = new ParameterSet();
+        pfs[0].parameters = ParameterSet.emptyParameterSet();
 
         // This fragment aggregates the save-to-disk sanity check results
         pfs[1] = new SynthesizedPlanFragment();
@@ -1267,7 +1306,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         pfs[1].outputDepId = DEP_restoreDigestScanResults;
         pfs[1].inputDepIds = new int[] { DEP_restoreDigestScan };
         pfs[1].multipartition = false;
-        pfs[1].parameters = new ParameterSet();
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
 
         VoltTable[] results;
         results = executeSysProcPlanFragments(pfs, DEP_restoreDigestScanResults);
@@ -1602,9 +1641,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 pfs[0].outputDepId = result_dependency_id;
                 pfs[0].inputDepIds = new int[] {};
                 pfs[0].multipartition = false;
-                ParameterSet params = new ParameterSet();
-                params.setParameters(tableName, result_dependency_id, compressedTable);
-                pfs[0].parameters = params;
+                pfs[0].parameters = ParameterSet.fromArrayNoCopy(tableName, result_dependency_id, compressedTable);
 
                 int final_dependency_id = TableSaveFileState.getNextDependencyId();
                 pfs[1] = new SynthesizedPlanFragment();
@@ -1613,9 +1650,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 pfs[1].outputDepId = final_dependency_id;
                 pfs[1].inputDepIds = new int[] { result_dependency_id };
                 pfs[1].multipartition = false;
-                ParameterSet result_params = new ParameterSet();
-                result_params.setParameters(final_dependency_id);
-                pfs[1].parameters = result_params;
+                pfs[1].parameters = ParameterSet.fromArrayNoCopy(final_dependency_id);
                 TRACE_LOG.trace("Sending replicated table: " + tableName + " to site id:" +
                         siteId);
                 results = executeSysProcPlanFragments(pfs, m_mbox);
@@ -1723,11 +1758,10 @@ public class SnapshotRestore extends VoltSystemProcedure
                     pfs[pfs_index].multipartition = false;
                     pfs[pfs_index].outputDepId = dependencyIds[pfs_index];
                     pfs[pfs_index].inputDepIds = new int [] {};
-                    ParameterSet params = new ParameterSet();
-                    params.setParameters(tableName, partition_id,
+                    pfs[pfs_index].parameters = ParameterSet.fromArrayNoCopy(
+                            tableName, partition_id,
                             dependencyIds[pfs_index],
                             partitioned_tables[partition_id]);
-                    pfs[pfs_index].parameters = params;
                     ++pfs_index;
                 }
                 int result_dependency_id = TableSaveFileState.getNextDependencyId();
@@ -1737,9 +1771,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 pfs[sites_to_partitions.size()].multipartition = false;
                 pfs[sites_to_partitions.size()].outputDepId = result_dependency_id;
                 pfs[sites_to_partitions.size()].inputDepIds = dependencyIds;
-                ParameterSet params = new ParameterSet();
-                params.setParameters(result_dependency_id);
-                pfs[sites_to_partitions.size()].parameters = params;
+                pfs[sites_to_partitions.size()].parameters = ParameterSet.fromArrayNoCopy(result_dependency_id);
                 results = executeSysProcPlanFragments(pfs, m_mbox);
             }
         } catch (Exception e) {
@@ -1802,6 +1834,58 @@ public class SnapshotRestore extends VoltSystemProcedure
     private Table getCatalogTable(String tableName)
     {
         return m_database.getTables().get(tableName);
+    }
+
+    /*
+     * Do parameter checking for the pre-JSON version of @SnapshotRestore old version
+     */
+    public static ClientResponseImpl transformRestoreParamsToJSON(StoredProcedureInvocation task) {
+        Object params[] = task.getParams().toArray();
+        if (params.length == 1) {
+            return null;
+        } else if (params.length == 2) {
+            if (params[0] == null) {
+                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                        new VoltTable[0],
+                        "@SnapshotRestore parameter 0 was null",
+                        task.getClientHandle());
+            }
+            if (params[1] == null) {
+                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                        new VoltTable[0],
+                        "@SnapshotRestore parameter 1 was null",
+                        task.getClientHandle());
+            }
+            if (!(params[0] instanceof String)) {
+                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                        new VoltTable[0],
+                        "@SnapshotRestore param 0 (path) needs to be a string, but was type "
+                        + params[0].getClass().getSimpleName(),
+                        task.getClientHandle());
+            }
+            if (!(params[1] instanceof String)) {
+                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                        new VoltTable[0],
+                        "@SnapshotRestore param 1 (nonce) needs to be a string, but was type "
+                        + params[1].getClass().getSimpleName(),
+                        task.getClientHandle());
+            }
+            JSONObject jsObj = new JSONObject();
+            try {
+                jsObj.put(SnapshotRestore.JSON_PATH, (String)params[0]);
+                jsObj.put(SnapshotRestore.JSON_NONCE, (String)params[1]);
+            } catch (JSONException e) {
+                Throwables.propagate(e);
+            }
+            task.setParams( jsObj.toString() );
+            return null;
+        } else {
+            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                    new VoltTable[0],
+                    "@SnapshotRestore supports a single json document parameter or two parameters (path, nonce), " +
+                    params.length + " parameters provided",
+                    task.getClientHandle());
+        }
     }
 
     private Mailbox m_mbox;

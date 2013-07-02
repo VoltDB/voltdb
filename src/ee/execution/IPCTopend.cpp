@@ -48,6 +48,10 @@ int IPCTopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
     }
 }
 
+std::string IPCTopend::planForFragmentId(int64_t fragmentId) {
+    return m_vdbipc->planForFragmentId(fragmentId);
+}
+
 void IPCTopend::crashVoltDB(FatalException e) {
     m_vdbipc->crashVoltDB(e);
 }

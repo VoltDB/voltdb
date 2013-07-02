@@ -283,8 +283,7 @@ public class TestVoltProcedure extends TestCase {
                 return 42;
             }
         };
-        nullParam = new ParameterSet();
-        nullParam.setParameters(new Object[]{null});
+        nullParam = ParameterSet.fromArrayNoCopy(new Object[]{null});
     }
 
     @Override
@@ -393,6 +392,12 @@ public class TestVoltProcedure extends TestCase {
         assertTrue(r.getStatusString().contains("java.lang.NullPointerException"));
     }
 
+    public void testNegativeWiderType() {
+        ClientResponse r = callWithArgs(LongProcedure.class, Integer.valueOf(-1000));
+        assertEquals(-1000L, LongProcedure.arg);
+        assertEquals(ClientResponse.SUCCESS, r.getStatus());
+    }
+
     public void testUnexpectedFailureFour() {
         ClientResponse r = call(UnexpectedFailureFourProcedure.class);
         assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.getStatus());
@@ -406,11 +411,10 @@ public class TestVoltProcedure extends TestCase {
                 wrapper, site, null,
                 site.m_context.database.getProcedures().get(LongProcedure.class.getName()), null);
 
-        ParameterSet params = new ParameterSet();
-        params.setParameters(1L);
+        ParameterSet params = ParameterSet.fromArrayNoCopy(1L);
         assertNotNull(agent.m_selector);
         assertNotNull(agent.m_source);
-        assertEquals(agent.m_selector, SysProcSelector.PROCEDURE);
+        assertEquals(agent.m_selector, StatsSelector.PROCEDURE);
         assertEquals(agent.m_catalogId,
                      executionSiteId);
         Object statsRow[][] = agent.m_source.getStatsRows(false, 0L);
@@ -430,6 +434,10 @@ public class TestVoltProcedure extends TestCase {
     }
 
     private ClientResponse call(Class<? extends NullProcedureWrapper> procedure) {
+        return callWithArgs(procedure, (Object) null);
+    }
+
+    private ClientResponse callWithArgs(Class<? extends NullProcedureWrapper> procedure, Object... args) {
         NullProcedureWrapper wrapper = null;
         try {
             wrapper = procedure.newInstance();
@@ -445,7 +453,7 @@ public class TestVoltProcedure extends TestCase {
                 site.m_context.database.getProcedures().get(procedure.getName()), null);
 
         runner.setupTransaction(null);
-        return runner.call((Object) null);
+        return runner.call(args);
     }
 
     private class MockExecutionSite extends ExecutionSite {
@@ -462,11 +470,11 @@ public class TestVoltProcedure extends TestCase {
 
     private class MockStatsAgent extends StatsAgent {
         public StatsSource m_source = null;
-        public SysProcSelector m_selector = null;
+        public StatsSelector m_selector = null;
         public long m_catalogId = 0;
 
         @Override
-        public void registerStatsSource(SysProcSelector selector, long catalogId, StatsSource source) {
+        public void registerStatsSource(StatsSelector selector, long catalogId, StatsSource source) {
             m_source = source;
             m_selector = selector;
             m_catalogId = catalogId;

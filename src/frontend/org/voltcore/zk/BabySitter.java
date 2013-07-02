@@ -19,20 +19,18 @@ package org.voltcore.zk;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.zookeeper_voltpatches.data.Stat;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-
+import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 
@@ -119,6 +117,20 @@ public class BabySitter
         return new Pair<BabySitter, List<String>>(bs, initialChildren);
     }
 
+    /**
+     * Create a new BabySitter and make sure it reads the initial children list.
+     * Use the provided ExecutorService to queue events to, rather than
+     * creating a private ExecutorService.
+     */
+    public static BabySitter nonblockingFactory(ZooKeeper zk, String dir,
+                                                Callback cb, ExecutorService es)
+        throws InterruptedException, ExecutionException
+    {
+        BabySitter bs = new BabySitter(zk, dir, cb, es);
+        bs.m_es.submit(bs.m_eventHandler);
+        return bs;
+    }
+
     // eventHandler fetches the new children and resets the watch.
     // It is always run in m_es (the ExecutorService).
     private final Callable<List<String>> m_eventHandler = new Callable<List<String>>() {
@@ -155,7 +167,7 @@ public class BabySitter
         List<String> zkchildren = m_zk.getChildren(m_dir, m_watcher, stat);
         ArrayList<String> tmp = new ArrayList<String>(zkchildren.size());
         tmp.addAll(zkchildren);
-        ZKUtil.sortSequentialNodes(tmp);
+        Collections.sort(tmp);
         m_children = Collections.unmodifiableList(tmp);
         return m_children;
     }

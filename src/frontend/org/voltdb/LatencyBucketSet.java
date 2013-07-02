@@ -29,6 +29,9 @@ public class LatencyBucketSet {
     /** */
     public long buckets[];
 
+    public int maxNumberOfBins = 10;
+    public long maxBinHeight = 70;
+
     public LatencyBucketSet(int msPerBucket, int numberOfBuckets) {
         this.msPerBucket = msPerBucket;
         this.numberOfBuckets = numberOfBuckets;
@@ -151,6 +154,48 @@ public class LatencyBucketSet {
             else {
                 sb.append(", ");
             }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Generate histo report with current latency granularity (this latency bucket set)
+     * For all executed txns, if
+     *         - kPercentileLatency(0.99) <= 50ms: use 1ms latency bucket set
+     *         - kPercentileLatency(0.999) <= 200ms: use 10ms latency bucket set
+     *         - otherwise: use 100ms latency bucket set [ + an additional bin]
+     * The measurement unit here is "bucket" (N ms), so:
+     *     total range (# of units) of the histogram <=> upper / msPerBucket
+     *     # of bins <=> (# of units > max # of units) ? resize() : (# of units)
+     *     width of bin <=> (# of units) / (# of bins)
+     * For each bin: calculate # of txns falling in the buckets belonging to it
+     * @param upper <= msPerBucket * numberOfBucket
+     * @return
+     */
+    public String latencyHistoReport(int upper) {
+        StringBuilder sb = new StringBuilder();
+
+        // Try to use finer granularity here, resize when really needed
+        // 100ms latency bucket set: return 1
+        // 10ms latency bucket set: return 1 or 2 (if upper > 120ms)
+        // 1ms latency bucket set: return 1 (if upper <= 12ms) or (upper / 10)
+        int numberOfBucketsPerBin = (upper <= maxNumberOfBins * msPerBucket * 1.2) ? 1 :
+                                        (int)Math.ceil((double) upper / (double) maxNumberOfBins / (double) msPerBucket);
+        int binWidth = numberOfBucketsPerBin * msPerBucket;
+        int numberOfBins = (int)Math.ceil(upper / binWidth);
+
+        for(int i = 0; i < numberOfBins; i++) {
+            sb.append(String.format("%1$-4s - %2$-4sms: [", i * numberOfBucketsPerBin * msPerBucket,
+                        (i * numberOfBucketsPerBin + numberOfBucketsPerBin) * msPerBucket));
+            long txnsInCurrentBin = 0;
+            for (int j = 0; j < numberOfBucketsPerBin; j++) {
+                txnsInCurrentBin += buckets[i * numberOfBucketsPerBin + j];
+            }
+            int binHeight = (int)Math.ceil(txnsInCurrentBin * maxBinHeight / totalTxns);
+            for (int j = 0; j < binHeight; j++) {
+                sb.append("|");
+            }
+            sb.append(String.format("]%7.3f%%\n", (double)txnsInCurrentBin / (double)totalTxns * 100));
         }
         return sb.toString();
     }

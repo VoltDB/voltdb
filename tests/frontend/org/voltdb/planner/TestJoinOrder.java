@@ -62,10 +62,18 @@ public class TestJoinOrder extends PlannerTestCase {
         }
     }
 
+    public void testOuterJoinOrder() {
+        try {
+            compileWithInvalidJoinOrder("select * FROM T1 LEFT JOIN T2 ON T1.A = T2.B", "T2, T1");
+            fail();
+        } catch (Exception ex) {
+            assertTrue("The specified join order is invalid for the given query".equals(ex.getMessage()));
+        }
+    }
+
     @Override
     protected void setUp() throws Exception {
         setupSchema(TestJoinOrder.class.getResource("testjoinorder-ddl.sql"), "testjoinorder", true);
-        forceReplication();
     }
 
     @Override

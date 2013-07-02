@@ -134,7 +134,7 @@ public class FunctionExpression extends AbstractExpression {
     }
 
     @Override
-    public Object clone() throws CloneNotSupportedException {
+    public Object clone() {
         FunctionExpression clone = (FunctionExpression)super.clone();
         clone.m_name = m_name;
         clone.m_alias = m_alias;
@@ -294,4 +294,17 @@ public class FunctionExpression extends AbstractExpression {
         // resolving a child column has type implications for parameterized functions
         negotiateInitialValueTypes();
     }
+
+    @Override
+    public String explain(String impliedTableName) {
+        String result = m_name + "(";
+        String connector = "";
+        for (AbstractExpression arg : m_args) {
+            result += connector + arg.explain(impliedTableName);
+            connector = ", ";
+        }
+        result += ")";
+        return result;
+    }
+
 }

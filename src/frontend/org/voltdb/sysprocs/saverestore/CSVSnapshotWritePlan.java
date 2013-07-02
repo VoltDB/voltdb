@@ -94,7 +94,8 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
         }
 
         NativeSnapshotWritePlan.createFileBasedCompletionTasks(file_path, file_nonce,
-                txnId, partitionTransactionIds, context, exportSequenceNumbers, timestamp);
+                txnId, partitionTransactionIds, context, exportSequenceNumbers, timestamp,
+                context.getNumberOfPartitions());
 
         final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
         final AtomicInteger numTables = new AtomicInteger(tables.size());
@@ -146,11 +147,11 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
 
                 final SnapshotTableTask task =
                     new SnapshotTableTask(
-                            table.getRelativeIndex(),
+                            table,
                             sdt,
                             filters.toArray(new SnapshotDataFilter[filters.size()]),
-                            table.getIsreplicated(),
-                            table.getTypeName());
+                            null,
+                            false);
 
                 if (table.getIsreplicated()) {
                     replicatedSnapshotTasks.add(task);

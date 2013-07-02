@@ -28,21 +28,25 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Random;
+import java.util.Set;
 import java.util.TreeMap;
 
-import junit.framework.TestCase;
-
 import org.apache.cassandra_voltpatches.MurmurHash3;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
+import org.voltcore.utils.Pair;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineJNI;
+
+import static org.junit.Assert.*;
 
 /**
  * This test verifies that the Java Hashinator behaves
@@ -50,10 +54,10 @@ import org.voltdb.jni.ExecutionEngineJNI;
  *
  */
 @RunWith(Parameterized.class)
-public class TestTheHashinator extends TestCase {
+public class TestTheHashinator {
     Random r = new Random();
 
-    @Override
+    @Before
     public void setUp() {
         EELibraryLoader.loadExecutionEngineLibrary(true);
         VoltDB.instance().readBuildInfo("Test");
@@ -91,6 +95,106 @@ public class TestTheHashinator extends TestCase {
         throw new RuntimeException();
     }
 
+    private static Map<Long, Integer> deserializeElasticConfig(byte[] config) {
+        Map<Long, Integer> tokens = new HashMap<Long, Integer>();
+        ByteBuffer buf = ByteBuffer.wrap(config);
+        int count = buf.getInt();
+
+        for (int i = 0; i < count; i++) {
+            tokens.put(buf.getLong(), buf.getInt());
+        }
+
+        return tokens;
+    }
+
+    /** make sure that every range hashes to partition */
+    private static void checkRangeBoundaries(ElasticHashinator hashinator,
+                                             int partition,
+                                             Map<Long, Long> range)
+    {
+        for (Map.Entry<Long, Long> entry : range.entrySet()) {
+            long start = entry.getKey();
+            long end = entry.getValue();
+            assertEquals(partition, hashinator.partitionForToken(start));
+            if (end != Long.MIN_VALUE) {
+                assertEquals(partition, hashinator.partitionForToken(end - 1));
+            } else {
+                assertEquals(partition, hashinator.partitionForToken(Long.MAX_VALUE));
+            }
+        }
+    }
+
+    /** make sure that every token for partition appears in the range map */
+    private static void checkTokensInRanges(ElasticHashinator hashinator,
+                                            int partition,
+                                            Map<Long, Long> range)
+    {
+        byte[] config = hashinator.pGetCurrentConfig().getSecond();
+        Map<Long, Integer> tokens = deserializeElasticConfig(config);
+        for (Map.Entry<Long, Integer> entry : tokens.entrySet()) {
+            long token = entry.getKey();
+            int pid = entry.getValue();
+
+            if (pid == partition) {
+                boolean foundRange = false;
+                for (Map.Entry<Long, Long> rangeEntry : range.entrySet()) {
+                    long start = rangeEntry.getKey();
+                    long end = rangeEntry.getValue();
+                    if (start <= token && token < end) {
+                        foundRange = true;
+                        break;
+                    } else if (end < start && (start <= token || token < end)) {
+                        // Boundary case, [start, end) wraps around the origin
+                        foundRange = true;
+                        break;
+                    }
+                }
+
+                assertTrue(foundRange);
+            }
+        }
+    }
+
+    private static Map<Long, Long> getRangesAndCheck(int partitionCount, int partitionToCheck)
+    {
+        ElasticHashinator hashinator =
+            new ElasticHashinator(ElasticHashinator.getConfigureBytes(partitionCount,
+                                                                      ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION));
+        Map<Long, Long> range1 = hashinator.pGetRanges(partitionToCheck);
+        assertEquals(ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION, range1.size());
+
+        // make sure that the returned map is sorted
+        long previous = Long.MIN_VALUE;
+        for (long k : range1.keySet()) {
+            assertTrue(k >= previous);
+            previous = k;
+        }
+
+        checkRangeBoundaries(hashinator, partitionToCheck, range1);
+        checkTokensInRanges(hashinator, partitionToCheck, range1);
+
+        // non-existing partition should have an empty range
+        assertTrue(hashinator.pGetRanges(partitionCount + 1).isEmpty());
+
+        return range1;
+    }
+
+    /**
+     * Compare the tokens of the covered partitions before and after adding new partitions to
+     * the hashinator. The tokens should match.
+     * @param beforePartitionCount    Partition count before adding new partitions
+     * @param afterPartitionCount     Partition count after adding new partitions
+     */
+    private static void checkRangesAfterExpansion(int beforePartitionCount, int afterPartitionCount) {
+        for (int i = 0; i < beforePartitionCount; i++) {
+            Map<Long, Long> oldrange = getRangesAndCheck(beforePartitionCount, i);
+            Map<Long, Long> newrange = getRangesAndCheck(afterPartitionCount, i);
+
+            // Only compare the begin tokens, end tokens are determined by the successors
+            assertEquals(oldrange.keySet(), newrange.keySet());
+        }
+    }
+
     /*
      * This test validates that not all values hash to 0. Most of the other
      * tests will pass even if everything hashes to a single partition.
@@ -107,14 +211,15 @@ public class TestTheHashinator extends TestCase {
                         "",
                         100,
                         hashinatorType,
-                        configBytes);
+                        configBytes,
+                        null);
 
         int partitionCount = 3;
         long valueToHash = hashinatorType == HashinatorType.ELASTIC ? 41 : 2;
         TheHashinator.initialize(getHashinatorClass(), configBytes);
 
         int eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
-        int javahash = TheHashinator.hashinateLong(valueToHash);
+        int javahash = TheHashinator.hashToPartition(valueToHash);
         if (eehash != javahash) {
             System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
         }
@@ -138,14 +243,15 @@ public class TestTheHashinator extends TestCase {
                         "",
                         100,
                         hashinatorType,
-                        configBytes);
+                        configBytes,
+                        null);
 
         int partitionCount = 2;
         TheHashinator.initialize(getHashinatorClass(), getConfigBytes(partitionCount));
 
         long valueToHash = 0;
         int eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
-        int javahash = TheHashinator.hashinateLong(valueToHash);
+        int javahash = TheHashinator.hashToPartition(valueToHash);
         if (eehash != javahash) {
             System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
         }
@@ -155,7 +261,7 @@ public class TestTheHashinator extends TestCase {
 
         valueToHash = 1;
         eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
-        javahash = TheHashinator.hashinateLong(valueToHash);
+        javahash = TheHashinator.hashToPartition(valueToHash);
         if (eehash != javahash) {
             System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
         }
@@ -165,7 +271,7 @@ public class TestTheHashinator extends TestCase {
 
         valueToHash = 2;
         eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
-        javahash = TheHashinator.hashinateLong(valueToHash);
+        javahash = TheHashinator.hashToPartition(valueToHash);
         if (eehash != javahash) {
             System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
         }
@@ -175,7 +281,7 @@ public class TestTheHashinator extends TestCase {
 
         valueToHash = 3;
         eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
-        javahash = TheHashinator.hashinateLong(valueToHash);
+        javahash = TheHashinator.hashToPartition(valueToHash);
         if (eehash != javahash) {
             System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
         }
@@ -197,7 +303,9 @@ public class TestTheHashinator extends TestCase {
                         0,
                         "",
                         100,
-                        hashinatorType, configBytes);
+                        hashinatorType,
+                        configBytes,
+                        null);
 
         /**
          *  Run with 100k of random values and make sure C++ and Java hash to
@@ -212,7 +320,7 @@ public class TestTheHashinator extends TestCase {
             TheHashinator.initialize(getHashinatorClass(), configBytes);
             for (long valueToHash : values) {
                 int eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
-                int javahash = TheHashinator.hashinateLong(valueToHash);
+                int javahash = TheHashinator.hashToPartition(valueToHash);
                 if (eehash != javahash) {
                     System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
                 }
@@ -228,7 +336,7 @@ public class TestTheHashinator extends TestCase {
     @Test
     public void testSameLongHash() {
         byte configBytes[] = getConfigBytes(1);
-        ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, 0, "", 100, hashinatorType, configBytes);
+        ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, 0, "", 100, hashinatorType, configBytes, null);
 
         /**
          *  Run with 10k of random values and make sure C++ and Java hash to
@@ -240,7 +348,7 @@ public class TestTheHashinator extends TestCase {
             TheHashinator.initialize(getHashinatorClass(), configBytes);
             // this will produce negative values, which is desired here.
             final long valueToHash = r.nextLong();
-            final int javahash = TheHashinator.hashinateLong(valueToHash);
+            final int javahash = TheHashinator.hashToPartition(valueToHash);
             final int eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
             if (eehash != javahash) {
                 System.out.printf("Hash of %d with %d partitions => EE: %d, Java: %d\n", valueToHash, partitionCount, eehash, javahash);
@@ -265,7 +373,8 @@ public class TestTheHashinator extends TestCase {
                         "",
                         100,
                         hashinatorType,
-                        configBytes);
+                        configBytes,
+                        null);
 
         for (int i = 0; i < 2500; i++) {
             int partitionCount = r.nextInt(1000) + 1;
@@ -274,7 +383,7 @@ public class TestTheHashinator extends TestCase {
             TheHashinator.initialize(getHashinatorClass(), configBytes);
 
             int eehash = ee.hashinate(valueToHash, hashinatorType, configBytes);
-            int javahash = TheHashinator.hashinateString(valueToHash);
+            int javahash = TheHashinator.hashToPartition(valueToHash);
             if (eehash != javahash) {
                 partitionCount++;
             }
@@ -297,7 +406,8 @@ public class TestTheHashinator extends TestCase {
                         "",
                         100,
                         hashinatorType,
-                        getConfigBytes(2));
+                        getConfigBytes(2),
+                        null);
         final byte configBytes[] = getConfigBytes(2);
         TheHashinator.initialize(getHashinatorClass(), configBytes);
         int jHash = TheHashinator.hashToPartition(new Byte(VoltType.NULL_TINYINT));
@@ -362,7 +472,8 @@ public class TestTheHashinator extends TestCase {
                         "",
                         100,
                         hashinatorType,
-                        getConfigBytes(6));
+                        getConfigBytes(6),
+                        null);
         for (int i = 0; i < 2500; i++) {
             int partitionCount = r.nextInt(1000) + 1;
             byte[] valueToHash = new byte[r.nextInt(1000)];
@@ -470,7 +581,8 @@ public class TestTheHashinator extends TestCase {
                 "",
                 100,
                 hashinatorType,
-                holder.configBytes);
+                holder.configBytes,
+                null);
 
         TheHashinator.initialize(getHashinatorClass(), holder.configBytes);
 
@@ -547,5 +659,160 @@ public class TestTheHashinator extends TestCase {
         assertEquals( 2, hashinator.partitionForToken(Long.MAX_VALUE - 1));
     }
 
+    @Test
+    public void testElasticAddPartitions() {
+        if (hashinatorType == HashinatorType.LEGACY) return;
+
+        ElasticHashinator hashinator = new ElasticHashinator(ElasticHashinator.getConfigureBytes(3,
+                ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION));
+
+        byte[] newConfig = ElasticHashinator.addPartitions(hashinator, Arrays.asList(3, 4, 5),
+                ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+
+        Map<Long, Integer> oldTokens = deserializeElasticConfig(hashinator.pGetCurrentConfig().getSecond());
+        Map<Long, Integer> newTokens = deserializeElasticConfig(newConfig);
+
+        for (Map.Entry<Long, Integer> entry : oldTokens.entrySet()) {
+            assertEquals(entry.getValue(), newTokens.get(entry.getKey()));
+        }
+
+        Map<Integer, Integer> newPidCounts = new HashMap<Integer, Integer>();
+        for (Map.Entry<Long, Integer> entry : newTokens.entrySet()) {
+            switch (entry.getValue()) {
+            case 3:
+            case 4:
+            case 5:
+                Integer count = newPidCounts.get(entry.getValue());
+                if (count == null) {
+                    count = 0;
+                }
+                newPidCounts.put(entry.getValue(), ++count);
+            }
+        }
+
+        assertEquals(3, newPidCounts.size());
+        assertEquals(ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION, (int) newPidCounts.get(3));
+        assertEquals(ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION, (int) newPidCounts.get(4));
+        assertEquals(ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION, (int) newPidCounts.get(5));
+    }
+
+    @Test
+    public void testElasticPredecessors() {
+        if (hashinatorType == HashinatorType.LEGACY) return;
+
+        byte[] config = ElasticHashinator.getConfigureBytes(3,
+                                                            ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+        byte[] newConfig = ElasticHashinator.addPartitions(new ElasticHashinator(config), Arrays.asList(3, 4, 5),
+                                                           ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+        TheHashinator.initialize(HashinatorType.ELASTIC.hashinatorClass, newConfig);
+        Map<Long, Integer> newTokens = deserializeElasticConfig(newConfig);
+        Set<Long> tokensForP4 = new HashSet<Long>();
+        Map<Long, Integer> tokensToPredecessors = TheHashinator.predecessors(4);
+        Set<Integer> predecessors = new HashSet<Integer>(tokensToPredecessors.values());
+        // Predecessor set shouldn't contain the partition itself
+        assertFalse(predecessors.contains(4));
+
+        for (Map.Entry<Long, Integer> entry : newTokens.entrySet()) {
+            if (tokensToPredecessors.containsKey(entry.getKey())) {
+                assertEquals(entry.getValue(), tokensToPredecessors.get(entry.getKey()));
+            }
+            if (entry.getValue() == 4) {
+                tokensForP4.add(entry.getKey());
+            }
+        }
+        assertEquals(ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION, tokensForP4.size());
+
+        ElasticHashinator hashinator = new ElasticHashinator(TheHashinator.getCurrentConfig().getSecond());
+        for (long token : tokensForP4) {
+            int pid;
+            if (token != Long.MIN_VALUE) {
+                pid = hashinator.partitionForToken(token - 1);
+            } else {
+                pid = hashinator.partitionForToken(Long.MAX_VALUE);
+            }
+            predecessors.remove(pid);
+        }
+        assertEquals(0, predecessors.size());
+    }
+
+    @Test
+    public void testElasticPredecessor() {
+        if (hashinatorType == HashinatorType.LEGACY) return;
+
+        byte[] config = ElasticHashinator.getConfigureBytes(3,
+                                                            ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+        byte[] newConfig = ElasticHashinator.addPartitions(new ElasticHashinator(config), Arrays.asList(3, 4, 5),
+                                                           ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+        TheHashinator.initialize(HashinatorType.ELASTIC.hashinatorClass, newConfig);
+        Map<Long, Integer> predecessors = TheHashinator.predecessors(4);
+
+        // pick the first predecessor
+        Map.Entry<Long, Integer> predecessor = predecessors.entrySet().iterator().next();
+        // if token and partition doesn't match, it should throw
+        try {
+            TheHashinator.predecessor(predecessor.getValue(), predecessor.getKey() - 1);
+            fail();
+        } catch (Exception e) {}
+        Pair<Long, Integer> prevPredecessor = TheHashinator.predecessor(predecessor.getValue(), predecessor.getKey());
+        assertNotNull(prevPredecessor);
+
+        ElasticHashinator hashinator = new ElasticHashinator(TheHashinator.getCurrentConfig().getSecond());
+        assertEquals(prevPredecessor.getSecond().intValue(), hashinator.partitionForToken(prevPredecessor.getFirst()));
+        // check if predecessor's token - 1 belongs to the previous predecessor
+        if (predecessor.getKey() != Long.MIN_VALUE) {
+            assertEquals(prevPredecessor.getSecond().intValue(), hashinator.partitionForToken(predecessor.getKey() - 1));
+        } else {
+            assertEquals(prevPredecessor.getSecond().intValue(), hashinator.partitionForToken(Long.MAX_VALUE));
+        }
+    }
+
+    @Test
+    public void testElasticAddPartitionDeterminism() {
+        if (hashinatorType == HashinatorType.LEGACY) return;
+
+        ElasticHashinator hashinator = new ElasticHashinator(ElasticHashinator.getConfigureBytes(3,
+                ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION));
+
+        // Add 3 partitions in a batch to the original hashinator
+        byte[] batchAddConfig = ElasticHashinator.addPartitions(hashinator, Arrays.asList(3, 4, 5),
+                                                                ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+        Map<Long, Integer> batchAddTokens = deserializeElasticConfig(batchAddConfig);
+
+        // Add the same 3 partitions one at a time to the original hashinator
+        byte[] add3Config = ElasticHashinator.addPartitions(hashinator, Arrays.asList(3),
+                                                            ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+        ElasticHashinator add3Hashinator = new ElasticHashinator(add3Config);
+        byte[] add4Config = ElasticHashinator.addPartitions(add3Hashinator, Arrays.asList(4),
+                                                            ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+        ElasticHashinator add4Hashinator = new ElasticHashinator(add4Config);
+        byte[] seqAddConfig = ElasticHashinator.addPartitions(add4Hashinator, Arrays.asList(5),
+                                                              ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
+        Map<Long, Integer> seqAddTokens = deserializeElasticConfig(seqAddConfig);
+
+        // The two approaches should produce the same hash ring
+        assertFalse(seqAddTokens.isEmpty());
+        assertTrue(seqAddTokens.values().contains(3));
+        assertTrue(seqAddTokens.values().contains(4));
+        assertTrue(seqAddTokens.values().contains(5));
+        assertEquals(batchAddTokens, seqAddTokens);
+    }
+
+    @Test
+    public void testElasticGetRanges() {
+        if (hashinatorType == HashinatorType.LEGACY) return;
+
+        getRangesAndCheck(/* partitionCount = */ 2,  /* partitionToCheck = */ 1);
+        getRangesAndCheck(/* partitionCount = */ 24, /* partitionToCheck = */ 15);
+    }
+
+    @Test
+    public void testElasticExpansionDeterminism()
+    {
+        if (hashinatorType == HashinatorType.LEGACY) return;
+
+        checkRangesAfterExpansion(/* beforePartitionCount = */ 2, /* afterPartitionCount = */ 6);
+        checkRangesAfterExpansion(/* beforePartitionCount = */ 21, /* afterPartitionCount = */ 28);
+        checkRangesAfterExpansion(/* beforePartitionCount = */ 24, /* afterPartitionCount = */ 48);
+    }
 }
 

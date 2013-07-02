@@ -23,6 +23,8 @@ import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -39,11 +41,9 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
-import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.export.ExportManager;
@@ -53,7 +53,6 @@ import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.HTTPAdminListener;
-import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 
@@ -118,8 +117,7 @@ public class Inits {
         m_config = rvdb.m_config;
         // determine if this is a rejoining node
         // (used for license check and later the actual rejoin)
-        if (m_config.m_startAction == START_ACTION.REJOIN ||
-                m_config.m_startAction == START_ACTION.LIVE_REJOIN) {
+        if (m_config.m_startAction.doesRejoin()) {
             m_isRejoin = true;
         } else {
             m_isRejoin = false;
@@ -217,7 +215,7 @@ public class Inits {
         SetupAdminMode
         StartHTTPServer
         InitHashinator
-        InitStatsAgent
+        InitAsyncCompilerAgent
         SetupReplicationRole
         CreateRestoreAgentAndPlan
         DistributeCatalog <- CreateRestoreAgentAndPlan
@@ -291,12 +289,23 @@ public class Inits {
                                 org.voltdb.TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0);
                     }
 
+                    // get a hash of the catalog - should never actually throw
+                    MessageDigest md = null;
+                    try {
+                        md = MessageDigest.getInstance("SHA-1");
+                    } catch (NoSuchAlgorithmException e) {
+                        VoltDB.crashLocalVoltDB("Bad JVM has no SHA-1 hash.", true, e);
+                    }
+                    md.update(catalogBytes);
+                    byte[] catalogHash = md.digest();
+                    assert(catalogHash.length == 20); // sha-1 length
 
                     // publish the catalog bytes to ZK
                     CatalogUtil.uploadCatalogToZK(
                             m_rvdb.getHostMessenger().getZK(),
                             0, catalogTxnId,
                             catalogUniqueId,
+                            catalogHash,
                             catalogBytes);
                 }
                 catch (IOException e) {
@@ -334,7 +343,7 @@ public class Inits {
             try {
                 m_rvdb.m_serializedCatalog = CatalogUtil.loadCatalogFromJar(catalogStuff.bytes, hostLog);
             } catch (IOException e) {
-                VoltDB.crashLocalVoltDB("Unable to load catalog: " + e.getMessage(), false, null);
+                VoltDB.crashLocalVoltDB("Unable to load catalog", true, e);
             }
 
             if ((m_rvdb.m_serializedCatalog == null) || (m_rvdb.m_serializedCatalog.length() == 0))
@@ -346,8 +355,7 @@ public class Inits {
 
             // note if this fails it will print an error first
             try {
-                m_rvdb.m_depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_deployment,
-                                                                         true, false);
+                m_rvdb.m_depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_deployment, true);
                 if (m_rvdb.m_depCRC < 0)
                     System.exit(-1);
             } catch (Exception e) {
@@ -600,9 +608,8 @@ public class Inits {
                         m_rvdb.m_messenger,
                         m_rvdb.m_partitionsToSitesAtStartupForExportInit
                         );
-            } catch (ExportManager.SetupException e) {
-                hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ExportInitFailure.name(), e);
-                System.exit(-1);
+            } catch (Throwable t) {
+                VoltDB.crashLocalVoltDB("Error setting up export", true, t);
             }
         }
     }
@@ -620,17 +627,13 @@ public class Inits {
         }
     }
 
-    class InitStatsAgent extends InitWork {
-        InitStatsAgent() {
+    class InitAsyncCompilerAgent extends InitWork {
+        InitAsyncCompilerAgent() {
         }
 
         @Override
         public void run() {
             try {
-                final long statsAgentHSId = m_rvdb.getHostMessenger().getHSIdForLocalSite(HostMessenger.STATS_SITE_ID);
-                m_rvdb.getStatsAgent().getMailbox(
-                            VoltDB.instance().getHostMessenger(),
-                            statsAgentHSId);
                 m_rvdb.getAsyncCompilerAgent().createMailbox(
                             VoltDB.instance().getHostMessenger(),
                             m_rvdb.getHostMessenger().getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID));
@@ -672,7 +675,8 @@ public class Inits {
                                                       cl.getInternalsnapshotpath(),
                                                       snapshotPath,
                                                       allPartitions,
-                                                      ImmutableSet.copyOf(m_rvdb.m_messenger.getLiveHostIds()));
+                                                      ImmutableSet.copyOf(m_rvdb.m_messenger.getLiveHostIds()),
+                                                      CatalogUtil.getVoltDbRoot(m_deployment.getPaths()).getAbsolutePath());
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Unable to establish a ZooKeeper connection: " +
                             e.getMessage(), false, e);

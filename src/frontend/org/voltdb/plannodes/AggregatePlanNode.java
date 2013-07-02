@@ -105,6 +105,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
     {
         // aggregates currently have their output schema specified
         m_outputSchema = schema.clone();
+        m_hasSignificantOutputSchema = true;
     }
 
 
@@ -203,21 +204,12 @@ public class AggregatePlanNode extends AbstractPlanNode {
             m_aggregateDistinct.add(0);
         }
         m_aggregateOutputColumns.add(aggOutputColumn);
-        try
-        {
-            if (aggType == ExpressionType.AGGREGATE_COUNT_STAR) {
-                assert(aggInputExpr == null);
-                m_aggregateExpressions.add(null);
-            } else {
-                assert(aggInputExpr != null);
-                m_aggregateExpressions.add((AbstractExpression) aggInputExpr.clone());
-            }
-        }
-        catch (CloneNotSupportedException e)
-        {
-            // This shouldn't ever happen
-            e.printStackTrace();
-            throw new RuntimeException(e.getMessage());
+        if (aggType == ExpressionType.AGGREGATE_COUNT_STAR) {
+            assert(aggInputExpr == null);
+            m_aggregateExpressions.add(null);
+        } else {
+            assert(aggInputExpr != null);
+            m_aggregateExpressions.add((AbstractExpression) aggInputExpr.clone());
         }
     }
 
@@ -225,16 +217,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
     {
         if (expr != null)
         {
-            try
-            {
-                m_groupByExpressions.add((AbstractExpression) expr.clone());
-            }
-            catch (CloneNotSupportedException e)
-            {
-                // This shouldn't ever happen
-                e.printStackTrace();
-                throw new RuntimeException(e.getMessage());
-            }
+            m_groupByExpressions.add((AbstractExpression) expr.clone());
         }
     }
 

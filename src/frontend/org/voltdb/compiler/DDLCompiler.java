@@ -40,7 +40,6 @@ import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
@@ -331,9 +330,6 @@ public class DDLCompiler {
     /// Partition descriptors parsed from DDL PARTITION or REPLICATE statements.
     final VoltDDLElementTracker m_tracker;
 
-    /// Database Catalog
-    final Database m_database;
-
     HashMap<String, Column> columnMap = new HashMap<String, Column>();
     HashMap<String, Index> indexMap = new HashMap<String, Index>();
     HashMap<Table, String> matViewMap = new HashMap<Table, String>();
@@ -345,22 +341,22 @@ public class DDLCompiler {
         int lineNo;
     }
 
-    public DDLCompiler(VoltCompiler compiler, HSQLInterface hsql, VoltDDLElementTracker tracker, Database catDB) {
+    public DDLCompiler(VoltCompiler compiler, HSQLInterface hsql, VoltDDLElementTracker tracker) {
         assert(compiler != null);
         assert(hsql != null);
         assert(tracker != null);
         this.m_hsql = hsql;
         this.m_compiler = compiler;
         this.m_tracker = tracker;
-        this.m_database = catDB;
     }
 
     /**
      * Compile a DDL schema from a file on disk
      * @param path
+     * @param db
      * @throws VoltCompiler.VoltCompilerException
      */
-    public void loadSchema(String path)
+    public void loadSchema(String path, Database db)
             throws VoltCompiler.VoltCompilerException {
         File inputFile = new File(path);
         FileReader reader = null;
@@ -371,16 +367,17 @@ public class DDLCompiler {
         }
 
         m_currLineNo = 1;
-        this.loadSchema(path, reader);
+        loadSchema(path, db, reader);
     }
 
     /**
      * Compile a file from an open input stream
      * @param path
+     * @param db
      * @param reader
      * @throws VoltCompiler.VoltCompilerException
      */
-    public void loadSchema(String path, FileReader reader)
+    private void loadSchema(String path, Database db, FileReader reader)
             throws VoltCompiler.VoltCompilerException {
 
         DDLStatement stmt = getNextStatement(reader, m_compiler);
@@ -388,7 +385,7 @@ public class DDLCompiler {
             // Some statements are processed by VoltDB and the rest are handled by HSQL.
             boolean processed = false;
             try {
-                processed = processVoltDBStatement(stmt.statement);
+                processed = processVoltDBStatement(stmt.statement, db);
             } catch (VoltCompilerException e) {
                 // Reformat the message thrown by VoltDB DDL processing to have a line number.
                 String msg = "VoltDB DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
@@ -450,10 +447,11 @@ public class DDLCompiler {
      * Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE,
      * CREATE PROCEDURE, and CREATE ROLE.
      * @param statement  DDL statement string
+     * @param db
      * @return true if statement was handled, otherwise it should be passed to HSQL
      * @throws VoltCompilerException
      */
-    private boolean processVoltDBStatement(String statement) throws VoltCompilerException {
+    private boolean processVoltDBStatement(String statement, Database db) throws VoltCompilerException {
         if (statement == null || statement.trim().isEmpty()) {
             return false;
         }
@@ -596,7 +594,7 @@ public class DDLCompiler {
         statementMatcher = createRolePattern.matcher(statement);
         if( statementMatcher.matches()) {
             String roleName = statementMatcher.group(1);
-            CatalogMap<Group> groupMap = m_database.getGroups();
+            CatalogMap<Group> groupMap = db.getGroups();
             if (groupMap.get(roleName) != null) {
                 throw m_compiler.new VoltCompilerException(String.format(
                         "Role name \"%s\" in CREATE ROLE statement already exists.",
@@ -628,7 +626,7 @@ public class DDLCompiler {
                         catGroup.setDefaultproc(true);
                         break;
                     case export:
-                        m_compiler.grantExportToGroup(roleName, m_database);
+                        m_compiler.grantExportToGroup(roleName, db);
                         break;
                     }
                 }
@@ -693,9 +691,9 @@ public class DDLCompiler {
         return false;
     }
 
-    public void compileToCatalog(Catalog catalog, Database db) throws VoltCompilerException {
+    public void compileToCatalog(Database db) throws VoltCompilerException {
         String hexDDL = Encoder.hexEncode(m_fullDDL);
-        catalog.execute("set " + db.getPath() + " schema \"" + hexDDL + "\"");
+        db.getCatalog().execute("set " + db.getPath() + " schema \"" + hexDDL + "\"");
 
         VoltXMLElement xmlCatalog;
         try
@@ -712,7 +710,7 @@ public class DDLCompiler {
         BuildDirectoryUtils.writeFile("schema-xml", "hsql-catalog-output.xml", xmlCatalog.toString());
 
         // build the local catalog from the xml catalog
-        fillCatalogFromXML(catalog, db, xmlCatalog);
+        fillCatalogFromXML(db, xmlCatalog);
     }
 
     /**
@@ -917,7 +915,7 @@ public class DDLCompiler {
         }
     }
 
-    public void fillCatalogFromXML(Catalog catalog, Database db, VoltXMLElement xml)
+    public void fillCatalogFromXML(Database db, VoltXMLElement xml)
     throws VoltCompiler.VoltCompilerException {
 
         if (xml == null)
@@ -927,13 +925,13 @@ public class DDLCompiler {
 
         for (VoltXMLElement node : xml.children) {
             if (node.name.equals("table"))
-                addTableToCatalog(catalog, db, node);
+                addTableToCatalog(db, node);
         }
 
         processMaterializedViews(db);
     }
 
-    void addTableToCatalog(Catalog catalog, Database db, VoltXMLElement node) throws VoltCompilerException {
+    void addTableToCatalog(Database db, VoltXMLElement node) throws VoltCompilerException {
         assert node.name.equals("table");
 
         // clear these maps, as they're table specific
@@ -1421,18 +1419,19 @@ public class DDLCompiler {
             }
             assert(stmt != null);
 
-            // throw an error if the view isn't withing voltdb's limited worldview
+            // throw an error if the view isn't within voltdb's limited worldview
             checkViewMeetsSpec(destTable.getTypeName(), stmt);
 
             // create the materializedviewinfo catalog node for the source table
             Table srcTable = stmt.tableList.get(0);
             MaterializedViewInfo matviewinfo = srcTable.getViews().add(destTable.getTypeName());
             matviewinfo.setDest(destTable);
-            if (stmt.where == null)
-                matviewinfo.setPredicate("");
-            else {
-                String hex = Encoder.hexEncode(stmt.where.toJSONString());
+            AbstractExpression where = stmt.getCombinedFilterExpression();
+            if (where != null) {
+                String hex = Encoder.hexEncode(where.toJSONString());
                 matviewinfo.setPredicate(hex);
+            } else {
+                matviewinfo.setPredicate("");
             }
             destTable.setMaterializer(srcTable);
 

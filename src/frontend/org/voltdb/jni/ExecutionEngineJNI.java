@@ -20,15 +20,17 @@ package org.voltdb.jni;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
+import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.FragmentPlanSource;
 import org.voltdb.ParameterSet;
-import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.PrivateVoltTableFactory;
-import org.voltdb.SysProcSelector;
+import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
@@ -36,6 +38,10 @@ import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FastSerializer.BufferGrowCallback;
+import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+
+import com.google.common.base.Throwables;
 
 /**
  * Wrapper for native Execution Engine library.
@@ -94,10 +100,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final String hostname,
             final int tempTableMemory,
             final TheHashinator.HashinatorType hashinatorType,
-            final byte hashinatorConfig[])
+            final byte hashinatorConfig[],
+            final FragmentPlanSource planSource)
     {
         // base class loads the volt shared library.
-        super(siteId, partitionId);
+        super(siteId, partitionId, planSource);
 
         //exceptionBuffer.order(ByteOrder.nativeOrder());
         LOG.trace("Creating Execution Engine on clusterIndex=" + clusterIndex
@@ -203,51 +210,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         checkErrorCode(errorCode);
     }
 
-    @Override
-    public long loadPlanFragment(byte[] plan) throws EEException
-    {
-        deserializer.clear();
-
-        long cacheSize = 0;
-        CacheUse cacheUse = CacheUse.FAIL;
-
-        // Start collecting statistics
-        startStatsCollection();
-
-        //C++ JSON deserializer is not thread safe, must synchronize
-        int errorCode = 0;
-        synchronized (ExecutionEngineJNI.class) {
-            errorCode = nativeLoadPlanFragment(pointer, plan);
-        }
-        try {
-            checkErrorCode(errorCode);
-            FastDeserializer fds = fallbackBuffer == null ? deserializer : new FastDeserializer(fallbackBuffer);
-            try {
-                final long fragId = fds.readLong();
-                final boolean wasHit = fds.readBoolean();
-                cacheSize = fds.readLong();
-                if (fragId == 0) {
-                    throw new EEException(ERRORCODE_ERROR);
-                }
-                if (wasHit) {
-                    cacheUse = CacheUse.HIT1;
-                }
-                else {
-                    cacheUse = CacheUse.MISS;
-                }
-                return fragId;
-            } catch (final IOException ex) {
-                LOG.error("Failed to deserialze loadPlanFragment results" + ex);
-                throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
-            }
-        } finally {
-            // Stop collecting statistics.
-            endStatsCollection(cacheSize, cacheUse);
-
-            fallbackBuffer = null;
-        }
-    }
-
     private static byte[] getStringBytes(String string) {
         try {
             return string.getBytes("UTF-8");
@@ -260,11 +222,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * @param undoToken Token identifying undo quantum for generated undo info
      */
     @Override
-    public VoltTable[] executePlanFragments(
+    protected VoltTable[] coreExecutePlanFragments(
             final int numFragmentIds,
             final long[] planFragmentIds,
             final long[] inputDepIds,
-            final ParameterSet[] parameterSets,
+            final Object[] parameterSets,
             final long spHandle, final long lastCommittedSpHandle,
             long uniqueId, final long undoToken) throws EEException
     {
@@ -282,14 +244,28 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         // serialize the param sets
         fsForParameterSet.clear();
         for (int i = 0; i < batchSize; ++i) {
-            try {
-                parameterSets[i].writeExternal(fsForParameterSet);
+            if (parameterSets[i] instanceof ByteBuffer) {
+                ByteBuffer buf = (ByteBuffer) parameterSets[i];
+                try {
+                    fsForParameterSet.write(buf);
+                } catch (IOException exception) {
+                    throw new RuntimeException("Error serializing parameters for SQL batch element: " +
+                            i + " with plan fragment ID: " + planFragmentIds[i] +
+                            " and with pre-serialized params of length: " +
+                            buf.capacity(), exception);
+                }
             }
-            catch (final IOException exception) {
-                throw new RuntimeException("Error serializing parameters for SQL batch element: " +
-                                           i + " with plan fragment ID: " + planFragmentIds[i] +
-                                           " and with params: " +
-                                           parameterSets[i].toJSONString(), exception);
+            else {
+                ParameterSet pset = (ParameterSet) parameterSets[i];
+                try {
+                    pset.writeExternal(fsForParameterSet);
+                }
+                catch (final IOException exception) {
+                    throw new RuntimeException("Error serializing parameters for SQL batch element: " +
+                                               i + " with plan fragment ID: " + planFragmentIds[i] +
+                                               " and with params: " +
+                                               pset.toJSONString(), exception);
+                }
             }
         }
         // checkMaxFsSize();
@@ -366,8 +342,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public void loadTable(final int tableId, final VoltTable table,
-        final long txnId, final long lastCommittedTxnId) throws EEException
+    public byte[] loadTable(final int tableId, final VoltTable table,
+        final long txnId, final long lastCommittedTxnId, boolean returnUniqueViolations) throws EEException
     {
         if (LOG.isTraceEnabled()) {
             LOG.trace("loading table id=" + tableId + "...");
@@ -378,8 +354,24 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
 
         final int errorCode = nativeLoadTable(pointer, tableId, serialized_table,
-                                              txnId, lastCommittedTxnId);
+                                              txnId, lastCommittedTxnId, returnUniqueViolations);
         checkErrorCode(errorCode);
+
+        deserializer.clear();
+
+        try {
+            int length = deserializer.readInt();
+            if (length == 0) return null;
+            if (length < 0) VoltDB.crashLocalVoltDB("Length shouldn't be < 0", true, null);
+
+            byte uniqueViolations[] = new byte[length];
+            deserializer.readFully(uniqueViolations);
+
+            return uniqueViolations;
+        } catch (final IOException ex) {
+            LOG.error("Failed to retrieve unique violations: " + tableId, ex);
+            throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
+        }
     }
 
     /**
@@ -408,7 +400,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     @Override
     public VoltTable[] getStats(
-            final SysProcSelector selector,
+            final StatsSelector selector,
             final int locators[],
             final boolean interval,
             final Long now)
@@ -463,39 +455,26 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateTableStream(int tableId, TableStreamType streamType) {
-        FastSerializer fs = new FastSerializer();
-        try {
-            fs.writeInt(0);                 // Predicate count
-        }
-        catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        return nativeActivateTableStream(pointer, tableId, streamType.ordinal(), fs.getBytes());
+    public boolean activateTableStream(int tableId, TableStreamType streamType, SnapshotPredicates predicates) {
+        return nativeActivateTableStream(pointer, tableId, streamType.ordinal(), predicates.toBytes());
     }
 
     @Override
-    public int tableStreamSerializeMore(BBContainer c, int tableId, TableStreamType streamType) {
-        FastSerializer fs = new FastSerializer();
-        try {
-            fs.writeInt(1);                 // Buffer count
-            fs.writeLong(c.address);        // Pointer
-            fs.writeInt(c.b.position());    // Offset
-            fs.writeInt(c.b.remaining());   // Length
-        }
-        catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        long remaining = nativeTableStreamSerializeMore(pointer, tableId, streamType.ordinal(), fs.getBytes());
+    public int[] tableStreamSerializeMore(int tableId,
+                                          TableStreamType streamType,
+                                          List<BBContainer> outputBuffers) {
+        long remaining = nativeTableStreamSerializeMore(pointer,
+                                                        tableId,
+                                                        streamType.ordinal(),
+                                                        SnapshotUtil.OutputBuffersToBytes(outputBuffers));
         int[] positions = null;
-        //TODO: Pass remaining count back to caller.
         // -1 is end of stream.
         if (remaining == -1) {
-            return 0;
+            return new int[] {0};
         }
         // -2 is an error.
         if (remaining == -2) {
-            return -1;
+            return new int[] {-1};
         }
         assert(deserializer != null);
         deserializer.clear();
@@ -507,16 +486,14 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 for (int i = 0; i < count; i++) {
                     positions[i] = deserializer.readInt();
                 }
-                //TODO: Support multiple streams.
-                assert(positions.length == 1);
-                return positions[0];
+                return positions;
             }
         } catch (final IOException ex) {
             LOG.error("Failed to deserialize position array" + ex);
             throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
         }
 
-        return 0;
+        return new int[] {0};
     }
 
     /**
@@ -556,8 +533,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     public int hashinate(Object value, TheHashinator.HashinatorType hashinatorType, byte hashinatorConfig[])
     {
-        ParameterSet parameterSet = new ParameterSet();
-        parameterSet.setParameters(value, hashinatorType.typeId(), hashinatorConfig);
+        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(value, hashinatorType.typeId(), hashinatorConfig);
 
         // serialize the param set
         fsForParameterSet.clear();
@@ -573,8 +549,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     public void updateHashinator(TheHashinator.HashinatorType type, byte[] config)
     {
-        ParameterSet parameterSet = new ParameterSet();
-        parameterSet.setParameters(type.typeId(), config);
+        ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(type.typeId(), config);
 
         // serialize the param set
         fsForParameterSet.clear();
@@ -600,5 +575,22 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         assert(buffer != null);
         assert(fallbackBuffer == null);
         fallbackBuffer = buffer;
+    }
+
+    @Override
+    public byte[] executeTask(TaskType taskType, byte[] task) {
+        fsForParameterSet.clear();
+        byte retval[] = null;
+        try {
+            fsForParameterSet.writeLong(taskType.taskId);
+            fsForParameterSet.write(task);
+
+            deserializer.clear();
+            nativeExecuteTask(pointer);
+            return (byte[])deserializer.readArray(byte.class);
+        } catch (IOException e) {
+            Throwables.propagate(e);
+        }
+        return retval;
     }
 }

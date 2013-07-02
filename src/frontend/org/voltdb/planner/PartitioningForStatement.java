@@ -47,12 +47,12 @@ public class PartitioningForStatement implements Cloneable{
 
     /**
      * This value can be provided any non-null value to force single-partition statement planning and
-     * (at least currently) disabling any kind of analysis of single-partition suitability
-     * (except to forbid single-partition execution of replicated table DML.
-     * Currently most of these cases are taken at face value -- the only case where such single partitioning is second-guessed
-     * is in DML for replicated tables where a single-partition write would corrupt the replication.
-     * This is flagged as an error.  Otherwise, no attempt is made to validate that a single partition statement would
-     * have the same result as the same query run on all partitions. That is for the caller to decide.
+     * (at least currently) the disabling of any kind of analysis of single-partition suitability --
+     * except to forbid single-partition execution of replicated table DML.
+     * Since that would corrupt the replication, it is flagged as an error.
+     * Otherwise, no attempt is made to validate that a single partition statement would
+     * have the same result as the same query run on all partitions.
+     * It is up to the caller to decide whether that is an issue.
      */
     private final Object m_specifiedValue;
     /**
@@ -60,7 +60,7 @@ public class PartitioningForStatement implements Cloneable{
      * to not only analyze whether the statement CAN be run single-partition,
      * but also to decide that it WILL and to alter the plan accordingly.
      * If initialized to false, the analysis is considered to be for advisory purposes only,
-     * so the planner may not commit to plan changes specific to single-partition execution.
+     * so the planner may not commit to plan changes that are specific to single-partition execution.
      */
     private final boolean m_lockIn;
     /**
@@ -123,6 +123,7 @@ public class PartitioningForStatement implements Cloneable{
     /**
      * @return deep copy of self
      */
+    @Override
     public Object clone() {
         return new PartitioningForStatement(m_specifiedValue, m_lockIn, m_inferSP);
     }
@@ -213,7 +214,7 @@ public class PartitioningForStatement implements Cloneable{
     }
 
     /**
-     * Returns the discovered single partition expression (if exists), unless the
+     * Returns the discovered single partition expression (if it exists), unless the
      * user gave a partitioning a-priori, and then it will return null.
      */
     public AbstractExpression effectivePartitioningExpression() {
@@ -270,13 +271,6 @@ public class PartitioningForStatement implements Cloneable{
      */
     public String getFullColumnName() {
         return m_fullColumnName;
-    }
-
-    /**
-     * smart accessor
-     */
-    public boolean hasPartitioningConstantLockedIn() {
-        return m_lockIn && (m_inferredValue != null);
     }
 
     /**

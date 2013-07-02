@@ -77,6 +77,10 @@ class MockTopend : public Topend {
         return 0;
     }
 
+    virtual std::string planForFragmentId(int64_t fragmentId) {
+        return "";
+    }
+
     virtual void crashVoltDB(FatalException e) {
 
     }
@@ -95,9 +99,7 @@ public:
         srand(0);
         m_topend = new MockTopend();
         m_pool = new Pool();
-        m_quantum =
-          new (m_pool->allocate(sizeof(UndoQuantum)))
-          UndoQuantum(0, m_pool);
+        m_quantum = new (*m_pool) UndoQuantum(0, m_pool);
 
         m_context = new ExecutorContext(0, 0, m_quantum, m_topend, m_pool, true, "", 0);
 
@@ -129,7 +131,15 @@ public:
         // a simple helper around the constructor that sets the
         // wrapper buffer size to the specified value
         m_table = StreamedTable::createForTest(1024, m_context);
+    }
 
+    void nextQuantum(int i, int64_t tokenOffset)
+    {
+        // Takes advantage of "grey box test" friend privileges on UndoQuantum.
+        m_quantum->release();
+        m_quantum = new (*m_pool) UndoQuantum(i + tokenOffset, m_pool);
+        // quant, currTxnId, committedTxnId
+        m_context->setupForPlanFragments(m_quantum, i, i - 1, 0);
     }
 
     virtual ~StreamedTableTest() {
@@ -167,12 +177,7 @@ TEST_F(StreamedTableTest, BaseCase) {
     for (int i = 1; i < 1000; i++) {
 
         // pretend to be a plan fragment execution
-        m_quantum->release();
-        m_quantum =
-          new (m_pool->allocate(sizeof(UndoQuantum)))
-          UndoQuantum(i + tokenOffset, m_pool);
-        // quant, currTxnId, committedTxnId
-        m_context->setupForPlanFragments(m_quantum, i, i - 1, 0);
+        nextQuantum(i, tokenOffset);
 
         // fill a tuple
         for (int col = 0; col < COLUMN_COUNT; col++) {

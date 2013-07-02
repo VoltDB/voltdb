@@ -58,6 +58,24 @@
 
 namespace voltdb {
 
+/** Parse JSON parameters to create a hash range expression */
+static AbstractExpression*
+hashRangeFactory(PlannerDomValue obj) {
+    PlannerDomValue hashColumnValue = obj.valueForKey("HASH_COLUMN");
+
+    PlannerDomValue rangesArray = obj.valueForKey("RANGES");
+
+    srange_type *ranges = new srange_type[rangesArray.arrayLen()];
+    for (int ii = 0; ii < rangesArray.arrayLen(); ii++) {
+        PlannerDomValue arrayObject = rangesArray.valueAtIndex(ii);
+        PlannerDomValue rangeStartValue = arrayObject.valueForKey("RANGE_START");
+        PlannerDomValue rangeEndValue = arrayObject.valueForKey("RANGE_END");
+
+        ranges[ii] = srange_type(rangeStartValue.asInt64(), rangeEndValue.asInt64());
+    }
+    return new HashRangeExpression(hashColumnValue.asInt(), ranges, static_cast<int>(rangesArray.arrayLen()));
+}
+
 /** Function static helper templated functions to vivify an optimal
     comparison class. */
 static AbstractExpression*
@@ -82,6 +100,8 @@ getGeneral(ExpressionType c,
         return new ComparisonExpression<CmpGte>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_LIKE):
         return new ComparisonExpression<CmpLike>(c, l, r);
+    case (EXPRESSION_TYPE_COMPARE_IN):
+        return new ComparisonExpression<CmpIn>(c, l, r);
     default:
         char message[256];
         snprintf(message, 256, "Invalid ExpressionType '%s' called"
@@ -113,6 +133,8 @@ getMoreSpecialized(ExpressionType c, L* l, R* r)
         return new InlinedComparisonExpression<CmpGte, L, R>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_LIKE):
         return new InlinedComparisonExpression<CmpLike, L, R>(c, l, r);
+    case (EXPRESSION_TYPE_COMPARE_IN):
+        return new InlinedComparisonExpression<CmpIn, L, R>(c, l, r);
     default:
         char message[256];
         snprintf(message, 256, "Invalid ExpressionType '%s' called for"
@@ -304,7 +326,6 @@ tupleValueFactory(PlannerDomValue obj, ExpressionType et,
     // read the tuple value expression specific data
     int columnIndex = obj.valueForKey("COLUMN_IDX").asInt();
     std::string tableName = obj.valueForKey("TABLE_NAME").asStr();
-    std::string columnName = obj.valueForKey("COLUMN_NAME").asStr();
 
     // verify input
     if (columnIndex < 0) {
@@ -312,7 +333,8 @@ tupleValueFactory(PlannerDomValue obj, ExpressionType et,
                                       "tupleValueFactory: invalid column_idx.");
     }
 
-    return new TupleValueExpression(columnIndex, tableName, columnName);
+    //TODO: The columnName argument should be deprecated. The member is not used anywhere.
+    return new TupleValueExpression(columnIndex, tableName, "");
 }
 
 AbstractExpression *
@@ -370,6 +392,7 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     case (EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO):
     case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
     case (EXPRESSION_TYPE_COMPARE_LIKE):
+    case (EXPRESSION_TYPE_COMPARE_IN):
         ret = comparisonFactory( et, lc, rc);
     break;
 
@@ -409,6 +432,16 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     }
     break;
 
+    case (EXPRESSION_TYPE_VALUE_VECTOR): {
+        // Parse whatever is needed out of obj and pass the pieces to inListFactory
+        // to make it easier to unit test independently of the parsing.
+        // The first argument is used as the list element type.
+        // If the ValueType of the list builder expression needs to be "ARRAY" or something else,
+        // a separate element type attribute will have to be serialized and passed in here.
+        ret = vectorFactory(vt, args);
+    }
+    break;
+
     // Constant Values, parameters, tuples
     case (EXPRESSION_TYPE_VALUE_CONSTANT):
         ret = constantValueFactory(obj, vt, et, lc, rc);
@@ -425,7 +458,9 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     case (EXPRESSION_TYPE_VALUE_TUPLE_ADDRESS):
         ret = new TupleAddressExpression();
         break;
-
+    case (EXPRESSION_TYPE_HASH_RANGE):
+        ret = hashRangeFactory(obj);
+        break;
         // must handle all known expressions in this factory
     default:
 
@@ -484,6 +519,5 @@ void ExpressionUtil::loadIndexedExprsFromJson(std::vector<AbstractExpression*>& 
         indexed_exprs.push_back(expr);
     }
 }
-
 
 }

@@ -22,6 +22,7 @@ import java.io.Writer;
 
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.SystemProcedureCatalog.Config;
+import org.voltdb.catalog.Procedure;
 
 /**
  * Check if the parameters of the sysproc can be deserialized successfully.
@@ -34,18 +35,20 @@ public class ParameterDeserializationPolicy extends InvocationAcceptancePolicy {
     @Override
     public ClientResponseImpl shouldAccept(AuthUser user,
             StoredProcedureInvocation invocation,
-            Config sysProc) {
-        try {
-            invocation.getParams();
-        } catch (RuntimeException e) {
-            Writer result = new StringWriter();
-            PrintWriter pw = new PrintWriter(result);
-            e.printStackTrace(pw);
-            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                    new VoltTable[0],
-                    "Exception while deserializing procedure params\n" +
-                    result.toString(),
-                    invocation.clientHandle);
+            Procedure proc) {
+        if (proc.getSystemproc()) {
+            try {
+                invocation.getParams();
+            } catch (RuntimeException e) {
+                Writer result = new StringWriter();
+                PrintWriter pw = new PrintWriter(result);
+                e.printStackTrace(pw);
+                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                        new VoltTable[0],
+                        "Exception while deserializing procedure params\n" +
+                                result.toString(),
+                        invocation.clientHandle);
+            }
         }
 
         return null;

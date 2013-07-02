@@ -19,7 +19,6 @@ package org.voltdb;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Semaphore;
 
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
@@ -29,26 +28,26 @@ public interface CommandLog {
      * @param context
      * @param txnId
      *            The txnId of the truncation snapshot at the end of restore, or
-     *            Long.MIN if there was none.
+     * @param partitionCount
      */
     public abstract void init(
-            CatalogContext context,
-            long txnId,
-            Map<Integer, Long> perPartitionTxnId,
-            String coreBinding);
+                                 CatalogContext context,
+                                 long txnId,
+                                 int partitionCount, String coreBinding,
+                                 Map<Integer, Long> perPartitionTxnId);
 
     /**
     *
-    * @param txnId
-    *            The txnId of the truncation snapshot at the end of restore, or
-    *            Long.MIN if there was none.
-    */
+     * @param txnId
+     *            The txnId of the truncation snapshot at the end of restore, or
+     *            Long.MIN if there was none.
+     * @param partitionCount
+     */
     public abstract void initForRejoin(
-            CatalogContext context,
-            long txnId,
-            Map<Integer, Long> perPartitionTxnId,
-            boolean isRejoin,
-            String coreBinding);
+                                          CatalogContext context,
+                                          long txnId,
+                                          int partitionCount, boolean isRejoin,
+                                          String coreBinding, Map<Integer, Long> perPartitionTxnId);
 
     public abstract boolean needsInitialization();
 
@@ -66,22 +65,10 @@ public interface CommandLog {
     public abstract void shutdown() throws InterruptedException;
 
     /**
-     * @param failedInitiators
-     * @param faultedTxns
-     * @return null if the logger is not initialized
-     */
-    public abstract Semaphore logFault(Set<Long> failedInitiators,
-                                       Set<Long> faultedTxns);
-
-    /**
      * IV2-only method.  Write this Iv2FaultLogEntry to the fault log portion of the command log
      */
     public abstract void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
             int partitionId, long spHandle);
-
-    public abstract void logHeartbeat(final long txnId);
-
-    public abstract long getFaultSequenceNumber();
 
     public interface DurabilityListener {
         public void onDurability(ArrayList<Object> durableThings);

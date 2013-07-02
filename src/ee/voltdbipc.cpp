@@ -194,6 +194,12 @@ typedef struct {
     char data[0];
 }__attribute__((packed)) catalog_load;
 
+typedef struct {
+    struct ipc_command cmd;
+    int64_t taskId;
+    char task[0];
+}__attribute__((packed)) execute_task;
+
 
 using namespace voltdb;
 
@@ -230,7 +236,7 @@ void deserializeParameterSetCommon(int cnt, ReferenceSerializeInput &serialize_i
                                    NValueArray &params, Pool *stringPool)
 {
     for (int i = 0; i < cnt; ++i) {
-        params[i] = NValue::deserializeFromAllocateForStorage(serialize_in, stringPool);
+        params[i].deserializeFromAllocateForStorage(serialize_in, stringPool);
     }
 }
 
@@ -327,12 +333,12 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
           threadLocalPoolAllocations();
           result = kErrorCode_None;
           break;
-      case 26:
-          loadFragment(cmd);
-          result = kErrorCode_None;
-          break;
       case 27:
           updateHashinator(cmd);
+          result = kErrorCode_None;
+          break;
+      case 28:
+          executeTask(cmd);
           result = kErrorCode_None;
           break;
       default:
@@ -606,7 +612,6 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
             }
         }
         pool->purge();
-        m_engine->resizePlanCache(); // shrink cache if need be
     }
     catch (const FatalException &e) {
         crashVoltDB(e);
@@ -638,47 +643,6 @@ void VoltDBIPC::sendException(int8_t errorCode) {
     writeOrDie(m_fd, (const unsigned char*)exceptionData, expectedSize);
 }
 
-/**
- * Ensure a plan fragment is loaded.
- * Return error code, fragmentid for plan, and cache stats
- */
-void VoltDBIPC::loadFragment(struct ipc_command *cmd) {
-    int errors = 0;
-
-    loadfrag *load = (loadfrag*)cmd;
-
-    int32_t planFragLength = ntohl(load->planFragLength);
-
-    int64_t fragId;
-    bool wasHit;
-    int64_t cacheSize;
-
-    try {
-        // execute
-        if (m_engine->loadFragment(load->data, planFragLength, fragId, wasHit, cacheSize)) {
-            ++errors;
-        }
-    } catch (const FatalException &e) {
-        crashVoltDB(e);
-    }
-
-    // make network suitable
-    fragId = htonll(fragId);
-    int64_t wasHitLong = htonll((wasHit ? 1L : 0L));
-    cacheSize = htonll(cacheSize);
-
-    // write the results array back across the wire
-    const int8_t successResult = kErrorCode_Success;
-    if (errors == 0) {
-        writeOrDie(m_fd, (const unsigned char*)&successResult, sizeof(int8_t));
-        writeOrDie(m_fd, (const unsigned char*)&fragId, sizeof(int64_t));
-        writeOrDie(m_fd, (const unsigned char*)&wasHitLong, sizeof(int64_t));
-        writeOrDie(m_fd, (const unsigned char*)&cacheSize, sizeof(int64_t));
-    } else {
-        sendException(kErrorCode_Error);
-    }
-}
-
 int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
     load_table_cmd *loadTableCommand = (load_table_cmd*) cmd;
 
@@ -697,7 +661,7 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
     try {
         ReferenceSerializeInput serialize_in(offset, sz);
 
-        bool success = m_engine->loadTable(tableId, serialize_in, spHandle, lastCommittedSpHandle);
+        bool success = m_engine->loadTable(tableId, serialize_in, spHandle, lastCommittedSpHandle, false);
         if (success) {
             return kErrorCode_Success;
         } else {
@@ -799,6 +763,54 @@ char *VoltDBIPC::retrieveDependency(int32_t dependencyId, size_t *dependencySz) 
     return dependencyData;
 }
 
+std::string VoltDBIPC::planForFragmentId(int64_t fragmentId) {
+    char message[sizeof(int8_t) + sizeof(int64_t)];
+
+    message[0] = static_cast<int8_t>(kErrorCode_needPlan);
+    *reinterpret_cast<int64_t*>(&message[1]) = htonll(fragmentId);
+    writeOrDie(m_fd, (unsigned char*)message, sizeof(int8_t) + sizeof(int64_t));
+
+    int32_t length;
+    ssize_t bytes = read(m_fd, &length, sizeof(int32_t));
+    if (bytes != sizeof(int32_t)) {
+        printf("Error - blocking read failed. %jd read %jd attempted",
+               (intmax_t)bytes, (intmax_t)sizeof(int32_t));
+        fflush(stdout);
+        assert(false);
+        exit(-1);
+    }
+    length = static_cast<int32_t>(ntohl(length) - sizeof(int32_t));
+    assert(length > 0);
+
+    boost::scoped_array<char> planBytes(new char[length + 1]);
+    bytes = 0;
+    while (bytes != length) {
+        ssize_t oldBytes = bytes;
+        bytes += read(m_fd, planBytes.get() + bytes, length - bytes);
+        if (oldBytes == bytes) {
+            break;
+        }
+        if (oldBytes > bytes) {
+            bytes++;
+            break;
+        }
+    }
+
+    if (bytes != length) {
+        printf("Error - blocking read failed. %jd read %jd attempted",
+               (intmax_t)bytes, (intmax_t)length);
+        fflush(stdout);
+        assert(false);
+        exit(-1);
+    }
+
+    // null terminate
+    planBytes[length] = '\0';
+
+    // need to return a string
+    return std::string(planBytes.get());
+}
+
 void VoltDBIPC::crashVoltDB(voltdb::FatalException e) {
     const char *reasonBytes = e.m_reason.c_str();
     int32_t reasonLength = static_cast<int32_t>(strlen(reasonBytes));
@@ -888,13 +900,19 @@ void VoltDBIPC::getStats(struct ipc_command *cmd) {
 
         // write the results array back across the wire
         const int8_t successResult = kErrorCode_Success;
-        if (result == 1) {
+        if (result == 0 || result == 1) {
             writeOrDie(m_fd, (const unsigned char*)&successResult, sizeof(int8_t));
 
-            // write the dependency tables back across the wire
-            // the result set includes the total serialization size
-            const int32_t size = m_engine->getResultsSize();
-            writeOrDie(m_fd, (unsigned char*)(m_engine->getReusedResultBuffer()), size);
+            if (result == 1) {
+                const int32_t size = m_engine->getResultsSize();
+                // write the dependency tables back across the wire
+                // the result set includes the total serialization size
+                writeOrDie(m_fd, (unsigned char*)(m_engine->getReusedResultBuffer()), size);
+            }
+            else {
+                int32_t zero = 0;
+                writeOrDie(m_fd, (const unsigned char*)&zero, sizeof(int32_t));
+            }
         } else {
             sendException(kErrorCode_Error);
         }
@@ -955,6 +973,7 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
         // Pass 1 - calculate size and allow for status code byte and count length integers.
         size_t outputSize = 1;
         for (size_t i = 0; i < bufferCount; i++) {
+            in1.readLong(); in1.readInt(); // skip address and offset, used for jni only
             outputSize += in1.readInt() + 4;
         }
 
@@ -975,6 +994,7 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
         ReferenceSerializeOutput out1(m_reusedResultBuffer, MAX_MSG_SZ);
         out1.writeInt(bufferCount);
         for (size_t i = 0; i < bufferCount; i++) {
+            in2.readLong(); in2.readInt(); // skip address and offset, used for jni only
             int length = in2.readInt();
             out1.writeLong((long)m_tupleBuffer);
             // Allow for the length int written later.
@@ -1224,83 +1244,14 @@ void VoltDBIPC::pushExportBuffer(
     delete [] block->rawPtr();
 }
 
-void *eethread(void *ptr) {
-    int fd = (int)(*(int*)ptr);
-
-    /* max message size that can be read from java */
-    int max_ipc_message_size = (1024 * 1024 * 2);
-
-    // requests larger than this will cause havoc.
-    // cry havoc and let loose the dogs of war
-    boost::shared_array<char> data(new char[max_ipc_message_size]);
-    memset(data.get(), 0, max_ipc_message_size);
-
-    // instantiate voltdbipc to interface to EE.
-    boost::shared_ptr<VoltDBIPC> voltipc(new VoltDBIPC(fd));
-    int more = 1;
-    while (more) {
-        size_t bytesread = 0;
-
-        // read the header
-        while (bytesread < 4) {
-            std::size_t b = read(fd, data.get() + bytesread, 4 - bytesread);
-            if (b == 0) {
-                printf("client eof\n");
-                close(fd);
-                return NULL;
-            } else if (b == -1) {
-                printf("client error\n");
-                close(fd);
-                return NULL;
-            }
-            bytesread += b;
-        }
-
-        // read the message body in to the same data buffer
-        int msg_size = ntohl(((struct ipc_command*) data.get())->msgsize);
-        //printf("Received message size %d\n", msg_size);
-        if (msg_size > max_ipc_message_size) {
-            max_ipc_message_size = msg_size;
-            char* newdata = (char*) malloc(max_ipc_message_size);
-            memset(newdata, 0, max_ipc_message_size);
-            memcpy(newdata, data.get(), 4);
-            data.reset(newdata);
-        }
-
-        while (bytesread < msg_size) {
-            std::size_t b = read(fd, data.get() + bytesread, msg_size - bytesread);
-            if (b == 0) {
-                printf("client eof\n");
-                close(fd);
-                return NULL;
-            } else if (b == -1) {
-                printf("client error\n");
-                close(fd);
-                return NULL;
-            }
-            bytesread += b;
-        }
-
-        // dispatch the request
-        struct ipc_command *cmd = (struct ipc_command*) data.get();
-
-        // size at least length + command
-        if (ntohl(cmd->msgsize) < sizeof(struct ipc_command)) {
-            printf("bytesread=%zx cmd=%d msgsize=%d\n",
-                   bytesread, cmd->command, ntohl(cmd->msgsize));
-            for (int ii = 0; ii < bytesread; ++ii) {
-                printf("%x ", data[ii]);
-            }
-            assert(ntohl(cmd->msgsize) >= sizeof(struct ipc_command));
-        }
-        bool terminate = voltipc->execute(cmd);
-        if (terminate) {
-            close(fd);
-            return NULL;
-        }
-    }
-
-    return NULL;
+void VoltDBIPC::executeTask(struct ipc_command *cmd) {
+    execute_task *task = (execute_task*)cmd;
+    voltdb::TaskType taskId = static_cast<voltdb::TaskType>(ntohll(task->taskId));
+    m_engine->resetReusedResultOutputBuffer(1);
+    m_engine->executeTask(taskId, task->task);
+    int32_t responseLength = m_engine->getResultsSize();
+    char *resultsBuffer = m_engine->getReusedResultBuffer();
+    writeOrDie(m_fd, (unsigned char*)resultsBuffer, responseLength);
 }
 
 int main(int argc, char **argv) {

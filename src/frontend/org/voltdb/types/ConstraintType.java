@@ -17,18 +17,21 @@
 
 package org.voltdb.types;
 
-import java.util.*;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  *
  */
 public enum ConstraintType {
-    FOREIGN_KEY (0),
-    MAIN           (1),
+    FOREIGN_KEY  (0),
+    MAIN         (1),
     UNIQUE       (2),
-    CHECK         (3),
-    PRIMARY_KEY (4),
-    NOT_NULL(5);
+    CHECK        (3),
+    PRIMARY_KEY  (4),
+    NOT_NULL     (5),
+    PARTITIONING (6);
 
     ConstraintType(int val) {
         assert (this.ordinal() == val) :

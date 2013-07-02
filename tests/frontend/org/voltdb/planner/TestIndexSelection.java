@@ -26,16 +26,16 @@ package org.voltdb.planner;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
 
 public class TestIndexSelection extends PlannerTestCase {
 
     @Override
     protected void setUp() throws Exception {
-        //TODO: consider switching to true for single-partition planning or replication to simplify resulting plans
         final boolean planForSinglePartitionFalse = false;
-        setupSchema(TestIndexSelection.class.getResource("testplans-indexselection-ddl.sql"), "testindexselectionplans",
+        setupSchema(TestIndexSelection.class.getResource("testplans-indexselection-ddl.sql"),
+                    "testindexselectionplans",
                     planForSinglePartitionFalse);
-        forceHackPartitioning();
     }
 
     @Override
@@ -43,26 +43,31 @@ public class TestIndexSelection extends PlannerTestCase {
         super.tearDown();
     }
 
-    /*public void testEng931Plan()
+    // This tests recognition of covering parameters to prefer a hash index that would use a
+    // greater number of key components than a competing tree index.
+    // Not sure how this relates to ENG-931?
+    public void testEng931Plan()
     {
-        AbstractPlanNode pn = compile("select a from t where a = ? and b = ? and c = ? and d = ? and e >= ? and e <= ?;");
+        AbstractPlanNode pn = compile("select a from t where a = ? and b = ? and c = ? and d = ? " +
+                                      "and e >= ? and e <= ?;");
 
         pn = pn.getChild(0);
         assertTrue(pn instanceof IndexScanPlanNode);
-        assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"IDX_1\""));
+        assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"IDX_1_HASH\""));
 
         if (pn != null) {
             System.out.println(pn.toJSONString());
         }
-    }*/
+    }
 
+    // This tests recognition of prefix parameters and constants to prefer an index that
+    // would use a greater number of key components AND would give the desired ordering.
     public void testEng2541Plan() throws JSONException
     {
         AbstractPlanNode pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;");
         pn = pn.getChild(0);
-        //TODO: This test wants its teeth back. As is, it doesn't really prove much.
-        //assertTrue(pn instanceof IndexScanPlanNode);
-        //assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"IDX_1\""));
+        assertTrue(pn instanceof IndexScanPlanNode);
+        assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"IDX_B\""));
 
         if (pn != null) {
             JSONObject j = new JSONObject(pn.toJSONString());

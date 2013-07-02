@@ -25,6 +25,7 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.LeaderNoticeHandler;
+import org.voltdb.export.ExportManager;
 
 /**
  * GlobalServiceElector performs leader election to determine which VoltDB cluster node
@@ -42,7 +43,7 @@ class GlobalServiceElector implements LeaderNoticeHandler
     GlobalServiceElector(ZooKeeper zk, int hostId)
     {
         m_leaderElector = new LeaderElector(zk, VoltZK.leaders_globalservice,
-                Integer.toString(hostId), null, this);
+                "globalservice", null, this);
         m_hostId = hostId;
     }
 
@@ -89,6 +90,13 @@ class GlobalServiceElector implements LeaderNoticeHandler
             m_leaderElector.shutdown();
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Error shutting down GlobalServiceElector's LeaderElector", true, e);
+        }
+    }
+
+    @Override
+    public void noticedTopologyChange() {
+        if (ExportManager.instance() != null) {
+            ExportManager.instance().notifyOfClusterTopologyChange();
         }
     }
 }

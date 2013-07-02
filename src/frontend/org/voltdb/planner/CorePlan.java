@@ -19,10 +19,12 @@ package org.voltdb.planner;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 
-import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.AdHocPlannedStatement;
 
 /**
@@ -37,6 +39,10 @@ public class CorePlan {
     /** The plan itself. Collector can be null. */
     public final byte[] aggregatorFragment;
     public final byte[] collectorFragment;
+
+    /** hashes */
+    public final byte[] aggregatorHash;
+    public final byte[] collectorHash;
 
     /**
      * If true, divide the number of tuples changed
@@ -73,6 +79,26 @@ public class CorePlan {
     public CorePlan(CompiledPlan plan, int catalogVersion) {
         aggregatorFragment = CompiledPlan.bytesForPlan(plan.rootPlanGraph);
         collectorFragment = CompiledPlan.bytesForPlan(plan.subPlanGraph);
+
+        // compute the hashes
+        MessageDigest md = null;
+        try {
+            md = MessageDigest.getInstance("SHA-1");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+            System.exit(-1); // JVM is broken
+        }
+        md.update(aggregatorFragment);
+        aggregatorHash = md.digest();
+        if (collectorFragment != null) {
+            md.reset();
+            md.update(collectorFragment);
+            collectorHash = md.digest();
+        }
+        else {
+            collectorHash = null;
+        }
+
         isReplicatedTableDML = plan.replicatedTableDML;
         isNonDeterministic = (!plan.isContentDeterministic()) || (!plan.isOrderDeterministic());
         this.catalogVersion = catalogVersion;
@@ -94,6 +120,8 @@ public class CorePlan {
      */
     public CorePlan(byte[] aggregatorFragment,
                     byte[] collectorFragment,
+                    byte[] aggregatorHash,
+                    byte[] collectorHash,
                     boolean isReplicatedTableDML,
                     boolean isNonDeterministic,
                     boolean isReadOnly,
@@ -101,6 +129,8 @@ public class CorePlan {
                     int catalogVersion) {
         this.aggregatorFragment = aggregatorFragment;
         this.collectorFragment = collectorFragment;
+        this.aggregatorHash = aggregatorHash;
+        this.collectorHash = collectorHash;
         this.isReplicatedTableDML = isReplicatedTableDML;
         this.isNonDeterministic = isNonDeterministic;
         this.readOnly = isReadOnly;
@@ -114,9 +144,9 @@ public class CorePlan {
         StringBuilder sb = new StringBuilder();
         sb.append("COMPILED PLAN {\n");
         sb.append("  ONE: ").append(aggregatorFragment == null ?
-                "null" : new String(aggregatorFragment, VoltDB.UTF8ENCODING)).append("\n");
+                "null" : new String(aggregatorFragment, Constants.UTF8ENCODING)).append("\n");
         sb.append("  ALL: ").append(collectorFragment == null ?
-                "null" : new String(collectorFragment, VoltDB.UTF8ENCODING)).append("\n");
+                "null" : new String(collectorFragment, Constants.UTF8ENCODING)).append("\n");
         sb.append("  RTD: ").append(isReplicatedTableDML ? "true" : "false").append("\n");
         sb.append("}");
         return sb.toString();
@@ -124,9 +154,9 @@ public class CorePlan {
 
     public int getSerializedSize() {
         // plan fragments first
-        int size = 4 + aggregatorFragment.length;
+        int size = 4 + aggregatorFragment.length + 20; // hash is 20b
         if (collectorFragment != null) {
-            size += 4 + collectorFragment.length;
+            size += 4 + collectorFragment.length + 20; // hash is 20b
         }
         else {
             size += 4;
@@ -144,12 +174,14 @@ public class CorePlan {
         // plan fragments first
         buf.putInt(aggregatorFragment.length);
         buf.put(aggregatorFragment);
+        buf.put(aggregatorHash);
         if (collectorFragment == null) {
             buf.putInt(-1);
         }
         else {
             buf.putInt(collectorFragment.length);
             buf.put(collectorFragment);
+            buf.put(collectorHash);
         }
 
         // booleans
@@ -171,11 +203,16 @@ public class CorePlan {
         // plan fragments first
         byte[] aggregatorFragment = new byte[buf.getInt()];
         buf.get(aggregatorFragment);
+        byte[] aggregatorHash = new byte[20]; // sha-1 hash is 20b
+        buf.get(aggregatorHash);
         byte[] collectorFragment = null;
+        byte[] collectorHash = null;
         int cflen = buf.getInt();
         if (cflen >= 0) {
             collectorFragment = new byte[cflen];
             buf.get(collectorFragment);
+            collectorHash = new byte[20]; // sha-1 hash is 20b
+            buf.get(collectorHash);
         }
 
         // booleans
@@ -196,6 +233,8 @@ public class CorePlan {
         return new CorePlan(
                 aggregatorFragment,
                 collectorFragment,
+                aggregatorHash,
+                collectorHash,
                 isReplicatedTableDML,
                 isNonDeterministic,
                 isReadOnly,
@@ -215,10 +254,10 @@ public class CorePlan {
         }
         CorePlan other = (CorePlan) obj;
 
-        if (!Arrays.equals(aggregatorFragment, other.aggregatorFragment)) {
+        if (!Arrays.equals(aggregatorHash, other.aggregatorHash)) {
             return false;
         }
-        if (!Arrays.equals(collectorFragment, other.collectorFragment)) {
+        if (!Arrays.equals(collectorHash, other.collectorHash)) {
             return false;
         }
         if (!Arrays.equals(parameterTypes, other.parameterTypes)) {

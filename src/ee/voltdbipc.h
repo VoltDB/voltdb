@@ -23,9 +23,12 @@
 #include "common/ids.h"
 #include "logging/LogDefs.h"
 #include "logging/LogProxy.h"
-#include "execution/VoltDBEngine.h"
 #include "common/FatalException.hpp"
 #include "storage/StreamBlock.h"
+
+namespace voltdb {
+class VoltDBEngine;
+}
 
 class VoltDBIPC {
 public:
@@ -43,7 +46,8 @@ public:
         kErrorCode_DependencyNotFound = 102, //Also response to 100
         kErrorCode_pushExportBuffer = 103, //Indication that el buffer is next
         kErrorCode_CrashVoltDB = 104, //Crash with reason string
-        kErrorCode_getQueuedExportBytes = 105 //Retrieve value for stats
+        kErrorCode_getQueuedExportBytes = 105, //Retrieve value for stats
+        kErrorCode_needPlan = 110 // fetch a plan from java for a fragment
     };
 
     VoltDBIPC(int fd);
@@ -60,6 +64,13 @@ public:
      * Returns dependency size with out parameter.
      */
     char *retrieveDependency(int32_t dependencyId, size_t *dependencySz);
+
+    /**
+     * Retrieve a plan from Java via the IPC connection for a fragment id.
+     * Plan is JSON. Returns the empty string on failure, but failure is
+     * probably going to be detected somewhere else.
+     */
+    std::string planForFragmentId(int64_t fragmentId);
 
     bool execute(struct ipc_command *cmd);
 
@@ -109,8 +120,6 @@ private:
 
     void executePlanFragments(struct ipc_command *cmd);
 
-    void loadFragment(struct ipc_command *cmd);
-
     void getStats(struct ipc_command *cmd);
 
     int8_t loadTable(struct ipc_command *cmd);
@@ -124,6 +133,8 @@ private:
     void updateHashinator(struct ipc_command *cmd);
 
     void threadLocalPoolAllocations();
+
+    void executeTask(struct ipc_command*);
 
     void sendException( int8_t errorCode);
 

@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
@@ -63,6 +64,116 @@ public class TableHelper {
         @Override
         public int hashCode() {
             return Arrays.deepHashCode(values);
+        }
+    }
+
+    /**
+     * Represents a simple materialized view used for test purposes.
+     * For now, has one sum column, a count* and a single group by column.
+     * No provision for manual creation, only the random creation from a
+     * source table.
+     */
+    public static class ViewRep {
+        public final String viewName;
+        public final String sumColName;
+        public final String groupColName;
+        public final String srcTableName;
+
+        protected ViewRep(String name, String sumColName, String groupColName, String srcTableName) {
+            this.viewName = name;
+            this.sumColName = sumColName;
+            this.groupColName = groupColName;
+            this.srcTableName = srcTableName;
+        }
+
+        /**
+         * Create a random view based on a given table, or return null if no
+         * good view is possible to create.
+         */
+        public static ViewRep viewRepForTable(String name, VoltTable table, Random rand) {
+            String sumColName = null;
+            String groupColName = null;
+
+            // pick a sum column
+            for (int colIndex = 0; colIndex < table.getColumnCount(); colIndex++) {
+                VoltType type = table.getColumnType(colIndex);
+                if ((type == VoltType.TINYINT) || (type == VoltType.SMALLINT) || (type == VoltType.INTEGER)) {
+                    sumColName = table.getColumnName(colIndex);
+                }
+            }
+            if (sumColName == null) {
+                return null;
+            }
+
+            // find all potential group by columns
+            List<String> potentialGroupByCols = new ArrayList<String>();
+            for (int colIndex = 0; colIndex < table.getColumnCount(); colIndex++) {
+                String colName = table.getColumnName(colIndex);
+                // skip the sum col
+                if (colName.equals(sumColName)) {
+                    continue;
+                }
+                potentialGroupByCols.add(colName);
+            }
+
+            // no potential group by cols
+            if (potentialGroupByCols.size() == 0) {
+                return null;
+            }
+
+            // pick a random non-summing col to group on
+            // could pick more than one to make this better in the future
+            groupColName = potentialGroupByCols.get(rand.nextInt(potentialGroupByCols.size()));
+
+            return new ViewRep(name, sumColName, groupColName, getTableName(table));
+        }
+
+        public String ddlForView() {
+            return String.format("CREATE VIEW %s (col1,col2,col3) AS " +
+                    "SELECT %s, COUNT(*), SUM(%s) FROM %s GROUP BY %s;",
+                    viewName, groupColName, sumColName, srcTableName, groupColName);
+        }
+
+        /**
+         * Check if the view could apply to the provided table unchanged.
+         */
+        public boolean compatibleWithTable(VoltTable table) {
+            String candidateName = getTableName(table);
+            // table can't have the same name as the view
+            if (candidateName.equals(viewName)) {
+                return false;
+            }
+            // view is for a different table
+            if (candidateName.equals(srcTableName) == false) {
+                return false;
+            }
+
+            try {
+                // ignore ret value here - just looking to not throw
+                int groupColIndex = table.getColumnIndex(groupColName);
+                VoltType groupColType = table.getColumnType(groupColIndex);
+                if (groupColType == VoltType.DECIMAL) {
+                    // no longer a good type to group
+                    return false;
+                }
+
+                // check the sum col is still value
+                int sumColIndex = table.getColumnIndex(sumColName);
+                VoltType sumColType = table.getColumnType(sumColIndex);
+                if ((sumColType == VoltType.TINYINT) ||
+                        (sumColType == VoltType.SMALLINT) ||
+                        (sumColType == VoltType.INTEGER)) {
+                    return true;
+                }
+                else {
+                    // no longer a good type to sum
+                    return false;
+                }
+            }
+            catch (IllegalArgumentException e) {
+                // column index is bad
+                return false;
+            }
         }
     }
 
@@ -621,7 +732,7 @@ public class TableHelper {
     /**
      * Helper method for RandomFill
      */
-    protected static Object[] randomRow(VoltTable table, int maxStringSize, Random rand) {
+    public static Object[] randomRow(VoltTable table, int maxStringSize, Random rand) {
         Object[] row = new Object[table.getColumnCount()];
         for (int col = 0; col < table.getColumnCount(); col++) {
             boolean allowNulls = table.getColumnNullable(col);
@@ -760,8 +871,9 @@ public class TableHelper {
                 // make the values the core types of the target table
                 VoltType destColType = dest.getColumnType(i);
                 Class<?> descColClass = destColType.classFromType();
-                row[i] = ParameterConverter.tryToMakeCompatible(false, descColClass.isArray(), descColClass,
-                        descColClass.getComponentType(), row[i]);
+                row[i] = ParameterConverter.tryToMakeCompatible(descColClass, row[i]);
+                // check the result type in an assert
+                assert(ParameterConverter.verifyParameterConversion(row[i], descColClass));
             }
 
             dest.addRow(row);

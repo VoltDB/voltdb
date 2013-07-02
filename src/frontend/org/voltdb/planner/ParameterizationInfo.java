@@ -166,6 +166,9 @@ class ParameterizationInfo {
         }
 
         // leverage existing (rather heavyweight) code to convert param types
-        return ParameterConverter.tryToMakeCompatible(false, false, type.classFromType(), null, value);
+        Object retval = ParameterConverter.tryToMakeCompatible(type.classFromType(), value);
+        // check the result type in an assert
+        assert(ParameterConverter.verifyParameterConversion(retval, type.classFromType()));
+        return retval;
     }
 }

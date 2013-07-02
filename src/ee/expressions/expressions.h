@@ -58,6 +58,7 @@
 #include "expressions/parametervalueexpression.h"
 #include "expressions/tupleaddressexpression.h"
 #include "expressions/tuplevalueexpression.h"
+#include "expressions/hashrangeexpression.h"
 
 
 #endif

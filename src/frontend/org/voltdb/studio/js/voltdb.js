@@ -49,7 +49,7 @@ var IVoltDB = (function(){
             {
                 var params = '[';
                 var i = 0;
-                for(i = 0; i < localParameters.length; i++) {               
+                for(i = 0; i < localParameters.length; i++) {
                     if (i > 0) {
                         params += ',';
                     }
@@ -107,7 +107,7 @@ var IVoltDB = (function(){
             var CriticalErrorResponse = {"status":-1,"statusstring":"Query timeout.","results":[]};
             var UserCallback = userCallback;
             var TimeoutOccurred = 0;
-            var Timeout = setTimeout(function() {TimeoutOccurred=1;UserCallback(CriticalErrorResponse);}, 5000);
+            var Timeout = setTimeout(function() {TimeoutOccurred=1;UserCallback(CriticalErrorResponse);}, 20000);
             this.Callback = function(response) { clearTimeout(Timeout); if (TimeoutOccurred == 0) UserCallback(response); }
             return this;
         }
@@ -244,7 +244,7 @@ var IVoltDB = (function(){
         connectionQueue.Start()
             .BeginExecute('@Statistics', ['TABLE',0], function(data) { connection.Metadata['rawTables'] = data.results[0]; })
             .BeginExecute('@Statistics', ['INDEX',0], function(data) { connection.Metadata['rawIndexes'] = data.results[0]; })
-            .BeginExecute('@Statistics', ['PARTITIONCOUNT',0], function(data) { connection.Metadata['partitionCount'] = data.results[0].data[0][0]; })
+            .BeginExecute('@Statistics', ['PARTITIONCOUNT',0], function(data) { connection.Metadata['partitionCount'] = data.results[0].data[0][3]; })
             .BeginExecute('@Statistics', ['STARVATION',0], function(data) { connection.Metadata['siteCount'] = data.results[0].data.length; })
             .BeginExecute('@SystemCatalog', ['PROCEDURES'], function(data) { connection.Metadata['procedures'] = data.results[0]; })
             .BeginExecute('@SystemCatalog', ['PROCEDURECOLUMNS'], function(data) { connection.Metadata['procedurecolumns'] = data.results[0]; })
@@ -349,16 +349,16 @@ var IVoltDB = (function(){
                     }
                     // the name field is really ordinal position: 1, 2, 3...
                     procParams.sort(function(a,b) {return a.name - b.name;});
-                 
+
                     for (var p = 0; p < procParams.length; ++p) {
                         connTypeParams[connTypeParams.length] = procParams[p].type;
                     }
-                 
+
                     // make the procedure callable.
                     connection.Procedures[procName] = {};
                     connection.Procedures[procName]['' + connTypeParams.length] = connTypeParams;
                  }
-     
+
                 var childConnectionQueue = connection.getQueue();
                 childConnectionQueue.Start(true);
                 childConnectionQueue.End(function(state) { connection.Ready = true; if (onconnectionready != null) onconnectionready(connection, state); }, null);

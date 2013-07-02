@@ -32,6 +32,7 @@ import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -54,6 +55,7 @@ import org.voltcore.network.Connection;
 import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.InstanceId;
@@ -94,7 +96,8 @@ public class SnapshotUtil {
         Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
         Map<Integer, Long> partitionTransactionIds,
         InstanceId instanceId,
-        long timestamp)
+        long timestamp,
+        int newPartitionCount)
     throws IOException
     {
         final File f = new VoltFile(path, constructDigestFilenameForNonce(nonce, hostId));
@@ -114,6 +117,7 @@ public class SnapshotUtil {
                 stringer.key("txnId").value(txnId);
                 stringer.key("timestamp").value(timestamp);
                 stringer.key("timestampString").value(SnapshotUtil.formatHumanReadableDate(timestamp));
+                stringer.key("newPartitionCount").value(newPartitionCount);
                 stringer.key("tables").array();
                 for (int ii = 0; ii < tables.size(); ii++) {
                     stringer.value(tables.get(ii).getTypeName());
@@ -378,10 +382,10 @@ public class SnapshotUtil {
      * Storage for information about files that are part of a specific snapshot
      */
     public static class Snapshot {
-        public Snapshot(String nonce, long txnId)
+        public Snapshot(String nonce)
         {
             m_nonce = nonce;
-            m_txnId = txnId;
+            m_txnId = Long.MIN_VALUE;
         }
 
         public void setInstanceId(InstanceId id)
@@ -402,6 +406,14 @@ public class SnapshotUtil {
             return m_instanceId;
         }
 
+        public void setTxnId(long txnId)
+        {
+            if (m_txnId != Long.MIN_VALUE) {
+                assert(txnId == m_txnId);
+            }
+            m_txnId = txnId;
+        }
+
         public long getTxnId()
         {
             return m_txnId;
@@ -410,6 +422,7 @@ public class SnapshotUtil {
         public final List<File> m_digests = new ArrayList<File>();
         public final List<Set<String>> m_digestTables = new ArrayList<Set<String>>();
         public final Map<String, TableFiles> m_tableFiles = new TreeMap<String, TableFiles>();
+        public File m_catalogFile = null;
 
         private String m_nonce;
         private InstanceId m_instanceId = null;
@@ -444,6 +457,9 @@ public class SnapshotUtil {
             if (pathname.getName().endsWith(".digest") || pathname.getName().endsWith(".vpt")) {
                 return true;
             }
+            if (pathname.getName().endsWith(".jar")) {
+                return true;
+            }
             return false;
         }
     };
@@ -471,7 +487,8 @@ public class SnapshotUtil {
             for (String snapshotName : snapshotNames) {
                 // izzy: change this to use parseNonceFromSnapshotFilename at some point
                 if (pathname.getName().startsWith(snapshotName + "-")  ||
-                        pathname.getName().equals(snapshotName + ".digest")) {
+                    pathname.getName().equals(snapshotName + ".digest") ||
+                    pathname.getName().equals(snapshotName + ".jar")) {
                     return true;
                 }
             }
@@ -544,9 +561,10 @@ public class SnapshotUtil {
                     String nonce = parseNonceFromSnapshotFilename(f.getName());
                     Snapshot named_s = namedSnapshots.get(nonce);
                     if (named_s == null) {
-                        named_s = new Snapshot(nonce, snapshotTxnId);
+                        named_s = new Snapshot(nonce);
                         namedSnapshots.put(nonce, named_s);
                     }
+                    named_s.setTxnId(snapshotTxnId);
                     InstanceId iid = new InstanceId(0,0);
                     if (digest.has("instanceId")) {
                         iid = new InstanceId(digest.getJSONObject("instanceId"));
@@ -559,6 +577,14 @@ public class SnapshotUtil {
                     }
                     named_s.m_digestTables.add(tableSet);
                     named_s.m_digests.add(f);
+                } else if (f.getName().endsWith(".jar")) {
+                    String nonce = parseNonceFromSnapshotFilename(f.getName());
+                    Snapshot named_s = namedSnapshots.get(nonce);
+                    if (named_s == null) {
+                        named_s = new Snapshot(nonce);
+                        namedSnapshots.put(nonce, named_s);
+                    }
+                    named_s.m_catalogFile = f;
                 } else {
                     HashSet<Integer> partitionIds = new HashSet<Integer>();
                     TableSaveFile saveFile = new TableSaveFile(fis.getChannel(), 1, null, true);
@@ -578,10 +604,10 @@ public class SnapshotUtil {
                         String nonce = parseNonceFromSnapshotFilename(f.getName());
                         Snapshot named_s = namedSnapshots.get(nonce);
                         if (named_s == null) {
-                            named_s = new Snapshot(nonce, saveFile.getTxnId());
+                            named_s = new Snapshot(nonce);
                             namedSnapshots.put(nonce, named_s);
                         }
-
+                        named_s.setTxnId(saveFile.getTxnId());
                         TableFiles namedTableFiles = named_s.m_tableFiles.get(saveFile.getTableName());
                         if (namedTableFiles == null) {
                             namedTableFiles = new TableFiles(saveFile.isReplicated());
@@ -1174,5 +1200,20 @@ public class SnapshotUtil {
         SimpleDateFormat sdf = new SimpleDateFormat(VoltDB.ODBC_DATE_FORMAT_STRING + "z");
         sdf.setTimeZone(VoltDB.VOLT_TIMEZONE);
         return sdf.format(new Date(timestamp));
+    }
+
+    public static byte[] OutputBuffersToBytes(Collection<BBContainer> outputContainers)
+    {
+        ByteBuffer buf = ByteBuffer.allocate(4 + // buffer count
+                                             (8 + 4 + 4) * outputContainers.size()); // buffer info
+
+        buf.putInt(outputContainers.size());
+        for (DBBPool.BBContainer container : outputContainers) {
+            buf.putLong(container.address);
+            buf.putInt(container.b.position());
+            buf.putInt(container.b.remaining());
+        }
+
+        return buf.array();
     }
 }

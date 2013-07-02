@@ -24,29 +24,27 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Random;
 
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.SysProcSelector;
 import org.voltdb.UpdateCatalogAcceptancePolicy;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.iv2.TxnEgo;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestSystemProcedureSuite extends RegressionSuite {
 
-    private static int sites = 3;
-    private static int hosts = 2;
-    private static int kfactor = 1;
+    private static int SITES = 3;
+    private static int HOSTS = 2;
+    private static int KFACTOR = 1;
     private static boolean hasLocalServer = false;
 
     static final Class<?>[] PROCEDURES =
@@ -134,304 +132,6 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         }
     }
 
-    public void testStatistics() throws Exception {
-        Client client  = getClient();
-
-        //
-        // initiator selector
-        //
-        VoltTable results[] = null;
-        results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
-        results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
-        // one aggregate table returned
-        assertEquals(1, results.length);
-        System.out.println("Test initiators table: " + results[0].toString());
-        //Now two entries because client affinity also does a query
-        assertEquals(2, results[0].getRowCount());
-
-        int counts = 0;
-        while (results[0].advanceRow()) {
-            String procName = results[0].getString("PROCEDURE_NAME");
-            if (procName.equals("@SystemCatalog")) {
-                assertEquals( 1, results[0].getLong("INVOCATIONS"));
-                counts++;
-            } else if (procName.equals("@Statistics")) {
-                assertEquals( 1, results[0].getLong("INVOCATIONS"));
-                counts++;
-            }
-        }
-        assertEquals(2, counts);
-
-        //
-        // invalid selector
-        //
-        try {
-            // No selector at all.
-            client.callProcedure("@Statistics");
-            fail();
-        }
-        catch (ProcCallException ex) {
-            // All badness gets turned into ProcCallExceptions, so we need
-            // to check specifically for this error, otherwise things that
-            // crash the cluster also turn into ProcCallExceptions and don't
-            // trigger failure (ENG-2347)
-            assertEquals("VOLTDB ERROR: PROCEDURE Statistics EXPECTS 3 PARAMS, BUT RECEIVED 1",
-                         ex.getMessage());
-        }
-        try {
-            // Invalid selector
-            client.callProcedure("@Statistics", "garbage", 0);
-            fail();
-        }
-        catch (ProcCallException ex) {}
-
-        //
-        // Partition count
-        //
-        results = client.callProcedure("@Statistics", SysProcSelector.PARTITIONCOUNT.name(), 0).getResults();
-        assertEquals( 1, results.length);
-        assertTrue( results[0] != null);
-        assertEquals( 1, results[0].getRowCount());
-        assertEquals( 1, results[0].getColumnCount());
-        assertEquals( VoltType.INTEGER, results[0].getColumnType(0));
-        assertTrue( results[0].advanceRow());
-        final int siteCount = (int)results[0].getLong(0);
-        assertTrue (siteCount == TestSystemProcedureSuite.sites);
-
-        //
-        // table
-        //
-        results = client.callProcedure("@Statistics", "table", 0).getResults();
-        // one aggregate table returned
-        assertTrue(results.length == 1);
-        // with 10 rows per site. Can be two values depending on the test scenario of cluster vs. local.
-        assertEquals(TestSystemProcedureSuite.hosts * TestSystemProcedureSuite.sites * 3, results[0].getRowCount());
-
-        System.out.println("Test statistics table: " + results[0].toString());
-
-        results = client.callProcedure("@Statistics", "index", 0).getResults();
-        // one aggregate table returned
-        assertEquals(1, results.length);
-
-        //
-        // memory
-        //
-        // give time to seed the stats cache?
-        Thread.sleep(1000);
-        results = client.callProcedure("@Statistics", "memory", 0).getResults();
-        // one aggregate table returned
-        assertEquals(1, results.length);
-        System.out.println("Node memory statistics table: " + results[0].toString());
-        // alternate form
-        results = client.callProcedure("@Statistics", "nodememory", 0).getResults();
-        // one aggregate table returned
-        assertEquals(1, results.length);
-        System.out.println("Node memory statistics table: " + results[0].toString());
-
-        //
-        // procedure
-        //
-        // 3 seconds translates to 3 billion nanos, which overflows internal
-        // values (ENG-1039)
-        //It's possible that the nanosecond count goes backwards... so run this a couple
-        //of times to make sure the min value gets set
-        for (int ii = 0; ii < 3; ii++) {
-            results = client.callProcedure("GoSleep", 3000, 0, null).getResults();
-        }
-        results = client.callProcedure("@Statistics", "procedure", 0).getResults();
-        // one aggregate table returned
-        assertEquals(1, results.length);
-        System.out.println("Test procedures table: " + results[0].toString());
-
-        VoltTable stats = results[0];
-        String procname = "blerg";
-        while (!procname.equals("org.voltdb_testprocs.regressionsuites.malicious.GoSleep")) {
-            stats.advanceRow();
-            procname = (String)stats.get("PROCEDURE", VoltType.STRING);
-        }
-
-        // Retrieve all statistics
-        long min_time = (Long)stats.get("MIN_EXECUTION_TIME", VoltType.BIGINT);
-        long max_time = (Long)stats.get("MAX_EXECUTION_TIME", VoltType.BIGINT);
-        long avg_time = (Long)stats.get("AVG_EXECUTION_TIME", VoltType.BIGINT);
-        long min_result_size = (Long)stats.get("MIN_RESULT_SIZE", VoltType.BIGINT);
-        long max_result_size = (Long)stats.get("MAX_RESULT_SIZE", VoltType.BIGINT);
-        long avg_result_size = (Long)stats.get("AVG_RESULT_SIZE", VoltType.BIGINT);
-        long min_parameter_set_size = (Long)stats.get("MIN_PARAMETER_SET_SIZE", VoltType.BIGINT);
-        long max_parameter_set_size = (Long)stats.get("MAX_PARAMETER_SET_SIZE", VoltType.BIGINT);
-        long avg_parameter_set_size = (Long)stats.get("AVG_PARAMETER_SET_SIZE", VoltType.BIGINT);
-
-        // Check for overflow
-        assertTrue("Failed MIN_EXECUTION_TIME > 0, value was: " + min_time,
-                   min_time > 0);
-        assertTrue("Failed MAX_EXECUTION_TIME > 0, value was: " + max_time,
-                   max_time > 0);
-        assertTrue("Failed AVG_EXECUTION_TIME > 0, value was: " + avg_time,
-                   avg_time > 0);
-        assertTrue("Failed MIN_RESULT_SIZE > 0, value was: " + min_result_size,
-                   min_result_size >= 0);
-        assertTrue("Failed MAX_RESULT_SIZE > 0, value was: " + max_result_size,
-                   max_result_size >= 0);
-        assertTrue("Failed AVG_RESULT_SIZE > 0, value was: " + avg_result_size,
-                   avg_result_size >= 0);
-        assertTrue("Failed MIN_PARAMETER_SET_SIZE > 0, value was: " + min_parameter_set_size,
-                   min_parameter_set_size >= 0);
-        assertTrue("Failed MAX_PARAMETER_SET_SIZE > 0, value was: " + max_parameter_set_size,
-                   max_parameter_set_size >= 0);
-        assertTrue("Failed AVG_PARAMETER_SET_SIZE > 0, value was: " + avg_parameter_set_size,
-                   avg_parameter_set_size >= 0);
-
-        // check for reasonable values
-        assertTrue("Failed MIN_EXECUTION_TIME > 2,400,000,000ns, value was: " +
-                   min_time,
-                   min_time > 2400000000L);
-        assertTrue("Failed MAX_EXECUTION_TIME > 2,400,000,000ns, value was: " +
-                   max_time,
-                   max_time > 2400000000L);
-        assertTrue("Failed AVG_EXECUTION_TIME > 2,400,000,000ns, value was: " +
-                   avg_time,
-                   avg_time > 2400000000L);
-        assertTrue("Failed MIN_RESULT_SIZE < 1,000,000, value was: " +
-                   min_result_size,
-                   min_result_size < 1000000L);
-        assertTrue("Failed MAX_RESULT_SIZE < 1,000,000, value was: " +
-                   max_result_size,
-                   max_result_size < 1000000L);
-        assertTrue("Failed AVG_RESULT_SIZE < 1,000,000, value was: " +
-                   avg_result_size,
-                   avg_result_size < 1000000L);
-        assertTrue("Failed MIN_PARAMETER_SET_SIZE < 1,000,000, value was: " +
-                   min_parameter_set_size,
-                   min_parameter_set_size < 1000000L);
-        assertTrue("Failed MAX_PARAMETER_SET_SIZE < 1,000,000, value was: " +
-                   max_parameter_set_size,
-                   max_parameter_set_size < 1000000L);
-        assertTrue("Failed AVG_PARAMETER_SET_SIZE < 1,000,000, value was: " +
-                   avg_parameter_set_size,
-                   avg_parameter_set_size < 1000000L);
-
-        //
-        // iostats
-        //
-        results = client.callProcedure("@Statistics", "iostats", 0).getResults();
-        // one aggregate table returned
-        assertEquals(1, results.length);
-        System.out.println("Test iostats table: " + results[0].toString());
-
-        //
-        // TOPO
-        //
-        if (VoltDB.checkTestEnvForIv2()) {
-            results = client.callProcedure("@Statistics", "TOPO", 0).getResults();
-            // one aggregate table returned
-            assertEquals(2, results.length);
-            System.out.println("Test TOPO table: " + results[0].toString());
-            System.out.println("Test TOPO table: " + results[1].toString());
-            VoltTable topo = results[0];
-            // Make sure we can find the MPI, at least
-            boolean found = false;
-            while (topo.advanceRow()) {
-                if ((int)topo.getLong("Partition") == TxnEgo.MP_PARTITIONID) {
-                    found = true;
-                }
-            }
-            assertTrue(found);
-        }
-    }
-
-    //
-    // planner statistics
-    //
-    public void testPlannerStatistics() throws Exception {
-        Client client  = getClient();
-        // Clear the interval statistics
-        VoltTable[] results = client.callProcedure("@Statistics", "planner", 1).getResults();
-        assertEquals(1, results.length);
-
-        // Invoke a few select queries a few times to get some cache hits and misses,
-        // and to exceed the sampling frequency.
-        // This does not use level 2 cache (parameterization) or trigger failures.
-        for (String query : new String[] {
-                "select * from warehouse",
-                "select * from new_order",
-                "select * from item",
-                }) {
-            for (int i = 0; i < 10; i++) {
-                client.callProcedure("@AdHoc", query).getResults();
-                assertEquals(1, results.length);
-            }
-        }
-
-        // Get the final interval statistics
-        results = client.callProcedure("@Statistics", "planner", 1).getResults();
-        assertEquals(1, results.length);
-        System.out.println("Test planner table: " + results[0].toString());
-        VoltTable stats = results[0];
-
-        // Sample the statistics
-        List<Long> siteIds = new ArrayList<Long>();
-        int cache1_level = 0;
-        int cache2_level = 0;
-        int cache1_hits  = 0;
-        int cache2_hits  = 0;
-        int cache_misses = 0;
-        long plan_time_min_min = Long.MAX_VALUE;
-        long plan_time_max_max = Long.MIN_VALUE;
-        long plan_time_avg_tot = 0;
-        int failures = 0;
-        while (stats.advanceRow()) {
-            cache1_level += (Integer)stats.get("CACHE1_LEVEL", VoltType.INTEGER);
-            cache2_level += (Integer)stats.get("CACHE2_LEVEL", VoltType.INTEGER);
-            cache1_hits  += (Integer)stats.get("CACHE1_HITS", VoltType.INTEGER);
-            cache2_hits  += (Integer)stats.get("CACHE2_HITS", VoltType.INTEGER);
-            cache_misses += (Integer)stats.get("CACHE_MISSES", VoltType.INTEGER);
-            plan_time_min_min = Math.min(plan_time_min_min, (Long)stats.get("PLAN_TIME_MIN", VoltType.BIGINT));
-            plan_time_max_max = Math.max(plan_time_max_max, (Long)stats.get("PLAN_TIME_MAX", VoltType.BIGINT));
-            plan_time_avg_tot += (Long)stats.get("PLAN_TIME_AVG", VoltType.BIGINT);
-            failures += (Integer)stats.get("FAILURES", VoltType.INTEGER);
-            siteIds.add((Long)stats.get("SITE_ID", VoltType.BIGINT));
-        }
-
-        // Check for reasonable results
-        int globalPlanners = 0;
-        assertTrue("Failed siteIds count >= 2", siteIds.size() >= 2);
-        for (long siteId : siteIds) {
-            if (siteId == -1) {
-                globalPlanners++;
-            }
-        }
-        assertTrue("Global planner sites not 1, value was: " + globalPlanners, globalPlanners == 1);
-        assertTrue("Failed total CACHE1_LEVEL > 0, value was: " + cache1_level, cache1_level > 0);
-        assertTrue("Failed total CACHE1_LEVEL < 1,000,000, value was: " + cache1_level, cache1_level < 1000000);
-        assertTrue("Failed total CACHE2_LEVEL >= 0, value was: " + cache2_level, cache2_level >= 0);
-        assertTrue("Failed total CACHE2_LEVEL < 1,000,000, value was: " + cache2_level, cache2_level < 1000000);
-        assertTrue("Failed total CACHE1_HITS > 0, value was: " + cache1_hits, cache1_hits > 0);
-        assertTrue("Failed total CACHE1_HITS < 1,000,000, value was: " + cache1_hits, cache1_hits < 1000000);
-        assertTrue("Failed total CACHE2_HITS == 0, value was: " + cache2_hits, cache2_hits == 0);
-        assertTrue("Failed total CACHE2_HITS < 1,000,000, value was: " + cache2_hits, cache2_hits < 1000000);
-        assertTrue("Failed total CACHE_MISSES > 0, value was: " + cache_misses, cache_misses > 0);
-        assertTrue("Failed total CACHE_MISSES < 1,000,000, value was: " + cache_misses, cache_misses < 1000000);
-        assertTrue("Failed min PLAN_TIME_MIN > 0, value was: " + plan_time_min_min, plan_time_min_min > 0);
-        assertTrue("Failed total PLAN_TIME_MIN < 100,000,000,000, value was: " + plan_time_min_min, plan_time_min_min < 100000000000L);
-        assertTrue("Failed max PLAN_TIME_MAX > 0, value was: " + plan_time_max_max, plan_time_max_max > 0);
-        assertTrue("Failed total PLAN_TIME_MAX < 100,000,000,000, value was: " + plan_time_max_max, plan_time_max_max < 100000000000L);
-        assertTrue("Failed total PLAN_TIME_AVG > 0, value was: " + plan_time_avg_tot, plan_time_avg_tot > 0);
-        assertTrue("Failed total FAILURES == 0, value was: " + failures, failures == 0);
-    }
-
-    //public void testShutdown() {
-    //    running @shutdown kills the JVM.
-    //    not sure how to test this.
-    // }
-
-    // covered by TestSystemInformationSuite
-    /*public void testSystemInformation() throws IOException, ProcCallException {
-        Client client = getClient();
-        VoltTable results[] = client.callProcedure("@SystemInformation").getResults();
-        assertEquals(1, results.length);
-        System.out.println(results[0]);
-    }*/
-
     // Pretty lame test but at least invoke the procedure.
     // "@Quiesce" is used more meaningfully in TestExportSuite.
     public void testQuiesce() throws IOException, ProcCallException {
@@ -442,8 +142,17 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertEquals(results[0].get(0, VoltType.BIGINT), new Long(0));
     }
 
-    public void testLoadMultipartitionTableAndIndexStats() throws IOException {
+    public void testLoadMultipartitionTableAndIndexStatsAndValidatePartitioning() throws Exception {
         Client client = getClient();
+
+        /*
+         * Load a little partitioned data for the mispartitioned check
+         */
+        Random r = new Random(0);
+        for (int ii = 0; ii < 50; ii++) {
+            client.callProcedure(new NullCallback(), "@AdHoc",
+                    "INSERT INTO new_order values (" + (short)(r.nextDouble() * Short.MAX_VALUE) + ");");
+        }
 
         // try the failure case first
         try {
@@ -503,13 +212,27 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             } catch (ProcCallException e) {}
             client.callProcedure("@LoadMultipartitionTable", "ITEM",
                                  replicated_table);
-            VoltTable results[] = client.callProcedure("@Statistics", "table", 0).getResults();
 
-            int foundItem = 0;
+            // 20 rows per site for the replicated table.  Wait for it...
+            int rowcount = 0;
+            VoltTable results[] = client.callProcedure("@Statistics", "table", 0).getResults();
+            while (rowcount != (20 * SITES * HOSTS)) {
+                rowcount = 0;
+                results = client.callProcedure("@Statistics", "table", 0).getResults();
+                // Check that tables loaded correctly
+                while(results[0].advanceRow()) {
+                    if (results[0].getString("TABLE_NAME").equals("ITEM"))
+                    {
+                        rowcount += results[0].getLong("TUPLE_COUNT");
+                    }
+                }
+            }
 
             System.out.println(results[0]);
 
             // Check that tables loaded correctly
+            int foundItem = 0;
+            results = client.callProcedure("@Statistics", "table", 0).getResults();
             while(results[0].advanceRow()) {
                 if (results[0].getString("TABLE_NAME").equals("ITEM"))
                 {
@@ -520,6 +243,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             }
             assertEquals(6, foundItem);
 
+            // Table finally loaded fully should mean that index is okay on first read.
             VoltTable indexStats =
                     client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
             System.out.println(indexStats);
@@ -544,13 +268,38 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 if (success) {
                     success = memorySum == indexMemorySum;
                     if (success) {
-                        return;
+                        break;
                     }
                 }
                 Thread.sleep(1);
             }
             assertTrue(indexMemorySum != 120);//That is a row count, not memory usage
             assertEquals(memorySum, indexMemorySum);
+
+            /*
+             * Test once using the current correct hash function,
+             * expect no mispartitioned rows
+             */
+            VoltTable validateResult = client.callProcedure("@ValidatePartitioning", 0, null).getResults()[0];
+            System.out.println(validateResult);
+            while (validateResult.advanceRow()) {
+                assertEquals(0L, validateResult.getLong("MISPARTITIONED_ROWS"));
+            }
+
+            /*
+             * Test again with a bad hash function, expect mispartitioned rows
+             */
+            validateResult =
+                    client.callProcedure(
+                            "@ValidatePartitioning",
+                            0,
+                            new byte[] { 0, 0, 0, 9 }).getResults()[0];
+            System.out.println(validateResult);
+            while (validateResult.advanceRow()) {
+                if (validateResult.getString("TABLE").equals("NEW_ORDER")) {
+                    assertTrue(validateResult.getLong("MISPARTITIONED_ROWS") > 0);
+                }
+            }
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -669,7 +418,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         /*
          * Add a cluster configuration for sysprocs too
          */
-        config = new LocalCluster("sysproc-cluster.jar", TestSystemProcedureSuite.sites, TestSystemProcedureSuite.hosts, TestSystemProcedureSuite.kfactor,
+        config = new LocalCluster("sysproc-cluster.jar", TestSystemProcedureSuite.SITES, TestSystemProcedureSuite.HOSTS, TestSystemProcedureSuite.KFACTOR,
                                   BackendTarget.NATIVE_EE_JNI);
         ((LocalCluster) config).setHasLocalServer(hasLocalServer);
         boolean success = config.compile(project);

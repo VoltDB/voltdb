@@ -273,7 +273,7 @@ public class MpScheduler extends Scheduler
         final MpProcedureTask task =
             new MpProcedureTask(m_mailbox, procedureName,
                     m_pendingTasks, mp, m_iv2Masters, m_buddyHSId, false);
-        m_outstandingTxns.put(task.m_txn.txnId, task.m_txn);
+        m_outstandingTxns.put(task.m_txnState.txnId, task.m_txnState);
         m_pendingTasks.offer(task);
     }
 
@@ -313,7 +313,7 @@ public class MpScheduler extends Scheduler
         final MpProcedureTask task =
             new MpProcedureTask(m_mailbox, procedureName,
                     m_pendingTasks, mp, m_iv2Masters, m_buddyHSId, true);
-        m_outstandingTxns.put(task.m_txn.txnId, task.m_txn);
+        m_outstandingTxns.put(task.m_txnState.txnId, task.m_txnState);
         m_pendingTasks.offer(task);
     }
 

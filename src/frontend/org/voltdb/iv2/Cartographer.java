@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -275,6 +276,13 @@ public class Cartographer extends StatsSource
         return Cartographer.getPartitions(m_zk);
     }
 
+    public int getPartitionCount()
+    {
+        // The list returned by getPartitions includes the MP PID.  Need to remove that for the
+        // true partition count.
+        return Cartographer.getPartitions(m_zk).size() - 1;
+    }
+
     /**
      * Given a partition ID, return a list of HSIDs of all the sites with copies of that partition
      */
@@ -301,7 +309,7 @@ public class Cartographer extends StatsSource
     /**
      * Given a set of partition IDs, return a map of partition to a list of HSIDs of all the sites with copies of each partition
      */
-    public Map<Integer, List<Long>> getReplicasForPartitions(Set<Integer> partitions) {
+    public Map<Integer, List<Long>> getReplicasForPartitions(Collection<Integer> partitions) {
         Map<Integer, List<Long>> retval = new HashMap<Integer, List<Long>>();
         List<Pair<Integer,ZKUtil.ChildrenCallback>> callbacks = new ArrayList<Pair<Integer, ZKUtil.ChildrenCallback>>();
 

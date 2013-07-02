@@ -22,14 +22,16 @@ import java.util.List;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
 import org.voltdb.ParameterSet;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.StatsAgent;
-import org.voltdb.SysProcSelector;
+import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
+import org.voltdb.common.Constants;
 import org.voltdb.planner.BoundPlan;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CorePlan;
@@ -84,7 +86,7 @@ public class PlannerTool {
             }
         }
 
-        hostLog.info("hsql loaded");
+        hostLog.debug("hsql loaded");
 
         // Create and register a singleton planner stats collector, if this is the first time.
         // In mock test environments there may be no stats agent.
@@ -93,7 +95,7 @@ public class PlannerTool {
                 final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
                 if (statsAgent != null) {
                     m_plannerStats = new PlannerStatsCollector(-1);
-                    statsAgent.registerStatsSource(SysProcSelector.PLANNER, -1, m_plannerStats);
+                    statsAgent.registerStatsSource(StatsSelector.PLANNER, -1, m_plannerStats);
                 }
             }
         }
@@ -165,15 +167,16 @@ public class PlannerTool {
                         }
                         if (matched != null) {
                             CorePlan core = matched.core;
-                            ParameterSet params = new ParameterSet();
-                            planner.buildParameterSetFromExtractedLiteralsAndReturnPartitionIndex(
-                                    boundVariants.get(0).core.parameterTypes, params);
-                            Object[] paramArray = params.toArray();
+                            Pair<Integer, Object[]> info =
+                                    planner.buildParameterSetFromExtractedLiteralsAndReturnPartitionIndex(
+                                            boundVariants.get(0).core.parameterTypes);
+                            Object[] paramArray = info.getSecond();
+                            ParameterSet params = ParameterSet.fromArrayNoCopy(paramArray);
                             Object partitionKey = null;
                             if (core.partitioningParamIndex >= 0) {
                                 partitionKey = paramArray[core.partitioningParamIndex];
                             }
-                            AdHocPlannedStatement ahps = new AdHocPlannedStatement(sql.getBytes(VoltDB.UTF8ENCODING),
+                            AdHocPlannedStatement ahps = new AdHocPlannedStatement(sql.getBytes(Constants.UTF8ENCODING),
                                                                                    core,
                                                                                    params,
                                                                                    extractedLiterals,
@@ -202,14 +205,6 @@ public class PlannerTool {
                 (plan.parameters.length > 0))
             {
                 throw new RuntimeException("ERROR: PARAMETERIZATION IN AD HOC QUERY");
-            }
-
-            if (plan.isContentDeterministic() == false) {
-                String potentialErrMsg =
-                    "Statement has a non-deterministic result - statement: \"" +
-                    sql + "\" , reason: " + plan.nondeterminismDetail();
-                // throw new RuntimeException(potentialErrMsg);
-                hostLog.warn(potentialErrMsg);
             }
 
             //////////////////////

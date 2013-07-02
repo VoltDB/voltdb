@@ -17,7 +17,6 @@
 
 package org.voltdb.sysprocs;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -25,7 +24,6 @@ import org.voltdb.DependencyPair;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
-import org.voltdb.SysProcSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
@@ -44,15 +42,9 @@ public class SnapshotStatus extends VoltSystemProcedure {
         return null;
     }
 
-    public VoltTable[] run(SystemProcedureExecutionContext ctx) throws VoltAbortException
+    public void run(SystemProcedureExecutionContext ctx) throws VoltAbortException
     {
-        ArrayList<Long> catalogIds = new ArrayList<Long>();
-        catalogIds.add(0L);
-        return new VoltTable[] {
-            VoltDB.instance().getStatsAgent().getStats(SysProcSelector.SNAPSHOTSTATUS,
-                                                       catalogIds,
-                                                       false,
-                                                       System.currentTimeMillis())
-        };
+        VoltDB.crashLocalVoltDB("The old SnapshotStatus system procedure code should never be possible to run.",
+               false, null);
     }
 }

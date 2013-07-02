@@ -28,11 +28,10 @@ import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
 import java.sql.Timestamp;
-import java.util.List;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.catalog.StmtParameter;
 import org.voltdb.exceptions.ConstraintFailureException;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.types.TimestampType;
@@ -260,14 +259,22 @@ public class HsqlBackend {
         }
     }
 
-    VoltTable runSQLWithSubstitutions(final SQLStmt stmt, ParameterSet params, List<StmtParameter> sparams) {
+    VoltTable runSQLWithSubstitutions(final SQLStmt stmt, ParameterSet params, byte[] paramJavaTypes) {
         //HSQLProcedureWrapper does nothing smart. it just implements this interface with runStatement()
         StringBuilder sqlOut = new StringBuilder(stmt.getText().length() * 2);
 
-        assert(sparams != null);
+        assert(paramJavaTypes != null);
 
         int lastIndex = 0;
         String sql = stmt.getText();
+
+        // if there's no ? in the statmemt, then zero out any auto-parameterization
+        int paramCount = StringUtils.countMatches(sql, "?");
+        if (paramCount == 0) {
+            params = ParameterSet.emptyParameterSet();
+            paramJavaTypes = new byte[0];
+        }
+
         Object[] paramObjs = params.toArray();
         for (int i = 0; i < paramObjs.length; i++) {
             int nextIndex = sql.indexOf('?', lastIndex);
@@ -276,9 +283,7 @@ public class HsqlBackend {
             sqlOut.append(sql, lastIndex, nextIndex);
             lastIndex = nextIndex + 1;
 
-            StmtParameter stmtParam = sparams.get(i);
-            assert(stmtParam != null);
-            VoltType type = VoltType.get((byte) stmtParam.getJavatype());
+            VoltType type = VoltType.get(paramJavaTypes[i]);
 
             if (VoltType.isNullVoltType(paramObjs[i])) {
                 sqlOut.append("NULL");

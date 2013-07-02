@@ -18,12 +18,13 @@
 package org.voltdb;
 
 import java.io.IOException;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -48,10 +49,17 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.iv2.SiteTaskerQueue;
+import org.voltdb.iv2.SnapshotTask;
 import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CompressionService;
+import org.voltdb.utils.MiscUtils;
 
+import com.google.common.collect.ListMultimap;
 import com.google.common.util.concurrent.Callables;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
 
@@ -124,15 +132,23 @@ public class SnapshotSiteProcessor {
     public static final ConcurrentLinkedQueue<Runnable> m_tasksOnSnapshotCompletion =
         new ConcurrentLinkedQueue<Runnable>();
 
+    /*
+     * Random tasks performed on each site after the snapshot tasks are finished but
+     * before the snapshot transaction is finished.
+     */
+    public static final Map<Integer, PostSnapshotTask> m_siteTasksPostSnapshotting =
+            Collections.synchronizedMap(new HashMap<Integer, PostSnapshotTask>());
 
-    /** Number of snapshot buffers to keep */
-    static final int m_numSnapshotBuffers = 5;
+    /** Snapshot buffer count multiplier. If there is only 1 target, there are at least 5 buffers */
+    static final int m_bufferCountMultiplier = 5;
 
     /**
      * Pick a buffer length that is big enough to store at least one of the largest size tuple supported
      * in the system (2 megabytes). Add a fudge factor for metadata.
      */
     public static final int m_snapshotBufferLength = (1024 * 1024 * 2) + Short.MAX_VALUE;
+    public static final int m_snapshotBufferCompressedLen =
+        CompressionService.maxCompressedLength(m_snapshotBufferLength);
     private final ArrayList<BBContainer> m_snapshotBufferOrigins =
         new ArrayList<BBContainer>();
     /**
@@ -152,10 +168,11 @@ public class SnapshotSiteProcessor {
     private ArrayList<SnapshotDataTarget> m_snapshotTargets = null;
 
     /**
-     * Queue of tasks for tables that still need to be snapshotted.
-     * This is polled from until there are no more tasks.
+     * Map of tasks for tables that still need to be snapshotted.
+     * Once a table has finished serializing stuff, it's removed from the map.
+     * Making it a TreeMap so that it works through one table at time, easier to debug.
      */
-    private ArrayDeque<SnapshotTableTask> m_snapshotTableTasks = null;
+    private ListMultimap<Integer, SnapshotTableTask> m_snapshotTableTasks = null;
 
     private long m_lastSnapshotTxnId;
     private int m_lastSnapshotNumHosts;
@@ -170,12 +187,10 @@ public class SnapshotSiteProcessor {
     private ArrayList<Thread> m_snapshotTargetTerminators = null;
 
     /**
-     * When a buffer is returned to the pool this is invoked to ensure the EE wakes up
-     * and does any potential snapshot work with that buffer
+     * When a buffer is returned to the pool a new snapshot task will be offered to the queue
+     * to ensure the EE wakes up and does any potential snapshot work with that buffer
      */
-    private final Runnable m_onPotentialSnapshotWork;
-
-    private final boolean m_isIV2Enabled = VoltDB.instance().isIV2Enabled();
+    private final SiteTaskerQueue m_siteTaskerQueue;
 
     private final Random m_random = new Random();
 
@@ -229,16 +244,8 @@ public class SnapshotSiteProcessor {
 
     private long m_quietUntil = 0;
 
-    private boolean inQuietPeriod() {
-        if (m_isIV2Enabled) {
-            return false;
-        } else {
-            return org.voltcore.utils.EstTime.currentTimeMillis() < m_quietUntil;
-        }
-    }
-
-    public SnapshotSiteProcessor(Runnable onPotentialSnapshotWork, int snapshotPriority) {
-        this(onPotentialSnapshotWork, snapshotPriority, new IdlePredicate() {
+    public SnapshotSiteProcessor(SiteTaskerQueue siteQueue, int snapshotPriority) {
+        this(siteQueue, snapshotPriority, new IdlePredicate() {
             @Override
             public boolean idle(long now) {
                 throw new UnsupportedOperationException();
@@ -246,19 +253,14 @@ public class SnapshotSiteProcessor {
         });
     }
 
-    public SnapshotSiteProcessor(Runnable onPotentialSnapshotWork, int snapshotPriority, IdlePredicate idlePredicate) {
-        m_onPotentialSnapshotWork = onPotentialSnapshotWork;
+    public SnapshotSiteProcessor(SiteTaskerQueue siteQueue, int snapshotPriority, IdlePredicate idlePredicate) {
+        m_siteTaskerQueue = siteQueue;
         m_snapshotPriority = snapshotPriority;
-        initializeBufferPool();
         m_idlePredicate = idlePredicate;
     }
 
     public void shutdown() throws InterruptedException {
-        for (BBContainer c : m_snapshotBufferOrigins ) {
-            c.discard();
-        }
-        m_snapshotBufferOrigins.clear();
-        m_availableSnapshotBuffers.clear();
+        emptyBufferPool();
         m_snapshotCreateSetupBarrier = null;
         m_snapshotCreateFinishBarrier = null;
         if (m_snapshotTargetTerminators != null) {
@@ -268,86 +270,112 @@ public class SnapshotSiteProcessor {
         }
     }
 
-    void initializeBufferPool() {
-        for (int ii = 0; ii < SnapshotSiteProcessor.m_numSnapshotBuffers; ii++) {
+    private void emptyBufferPool()
+    {
+        // m_snapshotBufferOrigins is only used at snapshot initiation and snapshot termination,
+        // so no concurrent access.
+        for (BBContainer c : m_snapshotBufferOrigins ) {
+            c.discard();
+        }
+        m_snapshotBufferOrigins.clear();
+        m_availableSnapshotBuffers.clear();
+    }
+
+    /**
+     * Create enough snapshot buffers and put them into the pool
+     * @param targetSize    The desired number of buffers
+     */
+    private void resizeBufferPool(int targetSize) {
+        while (m_availableSnapshotBuffers.size() < targetSize) {
             final BBContainer origin = org.voltcore.utils.DBBPool.allocateDirect(m_snapshotBufferLength);
             m_snapshotBufferOrigins.add(origin);
             long snapshotBufferAddress = 0;
             if (VoltDB.getLoadLibVOLTDB()) {
                 snapshotBufferAddress = org.voltcore.utils.DBBPool.getBufferAddress(origin.b);
             }
-            m_availableSnapshotBuffers.offer(new BBContainer(origin.b, snapshotBufferAddress) {
-                @Override
-                public void discard() {
-                    m_availableSnapshotBuffers.offer(this);
+            m_availableSnapshotBuffers.offer(createNewBuffer(origin, snapshotBufferAddress));
+        }
+    }
+
+    private BBContainer createNewBuffer(final BBContainer origin, final long snapshotBufferAddress)
+    {
+        return new BBContainer(origin.b, snapshotBufferAddress) {
+            @Override
+            public void discard() {
+                m_availableSnapshotBuffers.offer(this);
+
+                /*
+                 * If IV2 is enabled, don't run the potential snapshot work jigger
+                 * until the quiet period restrictions have been met. In IV2 doSnapshotWork
+                 * is always called with ignoreQuietPeriod and the scheduling is instead done
+                 * via the STPE in RealVoltDB.
+                 *
+                 * The goal of the quiet period is to spread snapshot work out over time and minimize
+                 * the impact on latency
+                 *
+                 * If snapshot priority is 0 then running the jigger immediately is the specified
+                 * policy anyways. 10 would be the largest delay
+                 */
+                if (m_snapshotPriority > 0) {
+                    final long now = System.currentTimeMillis();
+                    //Ask if the site is idle, and if it is queue the work immediately
+                    if (m_idlePredicate.idle(now)) {
+                        m_siteTaskerQueue.offer(new SnapshotTask());
+                        return;
+                    }
+
+                    //Cache the value locally, the dirty secret is that in edge cases multiple threads
+                    //will read/write briefly, but it isn't a big deal since the scheduling can be wrong
+                    //briefly. Caching it locally will make the logic here saner because it can't change
+                    //as execution progresses
+                    final long quietUntil = m_quietUntil;
 
                     /*
-                     * If IV2 is enabled, don't run the potential snapshot work jigger
-                     * until the quiet period restrictions have been met. In IV2 doSnapshotWork
-                     * is always called with ignoreQuietPeriod and the scheduling is instead done
-                     * via the STPE in RealVoltDB.
+                     * If the current time is > than quietUntil then the quiet period is over
+                     * and the snapshot work should be done immediately
                      *
-                     * The goal of the quiet period is to spread snapshot work out over time and minimize
-                     * the impact on latency
-                     *
-                     * If snapshot priority is 0 then running the jigger immediately is the specified
-                     * policy anyways. 10 would be the largest delay
+                     * Otherwise it needs to be scheduled in the future and the next quiet period
+                     * needs to be calculated
                      */
-                    if (m_isIV2Enabled && m_snapshotPriority > 0) {
-                        final long now = System.currentTimeMillis();
-                        //Ask if the site is idle, and if it is queue the work immediately
-                        if (m_idlePredicate.idle(now)) {
-                            m_onPotentialSnapshotWork.run();
-                            return;
-                        }
-
-                        //Cache the value locally, the dirty secret is that in edge cases multiple threads
-                        //will read/write briefly, but it isn't a big deal since the scheduling can be wrong
-                        //briefly. Caching it locally will make the logic here saner because it can't change
-                        //as execution progresses
-                        final long quietUntil = m_quietUntil;
+                    if (now > quietUntil) {
+                        m_siteTaskerQueue.offer(new SnapshotTask());
+                        //Now push the quiet period further into the future,
+                        //generally no threads will be racing to do this
+                        //since the execution site only interacts with one snapshot data target at a time
+                        //except when it is switching tables. It doesn't really matter if it is wrong
+                        //it will just result in a little extra snapshot work being done close together
+                        m_quietUntil =
+                                System.currentTimeMillis() +
+                                (5 * m_snapshotPriority) + ((long)(m_random.nextDouble() * 15));
+                    } else {
+                        //Schedule it to happen after the quiet period has elapsed
+                        VoltDB.instance().schedulePriorityWork(
+                                new Runnable() {
+                                    @Override
+                                    public void run()
+                                    {
+                                        m_siteTaskerQueue.offer(new SnapshotTask());
+                                    }
+                                },
+                                quietUntil - now,
+                                0,
+                                TimeUnit.MILLISECONDS);
 
                         /*
-                         * If the current time is > than quietUntil then the quiet period is over
-                         * and the snapshot work should be done immediately
-                         *
-                         * Otherwise it needs to be scheduled in the future and the next quiet period
-                         * needs to be calculated
+                         * This is the same calculation as above except the future is not based
+                         * on the current time since the quiet period was already in the future
+                         * and we need to move further past it since we just scheduled snapshot work
+                         * at the end of the current quietUntil value
                          */
-                        if (now > quietUntil) {
-                            m_onPotentialSnapshotWork.run();
-                            //Now push the quiet period further into the future,
-                            //generally no threads will be racing to do this
-                            //since the execution site only interacts with one snapshot data target at a time
-                            //except when it is switching tables. It doesn't really matter if it is wrong
-                            //it will just result in a little extra snapshot work being done close together
-                            m_quietUntil =
-                                    System.currentTimeMillis() +
-                                    (5 * m_snapshotPriority) + ((long)(m_random.nextDouble() * 15));
-                        } else {
-                            //Schedule it to happen after the quiet period has elapsed
-                            VoltDB.instance().schedulePriorityWork(
-                                    m_onPotentialSnapshotWork,
-                                    quietUntil - now,
-                                    0,
-                                    TimeUnit.MILLISECONDS);
-
-                            /*
-                             * This is the same calculation as above except the future is not based
-                             * on the current time since the quiet period was already in the future
-                             * and we need to move further past it since we just scheduled snapshot work
-                             * at the end of the current quietUntil value
-                             */
-                            m_quietUntil =
-                                    quietUntil +
-                                    (5 * m_snapshotPriority) + ((long)(m_random.nextDouble() * 15));
-                        }
-                    } else {
-                        m_onPotentialSnapshotWork.run();
+                        m_quietUntil =
+                                quietUntil +
+                                (5 * m_snapshotPriority) + ((long)(m_random.nextDouble() * 15));
                     }
+                } else {
+                    m_siteTaskerQueue.offer(new SnapshotTask());
                 }
-            });
-        }
+            }
+        };
     }
 
     public void initiateSnapshots(
@@ -364,123 +392,168 @@ public class SnapshotSiteProcessor {
         m_lastSnapshotSucceded = true;
         m_lastSnapshotTxnId = txnId;
         m_lastSnapshotNumHosts = numHosts;
-        m_snapshotTableTasks = new ArrayDeque<SnapshotTableTask>(tasks);
+        m_snapshotTableTasks = MiscUtils.sortedArrayListMultimap();
         m_snapshotTargets = new ArrayList<SnapshotDataTarget>();
         m_snapshotTargetTerminators = new ArrayList<Thread>();
         m_exportSequenceNumbersToLogOnCompletion = exportSequenceNumbers;
-        if (targets != null) { // HACK to keep legacy "working"
-            for (final SnapshotDataTarget target : targets) {
-                if (target.needsFinalClose()) {
-                    assert(m_snapshotTargets != null);
-                    m_snapshotTargets.add(target);
-                }
+
+        for (final SnapshotDataTarget target : targets) {
+            if (target.needsFinalClose()) {
+                assert(m_snapshotTargets != null);
+                m_snapshotTargets.add(target);
             }
         }
-        for (final SnapshotTableTask task : tasks) {
-            if (targets == null) { // HACK to keep legecy "working"
-                if (task.m_target.needsFinalClose()) {
-                    m_snapshotTargets.add(task.m_target);
-                }
-            }
-            SNAP_LOG.debug("Examining SnapshotTableTask: " + task);
+
+        // Table doesn't implement hashCode(), so use the table ID as key
+        Map<Integer, Pair<Table, SnapshotPredicates>> tablesAndPredicates =
+            makeTablesAndPredicatesToSnapshot(tasks);
+
+        activateTableStreams(ee, tablesAndPredicates);
+
+        /*
+         * Resize the buffer pool to contain enough buffers for the number of tasks. The buffer
+         * pool will be cleaned up at the end of the snapshot.
+         *
+         * For the general case of only one snapshot at a time, this will have the same behavior
+         * as before, 5 buffers per snapshot.
+         *
+         * TODO: This is not a good algorithm for general snapshot coalescing. Rate limiting
+         * won't work as expected with this approach. For general snapshot coalescing,
+         * a better approach like pool per output target should be used.
+         */
+        int maxTableTaskSize = 0;
+        for (Collection<SnapshotTableTask> perTableTasks : m_snapshotTableTasks.asMap().values()) {
+            maxTableTaskSize = Math.max(maxTableTaskSize, perTableTasks.size());
+        }
+
+        // Only use the multiplier for 1 snapshot target now. In the case of join,
+        // which has multiple targets, using the multiplier uses a lot of direct byte buffers
+        // which may exhaust the java heap.
+        if (maxTableTaskSize == 1) {
+            resizeBufferPool(m_bufferCountMultiplier);
+        } else {
+            resizeBufferPool(maxTableTaskSize);
+        }
+
+        if (tasks.isEmpty()) {
+            // This site has no snapshot work to do, still queue a task to clean up. Otherwise,
+            // the snapshot will never finish.
+            queueInitialSnapshotTasks(1, now);
+        } else {
             /*
-             * Why do the extra work for a /dev/null target
-             * Check if it is dev null and don't activate COW
+             * Kick off the initial snapshot tasks. They will continue to
+             * requeue themselves as the snapshot progresses. See intializeBufferPool
+             * and the discard method of BBContainer for how requeuing works.
              */
-            if (!task.m_isDevNull) {
-                if (!ee.activateTableStream(task.m_tableId, TableStreamType.SNAPSHOT )) {
-                    SNAP_LOG.error("Attempted to activate copy on write mode for table "
-                            + task.m_name + " and failed");
-                    SNAP_LOG.error(task);
-                    VoltDB.crashLocalVoltDB("No additional info", false, null);
-                }
-            }
+            queueInitialSnapshotTasks(m_availableSnapshotBuffers.size(), now);
         }
-        /*
-         * Kick off the initial snapshot tasks. They will continue to
-         * requeue themselves as the snapshot progresses. See intializeBufferPool
-         * and the discard method of BBContainer for how requeuing works.
-         */
-        if (m_isIV2Enabled) {
-            for (int ii = 0; ii < m_availableSnapshotBuffers.size(); ii++) {
-                VoltDB.instance().schedulePriorityWork(
-                        m_onPotentialSnapshotWork,
-                        (m_quietUntil + (5 * m_snapshotPriority) - now),
-                        0,
-                        TimeUnit.MILLISECONDS);
-                m_quietUntil += 5 * m_snapshotPriority;
+    }
+
+    private void queueInitialSnapshotTasks(int count, long now)
+    {
+        for (int ii = 0; ii < count; ii++) {
+            VoltDB.instance().schedulePriorityWork(
+                    new Runnable() {
+                        @Override
+                        public void run()
+                        {
+                            m_siteTaskerQueue.offer(new SnapshotTask());
+                        }
+                    },
+                    (m_quietUntil + (5 * m_snapshotPriority) - now),
+                    0,
+                    TimeUnit.MILLISECONDS);
+            m_quietUntil += 5 * m_snapshotPriority;
+        }
+    }
+
+    private Map<Integer, Pair<Table, SnapshotPredicates>>
+    makeTablesAndPredicatesToSnapshot(Collection<SnapshotTableTask> tasks) {
+        Map<Integer, Pair<Table, SnapshotPredicates>> tablesAndPredicates =
+            new HashMap<Integer, Pair<Table, SnapshotPredicates>>();
+
+        for (SnapshotTableTask task : tasks) {
+            SNAP_LOG.debug("Examining SnapshotTableTask: " + task);
+
+            // Add the task to the task list for the given table
+            m_snapshotTableTasks.put(task.m_table.getRelativeIndex(), task);
+
+            // Make sure there is a predicate object for each table, the predicate could contain
+            // empty expressions. So activateTableStream() doesn't have to do a null check.
+            Pair<Table, SnapshotPredicates> tableAndPredicate =
+                tablesAndPredicates.get(task.m_table.getRelativeIndex());
+            if (tableAndPredicate == null) {
+                tableAndPredicate =
+                    Pair.of(task.m_table, new SnapshotPredicates());
+                tablesAndPredicates.put(task.m_table.getRelativeIndex(), tableAndPredicate);
+            }
+
+            tableAndPredicate.getSecond().addPredicate(task.m_predicate, task.m_deleteTuples);
+        }
+
+        return tablesAndPredicates;
+    }
+
+    private static void activateTableStreams(ExecutionEngine ee,
+                                             Map<Integer, Pair<Table, SnapshotPredicates>> tablesAndPredicates)
+    {
+        for (Pair<Table, SnapshotPredicates> tableAndPredicate : tablesAndPredicates.values()) {
+            Table table = tableAndPredicate.getFirst();
+            SnapshotPredicates predicates = tableAndPredicate.getSecond();
+
+            if (!ee.activateTableStream(table.getRelativeIndex(),
+                                        TableStreamType.SNAPSHOT,
+                                        predicates)) {
+                VoltDB.crashLocalVoltDB("Attempted to activate copy on write mode for table "
+                                        + table.getTypeName() + " and failed", false, null);
             }
         }
     }
 
-    private void quietPeriodSet(boolean ignoreQuietPeriod) {
-        if (!m_isIV2Enabled && !ignoreQuietPeriod && m_snapshotPriority > 0) {
-            m_quietUntil = System.currentTimeMillis() + (5 * m_snapshotPriority) + ((long)(m_random.nextDouble() * 15));
-        }
-    }
-    public Future<?> doSnapshotWork(ExecutionEngine ee, boolean ignoreQuietPeriod) {
-        ListenableFuture<?> retval = null;
-
-        /*
-         * This thread will null out the reference to m_snapshotTableTasks when
-         * a snapshot is finished. If the snapshot buffer is loaned out that means
-         * it is pending I/O somewhere so there is no work to do until it comes back.
-         */
-        if (m_snapshotTableTasks == null ||
-                m_availableSnapshotBuffers.isEmpty() ||
-                (!ignoreQuietPeriod && inQuietPeriod())) {
-            return retval;
+    /**
+     * Create an output buffer for each task.
+     * @return null if there aren't enough buffers left in the pool.
+     */
+    private List<BBContainer> getOutputBuffers(Collection<SnapshotTableTask> tableTasks)
+    {
+        if (m_availableSnapshotBuffers.size() < tableTasks.size()) {
+            // Don't have enough buffers
+            return null;
         }
 
-        /*
-         * There definitely is snapshot work to do. There should be a task
-         * here. If there isn't something is wrong because when the last task
-         * is polled cleanup and nulling should occur.
-         */
-        while (!m_snapshotTableTasks.isEmpty()) {
-            final SnapshotTableTask currentTask = m_snapshotTableTasks.peek();
-            assert(currentTask != null);
-            final int headerSize = currentTask.m_target.getHeaderSize();
-            int serialized = 0;
-            final BBContainer snapshotBuffer = m_availableSnapshotBuffers.poll();
+        List<BBContainer> outputBuffers = new ArrayList<BBContainer>(tableTasks.size());
+
+        for (SnapshotTableTask tableTask : tableTasks) {
+            assert(tableTask != null);
+            int headerSize = tableTask.m_target.getHeaderSize();
+            BBContainer snapshotBuffer = m_availableSnapshotBuffers.poll();
+            // XXX: with multiple output targets, is this still true?
             assert(snapshotBuffer != null);
             snapshotBuffer.b.clear();
             snapshotBuffer.b.position(headerSize);
 
-            /*
-             * For a dev null target don't do the work. The table wasn't
-             * put in COW mode anyway so this will fail
-             */
-            if (!currentTask.m_isDevNull) {
-                serialized =
-                    ee.tableStreamSerializeMore(
-                        snapshotBuffer,
-                        currentTask.m_tableId,
-                        TableStreamType.SNAPSHOT);
-                if (serialized < 0) {
-                    VoltDB.crashLocalVoltDB("Failure while serialize data from a table for COW snapshot", false, null);
-                }
-            }
+            outputBuffers.add(snapshotBuffer);
+        }
 
+        return outputBuffers;
+    }
+
+    private void asyncTerminateReplicatedTableTasks(Collection<SnapshotTableTask> tableTasks)
+    {
+        for (final SnapshotTableTask tableTask : tableTasks) {
             /**
-             * The EE will return 0 when there is no more data left to pull from that table.
-             * The enclosing loop ensures that the next table is then addressed.
+             * Replicated tables are assigned to a single ES on each site and that ES
+             * is responsible for closing the data target. Done in a separate
+             * thread so the EE can continue working.
              */
-            if (serialized == 0) {
-                final SnapshotTableTask t = m_snapshotTableTasks.poll();
-                SNAP_LOG.debug("Finished snapshot task: " + t);
-                /**
-                 * Replicated tables are assigned to a single ES on each site and that ES
-                 * is responsible for closing the data target. Done in a separate
-                 * thread so the EE can continue working.
-                 */
-                if (t.m_isReplicated && t.m_target.getFormat().isTableBased()) {
-                    final Thread terminatorThread =
-                        new Thread("Replicated SnapshotDataTarget terminator ") {
+            if (tableTask.m_table.getIsreplicated() &&
+                tableTask.m_target.getFormat().isTableBased()) {
+                final Thread terminatorThread =
+                    new Thread("Replicated SnapshotDataTarget terminator ") {
                         @Override
                         public void run() {
                             try {
-                                t.m_target.close();
+                                tableTask.m_target.close();
                             } catch (IOException e) {
                                 throw new RuntimeException(e);
                             } catch (InterruptedException e) {
@@ -489,25 +562,52 @@ public class SnapshotSiteProcessor {
 
                         }
                     };
-                    m_snapshotTargetTerminators.add(terminatorThread);
-                    terminatorThread.start();
-                }
-                m_availableSnapshotBuffers.offer(snapshotBuffer);
-                continue;
+                m_snapshotTargetTerminators.add(terminatorThread);
+                terminatorThread.start();
             }
+        }
+    }
 
-            /**
-             * The block from the EE will contain raw tuple data with no length prefix etc.
+    /**
+     * Finalize the output buffers and write them to the corresponding data targets
+     *
+     * @return A future that can used to wait for all targets to finish writing the buffers
+     */
+    private ListenableFuture<?> writeSnapshotBlocksToTargets(int tableId,
+                                                             Collection<BBContainer> outputBuffers,
+                                                             int[] serialized)
+    {
+        final List<ListenableFuture<?>> writeFutures =
+            new ArrayList<ListenableFuture<?>>(outputBuffers.size());
+
+        // The containers, the data targets, and the serialized byte counts should all line up
+        Iterator<BBContainer> containerIter = outputBuffers.iterator();
+        Iterator<SnapshotTableTask> taskIter = m_snapshotTableTasks.get(tableId).iterator();
+        int serializedIndex = 0;
+
+        while (containerIter.hasNext() &&
+               taskIter.hasNext() &&
+               serializedIndex < serialized.length) {
+            final BBContainer snapshotBuffer = containerIter.next();
+            final SnapshotTableTask task = taskIter.next();
+            final int serializedBytes = serialized[serializedIndex++];
+            final int headerSize = snapshotBuffer.b.position();
+
+            /*
+             * Finalize the buffer by setting position to 0 and limit to the last used byte
              */
-            snapshotBuffer.b.limit(serialized + headerSize);
+            snapshotBuffer.b.limit(serializedBytes + headerSize);
             snapshotBuffer.b.position(0);
+
             Callable<BBContainer> valueForTarget = Callables.returning(snapshotBuffer);
-            for (SnapshotDataFilter filter : currentTask.m_filters) {
+            for (SnapshotDataFilter filter : task.m_filters) {
                 valueForTarget = filter.filter(valueForTarget);
             }
-            retval = currentTask.m_target.write(valueForTarget, currentTask);
-            if (retval != null) {
-                final ListenableFuture<?> retvalFinal = retval;
+
+            ListenableFuture<?> writeFuture = task.m_target.write(valueForTarget, task);
+            if (writeFuture != null) {
+                writeFutures.add(writeFuture);
+                final ListenableFuture<?> retvalFinal = writeFuture;
                 retvalFinal.addListener(new Runnable() {
                     @Override
                     public void run() {
@@ -516,15 +616,83 @@ public class SnapshotSiteProcessor {
                         } catch (Throwable t) {
                             if (m_lastSnapshotSucceded) {
                                 SNAP_LOG.error("Error while attempting to write snapshot data to file " +
-                                        currentTask.m_target, t);
+                                               task.m_target, t);
                                 m_lastSnapshotSucceded = false;
                             }
                         }
                     }
                 }, MoreExecutors.sameThreadExecutor());
             }
-            quietPeriodSet(ignoreQuietPeriod);
-            break;
+        }
+
+        // Should have iterated through all containers and tasks
+        assert !containerIter.hasNext() && !taskIter.hasNext() && serializedIndex == serialized.length;
+
+        // Wraps all write futures in one future
+        return Futures.allAsList(writeFutures);
+    }
+
+    public Future<?> doSnapshotWork(SystemProcedureExecutionContext context,
+                                    ExecutionEngine ee) {
+        ListenableFuture<?> retval = null;
+
+        /*
+         * This thread will null out the reference to m_snapshotTableTasks when
+         * a snapshot is finished. If the snapshot buffer is loaned out that means
+         * it is pending I/O somewhere so there is no work to do until it comes back.
+         */
+        if (m_snapshotTableTasks == null) {
+            return retval;
+        }
+
+        /*
+         * Try to serialize a block from a table, if the table is finished,
+         * remove the tasks from the task map and move on to the next table. If a block is
+         * successfully serialized, break out of the loop and release the site thread for more
+         * transaction work.
+         */
+        Iterator<Map.Entry<Integer, Collection<SnapshotTableTask>>> taskIter =
+            m_snapshotTableTasks.asMap().entrySet().iterator();
+        while (taskIter.hasNext()) {
+            Map.Entry<Integer, Collection<SnapshotTableTask>> taskEntry = taskIter.next();
+            final int tableId = taskEntry.getKey();
+            final Collection<SnapshotTableTask> tableTasks = taskEntry.getValue();
+
+            final List<BBContainer> outputBuffers = getOutputBuffers(tableTasks);
+            if (outputBuffers == null) {
+                // Not enough buffers available
+                break;
+            }
+
+            final int[] serialized = ee.tableStreamSerializeMore(tableId,
+                                                                 TableStreamType.SNAPSHOT,
+                                                                 outputBuffers);
+            for (int serializedBytes : serialized) {
+                if (serializedBytes < 0) {
+                    VoltDB.crashLocalVoltDB("Failure while serialize data from a table for COW snapshot", false, null);
+                }
+            }
+
+            /**
+             * The EE will return 0 when there is no more data left to pull from that table.
+             * The enclosing loop ensures that the next table is then addressed.
+             */
+            if (serialized[0] == 0) {
+                asyncTerminateReplicatedTableTasks(tableTasks);
+                // XXX: Guava's multimap will clear the tableTasks collection when the entry is
+                // removed from the containing map, so don't use the collection after removal!
+                taskIter.remove();
+                SNAP_LOG.debug("Finished snapshot tasks for table " + tableId +
+                               ": " + tableTasks);
+
+                // Return all allocated snapshot output buffers
+                for (BBContainer container : outputBuffers) {
+                    m_availableSnapshotBuffers.offer(container);
+                }
+            } else {
+                retval = writeSnapshotBlocksToTargets(tableId, outputBuffers, serialized);
+                break;
+            }
         }
 
         /**
@@ -533,6 +701,8 @@ public class SnapshotSiteProcessor {
          */
         if (m_snapshotTableTasks.isEmpty()) {
             SNAP_LOG.debug("Finished with tasks");
+            // In case this is a non-blocking snapshot, do the post-snapshot tasks here.
+            runPostSnapshotTasks(context);
             final ArrayList<SnapshotDataTarget> snapshotTargets = m_snapshotTargets;
             m_snapshotTargets = null;
             m_snapshotTableTasks = null;
@@ -546,6 +716,10 @@ public class SnapshotSiteProcessor {
                 if (!IamLast) {
                     ExecutionSitesCurrentlySnapshotting.remove(this);
                 }
+
+                // Queue a cleanup task to empty the buffer pool on this site. The task will be
+                // run when the last site finishes snapshotting
+                m_tasksOnSnapshotCompletion.add(createCleanupTask());
             }
 
             /**
@@ -627,6 +801,25 @@ public class SnapshotSiteProcessor {
         return retval;
     }
 
+    private Runnable createCleanupTask()
+    {
+        return new Runnable() {
+            @Override
+            public void run()
+            {
+                emptyBufferPool();
+            }
+        };
+    }
+
+    public static void runPostSnapshotTasks(SystemProcedureExecutionContext context)
+    {
+        SNAP_LOG.debug("Running post-snapshot tasks");
+        PostSnapshotTask postSnapshotTask = m_siteTasksPostSnapshotting.remove(context.getPartitionId());
+        if (postSnapshotTask != null) {
+            postSnapshotTask.run(context);
+        }
+    }
 
     private static void logSnapshotCompleteToZK(
             long txnId,
@@ -774,10 +967,12 @@ public class SnapshotSiteProcessor {
      * Do snapshot work exclusively until there is no more. Also blocks
      * until the fsync() and close() of snapshot data targets has completed.
      */
-    public HashSet<Exception> completeSnapshotWork(ExecutionEngine ee) throws InterruptedException {
+    public HashSet<Exception> completeSnapshotWork(SystemProcedureExecutionContext context,
+                                                   ExecutionEngine ee)
+        throws InterruptedException {
         HashSet<Exception> retval = new HashSet<Exception>();
         while (m_snapshotTableTasks != null) {
-            Future<?> result = doSnapshotWork(ee, true);
+            Future<?> result = doSnapshotWork(context, ee);
             if (result != null) {
                 try {
                     result.get();

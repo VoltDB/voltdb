@@ -19,10 +19,11 @@ package org.voltdb;
 
 import java.io.File;
 import java.io.FileFilter;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -51,12 +52,14 @@ import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
 import org.voltdb.SystemProcedureCatalog.Config;
-import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.common.Constants;
 import org.voltdb.dtxn.TransactionCreator;
+import org.voltdb.sysprocs.SnapshotRestore;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.TableFiles;
+import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 
 /**
@@ -86,6 +89,7 @@ SnapshotCompletionInterest
     }
 
     private final static VoltLogger LOG = new VoltLogger("HOST");
+
     private String m_generatedRestoreBarrier2;
 
     // Different states the restore process can be in
@@ -102,6 +106,8 @@ SnapshotCompletionInterest
     private final Runnable m_changeStateFunctor = new Runnable() {
         @Override
         public void run() {
+            //After restore it is safe to initialize partition tracking
+            m_replayAgent.initPartitionTracking();
             changeState();
         }
     };
@@ -117,11 +123,12 @@ SnapshotCompletionInterest
     private final SnapshotCompletionMonitor m_snapshotMonitor;
     private final Callback m_callback;
     private final Integer m_hostId;
-    private final START_ACTION m_action;
+    private final StartAction m_action;
     private final boolean m_clEnabled;
     private final String m_clPath;
     private final String m_clSnapshotPath;
     private final String m_snapshotPath;
+    private final String m_voltdbrootPath;
     private final int[] m_allPartitions;
     private final Set<Integer> m_liveHosts;
 
@@ -191,8 +198,13 @@ SnapshotCompletionInterest
                     if (m_snapshotToRestore != null) {
                         LOG.debug("Initiating snapshot " + m_snapshotToRestore.nonce +
                                 " in " + m_snapshotToRestore.path);
-                        Object[] params = new Object[] {m_snapshotToRestore.path,
-                            m_snapshotToRestore.nonce};
+                        JSONObject jsObj = new JSONObject();
+                        jsObj.put(SnapshotRestore.JSON_PATH, m_snapshotToRestore.path);
+                        jsObj.put(SnapshotRestore.JSON_NONCE, m_snapshotToRestore.nonce);
+                        if (m_action == StartAction.SAFE_RECOVER) {
+                            jsObj.put(SnapshotRestore.JSON_DUPLICATES_PATH, m_voltdbrootPath);
+                        }
+                        Object[] params = new Object[] { jsObj.toString() };
                         initSnapshotWork(RESTORE_TXNID,
                                 Pair.of("@SnapshotRestore", params));
                     }
@@ -221,6 +233,10 @@ SnapshotCompletionInterest
         public final String path;
         public final String nonce;
         public final int partitionCount;
+        // If this is a truncation snapshot that is on the boundary of partition count change
+        // newPartitionCount will record the partition count after the topology change,
+        // otherwise it's the same as partitionCount
+        public final int newPartitionCount;
         public final long catalogCrc;
         // All the partitions for partitioned tables in the local snapshot file
         public final Map<String, Set<Integer>> partitions = new TreeMap<String, Set<Integer>>();
@@ -233,13 +249,15 @@ SnapshotCompletionInterest
             partitionToTxnId.putAll(map);
         }
 
-        public SnapshotInfo(long txnId, String path, String nonce, int partitions,
+        public SnapshotInfo(long txnId, String path, String nonce,
+                            int partitions, int newPartitionCount,
                             long catalogCrc, int hostId, InstanceId instanceId)
         {
             this.txnId = txnId;
             this.path = path;
             this.nonce = nonce;
             this.partitionCount = partitions;
+            this.newPartitionCount = newPartitionCount;
             this.catalogCrc = catalogCrc;
             this.hostId = hostId;
             this.instanceId = instanceId;
@@ -251,6 +269,7 @@ SnapshotCompletionInterest
             path = jo.getString("path");
             nonce = jo.getString("nonce");
             partitionCount = jo.getInt("partitionCount");
+            newPartitionCount = jo.getInt("newPartitionCount");
             catalogCrc = jo.getLong("catalogCrc");
             hostId = jo.getInt("hostId");
             instanceId = new InstanceId(jo.getJSONObject("instanceId"));
@@ -288,6 +307,7 @@ SnapshotCompletionInterest
                 stringer.key("path").value(path);
                 stringer.key("nonce").value(nonce);
                 stringer.key("partitionCount").value(partitionCount);
+                stringer.key("newPartitionCount").value(newPartitionCount);
                 stringer.key("catalogCrc").value(catalogCrc);
                 stringer.key("hostId").value(hostId);
                 stringer.key("tables").array();
@@ -371,10 +391,11 @@ SnapshotCompletionInterest
     }
 
     public RestoreAgent(ZooKeeper zk, SnapshotCompletionMonitor snapshotMonitor,
-                        Callback callback, int hostId, START_ACTION action, boolean clEnabled,
+                        Callback callback, int hostId, StartAction action, boolean clEnabled,
                         String clPath, String clSnapshotPath,
                         String snapshotPath, int[] allPartitions,
-                        Set<Integer> liveHosts)
+                        Set<Integer> liveHosts,
+                        String voltdbrootPath)
     throws IOException {
         m_hostId = hostId;
         m_initiator = null;
@@ -388,6 +409,7 @@ SnapshotCompletionInterest
         m_snapshotPath = snapshotPath;
         m_allPartitions = allPartitions;
         m_liveHosts = liveHosts;
+        m_voltdbrootPath = voltdbrootPath;
 
         initialize();
     }
@@ -400,9 +422,8 @@ SnapshotCompletionInterest
             if (replayClass != null) {
                 Constructor<?> constructor =
                     replayClass.getConstructor(int.class,
-                                               START_ACTION.class,
+                                               StartAction.class,
                                                ZooKeeper.class,
-                                               int.class,
                                                String.class,
                                                int[].class,
                                                Set.class,
@@ -412,7 +433,6 @@ SnapshotCompletionInterest
                     (CommandLogReinitiator) constructor.newInstance(m_hostId,
                                                                     m_action,
                                                                     m_zk,
-                                                                    m_allPartitions.length,
                                                                     m_clPath,
                                                                     m_allPartitions,
                                                                     m_liveHosts,
@@ -420,7 +440,7 @@ SnapshotCompletionInterest
             }
         } catch (Exception e) {
             VoltDB.crashGlobalVoltDB("Unable to instantiate command log reinitiator",
-                                     false, e instanceof InvocationTargetException ? e.getCause() : e);
+                                     true, e);
         }
         m_replayAgent.setCallback(this);
     }
@@ -453,7 +473,7 @@ SnapshotCompletionInterest
         try {
             m_snapshotToRestore = generatePlans();
         } catch (Exception e) {
-            VoltDB.crashGlobalVoltDB(e.getMessage(), false, e);
+            VoltDB.crashGlobalVoltDB(e.getMessage(), true, e);
         }
 
         if (m_snapshotToRestore != null) {
@@ -554,7 +574,7 @@ SnapshotCompletionInterest
         Map<String, Snapshot> snapshots = new HashMap<String, SnapshotUtil.Snapshot>();
 
         // Only scan if startup might require a snapshot restore.
-        if (m_action == START_ACTION.RECOVER) {
+        if (m_action.doesRecover()) {
             snapshots = getSnapshots();
         }
 
@@ -626,12 +646,20 @@ SnapshotCompletionInterest
         // Negotiate with other hosts about which snapshot to restore
         SnapshotInfo infoWithMinHostId = getRestorePlan();
 
+        // The expected partition count could be determined by the partition count in the current
+        // cluster or the new partition count recorded in the truncation snapshot,
+        // whichever is larger. Truncation snapshot taken at the end of the join process actually
+        // records the new partition count in the digest.
+        final int newPartitionCount =
+            (infoWithMinHostId == null ? 0 : infoWithMinHostId.newPartitionCount);
+        final int expectedPartitionCount = Math.max(m_allPartitions.length, newPartitionCount);
+
         /*
          * Generate the replay plan here so that we don't have to wait until the
          * snapshot restore finishes.
          */
-        if (m_action == START_ACTION.RECOVER) {
-            m_replayAgent.generateReplayPlan();
+        if (m_action.doesRecover()) {
+            m_replayAgent.generateReplayPlan(expectedPartitionCount);
         }
 
         m_planned = true;
@@ -664,11 +692,16 @@ SnapshotCompletionInterest
             }
         }
 
+        if (s.m_digests.isEmpty()) {
+            LOG.debug("Rejecting snapshot because it had no valid digest file.");
+            return null;
+        }
         File digest = s.m_digests.get(0);
         Long catalog_crc = null;
         Map<Integer,Long> pidToTxnMap = new TreeMap<Integer,Long>();
         // Create a valid but meaningless InstanceId to support pre-instanceId checking versions
         InstanceId instanceId = new InstanceId(0, 0);
+        int newParitionCount = -1;
         try
         {
             JSONObject digest_detail = SnapshotUtil.CRCCheck(digest, LOG);
@@ -689,6 +722,10 @@ SnapshotCompletionInterest
             if (digest_detail.has("instanceId")) {
                 instanceId = new InstanceId(digest_detail.getJSONObject("instanceId"));
             }
+
+            if (digest_detail.has("newPartitionCount")) {
+                newParitionCount = digest_detail.getInt("newPartitionCount");
+            }
         }
         catch (IOException ioe)
         {
@@ -703,10 +740,50 @@ SnapshotCompletionInterest
             return null;
         }
 
+        if (s.m_catalogFile == null) {
+            LOG.debug("Rejecting snapshot because it had no catalog.");
+            return null;
+        }
+
+        FileInputStream fin = null;
+        try {
+            fin = new FileInputStream(s.m_catalogFile);
+            byte[] buffer = new byte[(int)s.m_catalogFile.length() + 1000];
+            int readBytes = 0;
+            int totalBytes = 0;
+            try {
+                while (readBytes >= 0) {
+                    totalBytes += readBytes;
+                    readBytes = fin.read(buffer, totalBytes, buffer.length - totalBytes - 1);
+                }
+            } finally {
+                fin.close();
+                fin = null;
+            }
+            byte[] catalogBytes = Arrays.copyOf(buffer, totalBytes);
+            InMemoryJarfile jarfile = new InMemoryJarfile(catalogBytes);
+            if (jarfile.getCRC() != catalog_crc) {
+                LOG.debug("Rejecting snapshot because catalog CRC did not match digest.");
+                return null;
+            }
+        }
+        catch (IOException ioe) {
+            LOG.debug("Rejecting snapshot because catalog CRC could not be validated");
+            return null;
+        }
+        finally {
+            if (fin != null) {
+                try {
+                    fin.close();
+                }
+                catch (Exception e) {}
+            }
+        }
+
         SnapshotInfo info =
             new SnapshotInfo(key, digest.getParent(),
                     SnapshotUtil.parseNonceFromDigestFilename(digest.getName()),
-                    partitionCount, catalog_crc, m_hostId, instanceId);
+                    partitionCount, newParitionCount, catalog_crc, m_hostId, instanceId);
         // populate table to partition map.
         for (Entry<String, TableFiles> te : s.m_tableFiles.entrySet()) {
             TableFiles tableFile = te.getValue();
@@ -761,7 +838,7 @@ SnapshotCompletionInterest
         String jsonData = toRestore != null ? toRestore.toJSONObject().toString() : "{}";
         LOG.debug("Sending snapshot ID " + txnId + " for restore to other nodes");
         try {
-            m_zk.create(VoltZK.restore_snapshot_id, jsonData.getBytes(VoltDB.UTF8ENCODING),
+            m_zk.create(VoltZK.restore_snapshot_id, jsonData.getBytes(Constants.UTF8ENCODING),
                         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         } catch (Exception e) {
             VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
@@ -780,7 +857,7 @@ SnapshotCompletionInterest
         try {
             byte[] data = m_zk.getData(VoltZK.restore_snapshot_id, false, null);
 
-            String jsonData = new String(data, VoltDB.UTF8ENCODING);
+            String jsonData = new String(data, Constants.UTF8ENCODING);
             if (!jsonData.equals("{}")) {
                 m_hasRestored = true;
                 JSONObject jo = new JSONObject(jsonData);
@@ -813,7 +890,7 @@ SnapshotCompletionInterest
         String jsonData = serializeRestoreInformation(max, snapshots);
         String zkNode = VoltZK.restore + "/" + m_hostId;
         try {
-            m_zk.create(zkNode, jsonData.getBytes(VoltDB.UTF8ENCODING),
+            m_zk.create(zkNode, jsonData.getBytes(Constants.UTF8ENCODING),
                         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         } catch (Exception e) {
             throw new RuntimeException("Failed to create Zookeeper node: " +
@@ -861,7 +938,7 @@ SnapshotCompletionInterest
         List<String> children = waitOnVoltZK_restore();
 
         // If not recovering, nothing to do.
-        if (m_action == START_ACTION.CREATE) {
+        if (m_action == StartAction.CREATE) {
             return null;
         }
 
@@ -1042,8 +1119,7 @@ SnapshotCompletionInterest
         spi.params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
             @Override
             public ParameterSet call() throws Exception {
-                ParameterSet params = new ParameterSet();
-                params.setParameters(invocation.getSecond());
+                ParameterSet params = ParameterSet.fromArrayWithCopy(invocation.getSecond());
                 return params;
             }
         });
@@ -1110,7 +1186,7 @@ SnapshotCompletionInterest
     @Override
     public void onReplayCompletion() {
         if (!m_hasRestored && !m_replayAgent.hasReplayedSegments() &&
-            m_action == START_ACTION.RECOVER) {
+            m_action.doesRecover()) {
             /*
              * This means we didn't restore any snapshot, and there's no command
              * log to replay. But the user asked for recover

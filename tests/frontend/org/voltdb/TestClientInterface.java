@@ -65,6 +65,7 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
@@ -82,6 +83,7 @@ public class TestClientInterface {
     // mocked objects that CI requires
     private VoltDBInterface m_volt;
     private StatsAgent m_statsAgent;
+    private SystemInformationAgent m_sysinfoAgent;
     private HostMessenger m_messenger;
     private ClientInputHandler m_handler;
     private Cartographer m_cartographer;
@@ -109,6 +111,7 @@ public class TestClientInterface {
         // Set up CI with the mock objects.
         m_volt = mock(VoltDBInterface.class);
         m_statsAgent = mock(StatsAgent.class);
+        m_sysinfoAgent = mock(SystemInformationAgent.class);
         m_messenger = mock(HostMessenger.class);
         m_handler = mock(ClientInputHandler.class);
         m_cartographer = mock(Cartographer.class);
@@ -122,6 +125,8 @@ public class TestClientInterface {
          */
         VoltDB.replaceVoltDBInstanceForTest(m_volt);
         doReturn(m_statsAgent).when(m_volt).getStatsAgent();
+        doReturn(m_statsAgent).when(m_volt).getOpsAgent(OpsSelector.STATISTICS);
+        doReturn(m_sysinfoAgent).when(m_volt).getOpsAgent(OpsSelector.SYSTEMINFORMATION);
         doReturn(mock(SnapshotCompletionMonitor.class)).when(m_volt).getSnapshotCompletionMonitor();
         doReturn(m_messenger).when(m_volt).getHostMessenger();
         doReturn(mock(VoltNetworkPool.class)).when(m_messenger).getNetwork();
@@ -275,24 +280,74 @@ public class TestClientInterface {
         assertTrue(captor.getValue().payload.toString().contains("partition param: 3"));
     }
 
+    @Test
+    public void testFinishedSPAdHocPlanning() throws Exception {
+        // Need a batch and a statement
+        AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
+                "select * from a where i = 3", 3, 0, 0, "localhost", false,
+                ProcedureInvocationType.ORIGINAL, 0, 0, null);
+        AdHocPlannedStatement s = new AdHocPlannedStatement("select * from a where i = 3".getBytes
+                (Constants.UTF8ENCODING),
+                new CorePlan(new byte[0],
+                        null,
+                        new byte[20],
+                        null,
+                        false,
+                        false,
+                        true,
+                        new VoltType[0],
+                        0),
+                ParameterSet.fromArrayNoCopy(new Object[0]),
+                null,
+                null,
+                3);
+        plannedStmtBatch.addStatement(s);
+        m_ci.processFinishedCompilerWork(plannedStmtBatch).run();
+
+        ArgumentCaptor<Long> destinationCaptor =
+                ArgumentCaptor.forClass(Long.class);
+        ArgumentCaptor<Iv2InitiateTaskMessage> messageCaptor =
+                ArgumentCaptor.forClass(Iv2InitiateTaskMessage.class);
+        verify(m_messenger).send(destinationCaptor.capture(), messageCaptor.capture());
+        Iv2InitiateTaskMessage message = messageCaptor.getValue();
+
+        assertTrue(message.isReadOnly());  // readonly
+        assertTrue(message.isSinglePartition()); // single-part
+        assertEquals("@AdHoc_RO_SP", message.getStoredProcedureName());
+
+        // SP AdHoc should have partitioning parameter serialized in the parameter set
+        Object partitionParam = message.getStoredProcedureInvocation().getParameterAtIndex(0);
+        assertTrue(partitionParam instanceof byte[]);
+        VoltType type = VoltType.get((Byte) message.getStoredProcedureInvocation().getParameterAtIndex(1));
+        assertTrue(type.isInteger());
+        byte[] serializedData = (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(2);
+        AdHocPlannedStatement[] statements = AdHocPlannedStmtBatch.planArrayFromBuffer(ByteBuffer.wrap(serializedData));
+        assertTrue(Arrays.equals(TheHashinator.valueToBytes(3), (byte[]) partitionParam));
+        assertEquals(1, statements.length);
+        String sql = new String(statements[0].sql, Constants.UTF8ENCODING);
+        assertEquals("select * from a where i = 3", sql);
+    }
+
     /**
      * Fake an adhoc compiler result and return it to the CI, see if CI
      * initiates the txn.
      */
     @Test
-    public void testFinishedAdHocPlanning() throws Exception {
+    public void testFinishedMPAdHocPlanning() throws Exception {
         // Need a batch and a statement
         AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
                 "select * from a", null, 0, 0, "localhost", false, ProcedureInvocationType.ORIGINAL, 0, 0, null);
-        AdHocPlannedStatement s = new AdHocPlannedStatement("select * from a".getBytes(VoltDB.UTF8ENCODING),
+        AdHocPlannedStatement s = new AdHocPlannedStatement("select * from a".getBytes(Constants.UTF8ENCODING),
                                                             new CorePlan(new byte[0],
                                                                          new byte[0],
+                                                                         new byte[20],
+                                                                         new byte[20],
                                                                          false,
                                                                          false,
                                                                          true,
                                                                          new VoltType[0],
                                                                          0),
-                                                            new ParameterSet(),
+                                                            ParameterSet.emptyParameterSet(),
                                                             null,
                                                             null,
                                                             null);
@@ -315,7 +370,7 @@ public class TestClientInterface {
         byte[] serializedData = (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(0);
         AdHocPlannedStatement[] statements = AdHocPlannedStmtBatch.planArrayFromBuffer(ByteBuffer.wrap(serializedData));
         assertEquals(1, statements.length);
-        String sql = new String(statements[0].sql, VoltDB.UTF8ENCODING);
+        String sql = new String(statements[0].sql, Constants.UTF8ENCODING);
         assertEquals("select * from a", sql);
     }
 
@@ -357,6 +412,7 @@ public class TestClientInterface {
         catalogResult.adminConnection = false;
         catalogResult.hostname = "localhost";
         // catalog change specific boiler plate
+        catalogResult.catalogHash = "blah".getBytes();
         catalogResult.catalogBytes = "blah".getBytes();
         catalogResult.deploymentString = "blah";
         catalogResult.deploymentCRC = 1234l;
@@ -379,10 +435,10 @@ public class TestClientInterface {
         //assertFalse(boolValues.get(3)); // every site
         assertEquals("@UpdateApplicationCatalog", message.getStoredProcedureName());
         assertEquals("diff", message.getStoredProcedureInvocation().getParameterAtIndex(0));
-        assertTrue(Arrays.equals("blah".getBytes(), (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(1)));
-        assertEquals(3, message.getStoredProcedureInvocation().getParameterAtIndex(2));
-        assertEquals("blah", message.getStoredProcedureInvocation().getParameterAtIndex(3));
-        assertEquals(1234l, message.getStoredProcedureInvocation().getParameterAtIndex(4));
+        assertTrue(Arrays.equals("blah".getBytes(), (byte[]) message.getStoredProcedureInvocation().getParameterAtIndex(2)));
+        assertEquals(3, message.getStoredProcedureInvocation().getParameterAtIndex(3));
+        assertEquals("blah", message.getStoredProcedureInvocation().getParameterAtIndex(4));
+        assertEquals(1234l, message.getStoredProcedureInvocation().getParameterAtIndex(5));
         assertEquals(ProcedureInvocationType.REPLICATED, message.getStoredProcedureInvocation().getType());
         assertEquals(12345678l, message.getStoredProcedureInvocation().getOriginalTxnId());
         assertEquals(87654321l, message.getStoredProcedureInvocation().getOriginalUniqueId());
@@ -397,11 +453,12 @@ public class TestClientInterface {
     }
 
     @Test
-    public void testSystemInformation() throws IOException {
+    public void testSystemInformation() throws Exception {
         ByteBuffer msg = createMsg("@SystemInformation");
-        StoredProcedureInvocation invocation =
-                readAndCheck(msg, "@SystemInformation", 1, false, true, false, false);
-        assertEquals("OVERVIEW", invocation.getParams().toArray()[0]);
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
+        assertNull(resp);
+        verify(m_sysinfoAgent).performOpsAction(any(Connection.class), anyInt(), eq(OpsSelector.SYSTEMINFORMATION),
+                any(ParameterSet.class));
     }
 
     /**
@@ -413,25 +470,18 @@ public class TestClientInterface {
         ByteBuffer msg = createMsg("@Statistics", "DR", 0);
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
-        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-        verify(m_statsAgent).collectStats(any(Connection.class), anyInt(), captor.capture());
-        assertEquals("DR", captor.getValue());
-    }
-
-    @Test
-    public void testStatisticsProc() throws IOException {
-        ByteBuffer msg = createMsg("@Statistics", "table", 0);
-        StoredProcedureInvocation invocation =
-                readAndCheck(msg, "@Statistics", null, false, true, false, false);
-        assertEquals("table", invocation.getParameterAtIndex(0));
+        verify(m_statsAgent).performOpsAction(any(Connection.class), anyInt(), eq(OpsSelector.STATISTICS),
+                any(ParameterSet.class));
     }
 
     @Test
     public void testLoadSinglePartTable() throws IOException {
         VoltTable table = new VoltTable(new ColumnInfo("i", VoltType.INTEGER));
         table.addRow(1);
-        ByteBuffer msg = createMsg("@LoadSinglepartitionTable", "a", table);
-        readAndCheck(msg, "@LoadSinglepartitionTable", 1, false, false, true, false);
+
+        byte[] partitionParam = {0, 0, 0, 0, 0, 0, 0, 4};
+        ByteBuffer msg = createMsg("@LoadSinglepartitionTable", partitionParam, "a", table);
+        readAndCheck(msg, "@LoadSinglepartitionTable", partitionParam, false, false, true, false);
     }
 
     @Test

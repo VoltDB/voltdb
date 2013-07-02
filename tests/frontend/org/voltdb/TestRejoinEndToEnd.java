@@ -24,15 +24,9 @@
 package org.voltdb;
 
 import java.net.InetSocketAddress;
-import java.util.Arrays;
-import java.util.Collection;
 
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
@@ -46,20 +40,7 @@ import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
 
-@RunWith(value = Parameterized.class)
 public class TestRejoinEndToEnd extends RejoinTestBase {
-
-    @Parameters
-    public static Collection<Object[]> useIv2() {
-        return Arrays.asList(new Object[][] {{true}});
-    }
-
-    protected final boolean m_useIv2;
-    public TestRejoinEndToEnd(boolean useIv2)
-    {
-        m_useIv2 = useIv2 || VoltDB.checkTestEnvForIv2();
-    }
-
     final int FAIL_NO_OPEN_SOCKET = 0;
     final int FAIL_TIMEOUT_ON_SOCKET = 1;
     final int FAIL_SKEW = 2;
@@ -77,7 +58,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
                     BackendTarget.NATIVE_EE_JNI,
                     LocalCluster.FailureState.ALL_RUNNING,
-                    false, true, m_useIv2);
+                    false, true, true);
             cluster.setMaxHeap(256);
             cluster.overrideAnyRequestForValgrind();
             boolean success = cluster.compile(builder);
@@ -151,8 +132,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             ServerThread localServer = null;
             try {
                 VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
-                config.m_enableIV2 = m_useIv2;
-                config.m_startAction = START_ACTION.REJOIN;
+                config.m_enableIV2 = true;
+                config.m_startAction = StartAction.REJOIN;
                 config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
                 config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
                 config.m_leader = ":" + cluster.internalPort(1);
@@ -258,7 +239,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1,
                 BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ONE_FAILURE,
-                false, false, m_useIv2);
+                false, false, true);
         cluster.overrideAnyRequestForValgrind();
         cluster.setMaxHeap(256);
         boolean success = cluster.compile(builder);
@@ -274,7 +255,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
                 BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ONE_RECOVERING,
-                false, true, m_useIv2);
+                false, true, true);
         cluster.setMaxHeap(256);
         cluster.overrideAnyRequestForValgrind();
         success = cluster.compile(builder);
@@ -293,7 +274,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         VoltProjectBuilder builder = getBuilderForTest();
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 1, 2, 1,
-                BackendTarget.NATIVE_EE_JNI, false, m_useIv2);
+                BackendTarget.NATIVE_EE_JNI, false, true);
         cluster.setMaxHeap(256);
         cluster.overrideAnyRequestForValgrind();
         boolean success = cluster.compile(builder);
@@ -354,7 +335,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         builder.setSecurityEnabled(true);
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 4, 3, 1,
-                BackendTarget.NATIVE_EE_JNI, false, m_useIv2);
+                BackendTarget.NATIVE_EE_JNI, false, true);
         cluster.setMaxHeap(256);
         cluster.overrideAnyRequestForValgrind();
         boolean success = cluster.compile(builder);
@@ -390,8 +371,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         Thread.sleep(100);
 
         VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
-        config.m_enableIV2 = m_useIv2;
-        config.m_startAction = START_ACTION.REJOIN;
+        config.m_enableIV2 = true;
+        config.m_startAction = StartAction.REJOIN;
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         config.m_leader = ":" + cluster.internalPort(1);
@@ -436,7 +417,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         builder.setSecurityEnabled(true);
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
-                BackendTarget.NATIVE_EE_JNI, false, m_useIv2);
+                BackendTarget.NATIVE_EE_JNI, false, true);
         cluster.overrideAnyRequestForValgrind();
         cluster.setMaxHeap(256);
         boolean success = cluster.compileWithAdminMode(builder, 21211, false); // note this admin port is ignored
@@ -460,8 +441,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         Thread.sleep(100);
 
         VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
-        config.m_enableIV2 = m_useIv2;
-        config.m_startAction = START_ACTION.REJOIN;
+        config.m_enableIV2 = true;
+        config.m_startAction = StartAction.REJOIN;
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         config.m_leader = ":" + cluster.internalPort(1);
@@ -532,7 +513,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
                 null);  // authGroups (off)
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
-                BackendTarget.NATIVE_EE_JNI, false, m_useIv2);
+                BackendTarget.NATIVE_EE_JNI, false, true);
         cluster.overrideAnyRequestForValgrind();
         cluster.setMaxHeap(256);
         boolean success = cluster.compile(builder);
@@ -580,8 +561,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         Thread.sleep(100);
 
         VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
-        config.m_enableIV2 = m_useIv2;
-        config.m_startAction = START_ACTION.REJOIN;
+        config.m_enableIV2 = true;
+        config.m_startAction = StartAction.REJOIN;
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         config.m_leader = ":" + cluster.internalPort(1);
@@ -644,7 +625,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
                 null);  // authGroups (off)
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
-                BackendTarget.NATIVE_EE_JNI, false, m_useIv2);
+                BackendTarget.NATIVE_EE_JNI, false, true);
         cluster.overrideAnyRequestForValgrind();
         cluster.setMaxHeap(256);
         boolean success = cluster.compile(builder);
@@ -692,8 +673,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         Thread.sleep(100);
 
         VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
-        config.m_enableIV2 = m_useIv2;
-        config.m_startAction = START_ACTION.REJOIN;
+        config.m_enableIV2 = true;
+        config.m_startAction = StartAction.REJOIN;
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         config.m_leader = ":" + cluster.internalPort(1);
@@ -751,7 +732,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         builder.setSecurityEnabled(true);
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
-                BackendTarget.NATIVE_EE_JNI, false, m_useIv2);
+                BackendTarget.NATIVE_EE_JNI, false, true);
         cluster.overrideAnyRequestForValgrind();
         cluster.setMaxHeap(256);
         boolean success = cluster.compile(builder);
@@ -778,8 +759,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         Thread.sleep(1000);
 
         VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
-        config.m_enableIV2 = m_useIv2;
-        config.m_startAction = START_ACTION.REJOIN;
+        config.m_enableIV2 = true;
+        config.m_startAction = StartAction.REJOIN;
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         config.m_leader = ":" + cluster.internalPort(1);

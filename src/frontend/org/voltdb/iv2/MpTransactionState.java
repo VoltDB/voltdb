@@ -45,6 +45,7 @@ import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.utils.VoltTableUtil;
 
 public class MpTransactionState extends TransactionState
 {
@@ -54,13 +55,11 @@ public class MpTransactionState extends TransactionState
      *  goes wrong mid-fragment, and execution needs to back all the way
      *  out to the stored procedure call.
      */
-    // IZZY Consolidate me with MultiPartitionParticipantTransactionState
-    // and perhaps make me more descriptive
     public static class FragmentFailureException extends RuntimeException {
         private static final long serialVersionUID = 1L;
     }
 
-    final Iv2InitiateTaskMessage m_task;
+    final Iv2InitiateTaskMessage m_initiationMsg;
 
     LinkedBlockingDeque<FragmentResponseMessage> m_newDeps =
         new LinkedBlockingDeque<FragmentResponseMessage>();
@@ -79,7 +78,7 @@ public class MpTransactionState extends TransactionState
                        List<Long> useHSIds, long buddyHSId, boolean isRestart)
     {
         super(mailbox, notice);
-        m_task = (Iv2InitiateTaskMessage)notice;
+        m_initiationMsg = (Iv2InitiateTaskMessage)notice;
         m_useHSIds.addAll(useHSIds);
         m_buddyHSId = buddyHSId;
         m_isRestart = isRestart;
@@ -111,39 +110,9 @@ public class MpTransactionState extends TransactionState
     }
 
     @Override
-    public boolean isCoordinator()
-    {
-        return true;
-    }
-
-    @Override
-    public boolean isBlocked()
-    {
-        // Not clear this method is useful in the new world?
-        return false;
-    }
-
-    @Override
-    public boolean hasTransactionalWork()
-    {
-        return false;
-    }
-
-    @Override
-    public boolean doWork(boolean recovering)
-    {
-        return false;
-    }
-
-    @Override
     public StoredProcedureInvocation getInvocation()
     {
-        return m_task.getStoredProcedureInvocation();
-    }
-
-    @Override
-    public void handleSiteFaults(HashSet<Long> failedSites)
-    {
+        return m_initiationMsg.getStoredProcedureInvocation();
     }
 
     // Overrides needed by MpProcedureRunner
@@ -168,7 +137,7 @@ public class MpTransactionState extends TransactionState
     public void createLocalFragmentWork(FragmentTaskMessage task, boolean nonTransactional)
     {
         m_localWork = task;
-        m_localWork.setTruncationHandle(m_task.getTruncationHandle());
+        m_localWork.setTruncationHandle(m_initiationMsg.getTruncationHandle());
     }
 
     @Override
@@ -186,12 +155,12 @@ public class MpTransactionState extends TransactionState
                 task.setInitiateTask((Iv2InitiateTaskMessage)getNotice());
             }
 
-            if (m_task.getStoredProcedureInvocation().getType() == ProcedureInvocationType.REPLICATED) {
-                task.setOriginalTxnId(m_task.getStoredProcedureInvocation().getOriginalTxnId());
+            if (m_initiationMsg.getStoredProcedureInvocation().getType() == ProcedureInvocationType.REPLICATED) {
+                task.setOriginalTxnId(m_initiationMsg.getStoredProcedureInvocation().getOriginalTxnId());
             }
 
             m_remoteWork = task;
-            m_remoteWork.setTruncationHandle(m_task.getTruncationHandle());
+            m_remoteWork.setTruncationHandle(m_initiationMsg.getTruncationHandle());
             // Distribute fragments to remote destinations.
             long[] non_local_hsids = new long[m_useHSIds.size()];
             for (int i = 0; i < m_useHSIds.size(); i++) {
@@ -313,7 +282,7 @@ public class MpTransactionState extends TransactionState
             while (msg == null) {
                 msg = m_newDeps.poll(60L * 5, TimeUnit.SECONDS);
                 if (msg == null) {
-                    tmLog.warn("Possible multipartition transaction deadlock detected for: " + m_task);
+                    tmLog.warn("Possible multipartition transaction deadlock detected for: " + m_initiationMsg);
                     if (m_remoteWork == null) {
                         tmLog.warn("Waiting on local BorrowTask response from site: " +
                                 CoreUtils.hsIdToString(m_buddyHSId));
@@ -364,7 +333,10 @@ public class MpTransactionState extends TransactionState
                 tables = new ArrayList<VoltTable>();
                 m_remoteDepTables.put(depId, tables);
             }
-            tables.add(table);
+            // null dependency table is from a joining node, has no content, drop it
+            if (table.getStatusCode() != VoltTableUtil.NULL_DEPENDENCY_STATUS) {
+                tables.add(table);
+            }
         }
         else {
             System.out.println("No remote dep for local site: " + hsid);

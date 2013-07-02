@@ -82,7 +82,8 @@ public:
         const std::vector<std::string> &columnNames,
         int partitionColumn = -1, // defaults provided for ease of testing.
         bool exportEnabled = false,
-        bool exportOnly = false);
+        bool exportOnly = false,
+        int tableAllocationTargetSize = 0);
 
     /**
     * Creates an empty temp table with given name and columns.

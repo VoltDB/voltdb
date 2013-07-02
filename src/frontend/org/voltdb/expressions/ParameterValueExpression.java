@@ -48,7 +48,7 @@ public class ParameterValueExpression extends AbstractValueExpression {
     }
 
     @Override
-    public Object clone() throws CloneNotSupportedException {
+    public Object clone() {
         ParameterValueExpression clone = (ParameterValueExpression)super.clone();
         clone.m_paramIndex = m_paramIndex;
         clone.m_originalValue = m_originalValue;
@@ -159,6 +159,11 @@ public class ParameterValueExpression extends AbstractValueExpression {
         List<AbstractExpression> result = new ArrayList<AbstractExpression>();
         result.add(this);
         return result;
+    }
+
+    @Override
+    public String explain(String unused) {
+        return "?" + m_paramIndex;
     }
 
 }

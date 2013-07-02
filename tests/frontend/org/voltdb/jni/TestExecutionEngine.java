@@ -23,8 +23,11 @@
 
 package org.voltdb.jni;
 
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import junit.framework.TestCase;
@@ -37,10 +40,11 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.LegacyHashinator;
+import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
 import org.voltdb.RecoverySiteProcessorDestination;
 import org.voltdb.RecoverySiteProcessorSource;
-import org.voltdb.SysProcSelector;
+import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB;
@@ -49,6 +53,7 @@ import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 
 /**
  * Tests native execution engine JNI interface.
@@ -100,7 +105,13 @@ public class TestExecutionEngine extends TestCase {
         }
 
         System.out.println(warehousedata.toString());
-        engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0);
+        engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, false);
+
+        //Check that we can detect and handle the dups when loading the data twice
+        byte results[] = engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, true);
+        System.out.println("Printing dups");
+        System.out.println(PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(results), true));
+
 
         VoltTable stockdata = new VoltTable(
                 new VoltTable.ColumnInfo("S_I_ID", VoltType.INTEGER),
@@ -126,7 +137,7 @@ public class TestExecutionEngine extends TestCase {
                              "sdist4", "sdist5", "sdist6", "sdist7", "sdist8",
                              "sdist9", "sdist10", 0, 0, 0, "sdata");
         }
-        engine.loadTable(STOCK_TABLEID, stockdata, 0, 0);
+        engine.loadTable(STOCK_TABLEID, stockdata, 0, 0, false);
     }
 
     public void testLoadTable() throws Exception {
@@ -159,7 +170,8 @@ public class TestExecutionEngine extends TestCase {
                                 "",
                                 100,
                                 HashinatorType.LEGACY,
-                                configBytes));
+                                configBytes,
+                                null));
             }
         };
         destEEThread.start();
@@ -172,8 +184,8 @@ public class TestExecutionEngine extends TestCase {
 
         loadTestTables( sourceEngine, m_catalog);
 
-        sourceEngine.activateTableStream( WAREHOUSE_TABLEID, TableStreamType.RECOVERY );
-        sourceEngine.activateTableStream( STOCK_TABLEID, TableStreamType.RECOVERY );
+        sourceEngine.activateTableStream( WAREHOUSE_TABLEID, TableStreamType.RECOVERY, new SnapshotPredicates());
+        sourceEngine.activateTableStream( STOCK_TABLEID, TableStreamType.RECOVERY, new SnapshotPredicates());
 
         BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
         try {
@@ -185,26 +197,36 @@ public class TestExecutionEngine extends TestCase {
                 public void discard() {
                 }};
 
-            int serialized = sourceEngine.tableStreamSerializeMore( container, WAREHOUSE_TABLEID, TableStreamType.RECOVERY);
+            List<BBContainer> output = new ArrayList<BBContainer>();
+            output.add(container);
+            int serialized = sourceEngine.tableStreamSerializeMore(WAREHOUSE_TABLEID,
+                                                                   TableStreamType.RECOVERY,
+                                                                   output)[0];
             assertTrue(serialized > 0);
             container.b.limit(serialized);
             destinationEngine.get().processRecoveryMessage( container.b, container.address);
 
 
-            serialized = sourceEngine.tableStreamSerializeMore( container, WAREHOUSE_TABLEID, TableStreamType.RECOVERY);
+            serialized = sourceEngine.tableStreamSerializeMore(WAREHOUSE_TABLEID,
+                                                               TableStreamType.RECOVERY,
+                                                               output)[0];
             assertEquals( 5, serialized);
             assertEquals( RecoveryMessageType.Complete.ordinal(), container.b.get());
 
             assertEquals( sourceEngine.tableHashCode(WAREHOUSE_TABLEID), destinationEngine.get().tableHashCode(WAREHOUSE_TABLEID));
 
             container.b.clear();
-            serialized = sourceEngine.tableStreamSerializeMore( container, STOCK_TABLEID, TableStreamType.RECOVERY);
+            serialized = sourceEngine.tableStreamSerializeMore(STOCK_TABLEID,
+                                                               TableStreamType.RECOVERY,
+                                                               output)[0];
             assertTrue(serialized > 0);
             container.b.limit(serialized);
             destinationEngine.get().processRecoveryMessage( container.b, container.address);
 
 
-            serialized = sourceEngine.tableStreamSerializeMore( container, STOCK_TABLEID, TableStreamType.RECOVERY);
+            serialized = sourceEngine.tableStreamSerializeMore(STOCK_TABLEID,
+                                                               TableStreamType.RECOVERY,
+                                                               output)[0];
             assertEquals( 5, serialized);
             assertEquals( RecoveryMessageType.Complete.ordinal(), container.b.get());
             assertEquals( STOCK_TABLEID, container.b.getInt());
@@ -291,7 +313,8 @@ public class TestExecutionEngine extends TestCase {
                             "",
                             100,
                             HashinatorType.LEGACY,
-                            configBytes);
+                            configBytes,
+                            null);
                 destinationReference.set(destinationEngine);
                 destinationEngine.loadCatalog( 0, serializedCatalog);
                 RecoverySiteProcessorDestination destinationProcess =
@@ -331,7 +354,8 @@ public class TestExecutionEngine extends TestCase {
                                 "",
                                 100,
                                 HashinatorType.LEGACY,
-                                configBytes);
+                                configBytes,
+                                null);
                 sourceReference.set(sourceEngine);
                 sourceEngine.loadCatalog( 0, serializedCatalog);
 
@@ -390,7 +414,7 @@ public class TestExecutionEngine extends TestCase {
         final int WAREHOUSE_TABLEID = m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("WAREHOUSE").getRelativeIndex();
         final int STOCK_TABLEID = m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().get("STOCK").getRelativeIndex();
         final int locators[] = new int[] { WAREHOUSE_TABLEID, STOCK_TABLEID };
-        final VoltTable results[] = sourceEngine.getStats(SysProcSelector.TABLE, locators, false, 0L);
+        final VoltTable results[] = sourceEngine.getStats(StatsSelector.TABLE, locators, false, 0L);
         assertNotNull(results);
         assertEquals(1, results.length);
         assertNotNull(results[0]);
@@ -422,7 +446,8 @@ public class TestExecutionEngine extends TestCase {
                         "",
                         100,
                         HashinatorType.LEGACY,
-                        LegacyHashinator.getConfigureBytes(1));
+                        LegacyHashinator.getConfigureBytes(1),
+                        null);
         m_project = new TPCCProjectBuilder();
         m_catalog = m_project.createTPCCSchemaCatalog();
     }

@@ -22,15 +22,17 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import sys
+import filecmp
+import fnmatch
+import getpass
 import os.path
 import shutil
-import fnmatch
-import subprocess
-import time
-import filecmp
 import socket
-import getpass
+import subprocess
+import sys
+import time
+import urllib
+
 from collections import defaultdict
 from optparse import OptionParser
 from subprocess import call # invoke unix/linux cmds
@@ -49,14 +51,10 @@ from XMLUtils import prettify # To create a human readable xml file
 
 hostname = socket.gethostname()
 pkgName = {'comm': 'LINUX-voltdb',
-           'voltkv': 'LINUX-voltdb-voltkv',
-           'voltcache': 'LINUX-voltdb-voltcache',
            'pro': 'LINUX-voltdb-ent'}
 pkgDict = {'comm': 'Community',
            'pro': 'Enterprise',
-           'voltkv': 'Voltkv',
-           'voltcache': 'Voltcache',
-           'all': "Community, Pro, Voltkv, Voltcache"}
+           'all': "Community, Pro"}
 suiteDict = {'helloworld': 'HelloWorld',
              'voltcache': 'Voltcache',
              'voltkv': 'Voltkv',
@@ -67,8 +65,7 @@ tail = "tar.gz"
 # http://volt0/kits/candidate/LINUX-voltdb-ent-2.8.1.tar.gz
 root = "http://volt0/kits/branch/"
 testname = os.path.basename(os.path.abspath(__file__)).replace(".py", "")
-destDir = "/tmp/"
-logDir = destDir + getpass.getuser() + "_" + testname + "_log/"
+#logDir = destDir + getpass.getuser() + "_" + testname + "_log/"
 elem2Test = {'helloworld':'./run.sh', 'voltcache':'./run.sh', 'voltkv':'./run.sh', 'voter':'./run.sh'}
 defaultHost = "localhost"
 defaultPort = 21212
@@ -147,10 +144,11 @@ def installVoltDB(pkg, release):
     info["ok"] = False
     thispkg = pkgName[pkg] + '-' + release + "." + tail
     srce = root + thispkg
-    dest = logDir + thispkg
+    dest = os.path.join('/tmp', thispkg)
     cmd = "wget " + srce + " -O " + dest + " 2>/dev/null"
     print sectionBreak
     print "Getting " + srce
+    print "to " +dest
 
     ret = call(cmd, shell=True)
     if ret != 0 or not os.path.exists(dest):
@@ -166,7 +164,6 @@ def installVoltDB(pkg, release):
     if ret != 0:
         info["err"] = "Cannot create the working directory: '%s'" % workDir
         return info
-
     cmd = "tar zxf " + dest + " -C " + workDir + " 2>/dev/null"
     ret = call(cmd, shell=True)
     if ret == 0:
@@ -178,8 +175,22 @@ def installVoltDB(pkg, release):
     else:
         info["err"] = "VoltDB pkg '%s' installation FAILED at location '%s'" \
             % (dest, workDir)
+
+    if "ent" in thispkg:
+        info["license"] = getEnterpriseLicense(workDir, release)
     return info
 # end of installVoltDB(pkg, release):
+
+
+def getEnterpriseLicense(workDir, release):
+    print workDir
+    print release
+    url = root + "license.xml"
+    filename = os.path.join(workDir, "voltdb-ent-" + release, "voltdb","license.xml")
+    urllib.urlretrieve(url,filename)
+    print "Retrieved to " + filename
+    return True
+
 
 # Sample key/val pairs for testSuiteList are:
 # key: voltcache,   val: /tmp/<user_name>_exp_test/voltdb-2.8.1/examples/voltcache
@@ -279,7 +290,6 @@ def assertVoltkv_Voltcache(mod, logC):
 "Starting Benchmark":1,
 "KV Store Results":1,
 "Client Workload Statistics":1,
-"System Server Statistics":1,
     }
 
     dynamicKeyStr = {}
@@ -382,8 +392,8 @@ def startTest(testSuiteList):
             currDir = os.getcwd()
             service = elem2Test[suiteName]
             print ">>> Test: %s\n   Current Directory: '%s'" % (suiteName, currDir)
-            logFileS = logDir + suiteName + "_server"
-            logFileC = logDir + suiteName + "_client"
+            logFileS = os.path.join(logDir, suiteName + "_server")
+            logFileC = os.path.join(logDir,suiteName + "_client")
             print "   Log File for VoltDB Server: '%s'" % logFileS
             print "   Log File for VoltDB Client: '%s'" % logFileC
             execThisService(service, logFileS, logFileC)
@@ -482,11 +492,18 @@ if __name__ == "__main__":
                       help="Report file location")
     parser.add_option("-b","--branch", dest="branch", default="master",
                       help="Branch name to test")
+    parser.add_option("-o","--output", dest="destDir", default=os.getcwd(),
+                      help="Output Directory")
+
+
 
     parser.set_defaults(pkg="all")
     parser.set_defaults(suite="all")
     (options, args) = parser.parse_args()
-    workDir = destDir + getpass.getuser() + "_" + testname
+    destDir = options.destDir
+    logDir = os.path.join(destDir,getpass.getuser() + "_" + testname + '_log')
+
+    workDir = os.path.join(destDir,getpass.getuser() + "_" + testname)
 
     if not os.path.exists(logDir):
         os.makedirs(logDir)
@@ -527,6 +544,7 @@ if __name__ == "__main__":
             print "%s - %s" % (pkgDict[options.pkg], pkgFullName)
     else:
         print "Unknown package name passed in from cmdline: %s" % options.pkg
+        print "Select from: " + ', '.join((pkgDict.keys()))
         exit(1)
 
     tf = msg = keys = None

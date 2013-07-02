@@ -32,9 +32,9 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.PortGenerator;
 import org.voltdb.BackendTarget;
 import org.voltdb.ReplicationRole;
+import org.voltdb.StartAction;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CommandLine;
 import org.voltdb.utils.VoltFile;
@@ -77,7 +77,7 @@ public class LocalCluster implements VoltServerConfig {
     int m_hostCount;
     int m_kfactor = 0;
     boolean m_enableIv2 = false;
-    protected final BackendTarget m_target;
+    protected BackendTarget m_target;
     protected String m_jarFileName;
     boolean m_running = false;
     private final boolean m_debug;
@@ -111,7 +111,7 @@ public class LocalCluster implements VoltServerConfig {
     // Each local cluster process has a CommandLine instance configured
     // with the port numbers and command line parameter value specific to that
     // instance.
-    private final CommandLine templateCmdLine = new CommandLine(START_ACTION.CREATE);
+    private final CommandLine templateCmdLine = new CommandLine(StartAction.CREATE);
 
     public LocalCluster(String jarFileName, int siteCount,
             int hostCount, int kfactor, BackendTarget target) {
@@ -228,8 +228,7 @@ public class LocalCluster implements VoltServerConfig {
             javaLibraryPath(java_library_path).
             classPath(classPath).
             pathToLicense(ServerThread.getTestLicensePath()).
-            log4j(log4j).
-            enableIV2(m_enableIv2);
+            log4j(log4j);
         this.templateCmdLine.m_noLoadLibVOLTDB = m_target == BackendTarget.HSQLDB_BACKEND;
         // "tag" this command line so it's clear which test started it
         this.templateCmdLine.m_tag = m_callingClassName + ":" + m_callingMethodName;
@@ -241,6 +240,7 @@ public class LocalCluster implements VoltServerConfig {
      */
     public void overrideAnyRequestForValgrind() {
         if (templateCmdLine.m_backend == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
+            m_target = BackendTarget.NATIVE_EE_JNI;
             templateCmdLine.m_backend = BackendTarget.NATIVE_EE_JNI;
         }
     }
@@ -452,7 +452,7 @@ public class LocalCluster implements VoltServerConfig {
 
         // create all the out-of-process servers
         for (int i = oopStartIndex; i < m_hostCount; i++) {
-            startOne(i, clearLocalDataDirectories, role, START_ACTION.CREATE);
+            startOne(i, clearLocalDataDirectories, role, StartAction.CREATE);
         }
 
         printTiming(logtime, "Pre-witness: " + (System.currentTimeMillis() - startTime) + "ms");
@@ -535,7 +535,7 @@ public class LocalCluster implements VoltServerConfig {
         }
     }
 
-    private void startOne(int hostId, boolean clearLocalDataDirectories, ReplicationRole replicaMode, START_ACTION startAction)
+    private void startOne(int hostId, boolean clearLocalDataDirectories, ReplicationRole replicaMode, StartAction startAction)
     {
         PipeToFile ptf = null;
         CommandLine cmdln = (templateCmdLine.makeCopy());
@@ -571,8 +571,8 @@ public class LocalCluster implements VoltServerConfig {
 
             cmdln.zkport(portGenerator.next());
 
-            if (startAction == START_ACTION.JOIN) {
-                cmdln.startCommand(startAction.name());
+            if (startAction == StartAction.JOIN) {
+                cmdln.startCommand(startAction);
                 int portNoToRejoin = m_cmdLines.get(0).internalPort();
                 cmdln.leader(":" + portNoToRejoin);
             }
@@ -636,7 +636,7 @@ public class LocalCluster implements VoltServerConfig {
                     "idx" + String.valueOf(perLocalClusterExtProcessIndex++) +
                     ".txt",
                     proc.getInputStream(),
-                    startAction == START_ACTION.JOIN ? PipeToFile.m_rejoinToken : PipeToFile.m_initToken,
+                    startAction == StartAction.JOIN ? PipeToFile.m_rejoinToken : PipeToFile.m_initToken,
                     false,
                     proc);
             m_pipes.add(ptf);
@@ -648,7 +648,7 @@ public class LocalCluster implements VoltServerConfig {
             assert (false);
         }
 
-        if (startAction == START_ACTION.JOIN) {
+        if (startAction == StartAction.JOIN) {
             waitOnPTFReady(ptf, true, System.currentTimeMillis(), System.currentTimeMillis(), hostId);
         }
 
@@ -678,25 +678,25 @@ public class LocalCluster implements VoltServerConfig {
                 hostId,
                 portOffset,
                 rejoinHost,
-                liveRejoin ? START_ACTION.LIVE_REJOIN : START_ACTION.REJOIN);
+                liveRejoin ? StartAction.LIVE_REJOIN : StartAction.REJOIN);
     }
 
     public void joinOne(int hostId) {
-        startOne(hostId, true, ReplicationRole.NONE, START_ACTION.JOIN);
+        startOne(hostId, true, ReplicationRole.NONE, StartAction.JOIN);
     }
 
     public boolean recoverOne(int hostId, Integer portOffset, String rejoinHost) {
-        return recoverOne(false, 0, hostId, portOffset, rejoinHost, START_ACTION.REJOIN);
+        return recoverOne(false, 0, hostId, portOffset, rejoinHost, StartAction.REJOIN);
     }
 
     private boolean recoverOne(boolean logtime, long startTime, int hostId) {
-        return recoverOne( logtime, startTime, hostId, null, "", START_ACTION.REJOIN);
+        return recoverOne( logtime, startTime, hostId, null, "", StartAction.REJOIN);
     }
 
     // Re-start a (dead) process. HostId is the enumberation of the host
     // in the cluster (0, 1, ... hostCount-1) -- not an hsid, for example.
     private boolean recoverOne(boolean logtime, long startTime, int hostId, Integer rejoinHostId,
-                               String rejoinHost, START_ACTION startAction) {
+                               String rejoinHost, StartAction startAction) {
 
         // Lookup the client interface port of the rejoin host
         // I have no idea why this code ignores the user's input
@@ -728,7 +728,7 @@ public class LocalCluster implements VoltServerConfig {
             CommandLine rejoinCmdLn = m_cmdLines.get(hostId);
             // some tests need this
             rejoinCmdLn.javaProperties = templateCmdLine.javaProperties;
-            rejoinCmdLn.startCommand(startAction.name());
+            rejoinCmdLn.startCommand(startAction);
 
             // This shouldn't collide but apparently it sucks.
             // Bump it to avoid collisions on rejoin.

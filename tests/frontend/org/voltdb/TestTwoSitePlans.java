@@ -43,9 +43,10 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.Encoder;
 import org.voltdb_testprocs.regressionsuites.multipartitionprocs.MultiSiteSelect;
 
-public class TestTwoSitePlans extends TestCase {
+public class TestTwoSitePlans extends TestCase implements FragmentPlanSource {
 
     static final String JAR = "distplanningregression.jar";
 
@@ -60,6 +61,7 @@ public class TestTwoSitePlans extends TestCase {
     Statement selectStmt = null;
     PlanFragment selectTopFrag = null;
     PlanFragment selectBottomFrag = null;
+    PlanFragment insertFrag = null;
 
     @Override
     public void setUp() throws IOException, InterruptedException {
@@ -75,7 +77,6 @@ public class TestTwoSitePlans extends TestCase {
         pb.addProcedures(MultiSiteSelect.class, InsertNewOrder.class);
 
         pb.compile(catalogJar, 2, 0);
-
 
         // load a catalog
         byte[] bytes = CatalogUtil.toBytes(new File(catalogJar));
@@ -111,7 +112,8 @@ public class TestTwoSitePlans extends TestCase {
                                 "",
                                 100,
                                 HashinatorType.LEGACY,
-                                configBytes));
+                                configBytes,
+                                TestTwoSitePlans.this));
             }
         };
         site1Thread.start();
@@ -130,7 +132,8 @@ public class TestTwoSitePlans extends TestCase {
                                 "",
                                 100,
                                 HashinatorType.LEGACY,
-                                configBytes));
+                                configBytes,
+                                TestTwoSitePlans.this));
             }
         };
         site2Thread.start();
@@ -167,11 +170,9 @@ public class TestTwoSitePlans extends TestCase {
         Statement insertStmt = insertProc.getStatements().get("insert");
         assert(insertStmt != null);
 
-        PlanFragment insertFrag = null;
         for (PlanFragment f : insertStmt.getFragments())
             insertFrag = f;
-        ParameterSet params = new ParameterSet();
-        params.setParameters(1L, 1L, 1L);
+        ParameterSet params = ParameterSet.fromArrayNoCopy(1L, 1L, 1L);
 
         VoltTable[] results = ee2.executePlanFragments(
                 1,
@@ -185,8 +186,7 @@ public class TestTwoSitePlans extends TestCase {
         assert(results.length == 1);
         assert(results[0].asScalarLong() == 1L);
 
-        params = new ParameterSet();
-        params.setParameters(2L, 2L, 2L);
+        params = ParameterSet.fromArrayNoCopy(2L, 2L, 2L);
 
         results = ee1.executePlanFragments(
                 1,
@@ -202,8 +202,7 @@ public class TestTwoSitePlans extends TestCase {
     }
 
     public void testMultiSiteSelectAll() {
-        ParameterSet params = new ParameterSet();
-        params.setParameters();
+        ParameterSet params = ParameterSet.emptyParameterSet();
 
         int outDepId = 1 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
         VoltTable dependency1 = ee1.executePlanFragments(
@@ -249,6 +248,24 @@ public class TestTwoSitePlans extends TestCase {
         } catch (Exception e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
+        }
+    }
+
+    @Override
+    public byte[] planForFragmentId(long fragmentId) {
+        if (fragmentId == CatalogUtil.getUniqueIdForFragment(selectBottomFrag)) {
+            return Encoder.base64Decode(selectBottomFrag.getPlannodetree());
+        }
+        else if (fragmentId == CatalogUtil.getUniqueIdForFragment(selectTopFrag)) {
+            return Encoder.base64Decode(selectTopFrag.getPlannodetree());
+        }
+        else if (fragmentId == CatalogUtil.getUniqueIdForFragment(insertFrag)) {
+            return Encoder.base64Decode(insertFrag.getPlannodetree());
+        }
+        else {
+            fail();
+            assert(false);
+            return null;
         }
     }
 

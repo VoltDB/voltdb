@@ -35,16 +35,19 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 
 import junit.framework.TestCase;
 
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.ParameterSet;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
@@ -53,6 +56,7 @@ import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.utils.VoltTableUtil;
 
 public class Iv2TestMpTransactionState extends TestCase
 {
@@ -67,10 +71,9 @@ public class Iv2TestMpTransactionState extends TestCase
 
     ByteBuffer createDummyParameterSet() throws IOException
     {
-        ParameterSet blah = new ParameterSet();
-        blah.setParameters(new Long(4321), new Long(5678));
+        ParameterSet blah = ParameterSet.fromArrayNoCopy(new Long(4321), new Long(5678));
         FastSerializer fs = new FastSerializer();
-        fs.writeObject(blah);
+        blah.writeExternal(fs);
         ByteBuffer params = fs.getBuffer();
         return params;
     }
@@ -117,7 +120,7 @@ public class Iv2TestMpTransactionState extends TestCase
                                                   false, false);  // IV2 doesn't use final task (yet)
 
         for (int i = 0; i < distributedOutputDepIds.size(); i++) {
-            plan.remoteWork.addFragment(Long.MIN_VALUE,
+            plan.remoteWork.addFragment(VoltSystemProcedure.fragIdToHash(Long.MIN_VALUE),
                     distributedOutputDepIds.get(i), createDummyParameterSet());
         }
         System.out.println("REMOTE TASK: " + plan.remoteWork.toString());
@@ -154,7 +157,8 @@ public class Iv2TestMpTransactionState extends TestCase
                 false);
 
         for (int i = 0; i < batchSize; i++) {
-            plan.localWork.addFragment(0L, depsToResumeList.get(i), createDummyParameterSet());
+            plan.localWork.addFragment(VoltSystemProcedure.fragIdToHash(0L),
+                    depsToResumeList.get(i), createDummyParameterSet());
         }
 
        for (int i = 0; i < depsForLocalTask.size(); i++) {
@@ -518,4 +522,79 @@ public class Iv2TestMpTransactionState extends TestCase
         verify(dut.m_remoteWork).setTruncationHandle(truncPt);
     }
 
+    @Test
+    public void testMPReadWithDummyResponse() throws IOException
+    {
+        long txnId = 1234l;
+        int batch_size = 3;
+        Iv2InitiateTaskMessage taskmsg =
+                new Iv2InitiateTaskMessage(
+                        0,
+                        -1,
+                        (txnId -1),
+                        txnId,
+                        System.currentTimeMillis(),
+                        true,
+                        false,
+                        new StoredProcedureInvocation(),
+                        0,
+                        0,
+                        false);
+        int hsids = 6;
+        buddyHSId = 0;
+        long[] non_local = configureHSIds(hsids);
+
+        MpTestPlan plan = createTestPlan(batch_size, true, false, false, non_local);
+
+        // replace the last remote fragment response with a dummy
+        for (FragmentResponseMessage dummy : plan.generatedResponses) {
+            if (dummy.getExecutorSiteId() == non_local[non_local.length - 1]) {
+                dummy.setRecovering(true);
+                for (int i = 0; i < dummy.getTableCount(); i++) {
+                    VoltTable depTable = dummy.getTableAtIndex(i);
+                    depTable.setStatusCode(VoltTableUtil.NULL_DEPENDENCY_STATUS);
+                    depTable.clearRowData();
+                }
+            }
+        }
+
+        Mailbox mailbox = mock(Mailbox.class);
+        SiteProcedureConnection siteConnection = mock(SiteProcedureConnection.class);
+
+        MpTransactionState dut =
+                new MpTransactionState(mailbox, taskmsg, allHsids, buddyHSId, false);
+
+        // emulate ProcedureRunner's use for a single local fragment
+        dut.setupProcedureResume(true, plan.depsToResume);
+        dut.createLocalFragmentWork(plan.localWork, false);
+
+        // This will be passed a FragmentTaskMessage with no deps
+        dut.createAllParticipatingFragmentWork(plan.remoteWork);
+        // we should send 6 messages
+        verify(mailbox).send(eq(non_local), (VoltMessage)any());
+
+        // to simplify, offer messages first
+        // offer all the necessary fragment responses to satisfy deps
+        for (FragmentResponseMessage msg : plan.generatedResponses) {
+            dut.offerReceivedFragmentResponse(msg);
+        }
+
+        // if we've satisfied everything, this should run to completion
+        Map<Integer, List<VoltTable>> results = dut.recursableRun(siteConnection);
+        ArgumentCaptor<BorrowTaskMessage> borrowCaptor = ArgumentCaptor.forClass
+                (BorrowTaskMessage.class);
+        verify(mailbox).send(eq(buddyHSId), borrowCaptor.capture());
+        // make sure that the borrow task message doesn't have any dummy dependency tables as input
+        BorrowTaskMessage borrowMsg = borrowCaptor.getValue();
+        Map<Integer, List<VoltTable>> inputDepMap = borrowMsg.getInputDepMap();
+        for (List<VoltTable> tables : inputDepMap.values()) {
+            for (VoltTable table : tables) {
+                assertNotSame(VoltTableUtil.NULL_DEPENDENCY_STATUS, table.getStatusCode());
+            }
+        }
+
+        // verify returned deps/tables
+        assertEquals(batch_size, results.size());
+        System.out.println(results);
+    }
 }

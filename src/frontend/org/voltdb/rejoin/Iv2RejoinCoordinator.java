@@ -17,8 +17,9 @@
 
 package org.voltdb.rejoin;
 
-import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -27,11 +28,14 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 
+import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.catalog.Database;
 
 import org.voltdb.SnapshotFormat;
@@ -41,14 +45,15 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.VoltDB;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
-import org.voltdb.utils.VoltFile;
+import org.voltdb.sysprocs.saverestore.StreamSnapshotRequestConfig;
+import org.voltdb.utils.FixedDBBPool;
 
 /**
  * Thread Safety: this is a reentrant class. All mutable datastructures
  * must be thread-safe. They use m_lock to do this. DO NOT hold m_lock
  * when leaving this class.
  */
-public class Iv2RejoinCoordinator extends RejoinCoordinator {
+public class Iv2RejoinCoordinator extends JoinCoordinator {
     private static final VoltLogger REJOINLOG = new VoltLogger("REJOIN");
 
     private long m_startTime;
@@ -58,28 +63,33 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
     private final Object m_lock = new Object();
 
     // triggers specific test code for TestMidRejoinDeath
-    private static final boolean m_rejoinDeathTestMode = System.getProperties().containsKey("rejoindeathtestonrejoinside");
-    private static final boolean m_rejoinDeathTestCancel = System.getProperties().containsKey("rejoindeathtestcancel");
+    private static final boolean m_rejoinDeathTestMode   = System.getProperties()
+                                                                 .containsKey("rejoindeathtestonrejoinside");
+    private static final boolean m_rejoinDeathTestCancel = System.getProperties()
+                                                                 .containsKey("rejoindeathtestcancel");
 
     private static AtomicLong m_sitesRejoinedCount = new AtomicLong(0);
 
     // contains all sites that haven't started rejoin initialization
     private final Queue<Long> m_pendingSites;
     // contains all sites that are waiting to start a snapshot
-    private final Queue<Long> m_snapshotSites = new LinkedList<Long>();
+    private final Queue<Long>                   m_snapshotSites  = new LinkedList<Long>();
     // Mapping of source to destination HSIds for the current snapshot
-    private final Map<Long, Long> m_destToSource = new HashMap<Long, Long>();
+    private final ArrayListMultimap<Long, Long> m_srcToDest = ArrayListMultimap.create();
     // contains all sites that haven't finished replaying transactions
-    private final Queue<Long> m_rejoiningSites = new LinkedList<Long>();
+    private final Queue<Long>                   m_rejoiningSites = new LinkedList<Long>();
     // true if performing live rejoin
     private final boolean m_liveRejoin;
     // Need to remember the nonces we're using here (for now)
     private final Map<Long, String> m_nonces = new HashMap<Long, String>();
+    // Node-wise stream snapshot receiver buffer pool
+    private final FixedDBBPool m_snapshotBufPool;
 
     public Iv2RejoinCoordinator(HostMessenger messenger,
-                                       List<Long> sites,
-                                       String voltroot,
-                                       boolean liveRejoin) {
+                                Collection<Long> sites,
+                                String voltroot,
+                                boolean liveRejoin)
+    {
         super(messenger);
         synchronized (m_lock) {
             m_liveRejoin = liveRejoin;
@@ -89,14 +99,17 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
             }
 
             // clear overflow dir in case there are files left from previous runs
-            try {
-                File overflowDir = new File(voltroot, "rejoin_overflow");
-                if (overflowDir.exists()) {
-                    VoltFile.recursivelyDelete(overflowDir);
-                }
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Fail to clear rejoin overflow directory", false, e);
-            }
+            clearOverflowDir(voltroot);
+
+            // The buffer pool capacity is min(numOfSites to rejoin times 3, 16)
+            // or any user specified value.
+            Integer userPoolSize = Integer.getInteger("REJOIN_RECEIVE_BUFFER_POOL_SIZE");
+            int poolSize = userPoolSize != null ? userPoolSize : Math.min(sites.size() * 3, 16);
+            m_snapshotBufPool = new FixedDBBPool();
+            // Create a buffer pool for uncompressed stream snapshot data
+            m_snapshotBufPool.allocate(SnapshotSiteProcessor.m_snapshotBufferLength, poolSize);
+            // Create a buffer pool for compressed stream snapshot data
+            m_snapshotBufPool.allocate(SnapshotSiteProcessor.m_snapshotBufferCompressedLen, poolSize);
         }
     }
 
@@ -104,27 +117,30 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
      * Send rejoin initiation message to the local site
      * @param HSId
      */
-    private void initiateRejoinOnSites(long HSId) {
+    private void initiateRejoinOnSites(long HSId)
+    {
         List<Long> HSIds = new ArrayList<Long>();
         HSIds.add(HSId);
         initiateRejoinOnSites(HSIds);
     }
 
-    private void initiateRejoinOnSites(List<Long> HSIds) {
+    private void initiateRejoinOnSites(List<Long> HSIds)
+    {
         // We're going to share this snapshot across the provided HSIDs.
         // Steal just the first one to disabiguate it.
         String nonce = makeSnapshotNonce("Rejoin", HSIds.get(0));
         // Must not hold m_lock across the send() call to manage lock
         // acquisition ordering with other in-process mailboxes.
-        synchronized(m_lock) {
+        synchronized (m_lock) {
             for (long HSId : HSIds) {
                 m_nonces.put(HSId, nonce);
             }
         }
         RejoinMessage msg = new RejoinMessage(getHSId(),
-                m_liveRejoin ? RejoinMessage.Type.INITIATION :
-                               RejoinMessage.Type.INITIATION_COMMUNITY,
-                               nonce);
+                                              m_liveRejoin ? RejoinMessage.Type.INITIATION :
+                                              RejoinMessage.Type.INITIATION_COMMUNITY,
+                                              nonce,
+                                              m_snapshotBufPool);
         send(com.google.common.primitives.Longs.toArray(HSIds), msg);
 
         // For testing, exit if only one property is set...
@@ -134,13 +150,17 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
         }
     }
 
-    private String makeSnapshotRequest(Map<Long, Long> sourceToDests)
+    private String makeSnapshotRequest(Multimap<Long, Long> sourceToDests)
     {
-        return makeSnapshotRequest(sourceToDests, null);
+        StreamSnapshotRequestConfig.Stream stream =
+            new StreamSnapshotRequestConfig.Stream(sourceToDests, null, null);
+        StreamSnapshotRequestConfig config =
+            new StreamSnapshotRequestConfig(null, Arrays.asList(stream), false);
+        return makeSnapshotRequest(config);
     }
 
     @Override
-    public boolean startJoin(Database catalog, Cartographer cartographer) {
+    public boolean startJoin(Database catalog, Cartographer cartographer, String clSnapshotPath) {
         m_startTime = System.currentTimeMillis();
         if (m_liveRejoin) {
             long firstSite;
@@ -211,6 +231,9 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
         }
 
         if (allDone) {
+            // All sites have finished snapshot streaming, clear buffer pool
+            m_snapshotBufPool.clear();
+
             long delta = (System.currentTimeMillis() - m_startTime) / 1000;
             REJOINLOG.info("" + (m_liveRejoin ? "Live" : "Blocking") + " rejoin data transfer completed in " +
                     delta + " seconds.");
@@ -225,12 +248,12 @@ public class Iv2RejoinCoordinator extends RejoinCoordinator {
         String data = null;
         synchronized(m_lock) {
             m_snapshotSites.remove(HSId);
-            m_destToSource.put(masterHSId, dataSinkHSId);
+            m_srcToDest.put(masterHSId, dataSinkHSId);
             m_rejoiningSites.add(HSId);
             nonce = m_nonces.get(HSId);
             if (m_snapshotSites.isEmpty()) {
-                data = makeSnapshotRequest(m_destToSource);
-                m_destToSource.clear();
+                data = makeSnapshotRequest(m_srcToDest);
+                m_srcToDest.clear();
             }
         }
         if (nonce == null) {

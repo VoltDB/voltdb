@@ -47,4 +47,10 @@ public class TupleAddressExpression extends AbstractValueExpression {
     protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {
         // No attributes -- nothing to load.
     }
+
+    @Override
+    public String explain(String impliedTableName) {
+        return "tuple address";
+    }
+
 }

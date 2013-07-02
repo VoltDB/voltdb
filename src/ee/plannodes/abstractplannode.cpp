@@ -228,20 +228,85 @@ AbstractPlanNode::getOutputTable() const
 const vector<SchemaColumn*>&
 AbstractPlanNode::getOutputSchema() const
 {
-    return m_outputSchema;
+    // Test for a valid output schema defined at this plan node.
+    // 1-or-more column output schemas are always valid.
+    // 0-column output schemas are not currently supported,
+    // but SHOULD be for certain edge cases.
+    // So, leave that door open, at least here.
+    if (m_validOutputColumnCount >= 0) {
+        return m_outputSchema;
+    }
+    // If m_validOutputColumnCount indicates with its magic (negative) value
+    // that this node does not actually define its own output schema,
+    // navigate downward to its first child (normal or inline) that does.
+
+    // NOTE: we have the option of caching the result in the local m_outputSchema vector
+    // and updating m_validOutputColumnCount but that would involve deep copies or
+    // reference counts or some other memory management scheme.
+    // On the other hand, pass-through output schemas aren't accessed that often
+    // (or at least don't strictly NEED to be).
+    // Best practice is probably to access them only in the executor's init method
+    // and cache any details pertinent to execute.
+
+    const AbstractPlanNode* parent = this;
+    const AbstractPlanNode* schema_definer = NULL;
+    while (true) {
+        // An inline child projection is an excellent place to find an output schema.
+        if (parent->m_validOutputColumnCount == SCHEMA_UNDEFINED_SO_GET_FROM_INLINE_PROJECTION) {
+            schema_definer = parent->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION);
+            DEBUG_ASSERT_OR_THROW_OR_CRASH((schema_definer != NULL),
+                                           "Incorrect output schema source for plannode:\n" << debug(""));
+            DEBUG_ASSERT_OR_THROW_OR_CRASH((schema_definer->m_validOutputColumnCount >= 0),
+                                           "Missing output schema for inline projection:\n" << debug(""));
+            return schema_definer->m_outputSchema;
+        }
+
+        // A child node is another possible output schema source, but may take some digging.
+        if (parent->m_validOutputColumnCount == SCHEMA_UNDEFINED_SO_GET_FROM_CHILD) {
+            // Joins always define their own output schema,
+            // so there should only be one child to check,
+            // EXCEPT for unions, which DO follow the convention of using the first child's
+            // output schema, anyway.  So, just assert that there is at least one child node to use.
+            DEBUG_ASSERT_OR_THROW_OR_CRASH( ! parent->m_children.empty(),
+                                           "Incorrect output schema source for plannode:\n" << debug("") );
+
+            schema_definer = parent->m_children[0];
+
+            DEBUG_ASSERT_OR_THROW_OR_CRASH((schema_definer != NULL),
+                                           "Incorrect output schema source for plannode:\n" << debug(""));
+            if (schema_definer->m_validOutputColumnCount >= 0) {
+                return schema_definer->m_outputSchema;
+            }
+
+            // The child is no more an output schema definer than its parent, keep searching.
+            parent = schema_definer;
+            continue;
+        }
+
+        // All the expected cases have been eliminated -- that can't be good.
+        break;
+    }
+    throwFatalLogicErrorStreamed("No valid output schema defined for plannode:\n" << debug(""));
 }
 
 TupleSchema*
-AbstractPlanNode::generateTupleSchema(bool allowNulls)
+AbstractPlanNode::generateTupleSchema(bool allowNulls) const
 {
-    int schema_size = static_cast<int>(m_outputSchema.size());
+    // Get the effective output schema.
+    // In general, this may require a search.
+    const vector<SchemaColumn*>& outputSchema = getOutputSchema();
+    int schema_size = static_cast<int>(outputSchema.size());
     vector<voltdb::ValueType> columnTypes;
     vector<int32_t> columnSizes;
     vector<bool> columnAllowNull(schema_size, allowNulls);
 
     for (int i = 0; i < schema_size; i++)
     {
-        SchemaColumn* col = m_outputSchema[i];
+        //TODO: SchemaColumn is a sad little class that holds an expression pointer,
+        // a column name that only really comes in handy in one quirky special case,
+        // (see UpdateExecutor::p_init) and a bunch of other stuff that doesn't get used.
+        // Someone should put that class out of our misery.
+        SchemaColumn* col = outputSchema[i];
         columnTypes.push_back(col->getExpression()->getValueType());
         columnSizes.push_back(col->getExpression()->getValueSize());
     }
@@ -252,6 +317,20 @@ AbstractPlanNode::generateTupleSchema(bool allowNulls)
     return schema;
 }
 
+
+TupleSchema*
+AbstractPlanNode::generateDMLCountTupleSchema()
+{
+    // Assuming the expected output schema here saves the expense of hard-coding it into each DML plan.
+    vector<voltdb::ValueType> columnTypes(1, VALUE_TYPE_BIGINT);
+    vector<int32_t> columnSizes(1, sizeof(int64_t));
+    vector<bool> columnAllowNull(1, false);
+    TupleSchema* schema = TupleSchema::createTupleSchema(columnTypes, columnSizes, columnAllowNull, true);
+    return schema;
+}
+
+
+
 // ----------------------------------------------------
 //  Serialization Functions
 // ----------------------------------------------------
@@ -260,6 +339,13 @@ AbstractPlanNode::fromJSONObject(PlannerDomValue obj) {
 
     string typeString = obj.valueForKey("PLAN_NODE_TYPE").asStr();
 
+    //FIXME: EVEN if this leak guard is warranted --
+    // like we EXPECT to be catching plan deserialization exceptions
+    // and our biggest concern will be the memory this may leak? --
+    // we don't need to be mediating all the node
+    // pointer dereferences through the smart pointer.
+    // Why not just get() it and forget it until .release() time?
+    // As is, it just makes single-step debugging awkward.
     std::auto_ptr<AbstractPlanNode> node(
         plannodeutil::getEmptyPlanNode(stringToPlanNode(typeString)));
 
@@ -288,11 +374,30 @@ AbstractPlanNode::fromJSONObject(PlannerDomValue obj) {
         node->m_childIds.push_back(childNodeId);
     }
 
-    PlannerDomValue outputSchemaArray = obj.valueForKey("OUTPUT_SCHEMA");
-    for (int i = 0; i < outputSchemaArray.arrayLen(); i++) {
-        PlannerDomValue outputColumnValue = outputSchemaArray.valueAtIndex(i);
-        SchemaColumn* outputColumn = new SchemaColumn(outputColumnValue);
-        node->m_outputSchema.push_back(outputColumn);
+    // Output schema are optional -- when they can be determined by a child's copy.
+    if (obj.hasKey("OUTPUT_SCHEMA")) {
+        PlannerDomValue outputSchemaArray = obj.valueForKey("OUTPUT_SCHEMA");
+        for (int i = 0; i < outputSchemaArray.arrayLen(); i++) {
+            PlannerDomValue outputColumnValue = outputSchemaArray.valueAtIndex(i);
+            SchemaColumn* outputColumn = new SchemaColumn(outputColumnValue);
+            node->m_outputSchema.push_back(outputColumn);
+        }
+        node->m_validOutputColumnCount = static_cast<int>(node->m_outputSchema.size());
+    }
+
+    // Anticipate and mark the two different scenarios of missing output schema.
+    // The actual output schema can be searched for on demand once the whole plan tree is loaded.
+    // If there's an inline projection node,
+    // one of its chief purposes is defining the parent's output schema.
+    else if (node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION)) {
+        node->m_validOutputColumnCount = SCHEMA_UNDEFINED_SO_GET_FROM_INLINE_PROJECTION;
+    }
+
+    // Otherwise, the node is relying on a child's output schema, possibly several levels down,
+    // OR it is just an inline node (e.g. a LIMIT) or a DML node,
+    // whose output schema is known from its context or is otherwise not of any interest.
+    else {
+        node->m_validOutputColumnCount = SCHEMA_UNDEFINED_SO_GET_FROM_CHILD;
     }
 
     node->loadFromJSONObject(obj);
@@ -310,7 +415,7 @@ string
 AbstractPlanNode::debug() const
 {
     ostringstream buffer;
-    buffer << plannodeutil::getTypeName(this->getPlanNodeType())
+    buffer << planNodeToString(this->getPlanNodeType())
            << "[" << this->getPlanNodeId() << "]";
     return buffer.str();
 }
@@ -340,7 +445,7 @@ AbstractPlanNode::debug(const string& spacer) const
         for (it = m_inlineNodes.begin(); it != m_inlineNodes.end(); it++)
         {
             buffer << info_spacer << "Inline "
-                   << plannodeutil::getTypeName(it->second->getPlanNodeType())
+                   << planNodeToString(it->second->getPlanNodeType())
                    << ":\n";
             buffer << it->second->debugInfo(internal_spacer);
         }

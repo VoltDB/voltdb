@@ -10,7 +10,7 @@
 
     If you modify this schema, the jaxb bindings must be regenerated.
     It is normally handled by the ant build.
-    
+
     It's also easy to do manually:
 
     cd src/frontend
@@ -60,6 +60,7 @@
     <xs:attribute name="hostcount" type="xs:int" default="1"/>
     <xs:attribute name="sitesperhost" type="xs:int" default="2"/>
     <xs:attribute name="kfactor" type="xs:int" default="0"/>
+    <xs:attribute name="elastic" type="xs:string" default="disabled"/>
   </xs:complexType>
 
   <!-- <paths> -->
@@ -273,6 +274,7 @@
           <xs:attribute name="groups" type="xs:string"/>
           <xs:attribute name="roles" type="xs:string"/>
           <xs:attribute name="password" type="xs:string" use="required"/>
+          <xs:attribute name="plaintext" type="xs:boolean" default="true"/>
         </xs:complexType>
       </xs:element>
     </xs:sequence>

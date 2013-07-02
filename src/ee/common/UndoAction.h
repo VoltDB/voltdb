@@ -19,14 +19,21 @@
 #ifndef UNDOACTION_H_
 #define UNDOACTION_H_
 
+#include <cstdlib>
+
 namespace voltdb {
+class UndoQuantum;
 
 /*
- * Abstract base class for all classes generated to undo changes to the system. Can be registered with an
- * undo quantum
+ * Abstract base class for all classes generated to undo changes to the system.
+ * Always memory-managed by and registered with an undo quantum.
  */
 class UndoAction {
 public:
+    void* operator new(std::size_t sz, UndoQuantum& uq); // defined inline in UndoQuantum.h
+    void operator delete(void*, UndoQuantum&) { /* emergency deallocator does nothing */ }
+    void operator delete(void*) { /* every-day deallocator does nothing -- lets the pool cope */ }
+
     inline UndoAction() {}
     virtual ~UndoAction() {}
 

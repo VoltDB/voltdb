@@ -381,13 +381,21 @@ def runTests(CTX):
 
     return failures
 
-def getGCCVersion():
+def getCompilerVersion():
     vinfo = output = Popen(["gcc", "-v"], stderr=PIPE).communicate()[1]
-    vinfo = vinfo.strip().split("\n")
-    vinfo = vinfo[-1]
-    vinfo = vinfo.split()[2]
-    vinfo = vinfo.split(".")
-    return int(vinfo[0]), int(vinfo[1]), int(vinfo[2])
+    # Apple now uses clang and has its own versioning system.
+    # Not sure we do anything that cares which version of clang yet.
+    # This is pretty dumb code that could be improved as we support more
+    #  compilers and versions.
+    if output.find('clang') != -1:
+        return "clang", 0, 0, 0
+    else:
+        vinfo = vinfo.strip().split("\n")
+        vinfo = vinfo[-1]
+        vinfo = vinfo.split()[2]
+        vinfo = vinfo.split(".")
+        return "gcc", int(vinfo[0]), int(vinfo[1]), int(vinfo[2])
 
 # get the version of gcc and make it avaliable
-gcc_major, gcc_minor, gcc_point = getGCCVersion()
+compiler_name, compiler_major, compiler_minor, compiler_point = getCompilerVersion()
+
