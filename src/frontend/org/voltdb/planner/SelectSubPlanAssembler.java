@@ -302,15 +302,15 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             return false;
         } else if (root.m_leftNode.m_id == node.m_id) {
             root.m_leftNode  = node;
-           return true;
-       } else if (replaceChild(root.m_leftNode, node) == true) {
-           return true;
-       } else if (root.m_rightNode.m_id == node.m_id) {
+            return true;
+        } else if (root.m_rightNode.m_id == node.m_id) {
             root.m_rightNode  = node;
-           return true;
-       } else if (replaceChild(root.m_rightNode, node) == true) {
-           return true;
-       }
+            return true;
+        } else if (replaceChild(root.m_leftNode, node) == true) {
+            return true;
+        } else if (replaceChild(root.m_rightNode, node) == true) {
+            return true;
+        }
 
         return false;
     }
@@ -613,8 +613,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                     null));
         } else {
             assert (joinNode.m_leftNode != null && joinNode.m_rightNode != null);
-            generateOuterAccessPaths(joinNode, joinNode.m_leftNode);
-            generateInnerAccessPaths(joinNode, joinNode.m_rightNode);
+            generateOuterAccessPaths(joinNode);
+            generateInnerAccessPaths(joinNode);
             // An empty access path for the root
             joinNode.m_accessPaths.add(new AccessPath());
         }
@@ -628,26 +628,26 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * For inner joins outer-table-only join expressions can be pushed down as well
      *
      * @param parentNode A parent node to the node to generate paths to.
-     * @param childNode An outer node to generate paths to.
      */
-    private void generateOuterAccessPaths(JoinNode parentNode, JoinNode childNode) {
-        assert(childNode != null);
+    private void generateOuterAccessPaths(JoinNode parentNode) {
+        assert(parentNode.m_leftNode != null);
+        JoinNode outerChildNode = parentNode.m_leftNode;
         List<AbstractExpression> joinOuterList =  (parentNode.m_joinType == JoinType.INNER) ?
                 parentNode.m_joinOuterList : null;
-        if (childNode.m_table == null) {
-            assert (childNode.m_leftNode != null && childNode.m_rightNode != null);
-            generateOuterAccessPaths(childNode, childNode.m_leftNode);
-            generateInnerAccessPaths(childNode, childNode.m_rightNode);
+        if (outerChildNode.m_table == null) {
+            assert (outerChildNode.m_leftNode != null && outerChildNode.m_rightNode != null);
+            generateOuterAccessPaths(outerChildNode);
+            generateInnerAccessPaths(outerChildNode);
             // The join node can have only sequential scan access
-            childNode.m_accessPaths.add(getRelevantNaivePath(joinOuterList, parentNode.m_whereOuterList));
+            outerChildNode.m_accessPaths.add(getRelevantNaivePath(joinOuterList, parentNode.m_whereOuterList));
         } else {
-            assert (childNode.m_table != null);
-            childNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(childNode.m_table,
+            assert (outerChildNode.m_table != null);
+            outerChildNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(outerChildNode.m_table,
                     joinOuterList,
                     parentNode.m_whereOuterList,
                     null));
         }
-        assert(childNode.m_accessPaths.size() > 0);
+        assert(outerChildNode.m_accessPaths.size() > 0);
     }
 
     /**
@@ -657,10 +657,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * be considered for the index access. In the latter, only inner join expressions qualifies.
      *
      * @param parentNode A parent node to the node to generate paths to.
-     * @param childNode An inner node to generate paths to.
      */
-    private void generateInnerAccessPaths(JoinNode parentNode, JoinNode childNode) {
-        assert(childNode != null);
+    private void generateInnerAccessPaths(JoinNode parentNode) {
+        assert(parentNode.m_rightNode != null);
+        JoinNode innerChildNode = parentNode.m_rightNode;
         // In case of inner join WHERE and JOIN expressions can be merged
         if (parentNode.m_joinType == JoinType.INNER) {
             parentNode.m_joinInnerOuterList.addAll(parentNode.m_whereInnerOuterList);
@@ -668,12 +668,12 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             parentNode.m_joinInnerList.addAll(parentNode.m_whereInnerList);
             parentNode.m_whereInnerList.clear();
         }
-        if (childNode.m_table == null) {
-            assert (childNode.m_leftNode != null && childNode.m_rightNode != null);
-            generateOuterAccessPaths(childNode, childNode.m_leftNode);
-            generateInnerAccessPaths(childNode, childNode.m_rightNode);
+        if (innerChildNode.m_table == null) {
+            assert (innerChildNode.m_leftNode != null && innerChildNode.m_rightNode != null);
+            generateOuterAccessPaths(innerChildNode);
+            generateInnerAccessPaths(innerChildNode);
             // The inner node is a join node itself. Only naive access path is possible
-            childNode.m_accessPaths.add(getRelevantNaivePath(parentNode.m_joinInnerOuterList, parentNode.m_joinInnerList));
+            innerChildNode.m_accessPaths.add(getRelevantNaivePath(parentNode.m_joinInnerOuterList, parentNode.m_joinInnerList));
             return;
         }
 
@@ -681,11 +681,12 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         // inner and inner-outer join expressions plus the naive one.
         // If the join is INNER or the inner table is replicated or the send/receive pair can be deferred,
         // the join node can be NLIJ, otherwise it will be NLJ even for an index access path.
-        if (parentNode.m_joinType == JoinType.INNER || childNode.m_table.getIsreplicated() || canDeferSendReceivePairForNode()) {
+        if (parentNode.m_joinType == JoinType.INNER || innerChildNode.m_table.getIsreplicated() ||
+                canDeferSendReceivePairForNode()) {
             // This case can support either NLIJ -- assuming joinNode.m_joinInnerOuterList
             // is non-empty AND at least ONE of its clauses can be leveraged in the IndexScan
             // -- or NLJ, otherwise.
-            childNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(childNode.m_table,
+            innerChildNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(innerChildNode.m_table,
                     parentNode.m_joinInnerOuterList,
                     parentNode.m_joinInnerList,
                     null));
@@ -694,13 +695,13 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             // If the join is NLJ, the inner node won't be inlined
             // which means that it can't use inner-outer join expressions
             // -- they must be set aside to be processed within the NLJ.
-            childNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(childNode.m_table,
+            innerChildNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(innerChildNode.m_table,
                     null,
                     parentNode.m_joinInnerList,
                     parentNode.m_joinInnerOuterList));
         }
 
-        assert(childNode.m_accessPaths.size() > 0);
+        assert(innerChildNode.m_accessPaths.size() > 0);
     }
 
     /**

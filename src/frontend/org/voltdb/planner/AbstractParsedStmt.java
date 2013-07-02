@@ -984,18 +984,17 @@ public abstract class AbstractParsedStmt {
     }
 
     private void pushDownExpressionsRecursively(JoinNode joinNode, List<AbstractExpression> pushDownExprList) {
-        if (joinNode.m_table == null) {
-            // It is a join node. Classify pushed down expressions as inner, outer, or inner-outer
-            // WHERE expressions.
-            Collection<Table> outerTables = joinNode.m_leftNode.generateTableJoinOrder();
-            Collection<Table> innerTables = joinNode.m_rightNode.generateTableJoinOrder();
-            classifyJoinExpressions(pushDownExprList, outerTables, innerTables,
-                    joinNode.m_whereOuterList, joinNode.m_whereInnerList, joinNode.m_whereInnerOuterList);
-            // Remove them from the original list
-            pushDownExprList.clear();
-            // Descend to the inner child
-            pushDownExpressions(joinNode);
-        }
+        assert(joinNode.m_table == null);
+        // It is a join node. Classify pushed down expressions as inner, outer, or inner-outer
+        // WHERE expressions.
+        Collection<Table> outerTables = joinNode.m_leftNode.generateTableJoinOrder();
+        Collection<Table> innerTables = joinNode.m_rightNode.generateTableJoinOrder();
+        classifyJoinExpressions(pushDownExprList, outerTables, innerTables,
+                joinNode.m_whereOuterList, joinNode.m_whereInnerList, joinNode.m_whereInnerOuterList);
+        // Remove them from the original list
+        pushDownExprList.clear();
+        // Descend to the inner child
+        pushDownExpressions(joinNode);
     }
 
     /**

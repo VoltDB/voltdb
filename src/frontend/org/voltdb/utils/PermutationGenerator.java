@@ -41,7 +41,8 @@ public class PermutationGenerator {
         } else {
             // recursively explore the permutations starting
             //  at index idx going through the last element in the sequence
-            for (int i = idx; i < sequence.size(); i++) {
+            generatePurmutations(sequence, idx+1, permutations);
+            for (int i = idx + 1; i < sequence.size(); i++) {
                 // swap i and idx elements
                 swapElements(sequence, i, idx);
                 generatePurmutations(sequence, idx+1, permutations);

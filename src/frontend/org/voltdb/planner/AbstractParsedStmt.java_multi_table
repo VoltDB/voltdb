@@ -621,8 +621,6 @@ public abstract class AbstractParsedStmt {
         // temp guard against self-joins.
         Set<Table> visited = new HashSet<Table>(tableList);
 
-        // temp restriction on number of tables for an outer join statement // 1st of 2 ALLOWED differences between AbstractParsedStmt.java
-        int tableCount = 0;                                                 //                      and AbstractParsedStmt.java_multi_table
         for (VoltXMLElement node : tablesNode.children) {
             if (node.name.equalsIgnoreCase("tablescan")) {
 
@@ -637,10 +635,6 @@ public abstract class AbstractParsedStmt {
 
                 parseTable(node);
                 visited.add(table);
-                ++tableCount;                                                                   //        2nd of 2 ALLOWED differences
-                if (joinTree.m_hasOuterJoin && tableCount > 2) {                                //     between AbstractParsedStmt.java
-                    throw new PlanningErrorException("VoltDB does not support outer joins with more than two tables involved"); // and
-                }                                                                               // AbstractParsedStmt.java_multi_table
             }
         }
     }
@@ -784,20 +778,23 @@ public abstract class AbstractParsedStmt {
         ArrayList<AbstractExpression> joinList = new ArrayList<AbstractExpression>();
         ArrayList<AbstractExpression> whereList = new ArrayList<AbstractExpression>();
 
-        // Collect children's and node's own join expressions
+        // Collect node's own join and where expressions
         joinList.addAll(ExpressionUtil.uncombineAny(joinNode.m_joinExpr));
-        joinList.addAll(joinNode.m_leftNode.m_joinInnerList);
-        joinNode.m_leftNode.m_joinInnerList.clear();
-        joinList.addAll(joinNode.m_rightNode.m_joinInnerList);
-        joinNode.m_rightNode.m_joinInnerList.clear();
-
-        // Collect children's and node's own where expressions
         whereList.addAll(ExpressionUtil.uncombineAny(joinNode.m_whereExpr));
-        whereList.addAll(joinNode.m_leftNode.m_whereInnerList);
-        joinNode.m_leftNode.m_whereInnerList.clear();
-        whereList.addAll(joinNode.m_rightNode.m_whereInnerList);
-        joinNode.m_rightNode.m_whereInnerList.clear();
 
+        // Collect children expressions only if a child is a leaf. They are not classified yet
+        if (joinNode.m_leftNode.m_table != null) {
+            joinList.addAll(joinNode.m_leftNode.m_joinInnerList);
+            joinNode.m_leftNode.m_joinInnerList.clear();
+            whereList.addAll(joinNode.m_leftNode.m_whereInnerList);
+            joinNode.m_leftNode.m_whereInnerList.clear();
+        }
+        if (joinNode.m_rightNode.m_table != null) {
+            joinList.addAll(joinNode.m_rightNode.m_joinInnerList);
+            joinNode.m_rightNode.m_joinInnerList.clear();
+            whereList.addAll(joinNode.m_rightNode.m_whereInnerList);
+            joinNode.m_rightNode.m_whereInnerList.clear();
+        }
 
         Collection<Table> outerTables = joinNode.m_leftNode.generateTableJoinOrder();
         Collection<Table> innerTables = joinNode.m_rightNode.generateTableJoinOrder();
@@ -981,18 +978,17 @@ public abstract class AbstractParsedStmt {
     }
 
     private void pushDownExpressionsRecursively(JoinNode joinNode, List<AbstractExpression> pushDownExprList) {
-        if (joinNode.m_table == null) {
-            // It is a join node. Classify pushed down expressions as inner, outer, or inner-outer
-            // WHERE expressions.
-            Collection<Table> outerTables = joinNode.m_leftNode.generateTableJoinOrder();
-            Collection<Table> innerTables = joinNode.m_rightNode.generateTableJoinOrder();
-            classifyJoinExpressions(pushDownExprList, outerTables, innerTables,
-                    joinNode.m_whereOuterList, joinNode.m_whereInnerList, joinNode.m_whereInnerOuterList);
-            // Remove them from the original list
-            pushDownExprList.clear();
-            // Descend to the inner child
-            pushDownExpressions(joinNode);
-        }
+        assert(joinNode.m_table == null);
+        // It is a join node. Classify pushed down expressions as inner, outer, or inner-outer
+        // WHERE expressions.
+        Collection<Table> outerTables = joinNode.m_leftNode.generateTableJoinOrder();
+        Collection<Table> innerTables = joinNode.m_rightNode.generateTableJoinOrder();
+        classifyJoinExpressions(pushDownExprList, outerTables, innerTables,
+                joinNode.m_whereOuterList, joinNode.m_whereInnerList, joinNode.m_whereInnerOuterList);
+        // Remove them from the original list
+        pushDownExprList.clear();
+        // Descend to the inner child
+        pushDownExpressions(joinNode);
     }
 
     /**
