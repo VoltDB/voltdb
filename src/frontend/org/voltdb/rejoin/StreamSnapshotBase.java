@@ -28,6 +28,11 @@ import org.voltdb.VoltDB;
  */
 public abstract class StreamSnapshotBase {
     protected static final int typeOffset = 0;
+
+    // For schema message
+    protected static final int schemaTableIdOffset = typeOffset + 1;
+
+    // For data message
     protected static final int blockIndexOffset = typeOffset + 1;
     protected static final int tableIdOffset = blockIndexOffset + 4;
     protected static final int contentOffset = tableIdOffset + 4;

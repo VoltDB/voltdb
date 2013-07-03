@@ -405,8 +405,10 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 byte[] schema = m_schemas.remove(context.getTableId());
                 rejoinLog.debug("Sending schema for table " + context.getTableId());
 
-                ByteBuffer buf = ByteBuffer.allocate(schema.length + 1); // 1 byte for the type
+                // 1 byte for the type, 4 bytes for table Id
+                ByteBuffer buf = ByteBuffer.allocate(schema.length + 1 + 4);
                 buf.put((byte) StreamSnapshotMessageType.SCHEMA.ordinal());
+                buf.putInt(context.getTableId());
                 buf.put(schema);
                 buf.flip();
                 schemaContainer = DBBPool.wrapBB(buf);

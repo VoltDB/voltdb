@@ -18,6 +18,9 @@
 package org.voltdb.rejoin;
 
 import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
@@ -42,16 +45,20 @@ public class StreamSnapshotSink {
     private Thread m_inThread = null;
     private StreamSnapshotAckSender m_ack = null;
     private Thread m_ackThread = null;
+    private final AtomicInteger m_expectedEOFs = new AtomicInteger();
     private boolean m_EOF = false;
-    // Schema of the table currently streaming
-    private byte[] m_schema = null;
+    // Schemas of the tables
+    private final Map<Integer, byte[]> m_schemas = new HashMap<Integer, byte[]>();
     // buffer for a single block
     private ByteBuffer m_buffer = null;
     private long m_bytesReceived = 0;
 
-    public long initialize(FixedDBBPool bufferPool) {
+    public long initialize(int sourceCount, FixedDBBPool bufferPool) {
         // Mailbox used to transfer snapshot data
         m_mb = VoltDB.instance().getHostMessenger().createMailbox();
+
+        // Expect sourceCount number of EOFs at the end
+        m_expectedEOFs.set(sourceCount);
 
         m_in = new StreamSnapshotDataReceiver(m_mb, bufferPool);
         m_inThread = new Thread(m_in, "Snapshot data receiver");
@@ -108,12 +115,14 @@ public class StreamSnapshotSink {
      * @param buf
      * @return
      */
-    private ByteBuffer getNextChunk(ByteBuffer buf) {
+    private ByteBuffer getNextChunk(int tableId, ByteBuffer buf) {
+        byte[] schemaBytes = m_schemas.get(tableId);
+
         buf.position(buf.position() + 4);//skip partition id
-        int length = m_schema.length + buf.remaining();
+        int length = schemaBytes.length + buf.remaining();
 
         ByteBuffer outputBuffer = getOutputBuffer(length);
-        outputBuffer.put(m_schema);
+        outputBuffer.put(schemaBytes);
         outputBuffer.put(buf);
         outputBuffer.flip();
 
@@ -172,22 +181,28 @@ public class StreamSnapshotSink {
                 VoltDB.crashLocalVoltDB("Rejoin source sent failure message.", false, null);
 
                 // for test code only
-                m_EOF = true;
+                if (m_expectedEOFs.decrementAndGet() == 0) {
+                    m_EOF = true;
+                }
                 return null;
             }
             if (type == StreamSnapshotMessageType.END) {
                 rejoinLog.trace("Got END message");
 
                 // End of stream, no need to ack this buffer
-                m_EOF = true;
+                if (m_expectedEOFs.decrementAndGet() == 0) {
+                    m_EOF = true;
+                }
                 return null;
             }
             else if (type == StreamSnapshotMessageType.SCHEMA) {
                 rejoinLog.trace("Got SCHEMA message");
 
-                block.position(block.position() + 1);
-                m_schema = new byte[block.remaining()];
-                block.get(m_schema);
+                block.position(block.position() + 1 + 4);
+                byte[] schemaBytes = new byte[block.remaining()];
+                block.get(schemaBytes);
+                m_schemas.put(block.getInt(StreamSnapshotDataTarget.schemaTableIdOffset),
+                              schemaBytes);
                 return null;
             }
 
@@ -196,14 +211,14 @@ public class StreamSnapshotSink {
             final int blockIndex = block.getInt(StreamSnapshotDataTarget.blockIndexOffset);
             final int tableId = block.getInt(StreamSnapshotDataTarget.tableIdOffset);
 
-            if (m_schema == null) {
+            if (!m_schemas.containsKey(tableId)) {
                 VoltDB.crashLocalVoltDB("No schema for table with ID " + tableId,
                                         false, null);
             }
 
             // Get the byte buffer ready to be consumed
             block.position(StreamSnapshotDataTarget.contentOffset);
-            ByteBuffer nextChunk = getNextChunk(block);
+            ByteBuffer nextChunk = getNextChunk(tableId, block);
             m_bytesReceived += nextChunk.remaining();
 
             // Queue ack to this block
