@@ -853,8 +853,8 @@ public:
         Json::Value array;
         for (size_t i = 0; i < ranges.size(); i++) {
             Json::Value range;
-            range["RANGE_START"] = ranges[i].first;
-            range["RANGE_END"] = ranges[i].second;
+            range["RANGE_START"] = static_cast<Json::Int64>(ranges[i].first);
+            range["RANGE_END"] = static_cast<Json::Int64>(ranges[i].second);
             array.append(range);
         }
         json["RANGES"] = array;
