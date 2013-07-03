@@ -7,7 +7,7 @@ initialize_configuration()
         echo "Looking for development root..."
         if [ ! -d $WORK_ROOT ]; then
             echo "Creating \"$WORK_ROOT\" directory..."
-            mkdir $WORK_ROOT
+            mkdir -p $WORK_ROOT
         fi
         if [ -f $DEVELOPMENT_ROOT/voltdb/log4j.xml ]; then
             echo "Copying log4j.xml to \"work\"..."
@@ -16,19 +16,22 @@ initialize_configuration()
         echo "Generating $WORK_ROOT/$CONFIG_NAME..."
         cat <<EOF > $CONFIG_FILE || exit 1
 ### General configuration (use bash syntax and absolute paths)
-# Supports only one host for now.
-RUNTIME_ROOT=$WORK_ROOT/runtime
+# Current source root.
 DEVELOPMENT_ROOT=$DEVELOPMENT_ROOT
+# Comparison distribution version #, source root path, or distribution root path.
+COMPARISON_DISTRIBUTION=???
+# Where runtime files are saved
+RUNTIME_ROOT=$WORK_ROOT/runtime
 SEED_ROOT=$WORK_ROOT/seed/$APPLICATION_NAME
 SNAPSHOT_ROOT=$WORK_ROOT/snapshots
 LOG4J_CONFIG=$WORK_ROOT/log4j.xml
 APPLICATION_NAME=voter
 APPLICATION_CLASS=SyncBenchmark
 APPLICATION_OPTIONS="--warmup=6 --contestants=6 --maxvotes=2 --threads=40"
-COMPARISON_RELEASE=3.0
 SERVER_HOST=localhost
 SERVER_PORT=21212
 CLIENT_HOST=localhost
+# Supports only one host for now.
 HOST_COUNT=1
 SITES_PER_HOST=6
 K_FACTOR=0
@@ -57,7 +60,6 @@ prepare_files()
 {
     mkdir -p $RUN_OUTPUT_ROOT
     test -d $APPLICATION_NAME && \rm -rf $APPLICATION_NAME/
-    test -d $ARCHIVE_ROOT || mkdir $ARCHIVE_ROOT
     test -d $RUNTIME_ROOT && \rm -rf $RUNTIME_ROOT
     mkdir -p $RUNTIME_ROOT || exit 1
     test -d $SNAPSHOT_ROOT && \rm -rf $SNAPSHOT_ROOT
@@ -81,52 +83,66 @@ EOF
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
-    <snapshot prefix="auto" frequency="10s" retain="1" />
+    <snapshot prefix="auto" frequency="5s" retain="1" />
     <paths>
         <voltdbroot path="$RUNTIME_ROOT" />
         <snapshots path="$SNAPSHOT_ROOT/" />
     </paths>
 </deployment>
 EOF
-    pushd $WORK_ROOT > /dev/null
-    COMPARISON_TARBALL=LINUX-voltdb-$COMPARISON_RELEASE.tar.gz
-    if [ ! -e $COMPARISON_TARBALL ]; then
-        URL=http://volt0/kits/released/$COMPARISON_RELEASE-release/$COMPARISON_TARBALL
-        echo "Downloading $URL..."
-        if ! wget -q $URL; then
-            echo "ERROR: Failed to download $URL"
-            exit 1
-        fi
-    fi
-    \cp -a $DEVELOPMENT_ROOT/examples/$APPLICATION_NAME/ . || exit 1
-    tar xfz $COMPARISON_TARBALL || exit 1
+    \cp -a $DEVELOPMENT_ROOT/examples/$APPLICATION_NAME/ $WORK_ROOT/ || exit 1
 }
 
-run()
+prepare_comparison_distribution()
 {
-    local TEST_NAME=$1
-    local DISTRIBUTION_ROOT=$2
-    local DEPLOYMENT_FILE=$3
-    local APPLICATION_CLASSPATH=$({ \
-        \ls -1 "$DISTRIBUTION_ROOT/voltdb"/voltdb-*.jar; \
-        \ls -1 "$DISTRIBUTION_ROOT/lib"/*.jar; \
-        \ls -1 "$DISTRIBUTION_ROOT/lib"/extension/*.jar; \
-    } 2> /dev/null | paste -sd ':' - )
-    local CLIENT_SCRIPT=$PWD/client.sh
-    echo "
-======================================================================
- Run $TEST_NAME ($DISTRIBUTION_ROOT)
-======================================================================
-"
-    prepare_run $TEST_NAME $CLIENT_SCRIPT $APPLICATION_CLASSPATH
-    compile_application $TEST_NAME $APPLICATION_CLASSPATH
-    create_catalog $TEST_NAME $APPLICATION_CLASSPATH
-    start_server $TEST_NAME $DISTRIBUTION_ROOT $APPLICATION_CLASSPATH $DEPLOYMENT_FILE
-    local SERVER_PID=$!
-    load_data $TEST_NAME $DISTRIBUTION_ROOT $APPLICATION_CLASSPATH
-    start_client $TEST_NAME $CLIENT_SCRIPT
-    kill_server $TEST_NAME $SERVER_PID
-    finalize_run $TEST_NAME
+    if [ "$COMPARISON_DISTRIBUTION" = "???" ]; then
+        echo "ERROR: Please set COMPARISON_DISTRIBUTION in $CONFIG_FILE."
+        exit 1
+    fi
+    if [[ $COMPARISON_DISTRIBUTION =~ ^[0-9]+[.][0-9]+$ ]]; then
+        pushd $WORK_ROOT > /dev/null
+        # Download (as needed) and extract distribution tarball based on a version number.
+        COMPARISON_TARBALL=LINUX-voltdb-$COMPARISON_DISTRIBUTION
+        if [ ! -e $COMPARISON_TARBALL ]; then
+            URL=http://volt0/kits/released/$COMPARISON_DISTRIBUTION-release/$COMPARISON_TARBALL
+            echo "Downloading $URL..."
+            if ! wget -q $URL; then
+                echo "ERROR: Failed to download $URL"
+                exit 1
+            fi
+        fi
+        echo "Extracting $COMPARISON_TARBALL..."
+        tar xfz $COMPARISON_TARBALL || exit 1
+        COMPARISON_DISTRIBUTION_ROOT=$PWD/voltdb-$COMPARISON_DISTRIBUTION
+        popd > /dev/null
+    elif [ -f $COMPARISON_DISTRIBUTION/build.xml ]; then
+        # From the root of a source tree find the distribution root.
+        if [ -d $COMPARISON_DISTRIBUTION/obj/debug ]; then
+            if [ -d $COMPARISON_DISTRIBUTION/obj/debug/dist ]; then
+                COMPARISON_DISTRIBUTION_ROOT=$COMPARISON_DISTRIBUTION/obj/debug/dist
+            else
+                echo "ERROR: $COMPARISON_DISTRIBUTION/obj/debug looks like an incomplete build."
+                exit 1
+            fi
+        elif [ -d $COMPARISON_DISTRIBUTION/obj/release ]; then
+            if [ -d $COMPARISON_DISTRIBUTION/obj/release/dist ]; then
+                COMPARISON_DISTRIBUTION_ROOT=$COMPARISON_DISTRIBUTION/obj/release/dist
+            else
+                echo "ERROR: $COMPARISON_DISTRIBUTION/obj/release looks like an incomplete build."
+                exit 1
+            fi
+        else
+            echo "ERROR: Build not found for $COMPARISON_DISTRIBUTION."
+            exit 1
+        fi
+    else
+        # Otherwise assume it is a distribution root path.
+        COMPARISON_DISTRIBUTION_ROOT=$COMPARISON_DISTRIBUTION
+    fi
+    if [ ! -d $COMPARISON_DISTRIBUTION_ROOT/voltdb -o ! -d $COMPARISON_DISTRIBUTION_ROOT/lib ]; then
+        echo "ERROR: $COMPARISON_DISTRIBUTION_ROOT is not a proper distribution root."
+        exit 1
+    fi
 }
 
 prepare_run()
@@ -272,6 +288,64 @@ finalize_run()
     cp log/volt.log $OUTPUT_DIRECTORY/volt.log
 }
 
+profiler()
+{
+    local TEST_NAME=$1
+    local ACTION=$2
+    local OUTPUT_DIRECTORY=$RUN_OUTPUT_ROOT/$TEST_NAME
+    if [ -n "$ZOOMSCRIPT" ]; then
+        echo "Profiler: $ACTION"
+        if [ $ACTION = start -o $ACTION = stop ]; then
+            $ZOOMSCRIPT $ACTION || exit 1
+        elif [ $ACTION = quit -o $ACTION = run ]; then
+            for PID in $(pgrep zoom); do
+                echo "Killing zoom ($PID)..."
+                kill -s INT $PID
+            done
+            if [ $ACTION = run ]; then
+                pushd $OUTPUT_DIRECTORY > /dev/null
+                zoom run --allow_zoomscript &
+                test $? -ne 0 && exit 1
+                ZOOM_PID=$!
+                popd > /dev/null
+            fi
+        fi
+    fi
+}
+
+run_test()
+{
+    local TEST_NAME=$1
+    local DISTRIBUTION_ROOT=$2
+    local DEPLOYMENT_FILE=$3
+    local APPLICATION_CLASSPATH=$({ \
+        \ls -1 "$DISTRIBUTION_ROOT/voltdb"/voltdb-*.jar; \
+        \ls -1 "$DISTRIBUTION_ROOT/lib"/*.jar; \
+        \ls -1 "$DISTRIBUTION_ROOT/lib"/extension/*.jar; \
+    } 2> /dev/null | paste -sd ':' - )
+    pushd $WORK_ROOT/$APPLICATION_NAME > /dev/null
+    local CLIENT_SCRIPT=$PWD/client.sh
+    echo "
+======================================================================
+ Run $TEST_NAME ($DISTRIBUTION_ROOT)
+======================================================================
+"
+    prepare_run $TEST_NAME $CLIENT_SCRIPT $APPLICATION_CLASSPATH
+    compile_application $TEST_NAME $APPLICATION_CLASSPATH
+    create_catalog $TEST_NAME $APPLICATION_CLASSPATH
+    start_server $TEST_NAME $DISTRIBUTION_ROOT $APPLICATION_CLASSPATH $DEPLOYMENT_FILE
+    local SERVER_PID=$!
+    profiler $TEST_NAME run
+    load_data $TEST_NAME $DISTRIBUTION_ROOT $APPLICATION_CLASSPATH
+    profiler $TEST_NAME start
+    start_client $TEST_NAME $CLIENT_SCRIPT
+    profiler $TEST_NAME stop
+    kill_server $TEST_NAME $SERVER_PID
+    profiler $TEST_NAME quit
+    finalize_run $TEST_NAME
+    popd > /dev/null
+}
+
 ### Main program
 
 if [ -z "$1" ]; then
@@ -287,31 +361,38 @@ while [ "$DEVELOPMENT_ROOT" != "/" -a ! -e "$DEVELOPMENT_ROOT/build.xml" ]; do
     DEVELOPMENT_ROOT=$(dirname $DEVELOPMENT_ROOT)
 done
 TIMESTAMP=$(date "+%y%m%d%H%M%S")
+ZOOMSCRIPT=$(which zoomscript)
 
 initialize_configuration
 source $CONFIG_FILE
 
 # Derived globals
 OUTPUT_ROOT=$WORK_ROOT/output
-ARCHIVE_ROOT=$WORK_ROOT/archive
 RUN_OUTPUT_ROOT="$OUTPUT_ROOT/$TIMESTAMP"
 DEPLOYMENT_NOSNAP=$WORK_ROOT/deployment_nosnap.xml
 DEPLOYMENT_SNAP=$WORK_ROOT/deployment_snap.xml
+
+# Additional command line arguments for special behavior.
+if [ "$2" = "clean" ]; then
+    echo "Cleaning old output and runtime directories..."
+    test -d $OUTPUT_ROOT && \rm -rf $OUTPUT_ROOT
+    test -d $RUNTIME_ROOT && \rm -rf $RUNTIME_ROOT
+fi
+if [ "$2" = "seed" -o "$2" = "clean" ]; then
+    echo "Clearing old seed data..."
+    test -d $SEED_ROOT && \rm -rf $SEED_ROOT
+fi
 
 kill_running_server
 
 prepare_files
 
-COMPARISON_DISTRIBUTION_ROOT="$PWD/voltdb-$COMPARISON_RELEASE"
-pushd $WORK_ROOT/$APPLICATION_NAME > /dev/null
+prepare_comparison_distribution
 
-run old-nosnap $COMPARISON_DISTRIBUTION_ROOT $DEPLOYMENT_NOSNAP
-run old-snap   $COMPARISON_DISTRIBUTION_ROOT $DEPLOYMENT_SNAP
-run new-nosnap $DEVELOPMENT_ROOT             $DEPLOYMENT_NOSNAP
-run new-snap   $DEVELOPMENT_ROOT             $DEPLOYMENT_SNAP
-
-popd > /dev/null
-popd > /dev/null
+run_test old-nosnap $COMPARISON_DISTRIBUTION_ROOT $DEPLOYMENT_NOSNAP
+run_test old-snap   $COMPARISON_DISTRIBUTION_ROOT $DEPLOYMENT_SNAP
+run_test new-nosnap $DEVELOPMENT_ROOT             $DEPLOYMENT_NOSNAP
+run_test new-snap   $DEVELOPMENT_ROOT             $DEPLOYMENT_SNAP
 
 python analyze.py $RUN_OUTPUT_ROOT | tee $RUN_OUTPUT_ROOT/results.txt
 
