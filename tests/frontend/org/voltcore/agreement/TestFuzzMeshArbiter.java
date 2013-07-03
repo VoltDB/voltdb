@@ -153,30 +153,15 @@ public class TestFuzzMeshArbiter extends TestCase
         state.killLink(0, 1);
         state.setUpExpectations();
 
-        long start = System.currentTimeMillis();
-        while (!state.hasMetExpectations()) {
-            long now = System.currentTimeMillis();
-            if (now - start > 30000) {
-                start = now;
-                dumpNodeState();
-            }
-            Thread.sleep(50);
-        }
+        state.expect();
 
         assertTrue(checkFullyConnectedGraphs(state.m_expectedLive));
         state.pruneDeadNodes();
 
         state.killLink(0, 2);
         state.setUpExpectations();
-        start = System.currentTimeMillis();
-        while (!state.hasMetExpectations()) {
-            long now = System.currentTimeMillis();
-            if (now - start > 30000) {
-                start = now;
-                dumpNodeState();
-            }
-            Thread.sleep(50);
-        }
+
+        state.expect();
 
         assertTrue(checkFullyConnectedGraphs(state.m_expectedLive));
     }
@@ -190,15 +175,7 @@ public class TestFuzzMeshArbiter extends TestCase
         state.killLink(0, 2);
         state.setUpExpectations();
 
-        long start = System.currentTimeMillis();
-        while (!state.hasMetExpectations()) {
-            long now = System.currentTimeMillis();
-            if (now - start > 30000) {
-                start = now;
-                dumpNodeState();
-            }
-            Thread.sleep(50);
-        }
+        state.expect();
 
         assertTrue(checkFullyConnectedGraphs(state.m_expectedLive));
     }
@@ -316,6 +293,18 @@ public class TestFuzzMeshArbiter extends TestCase
             return met;
         }
 
+        void expect() throws InterruptedException {
+            long start = System.currentTimeMillis();
+            while (!hasMetExpectations()) {
+                long now = System.currentTimeMillis();
+                if (now - start > 30000) {
+                    start = now;
+                    dumpNodeState();
+                }
+                Thread.sleep(50);
+            }
+        }
+
         void pruneDeadNodes() throws InterruptedException {
             Iterator<Map.Entry<Long, MiniNode>> itr = m_nodes.entrySet().iterator();
             while (itr.hasNext()) {
@@ -329,6 +318,7 @@ public class TestFuzzMeshArbiter extends TestCase
                     itr.remove();
                 }
             }
+            expect();
         }
 
         void joinNode(int node) throws InterruptedException {
@@ -374,17 +364,26 @@ public class TestFuzzMeshArbiter extends TestCase
             }
         }
         state.setUpExpectations();
-        long start = System.currentTimeMillis();
-        while (!state.hasMetExpectations()) {
-            long now = System.currentTimeMillis();
-            if (now - start > 30000) {
-                start = now;
-                dumpNodeState();
-            }
-            Thread.sleep(50);
-        }
+
+        state.expect();
 
         assertTrue(checkFullyConnectedGraphs(state.m_expectedLive));
+        state.pruneDeadNodes();
+
+        for (int i = 0; i < 3; i++) {
+            if (state.m_rand.nextInt(100) < 50) {
+                state.killRandomNode();
+            }
+            else {
+                state.killRandomLink();
+            }
+        }
+        state.setUpExpectations();
+
+        state.expect();
+
+        assertTrue(checkFullyConnectedGraphs(state.m_expectedLive));
+
     }
 
     // Partition the nodes in subset out of the nodes in nodes

@@ -70,9 +70,9 @@ public final class FaultMessage extends VoltMessage {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        sb.append("FaultMessage { failedSite: ");
+        sb.append("FaultMessage {failed: ");
         sb.append(CoreUtils.hsIdToString(failedSite));
-        sb.append(", reportingSite: ");
+        sb.append(", reporting: ");
         sb.append(CoreUtils.hsIdToString(reportingSite));
         sb.append(", witnessed: ").append(witnessed);
         if (!witnessed) {

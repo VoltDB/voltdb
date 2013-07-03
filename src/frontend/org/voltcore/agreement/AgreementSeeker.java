@@ -363,6 +363,10 @@ public class AgreementSeeker {
         }
     };
 
+    public boolean needForward(int [] countdown) {
+        return --countdown[0] > 0 && m_strategy.accept(forwardDemander, (Void)null);
+    }
+
     /**
      * Is anyone in the mesh alive and connected to sites I consider dead?
      */
