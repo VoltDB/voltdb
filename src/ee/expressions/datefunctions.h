@@ -62,9 +62,9 @@ static void micros_to_date_and_time(int64_t epoch_micros_in, boost::gregorian::d
 }
 
 /** Convert from timestamp to micros since epoch **/
-static int64_t epoch_microseconds_from_components(int year, int month = 1,
-        int day = 1, int hour = 0, int minute = 0, int second = 0) {
-    boost::gregorian::date goal_date = boost::gregorian::date((int8_t)year, (int8_t)month, (int8_t)day);
+static int64_t epoch_microseconds_from_components(unsigned short int year, unsigned short int month = 1,
+        unsigned short int day = 1, int hour = 0, int minute = 0, int second = 0) {
+    boost::gregorian::date goal_date = boost::gregorian::date(year, month, day);
     boost::posix_time::ptime goal_ptime =
             boost::posix_time::ptime(goal_date,boost::posix_time::time_duration(hour,minute,second));
     boost::posix_time::time_period goal_period (EPOCH, goal_ptime);
