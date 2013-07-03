@@ -83,6 +83,7 @@ import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
+import org.voltdb.utils.CachedByteBufferAllocator;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 
@@ -956,7 +957,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
      */
     private boolean restoreSnapshotForRejoin() {
         boolean doneWork = false;
-        Pair<Integer, ByteBuffer> rejoinWork = m_rejoinSnapshotProcessor.poll();
+        Pair<Integer, ByteBuffer> rejoinWork = m_rejoinSnapshotProcessor.poll(new CachedByteBufferAllocator());
         if (rejoinWork != null) {
             int tableId = rejoinWork.getFirst();
             ByteBuffer buffer = rejoinWork.getSecond();
