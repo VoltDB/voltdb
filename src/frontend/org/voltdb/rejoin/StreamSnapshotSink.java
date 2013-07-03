@@ -18,7 +18,6 @@
 package org.voltdb.rejoin;
 
 import java.nio.ByteBuffer;
-import java.util.concurrent.LinkedBlockingQueue;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
@@ -129,7 +128,7 @@ public class StreamSnapshotSink {
 
         Pair<Integer, ByteBuffer> result = null;
         while (!m_EOF) {
-            Pair<Long, BBContainer> msg = m_in.take();
+            Pair<Long, Pair<Long, BBContainer>> msg = m_in.take();
             result = processMessage(msg);
             if (result != null) {
                 break;
@@ -145,7 +144,7 @@ public class StreamSnapshotSink {
             return null;
         }
 
-        Pair<Long, BBContainer> msg = m_in.poll();
+        Pair<Long, Pair<Long, BBContainer>> msg = m_in.poll();
         return processMessage(msg);
     }
 
@@ -157,13 +156,14 @@ public class StreamSnapshotSink {
      * @return The processed message, or null if there's no data block to return
      *         to the site.
      */
-    private Pair<Integer, ByteBuffer> processMessage(Pair<Long, BBContainer> msg) {
+    private Pair<Integer, ByteBuffer> processMessage(Pair<Long, Pair<Long, BBContainer>> msg) {
         if (msg == null) {
             return null;
         }
 
         long hsId = msg.getFirst();
-        BBContainer container = msg.getSecond();
+        long targetId = msg.getSecond().getFirst();
+        BBContainer container = msg.getSecond().getSecond();
         try {
             ByteBuffer block = container.b;
             byte typeByte = block.get(StreamSnapshotDataTarget.typeOffset);
@@ -207,7 +207,7 @@ public class StreamSnapshotSink {
             m_bytesReceived += nextChunk.remaining();
 
             // Queue ack to this block
-            m_ack.ack(hsId, blockIndex);
+            m_ack.ack(hsId, targetId, blockIndex);
 
             return Pair.of(tableId, nextChunk);
         } finally {
