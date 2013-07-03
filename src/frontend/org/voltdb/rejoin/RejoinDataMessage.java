@@ -28,6 +28,7 @@ import org.voltdb.messaging.VoltDbMessageFactory;
  *
  */
 public class RejoinDataMessage extends VoltMessage {
+    private long m_targetId = -1;
     // compressed snapshot data
     private byte[] m_data = null;
 
@@ -35,9 +36,14 @@ public class RejoinDataMessage extends VoltMessage {
         m_subject = Subject.DEFAULT.getId();
     }
 
-    public RejoinDataMessage(byte[] data) {
+    public RejoinDataMessage(long targetId, byte[] data) {
         m_subject = Subject.DEFAULT.getId();
+        m_targetId = targetId;
         m_data = data;
+    }
+
+    public long getTargetId() {
+        return m_targetId;
     }
 
     public byte[] getData() {
@@ -48,6 +54,7 @@ public class RejoinDataMessage extends VoltMessage {
     public int getSerializedSize() {
         int msgsize = super.getSerializedSize();
         msgsize +=
+                8 + // m_targetId
                 4 + // data length
                 m_data.length;
         return msgsize;
@@ -55,6 +62,7 @@ public class RejoinDataMessage extends VoltMessage {
 
     @Override
     protected void initFromBuffer(ByteBuffer buf) throws IOException {
+        m_targetId = buf.getLong();
         int len = buf.getInt();
         m_data = new byte[len];
         buf.get(m_data);
@@ -63,6 +71,7 @@ public class RejoinDataMessage extends VoltMessage {
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
         buf.put(VoltDbMessageFactory.REJOIN_DATA_ID);
+        buf.putLong(m_targetId);
         buf.putInt(m_data.length);
         buf.put(m_data);
         buf.limit(buf.position());
