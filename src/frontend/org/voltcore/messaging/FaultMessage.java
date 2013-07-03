@@ -20,6 +20,8 @@ package org.voltcore.messaging;
 import java.nio.ByteBuffer;
 import java.util.Set;
 
+import org.voltcore.utils.CoreUtils;
+
 import com.google.common.collect.ImmutableSet;
 
 
@@ -27,16 +29,20 @@ public final class FaultMessage extends VoltMessage {
 
     public final long failedSite;
     public final boolean witnessed;
+    public final long reportingSite;
     public final Set<Long> survivors;
 
-    public FaultMessage(final long failedSite) {
+    public FaultMessage(final long reportingSite, final long failedSite) {
         this.failedSite = failedSite;
+        this.reportingSite = reportingSite;
         this.witnessed = true;
         this.survivors = ImmutableSet.of();
     }
 
-    public FaultMessage(final long failedSite, final Set<Long> survivors) {
+    public FaultMessage(final long reportingSite,
+            final long failedSite, final Set<Long> survivors) {
         this.failedSite = failedSite;
+        this.reportingSite = reportingSite;
         this.witnessed = false;
         this.survivors = ImmutableSet.copyOf(survivors);
     }
@@ -59,5 +65,22 @@ public final class FaultMessage extends VoltMessage {
     @Override
     public byte getSubject() {
         return Subject.FAILURE.getId();
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("FaultMessage { failedSite: ");
+        sb.append(CoreUtils.hsIdToString(failedSite));
+        sb.append(", reportingSite: ");
+        sb.append(CoreUtils.hsIdToString(reportingSite));
+        sb.append(", witnessed: ").append(witnessed);
+        if (!witnessed) {
+            sb.append(", survivors: [");
+            sb.append(CoreUtils.hsIdCollectionToString(survivors));
+            sb.append("]");
+        }
+        sb.append("}");
+        return sb.toString();
     }
 }

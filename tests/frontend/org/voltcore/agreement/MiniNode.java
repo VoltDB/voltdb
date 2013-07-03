@@ -120,6 +120,10 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
         m_miniSite = new MiniSite(m_mailbox, HSIds, this, m_nodeLog);
     }
 
+    void joinWith(long HSId) {
+        m_HSIds.add(HSId);
+    }
+
     void shutdown()
     {
         m_nodeLog.info("Shutting down...");
@@ -187,7 +191,7 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
                         SiteFailureMessage sfm = (SiteFailureMessage)message;
 
                         for (long failedHostId : sfm.m_safeTxnIds.keySet()) {
-                            m_miniSite.reportFault(failedHostId, sfm.m_survivors);
+                            m_miniSite.reportFault(sfm.m_sourceHSId, failedHostId, sfm.m_survivors);
                         }
                     }
                 }

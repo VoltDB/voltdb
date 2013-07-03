@@ -321,7 +321,7 @@ public class ForeignHost {
             SiteFailureMessage sfm = (SiteFailureMessage)message;
 
             for (long failedHostId : sfm.m_safeTxnIds.keySet()) {
-                m_hostMessenger.relayForeignHostFailed((int)failedHostId, sfm.m_survivors);
+                m_hostMessenger.relayForeignHostFailed(message.m_sourceHSId, (int)failedHostId, sfm.m_survivors);
             }
         }
     }

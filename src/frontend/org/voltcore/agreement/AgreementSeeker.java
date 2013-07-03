@@ -27,12 +27,14 @@ import java.util.Set;
 
 import org.voltcore.messaging.SiteFailureForwardMessage;
 import org.voltcore.messaging.SiteFailureMessage;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedSet;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import com.google.common.collect.TreeMultimap;
@@ -189,6 +191,33 @@ public class AgreementSeeker {
                 itr.remove();
             }
         }
+    }
+
+    protected String dumpGraph(Multimap<Long,Long> mm, StringBuilder sb) {
+        sb.append("{ ");
+        int count = 0;
+        for (long h: mm.keySet()) {
+            if (count++ > 0) sb.append(", ");
+            sb.append(CoreUtils.hsIdToString(h)).append(": [");
+            sb.append(CoreUtils.hsIdCollectionToString(mm.get(h)));
+            sb.append("]");
+        }
+        sb.append("}");
+        return sb.toString();
+    }
+
+    public String dumpAlive() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Alive: ");
+        dumpGraph(m_alive, sb);
+        return sb.toString();
+    }
+
+    public String dumpDead() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Alive: ");
+        dumpGraph(m_dead, sb);
+        return sb.toString();
     }
 
     /**
