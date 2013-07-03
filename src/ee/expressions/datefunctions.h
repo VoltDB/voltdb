@@ -62,10 +62,9 @@ static void micros_to_date_and_time(int64_t epoch_micros_in, boost::gregorian::d
 }
 
 /** Convert from timestamp to micros since epoch **/
-static int64_t epoch_microseconds_from_components(int year, int month = 1, int day = 1, int hour = 0,
-        int minute = 0, int second = 0) {
-
-    boost::gregorian::date goal_date = boost::gregorian::date(year, month, day);
+static int64_t epoch_microseconds_from_components(int year, int month = 1,
+        int day = 1, int hour = 0, int minute = 0, int second = 0) {
+    boost::gregorian::date goal_date = boost::gregorian::date((int8_t)year, (int8_t)month, (int8_t)day);
     boost::posix_time::ptime goal_ptime =
             boost::posix_time::ptime(goal_date,boost::posix_time::time_duration(hour,minute,second));
     boost::posix_time::time_period goal_period (EPOCH, goal_ptime);
@@ -257,7 +256,7 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_QUARTER>() const {
     boost::gregorian::date as_date;
     micros_to_date(epoch_micros, as_date);
     int8_t quarter_start_month = QUARTER_START_MONTH_BY_MONTH[as_date.month()];
-    int64_t truncate_epoch_micros = epoch_microseconds_from_components(as_date.year(), (int)quarter_start_month);
+    int64_t truncate_epoch_micros = epoch_microseconds_from_components(as_date.year(), quarter_start_month);
     return getTimestampValue(truncate_epoch_micros);
 }
 
