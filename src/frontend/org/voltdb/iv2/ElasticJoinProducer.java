@@ -103,7 +103,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
      */
     private void runForBlockingDataTransfer(SiteProcedureConnection siteConnection)
     {
-        Pair<Integer, ByteBuffer> tableBlock = m_dataSink.poll();
+        Pair<Integer, ByteBuffer> tableBlock = m_dataSink.poll(m_snapshotBufferAllocator);
         // poll() could return null if the source indicated end of stream,
         // need to check on that before retry
         if (tableBlock == null && !m_dataSink.isEOF()) {
@@ -126,7 +126,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
 
             // Block on the data sink for more data. If end of stream, it will return null.
             try {
-                tableBlock = m_dataSink.take();
+                tableBlock = m_dataSink.take(m_snapshotBufferAllocator);
             } catch (InterruptedException e) {
                 JOINLOG.warn("Transfer of data interrupted");
                 tableBlock = null;
