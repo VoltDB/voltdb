@@ -120,7 +120,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         for (StreamSnapshotSink dataSink : m_dataSinks) {
             // poll() could return null if the source indicated end of stream,
             // need to check on that before retry
-            tableBlock = dataSink.poll();
+            tableBlock = dataSink.poll(m_snapshotBufferAllocator);
             if (tableBlock != null || m_dataSinks.get(0).isEOF()) {
                 retry = false;
                 break;
@@ -173,7 +173,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
                                           " finished transfering partitioned table data from one partition");
                     }
                 } else {
-                    tableBlock = sink.poll();
+                    tableBlock = sink.poll(m_snapshotBufferAllocator);
                 }
 
                 if (tableBlock != null) {

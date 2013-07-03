@@ -18,13 +18,13 @@
 package org.voltdb.rejoin;
 
 import java.nio.ByteBuffer;
-import java.util.concurrent.LinkedBlockingQueue;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
+import org.voltdb.utils.CachedByteBufferAllocator;
 import org.voltdb.utils.FixedDBBPool;
 
 /**
@@ -46,8 +46,6 @@ public class StreamSnapshotSink {
     private boolean m_EOF = false;
     // Schema of the table currently streaming
     private byte[] m_schema = null;
-    // buffer for a single block
-    private ByteBuffer m_buffer = null;
     private long m_bytesReceived = 0;
 
     public long initialize(FixedDBBPool bufferPool) {
@@ -94,14 +92,6 @@ public class StreamSnapshotSink {
         }
     }
 
-    private ByteBuffer getOutputBuffer(int length) {
-        if (m_buffer == null || m_buffer.capacity() < length) {
-            m_buffer = ByteBuffer.allocate(length);
-        }
-        m_buffer.clear();
-        return m_buffer;
-    }
-
     /**
      * Assemble the chunk so that it can be used to construct the VoltTable that
      * will be passed to EE.
@@ -109,11 +99,11 @@ public class StreamSnapshotSink {
      * @param buf
      * @return
      */
-    private ByteBuffer getNextChunk(ByteBuffer buf) {
+    private ByteBuffer getNextChunk(ByteBuffer buf, CachedByteBufferAllocator resultBufferAllocator) {
         buf.position(buf.position() + 4);//skip partition id
         int length = m_schema.length + buf.remaining();
 
-        ByteBuffer outputBuffer = getOutputBuffer(length);
+        ByteBuffer outputBuffer = resultBufferAllocator.allocate(length);
         outputBuffer.put(m_schema);
         outputBuffer.put(buf);
         outputBuffer.flip();
@@ -121,7 +111,8 @@ public class StreamSnapshotSink {
         return outputBuffer;
     }
 
-    public Pair<Integer, ByteBuffer> take() throws InterruptedException {
+    public Pair<Integer, ByteBuffer> take(CachedByteBufferAllocator resultBufferAllocator)
+        throws InterruptedException {
         if (m_in == null || m_ack == null) {
             // terminated already
             return null;
@@ -130,7 +121,7 @@ public class StreamSnapshotSink {
         Pair<Integer, ByteBuffer> result = null;
         while (!m_EOF) {
             Pair<Long, BBContainer> msg = m_in.take();
-            result = processMessage(msg);
+            result = processMessage(msg, resultBufferAllocator);
             if (result != null) {
                 break;
             }
@@ -139,14 +130,14 @@ public class StreamSnapshotSink {
         return result;
     }
 
-    public Pair<Integer, ByteBuffer> poll() {
+    public Pair<Integer, ByteBuffer> poll(CachedByteBufferAllocator resultBufferAllocator) {
         if (m_in == null || m_ack == null) {
             // not initialized yet or terminated already
             return null;
         }
 
         Pair<Long, BBContainer> msg = m_in.poll();
-        return processMessage(msg);
+        return processMessage(msg, resultBufferAllocator);
     }
 
     /**
@@ -157,7 +148,8 @@ public class StreamSnapshotSink {
      * @return The processed message, or null if there's no data block to return
      *         to the site.
      */
-    private Pair<Integer, ByteBuffer> processMessage(Pair<Long, BBContainer> msg) {
+    private Pair<Integer, ByteBuffer> processMessage(Pair<Long, BBContainer> msg,
+                                                     CachedByteBufferAllocator resultBufferAllocator) {
         if (msg == null) {
             return null;
         }
@@ -203,7 +195,7 @@ public class StreamSnapshotSink {
 
             // Get the byte buffer ready to be consumed
             block.position(StreamSnapshotDataTarget.contentOffset);
-            ByteBuffer nextChunk = getNextChunk(block);
+            ByteBuffer nextChunk = getNextChunk(block, resultBufferAllocator);
             m_bytesReceived += nextChunk.remaining();
 
             // Queue ack to this block
