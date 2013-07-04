@@ -59,7 +59,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     static boolean m_rejoinDeathTestMode = System.getProperties().containsKey("rejoindeathtest");
 
     private static AtomicLong m_totalSnapshotTargetCount = new AtomicLong(0);
-    private final long m_targetId;
+    final long m_targetId;
 
     // shortened when in test mode
     final static long WRITE_TIMEOUT_MS = m_rejoinDeathTestMode ? 10000 : 60000;
@@ -79,11 +79,11 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     private final AtomicBoolean m_writeFailed = new AtomicBoolean(false);
 
     // number of sent, but un-acked buffers
-    private final AtomicInteger m_outstandingWorkCount = new AtomicInteger(0);
+    final AtomicInteger m_outstandingWorkCount = new AtomicInteger(0);
     // map of sent, but un-acked buffers, packaged up a bit
     private final Map<Integer, SendWork> m_outstandingWork = (new TreeMap<Integer, SendWork>());
 
-    private int m_blockIndex = 0;
+    int m_blockIndex = 0;
     private final AtomicReference<Runnable> m_onCloseHandler = new AtomicReference<Runnable>(null);
 
     private final AtomicBoolean m_closed = new AtomicBoolean(false);
@@ -432,8 +432,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             }
 
             chunk.b.put((byte) StreamSnapshotMessageType.DATA.ordinal());
-            chunk.b.putInt(m_blockIndex); // put chunk index
             chunk.b.putInt(context.getTableId()); // put table ID
+            chunk.b.putInt(m_blockIndex); // put chunk index
             chunk.b.position(0);
 
             return send(m_blockIndex++, schemaContainer, chunk);
@@ -513,9 +513,6 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
             // locked so m_closed is true when the ack thread dies
             synchronized(this) {
-                // release the mailbox and close the socket,
-                // this should stop the ack receiver thread
-                VoltDB.instance().getHostMessenger().removeMailbox(m_mb.getHSId());
                 m_mb = null;
                 m_closed.set(true);
 

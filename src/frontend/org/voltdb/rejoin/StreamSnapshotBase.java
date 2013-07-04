@@ -33,7 +33,7 @@ public abstract class StreamSnapshotBase {
     protected static final int schemaTableIdOffset = typeOffset + 1;
 
     // For data message
-    protected static final int blockIndexOffset = typeOffset + 1;
-    protected static final int tableIdOffset = blockIndexOffset + 4;
-    protected static final int contentOffset = tableIdOffset + 4;
+    protected static final int tableIdOffset = typeOffset + 4;
+    protected static final int blockIndexOffset = tableIdOffset + 1;
+    protected static final int contentOffset = blockIndexOffset + 4;
 }

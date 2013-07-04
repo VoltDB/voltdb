@@ -201,8 +201,8 @@ public class StreamSnapshotSink {
 
             // It's normal snapshot data afterwards
 
-            final int blockIndex = block.getInt(StreamSnapshotDataTarget.blockIndexOffset);
             final int tableId = block.getInt(StreamSnapshotDataTarget.tableIdOffset);
+            final int blockIndex = block.getInt(StreamSnapshotDataTarget.blockIndexOffset);
 
             if (!m_schemas.containsKey(tableId)) {
                 VoltDB.crashLocalVoltDB("No schema for table with ID " + tableId,
