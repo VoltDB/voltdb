@@ -130,7 +130,21 @@ public class MeshArbiter {
                         + CoreUtils.hsIdToString(fm.failedSite));
             }
         },
-        ReportingFailed {
+        ReporterFailed {
+            @Override
+            void log(FaultMessage fm) {
+                m_recoveryLog.info("Agreement, Discarding " + name() + " "
+                        + CoreUtils.hsIdToString(fm.reportingSite));
+            }
+        },
+        Unknown {
+            @Override
+            void log(FaultMessage fm) {
+                m_recoveryLog.info("Agreement, Discarding " + name() + " "
+                        + CoreUtils.hsIdToString(fm.failedSite));
+            }
+        },
+        ReporterUnknown {
             @Override
             void log(FaultMessage fm) {
                 m_recoveryLog.info("Agreement, Discarding " + name() + " "
@@ -166,7 +180,7 @@ public class MeshArbiter {
         abstract void log(FaultMessage fm);
     }
 
-    protected Discard mayIgnore(FaultMessage fm) {
+    protected Discard mayIgnore(Set<Long> hsIds, FaultMessage fm) {
         Boolean alreadyWitnessed = m_inTrouble.get(fm.failedSite);
 
         if (fm.failedSite == m_hsId) {
@@ -174,7 +188,11 @@ public class MeshArbiter {
         } else if (m_failedSites.contains(fm.failedSite)) {
             return Discard.AlreadyFailed;
         } else if (m_failedSites.contains(fm.reportingSite)) {
-            return Discard.ReportingFailed;
+            return Discard.ReporterFailed;
+        } else if (!hsIds.contains(fm.failedSite)) {
+            return Discard.Unknown;
+        } else if (!hsIds.contains(fm.reportingSite)) {
+            return Discard.ReporterUnknown;
         } else if (!fm.witnessed && fm.reportingSite == m_hsId) {
             return Discard.SelfUnwitnessed;
         } else if (   alreadyWitnessed != null
@@ -205,7 +223,7 @@ public class MeshArbiter {
         final Subject [] justFailures = new Subject [] { Subject.FAILURE };
         boolean proceed = false;
         do {
-            Discard ignoreIt = mayIgnore(fm);
+            Discard ignoreIt = mayIgnore(hsIds,fm);
             if (Discard.DoNot == ignoreIt) {
                 m_inTrouble.put(fm.failedSite,fm.witnessed);
                 m_recoveryLog.info("Agreement, Processing " + fm);
@@ -428,7 +446,7 @@ public class MeshArbiter {
                  */
                 FaultMessage fm = (FaultMessage)m;
 
-                Discard ignoreIt = mayIgnore(fm);
+                Discard ignoreIt = mayIgnore(hsIds,fm);
                 if (Discard.DoNot == ignoreIt) {
                     m_mailbox.deliverFront(m);
                     m_recoveryLog.info("Agreement, Detected a concurrent failure from FaultDistributor, new failed site "
