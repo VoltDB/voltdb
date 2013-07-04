@@ -24,6 +24,7 @@ import org.voltcore.messaging.VoltMessage;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Thread that blocks on the receipt of Acks.
@@ -37,15 +38,18 @@ public class StreamSnapshotAckReceiver implements Runnable {
 
     private final Mailbox m_mb;
     private final Map<Long, AckCallback> m_callbacks;
+    private final AtomicInteger m_expectedEOFs;
 
     volatile Exception m_lastException = null;
 
     public StreamSnapshotAckReceiver(Mailbox mb) {
         m_mb = mb;
         m_callbacks = Collections.synchronizedMap(new HashMap<Long, AckCallback>());
+        m_expectedEOFs = new AtomicInteger();
     }
 
     public void setCallback(long targetId, AckCallback callback) {
+        m_expectedEOFs.incrementAndGet();
         m_callbacks.put(targetId, callback);
     }
 
@@ -66,8 +70,15 @@ public class StreamSnapshotAckReceiver implements Runnable {
                 RejoinDataAckMessage ackMsg = (RejoinDataAckMessage) msg;
 
                 if (ackMsg.isEOS()) {
-                    // EOS message indicates end of stream
-                    break;
+                    // EOS message indicates end of stream.
+                    // The receiver is shared by multiple data targets, each of them will
+                    // send an end of stream message, must wait until all end of stream
+                    // messages are received before terminating the thread.
+                    if (m_expectedEOFs.decrementAndGet() == 0) {
+                        break;
+                    } else {
+                        continue;
+                    }
                 }
 
                 // TestMidRejoinDeath ignores acks to trigger the watchdog
@@ -77,7 +88,8 @@ public class StreamSnapshotAckReceiver implements Runnable {
 
                 AckCallback ackCallback = m_callbacks.get(ackMsg.getTargetId());
                 if (ackCallback == null) {
-
+                    rejoinLog.error("Unknown target ID " + ackMsg.getTargetId() +
+                                    " in stream snapshot ack message");
                 } else {
                     ackCallback.receiveAck(ackMsg.getBlockIndex());
                 }

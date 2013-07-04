@@ -98,7 +98,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         m_destHSId = HSId;
         m_mb = mb;
         m_sender = sender;
-        m_sender.m_bytesSent.put(m_targetId, new AtomicLong());
+        m_sender.registerDataTarget(m_targetId);
         m_ackReceiver = ackReceiver;
         m_ackReceiver.setCallback(m_targetId, this);
 
@@ -308,6 +308,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     public static class SnapshotSender implements Runnable {
         private final Mailbox m_mb;
         private final LinkedBlockingQueue<SendWork> m_workQueue;
+        private final AtomicInteger m_expectedEOFs;
 
         final Map<Long, AtomicLong> m_bytesSent;
         volatile Exception m_lastException = null;
@@ -316,7 +317,14 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         {
             m_mb = mb;
             m_workQueue = new LinkedBlockingQueue<SendWork>();
+            m_expectedEOFs = new AtomicInteger();
             m_bytesSent = Collections.synchronizedMap(new HashMap<Long, AtomicLong>());
+        }
+
+        public void registerDataTarget(long targetId)
+        {
+            m_expectedEOFs.incrementAndGet();
+            m_bytesSent.put(targetId, new AtomicLong());
         }
 
         public void offer(SendWork work)
@@ -339,8 +347,15 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                         rejoinLog.warn("No stream snapshot send work was produced in the past 10 minutes");
                         break;
                     } else if (work.m_isEmpty) {
-                        // Empty work indicates the end of the queue
-                        break;
+                        // Empty work indicates the end of the queue.
+                        // The sender is shared by multiple data targets, each of them will
+                        // send an end-of-queue work, must wait until all end-of-queue works
+                        // are received before terminating the thread.
+                        if (m_expectedEOFs.decrementAndGet() == 0) {
+                            break;
+                        } else {
+                            continue;
+                        }
                     }
 
                     m_bytesSent.get(work.m_targetId).addAndGet(work.doWork(m_mb));
