@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -164,6 +163,8 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             StreamSnapshotAckReceiver ackReceiver = new StreamSnapshotAckReceiver(mb);
             new Thread(sender, "Stream Snapshot Sender").start();
             new Thread(ackReceiver, "Stream Snapshot Ack Receiver").start();
+            // The mailbox will be removed after all snapshot data targets are finished
+            SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(createCompletionTask(mb));
 
             // Create data target for each source HSID in each stream
             for (StreamSnapshotRequestConfig.Stream stream : localStreams) {
@@ -183,6 +184,19 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         }
 
         return sdts;
+    }
+
+    /**
+     * Remove the mailbox from the host messenger after all data targets are done.
+     */
+    private Runnable createCompletionTask(final Mailbox mb)
+    {
+        return new Runnable() {
+            @Override
+            public void run() {
+                VoltDB.instance().getHostMessenger().removeMailbox(mb.getHSId());
+            }
+        };
     }
 
     private void coalesceTruncationSnapshotPlan(String file_path, String file_nonce, long txnId,
