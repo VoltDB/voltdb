@@ -59,6 +59,14 @@
 #include <cstdio>
 #include "harness.h"
 
+// A custom assert macro that avoids "unused variable" warnings when compiled
+// away.
+#ifdef NDEBUG
+#undef assert
+#define assert(x) ((void)(x))
+#endif
+
+
 using std::string;
 using stupidunit::ChTempDir;
 
@@ -229,6 +237,13 @@ bool testAssertTrue() {
 
 // Test the EXPECT_DEATH macro. Note: This should *not* produce any output.
 TEST(ExpectDeath, FailsToDie) {
+    // Skip expectDeath in non-debug builds because overwriting memory doesn't
+    // always cause release builds to crash.
+#ifndef DEBUG
+    printf("SKIPPED: testing expectDeath due to non-debug build.\n");
+    return;
+#endif
+
     static const char MSG[] = "THIS TEXT SHOULD BE CAPTURED AND NOT VISIBLE";
     class DeathTest : public TestTemplate {
     public:

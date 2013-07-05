@@ -69,10 +69,10 @@
 using std::string;
 
 // A custom assert macro that avoids "unused variable" warnings when compiled
-// away. Inspired by: http://powerof2games.com/node/10
+// away.
 #ifdef NDEBUG
 #undef assert
-#define assert(x) do { (void)sizeof(x); } while(0)
+#define assert(x) ((void)(x))
 #endif
 
 
