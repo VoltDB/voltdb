@@ -23,34 +23,33 @@
 #include <ctime>
 #include "common/SQLException.h"
 
-static inline boost::gregorian::date date_from_epoch_micros(int64_t epoch_micros) {
-    time_t epoch_seconds = epoch_micros / 1000000;
-    return boost::posix_time::from_time_t(epoch_seconds).date();
-}
-
-static inline boost::posix_time::time_duration time_of_day_from_epoch_micros(int64_t epoch_micros) {
-    time_t epoch_seconds = epoch_micros / 1000000;
-    return boost::posix_time::from_time_t(epoch_seconds).time_of_day();
-}
-
 static const boost::posix_time::ptime EPOCH(boost::gregorian::date(1970,1,1));
 static const int64_t GREGORIAN_EPOCH = -12212553600000000;  // 1583-01-01 00:00:00
 static const int8_t QUARTER_START_MONTH_BY_MONTH[] = {
         /*[0] not used*/-1,  1, 1, 1,  4, 4, 4,  7, 7, 7,  10, 10, 10 };
 
 /** Convert from epoch_micros to date **/
-static void micros_to_date(int64_t epoch_micros_in, boost::gregorian::date& date_out) {
+static inline void micros_to_date(int64_t epoch_micros_in, boost::gregorian::date& date_out) {
     if (epoch_micros_in < GREGORIAN_EPOCH) {
         throw voltdb::SQLException(voltdb::SQLException::data_exception_numeric_value_out_of_range,
                 "Value out of range. Cannot convert dates prior to the year 1583");
     }
     boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros_in);
     date_out = input_ptime.date();
+}
 
+/** Convert from epoch_micros to time **/
+static inline void micros_to_time(int64_t epoch_micros_in, boost::posix_time::time_duration& time_out) {
+    if (epoch_micros_in < GREGORIAN_EPOCH) {
+        throw voltdb::SQLException(voltdb::SQLException::data_exception_numeric_value_out_of_range,
+                "Value out of range. Cannot convert dates prior to the year 1583");
+    }
+    boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros_in);
+    time_out = input_ptime.time_of_day();
 }
 
 /** Convert from epoch_micros to date and time **/
-static void micros_to_date_and_time(int64_t epoch_micros_in, boost::gregorian::date& date_out,
+static inline void micros_to_date_and_time(int64_t epoch_micros_in, boost::gregorian::date& date_out,
         boost::posix_time::time_duration& time_out) {
     if (epoch_micros_in < GREGORIAN_EPOCH) {
         throw voltdb::SQLException(voltdb::SQLException::data_exception_numeric_value_out_of_range,
@@ -62,7 +61,7 @@ static void micros_to_date_and_time(int64_t epoch_micros_in, boost::gregorian::d
 }
 
 /** Convert from timestamp to micros since epoch **/
-static int64_t epoch_microseconds_from_components(unsigned short int year, unsigned short int month = 1,
+static inline int64_t epoch_microseconds_from_components(unsigned short int year, unsigned short int month = 1,
         unsigned short int day = 1, int hour = 0, int minute = 0, int second = 0) {
     boost::gregorian::date goal_date = boost::gregorian::date(year, month, day);
     boost::posix_time::ptime goal_ptime =
@@ -81,7 +80,8 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_YEAR>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    boost::gregorian::date as_date;
+    micros_to_date(epoch_micros, as_date);
     return getIntegerValue(as_date.year());
 }
 
@@ -91,7 +91,8 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_MONTH>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    boost::gregorian::date as_date;
+    micros_to_date(epoch_micros, as_date);
     return getTinyIntValue((int8_t)as_date.month());
 }
 
@@ -101,7 +102,8 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_DAY>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    boost::gregorian::date as_date;
+    micros_to_date(epoch_micros, as_date);
     return getTinyIntValue((int8_t)as_date.day());
 }
 
@@ -111,7 +113,8 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_DAY_OF_WEEK>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    boost::gregorian::date as_date;
+    micros_to_date(epoch_micros, as_date);
     return getTinyIntValue((int8_t)(as_date.day_of_week() + 1)); // Have 0-based, want 1-based.
 }
 
@@ -121,7 +124,8 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_WEEK_OF_YEAR>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    boost::gregorian::date as_date;
+    micros_to_date(epoch_micros, as_date);
     return getTinyIntValue((int8_t)as_date.week_number());
 }
 
@@ -131,7 +135,8 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_DAY_OF_YEAR>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    boost::gregorian::date as_date;
+    micros_to_date(epoch_micros, as_date);
     return getSmallIntValue((int16_t)as_date.day_of_year());
 }
 
@@ -141,7 +146,8 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_QUARTER>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    boost::gregorian::date as_date;
+    micros_to_date(epoch_micros, as_date);
     return getTinyIntValue((int8_t)((as_date.month() + 2) / 3));
 }
 
@@ -152,7 +158,8 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_HOUR>() const {
     }
     int64_t epoch_micros = getTimestamp();
     // time_of_day manages the wrap at 24 hours
-    boost::posix_time::time_duration as_time = time_of_day_from_epoch_micros(epoch_micros);
+    boost::posix_time::time_duration as_time;
+    micros_to_time(epoch_micros, as_time);
     return getTinyIntValue((int8_t)as_time.hours());
 }
 
