@@ -41,17 +41,20 @@ import com.google.common.collect.TreeMultimap;
 import com.google.common.primitives.Longs;
 import org.json_voltpatches.JSONObject;
 
+import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 
 import org.voltdb.PostSnapshotTask;
 import org.voltdb.TheHashinator;
+import org.voltdb.VoltDB;
 import org.voltdb.catalog.Table;
 
 import org.voltdb.dtxn.SiteTracker;
 
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.HashRangeExpression;
+import org.voltdb.rejoin.StreamSnapshotAckReceiver;
 import org.voltdb.rejoin.StreamSnapshotDataTarget;
 
 import org.voltdb.SnapshotDataFilter;
@@ -64,7 +67,6 @@ import org.voltdb.SystemProcedureExecutionContext;
 
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.VoltTable;
-import org.voltdb.utils.MiscUtils;
 
 /**
  * Create a snapshot write plan for snapshots streamed to other sites
@@ -129,21 +131,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             schemas.put(table.getRelativeIndex(), schemaTable.getSchemaBytes());
         }
 
-        // Create data target for each source HSID in each stream
-        List<DataTargetInfo> sdts = Lists.newArrayList();
-        for (StreamSnapshotRequestConfig.Stream stream : localStreams) {
-            SNAP_LOG.debug("Sites to stream from: " +
-                           CoreUtils.hsIdCollectionToString(stream.streamPairs.keySet()));
-            for (Entry<Long, Long> entry : stream.streamPairs.entries()) {
-                long srcHSId = entry.getKey();
-                long destHSId = entry.getValue();
-
-                sdts.add(new DataTargetInfo(stream,
-                                            srcHSId,
-                                            destHSId,
-                                            new StreamSnapshotDataTarget(destHSId, schemas)));
-            }
-        }
+        List<DataTargetInfo> sdts = createDataTargets(localStreams, schemas);
 
         // Pick a pair of source to destination for each stream to ship the replicated table data.
         Multimap<Long, Long> replicatedSrcToDst = pickOnePairPerStream(config.streams);
@@ -162,6 +150,53 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         }
 
         return false;
+    }
+
+    private List<DataTargetInfo> createDataTargets(List<StreamSnapshotRequestConfig.Stream> localStreams,
+                                                   Map<Integer, byte[]> schemas)
+    {
+        List<DataTargetInfo> sdts = Lists.newArrayList();
+
+        if (!localStreams.isEmpty()) {
+            Mailbox mb = VoltDB.instance().getHostMessenger().createMailbox();
+            StreamSnapshotDataTarget.SnapshotSender sender = new StreamSnapshotDataTarget.SnapshotSender(mb);
+            StreamSnapshotAckReceiver ackReceiver = new StreamSnapshotAckReceiver(mb);
+            new Thread(sender, "Stream Snapshot Sender").start();
+            new Thread(ackReceiver, "Stream Snapshot Ack Receiver").start();
+            // The mailbox will be removed after all snapshot data targets are finished
+            SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(createCompletionTask(mb));
+
+            // Create data target for each source HSID in each stream
+            for (StreamSnapshotRequestConfig.Stream stream : localStreams) {
+                SNAP_LOG.debug("Sites to stream from: " +
+                               CoreUtils.hsIdCollectionToString(stream.streamPairs.keySet()));
+                for (Entry<Long, Long> entry : stream.streamPairs.entries()) {
+                    long srcHSId = entry.getKey();
+                    long destHSId = entry.getValue();
+
+                    sdts.add(new DataTargetInfo(stream,
+                                                srcHSId,
+                                                destHSId,
+                                                new StreamSnapshotDataTarget(destHSId, schemas, mb,
+                                                                             sender, ackReceiver)));
+                }
+            }
+        }
+
+        return sdts;
+    }
+
+    /**
+     * Remove the mailbox from the host messenger after all data targets are done.
+     */
+    private Runnable createCompletionTask(final Mailbox mb)
+    {
+        return new Runnable() {
+            @Override
+            public void run() {
+                VoltDB.instance().getHostMessenger().removeMailbox(mb.getHSId());
+            }
+        };
     }
 
     private void coalesceTruncationSnapshotPlan(String file_path, String file_nonce, long txnId,
