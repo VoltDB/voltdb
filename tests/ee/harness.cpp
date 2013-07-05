@@ -308,6 +308,13 @@ ChTempDir::~ChTempDir() {
 
 // TODO: Capture and match client output
 ExpectDeathStatus expectDeath() {
+    // Skip expectDeath in non-debug builds because overwriting memory doesn't
+    // always cause release builds to crash.
+#ifndef DEBUG
+    printf("SKIPPED: expectDeath test due to non-debug build.\n");
+    return SUCCESS;
+#endif
+
     // Create a pipe for the child's output
     int pipe_descriptors[2];
     int error = pipe(pipe_descriptors);
