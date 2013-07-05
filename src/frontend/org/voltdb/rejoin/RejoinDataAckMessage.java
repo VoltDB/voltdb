@@ -28,37 +28,62 @@ import org.voltdb.messaging.VoltDbMessageFactory;
  *
  */
 public class RejoinDataAckMessage extends VoltMessage {
+    private long m_targetId = -1;
     private int m_blockIndex = -1;
+
+    // Indicate end of stream. Only sent locally, not serialized
+    private final boolean m_isEOS;
 
     public RejoinDataAckMessage() {
         m_subject = Subject.DEFAULT.getId();
+        m_isEOS = false;
     }
 
-    public RejoinDataAckMessage(int blockIndex) {
+    /**
+     * Create an end-of-stream message to terminate the ack thread
+     */
+    public RejoinDataAckMessage(boolean isEOS) {
+        m_isEOS = isEOS;
+    }
+
+    public RejoinDataAckMessage(long targetId, int blockIndex) {
         m_subject = Subject.DEFAULT.getId();
+        m_targetId = targetId;
         m_blockIndex = blockIndex;
+        m_isEOS = false;
+    }
+
+    public long getTargetId() {
+        return m_targetId;
     }
 
     public int getBlockIndex() {
         return m_blockIndex;
     }
 
+    public boolean isEOS() {
+        return m_isEOS;
+    }
+
     @Override
     public int getSerializedSize() {
         int msgsize = super.getSerializedSize();
         msgsize +=
-                4; // m_blockIndex
+                8 + // m_targetId
+                4;  // m_blockIndex
         return msgsize;
     }
 
     @Override
     protected void initFromBuffer(ByteBuffer buf) throws IOException {
+        m_targetId = buf.getLong();
         m_blockIndex = buf.getInt();
     }
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
         buf.put(VoltDbMessageFactory.REJOIN_DATA_ACK_ID);
+        buf.putLong(m_targetId);
         buf.putInt(m_blockIndex);
         buf.limit(buf.position());
     }
