@@ -113,9 +113,9 @@
                     <th>Name</th>
                     <th>Type</th>
                     <th>Partitioning</th>
-                    <th>Column Count</th>
-                    <th>Index Count</th>
-                    <th>Has Pkey</th>
+                    <th>Columns</th>
+                    <th>Indexes</th>
+                    <th>Pkey</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -302,8 +302,8 @@
             // tooltips
             $('.l-Table').popover({trigger:'focus hover',delay:{show:500,hide:100},content:
                 'Persistent Relational Table'});
-            $('.l-MaterialziedView').popover({trigger:'focus hover',delay:{show:500,hide:100},content:
-                'Pre-Materialzied View'});
+            $('.l-MaterializedView').popover({trigger:'focus hover',delay:{show:500,hide:100},content:
+                'Views are always materialized and incrementally maintained.'});
             $('.l-Replicated').popover({trigger:'focus hover',delay:{show:500,hide:100},content:
                 'Table data is present at all partitions. Updates are a multi-partition operation.'});
             $('.l-Partitioned').popover({trigger:'focus hover',delay:{show:500,hide:100},content:

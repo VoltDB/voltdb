@@ -31,6 +31,7 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
@@ -165,12 +166,22 @@ public class ReportMaker {
         sb.append("</td>");
 
         // column 3: partitioning
-        sb.append("<td>");
+        sb.append("<td style='whitespace: nowrap;'>");
         if (table.getIsreplicated()) {
             tag(sb, "warning", "Replicated");
         }
         else {
             tag(sb, "success", "Partitioned");
+            Column partitionCol = table.getPartitioncolumn();
+            if (partitionCol != null) {
+                sb.append("<small> on " + partitionCol.getName() + "</small>");
+            }
+            else {
+                Table matSrc = table.getMaterializer();
+                if (matSrc != null) {
+                    sb.append("<small> with " + matSrc.getTypeName() + "</small>");
+                }
+            }
         }
         sb.append("</td>");
 
