@@ -158,7 +158,7 @@ public class MeshArbiter {
                         + CoreUtils.hsIdToString(fm.failedSite));
             }
         },
-        AlreadyWitnessed {
+        AlreadyKnow {
             @Override
             void log(FaultMessage fm) {
                 m_recoveryLog.info("Agreement, Discarding " + name() + " "
@@ -197,11 +197,12 @@ public class MeshArbiter {
             return Discard.SelfUnwitnessed;
         } else if (   alreadyWitnessed != null
                    && (alreadyWitnessed || alreadyWitnessed == fm.witnessed)) {
-            return Discard.AlreadyWitnessed;
+            return Discard.AlreadyKnow;
         } else if (   !fm.witnessed
                     && m_inTrouble.isEmpty()
                     && m_staleUnwitnessed.contains(fm.failedSite)
-                    && Sets.filter(fm.survivors, in(m_failedSites)).size() > 0) {
+                    && (   Sets.filter(fm.survivors, in(m_failedSites)).size() > 0
+                        || fm.survivors.equals(m_seeker.getSurvivors()))) {
             return Discard.StaleUnwinessed;
         } else {
             return Discard.DoNot;
@@ -259,7 +260,7 @@ public class MeshArbiter {
             m_failedSitesCount = m_failedSites.size();
 
             m_recoveryLog.info(
-                    "Adding "
+                    "Agreement, Adding "
                   + CoreUtils.hsIdCollectionToString(lastTxnIdByFailedSite.keySet())
                   + " to failed sites history");
 

@@ -349,13 +349,13 @@ public class TestFuzzMeshArbiter extends TestCase
     {
         long seed = System.currentTimeMillis();
         System.out.println("SEED: " + seed);
-        constructCluster(15);
+        constructCluster(20);
         while (!getNodesInState(NodeState.START).isEmpty()) {
             Thread.sleep(50);
         }
         FuzzTestState state = new FuzzTestState(seed, m_nodes.keySet());
 
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 5; i++) {
             if (state.m_rand.nextInt(100) < 50) {
                 state.killRandomNode();
             }
