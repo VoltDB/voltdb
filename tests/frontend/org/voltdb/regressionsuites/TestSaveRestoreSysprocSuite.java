@@ -52,6 +52,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
+import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
@@ -64,6 +65,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
+import org.voltdb.sysprocs.SnapshotRestore;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.SnapshotConverter;
 import org.voltdb.utils.SnapshotVerifier;
@@ -1516,6 +1518,51 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
         assertTrue(threwException);
 
+        /*
+         * Now check that doing a restore and logging duplicates works.
+         * Delete the ZK nodes created by the restore already done and
+         * it will go again.
+         */
+        VoltDB.instance().getHostMessenger().getZK().delete(VoltZK.restoreMarker, -1);
+        VoltDB.instance().getHostMessenger().getZK().delete(VoltZK.perPartitionTxnIds, -1);
+        threwException = false;
+        try
+        {
+            JSONObject jsObj = new JSONObject();
+            jsObj.put(SnapshotRestore.JSON_NONCE, TESTNONCE);
+            jsObj.put(SnapshotRestore.JSON_PATH, TMPDIR);
+            jsObj.put(SnapshotRestore.JSON_DUPLICATES_PATH, TMPDIR);
+
+            results = client.callProcedure("@SnapshotRestore", jsObj.toString()).getResults();
+
+            while (results[0].advanceRow()) {
+                if (results[0].getString("RESULT").equals("FAILURE")) {
+                    fail(results[0].getString("ERR_MSG"));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            threwException = true;
+        }
+        assertFalse(threwException);
+
+        /*
+         * Assert a non-empty CSV file containing duplicates was created
+         */
+        boolean haveCSVFile = false;
+        for (File f : new File(TMPDIR).listFiles()) {
+          final String name = f.getName();
+          if (name.startsWith("PARTITION_TESTER") && name.endsWith(".csv")) {
+              haveCSVFile = true;
+              if (!(f.length() > 30000)) {
+                  //It should be about 37k, make sure it isn't unusually small
+                  fail("Duplicates file is not as large as expected");
+              }
+          }
+        }
+        assertTrue(haveCSVFile);
+
         checkTable(client, "PARTITION_TESTER", "PT_ID",
                    num_partitioned_items_per_chunk * num_partitioned_chunks);
 
@@ -2012,6 +2059,9 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             ex.printStackTrace();
             fail("SnapshotRestore exception: " + ex.getMessage());
         }
+
+        // because stats are not synchronous :(
+        Thread.sleep(5000);
 
         // XXX consider adding a check that the newly materialized table is
         // not loaded

@@ -24,6 +24,8 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
+import org.voltdb.utils.CachedByteBufferAllocator;
+import org.voltdb.utils.FixedDBBPool;
 
 /**
  * Takes the decompressed snapshot blocks and pass them to EE. Once constructed,
@@ -33,7 +35,7 @@ import org.voltdb.VoltDB;
  *
  * This class is not thread-safe.
  */
-public class StreamSnapshotSink implements RejoinSiteProcessor {
+public class StreamSnapshotSink {
     private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
 
     private Mailbox m_mb = null;
@@ -44,16 +46,13 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
     private boolean m_EOF = false;
     // Schema of the table currently streaming
     private byte[] m_schema = null;
-    // buffer for a single block
-    private ByteBuffer m_buffer = null;
     private long m_bytesReceived = 0;
 
-    @Override
-    public long initialize() {
+    public long initialize(FixedDBBPool bufferPool) {
         // Mailbox used to transfer snapshot data
         m_mb = VoltDB.instance().getHostMessenger().createMailbox();
 
-        m_in = new StreamSnapshotDataReceiver(m_mb);
+        m_in = new StreamSnapshotDataReceiver(m_mb, bufferPool);
         m_inThread = new Thread(m_in, "Snapshot data receiver");
         m_inThread.setDaemon(true);
         m_ack = new StreamSnapshotAckSender(m_mb);
@@ -64,16 +63,18 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
         return m_mb.getHSId();
     }
 
-    @Override
     public boolean isEOF() {
         return m_EOF;
     }
 
-    @Override
     public void close() {
         if (m_in != null) {
             m_in.close();
-            // No need to join in thread, once socket is closed, it will exit
+            // Interrupt the thread in case it's blocked on mailbox recv.
+            m_inThread.interrupt();
+            try {
+                m_inThread.join();
+            } catch (InterruptedException e) {}
         }
 
         if (m_ack != null) {
@@ -91,14 +92,6 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
         }
     }
 
-    private ByteBuffer getOutputBuffer(int length) {
-        if (m_buffer == null || m_buffer.capacity() < length) {
-            m_buffer = ByteBuffer.allocate(length);
-        }
-        m_buffer.clear();
-        return m_buffer;
-    }
-
     /**
      * Assemble the chunk so that it can be used to construct the VoltTable that
      * will be passed to EE.
@@ -106,11 +99,11 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
      * @param buf
      * @return
      */
-    private ByteBuffer getNextChunk(ByteBuffer buf) {
+    private ByteBuffer getNextChunk(ByteBuffer buf, CachedByteBufferAllocator resultBufferAllocator) {
         buf.position(buf.position() + 4);//skip partition id
         int length = m_schema.length + buf.remaining();
 
-        ByteBuffer outputBuffer = getOutputBuffer(length);
+        ByteBuffer outputBuffer = resultBufferAllocator.allocate(length);
         outputBuffer.put(m_schema);
         outputBuffer.put(buf);
         outputBuffer.flip();
@@ -118,8 +111,8 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
         return outputBuffer;
     }
 
-    @Override
-    public Pair<Integer, ByteBuffer> take() throws InterruptedException {
+    public Pair<Integer, ByteBuffer> take(CachedByteBufferAllocator resultBufferAllocator)
+        throws InterruptedException {
         if (m_in == null || m_ack == null) {
             // terminated already
             return null;
@@ -128,7 +121,7 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
         Pair<Integer, ByteBuffer> result = null;
         while (!m_EOF) {
             Pair<Long, BBContainer> msg = m_in.take();
-            result = processMessage(msg);
+            result = processMessage(msg, resultBufferAllocator);
             if (result != null) {
                 break;
             }
@@ -137,15 +130,14 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
         return result;
     }
 
-    @Override
-    public Pair<Integer, ByteBuffer> poll() {
+    public Pair<Integer, ByteBuffer> poll(CachedByteBufferAllocator resultBufferAllocator) {
         if (m_in == null || m_ack == null) {
             // not initialized yet or terminated already
             return null;
         }
 
         Pair<Long, BBContainer> msg = m_in.poll();
-        return processMessage(msg);
+        return processMessage(msg, resultBufferAllocator);
     }
 
     /**
@@ -156,7 +148,8 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
      * @return The processed message, or null if there's no data block to return
      *         to the site.
      */
-    private Pair<Integer, ByteBuffer> processMessage(Pair<Long, BBContainer> msg) {
+    private Pair<Integer, ByteBuffer> processMessage(Pair<Long, BBContainer> msg,
+                                                     CachedByteBufferAllocator resultBufferAllocator) {
         if (msg == null) {
             return null;
         }
@@ -202,7 +195,7 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
 
             // Get the byte buffer ready to be consumed
             block.position(StreamSnapshotDataTarget.contentOffset);
-            ByteBuffer nextChunk = getNextChunk(block);
+            ByteBuffer nextChunk = getNextChunk(block, resultBufferAllocator);
             m_bytesReceived += nextChunk.remaining();
 
             // Queue ack to this block
@@ -214,7 +207,6 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
         }
     }
 
-    @Override
     public long bytesTransferred() {
         return m_bytesReceived;
     }

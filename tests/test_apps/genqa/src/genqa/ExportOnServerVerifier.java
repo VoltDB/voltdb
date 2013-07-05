@@ -62,6 +62,7 @@ import java.util.zip.GZIPOutputStream;
 import org.spearce_voltpatches.jgit.transport.OpenSshConfig;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
+import org.voltdb.common.Constants;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.types.TimestampType;
 
@@ -784,7 +785,7 @@ public class ExportOnServerVerifier {
     {
         final String trackerFileName = rh.path + "/" + TRACKER_FILENAME;
         final ByteArrayInputStream bis = new ByteArrayInputStream(
-                new String("__DUMMY__").getBytes(VoltDB.UTF8ENCODING)
+                new String("__DUMMY__").getBytes(Constants.UTF8ENCODING)
                 );
         rh.channel.put(bis,trackerFileName);
     }

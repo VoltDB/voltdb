@@ -222,6 +222,6 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
 
     @Override
     protected String explainPlanForNode(String indent) {
-        return "NESTLOOP INDEX " + this.m_joinType.toString() + " JOIN";
+        return "NESTLOOP INDEX " + this.m_joinType.toString() + " JOIN" + explainFilters(indent);
     }
 }

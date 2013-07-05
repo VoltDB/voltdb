@@ -31,10 +31,10 @@ import java.util.Random;
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.VoltDB;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.BufferArrayProc;
 import org.voltdb_testprocs.regressionsuites.LastBatchLie;
@@ -142,7 +142,7 @@ public class TestProcedureAPISuite extends RegressionSuite {
         Client client = getClient();
         byte[][] data = new byte[10][];
         for (int i = 0; i < data.length; i++) {
-            data[i] = "Hello".getBytes(VoltDB.UTF8ENCODING);
+            data[i] = "Hello".getBytes(Constants.UTF8ENCODING);
         }
         String[] data3 = new String[3];
         data3[0] = "AAbbff00";

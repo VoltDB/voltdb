@@ -49,9 +49,9 @@ public class LoadWarehouseReplicated extends VoltProcedure {
                 return null;
 
             // now we know the partition is not loaded yet
-            voltLoadTable("cluster", "database", "ITEM", items);
+            voltLoadTable("cluster", "database", "ITEM", items, false);
         }
-        voltLoadTable("cluster", "database", "CUSTOMER_NAME", customerNames);
+        voltLoadTable("cluster", "database", "CUSTOMER_NAME", customerNames, false);
         return null;
     }
 

@@ -43,12 +43,15 @@ CTX = BuildContext(sys.argv)
 CTX.CPPFLAGS += """-Wall -Wextra -Werror -Woverloaded-virtual
             -Wpointer-arith -Wcast-qual -Wwrite-strings
             -Winit-self -Wno-sign-compare -Wno-unused-parameter
-            -pthread
             -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK
             -fno-omit-frame-pointer
             -fvisibility=default -DBOOST_SP_DISABLE_THREADS"""
 
-if gcc_major == 4 and gcc_minor >= 3:
+# clang doesn't seem to want this
+if compiler_name == 'gcc':
+    CTX.CPPFLAGS += " -pthread"
+
+if (compiler_name != 'gcc') or (compiler_major == 4 and compiler_minor >= 3):
     CTX.CPPFLAGS += " -Wno-ignored-qualifiers -fno-strict-aliasing"
 
 if CTX.PROFILE:
@@ -235,6 +238,7 @@ CTX.INPUT['executors'] = """
  insertexecutor.cpp
  limitexecutor.cpp
  materializeexecutor.cpp
+ materializedscanexecutor.cpp
  nestloopexecutor.cpp
  nestloopindexexecutor.cpp
  orderbyexecutor.cpp
@@ -249,7 +253,7 @@ CTX.INPUT['executors'] = """
 CTX.INPUT['expressions'] = """
  abstractexpression.cpp
  expressionutil.cpp
- inlistbuilderexpression.cpp
+ vectorexpression.cpp
  functionexpression.cpp
  tupleaddressexpression.cpp
 """
@@ -268,6 +272,7 @@ CTX.INPUT['plannodes'] = """
  insertnode.cpp
  limitnode.cpp
  materializenode.cpp
+ materializedscanplannode.cpp
  nestloopindexnode.cpp
  nestloopnode.cpp
  orderbynode.cpp
@@ -291,8 +296,11 @@ CTX.INPUT['indexes'] = """
 CTX.INPUT['storage'] = """
  constraintutil.cpp
  CopyOnWriteContext.cpp
+ ElasticContext.cpp
  CopyOnWriteIterator.cpp
  ConstraintFailureException.cpp
+ TableStreamer.cpp
+ ElasticScanner.cpp
  MaterializedViewMetadata.cpp
  persistenttable.cpp
  PersistentTableStats.cpp
@@ -302,7 +310,6 @@ CTX.INPUT['storage'] = """
  TableCatalogDelegate.cpp
  tablefactory.cpp
  TableStats.cpp
- TableStreamer.cpp
  tableutil.cpp
  temptable.cpp
  TempTableLimits.cpp

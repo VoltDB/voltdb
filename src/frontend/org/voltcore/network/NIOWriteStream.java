@@ -25,8 +25,8 @@ import java.util.ArrayDeque;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DeferredSerialization;
-import org.voltcore.utils.EstTime;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.EstTime;
 
 /**
 *

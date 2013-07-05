@@ -450,4 +450,53 @@ public class TestLeaderAppointer extends ZKTestBase {
         // this should not trip partition detection
         assertFalse(LeaderAppointer.makePPDDecision(previous, current));
     }
+
+    @Test
+    public void testAddPartition() throws Exception
+    {
+        // run once to get to a startup state
+        configure(2, 2, 1, false);
+        VoltDB.ignoreCrash = true;
+        Thread dutthread = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    m_dut.acceptPromotion();
+                } catch (Exception e) {
+                }
+            }
+        };
+        dutthread.start();
+        // Need to sleep so we don't write to ZK before the LeaderAppointer appears or we'll crash
+        Thread.sleep(1000);
+        addReplica(0, 0L);
+        addReplica(0, 1L);
+        addReplica(1, 2L);
+        addReplica(1, 3L);
+        waitForAppointee(1);
+        registerLeader(0, m_cache.pointInTimeCache().get(0));
+        registerLeader(1, m_cache.pointInTimeCache().get(1));
+        dutthread.join();
+        assertFalse(VoltDB.wasCrashCalled);
+
+        // Create a partition dir
+        LeaderElector.createRootIfNotExist(m_zk, LeaderElector.electionDirForPartition(2));
+        Thread.sleep(500); // I'm evil
+        assertFalse(VoltDB.wasCrashCalled);
+
+        // Now, add a replica for partition 2, should be promoted
+        m_newAppointee.set(false);
+        addReplica(2, 4L);
+        while (!m_newAppointee.get()) {
+            Thread.sleep(0);
+        }
+        assertEquals(4L, (long)m_cache.pointInTimeCache().get(2));
+
+        // Now deleting the only replica for partition 2 should crash
+        VoltDB.wasCrashCalled = false;
+        deleteReplica(2, m_cache.pointInTimeCache().get(2));
+        while (!VoltDB.wasCrashCalled) {
+            Thread.sleep(0);
+        }
+    }
 }

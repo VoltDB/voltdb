@@ -17,6 +17,7 @@
 
 package org.voltdb.iv2;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -25,6 +26,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -130,6 +132,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         new HashMap<Long, TransactionState>();
     private final Map<DuplicateCounterKey, DuplicateCounter> m_duplicateCounters =
         new HashMap<DuplicateCounterKey, DuplicateCounter>();
+    // MP fragment tasks or completion tasks pending durability
+    private final Map<Long, Queue<TransactionTask>> m_mpsPendingDurability =
+        new HashMap<Long, Queue<TransactionTask>>();
     private CommandLog m_cl;
     private PartitionDRGateway m_drGateway = new PartitionDRGateway(true);
     private final SnapshotCompletionMonitor m_snapMonitor;
@@ -154,6 +159,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 synchronized (m_lock) {
                     for (Object o : durableThings) {
                         m_pendingTasks.offer((TransactionTask)o);
+
+                        // Make sure all queued tasks for this MP txn are released
+                        if (!((TransactionTask) o).getTransactionState().isSinglePartition()) {
+                            offerPendingMPTasks(((TransactionTask) o).getTxnId());
+                        }
                     }
                 }
             }
@@ -804,7 +814,53 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         if (logThis) {
             if (!m_cl.log(msg.getInitiateTask(), msg.getSpHandle(), m_durabilityListener, task)) {
                 m_pendingTasks.offer(task);
+            } else {
+                /* Getting here means that the task is the first fragment of an MP txn and
+                 * synchronous command logging is on, so create a backlog for future tasks of
+                 * this MP arrived before it's marked durable.
+                 *
+                 * This is important for synchronous command logging and MP txn restart. Without
+                 * this, a restarted MP txn may not be gated by logging of the first fragment.
+                 */
+                assert !m_mpsPendingDurability.containsKey(task.getTxnId());
+                m_mpsPendingDurability.put(task.getTxnId(), new ArrayDeque<TransactionTask>());
             }
+        } else {
+            queueOrOfferMPTask(task);
+        }
+    }
+
+    /**
+     * Offer all fragment tasks and complete transaction tasks queued for durability for the given
+     * MP transaction, and remove the entry from the pending map so that future ones won't be
+     * queued.
+     *
+     * @param txnId    The MP transaction ID.
+     */
+    private void offerPendingMPTasks(long txnId)
+    {
+        Queue<TransactionTask> pendingTasks = m_mpsPendingDurability.get(txnId);
+        if (pendingTasks != null) {
+            for (TransactionTask task : pendingTasks) {
+                m_pendingTasks.offer(task);
+            }
+            m_mpsPendingDurability.remove(txnId);
+        }
+    }
+
+    /**
+     * Check if the MP task has to be queued because the first fragment is still being logged
+     * synchronously to the command log. If not, offer it to the transaction task queue.
+     *
+     * @param task    A fragment task or a complete transaction task
+     */
+    private void queueOrOfferMPTask(TransactionTask task)
+    {
+        // The pending map will only have an entry for the transaction if the first fragment is
+        // still pending durability.
+        Queue<TransactionTask> pendingTasks = m_mpsPendingDurability.get(task.getTxnId());
+        if (pendingTasks != null) {
+            pendingTasks.offer(task);
         } else {
             m_pendingTasks.offer(task);
         }
@@ -860,7 +916,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             Iv2Trace.logCompleteTransactionMessage(message, m_mailbox.getHSId());
             final CompleteTransactionTask task =
                 new CompleteTransactionTask(txn, m_pendingTasks, message, m_drGateway);
-            m_pendingTasks.offer(task);
+            queueOrOfferMPTask(task);
             // If this is a restart, then we need to leave the transaction state around
             if (!message.isRestart()) {
                 m_outstandingTxns.remove(message.getTxnId());

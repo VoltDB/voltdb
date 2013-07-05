@@ -68,7 +68,7 @@ public abstract class TheHashinator {
 
     /**
      * Helper method to do the reflection boilerplate to call the constructor
-     * of the selected hashinator and convert the exceptions to runtime excetions.
+     * of the selected hashinator and convert the exceptions to runtime exceptions.
      */
     public static TheHashinator
         constructHashinator(
@@ -188,6 +188,40 @@ public abstract class TheHashinator {
         }
 
         return retval;
+    }
+
+    /**
+     * Converts a byte array with type back to the original partition value.
+     * This is the inverse of {@see TheHashinator#valueToBytes(Object)}.
+     * @param type VoltType of partition parameter.
+     * @param value Byte array representation of partition parameter.
+     * @return Java object of the correct type.
+     */
+    public static Object bytesToValue(VoltType type, byte[] value) {
+        if ((type == VoltType.NULL) || (value == null)) {
+            return null;
+        }
+
+        ByteBuffer buf = ByteBuffer.wrap(value);
+        buf.order(ByteOrder.LITTLE_ENDIAN);
+
+        switch (type) {
+        case BIGINT:
+            return buf.getLong();
+        case STRING:
+            return new String(value, Charsets.UTF_8);
+        case INTEGER:
+            return buf.getInt();
+        case SMALLINT:
+            return buf.getShort();
+        case TINYINT:
+            return buf.get();
+        case VARBINARY:
+            return value;
+        default:
+            throw new RuntimeException(
+                    "TheHashinator#bytesToValue failed to convert a non-partitionable type.");
+        }
     }
 
     /**

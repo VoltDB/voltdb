@@ -15,28 +15,25 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "storage/PersistentTableUndoInsertAction.h"
+package org.voltdb.utils;
 
-namespace voltdb {
+import java.nio.ByteBuffer;
 
-/*
- * Undo whatever this undo action was created to undo
+/**
+ * A ByteBuffer allocator that caches the buffer and reuse it in the future. If the cached buffer
+ * is smaller than the requested size, it will replace the cached buffer with a new buffer that
+ * fits the size.
+ *
+ * Note: this class is not thread-safe.
  */
-void PersistentTableUndoInsertAction::undo() {
-    m_table->deleteTupleForUndo(m_tuple);
-}
+public class CachedByteBufferAllocator {
+    private ByteBuffer m_buffer = null;
 
-/*
- * Release any resources held by the undo action. It will not need to be undone in the future.
- */
-void PersistentTableUndoInsertAction::release() {
-    /*
-     * Do nothing. Tuple stays inserted so no memory needs to be released.
-     */
-}
-
-PersistentTableUndoInsertAction::~PersistentTableUndoInsertAction() {
-    // TODO Auto-generated destructor stub
-}
-
+    public ByteBuffer allocate(int size) {
+        if (m_buffer == null || m_buffer.capacity() < size) {
+            m_buffer = ByteBuffer.allocate(size);
+        }
+        m_buffer.clear();
+        return m_buffer;
+    }
 }
