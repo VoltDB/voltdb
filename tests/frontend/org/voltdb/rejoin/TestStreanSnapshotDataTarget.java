@@ -120,11 +120,15 @@ public class TestStreanSnapshotDataTarget {
     {
         assertEquals(targetId, msg.getTargetId());
 
-        byte[] data = CompressionService.decompressBytes(msg.getData());
-        assertEquals(type.ordinal(), data[StreamSnapshotBase.typeOffset]);
+        ByteBuffer data = ByteBuffer.wrap(CompressionService.decompressBytes(msg.getData()));
+        assertEquals(type.ordinal(), data.get(StreamSnapshotBase.typeOffset));
         if (type != StreamSnapshotMessageType.END && type != StreamSnapshotMessageType.FAILURE) {
-            assertEquals(tableId, data[StreamSnapshotBase.tableIdOffset]);
-            assertEquals(blockIndex, data[StreamSnapshotBase.blockIndexOffset]);
+            assertEquals(tableId, data.getInt(StreamSnapshotBase.tableIdOffset));
+
+            // Only data block has block index
+            if (type == StreamSnapshotMessageType.DATA) {
+                assertEquals(blockIndex, data.getInt(StreamSnapshotBase.blockIndexOffset));
+            }
         }
     }
 

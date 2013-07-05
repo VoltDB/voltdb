@@ -194,7 +194,7 @@ public class StreamSnapshotSink {
                 block.position(block.position() + 1 + 4);
                 byte[] schemaBytes = new byte[block.remaining()];
                 block.get(schemaBytes);
-                m_schemas.put(block.getInt(StreamSnapshotDataTarget.schemaTableIdOffset),
+                m_schemas.put(block.getInt(StreamSnapshotDataTarget.tableIdOffset),
                               schemaBytes);
                 return null;
             }
