@@ -145,12 +145,20 @@ public class TestFuzzMeshArbiter extends TestCase
 
     public void testLinkFail() throws InterruptedException
     {
-        constructCluster(4);
+        constructCluster(5);
         while (!getNodesInState(NodeState.START).isEmpty()) {
             Thread.sleep(50);
         }
         FuzzTestState state = new FuzzTestState(0L, m_nodes.keySet());
         state.killLink(0, 1);
+        state.setUpExpectations();
+
+        state.expect();
+
+        assertTrue(checkFullyConnectedGraphs(state.m_expectedLive));
+        state.pruneDeadNodes();
+
+        state.killLink(2, 3);
         state.setUpExpectations();
 
         state.expect();
@@ -370,7 +378,7 @@ public class TestFuzzMeshArbiter extends TestCase
         assertTrue(checkFullyConnectedGraphs(state.m_expectedLive));
         state.pruneDeadNodes();
 
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 4; i++) {
             if (state.m_rand.nextInt(100) < 50) {
                 state.killRandomNode();
             }

@@ -288,10 +288,6 @@ public class MeshArbiter {
         Set<Long> dests = Sets.filter(m_seeker.getSurvivors(),not(equalTo(m_hsId)));
         sfmb.addSurvivors(Sets.difference(m_seeker.getSurvivors(), decision.keySet()));
 
-        for (Map.Entry<Long, Long> e: decision.entrySet()) {
-            sfmb.addSafeTxnId(e.getKey(), e.getValue());
-        }
-
         SiteFailureMessage sfm = sfmb.build();
         m_mailbox.send(Longs.toArray(dests), sfm);
 

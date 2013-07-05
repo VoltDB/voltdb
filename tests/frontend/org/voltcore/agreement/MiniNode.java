@@ -187,7 +187,7 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
                     m_mailbox.deliver(message);
 
                     // snoop for SiteFailureMessage, inject into MiniSite's mailbox
-                    if (message instanceof SiteFailureMessage) {
+                    if (message instanceof SiteFailureMessage && message.m_sourceHSId != m_HSId) {
                         SiteFailureMessage sfm = (SiteFailureMessage)message;
 
                         for (long failedHostId : sfm.m_safeTxnIds.keySet()) {
