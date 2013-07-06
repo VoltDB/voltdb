@@ -33,7 +33,6 @@ public class PermutationGenerator {
 
     private static <T> void generatePurmutations(List<T> sequence, int idx, List<List<T>> permutations) {
         if (idx == sequence.size()) {
-            System.out.println("Done");
             // if we are at the end of the array, we have one permutation
             List<T> purmutation = new ArrayList<T>();
             purmutation.addAll(sequence);
