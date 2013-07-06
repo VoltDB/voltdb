@@ -357,13 +357,13 @@ public class TestFuzzMeshArbiter extends TestCase
     {
         long seed = System.currentTimeMillis();
         System.out.println("SEED: " + seed);
-        constructCluster(20);
+        constructCluster(15);
         while (!getNodesInState(NodeState.START).isEmpty()) {
             Thread.sleep(50);
         }
         FuzzTestState state = new FuzzTestState(seed, m_nodes.keySet());
 
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 4; i++) {
             if (state.m_rand.nextInt(100) < 50) {
                 state.killRandomNode();
             }
@@ -378,7 +378,7 @@ public class TestFuzzMeshArbiter extends TestCase
         assertTrue(checkFullyConnectedGraphs(state.m_expectedLive));
         state.pruneDeadNodes();
 
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 3; i++) {
             if (state.m_rand.nextInt(100) < 50) {
                 state.killRandomNode();
             }
@@ -410,7 +410,7 @@ public class TestFuzzMeshArbiter extends TestCase
         }
     }
 
-    public void testPartition() throws InterruptedException
+    public void needsWorkTestPartition() throws InterruptedException
     {
         long seed = System.currentTimeMillis();
         System.out.println("SEED: " + seed);

@@ -18,7 +18,6 @@
 package org.voltcore.agreement;
 
 import static com.google.common.base.Predicates.equalTo;
-import static com.google.common.base.Predicates.in;
 import static com.google.common.base.Predicates.not;
 
 import java.util.ArrayList;
@@ -162,13 +161,35 @@ public class MeshArbiter {
             @Override
             void log(FaultMessage fm) {
                 m_recoveryLog.info("Agreement, Discarding " + name() + " "
-                        + CoreUtils.hsIdToString(fm.failedSite));
+                        + CoreUtils.hsIdToString(fm.failedSite)
+                        + " reporter: "
+                        + CoreUtils.hsIdToString(fm.reportingSite));
             }
         },
-        StaleUnwinessed {
+        StaleUnwitnessed {
             @Override
             void log(FaultMessage fm) {
-                m_recoveryLog.info("Agreement, Discarding " + name() + " " + fm);
+                m_recoveryLog.info("Agreement, Discarding " + name()
+                        + " stale: "
+                        + CoreUtils.hsIdToString(fm.failedSite)
+                        + ", repoter: "
+                        + CoreUtils.hsIdToString(fm.reportingSite)
+                        + ", survivors: ["
+                        + CoreUtils.hsIdCollectionToString(fm.survivors)
+                        + "]");
+            }
+        },
+        OtherUnwitnessed {
+            @Override
+            void log(FaultMessage fm) {
+                m_recoveryLog.info("Agreement, Discarding " + name()
+                        + " other: "
+                        + CoreUtils.hsIdToString(fm.failedSite)
+                        + ", repoter: "
+                        + CoreUtils.hsIdToString(fm.reportingSite)
+                        + ", survivors: ["
+                        + CoreUtils.hsIdCollectionToString(fm.survivors)
+                        + "]");
             }
         },
         DoNot {
@@ -198,12 +219,14 @@ public class MeshArbiter {
         } else if (   alreadyWitnessed != null
                    && (alreadyWitnessed || alreadyWitnessed == fm.witnessed)) {
             return Discard.AlreadyKnow;
-        } else if (   !fm.witnessed
-                    && m_inTrouble.isEmpty()
-                    && m_staleUnwitnessed.contains(fm.failedSite)
-                    && (   Sets.filter(fm.survivors, in(m_failedSites)).size() > 0
-                        || fm.survivors.equals(m_seeker.getSurvivors()))) {
-            return Discard.StaleUnwinessed;
+        } else if (!fm.witnessed && m_inTrouble.isEmpty()) {
+            if (fm.survivors.contains(fm.failedSite)) {
+                return Discard.OtherUnwitnessed;
+            } else if (m_staleUnwitnessed.contains(fm.failedSite)) {
+                return Discard.StaleUnwitnessed;
+            } else {
+                return Discard.DoNot;
+            }
         } else {
             return Discard.DoNot;
         }
@@ -287,6 +310,10 @@ public class MeshArbiter {
 
         Set<Long> dests = Sets.filter(m_seeker.getSurvivors(),not(equalTo(m_hsId)));
         sfmb.addSurvivors(Sets.difference(m_seeker.getSurvivors(), decision.keySet()));
+
+        for (Map.Entry<Long, Long> e: decision.entrySet()) {
+            sfmb.addSafeTxnId(e.getKey(), e.getValue());
+        }
 
         SiteFailureMessage sfm = sfmb.build();
         m_mailbox.send(Longs.toArray(dests), sfm);
@@ -506,7 +533,7 @@ public class MeshArbiter {
                 sb.append(m_seeker.dumpAlive());
             }
 
-            m_recoveryLog.warn("Failure resolution stalled waiting for ( ExecutionSite, Initiator ) " +
+            m_recoveryLog.warn("Failure resolution stalled waiting for (ExecutionSite, Initiator) " +
                                 "information: " + sb.toString());
         }
         return missingMessages.isEmpty();
