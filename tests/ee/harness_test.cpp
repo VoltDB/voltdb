@@ -282,7 +282,7 @@ TEST(ChTempDir, Simple) {
 
         // Create a file in the temporary directory
         string name = tempdir.name() + "/..foo";
-        int fd = open(name.c_str(), O_CREAT);
+        int fd = open(name.c_str(), O_CREAT, 666);
         EXPECT_NE(0, fd);
         int status = close(fd);
         EXPECT_EQ(0, status);
