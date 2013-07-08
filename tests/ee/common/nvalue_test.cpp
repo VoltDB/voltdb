@@ -2107,35 +2107,35 @@ TEST_F(NValueTest, TestExtract)
     result = midSeptember.callUnary<FUNC_EXTRACT_YEAR>();
     EXPECT_EQ(0, result.compare(ValueFactory::getIntegerValue(EXPECTED_YEAR)));
 
-    int EXPECTED_MONTH = 9;
+    int8_t EXPECTED_MONTH = 9;
     result = midSeptember.callUnary<FUNC_EXTRACT_MONTH>();
     EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_MONTH)));
 
-    int EXPECTED_DAY = 9;
+    int8_t EXPECTED_DAY = 9;
     result = midSeptember.callUnary<FUNC_EXTRACT_DAY>();
     EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_DAY)));
 
-    int EXPECTED_DOW = 1;
+    int8_t EXPECTED_DOW = 1;
     result = midSeptember.callUnary<FUNC_EXTRACT_DAY_OF_WEEK>();
     EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_DOW)));
 
-    int EXPECTED_DOY = 252;
+    int16_t EXPECTED_DOY = 252;
     result = midSeptember.callUnary<FUNC_EXTRACT_DAY_OF_YEAR>();
     EXPECT_EQ(0, result.compare(ValueFactory::getSmallIntValue(EXPECTED_DOY)));
 
-    int EXPECTED_WOY = 36;
+    int8_t EXPECTED_WOY = 36;
     result = midSeptember.callUnary<FUNC_EXTRACT_WEEK_OF_YEAR>();
     EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_WOY)));
 
-    int EXPECTED_QUARTER = 3;
+    int8_t EXPECTED_QUARTER = 3;
     result = midSeptember.callUnary<FUNC_EXTRACT_QUARTER>();
     EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_QUARTER)));
 
-    int EXPECTED_HOUR = 1;
+    int8_t EXPECTED_HOUR = 1;
     result = midSeptember.callUnary<FUNC_EXTRACT_HOUR>();
     EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_HOUR)));
 
-    int EXPECTED_MINUTE = 46;
+    int8_t EXPECTED_MINUTE = 46;
     result = midSeptember.callUnary<FUNC_EXTRACT_MINUTE>();
     EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_MINUTE)));
 
