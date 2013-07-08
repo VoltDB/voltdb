@@ -63,4 +63,6 @@ public class CLibrary {
         }
         return null;
     }
+
+    public static native final int getpid();
 }

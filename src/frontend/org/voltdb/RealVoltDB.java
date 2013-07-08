@@ -22,6 +22,7 @@ import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -58,14 +59,16 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
+import org.apache.log4j.Appender;
+import org.apache.log4j.DailyRollingFileAppender;
 import org.apache.log4j.FileAppender;
-import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
@@ -104,6 +107,7 @@ import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.rejoin.Iv2RejoinCoordinator;
 import org.voltdb.rejoin.JoinCoordinator;
+import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.HTTPAdminListener;
@@ -113,6 +117,8 @@ import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.VoltSampler;
 
+import com.google.common.base.Charsets;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.SettableFuture;
@@ -755,6 +761,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     private class ConfigLogging implements Runnable {
         private void logConfigInfo() {
+            hostLog.info("Logging config info");
+
             File voltDbRoot = CatalogUtil.getVoltDbRoot(m_deployment.getPaths());
 
             String pathToConfigInfoDir = voltDbRoot.getPath() + File.separator + "config_log";
@@ -764,33 +772,69 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             String pathToConfigInfo = pathToConfigInfoDir + File.separator + "config.log";
             File configInfo = new File(pathToConfigInfo);
 
+            byte jsonBytes[] = null;
             try {
-                BufferedWriter bw = new BufferedWriter(new FileWriter(configInfo));
+                JSONStringer stringer = new JSONStringer();
+                stringer.object();
 
-                // log current working directory
-                bw.write("[WorkingDirectory]\n");
-                bw.write(System.getProperty("user.dir"));
-                bw.newLine();
+                stringer.key("workingDir").value(System.getProperty("user.dir"));
+                stringer.key("pid").value(CLibrary.getpid());
 
-                // log pid volt started with
-                bw.write("[PID]\n");
-                byte[] bo = new byte[10];
-                String[] cmd = { "bash", "-c", "echo $PPID" };
-                Process p = Runtime.getRuntime().exec(cmd);
-                p.getInputStream().read(bo);
-                bw.write(new String(bo).trim());
-                bw.newLine();
+                stringer.key("log4jDst").array();
+                Enumeration appenders = Logger.getRootLogger().getAllAppenders();
+                while (appenders.hasMoreElements()) {
+                    Appender appender = (Appender) appenders.nextElement();
+                    if (appender instanceof FileAppender){
+                        stringer.object();
+                        stringer.key("path").value(((FileAppender) appender).getFile());
+                        if (appender instanceof DailyRollingFileAppender) {
+                            stringer.key("format").value(((DailyRollingFileAppender)appender).getDatePattern());
+                        }
+                        stringer.endObject();
+                    }
+                }
 
-                // log log4j destination
-                bw.write("[Log4jDestination]\n");
-                Logger logger = LogManager.getRootLogger();
-                FileAppender appender = (FileAppender) logger.getAppender("file");
-                String log4jFile = appender.getFile();
-                bw.write(log4jFile);
-                bw.newLine();
+                Enumeration loggers = Logger.getRootLogger().getLoggerRepository().getCurrentLoggers();
+                while (loggers.hasMoreElements()) {
+                    Logger logger = (Logger) loggers.nextElement();
+                    appenders = logger.getAllAppenders();
+                    while (appenders.hasMoreElements()) {
+                        Appender appender = (Appender) appenders.nextElement();
+                        if (appender instanceof FileAppender){
+                            stringer.object();
+                            stringer.key("path").value(((FileAppender) appender).getFile());
+                            if (appender instanceof DailyRollingFileAppender) {
+                                stringer.key("format").value(((DailyRollingFileAppender)appender).getDatePattern());
+                            }
+                            stringer.endObject();
+                        }
+                    }
+                }
+                stringer.endArray();
 
-                // log deployment
-                bw.write("[Deployment]\n");
+                stringer.endObject();
+                JSONObject jsObj = new JSONObject(stringer.toString());
+                jsonBytes = jsObj.toString(4).getBytes(Charsets.UTF_8);
+            } catch (JSONException e) {
+                Throwables.propagate(e);
+            }
+
+            try {
+                FileOutputStream fos = new FileOutputStream(configInfo);
+                fos.write(jsonBytes);
+                fos.getFD().sync();
+                fos.close();
+            } catch (IOException e) {
+                hostLog.error("Failed to log config info: " + e.getMessage());
+                e.printStackTrace();
+            }
+
+            String pathToDeploymentInfo = pathToConfigInfoDir + File.separator + "deployment.xml";
+            File deploymentInfo = new File(pathToDeploymentInfo);
+
+            try {
+                BufferedWriter bw = new BufferedWriter(new FileWriter(deploymentInfo));
+
                 File deploymentXMLFile = new File(m_config.m_pathToDeployment);
                 BufferedReader br = new BufferedReader(new FileReader(deploymentXMLFile));
                 String line = null;
@@ -803,16 +847,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 bw.flush();
                 bw.close();
             } catch (IOException e) {
-                hostLog.error("Failed to log config info: " + e.getMessage());
+                hostLog.error("Failed to log deployment file: " + e.getMessage());
                 e.printStackTrace();
             }
         }
 
         private void logCatalog() {
             File voltDbRoot = CatalogUtil.getVoltDbRoot(m_deployment.getPaths());
+            String pathToConfigInfoDir = voltDbRoot.getPath() + File.separator + "config_log";
 
             try {
-                m_catalogContext.writeCatalogJarToFile(voltDbRoot.getPath(), "catalog.jar");
+                m_catalogContext.writeCatalogJarToFile(pathToConfigInfoDir, "catalog.jar");
             } catch (IOException e) {
                 hostLog.error("Failed to log catalog: " + e.getMessage());
                 e.printStackTrace();
