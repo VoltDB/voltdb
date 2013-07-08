@@ -391,24 +391,108 @@ public class TestIndexesSuite extends RegressionSuite {
             assertEquals(0, results[0].getRowCount());
         }
 
+        // Flag whether CompiledInLists needs to tiptoe around lack of "col IN ?" support
+        // in the HSQL backend that doesn't support it.
+        int hsql = isHSQL() ? 1 : 0;
         String[] fewdescs = new String[] { "", "b", "no match", "this either",
         "and last but not least the obligatory longish value to test object allocation" };
         int[] fewnums = new int[] { 10, 100, 100, 100, -1 };
-        results = client.callProcedure("CompiledInLists", fewdescs, fewnums).getResults();
-        assertEquals(4, results.length);
+        results = client.callProcedure("CompiledInLists", fewdescs, fewnums, hsql).getResults();
+        assertEquals(6, results.length);
         assertEquals(1, results[0].getRowCount());
         assertEquals(1, results[1].getRowCount());
-        assertEquals(2, results[2].getRowCount());
+        assertEquals(1, results[2].getRowCount());
         assertEquals(2, results[3].getRowCount());
+        assertEquals(2, results[4].getRowCount());
+        assertEquals(2, results[5].getRowCount());
 
         String[] manydescs = new String[] { "b", "c", "f", "g", "h" };
         int[] manynums = new int[] { 100, 200, 300, 200, 100 };
-        results = client.callProcedure("CompiledInLists", manydescs, manynums).getResults();
-        assertEquals(4, results.length);
+        results = client.callProcedure("CompiledInLists", manydescs, manynums, hsql).getResults();
+        assertEquals(6, results.length);
         assertEquals(5, results[0].getRowCount());
         assertEquals(5, results[1].getRowCount());
-        assertEquals(4, results[2].getRowCount());
+        assertEquals(5, results[2].getRowCount());
         assertEquals(4, results[3].getRowCount());
+        assertEquals(4, results[4].getRowCount());
+        assertEquals(4, results[5].getRowCount());
+
+        Integer fewObjNums[] = new Integer[fewnums.length];
+        for (int ii = 0; ii < fewnums.length; ++ii) {
+            fewObjNums[ii] = new Integer(fewnums[ii]);
+        }
+
+        Integer manyObjNums[] = new Integer[manynums.length];
+        for (int ii = 0; ii < manynums.length; ++ii) {
+            manyObjNums[ii] = new Integer(manynums[ii]);
+        }
+
+        results = client.callProcedure("InlinedInListP3with5DESCs", (Object[])fewdescs).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
+        results = client.callProcedure("InlinedInListR3with5DESCs", (Object[])fewdescs).getResults();
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
+        if ( ! isHSQL()) {
+            results = client.callProcedure("InlinedInListP3withDESCs", (Object)fewdescs).getResults();
+            assertEquals(1, results.length);
+            assertEquals(1, results[0].getRowCount());
+        }
+        results = client.callProcedure("InlinedInListP3with5NUMs",  (Object[])fewObjNums).getResults();
+        assertEquals(1, results.length);
+        assertEquals(2, results[0].getRowCount());
+        results = client.callProcedure("InlinedInListR3with5NUMs",  (Object[])fewObjNums).getResults();
+        assertEquals(1, results.length);
+        assertEquals(2, results[0].getRowCount());
+        // Passing Object vectors as single parameters is not allowed.
+        // if ( ! isHSQL()) {
+        //     results = client.callProcedure("InlinedInListP3withNUMs", (Object)fewObjNums).getResults();
+        //     assertEquals(1, results.length);
+        //     assertEquals(2, results[0].getRowCount());
+        // }
+        //TODO: test as type failure:
+        //results = client.callProcedure("InlinedInListP3with5NUMs", fewnums).getResults();
+        //TODO: test as type failure:
+        //results = client.callProcedure("InlinedInListR3with5NUMs", fewnums).getResults();
+        if ( ! isHSQL()) {
+            results = client.callProcedure("InlinedInListP3withNUMs", fewnums).getResults();
+            assertEquals(1, results.length);
+            assertEquals(2, results[0].getRowCount());
+        }
+
+        results = client.callProcedure("InlinedInListP3with5DESCs", (Object[])manydescs).getResults();
+        assertEquals(1, results.length);
+        assertEquals(5, results[0].getRowCount());
+        results = client.callProcedure("InlinedInListR3with5DESCs", (Object[])manydescs).getResults();
+        assertEquals(1, results.length);
+        assertEquals(5, results[0].getRowCount());
+        if ( ! isHSQL()) {
+            results = client.callProcedure("InlinedInListP3withDESCs", (Object)manydescs).getResults();
+            assertEquals(1, results.length);
+            assertEquals(5, results[0].getRowCount());
+        }
+        results = client.callProcedure("InlinedInListP3with5NUMs",  (Object[])manyObjNums).getResults();
+        assertEquals(1, results.length);
+        assertEquals(4, results[0].getRowCount());
+        results = client.callProcedure("InlinedInListR3with5NUMs",  (Object[])manyObjNums).getResults();
+        assertEquals(1, results.length);
+        assertEquals(4, results[0].getRowCount());
+        // Passing Object vectors as single parameters is not allowed.
+        // if ( ! isHSQL()) {
+        //     results = client.callProcedure("InlinedInListP3withNUMs", (Object)manyObjNums).getResults();
+        //     assertEquals(1, results.length);
+        //     assertEquals(4, results[0].getRowCount());
+        //        }
+        //TODO: test as type failure:
+        //results = client.callProcedure("InlinedInListP3with5NUMs", manynums).getResults();
+        //TODO: test as type failure:
+        //results = client.callProcedure("InlinedInListR3with5NUMs", manynums).getResults();
+        if ( ! isHSQL()) {
+            results = client.callProcedure("InlinedInListP3withNUMs", manynums).getResults();
+            assertEquals(1, results.length);
+            assertEquals(4, results[0].getRowCount());
+        }
+
     }
 
     public void testTicket195()
@@ -787,7 +871,9 @@ public class TestIndexesSuite extends RegressionSuite {
 
     public void testKeyCastingOverflow() throws NoConnectionsException, IOException, ProcCallException {
         Client client = getClient();
-        ClientResponseImpl cr = (ClientResponseImpl) client.callProcedure("@AdHoc", "select * from P1 where ID = 6000000000;", 0);
+        ClientResponseImpl cr =
+               (ClientResponseImpl) client.callProcedure("@AdHoc",
+                                                         "select * from P1 where ID = 6000000000;", 0);
         assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
     }
 
@@ -812,8 +898,40 @@ public class TestIndexesSuite extends RegressionSuite {
         project.addStmtProcedure("Eng397LimitIndexR2", "select * from R2 where R2.ID > 2 Limit ?");
         project.addStmtProcedure("Eng397LimitIndexP2", "select * from P2 where P2.ID > 2 Limit ?");
         project.addStmtProcedure("Eng2914BigKeyP1", "select * from P1 where ID < 600000000000");
-        project.addStmtProcedure("Eng506UpdateRange", "UPDATE R1IX SET NUM = ? WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.NUM>?)");
+        project.addStmtProcedure("Eng506UpdateRange",
+                                 "UPDATE R1IX SET NUM = ? WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.NUM>?)");
         project.addStmtProcedure("InsertR1IX", "insert into R1IX values (?, ?, ?, ?);");
+
+        project.addStmtProcedure("InlinedInListP3with5DESCs",
+                                 "select * from P3 T where T.DESC IN (?, ?, ?, ?, ?)" +
+                                 " and T.NUM IN (100, 200, 300, 400, 500)");
+
+        project.addStmtProcedure("InlinedInListR3with5DESCs",
+                                 "select * from R3 T where T.DESC IN (?, ?, ?, ?, ?)" +
+                                 " and T.NUM IN (100, 200, 300, 400, 500)");
+
+        project.addStmtProcedure("InlinedInListP3withDESCs",
+                                 "select * from P3 T where T.DESC IN ?" +
+                                 " and T.NUM IN (100, 200, 300, 400, 500)");
+
+
+        project.addStmtProcedure("InlinedInListP3with5NUMs",
+                                 "select * from P3 T where T.DESC IN ('a', 'b', 'c', 'g', " +
+                                 "'this here is a longish string to force a permanent object allocation'" +
+                                 ")" +
+                                 " and T.NUM IN (?, ?, ?, ?, ?)");
+
+        project.addStmtProcedure("InlinedInListR3with5NUMs",
+                                 "select * from R3 T where T.DESC IN ('a', 'b', 'c', 'g', " +
+                                 "'this here is a longish string to force a permanent object allocation'" +
+                                 ")" +
+                                 " and T.NUM IN (?, ?, ?, ?, ?)");
+
+        project.addStmtProcedure("InlinedInListP3withNUMs",
+                                 "select * from P3 T where T.DESC IN ('a', 'b', 'c', 'g', " +
+                                 "'this here is a longish string to force a permanent object allocation'" +
+                                 ")" +
+                                 " and T.NUM IN ?");
 
         boolean success;
 

@@ -198,7 +198,7 @@ public class QueryPlanner {
                                                    m_paramzInfo.paramLiteralValues);
 
                 Pair<Integer, Object[]> info = buildParameterSetFromExtractedLiteralsAndReturnPartitionIndex(
-                        plan.parameters);
+                        plan.parameterTypes());
                 plan.partitioningKeyIndex = info.getFirst();
                 plan.extractedParamValues = ParameterSet.fromArrayNoCopy(info.getSecond());
 
@@ -215,10 +215,9 @@ public class QueryPlanner {
                 // fall through to re-planning without them
 
                 // note, real planning errors ignored here should be rethrown below
+                m_recentErrorMsg = null;
             }
         }
-
-        m_recentErrorMsg = null;
 
         // if parameterization isn't requested or if it failed, plan here
         CompiledPlan plan = compileFromXML(m_xmlSQL, null);

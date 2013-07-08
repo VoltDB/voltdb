@@ -180,6 +180,7 @@ public abstract class StatementDMQL extends Statement {
         }
     }
 
+    @Override
     public Result execute(Session session) {
 
         Result result = getAccessRightsResult(session);
@@ -228,6 +229,7 @@ public abstract class StatementDMQL extends Statement {
     /**
      * For the creation of the statement
      */
+    @Override
     public void setGeneratedColumnInfo(int generate, ResultMetaData meta) {
 
         // can support INSERT_SELECT also
@@ -304,6 +306,7 @@ public abstract class StatementDMQL extends Statement {
         return values;
     }
 
+    @Override
     public boolean hasGeneratedColumns() {
         return generatedIndexes != null;
     }
@@ -359,6 +362,7 @@ public abstract class StatementDMQL extends Statement {
         }
     }
 
+    @Override
     public void clearVariables() {
 
         isValid            = false;
@@ -508,6 +512,7 @@ public abstract class StatementDMQL extends Statement {
      * Returns the metadata, which is empty if the CompiledStatement does not
      * generate a Result.
      */
+    @Override
     public ResultMetaData getResultMetaData() {
 
         switch (type) {
@@ -529,6 +534,7 @@ public abstract class StatementDMQL extends Statement {
     /**
      * Returns the metadata for the placeholder parameters.
      */
+    @Override
     public ResultMetaData getParametersMetaData() {
         return parameterMetaData;
     }
@@ -597,6 +603,7 @@ public abstract class StatementDMQL extends Statement {
     /**
      * Retrieves a String representation of this object.
      */
+    @Override
     public String describe(Session session) {
 
         try {
@@ -805,8 +812,10 @@ public abstract class StatementDMQL extends Statement {
                                      "]\n");
     }
 
+    @Override
     public void resolve() {}
 
+    @Override
     public RangeVariable[] getRangeVariables() {
         return rangeVariables;
     }
@@ -822,6 +831,7 @@ public abstract class StatementDMQL extends Statement {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
+    @Override
     VoltXMLElement voltGetStatementXML(Session session) throws HSQLParseException
     {
         // XXX this seems, how you say, dumb.  leaving it though until I track
@@ -840,11 +850,17 @@ public abstract class StatementDMQL extends Statement {
             VoltXMLElement parameter = new VoltXMLElement("parameter");
             parameterXML.children.add(parameter);
             parameter.attributes.put("index", String.valueOf(i));
-            Expression param = parameters[i];
-            parameter.attributes.put("id", param.getUniqueId(session));
-            Type paramType = param.getDataType();
+            Expression expr = parameters[i];
+            parameter.attributes.put("id", expr.getUniqueId(session));
+            Type paramType = expr.getDataType();
             if (paramType != null) {
                 parameter.attributes.put("valuetype", Types.getTypeName(paramType.typeCode));
+            }
+            // Use of non-null nodeDataTypes for a DYNAMIC_PARAM is a voltdb extension to signal
+            // that values passed to parameters such as the one in "col in ?" must be vectors.
+            // So, it can just be forwarded as a boolean.
+            if (expr.nodeDataTypes != null) {
+                parameter.attributes.put("isvector", "true");
             }
         }
     }

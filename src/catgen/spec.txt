@@ -165,6 +165,7 @@ end
 begin StmtParameter            "A parameter for a parameterized SQL statement"
   int sqltype                  "The SQL type of the parameter (int/float/date/etc)"
   int javatype                 "The Java class of the parameter (int/float/date/etc)"
+  bool isarray                 "Is the parameter an array of value"
   int index                    "The index of the parameter in the set of statement parameters"
   ProcParameter? procparameter "Reference back to original input parameter"
 end

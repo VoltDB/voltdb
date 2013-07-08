@@ -719,7 +719,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * (hard-coded or easily determined up front by HSQL),
      * OR they have their own specific restrictions or side effects -- and so their own refineValueType method.
      */
-    public void refineValueType(VoltType columnType) {
+    public void refineValueType(VoltType columnType, int columnSize) {
         if (columnType.equals(m_valueType)) {
             return; // HSQL already initialized the expression to have the refined type.
         }

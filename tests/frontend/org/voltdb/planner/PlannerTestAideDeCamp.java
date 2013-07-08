@@ -44,6 +44,7 @@ import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.plannodes.SchemaColumn;
@@ -154,7 +155,9 @@ public class PlannerTestAideDeCamp {
         // If this is an adhoc query then there won't be any parameters
         for (int i = 0; i < plan.parameters.length; ++i) {
             StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(i));
-            catalogParam.setJavatype(plan.parameters[i].getValue());
+            ParameterValueExpression pve = plan.parameters[i];
+            catalogParam.setJavatype(pve.getValueType().getValue());
+            catalogParam.setIsarray(pve.getParamIsVector());
             catalogParam.setIndex(i);
         }
 
@@ -180,7 +183,8 @@ public class PlannerTestAideDeCamp {
         //Store the list of parameters types and indexes in the plan node list.
         List<Pair<Integer, VoltType>> parameters = nodeLists.get(0).getParameters();
         for (int i = 0; i < plan.parameters.length; ++i) {
-            Pair<Integer, VoltType> parameter = new Pair<Integer, VoltType>(i, plan.parameters[i]);
+            ParameterValueExpression pve = plan.parameters[i];
+            Pair<Integer, VoltType> parameter = new Pair<Integer, VoltType>(i, pve.getValueType());
             parameters.add(parameter);
         }
 

@@ -763,6 +763,14 @@ public class ProcedureRunner {
 
                 for (ProcParameter param : m_catProc.getParameters()) {
                     VoltType type = VoltType.get((byte) param.getType());
+                    if (param.getIsarray()) {
+                        m_paramTypes[param.getIndex()] = type.vectorClassFromType();
+                        continue;
+                    }
+                    // Paul doesn't understand why single-statement procedures
+                    // need to have their input parameter types widened here.
+                    // Is it not better to catch too-wide values in the ProcedureRunner
+                    // (ParameterConverter.tryToMakeCompatible) before falling through to the EE?
                     if (type == VoltType.INTEGER) {
                         type = VoltType.BIGINT;
                     } else if (type == VoltType.SMALLINT) {

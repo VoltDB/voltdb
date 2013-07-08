@@ -90,7 +90,7 @@ public class TestCSVLoader extends TestCase {
                 "clm_string varchar(10) default null, " +
                 "clm_decimal decimal default null, " +
                 "clm_float float default null"+
-                //"clm_varinary varbinary default null," +
+                //"clm_varinary varbinary(10) default null," +
                 //"clm_timestamp timestamp default null " +
                 ");";
 
@@ -187,7 +187,7 @@ public class TestCSVLoader extends TestCase {
                 "clm_string varchar(20) default null, " +
                 "clm_decimal decimal default null, " +
                 "clm_float float default null, "+
-                //"clm_varinary varbinary default null," +
+                //"clm_varinary varbinary(20) default null," +
                 "clm_timestamp timestamp default null " +
                 "); ";
         String []myOptions = {
@@ -362,7 +362,7 @@ public class TestCSVLoader extends TestCase {
                 "clm_decimal decimal default null, " +
                 "clm_float float default null "+
                 //"clm_timestamp timestamp default null, " +
-                //"clm_varinary varbinary default null" +
+                //"clm_varinary varbinary(20) default null" +
                 "); ";
         String []myOptions = {
                 "-f" + path_csv,
@@ -406,7 +406,7 @@ public class TestCSVLoader extends TestCase {
                         "clm_decimal decimal default null, " +
                         "clm_float float default null, "+
                         "clm_timestamp timestamp default null, " +
-                        "clm_varinary varbinary default null" +
+                        "clm_varinary varbinary(20) default null" +
                         "); ";
         String []myOptions = {
                 "-f" + path_csv,
@@ -435,7 +435,7 @@ public class TestCSVLoader extends TestCase {
                         "clm_decimal decimal default null, " +
                         "clm_float float default null, "+
                         "clm_timestamp timestamp default null, " +
-                        "clm_varinary varbinary default null" +
+                        "clm_varinary varbinary(20) default null" +
                         "); ";
         String []myOptions = {
                 "-f" + path_csv,
@@ -465,7 +465,7 @@ public class TestCSVLoader extends TestCase {
                         "clm_decimal decimal default null, " +
                         "clm_float float default null, "+
                         "clm_timestamp timestamp default null, " +
-                        "clm_varinary varbinary default null" +
+                        "clm_varinary varbinary(20) default null" +
                         "); ";
         String []myOptions = {
                 "-f" + path_csv,
@@ -521,7 +521,7 @@ public class TestCSVLoader extends TestCase {
                 "clm_string varchar(20) default null, " +
                 "clm_decimal decimal default null, " +
                 "clm_float float default null, "+
-                //"clm_varinary varbinary default null," +
+                //"clm_varinary varbinary(20) default null," +
                 "clm_timestamp timestamp default null " +
                 "); ";
         String []myOptions = {
@@ -575,7 +575,7 @@ public class TestCSVLoader extends TestCase {
                 "clm_string varchar(20) default null, " +
                 "clm_decimal decimal default null, " +
                 "clm_float float default null, "+
-                //"clm_varinary varbinary default null," +
+                //"clm_varinary varbinary(20) default null," +
                 "clm_timestamp timestamp default null " +
                 "); ";
         String []myOptions = {
@@ -629,7 +629,7 @@ public class TestCSVLoader extends TestCase {
                         "clm_decimal decimal default null, " +
                         "clm_float float default null, "+
                         "clm_timestamp timestamp default null, " +
-                        "clm_varinary varbinary default null" +
+                        "clm_varinary varbinary(20) default null" +
                         "); ";
         String []myOptions = {
                 "-f" + path_csv,

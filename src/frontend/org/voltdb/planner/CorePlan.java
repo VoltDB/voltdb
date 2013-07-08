@@ -102,7 +102,7 @@ public class CorePlan {
         isReplicatedTableDML = plan.replicatedTableDML;
         isNonDeterministic = (!plan.isContentDeterministic()) || (!plan.isOrderDeterministic());
         this.catalogVersion = catalogVersion;
-        parameterTypes = plan.parameters;
+        parameterTypes = plan.parameterTypes();
         readOnly = plan.readOnly;
         partitioningParamIndex = plan.partitioningKeyIndex;
     }

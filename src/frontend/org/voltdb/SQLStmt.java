@@ -110,9 +110,11 @@ public class SQLStmt {
      */
     @Override
     protected void finalize() throws Throwable {
-        site.decrefPlanFragmentById(aggregator.id);
-        if (collector != null) {
-            site.decrefPlanFragmentById(collector.id);
+        if (site != null) {
+            site.decrefPlanFragmentById(aggregator.id);
+            if (collector != null) {
+                site.decrefPlanFragmentById(collector.id);
+            }
         }
 
         super.finalize();

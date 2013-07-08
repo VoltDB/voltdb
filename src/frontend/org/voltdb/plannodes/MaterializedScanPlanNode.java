@@ -25,6 +25,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
 import org.voltdb.types.PlanNodeType;
@@ -55,7 +56,7 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
     }
 
     public void setRowData(AbstractExpression tableData) {
-        assert(tableData instanceof VectorValueExpression);
+        assert(tableData instanceof VectorValueExpression || tableData instanceof ParameterValueExpression);
         m_tableData = tableData;
         m_outputExpression.setColumnIndex(0);
         m_outputExpression.setColumnName("list_element");
