@@ -462,6 +462,7 @@ TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
 TEST_F(CopyOnWriteTest, TestTableTupleFlags) {
     initTable(true);
     char storage[9];
+    std::memset(storage, 0, 9);
     TableTuple tuple(m_table->schema());
     tuple.move(storage);
 
@@ -510,11 +511,13 @@ TEST_F(CopyOnWriteTest, BigTest) {
             }
             int ii = 12;//skip partition id and row count and first tuple length
             while (ii < (serialized - 4)) {
-                int values[2];
+                int32_t values[2];
                 values[0] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
                 values[1] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii + 4]));
-                const bool inserted =
-                COWTuples.insert(*reinterpret_cast<int64_t*>(values)).second;
+                // the following rediculous cast is to placate our gcc treat warnings as errors affliction
+                void *valuesVoid = reinterpret_cast<void*>(values);
+                int64_t *values64 = reinterpret_cast<int64_t*>(valuesVoid);
+                const bool inserted = COWTuples.insert(*values64).second;
                 if (!inserted) {
                     printf("Failed in iteration %d, total inserted %d, with values %d and %d\n", qq, totalInserted, values[0], values[1]);
                 }
@@ -577,8 +580,10 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
                 int values[2];
                 values[0] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
                 values[1] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii + 4]));
-                const bool inserted =
-                COWTuples.insert(*reinterpret_cast<int64_t*>(values)).second;
+                // the following rediculous cast is to placate our gcc treat warnings as errors affliction
+                void *valuesVoid = reinterpret_cast<void*>(values);
+                int64_t *values64 = reinterpret_cast<int64_t*>(valuesVoid);
+                const bool inserted = COWTuples.insert(*values64).second;
                 if (!inserted) {
                     printf("Failed in iteration %d with values %d and %d\n", totalInserted, values[0], values[1]);
                 }
@@ -642,8 +647,10 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
                 int values[2];
                 values[0] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
                 values[1] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii + 4]));
-                const bool inserted =
-                COWTuples.insert(*reinterpret_cast<int64_t*>(values)).second;
+                // the following rediculous cast is to placate our gcc treat warnings as errors affliction
+                void *valuesVoid = reinterpret_cast<void*>(values);
+                int64_t *values64 = reinterpret_cast<int64_t*>(valuesVoid);
+                const bool inserted = COWTuples.insert(*values64).second;
                 if (!inserted) {
                     printf("Failed in iteration %d with values %d and %d\n", totalInserted, values[0], values[1]);
                 }
@@ -990,8 +997,10 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
                         int32_t values[2];
                         values[0] = ntohl(*reinterpret_cast<const int32_t*>(buffers[ipart].get()+ibuf));
                         values[1] = ntohl(*reinterpret_cast<const int32_t*>(buffers[ipart].get()+ibuf+4));
-                        int64_t value = *reinterpret_cast<int64_t*>(values);
-                        const bool inserted = actual[ipart].insert(value).second;
+                        // the following rediculous cast is to placate our gcc treat warnings as errors affliction
+                        void *valuesVoid = reinterpret_cast<void*>(values);
+                        int64_t *values64 = reinterpret_cast<int64_t*>(valuesVoid);
+                        const bool inserted = actual[ipart].insert(*values64).second;
                         if (!inserted) {
                             tool.valueError(values, "Buffer duplicate: ipart=%lu totalInserted=%d ibuf=%d",
                                             ipart, totalInserted, ibuf);

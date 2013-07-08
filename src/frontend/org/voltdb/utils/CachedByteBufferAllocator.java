@@ -15,14 +15,25 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.rejoin;
+package org.voltdb.utils;
+
+import java.nio.ByteBuffer;
 
 /**
- * Base class for reading and writing snapshot streams over the network.
+ * A ByteBuffer allocator that caches the buffer and reuse it in the future. If the cached buffer
+ * is smaller than the requested size, it will replace the cached buffer with a new buffer that
+ * fits the size.
+ *
+ * Note: this class is not thread-safe.
  */
-public abstract class StreamSnapshotBase {
-    protected static final int typeOffset = 0; // 1 byte
-    protected static final int tableIdOffset = typeOffset + 1; // 4 bytes
-    protected static final int blockIndexOffset = tableIdOffset + 4; // 4 bytes
-    protected static final int contentOffset = blockIndexOffset + 4;
+public class CachedByteBufferAllocator {
+    private ByteBuffer m_buffer = null;
+
+    public ByteBuffer allocate(int size) {
+        if (m_buffer == null || m_buffer.capacity() < size) {
+            m_buffer = ByteBuffer.allocate(size);
+        }
+        m_buffer.clear();
+        return m_buffer;
+    }
 }
