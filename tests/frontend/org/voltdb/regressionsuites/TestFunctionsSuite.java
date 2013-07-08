@@ -671,7 +671,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
 
         // Normal test case 2001-9-9 01:46:40
-        cr = client.callProcedure("P1.insert", 1, "X0", 10, 1.1, new Timestamp(1000000000000L));
+        cr = client.callProcedure("P1.insert", 1, "X0", 10, 1.1, new Timestamp(1000000000789L));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure("EXTRACT_TIMESTAMP", 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -711,14 +711,14 @@ public class TestFunctionsSuite extends RegressionSuite {
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_MINUTE, result);
 
-        BigDecimal EXPECTED_SECONDS = new BigDecimal("40.000000000000");
+        BigDecimal EXPECTED_SECONDS = new BigDecimal("40.789000000000");
         BigDecimal decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
         assertEquals(EXPECTED_SECONDS, decimalResult);
 
-        // test timestamp before epoch, Human time (GMT): Thu, 18 Nov 1948 16:32:03 GMT
+        // test timestamp before epoch, Human time (GMT): Thu, 18 Nov 1948 16:32:02 GMT
         // Leap year!
         // http://disc.gsfc.nasa.gov/julian_calendar.shtml
-        cr = client.callProcedure("P1.insert", 2, "X0", 10, 1.1, new Timestamp(-666430077000L));
+        cr = client.callProcedure("P1.insert", 2, "X0", 10, 1.1, new Timestamp(-666430077123L));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure("EXTRACT_TIMESTAMP", 2);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -758,12 +758,12 @@ public class TestFunctionsSuite extends RegressionSuite {
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_MINUTE, result);
 
-        EXPECTED_SECONDS = new BigDecimal("3.000000000000");
+        EXPECTED_SECONDS = new BigDecimal("2.877000000000");
         decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
         assertEquals(EXPECTED_SECONDS, decimalResult);
 
-        // test timestamp with a very old date, Human time (GMT): Fri, 05 Jul 1658 14:22:28 GMT
-        cr = client.callProcedure("P1.insert", 3, "X0", 10, 1.1, new Timestamp(-9829676252000L));
+        // test timestamp with a very old date, Human time (GMT): Fri, 05 Jul 1658 14:22:27 GMT
+        cr = client.callProcedure("P1.insert", 3, "X0", 10, 1.1, new Timestamp(-9829676252456L));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure("EXTRACT_TIMESTAMP", 3);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -803,7 +803,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_MINUTE, result);
 
-        EXPECTED_SECONDS = new BigDecimal("28.000000000000");
+        EXPECTED_SECONDS = new BigDecimal("27.544000000000");
         decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
         assertEquals(EXPECTED_SECONDS, decimalResult);
     }

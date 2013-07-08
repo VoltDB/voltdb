@@ -182,9 +182,16 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_SECOND>() const {
     int64_t epoch_micros = getTimestamp();
     boost::posix_time::time_duration as_time;
     micros_to_time(epoch_micros, as_time);
-    TTInt retval(as_time.seconds());
-    retval *= NValue::kMaxScaleFactor;
-    return getDecimalValue(retval);
+    int second = as_time.seconds();
+    int fraction = static_cast<int>(epoch_micros % 1000000);
+    if (epoch_micros < 0 && fraction != 0) {
+        fraction = 1000000 + fraction;
+    }
+    TTInt ttSecond(second);
+    ttSecond *= NValue::kMaxScaleFactor;
+    TTInt ttMicro(fraction);
+    ttMicro *= NValue::kMaxScaleFactor / 1000000;
+    return getDecimalValue(ttSecond + ttMicro);
 }
 
 /** implement the timestamp SINCE_EPOCH in SECONDs function **/
