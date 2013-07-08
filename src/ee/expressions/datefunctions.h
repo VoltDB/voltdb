@@ -344,6 +344,9 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MILLISECOND>() const {
     }
     int64_t epoch_micros = getTimestamp();
     int64_t epoch_millis = static_cast<int64_t>(epoch_micros / 1000);
+    if (epoch_micros < 0) {
+        epoch_millis -= 1;
+    }
     return getTimestampValue(epoch_millis * 1000);
 }
 
