@@ -25,12 +25,17 @@
 using namespace std;
 
 namespace voltdb {
-RecoveryContext::RecoveryContext(PersistentTable &table, int32_t tableId) :
-        TableStreamerContext(table),
-        m_firstMessage(true),
-        m_iterator(getTable().iterator()),
-        m_tableId(tableId),
-        m_recoveryPhase(RECOVERY_MSG_TYPE_SCAN_TUPLES) {
+RecoveryContext::RecoveryContext(
+        PersistentTable &table,
+        PersistentTableSurgeon &surgeon,
+        int32_t partitionId,
+        TupleSerializer &serializer,
+        int32_t tableId) :
+    TableStreamerContext(table, surgeon, partitionId, serializer),
+    m_firstMessage(true),
+    m_iterator(getTable().iterator()),
+    m_tableId(tableId),
+    m_recoveryPhase(RECOVERY_MSG_TYPE_SCAN_TUPLES) {
 }
 
 /*

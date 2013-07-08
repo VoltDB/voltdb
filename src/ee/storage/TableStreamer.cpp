@@ -41,7 +41,7 @@ TableStreamer::TableStreamer(TupleSerializer &tupleSerializer,
     m_partitionId(partitionId)
 {
     // Grab the predicates and delete flag for snapshots or elastic contexts.
-    if (streamType == TABLE_STREAM_SNAPSHOT || streamType == TABLE_STREAM_ELASTIC) {
+    if (tableStreamTypeHasPredicates(streamType)) {
         int npreds = serializeIn.readInt();
         if (npreds > 0) {
             m_predicateStrings.reserve(npreds);
@@ -56,7 +56,9 @@ TableStreamer::TableStreamer(TupleSerializer &tupleSerializer,
 TableStreamer::~TableStreamer()
 {}
 
-bool TableStreamer::activateStream(PersistentTable &table, CatalogId tableId)
+bool TableStreamer::activateStream(PersistentTable &table,
+                                   PersistentTableSurgeon &surgeon,
+                                   CatalogId tableId)
 {
     if (m_context == NULL) {
         // This is the only place that can create a streaming context based on
@@ -67,18 +69,30 @@ bool TableStreamer::activateStream(PersistentTable &table, CatalogId tableId)
                 case TABLE_STREAM_SNAPSHOT: {
                     // Constructor can throw exception when it parses the predicates.
                     CopyOnWriteContext *newContext =
-                        new CopyOnWriteContext(table, m_tupleSerializer, m_partitionId,
-                                               m_predicateStrings, table.activeTupleCount());
+                        new CopyOnWriteContext(table,
+                                               surgeon,
+                                               m_tupleSerializer,
+                                               m_partitionId,
+                                               m_predicateStrings,
+                                               table.activeTupleCount());
                     m_context.reset(newContext);
                     break;
                 }
 
                 case TABLE_STREAM_RECOVERY:
-                    m_context.reset(new RecoveryContext(table, tableId));
+                    m_context.reset(new RecoveryContext(table,
+                                                        surgeon,
+                                                        m_partitionId,
+                                                        m_tupleSerializer,
+                                                        tableId));
                     break;
 
-                case TABLE_STREAM_ELASTIC:
-                    m_context.reset(new ElasticContext(table, m_predicateStrings));
+                case TABLE_STREAM_ELASTIC_INDEX:
+                    m_context.reset(new ElasticContext(table,
+                                                       surgeon,
+                                                       m_partitionId,
+                                                       m_tupleSerializer,
+                                                       m_predicateStrings));
                     break;
 
                 default:

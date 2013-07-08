@@ -24,6 +24,7 @@
 
 namespace voltdb {
 class PersistentTable;
+class PersistentTableSurgeon;
 
 class CopyOnWriteIterator : public TupleIterator {
     friend class CopyOnWriteContext;
@@ -32,6 +33,7 @@ public:
 
     CopyOnWriteIterator(
         PersistentTable *table,
+        PersistentTableSurgeon *surgeon,
         TBMapI start,
         TBMapI end);
 
@@ -69,6 +71,11 @@ private:
      * Table being iterated over
      */
     PersistentTable *m_table;
+
+    /**
+     * "Surgeon" that can perform deep changes to table.
+     */
+    PersistentTableSurgeon *m_surgeon;
 
     /**
      * Index of the current block being iterated over

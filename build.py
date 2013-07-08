@@ -316,6 +316,7 @@ CTX.INPUT['storage'] = """
  TupleStreamWrapper.cpp
  RecoveryContext.cpp
  TupleBlock.cpp
+ TableStreamerContext.cpp
 """
 
 CTX.INPUT['stats'] = """

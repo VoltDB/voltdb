@@ -38,6 +38,7 @@ class RecoveryContext;
 class ElasticContext;
 class ReferenceSerializeInput;
 class PersistentTable;
+class PersistentTableSurgeon;
 class TupleOutputStreamProcessor;
 
 class TableStreamer : public TableStreamerInterface
@@ -67,7 +68,9 @@ public:
     /**
      * Activate streaming.
      */
-    virtual bool activateStream(PersistentTable &table, CatalogId tableId);
+    virtual bool activateStream(PersistentTable &table,
+                                PersistentTableSurgeon &surgeon,
+                                CatalogId tableId);
 
     /**
      * Continue streaming.

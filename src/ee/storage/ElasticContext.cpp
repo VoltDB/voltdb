@@ -22,18 +22,30 @@
 namespace voltdb {
 
 ElasticContext::ElasticContext(PersistentTable &table,
+                               PersistentTableSurgeon &surgeon,
+                               int32_t partitionId,
+                               TupleSerializer &serializer,
                                const std::vector<std::string> &predicateStrings) :
-    TableStreamerContext(table, predicateStrings),
-    m_scanner(table)
+    TableStreamerContext(table, surgeon, partitionId, serializer, predicateStrings),
+    m_scanner(table, surgeon.getData()),
+    m_isIndexed(false)
 {
     if (predicateStrings.size() != 1) {
-        throwFatalException("ElasticContext() expects a single predicate");
+        throwFatalException("ElasticContext::ElasticContext() expects a single predicate.");
+    }
+
+    // Populate index with current tuples.
+    // Table changes are tracked through notifications.
+    TableTuple tuple(table.schema());
+    while (m_scanner.next(tuple)) {
+        if (getPredicates()[0].eval(&tuple).isTrue()) {
+            m_index.add(table, tuple);
+        }
     }
 }
 
 ElasticContext::~ElasticContext()
-{
-}
+{}
 
 /*
  * Serialize to multiple output streams.
@@ -42,13 +54,12 @@ ElasticContext::~ElasticContext()
 int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStreams,
                                          std::vector<int> &retPositions)
 {
-    PersistentTable &table = getTable();
-    TableTuple tuple(table.schema());
-    while (m_scanner.next(tuple)) {
-        if (getPredicates()[0].eval(&tuple).isTrue()) {
-            m_index.add(table, tuple);
-        }
+    if (m_isIndexed) {
+        throwFatalException("ElasticContext::handleStreamMore() was called more than once.");
     }
+
+    // We're done with indexing.
+    m_isIndexed = true;
     return 0;
 }
 

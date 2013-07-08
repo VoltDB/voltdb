@@ -91,7 +91,8 @@ PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetS
     m_partitionColumn(partitionColumn),
     stats_(this),
     m_failedCompactionCount(0),
-    m_tuplesPendingDeleteCount(0)
+    m_tuplesPendingDeleteCount(0),
+    m_surgeon(*this)
 {
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
@@ -272,7 +273,7 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
         UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
         if (uq) {
             char* tupleData = uq->allocatePooledCopy(target.address(), target.tupleLength());
-            uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, this));
+            uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, &m_surgeon));
         }
     }
 
@@ -423,7 +424,7 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         char* newTupleData = uq->allocatePooledCopy(targetTupleToUpdate.address(), tupleLength);
         uq->registerUndoAction(new (*uq) PersistentTableUndoUpdateAction(oldTupleData, newTupleData,
                                                                          oldObjects, newObjects,
-                                                                         this, someIndexGotUpdated));
+                                                                         &m_surgeon, someIndexGotUpdated));
     } else {
         // This is normally handled by the Undo Action's release (i.e. when there IS an Undo Action)
         // -- though maybe even that case should delegate memory management back to the PersistentTable
@@ -535,7 +536,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
             target.setPendingDeleteOnUndoReleaseTrue();
             m_tuplesPinnedByUndo++;
             // Create and register an undo action.
-            uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), this), this);
+            uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), &m_surgeon), this);
             return true;
         }
     }
@@ -946,7 +947,7 @@ bool PersistentTable::activateStreamInternal(
 
     //TODO: Move this special case snapshot code into the COW context.
     // Probably want to move all of the snapshot-related stuff there.
-    if (m_tableStreamer->getStreamType() == TABLE_STREAM_SNAPSHOT) {
+    if (tableStreamTypeIsSnapshot(m_tableStreamer->getStreamType())) {
         //All blocks are now pending snapshot
         m_blocksPendingSnapshot.swap(m_blocksNotPendingSnapshot);
         m_blocksPendingSnapshotLoad.swap(m_blocksNotPendingSnapshotLoad);
@@ -956,7 +957,7 @@ bool PersistentTable::activateStreamInternal(
         }
     }
 
-    if (m_tableStreamer->activateStream(*this, tableId)) {
+    if (m_tableStreamer->activateStream(*this, m_surgeon, tableId)) {
         return false;
     }
 
@@ -1186,7 +1187,7 @@ void PersistentTable::doIdleCompaction() {
 
 void PersistentTable::doForcedCompaction() {
     if (   m_tableStreamer.get() != NULL
-        && m_tableStreamer->getActiveStreamType() == TABLE_STREAM_RECOVERY) {
+        && tableStreamTypeIsRecovery(m_tableStreamer->getActiveStreamType())) {
         LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO,
             "Deferring compaction until recovery is complete.");
         return;
