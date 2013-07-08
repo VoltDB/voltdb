@@ -330,7 +330,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_MINUTE, result);
 
-        BigDecimal EXPECTED_SECONDS = new BigDecimal("37.000000000000");
+        BigDecimal EXPECTED_SECONDS = new BigDecimal("37.123000000000");
         BigDecimal decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
         assertEquals(EXPECTED_SECONDS, decimalResult);
 
