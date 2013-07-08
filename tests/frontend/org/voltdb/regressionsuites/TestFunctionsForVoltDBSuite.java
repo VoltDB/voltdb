@@ -1137,10 +1137,10 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(time.getTime() * 1000, result.getTimestampAsLong(6));
 
         time = dateFormat.parse("1583-11-24 13:56:40.123");
-        assertTrue(Math.abs(time.getTime() * 1000 - result.getTimestampAsLong(7)) < 1001);
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(7));
 
         time = dateFormat.parse("1583-11-24 13:56:40.123");
-        assertTrue(Math.abs(time.getTime() * 1000 - result.getTimestampAsLong(7)) < 1001);
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(7));
 
         assertEquals(-12184250599876544L, result.getTimestampAsLong(9));
         assertEquals(-12184250599876544L, result.getTimestampAsLong(10));
@@ -1176,10 +1176,10 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(time.getTime() * 1000, result.getTimestampAsLong(6));
 
         time = dateFormat.parse("2608-03-06 13:56:40.123");
-        assertTrue(Math.abs(time.getTime() * 1000 - result.getTimestampAsLong(7)) < 1001);
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(7));
 
         time = dateFormat.parse("2608-03-06 13:56:40.123");
-        assertTrue(Math.abs(time.getTime() * 1000 - result.getTimestampAsLong(7)) < 1001);
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(7));
 
         assertEquals(20138939800123456L, result.getTimestampAsLong(9));
         assertEquals(20138939800123456L, result.getTimestampAsLong(10));
