@@ -40,7 +40,8 @@ function srccompile() {
     mkdir -p obj
     javac -classpath $CLASSPATH -d obj \
         src/voltkvqa/*.java \
-        src/voltkvqa/procedures/*.java
+        src/voltkvqa/procedures/*.java \
+        src/voltkvqa/procedures_withexport/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -48,9 +49,8 @@ function srccompile() {
 # build an application catalog
 function catalog() {
     srccompile
-    $VOLTDB compile --classpath obj -o $APPNAME.jar -p project.xml
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+    $VOLTDB compile --classpath obj -o $APPNAME.jar -p project.xml || exit 1
+    $VOLTDB compile --classpath obj -o ${APPNAME}_withexport.jar -p project_withexport.xml || exit 1
 }
 
 # run the voltdb server locally
