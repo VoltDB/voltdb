@@ -37,6 +37,7 @@ import org.voltcore.agreement.FakeMesh.Message;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.DisconnectFailedHostsCallback;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.SiteFailureForwardMessage;
 import org.voltcore.messaging.SiteFailureMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
@@ -187,7 +188,8 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
                     m_mailbox.deliver(message);
 
                     // snoop for SiteFailureMessage, inject into MiniSite's mailbox
-                    if (message instanceof SiteFailureMessage && message.m_sourceHSId != m_HSId) {
+                    if (   message instanceof SiteFailureMessage
+                        && !(message instanceof SiteFailureForwardMessage)) {
                         SiteFailureMessage sfm = (SiteFailureMessage)message;
 
                         for (long failedHostId : sfm.m_safeTxnIds.keySet()) {

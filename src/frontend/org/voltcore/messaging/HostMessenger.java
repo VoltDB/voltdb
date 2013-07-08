@@ -244,10 +244,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     @Override
     public synchronized void relayForeignHostFailed(long reportingSite, int hostId, Set<Long> survivors) {
         long initiatorSiteId = CoreUtils.getHSIdFromHostAndSite(hostId, AGREEMENT_SITE_ID);
-        if (getHSIdForLocalSite(AGREEMENT_SITE_ID) != initiatorSiteId) {
-            m_agreementSite.reportFault(reportingSite, initiatorSiteId, survivors);
-            logger.warn(String.format("Someone else claims that host %d has failed", hostId));
-        }
+        m_agreementSite.reportFault(reportingSite, initiatorSiteId, survivors);
+        logger.warn(String.format("Someone else claims that host %d has failed", hostId));
     }
 
     /**
@@ -969,7 +967,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public void setDeadHostTimeout(int timeout) {
         Preconditions.checkArgument(timeout > 0, "Timeout value must be > 0, was %s", timeout);
         hostLog.info("Dead host timeout set to " + timeout + " milliseconds");
-        m_config.deadHostTimeout = (int)timeout;
+        m_config.deadHostTimeout = timeout;
         for (ForeignHost fh : m_foreignHosts.values()) {
             fh.updateDeadHostTimeout(timeout);
         }

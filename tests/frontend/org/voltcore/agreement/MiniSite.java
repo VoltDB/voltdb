@@ -100,6 +100,7 @@ class MiniSite extends Thread implements MeshAide
     }
 
     public void reportFault(long reportingSite, long faultingSite, Set<Long> survivors) {
+        if (reportingSite == m_mailbox.getHSId()) return;
         m_siteLog.debug("Reported fault: " + faultingSite + ", survivors: " + survivors);
         FaultMessage fm = new FaultMessage(reportingSite, faultingSite, survivors);
         fm.m_sourceHSId = m_mailbox.getHSId();

@@ -135,7 +135,9 @@ public class SiteFailureMessage extends VoltMessage {
         }
 
         public void addSurvivors(Set<Long> survivors) {
-            srvrb.addAll(survivors);
+            for (long survivor: survivors) {
+                addSurvivor(survivor);
+            }
         }
 
         public void addSafeTxnId(long failedHsid, long safeTxnId) {

@@ -47,6 +47,13 @@ public class MeshArbiter {
 
     protected static final VoltLogger m_recoveryLog = new VoltLogger("REJOIN");
 
+    protected static final Subject [] justFailures = new Subject [] { Subject.FAILURE };
+    protected static final Subject [] receiveSubjects = new Subject [] {
+        Subject.FAILURE,
+        Subject.SITE_FAILURE_UPDATE,
+        Subject.SITE_FAILURE_FORWARD
+    };
+
     /**
      * During arbitration this map keys contain failed sites we are seeking
      * resolution for, and the values indicate whether or not the fault was
@@ -119,7 +126,9 @@ public class MeshArbiter {
         Suicide {
             @Override
             void log(FaultMessage fm) {
-                m_recoveryLog.info("Agreement, Discarding " + name());
+                m_recoveryLog.info("Agreement, Discarding " + name()
+                        + " reporter: "
+                        + CoreUtils.hsIdToString(fm.reportingSite));
             }
         },
         AlreadyFailed {
@@ -148,6 +157,11 @@ public class MeshArbiter {
             void log(FaultMessage fm) {
                 m_recoveryLog.info("Agreement, Discarding " + name() + " "
                         + CoreUtils.hsIdToString(fm.reportingSite));
+            }
+        },
+        ReporterUnrecognized {
+            @Override
+            void log(FaultMessage fm) {
             }
         },
         SelfUnwitnessed {
@@ -208,10 +222,16 @@ public class MeshArbiter {
             return Discard.Suicide;
         } else if (m_failedSites.contains(fm.failedSite)) {
             return Discard.AlreadyFailed;
-        } else if (m_failedSites.contains(fm.reportingSite)) {
-            return Discard.ReporterFailed;
         } else if (!hsIds.contains(fm.failedSite)) {
             return Discard.Unknown;
+        } else if (   m_failedSites.contains(fm.reportingSite)
+                   && !fm.survivors.contains(fm.failedSite)) {
+            return Discard.ReporterUnrecognized;
+        } else if (   !hsIds.contains(fm.reportingSite)
+                   && !fm.survivors.contains(fm.failedSite)) {
+            return Discard.ReporterUnrecognized;
+        } else if (m_failedSites.contains(fm.reportingSite)) {
+            return Discard.ReporterFailed;
         } else if (!hsIds.contains(fm.reportingSite)) {
             return Discard.ReporterUnknown;
         } else if (!fm.witnessed && fm.reportingSite == m_hsId) {
@@ -219,15 +239,14 @@ public class MeshArbiter {
         } else if (   alreadyWitnessed != null
                    && (alreadyWitnessed || alreadyWitnessed == fm.witnessed)) {
             return Discard.AlreadyKnow;
-        } else if (!fm.witnessed && m_inTrouble.isEmpty()) {
-            if (fm.survivors.contains(fm.failedSite)) {
-                return Discard.OtherUnwitnessed;
-            } else if (m_staleUnwitnessed.contains(fm.failedSite)) {
-                return Discard.StaleUnwitnessed;
-            } else {
-                return Discard.DoNot;
-            }
-        } else {
+        } else if (fm.survivors.contains(fm.failedSite)) {
+            /*
+             * by the time we get here we fm.failedSite is
+             * within our survivors: not among failed, and among
+             * hsids (not(not(among hsids)))
+             */
+            return Discard.OtherUnwitnessed;
+        }  else {
             return Discard.DoNot;
         }
     }
@@ -244,7 +263,7 @@ public class MeshArbiter {
      *   reached
      */
     public Map<Long,Long> reconfigureOnFault(Set<Long> hsIds, FaultMessage fm) {
-        final Subject [] justFailures = new Subject [] { Subject.FAILURE };
+        List<FaultMessage> fromUnrecognized = new ArrayList<FaultMessage>();
         boolean proceed = false;
         do {
             Discard ignoreIt = mayIgnore(hsIds,fm);
@@ -252,12 +271,16 @@ public class MeshArbiter {
                 m_inTrouble.put(fm.failedSite,fm.witnessed);
                 m_recoveryLog.info("Agreement, Processing " + fm);
                 proceed = true;
+            } else if (Discard.ReporterUnrecognized == ignoreIt) {
+                fromUnrecognized.add(fm);
             } else {
                 ignoreIt.log(fm);
             }
 
             fm = (FaultMessage)m_mailbox.recv(justFailures);
         } while (fm != null);
+
+        notifyOnUnrecognizedReporters(hsIds, fromUnrecognized);
 
         if (!proceed) {
             return ImmutableMap.of();
@@ -294,6 +317,34 @@ public class MeshArbiter {
         } else {
             return ImmutableMap.of();
         }
+    }
+
+    protected void notifyOnUnrecognizedReporters(Set<Long> hsIds, List<FaultMessage> fromUrecognized) {
+        if (fromUrecognized.isEmpty()) return;
+
+        Set<Long> survivors = Sets.difference(hsIds, m_failedSites);
+        Set<Long> dests = Sets.filter(survivors, not(equalTo(m_hsId)));
+
+        SiteFailureMessage.Builder sfmb = SiteFailureMessage.builder();
+        sfmb.addSurvivors(survivors);
+        for (FaultMessage unr: fromUrecognized) {
+
+            if (   !survivors.contains(unr.failedSite)
+                || unr.failedSite == m_hsId) continue;
+
+            sfmb.addSafeTxnId(
+                    unr.failedSite,
+                    m_meshAide.getNewestSafeTransactionForInitiator(unr.failedSite)
+                    );
+        }
+        SiteFailureMessage sfm = sfmb.build();
+
+        if (sfm.m_safeTxnIds.isEmpty()) return;
+
+        m_mailbox.send(Longs.toArray(dests), sfm);
+
+        m_recoveryLog.info("Agreement, for unrecognized reporters sending ["
+                + CoreUtils.hsIdCollectionToString(dests) + "] " + sfm);
     }
 
     /**
@@ -357,13 +408,11 @@ public class MeshArbiter {
      * Sends all data all the time to avoid a need for request/response.
      */
     private void discoverGlobalFaultData_send() {
-        Set<Long> dests = m_seeker.getSurvivors();
+        Set<Long> survivors = m_seeker.getSurvivors();
 
-        m_recoveryLog.info("Agreement, Sending survivor set "
-                + CoreUtils.hsIdCollectionToString(m_seeker.getSurvivors()));
 
         SiteFailureMessage.Builder msgBuilder = SiteFailureMessage.builder();
-        msgBuilder.addSurvivors(m_seeker.getSurvivors());
+        msgBuilder.addSurvivors(survivors);
         for (long troubled: m_inTrouble.keySet()) {
             if (troubled == m_hsId) continue;
             /*
@@ -374,8 +423,11 @@ public class MeshArbiter {
             Long txnId = m_meshAide.getNewestSafeTransactionForInitiator(troubled);
             msgBuilder.addSafeTxnId(troubled, txnId != null ? txnId : Long.MIN_VALUE);
         }
+        SiteFailureMessage sfm = msgBuilder.build();
 
-        m_mailbox.send(Longs.toArray(dests), msgBuilder.build());
+        m_recoveryLog.info("Agreement, Sending survivors " + sfm);
+
+        m_mailbox.send(Longs.toArray(survivors), sfm);
     }
 
     protected void updateFailedSitesLedger(Set<Long> hsIds,SiteFailureMessage sfm) {
@@ -407,13 +459,9 @@ public class MeshArbiter {
      */
     private boolean discoverGlobalFaultData_rcv(Set<Long> hsIds) {
 
+        List<FaultMessage> fromUnrecognized = new ArrayList<FaultMessage>();
         long blockedOnReceiveStart = System.currentTimeMillis();
         long lastReportTime = 0;
-        final Subject [] receiveSubjects = new Subject [] {
-                Subject.FAILURE,
-                Subject.SITE_FAILURE_UPDATE,
-                Subject.SITE_FAILURE_FORWARD
-        };
         boolean haveEnough = false;
 
         do {
@@ -476,6 +524,8 @@ public class MeshArbiter {
                     m_recoveryLog.info("Agreement, Detected a concurrent failure from FaultDistributor, new failed site "
                             + CoreUtils.hsIdToString(fm.failedSite));
                     return false;
+                } else if (Discard.ReporterUnrecognized == ignoreIt) {
+                    fromUnrecognized.add(fm);
                 } else {
                     ignoreIt.log(fm);
                 }
@@ -501,6 +551,8 @@ public class MeshArbiter {
             }
 
         } while (!haveEnough || m_seeker.needForward());
+
+        notifyOnUnrecognizedReporters(m_seeker.getSurvivors(), fromUnrecognized);
 
         return true;
     }

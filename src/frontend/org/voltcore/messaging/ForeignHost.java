@@ -316,7 +316,8 @@ public class ForeignHost {
         // ENG-1608.  We sniff for SiteFailureMessage here so
         // that a node will participate in the failure resolution protocol
         // even if it hasn't directly witnessed a node fault.
-        if (message instanceof SiteFailureMessage)
+        if (   message instanceof SiteFailureMessage
+            && !(message instanceof SiteFailureForwardMessage))
         {
             SiteFailureMessage sfm = (SiteFailureMessage)message;
 

@@ -174,13 +174,21 @@ public class TestFuzzMeshArbiter extends TestCase
         assertTrue(checkFullyConnectedGraphs(state.m_expectedLive));
     }
 
-    public void testSingleLinkInTriagle() throws InterruptedException {
-        constructCluster(3);
+    public void testSingleLinkInFollowedByKill() throws InterruptedException {
+        constructCluster(4);
         while (!getNodesInState(NodeState.START).isEmpty()) {
             Thread.sleep(50);
         }
         FuzzTestState state = new FuzzTestState(0L, m_nodes.keySet());
         state.killLink(0, 2);
+        state.setUpExpectations();
+
+        state.expect();
+
+        assertTrue(checkFullyConnectedGraphs(state.m_expectedLive));
+        state.pruneDeadNodes();
+
+        state.killNode(0);
         state.setUpExpectations();
 
         state.expect();

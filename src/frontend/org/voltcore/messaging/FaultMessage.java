@@ -74,11 +74,12 @@ public final class FaultMessage extends VoltMessage {
         sb.append(CoreUtils.hsIdToString(failedSite));
         sb.append(", reporting: ");
         sb.append(CoreUtils.hsIdToString(reportingSite));
-        sb.append(", witnessed: ").append(witnessed);
         if (!witnessed) {
             sb.append(", survivors: [");
             sb.append(CoreUtils.hsIdCollectionToString(survivors));
             sb.append("]");
+        } else {
+            sb.append(", witnessed: ").append(witnessed);
         }
         sb.append("}");
         return sb.toString();
