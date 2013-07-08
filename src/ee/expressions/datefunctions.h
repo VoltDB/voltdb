@@ -64,8 +64,8 @@ static inline void micros_to_date_and_time(int64_t epoch_micros_in, boost::grego
 static inline int64_t epoch_microseconds_from_components(unsigned short int year, unsigned short int month = 1,
         unsigned short int day = 1, int hour = 0, int minute = 0, int second = 0) {
     boost::gregorian::date goal_date = boost::gregorian::date(year, month, day);
-    boost::posix_time::ptime goal_ptime =
-            boost::posix_time::ptime(goal_date,boost::posix_time::time_duration(hour,minute,second));
+    boost::posix_time::time_duration goal_time = boost::posix_time::time_duration(hour,minute,second);
+    boost::posix_time::ptime goal_ptime = boost::posix_time::ptime(goal_date,goal_time);
     boost::posix_time::time_period goal_period (EPOCH, goal_ptime);
     boost::posix_time::time_duration goal_duration = goal_period.length();
     int64_t epoch_seconds = goal_duration.ticks() / goal_duration.ticks_per_second();
