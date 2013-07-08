@@ -39,6 +39,11 @@ import org.voltdb.VoltZK;
 import com.google.common.collect.ImmutableSet;
 
 public class LeaderElector {
+    // The root is always created as INITIALIZING until the first participant is added,
+    // then it's changed to INITIALIZED.
+    public static final byte INITIALIZING = 0;
+    public static final byte INITIALIZED = 1;
+
     private final ZooKeeper zk;
     private final String dir;
     private final String prefix;
@@ -149,15 +154,26 @@ public class LeaderElector {
     public static String createParticipantNode(ZooKeeper zk, String dir, String prefix, byte[] data)
         throws KeeperException, InterruptedException
     {
+        createRootIfNotExist(zk, dir);
+
+        String node = zk.create(ZKUtil.joinZKPath(dir, prefix + "_"), data,
+                                Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+
+        // Unlock the dir as initialized
+        zk.setData(dir, new byte[] {INITIALIZED}, -1);
+
+        return node;
+    }
+
+    public static void createRootIfNotExist(ZooKeeper zk, String dir)
+        throws KeeperException, InterruptedException
+    {
         // create the election root node if it doesn't exist.
         try {
-            zk.create(dir, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            zk.create(dir, new byte[] {INITIALIZING}, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         } catch (KeeperException.NodeExistsException e) {
             // expected on all nodes that don't start() first.
         }
-        String node = zk.create(ZKUtil.joinZKPath(dir, prefix + "_"), data,
-                Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
-        return node;
     }
 
     /**

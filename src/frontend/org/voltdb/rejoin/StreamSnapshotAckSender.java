@@ -30,8 +30,8 @@ public class StreamSnapshotAckSender implements Runnable {
     private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
 
     private final Mailbox m_mb;
-    private final LinkedBlockingQueue<Pair<Long, Integer>> m_blockIndices =
-            new LinkedBlockingQueue<Pair<Long, Integer>>();
+    private final LinkedBlockingQueue<Pair<Long, Pair<Long, Integer>>> m_blockIndices =
+            new LinkedBlockingQueue<Pair<Long, Pair<Long, Integer>>>();
 
     public StreamSnapshotAckSender(Mailbox mb) {
         m_mb = mb;
@@ -39,7 +39,7 @@ public class StreamSnapshotAckSender implements Runnable {
 
     public void close() {
         // an index of -1 will terminate the thread
-        m_blockIndices.offer(Pair.of(-1L, -1));
+        m_blockIndices.offer(Pair.of(-1L, Pair.of(-1L, -1)));
     }
 
     /**
@@ -47,19 +47,21 @@ public class StreamSnapshotAckSender implements Runnable {
      * @param hsId The mailbox to send the ack to
      * @param blockIndex
      */
-    public void ack(long hsId, int blockIndex) {
-        m_blockIndices.offer(Pair.of(hsId, blockIndex));
+    public void ack(long hsId, long targetId, int blockIndex) {
+        m_blockIndices.offer(Pair.of(hsId, Pair.of(targetId, blockIndex)));
     }
 
     @Override
     public void run() {
         while (true) {
             long hsId;
+            long targetId;
             int blockIndex;
             try {
-                Pair<Long, Integer> blockToAck = m_blockIndices.take();
+                Pair<Long, Pair<Long, Integer>> blockToAck = m_blockIndices.take();
                 hsId = blockToAck.getFirst();
-                blockIndex = blockToAck.getSecond();
+                targetId = blockToAck.getSecond().getFirst();
+                blockIndex = blockToAck.getSecond().getSecond();
             } catch (InterruptedException e1) {
                 break;
             }
@@ -71,7 +73,7 @@ public class StreamSnapshotAckSender implements Runnable {
                 break;
             }
 
-            RejoinDataAckMessage msg = new RejoinDataAckMessage(blockIndex);
+            RejoinDataAckMessage msg = new RejoinDataAckMessage(targetId, blockIndex);
             m_mb.send(hsId, msg);
         }
     }

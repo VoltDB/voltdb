@@ -15,6 +15,9 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef STLFRIENDLYNVALUE_H_
+#define STLFRIENDLYNVALUE_H_
+
 #include "common/NValue.hpp"
 
 namespace voltdb {
@@ -53,3 +56,6 @@ struct StlFriendlyNValue : public NValue {
 };
 
 }
+
+#endif // STLFRIENDLYNVALUE_H_
+

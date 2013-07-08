@@ -15,14 +15,14 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.rejoin;
+#ifndef FIXUNUSEDASSERTHACK_H_
+#define FIXUNUSEDASSERTHACK_H_
 
-/**
- * Base class for reading and writing snapshot streams over the network.
- */
-public abstract class StreamSnapshotBase {
-    protected static final int typeOffset = 0; // 1 byte
-    protected static final int tableIdOffset = typeOffset + 1; // 4 bytes
-    protected static final int blockIndexOffset = tableIdOffset + 4; // 4 bytes
-    protected static final int contentOffset = blockIndexOffset + 4;
-}
+// A custom assert macro that avoids "unused variable" warnings when compiled
+// away.
+#ifdef NDEBUG
+#undef assert
+#define assert(x) ((void)(x))
+#endif
+
+#endif
