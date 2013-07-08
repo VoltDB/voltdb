@@ -131,7 +131,7 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_SECOND>() const {
     }
     int64_t epoch_micros = getTimestamp();
     boost::posix_time::time_duration as_time = time_of_day_from_epoch_micros(epoch_micros);
-    int fraction = epoch_micros % 1000000;
+    int fraction = static_cast<int>(epoch_micros % 1000000);
     int second = as_time.seconds();
     if (epoch_micros < 0 && fraction != 0) {
         second -= 1;
