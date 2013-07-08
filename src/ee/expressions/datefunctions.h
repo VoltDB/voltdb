@@ -131,8 +131,11 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_SECOND>() const {
     }
     int64_t epoch_micros = getTimestamp();
     boost::posix_time::time_duration as_time = time_of_day_from_epoch_micros(epoch_micros);
-    TTInt retval(as_time.seconds());
-    printf("Seconds using library: %d\n", as_time.seconds());
+    int second = as_time.seconds();
+    if (epoch_micros < 0 && epoch_micros % 1000000 != 0) {
+        second -= 1;
+    }
+    TTInt retval(second);
     retval *= NValue::kMaxScaleFactor;
     return getDecimalValue(retval);
 }
