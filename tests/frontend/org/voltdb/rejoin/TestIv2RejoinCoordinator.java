@@ -43,6 +43,7 @@ import org.voltcore.messaging.VoltMessage;
 
 import org.voltcore.network.Connection;
 
+import org.voltdb.RealVoltDB;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.ClientInterface;
 import org.voltdb.ClientResponseImpl;
@@ -76,6 +77,7 @@ public class TestIv2RejoinCoordinator {
     @BeforeClass
     public static void setUpOnce() throws IOException {
         m_volt = mock(VoltDBInterface.class);
+        doReturn(RealVoltDB.extractBuildInfo()[0]).when(m_volt).getVersionString();
         VoltDB.replaceVoltDBInstanceForTest(m_volt);
         VoltDB.ignoreCrash = true;
     }
@@ -166,12 +168,13 @@ public class TestIv2RejoinCoordinator {
     @Test
     public void testBlockingBasic() throws Exception {
         createCoordinator(false);
-        m_coordinator.startJoin(null, null);
+        m_coordinator.startJoin(null, null, null);
         // verify the first site is started
         List<Long> hsids = new ArrayList<Long>();
         hsids.add(1l);
         hsids.add(2l);
-        RejoinMessage msg = new RejoinMessage(10000l, RejoinMessage.Type.INITIATION_COMMUNITY, "Rejoin_3");
+        RejoinMessage msg = new RejoinMessage(10000l, RejoinMessage.Type.INITIATION_COMMUNITY, "Rejoin_3",
+                                              1, null);
         verifySent(hsids, msg);
 
         verify(m_volt, never()).onExecutionSiteRejoinCompletion(anyLong());
@@ -216,7 +219,7 @@ public class TestIv2RejoinCoordinator {
     @Test
     public void testReplayFinishedBeforeSnapshot() throws Exception {
         createCoordinator(false);
-        m_coordinator.startJoin(null, null);
+        m_coordinator.startJoin(null, null, null);
 
         // fake a replay finished response for site 2 before snapshot stream finishes
         RejoinMessage msg3 = new RejoinMessage(2l, RejoinMessage.Type.REPLAY_FINISHED);

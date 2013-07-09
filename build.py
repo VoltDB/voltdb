@@ -238,6 +238,7 @@ CTX.INPUT['executors'] = """
  insertexecutor.cpp
  limitexecutor.cpp
  materializeexecutor.cpp
+ materializedscanexecutor.cpp
  nestloopexecutor.cpp
  nestloopindexexecutor.cpp
  orderbyexecutor.cpp
@@ -271,6 +272,7 @@ CTX.INPUT['plannodes'] = """
  insertnode.cpp
  limitnode.cpp
  materializenode.cpp
+ materializedscanplannode.cpp
  nestloopindexnode.cpp
  nestloopnode.cpp
  orderbynode.cpp
@@ -294,8 +296,11 @@ CTX.INPUT['indexes'] = """
 CTX.INPUT['storage'] = """
  constraintutil.cpp
  CopyOnWriteContext.cpp
+ ElasticContext.cpp
  CopyOnWriteIterator.cpp
  ConstraintFailureException.cpp
+ TableStreamer.cpp
+ ElasticScanner.cpp
  MaterializedViewMetadata.cpp
  persistenttable.cpp
  PersistentTableStats.cpp
@@ -305,7 +310,6 @@ CTX.INPUT['storage'] = """
  TableCatalogDelegate.cpp
  tablefactory.cpp
  TableStats.cpp
- TableStreamer.cpp
  tableutil.cpp
  temptable.cpp
  TempTableLimits.cpp

@@ -23,7 +23,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 
 import com.google.common.util.concurrent.SettableFuture;
 import org.voltcore.logging.VoltLogger;
@@ -36,7 +35,6 @@ import org.voltdb.SnapshotSaveAPI;
 import org.voltdb.VoltDB;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
-import org.voltdb.rejoin.RejoinSiteProcessor;
 import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.TaskLog;
 
@@ -49,7 +47,7 @@ public class RejoinProducer extends JoinProducerBase {
 
     private final AtomicBoolean m_currentlyRejoining;
     private ScheduledFuture<?> m_timeFuture;
-    private RejoinSiteProcessor m_rejoinSiteProcessor;
+    private StreamSnapshotSink m_rejoinSiteProcessor;
     private final SettableFuture<SnapshotCompletionEvent> m_completionMonitorAwait =
             SettableFuture.create();
 
@@ -247,7 +245,8 @@ public class RejoinProducer extends JoinProducerBase {
 
         // MUST choose the leader as the source.
         long sourceSite = m_mailbox.getMasterHsId(m_partitionId);
-        long hsId = m_rejoinSiteProcessor.initialize();
+        long hsId = m_rejoinSiteProcessor.initialize(message.getSnapshotSourceCount(),
+                                                     message.getSnapshotBufferPool());
 
         REJOINLOG.debug(m_whoami
                 + "received INITIATION message. Doing liverejoin: "
@@ -302,7 +301,7 @@ public class RejoinProducer extends JoinProducerBase {
      */
     void runForLiveRejoin(SiteProcedureConnection siteConnection)
     {
-        Pair<Integer, ByteBuffer> rejoinWork = m_rejoinSiteProcessor.poll();
+        Pair<Integer, ByteBuffer> rejoinWork = m_rejoinSiteProcessor.poll(m_snapshotBufferAllocator);
         if (rejoinWork != null) {
             restoreBlock(rejoinWork, siteConnection);
         }
@@ -353,7 +352,7 @@ public class RejoinProducer extends JoinProducerBase {
      */
     void runForCommunityRejoin(SiteProcedureConnection siteConnection)
     {
-        Pair<Integer, ByteBuffer> rejoinWork = m_rejoinSiteProcessor.poll();
+        Pair<Integer, ByteBuffer> rejoinWork = m_rejoinSiteProcessor.poll(m_snapshotBufferAllocator);
         // poll() could return null if the source indicated enf of stream,
         // need to check on that before retry
         if (rejoinWork == null && !m_rejoinSiteProcessor.isEOF()) {
@@ -368,7 +367,7 @@ public class RejoinProducer extends JoinProducerBase {
         while (rejoinWork != null) {
             restoreBlock(rejoinWork, siteConnection);
             try {
-                rejoinWork = m_rejoinSiteProcessor.take();
+                rejoinWork = m_rejoinSiteProcessor.take(m_snapshotBufferAllocator);
             } catch (InterruptedException e) {
                 REJOINLOG.warn("RejoinProducer interrupted at take()");
                 rejoinWork = null;

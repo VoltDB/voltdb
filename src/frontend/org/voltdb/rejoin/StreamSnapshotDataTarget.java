@@ -19,6 +19,7 @@ package org.voltdb.rejoin;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -31,9 +32,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google.common.util.concurrent.SettableFuture;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -51,14 +52,14 @@ import com.google.common.util.concurrent.ListenableFuture;
  * partition.
  */
 public class StreamSnapshotDataTarget extends StreamSnapshotBase
-implements SnapshotDataTarget {
+implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
 
     // triggers specific test code for TestMidRejoinDeath
-    private static boolean m_rejoinDeathTestMode = System.getProperties().containsKey("rejoindeathtest");
+    static boolean m_rejoinDeathTestMode = System.getProperties().containsKey("rejoindeathtest");
 
     private static AtomicLong m_totalSnapshotTargetCount = new AtomicLong(0);
-    private final long m_snapshotProcessorId;
+    final long m_targetId;
 
     // shortened when in test mode
     final static long WRITE_TIMEOUT_MS = m_rejoinDeathTestMode ? 10000 : 60000;
@@ -71,87 +72,84 @@ implements SnapshotDataTarget {
     // HSId of the destination mailbox
     private final long m_destHSId;
     // input and output threads
-    private final AckReceiver m_in;
-    private final SnapshotSender m_out;
-
-    // list of send work in order
-    private final LinkedBlockingQueue<SendWork> m_sendQueue = new LinkedBlockingQueue<SendWork>();
+    private final SnapshotSender m_sender;
+    private final StreamSnapshotAckReceiver m_ackReceiver;
 
     // Skip all subsequent writes if one fails
     private final AtomicBoolean m_writeFailed = new AtomicBoolean(false);
 
-    // a scratch buffer for compression work
-    private final ByteBuffer m_compressionBuffer =
-            ByteBuffer.allocateDirect(
-                    CompressionService.maxCompressedLength(1024 * 1024 * 2 + (1024 * 256)));
-
-    private final AtomicLong m_bytesSent = new AtomicLong();
-
     // number of sent, but un-acked buffers
-    private final AtomicInteger m_outstandingWorkCount = new AtomicInteger(0);
+    final AtomicInteger m_outstandingWorkCount = new AtomicInteger(0);
     // map of sent, but un-acked buffers, packaged up a bit
     private final Map<Integer, SendWork> m_outstandingWork = (new TreeMap<Integer, SendWork>());
 
-    private int m_blockIndex = 0;
+    int m_blockIndex = 0;
     private final AtomicReference<Runnable> m_onCloseHandler = new AtomicReference<Runnable>(null);
 
     private final AtomicBoolean m_closed = new AtomicBoolean(false);
-    private Exception m_lastAckReceiverException = null;
-    private Exception m_lastSenderException = null;
 
-    public StreamSnapshotDataTarget(long HSId, Map<Integer, byte[]> schemas)
+    public StreamSnapshotDataTarget(long HSId, Map<Integer, byte[]> schemas,
+                                    Mailbox mb,
+                                    SnapshotSender sender, StreamSnapshotAckReceiver ackReceiver)
     {
         super();
+        m_targetId = m_totalSnapshotTargetCount.getAndIncrement();
         m_schemas.putAll(schemas);
         m_destHSId = HSId;
-        m_mb = VoltDB.instance().getHostMessenger().createMailbox();
+        m_mb = mb;
+        m_sender = sender;
+        m_sender.registerDataTarget(m_targetId);
+        m_ackReceiver = ackReceiver;
+        m_ackReceiver.setCallback(m_targetId, this);
 
-        m_snapshotProcessorId = m_totalSnapshotTargetCount.getAndIncrement();
         rejoinLog.info(String.format("Initializing snapshot stream processor " +
                 "for source site id: %s, and with processorid: %d",
-                CoreUtils.hsIdToString(HSId), m_snapshotProcessorId));
-
-        m_in = new AckReceiver();
-        m_in.setDaemon(true);
-        m_in.start();
-
-        m_out = new SnapshotSender();
-        m_out.setDaemon(true);
-        m_out.start();
+                CoreUtils.hsIdToString(HSId), m_targetId));
 
         // start a periodic task to look for timed out connections
-        VoltDB.instance().scheduleWork(new Watchdog(m_bytesSent.get()), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
+        VoltDB.instance().scheduleWork(new Watchdog(0), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
     }
 
     /**
      * Packages up a pending write into a piece of work that can be tracked
      * and can be scheduled.
      */
-    class SendWork implements Callable<Boolean> {
+    public static class SendWork {
         BBContainer m_message;
         BBContainer m_schema;
-        int m_blockIndex;
-        long m_ts;
-        AtomicReference<ListenableFuture<Boolean>> m_future = new AtomicReference<ListenableFuture<Boolean>>(null);
+        final long m_targetId;
+        final long m_destHSId;
+        final int m_blockIndex;
+        final long m_ts;
 
-        SendWork (int blockIndex, BBContainer schema, BBContainer message) {
+        final boolean m_isEmpty;
+
+        // A listenable future used to notify a listener when this buffer is discarded
+        final SettableFuture<Boolean> m_future;
+
+        /**
+         * Creates an empty send work to terminate the sender thread
+         */
+        SendWork() {
+            m_isEmpty = true;
+            m_targetId = -1;
+            m_destHSId = -1;
+            m_blockIndex = -1;
+            m_ts = -1;
+            m_future = null;
+        }
+
+        SendWork (long targetId, long destHSId, int blockIndex,
+                  BBContainer schema, BBContainer message,
+                  SettableFuture<Boolean> future) {
+            m_isEmpty = false;
+            m_targetId = targetId;
+            m_destHSId = destHSId;
             m_blockIndex = blockIndex;
             m_schema = schema;
             m_message = message;
             m_ts = System.currentTimeMillis();
-        }
-
-        @Override
-        protected void finalize() {
-            discard(); // idempotent
-        }
-
-        void setFuture(ListenableFuture<Boolean> future) {
-            m_future.set(future);
-        }
-
-        ListenableFuture<Boolean> getFuture() {
-            return m_future.get();
+            m_future = future;
         }
 
         /**
@@ -159,17 +157,8 @@ implements SnapshotDataTarget {
          * BBContainters held.
          */
         public synchronized void discard() {
-            rejoinLog.trace("Discarding buffer at index " + String.valueOf(m_blockIndex));
-
-            // try to cancel the work if it's not done yet
-            ListenableFuture<Boolean> future = m_future.get();
-            if (future != null) {
-                if (m_future.compareAndSet(future, null)) {
-                    future.cancel(true);
-                }
-                // should be null no matter what the result of the
-                // compare and set above
-                assert(m_future.get() == null);
+            if (rejoinLog.isTraceEnabled()) {
+                rejoinLog.trace("Discarding buffer at index " + String.valueOf(m_blockIndex));
             }
 
             // discard the buffers and null them out
@@ -188,60 +177,53 @@ implements SnapshotDataTarget {
          * a RejoinDataMessage instance, and finally hand it off to the messaging
          * subsystem.
          */
-        protected boolean send(BBContainer message) {
-            try {
-                if (message.b.isDirect()) {
-                    byte[] data = null;
-                    int compressedSize = 0;
+        protected int send(Mailbox mb, BBContainer message) throws IOException {
+            if (message.b.isDirect()) {
+                byte[] data = CompressionService.compressBuffer(message.b);
+                RejoinDataMessage msg = new RejoinDataMessage(m_targetId, data);
+                mb.send(m_destHSId, msg);
 
-                    // sync access to the one scratch buffer for compression
-                    synchronized (m_compressionBuffer) {
-                        m_compressionBuffer.clear();
-                        compressedSize = CompressionService.compressBuffer(message.b, m_compressionBuffer);
-                        m_compressionBuffer.limit(compressedSize);
-                        m_compressionBuffer.position(0);
-
-                        data = new byte[compressedSize];
-                        m_compressionBuffer.get(data);
-                    }
-
-                    RejoinDataMessage msg = new RejoinDataMessage(data);
-                    m_mb.send(m_destHSId, msg);
-                    m_bytesSent.addAndGet(compressedSize);
-
+                if (rejoinLog.isTraceEnabled()) {
                     rejoinLog.trace("Sending direct buffer");
-                } else {
-                    byte compressedBytes[] =
-                            CompressionService.compressBytes(
-                                    message.b.array(), message.b.position(),
-                                    message.b.remaining());
+                }
 
-                    RejoinDataMessage msg = new RejoinDataMessage(compressedBytes);
-                    m_mb.send(m_destHSId, msg);
-                    m_bytesSent.addAndGet(compressedBytes.length);
+                return data.length;
+            } else {
+                byte compressedBytes[] =
+                    CompressionService.compressBytes(
+                        message.b.array(), message.b.position(),
+                        message.b.remaining());
 
+                RejoinDataMessage msg = new RejoinDataMessage(m_targetId, compressedBytes);
+                mb.send(m_destHSId, msg);
+
+                if (rejoinLog.isTraceEnabled()) {
                     rejoinLog.trace("Sending heap buffer");
                 }
-            } catch (IOException e) {
-                rejoinLog.error("Error writing rejoin snapshot block", e);
-                return false;
+
+                return compressedBytes.length;
             }
-            return true;
         }
 
-        @Override
-        public synchronized Boolean call() throws Exception {
+        public synchronized int doWork(Mailbox mb) throws Exception {
             // this work has already been discarded
             if (m_message == null) {
-                return true;
+                return 0;
             }
 
-            if (m_schema != null) {
-                if (!send(m_schema)) {
-                    return false;
+            int bytesSent = 0;
+            try {
+                if (m_schema != null) {
+                    bytesSent = send(mb, m_schema);
                 }
+
+                bytesSent += send(mb, m_message);
+                return bytesSent;
+            } finally {
+                // Always discard the buffer so that they can be reused
+                discard();
+                m_future.set(true);
             }
-            return send(m_message);
         }
     }
 
@@ -263,7 +245,7 @@ implements SnapshotDataTarget {
                 return;
             }
 
-            long bytesWritten = m_bytesSent.get();
+            long bytesWritten = m_sender.m_bytesSent.get(m_targetId).get();
             rejoinLog.info(String.format("While sending rejoin data to site %s, %d bytes have been sent in the past %s seconds.",
                     CoreUtils.hsIdToString(m_destHSId), bytesWritten - m_bytesWrittenSinceConstruction, WATCHDOG_PERIOS_S));
 
@@ -306,47 +288,10 @@ implements SnapshotDataTarget {
     }
 
     /**
-     * Thread that blocks on the receipt of Acks.
-     */
-    class AckReceiver extends Thread {
-        @Override
-        public void run() {
-            rejoinLog.trace("Starting ack receiver thread");
-
-            try {
-                while (!m_closed.get()) {
-                    rejoinLog.trace("Blocking on receiving mailbox");
-                    VoltMessage msg = m_mb.recvBlocking(5000);
-                    if (msg == null) continue;
-                    assert(msg instanceof RejoinDataAckMessage);
-                    RejoinDataAckMessage ackMsg = (RejoinDataAckMessage) msg;
-                    final int blockIndex = ackMsg.getBlockIndex();
-
-                    // TestMidRejoinDeath ignores acks to trigger the watchdog
-                    if (m_rejoinDeathTestMode && (m_snapshotProcessorId == 1)) {
-                        continue;
-                    }
-
-                    receiveAck(blockIndex);
-                }
-            }
-            catch (Exception e) {
-                if (m_closed.get()) {
-                    return;
-                }
-                m_lastAckReceiverException = e;
-                rejoinLog.error("Error reading a message from a recovery stream", e);
-            }
-            finally {
-                rejoinLog.trace("Ack receiver thread exiting");
-            }
-        }
-    }
-
-    /**
      * Synchronized method to handle the arrival of an Ack.
      * @param blockIndex The index of the block that is being acked.
      */
+    @Override
     public synchronized void receiveAck(int blockIndex) {
         rejoinLog.trace("Received block ack for index " + String.valueOf(blockIndex));
 
@@ -358,32 +303,70 @@ implements SnapshotDataTarget {
     }
 
     /**
-     * Thread that runs send work (sending snapshot blocks)
+     * Thread that runs send work (sending snapshot blocks). One per node
      */
-    class SnapshotSender extends Thread {
+    public static class SnapshotSender implements Runnable {
+        private final Mailbox m_mb;
+        private final LinkedBlockingQueue<SendWork> m_workQueue;
+        private final AtomicInteger m_expectedEOFs;
+
+        final Map<Long, AtomicLong> m_bytesSent;
+        volatile Exception m_lastException = null;
+
+        public SnapshotSender(Mailbox mb)
+        {
+            m_mb = mb;
+            m_workQueue = new LinkedBlockingQueue<SendWork>();
+            m_expectedEOFs = new AtomicInteger();
+            m_bytesSent = Collections.synchronizedMap(new HashMap<Long, AtomicLong>());
+        }
+
+        public void registerDataTarget(long targetId)
+        {
+            m_expectedEOFs.incrementAndGet();
+            m_bytesSent.put(targetId, new AtomicLong());
+        }
+
+        public void offer(SendWork work)
+        {
+            m_workQueue.offer(work);
+        }
+
         @Override
         public void run() {
             rejoinLog.trace("Starting stream sender thread");
 
-            try {
-                while (!m_closed.get()) {
+            while (true) {
+                SendWork work = null;
+
+                try {
                     rejoinLog.trace("Blocking on sending work queue");
-                    SendWork work = m_sendQueue.poll(5, TimeUnit.SECONDS);
-                    if (work != null) {
-                        work.call();
+                    work = m_workQueue.poll(10, TimeUnit.MINUTES);
+
+                    if (work == null) {
+                        rejoinLog.warn("No stream snapshot send work was produced in the past 10 minutes");
+                        break;
+                    } else if (work.m_isEmpty) {
+                        // Empty work indicates the end of the queue.
+                        // The sender is shared by multiple data targets, each of them will
+                        // send an end-of-queue work, must wait until all end-of-queue works
+                        // are received before terminating the thread.
+                        if (m_expectedEOFs.decrementAndGet() == 0) {
+                            break;
+                        } else {
+                            continue;
+                        }
                     }
+
+                    m_bytesSent.get(work.m_targetId).addAndGet(work.doWork(m_mb));
+                }
+                catch (Exception e) {
+                    m_lastException = e;
+                    rejoinLog.error("Error sending a recovery stream message", e);
                 }
             }
-            catch (Exception e) {
-                if (m_closed.get()) {
-                    return;
-                }
-                m_lastSenderException = e;
-                rejoinLog.error("Error sending a recovery stream message", e);
-            }
-            finally {
-                rejoinLog.trace("Stream sender thread exiting");
-            }
+
+            rejoinLog.trace("Stream sender thread exiting");
         }
     }
 
@@ -437,8 +420,10 @@ implements SnapshotDataTarget {
                 byte[] schema = m_schemas.remove(context.getTableId());
                 rejoinLog.debug("Sending schema for table " + context.getTableId());
 
-                ByteBuffer buf = ByteBuffer.allocate(schema.length + 1); // 1 byte for the type
+                // 1 byte for the type, 4 bytes for table Id
+                ByteBuffer buf = ByteBuffer.allocate(schema.length + 1 + 4);
                 buf.put((byte) StreamSnapshotMessageType.SCHEMA.ordinal());
+                buf.putInt(context.getTableId());
                 buf.put(schema);
                 buf.flip();
                 schemaContainer = DBBPool.wrapBB(buf);
@@ -447,15 +432,11 @@ implements SnapshotDataTarget {
             }
 
             chunk.b.put((byte) StreamSnapshotMessageType.DATA.ordinal());
-            chunk.b.putInt(m_blockIndex); // put chunk index
             chunk.b.putInt(context.getTableId()); // put table ID
+            chunk.b.putInt(m_blockIndex); // put chunk index
             chunk.b.position(0);
 
-            send(m_blockIndex++, schemaContainer, chunk);
-
-            rejoinLog.trace("Submitted write with index " + String.valueOf(m_blockIndex));
-
-            return null;
+            return send(m_blockIndex++, schemaContainer, chunk);
         }
         finally {
             rejoinLog.trace("Finished call to write");
@@ -470,12 +451,16 @@ implements SnapshotDataTarget {
      * @param blockIndex Index useful for ack tracking and debugging
      * @param schemaContainer Optional schema for table (can be null)
      * @param chunk Snapshot data to send.
+     * @return return a listenable future for the caller to wait until the buffer is sent
      */
-    synchronized void send(int blockIndex, BBContainer schemaContainer, BBContainer chunk) {
-        SendWork sendWork = new SendWork(blockIndex, schemaContainer, chunk);
+    synchronized ListenableFuture<Boolean> send(int blockIndex, BBContainer schemaContainer, BBContainer chunk) {
+        SettableFuture<Boolean> sendFuture = SettableFuture.create();
+        SendWork sendWork = new SendWork(m_targetId, m_destHSId, blockIndex,
+                                         schemaContainer, chunk, sendFuture);
         m_outstandingWork.put(blockIndex, sendWork);
         m_outstandingWorkCount.incrementAndGet();
-        m_sendQueue.add(sendWork);
+        m_sender.offer(sendWork);
+        return sendFuture;
     }
 
     @Override
@@ -518,15 +503,16 @@ implements SnapshotDataTarget {
                     CompressionService.compressBytes(
                             buf.array(), buf.position(),
                             buf.remaining());
-            RejoinDataMessage msg = new RejoinDataMessage(compressedBytes);
+            RejoinDataMessage msg = new RejoinDataMessage(m_targetId, compressedBytes);
             m_mb.send(m_destHSId, msg);
-            m_bytesSent.addAndGet(compressedBytes.length);
+            m_sender.m_bytesSent.get(m_targetId).addAndGet(compressedBytes.length);
+
+            // Terminate the sender thread and the ack receiver thread
+            m_sender.offer(new SendWork());
+            m_mb.deliver(new RejoinDataAckMessage(true));
 
             // locked so m_closed is true when the ack thread dies
             synchronized(this) {
-                // release the mailbox and close the socket,
-                // this should stop the ack receiver thread
-                VoltDB.instance().getHostMessenger().removeMailbox(m_mb.getHSId());
                 m_mb = null;
                 m_closed.set(true);
 
@@ -544,7 +530,7 @@ implements SnapshotDataTarget {
 
     @Override
     public long getBytesWritten() {
-        return m_bytesSent.get();
+        return m_sender.m_bytesSent.get(m_targetId).get();
     }
 
     @Override
@@ -554,10 +540,11 @@ implements SnapshotDataTarget {
 
     @Override
     public synchronized Throwable getLastWriteException() {
-        if (m_lastSenderException != null) {
-            return m_lastSenderException;
+        Exception exception = m_sender.m_lastException;
+        if (exception != null) {
+            return exception;
         }
-        return m_lastAckReceiverException;
+        return m_ackReceiver.m_lastException;
     }
 
     @Override

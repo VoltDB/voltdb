@@ -80,6 +80,7 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
@@ -102,6 +103,7 @@ import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.plannodes.SendPlanNode;
+import org.voltdb.sysprocs.SnapshotRestore;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
@@ -1474,7 +1476,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 byte[] collByte = collByteArray.get(i);
                 if( collByte == null ) {
                     //signle partition query plan
-                    String plan = new String( aggByte, VoltDB.UTF8ENCODING);
+                    String plan = new String( aggByte, Constants.UTF8ENCODING);
                     PlanNodeTree pnt = new PlanNodeTree();
                     try {
                         JSONObject jobj = new JSONObject( plan );
@@ -1489,8 +1491,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
                 else {
                     //multi-partition query plan
-                    String aggplan = new String( aggByte, VoltDB.UTF8ENCODING);
-                    String collplan = new String( collByte, VoltDB.UTF8ENCODING);
+                    String aggplan = new String( aggByte, Constants.UTF8ENCODING);
+                    String collplan = new String( collByte, Constants.UTF8ENCODING);
                     PlanNodeTree pnt = new PlanNodeTree();
                     PlanNodeTree collpnt = new PlanNodeTree();
                     try {
@@ -1934,6 +1936,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
             else if (task.procName.equals("@SnapshotDelete")) {
                 return dispatchStatistics(OpsSelector.SNAPSHOTDELETE, task, ccxn);
+            } else if (task.procName.equals("@SnapshotRestore")) {
+                ClientResponseImpl retval = SnapshotRestore.transformRestoreParamsToJSON(task);
+                if (retval != null) return retval;
             }
 
 
@@ -2069,14 +2074,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         assert(buf.hasArray());
         if (isSinglePartition) {
             byte[] param = null;
+            byte type = VoltType.NULL.getValue();
             // replicated table read is single-part without a partitioning param
             if (plannedStmtBatch.partitionParam != null) {
+                type = VoltType.typeFromClass(plannedStmtBatch.partitionParam.getClass()).getValue();
                 param = TheHashinator.valueToBytes(plannedStmtBatch.partitionParam);
             }
 
             // Send the partitioning parameter and its type along so that the site can check if
-            // it's mis-partitioned.
-            task.setParams(param, buf.array());
+            // it's mis-partitioned. Type is needed to re-hashinate for command log re-init.
+            task.setParams(param, type, buf.array());
         } else {
             task.setParams(buf.array());
         }

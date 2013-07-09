@@ -82,11 +82,11 @@ import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
-import org.voltdb.rejoin.RejoinSiteProcessor;
 import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
+import org.voltdb.utils.CachedByteBufferAllocator;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 
@@ -180,7 +180,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
     private RecoverySiteProcessor m_recoveryProcessor = null;
     // The following variables are used for new rejoin
-    private RejoinSiteProcessor m_rejoinSnapshotProcessor = null;
+    private StreamSnapshotSink m_rejoinSnapshotProcessor = null;
     private volatile long m_rejoinSnapshotTxnId = -1;
     // The snapshot completion handler will set this to true
     private volatile boolean m_rejoinSnapshotFinished = false;
@@ -853,8 +853,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                         //Will return null if there is no work, safe to block on the mailbox if there is no work
                         boolean hadWork =
                             (m_snapshotter.doSnapshotWork(m_systemProcedureContext,
-                                    ee,
-                                    EstTime.currentTimeMillis() - lastCommittedTxnTime > 5) != null);
+                                    ee) != null);
 
                         /*
                          * Do rejoin work here before it blocks on the mailbox
@@ -879,7 +878,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                         handleMailboxMessage(message);
                     } else {
                         //idle, do snapshot work
-                        m_snapshotter.doSnapshotWork(m_systemProcedureContext, ee, EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
+                        m_snapshotter.doSnapshotWork(m_systemProcedureContext, ee);
                         // do some rejoin work
                         doRejoinWork();
                     }
@@ -961,7 +960,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
      */
     private boolean restoreSnapshotForRejoin() {
         boolean doneWork = false;
-        Pair<Integer, ByteBuffer> rejoinWork = m_rejoinSnapshotProcessor.poll();
+        Pair<Integer, ByteBuffer> rejoinWork = m_rejoinSnapshotProcessor.poll(new CachedByteBufferAllocator());
         if (rejoinWork != null) {
             int tableId = rejoinWork.getFirst();
             ByteBuffer buffer = rejoinWork.getSecond();
@@ -969,7 +968,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                     PrivateVoltTableFactory.createVoltTableFromBuffer(buffer.duplicate(),
                                                                       true);
             //m_recoveryLog.info("table " + tableId + ": " + table.toString());
-            loadTable(m_rejoinSnapshotTxnId, tableId, table);
+            loadTable(m_rejoinSnapshotTxnId, tableId, table, false);
             doneWork = true;
         } else if (m_rejoinSnapshotProcessor.isEOF()) {
             m_rejoinLog.debug("Rejoin snapshot transfer is finished");
@@ -1010,7 +1009,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         // Construct a snapshot stream receiver
         m_rejoinSnapshotProcessor = new StreamSnapshotSink();
 
-        long hsId = m_rejoinSnapshotProcessor.initialize();
+        long hsId = m_rejoinSnapshotProcessor.initialize(1, null);
 
         // Construct task log and start logging task messages
         int partition = getCorrespondingPartitionId();
@@ -1289,7 +1288,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
                                 exportm.m_m.getPartitionId(),
                                 exportm.m_m.getSignature());
         } else if (message instanceof PotentialSnapshotWorkMessage) {
-            m_snapshotter.doSnapshotWork(m_systemProcedureContext, ee, false);
+            m_snapshotter.doSnapshotWork(m_systemProcedureContext, ee);
         }
         else if (message instanceof ExecutionSiteLocalSnapshotMessage) {
             hostLog.info("Executing local snapshot. Completing any on-going snapshots.");
@@ -1803,12 +1802,13 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
 
     @Override
-    public void loadTable(
+    public byte[] loadTable(
             long txnId,
             String clusterName,
             String databaseName,
             String tableName,
-            VoltTable data)
+            VoltTable data,
+            boolean returnUniqueViolations)
     throws VoltAbortException
     {
         Cluster cluster = m_context.cluster;
@@ -1824,7 +1824,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
         }
 
-        loadTable(txnId, table.getRelativeIndex(), data);
+        return loadTable(txnId, table.getRelativeIndex(), data, returnUniqueViolations);
     }
 
     /**
@@ -1833,10 +1833,11 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
      * @param table
      */
     @Override
-    public void loadTable(long txnId, int tableId, VoltTable data) {
-        ee.loadTable(tableId, data,
+    public byte[] loadTable(long txnId, int tableId, VoltTable data, boolean returnUniqueViolations) {
+        return ee.loadTable(tableId, data,
                      txnId,
-                     lastCommittedTxnId);
+                     lastCommittedTxnId,
+                     returnUniqueViolations);
     }
 
     @Override
@@ -2049,7 +2050,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
      }
 
     @Override
-    public Future<?> doSnapshotWork(boolean ignoreQuietPeriod)
+    public Future<?> doSnapshotWork()
     {
         throw new RuntimeException("Unsupported IV2-only API.");
     }
@@ -2139,5 +2140,10 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     @Override
     public byte[] planForFragmentId(long fragmentId) {
         return null;
+    }
+
+    @Override
+    public long[] validatePartitioning(long[] tableIds, int hashinatorType, byte[] hashinatorConfig) {
+        throw new UnsupportedOperationException();
     }
 }

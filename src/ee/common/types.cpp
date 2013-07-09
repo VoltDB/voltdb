@@ -358,9 +358,6 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_RECEIVE: {
         return "RECEIVE";
     }
-    case PLAN_NODE_TYPE_PRINT: {
-        return "PRINT";
-    }
     case PLAN_NODE_TYPE_AGGREGATE: {
         return "AGGREGATE";
     }
@@ -385,8 +382,11 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_DISTINCT: {
         return "DISTINCT";
     }
+    case PLAN_NODE_TYPE_MATERIALIZEDSCAN: {
+        return "MATERIALIZEDSCAN";
     }
-    return "INVALID";
+    }
+    return "UNDEFINED";
 }
 
 PlanNodeType stringToPlanNode(string str )
@@ -415,8 +415,6 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_SEND;
     } else if (str == "RECEIVE") {
         return PLAN_NODE_TYPE_RECEIVE;
-    } else if (str == "PRINT") {
-        return PLAN_NODE_TYPE_PRINT;
     } else if (str == "AGGREGATE") {
         return PLAN_NODE_TYPE_AGGREGATE;
     } else if (str == "HASHAGGREGATE") {
@@ -433,6 +431,8 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_LIMIT;
     } else if (str == "DISTINCT") {
         return PLAN_NODE_TYPE_DISTINCT;
+    } else if (str == "MATERIALIZEDSCAN") {
+        return PLAN_NODE_TYPE_MATERIALIZEDSCAN;
     }
     return PLAN_NODE_TYPE_INVALID;
 }
