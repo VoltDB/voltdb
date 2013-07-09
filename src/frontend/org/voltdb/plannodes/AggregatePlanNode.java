@@ -101,6 +101,34 @@ public class AggregatePlanNode extends AbstractPlanNode {
         return true;
     }
 
+    public boolean isTableMin() {
+        // do not support GROUP BY for now
+        if (m_groupByExpressions.isEmpty() == false)
+            return false;
+        if (m_aggregateTypes.size() != 1)
+            return false;
+        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_MIN) == false)
+            return false;
+
+        return true;
+    }
+
+    public boolean isTableMax() {
+        // do not support GROUP BY for now
+        if (m_groupByExpressions.isEmpty() == false)
+            return false;
+        if (m_aggregateTypes.size() != 1)
+            return false;
+        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_MAX) == false)
+            return false;
+
+        return true;
+    }
+
+    public List<AbstractExpression> getAggregateExpressions() {
+        return m_aggregateExpressions;
+    }
+
     public void setOutputSchema(NodeSchema schema)
     {
         // aggregates currently have their output schema specified
@@ -164,6 +192,22 @@ public class AggregatePlanNode extends AbstractPlanNode {
         for (TupleValueExpression tve : agg_tves)
         {
             int index = input_schema.getIndexOfTve(tve);
+
+            // removed
+/*
+            // second part of the ReplaceWithIndexLimiter micro-optimization for partitioned table
+            if (index == -1) {
+                if(m_children.get(0).getPlanNodeType() == PlanNodeType.RECEIVE) {
+                    if(m_children.get(0).getOutputSchema().getColumns().size() == 1) {
+                        SchemaColumn srcColumnSchema = m_children.get(0).getOutputSchema().getColumns().get(0);
+                        tve.setTableName(srcColumnSchema.getTableName());
+                        tve.setColumnName(srcColumnSchema.getColumnName());
+                        tve.setColumnAlias(srcColumnSchema.getColumnAlias());
+                        index = input_schema.getIndexOfTve(tve);
+                    }
+                }
+            }
+*/
             tve.setColumnIndex(index);
         }
 
