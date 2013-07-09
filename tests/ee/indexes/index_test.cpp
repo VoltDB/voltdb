@@ -68,6 +68,7 @@
 #include "indexes/tableindexfactory.h"
 #include "execution/VoltDBEngine.h"
 #include "common/ThreadLocalPool.h"
+#include "common/FixUnusedAssertHack.h"
 
 
 using namespace std;
@@ -190,7 +191,9 @@ public:
         {
             setWideTableToRow(table->tempTuple(), row);
             bool result = table->insertTuple(table->tempTuple());
-            assert(result || !"Insert on init wide table failed");
+            // Insert on init wide table failed - stupidly coded to avoid unused var arg
+            // not sure why this isn't caught by the trick at the top of harness.h
+            if (!result) assert(result || !"Insert on init wide table failed");
         }
     }
 

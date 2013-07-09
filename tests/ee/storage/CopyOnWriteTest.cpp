@@ -42,6 +42,7 @@
 #include "storage/ElasticContext.h"
 #include "stx/btree_set.h"
 #include "common/DefaultTupleSerializer.h"
+#include "jsoncpp/jsoncpp.h"
 #include <vector>
 #include <string>
 #include <iostream>
@@ -49,8 +50,6 @@
 #include <stdarg.h>
 #include <boost/foreach.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
-#include <json_spirit/json_spirit.h>
-#include <json_spirit/json_spirit_writer.h>
 
 using namespace voltdb;
 
@@ -463,6 +462,7 @@ TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
 TEST_F(CopyOnWriteTest, TestTableTupleFlags) {
     initTable(true);
     char storage[9];
+    std::memset(storage, 0, 9);
     TableTuple tuple(m_table->schema());
     tuple.move(storage);
 
@@ -511,11 +511,13 @@ TEST_F(CopyOnWriteTest, BigTest) {
             }
             int ii = 12;//skip partition id and row count and first tuple length
             while (ii < (serialized - 4)) {
-                int values[2];
+                int32_t values[2];
                 values[0] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
                 values[1] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii + 4]));
-                const bool inserted =
-                COWTuples.insert(*reinterpret_cast<int64_t*>(values)).second;
+                // the following rediculous cast is to placate our gcc treat warnings as errors affliction
+                void *valuesVoid = reinterpret_cast<void*>(values);
+                int64_t *values64 = reinterpret_cast<int64_t*>(valuesVoid);
+                const bool inserted = COWTuples.insert(*values64).second;
                 if (!inserted) {
                     printf("Failed in iteration %d, total inserted %d, with values %d and %d\n", qq, totalInserted, values[0], values[1]);
                 }
@@ -578,8 +580,10 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
                 int values[2];
                 values[0] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
                 values[1] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii + 4]));
-                const bool inserted =
-                COWTuples.insert(*reinterpret_cast<int64_t*>(values)).second;
+                // the following rediculous cast is to placate our gcc treat warnings as errors affliction
+                void *valuesVoid = reinterpret_cast<void*>(values);
+                int64_t *values64 = reinterpret_cast<int64_t*>(valuesVoid);
+                const bool inserted = COWTuples.insert(*values64).second;
                 if (!inserted) {
                     printf("Failed in iteration %d with values %d and %d\n", totalInserted, values[0], values[1]);
                 }
@@ -643,8 +647,10 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
                 int values[2];
                 values[0] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
                 values[1] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii + 4]));
-                const bool inserted =
-                COWTuples.insert(*reinterpret_cast<int64_t*>(values)).second;
+                // the following rediculous cast is to placate our gcc treat warnings as errors affliction
+                void *valuesVoid = reinterpret_cast<void*>(values);
+                int64_t *values64 = reinterpret_cast<int64_t*>(valuesVoid);
+                const bool inserted = COWTuples.insert(*values64).second;
                 if (!inserted) {
                     printf("Failed in iteration %d with values %d and %d\n", totalInserted, values[0], values[1]);
                 }
@@ -763,46 +769,54 @@ public:
     // Assume non-ridiculous copy semantics for Object.
     // Structured JSON-building for readibility, not efficiency.
 
-    static json_spirit::Object expr_value(const std::string& type, const json_spirit::Pair& valuePair) {
-        json_spirit::Object o;
-        o.push_back(json_spirit::Pair("TYPE", "VALUE_CONSTANT"));
-        o.push_back(json_spirit::Pair("VALUE_TYPE", type));
-        o.push_back(json_spirit::Pair("VALUE_SIZE", 0));
-        o.push_back(json_spirit::Pair("ISNULL", false));
-        o.push_back(valuePair);
-        return o;
+    static Json::Value expr_value_base(const std::string& type) {
+        Json::Value value;
+        value["TYPE"] = "VALUE_CONSTANT";
+        value["VALUE_TYPE"] = type;
+        value["VALUE_SIZE"] = 0;
+        value["ISNULL"] = false;
+        return value;
     }
 
-    static json_spirit::Object expr_value(const std::string& type, int ivalue) {
-        return expr_value(type, json_spirit::Pair("VALUE", ivalue));
+    static Json::Value expr_value(const std::string& type, std::string& key, int data) {
+        Json::Value value = expr_value_base(type);
+        value[key.c_str()] = data;
+        return value;
     }
 
-    static json_spirit::Object expr_value_tuple(const std::string& type,
-                                                const std::string& tblname,
-                                                int32_t colidx,
-                                                const std::string& colname) {
-        json_spirit::Object o;
-        o.push_back(json_spirit::Pair("TYPE", "VALUE_TUPLE"));
-        o.push_back(json_spirit::Pair("VALUE_TYPE", type));
-        o.push_back(json_spirit::Pair("VALUE_SIZE", 0));
-        o.push_back(json_spirit::Pair("TABLE_NAME", tblname));
-        o.push_back(json_spirit::Pair("COLUMN_IDX", colidx));
-        o.push_back(json_spirit::Pair("COLUMN_NAME", colname));
-        o.push_back(json_spirit::Pair("COLUMN_ALIAS", json_spirit::Value())); // null
-        return o;
+    static Json::Value expr_value(const std::string& type, int ivalue) {
+        std::string key = "VALUE";
+        return expr_value(type, key, ivalue);
     }
 
-    static json_spirit::Object expr_binary_op(const std::string& op,
-                                              const std::string& type,
-                                              const json_spirit::Object& left,
-                                              const json_spirit::Object& right) {
-        json_spirit::Object o;
-        o.push_back(json_spirit::Pair("TYPE", op));
-        o.push_back(json_spirit::Pair("VALUE_TYPE", type));
-        o.push_back(json_spirit::Pair("VALUE_SIZE", 0));
-        o.push_back(json_spirit::Pair("LEFT", left));
-        o.push_back(json_spirit::Pair("RIGHT", right));
-        return o;
+    static Json::Value expr_value_tuple(const std::string& type,
+                                        const std::string& tblname,
+                                        int32_t colidx,
+                                        const std::string& colname)
+    {
+        Json::Value value;
+        value["TYPE"] = "VALUE_TUPLE";
+        value["VALUE_TYPE"] = type;
+        value["VALUE_SIZE"] = 0;
+        value["TABLE_NAME"] = tblname;
+        value["COLUMN_IDX"] = colidx;
+        value["COLUMN_NAME"] = colname;
+        value["COLUMN_ALIAS"] = Json::nullValue; // null
+        return value;
+    }
+
+    static Json::Value expr_binary_op(const std::string& op,
+                                      const std::string& type,
+                                      const Json::Value& left,
+                                      const Json::Value& right)
+    {
+        Json::Value value;
+        value["TYPE"] = op;
+        value["VALUE_TYPE"] = type;
+        value["VALUE_SIZE"] = 0;
+        value["LEFT"] = left;
+        value["RIGHT"] = right;
+        return value;
     }
 
     // Work around unsupported modulus operator with other integer operators:
@@ -812,8 +826,8 @@ public:
         std::string tblname = table.name();
         int colidx = table.partitionColumn();
         std::string colname = table.columnName(colidx);
-        json_spirit::Object jsonTuple = expr_value_tuple("INTEGER", tblname, colidx, colname);
-        json_spirit::Object json =
+        Json::Value jsonTuple = expr_value_tuple("INTEGER", tblname, colidx, colname);
+        Json::Value json =
         expr_binary_op("COMPARE_EQUAL", "INTEGER",
                        expr_binary_op("OPERATOR_MINUS", "INTEGER",
                                       jsonTuple,
@@ -827,37 +841,36 @@ public:
                        expr_value("INTEGER", (int)ipart)
                        );
 
-        std::ostringstream os;
+        Json::Value predicateStuff;
+        predicateStuff["triggersDelete"] = deleteForPredicate;
+        predicateStuff["predicateExpression"] = json;
 
-        json_spirit::Object predicateStuff;
-        predicateStuff.push_back(json_spirit::Pair("triggersDelete", deleteForPredicate));
-        predicateStuff.push_back(json_spirit::Pair("predicateExpression", json));
-        json_spirit::write(predicateStuff, os);
-        return os.str();
+        Json::FastWriter writer;
+        return writer.write(predicateStuff);
     }
 
     std::string generateHashRangePredicate(T_HashRangeVector& ranges) {
         int colidx = table.partitionColumn();
-        json_spirit::Object json;
+        Json::Value json;
         std::string op = expressionToString(EXPRESSION_TYPE_HASH_RANGE);
-        json.push_back(json_spirit::Pair("TYPE", json_spirit::Value(op)));
-        json.push_back(json_spirit::Pair("VALUE_TYPE", json_spirit::Value(valueToString(VALUE_TYPE_BIGINT))));
-        json.push_back(json_spirit::Pair("VALUE_SIZE", json_spirit::Value(8)));
-        json.push_back(json_spirit::Pair("HASH_COLUMN", json_spirit::Value(colidx)));
-        json_spirit::Array array;
+        json["TYPE"] = op;
+        json["VALUE_TYPE"] = valueToString(VALUE_TYPE_BIGINT);
+        json["VALUE_SIZE"] = 8;
+        json["HASH_COLUMN"] = colidx;
+        Json::Value array;
         for (size_t i = 0; i < ranges.size(); i++) {
-            json_spirit::Object range;
-            range.push_back(json_spirit::Pair("RANGE_START", ranges[i].first));
-            range.push_back(json_spirit::Pair("RANGE_END", ranges[i].second));
-            array.push_back(range);
+            Json::Value range;
+            range["RANGE_START"] = static_cast<Json::Int64>(ranges[i].first);
+            range["RANGE_END"] = static_cast<Json::Int64>(ranges[i].second);
+            array.append(range);
         }
-        json.push_back(json_spirit::Pair("RANGES", array));
-        json_spirit::Object predicateStuff;
-        predicateStuff.push_back(json_spirit::Pair("triggersDelete", false));
-        predicateStuff.push_back(json_spirit::Pair("predicateExpression", json));
-        std::ostringstream os;
-        json_spirit::write(predicateStuff, os);
-        return os.str();
+        json["RANGES"] = array;
+        Json::Value predicateStuff;
+        predicateStuff["triggersDelete"] = false;
+        predicateStuff["predicateExpression"] = json;
+
+        Json::FastWriter writer;
+        return writer.write(predicateStuff);
     }
 
     PersistentTable& table;
@@ -984,8 +997,10 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
                         int32_t values[2];
                         values[0] = ntohl(*reinterpret_cast<const int32_t*>(buffers[ipart].get()+ibuf));
                         values[1] = ntohl(*reinterpret_cast<const int32_t*>(buffers[ipart].get()+ibuf+4));
-                        int64_t value = *reinterpret_cast<int64_t*>(values);
-                        const bool inserted = actual[ipart].insert(value).second;
+                        // the following rediculous cast is to placate our gcc treat warnings as errors affliction
+                        void *valuesVoid = reinterpret_cast<void*>(values);
+                        int64_t *values64 = reinterpret_cast<int64_t*>(valuesVoid);
+                        const bool inserted = actual[ipart].insert(*values64).second;
                         if (!inserted) {
                             tool.valueError(values, "Buffer duplicate: ipart=%lu totalInserted=%d ibuf=%d",
                                             ipart, totalInserted, ibuf);

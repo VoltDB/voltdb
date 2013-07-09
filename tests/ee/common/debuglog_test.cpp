@@ -51,6 +51,7 @@
 
 #include "harness.h"
 
+#undef VOLT_LOG_LEVEL
 #define VOLT_LOG_LEVEL 200 //test DEBUG level
 #include "common/debuglog.h"
 
