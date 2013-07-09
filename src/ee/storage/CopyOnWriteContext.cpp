@@ -26,7 +26,6 @@
 #include <algorithm>
 #include <cassert>
 #include <iostream>
-#include <boost/exception/exception.hpp>
 
 namespace voltdb {
 

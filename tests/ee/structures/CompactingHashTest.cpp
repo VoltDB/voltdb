@@ -31,6 +31,7 @@
 #include <boost/unordered_map.hpp>
 #include "harness.h"
 #include "structures/CompactingHashTable.h"
+#include "common/FixUnusedAssertHack.h"
 
 using namespace voltdb;
 using namespace std;

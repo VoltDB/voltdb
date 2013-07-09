@@ -158,6 +158,10 @@ struct ExceptIntersectSetOperator : public SetOperator {
         void exceptTupleMaps(TupleMap& tuple_a, TupleMap& tuple_b);
         void intersectTupleMaps(TupleMap& tuple_a, TupleMap& tuple_b);
 
+        // for debugging - may be unused
+        void printTupleMap(const char* nonce, TupleMap &tuples);
+        void printTupleSet(const char* nonce, TupleSet &tuples);
+
         bool m_is_except;
 };
 
@@ -171,6 +175,27 @@ ExceptIntersectSetOperator::ExceptIntersectSetOperator(
         std::swap( m_input_tables[0], *minTableIt);
     }
 
+}
+
+// for debugging - may be unused
+void ExceptIntersectSetOperator::printTupleMap(const char* nonce, TupleMap &tuples) {
+    printf("Printing TupleMap (%s): ", nonce);
+    for (TupleMap::const_iterator mapIt = tuples.begin(); mapIt != tuples.end(); ++mapIt) {
+        TableTuple tuple = mapIt->first;
+        printf("%s, ", tuple.debugNoHeader().c_str());
+    }
+    printf("\n");
+    fflush(stdout);
+}
+
+// for debugging - may be unused
+void ExceptIntersectSetOperator::printTupleSet(const char* nonce, TupleSet &tuples) {
+    printf("Printing TupleSet (%s): ", nonce);
+    for (TupleSet::const_iterator setIt = tuples.begin(); setIt != tuples.end(); ++setIt) {
+        printf("%s, ", setIt->debugNoHeader().c_str());
+    }
+    printf("\n");
+    fflush(stdout);
 }
 
 bool ExceptIntersectSetOperator::processTuplesDo() {
@@ -235,8 +260,12 @@ void ExceptIntersectSetOperator::exceptTupleMaps(TupleMap& map_a, TupleMap& map_
     while(it_a != map_a.end()) {
         TupleMap::iterator it_b = map_b.find(it_a->first);
         if (it_b != map_b.end()) {
-            it_a->second = (it_a->second > it_b->second) ?
-                std::max(it_a->second - it_b->second, zero_val) : zero_val;
+            if (it_a->second > it_b->second) {
+                it_a->second = std::max(it_a->second - it_b->second, zero_val);
+            }
+            else {
+                it_a->second = zero_val;
+            }
             if (it_a->second == zero_val) {
                 it_a = map_a.erase(it_a);
             } else {
