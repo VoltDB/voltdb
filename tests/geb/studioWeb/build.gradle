@@ -5,36 +5,31 @@ apply plugin: "groovy"
 ext.drivers = ["firefox", "chrome"]
 
 repositories{
-	mavenCentral() 
+    mavenCentral() 
 }
 
 dependencies{
-	def gebVersion = "0.9.0"
-	def seleniumVersion = "2.33.0"
+    def gebVersion = "0.9.0"
+    def seleniumVersion = "2.33.0"
 
-	//Geb & Spock
-	testCompile "org.gebish:geb-spock:$gebVersion"
-	testCompile "org.spockframework:spock-core:0.7-groovy-2.0"
+    //Geb & Spock
+    testCompile "org.gebish:geb-spock:$gebVersion"
+    testCompile "org.spockframework:spock-core:0.7-groovy-2.0"
 
-	// Drivers
-	drivers.each { driver ->
-		testCompile "org.seleniumhq.selenium:selenium-$driver-driver:$seleniumVersion"
-	}
+    // Drivers
+    drivers.each { driver ->
+        testCompile "org.seleniumhq.selenium:selenium-$driver-driver:$seleniumVersion"
+    }
 }
 
 
 drivers.each { driver ->
-	task "${driver}Test"(type: Test) {
-		testReportDir = reporting.file("$name/tests")
-		testResultsDir = file("$buildDir/test-results/$name")
+    task "${driver}Test"(type: Test) {
+        testReportDir = reporting.file("$name/tests")
+        testResultsDir = file("$buildDir/test-results/$name")
 
-		systemProperty "geb.build.reportsDir", reporting.file("$name/geb")
-		systemProperty "geb.env", driver
+        systemProperty "geb.build.reportsDir", reporting.file("$name/geb")
+        systemProperty "geb.env", driver
 
-	}
-}
-
-test {
-	dependsOn drivers.collect { tasks["${it}Test"] }
-	enabled = false
+    }
 }
