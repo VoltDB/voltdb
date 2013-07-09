@@ -157,7 +157,6 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_HOUR>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    // time_of_day manages the wrap at 24 hours
     boost::posix_time::time_duration as_time;
     micros_to_time(epoch_micros, as_time);
     return getTinyIntValue((int8_t)as_time.hours());

@@ -806,6 +806,52 @@ public class TestFunctionsSuite extends RegressionSuite {
         EXPECTED_SECONDS = new BigDecimal("27.544000000000");
         decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
         assertEquals(EXPECTED_SECONDS, decimalResult);
+
+        // Move in this testcase of quickfix-extract(), Human time (GMT): Mon, 02 Jul 1956 12:53:37 GMT
+        cr = client.callProcedure("P1.insert", 4, "X0", 10, 1.1, new Timestamp(-425991982877L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("EXTRACT_TIMESTAMP", 4);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
+        columnIndex = 0;
+        //System.out.println("Result: " + r);
+
+        EXPECTED_YEAR = 1956;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_YEAR, result);
+
+        EXPECTED_MONTH = 7;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_MONTH, result);
+
+        EXPECTED_DAY = 2;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DAY, result);
+
+        EXPECTED_DOW = 2;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DOW, result);
+
+        EXPECTED_DOY = 184;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DOY, result);
+
+        EXPECTED_QUARTER = 3;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_QUARTER, result);
+
+        EXPECTED_HOUR = 12;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_HOUR, result);
+
+        EXPECTED_MINUTE = 53;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_MINUTE, result);
+
+        EXPECTED_SECONDS = new BigDecimal("37.123000000000");
+        decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
+        assertEquals(EXPECTED_SECONDS, decimalResult);
     }
 
     public void testParams() throws NoConnectionsException, IOException, ProcCallException {
