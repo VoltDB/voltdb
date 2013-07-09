@@ -110,7 +110,7 @@ class StudioWebDiag extends GebReportingSpec {
         def fold1 = prgrm.siblings("div")
         def fold2 = fold1.siblings().find("li",0).children("div")
         def fold3 = fold2.siblings().find("li",0).children("div")
-        [fold1, fold2, fold3]*.click()
+        [fold1, fold2, fold3]*.click() //open each folder
     }
 
     def chkElements(def eles, def file){
