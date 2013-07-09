@@ -76,7 +76,7 @@ LimitPlanNode::getLimitAndOffsetByReference(const NValueArray &params, int &limi
     // and probably makes it slower. Would have to initialize an nvalue for
     // each loop iteration.
     if (limitParamIdx != -1) {
-        limitOut = ValuePeeker::peekInteger(params[limitParamIdx]);
+        limitOut = ValuePeeker::peekAsInteger(params[limitParamIdx]);
         if (limitOut < 0) {
             throw SQLException(SQLException::data_exception_invalid_parameter,
                                "Negative parameter to LIMIT");
@@ -84,7 +84,7 @@ LimitPlanNode::getLimitAndOffsetByReference(const NValueArray &params, int &limi
 
     }
     if (offsetParamIdx != -1) {
-        offsetOut = ValuePeeker::peekInteger(params[offsetParamIdx]);
+        offsetOut = ValuePeeker::peekAsInteger(params[offsetParamIdx]);
         if (offsetOut < 0) {
             throw SQLException(SQLException::data_exception_invalid_parameter,
                                "Negative parameter to LIMIT OFFSET");

@@ -432,13 +432,13 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     }
     break;
 
-    case (EXPRESSION_TYPE_INLISTBUILDER): {
+    case (EXPRESSION_TYPE_VALUE_VECTOR): {
         // Parse whatever is needed out of obj and pass the pieces to inListFactory
         // to make it easier to unit test independently of the parsing.
         // The first argument is used as the list element type.
         // If the ValueType of the list builder expression needs to be "ARRAY" or something else,
         // a separate element type attribute will have to be serialized and passed in here.
-        ret = inListFactory(vt, args);
+        ret = vectorFactory(vt, args);
     }
     break;
 

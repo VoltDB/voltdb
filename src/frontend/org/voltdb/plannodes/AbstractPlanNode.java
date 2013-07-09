@@ -724,9 +724,9 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             // don't bother with inlined projections
             if (inlineNode.getPlanNodeType() == PlanNodeType.PROJECTION)
                 continue;
-            sb.append(indent + "inline (");
+            sb.append(indent + "inline ");
             sb.append(inlineNode.explainPlanForNode(indent));
-            sb.append(")\n");
+            sb.append("\n");
         }
 
         for (AbstractPlanNode node : m_children) {

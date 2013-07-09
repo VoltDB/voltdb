@@ -52,6 +52,7 @@ public class NestLoopPlanNode extends AbstractJoinPlanNode {
 
     @Override
     protected String explainPlanForNode(String indent) {
-        return "NEST LOOP " + this.m_joinType.toString() + " JOIN";
+        return "NEST LOOP " + this.m_joinType.toString() + " JOIN" + explainFilters(indent);
     }
+
 }

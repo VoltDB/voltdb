@@ -37,6 +37,7 @@ import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.indexes.CheckMultiMultiIntGTEFailure;
+import org.voltdb_testprocs.regressionsuites.indexes.CompiledInLists;
 import org.voltdb_testprocs.regressionsuites.indexes.Insert;
 
 /**
@@ -49,7 +50,7 @@ public class TestIndexesSuite extends RegressionSuite {
 
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Insert.class,
-        CheckMultiMultiIntGTEFailure.class};
+        CheckMultiMultiIntGTEFailure.class, CompiledInLists.class};
 
     // Index stuff to test:
     // scans against tree
@@ -119,7 +120,7 @@ public class TestIndexesSuite extends RegressionSuite {
             VoltTable results =
                 client.callProcedure(
                         "@AdHoc",
-                        "SELECT R1.ID, MIN(R1.ID) from R1 group by R1.ID order by R1.ID limit 4").getResults()[0];
+                        "select R1.ID, MIN(R1.ID) from R1 group by R1.ID order by R1.ID limit 4").getResults()[0];
             System.out.println(results);
         }
     }
@@ -137,58 +138,58 @@ public class TestIndexesSuite extends RegressionSuite {
             client.callProcedure("Insert", table, 6, "f", 200, 6, 17.5);
             client.callProcedure("Insert", table, 7, "g", 300, 7, 18.5);
             client.callProcedure("Insert", table, 8, "h", 300, 8, 19.5);
-            String query = String.format("select * from %s where %s.ID > 1",
-                                         table, table);
+            String query = String.format("select * from %s T where T.ID > 1",
+                                         table);
             VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(5, results[0].getRowCount());
             // make sure that we work if the value we want isn't present
-            query = String.format("select * from %s where %s.ID > 4",
-                                  table, table);
+            query = String.format("select * from %s T where T.ID > 4",
+                                  table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(3, results[0].getRowCount());
-            query = String.format("select * from %s where %s.ID > 8",
-                                  table, table);
+            query = String.format("select * from %s T where T.ID > 8",
+                                  table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(0, results[0].getRowCount());
-            query = String.format("select * from %s where %s.ID >= 1",
-                                  table, table);
+            query = String.format("select * from %s T where T.ID >= 1",
+                                  table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(6, results[0].getRowCount());
-            query = String.format("select * from %s where %s.ID >= 4",
-                                  table, table);
+            query = String.format("select * from %s T where T.ID >= 4",
+                                  table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(3, results[0].getRowCount());
-            query = String.format("select * from %s where %s.ID >= 9",
-                                  table, table);
+            query = String.format("select * from %s T where T.ID >= 9",
+                                  table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(0, results[0].getRowCount());
-            query = String.format("select * from %s where %s.ID > 1 and %s.ID < 6",
-                                  table, table, table);
+            query = String.format("select * from %s T where T.ID > 1 and T.ID < 6",
+                                  table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(2, results[0].getRowCount());
-            query = String.format("select * from %s where %s.ID > 1 and %s.ID <= 6",
-                                  table, table, table);
+            query = String.format("select * from %s T where T.ID > 1 and T.ID <= 6",
+                                  table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(3, results[0].getRowCount());
-            query = String.format("select * from %s where %s.ID > 1 and %s.ID <= 5",
-                                  table, table, table);
+            query = String.format("select * from %s T where T.ID > 1 and T.ID <= 5",
+                                  table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(2, results[0].getRowCount());
-            query = String.format("select * from %s where %s.ID >= 1 and %s.ID < 7",
-                                  table, table, table);
+            query = String.format("select * from %s T where T.ID >= 1 and T.ID < 7",
+                                  table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(4, results[0].getRowCount());
             // Check that >= work in conjunction with <
             // run over the end of the index to catch the keyIterate bug
             // in the first >= index fix
-            query = String.format("select * from %s where %s.ID >= 1 and %s.ID < 10",
-                                  table, table, table);
+            query = String.format("select * from %s T where T.ID >= 1 and T.ID < 10",
+                                  table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(6, results[0].getRowCount());
             // XXX THIS CASE CURRENTLY FAILS
             // SEE TICKET 194
-//            query = String.format("select * from %s where %s.ID >= 2.9",
-//                                  table, table);
+//            query = String.format("select * from %s T where T.ID >= 2.9",
+//                                  table);
 //            results = client.callProcedure("@AdHoc", query);
 //            assertEquals(4, results[0].getRowCount());
         }
@@ -212,51 +213,55 @@ public class TestIndexesSuite extends RegressionSuite {
             client.callProcedure("Insert", table, 6, "f", 200, 6, 17.5);
             client.callProcedure("Insert", table, 7, "g", 300, 7, 18.5);
             client.callProcedure("Insert", table, 8, "h", 300, 8, 19.5);
-            String query = String.format("select * from %s where %s.NUM > 100",
-                                         table, table);
+            String query = String.format("select * from %s T where T.NUM > 100",
+                                         table);
             VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(4, results[0].getRowCount());
-            query = String.format("select * from %s where %s.NUM > 150",
-                                  table, table);
+            query = String.format("select * from %s T where T.NUM > 150",
+                                  table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(4, results[0].getRowCount());
-            query = String.format("select * from %s where %s.NUM > 300",
-                                  table, table);
+            query = String.format("select * from %s T where T.NUM > 300",
+                                  table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(0, results[0].getRowCount());
-            query = String.format("select * from %s where %s.NUM >= 100",
-                                  table, table);
+            query = String.format("select * from %s T where T.NUM >= 100",
+                                  table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(6, results[0].getRowCount());
-            query = String.format("select * from %s where %s.NUM >= 150",
-                                  table, table);
+            query = String.format("select * from %s T where T.NUM >= 150",
+                                  table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(4, results[0].getRowCount());
-            query = String.format("select * from %s where %s.NUM >= 301",
-                                  table, table);
+            query = String.format("select * from %s T where T.NUM >= 301",
+                                  table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(0, results[0].getRowCount());
-            query = String.format("select * from %s where %s.NUM > 100 and %s.NUM < 300",
-                                  table, table, table);
+            query = String.format("select * from %s T where T.NUM > 100 and T.NUM < 300",
+                                  table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(2, results[0].getRowCount());
             // Check that >= work in conjunction with <
             // run over the end of the index to catch the keyIterate bug
             // in the first >= index fix
-            query = String.format("select * from %s where %s.NUM >= 100 and %s.NUM < 400",
-                                  table, table, table);
+            query = String.format("select * from %s T where T.NUM >= 100 and T.NUM < 400",
+                                  table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(6, results[0].getRowCount());
-            query = String.format("select * from %s where %s.NUM = 100",
-                                  table, table);
+            query = String.format("select * from %s T where T.NUM = 100",
+                                  table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(2, results[0].getRowCount());
-            query = String.format("select * from %s where %s.NUM > 100 and %s.NUM <= 300",
-                                  table, table, table);
+            query = String.format("select * from %s T where T.NUM > 100 and T.NUM <= 300",
+                                  table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(4, results[0].getRowCount());
-            query = String.format("select * from %s where %s.NUM > 100 and %s.NUM <= 250",
-                                  table, table, table);
+            query = String.format("select * from %s T where T.NUM > 100 and T.NUM <= 250",
+                                  table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(2, results[0].getRowCount());
+            query = String.format("select * from %s T where T.NUM > 100 and T.NUM <= 250",
+                                  table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(2, results[0].getRowCount());
         }
@@ -300,6 +305,112 @@ public class TestIndexesSuite extends RegressionSuite {
         assertEquals(4, result.getRowCount());
     }
 
+    public void testInList()
+            throws IOException, ProcCallException
+    {
+        String[] tables = {"P3", "R3"};
+        Client client = getClient();
+        String query;
+        VoltTable[] results;
+        for (String table : tables) {
+            client.callProcedure("Insert", table, 1, "a", 100, 1, 14.5);
+            client.callProcedure("Insert", table, 2, "b", 100, 2, 15.5);
+            client.callProcedure("Insert", table, 3, "c", 200, 3, 16.5);
+            client.callProcedure("Insert", table, 6, "f", 200, 6, 17.5);
+            client.callProcedure("Insert", table, 7, "g", 300, 7, 18.5);
+            client.callProcedure("Insert", table, 8, "h", 300, 8, 19.5);
+            query = String.format("select * from %s T where T.NUM IN (200, 300)", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(4, results[0].getRowCount());
+            query = String.format("select * from %s T where T.NUM IN (10, 200, 300, -1)", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(4, results[0].getRowCount());
+
+            query = String.format("select * from %s T where T.NUM IN (10, 200, 300, -1, 200)", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(4, results[0].getRowCount());
+
+            query = String.format("select * from %s T where T.NUM IN (200)", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(2, results[0].getRowCount());
+
+            query = String.format("select * from %s T where T.NUM IN (10)", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(0, results[0].getRowCount());
+
+            //query = String.format("select * from %s T where T.NUM IN ()", table);
+            //results = client.callProcedure("@AdHoc", query).getResults();
+            //assertEquals(0, results[0].getRowCount());
+
+            query = String.format("select * from %s T where T.DESC IN ('c', 'f', 'g', 'h')", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(4, results[0].getRowCount());
+            query = String.format("select * from %s T where T.DESC IN ('', 'c', 'f', 'g', 'h', " +
+                "'a value with some length to it in case there are object allocation issues'" +
+                ")", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(4, results[0].getRowCount());
+
+            query = String.format("select * from %s T where T.DESC IN ('', 'c', 'f', 'g', 'h', 'f')", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(4, results[0].getRowCount());
+
+            query = String.format("select * from %s T where T.DESC IN ('b')", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(1, results[0].getRowCount());
+
+            query = String.format("select * from %s T where T.DESC IN ('')", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(0, results[0].getRowCount());
+
+
+            query = String.format("select * from %s T where T.DESC IN ('c', 'f', 'g', 'h')" +
+                " and T.NUM IN (200, 300)", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(4, results[0].getRowCount());
+            query = String.format("select * from %s T where T.DESC IN ('', 'c', 'f', 'g', 'h', " +
+                "'a value with some length to it in case there are object allocation issues'" +
+                ")" +
+                " and T.NUM IN (10, 200, 300, -1)", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(4, results[0].getRowCount());
+
+            query = String.format("select * from %s T where T.DESC IN ('', 'c', 'f', 'g', 'h', 'f')" +
+                " and T.NUM IN (10, 200, 300, -1, 200)", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(4, results[0].getRowCount());
+
+            query = String.format("select * from %s T where T.DESC IN ('b')" +
+                " and T.NUM IN (100)", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(1, results[0].getRowCount());
+
+            query = String.format("select * from %s T where T.DESC IN ('')" +
+                 " and T.NUM IN (10)", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(0, results[0].getRowCount());
+        }
+
+        String[] fewdescs = new String[] { "", "b", "no match", "this either",
+        "and last but not least the obligatory longish value to test object allocation" };
+        int[] fewnums = new int[] { 10, 100, 100, 100, -1 };
+        results = client.callProcedure("CompiledInLists", fewdescs, fewnums).getResults();
+        assertEquals(4, results.length);
+        assertEquals(1, results[0].getRowCount());
+        assertEquals(1, results[1].getRowCount());
+        assertEquals(2, results[2].getRowCount());
+        assertEquals(2, results[3].getRowCount());
+
+        String[] manydescs = new String[] { "b", "c", "f", "g", "h" };
+        int[] manynums = new int[] { 100, 200, 300, 200, 100 };
+        results = client.callProcedure("CompiledInLists", manydescs, manynums).getResults();
+        assertEquals(4, results.length);
+        assertEquals(5, results[0].getRowCount());
+        assertEquals(5, results[1].getRowCount());
+        assertEquals(4, results[2].getRowCount());
+        assertEquals(4, results[3].getRowCount());
+    }
+
     public void testTicket195()
     throws IOException, ProcCallException
     {
@@ -313,8 +424,8 @@ public class TestIndexesSuite extends RegressionSuite {
             client.callProcedure("Insert", table, 6, "f", 200, 6, 17.5);
             client.callProcedure("Insert", table, 7, "g", 300, 7, 18.5);
             client.callProcedure("Insert", table, 8, "h", 300, 8, 19.5);
-            String query = String.format("select * from %s where %s.NUM >= 100 and %s.NUM <= 400",
-                                  table, table, table);
+            String query = String.format("select * from %s T where T.NUM >= 100 and T.NUM <= 400",
+                                  table);
             VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(6, results[0].getRowCount());
         }
@@ -338,8 +449,8 @@ public class TestIndexesSuite extends RegressionSuite {
             client.callProcedure("Insert", table, 6, "f", 200, 6, 17.5);
             client.callProcedure("Insert", table, 7, "g", 300, 7, 18.5);
             client.callProcedure("Insert", table, 8, "h", 300, 8, 19.5);
-            String query = String.format("select * from %s where %s.NUM > 100 AND %s.NUM2 > 1",
-                                         table, table, table);
+            String query = String.format("select * from %s T where T.NUM > 100 AND T.NUM2 > 1",
+                                         table);
             VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(4, results[0].getRowCount());
         }
@@ -464,204 +575,204 @@ public class TestIndexesSuite extends RegressionSuite {
         final Client client = getClient();
         VoltTable[] results;
 
-        callHelper(client, "InsertP1IX", 960, "ztgiZQdUtVJeaPLjN", 1643, 4.95657525992782899138e-01);
-        callHelper(client, "InsertP1IX", 961, "ztgiZQdUtVJeaPLjN", 1643, 4.95657525992782899138e-01);
-        callHelper(client, "InsertP1IX", 964, "ztgiZQdUtVJeaPLjN", 1643, 8.68352518423806229997e-01);
-        callHelper(client, "InsertP1IX", 965, "ztgiZQdUtVJeaPLjN", 1643, 8.68352518423806229997e-01);
-        callHelper(client, "InsertP1IX", 968, "ztgiZQdUtVJeaPLjN", -22250, 6.20549983245015868150e-01);
-        callHelper(client, "InsertP1IX", 969, "ztgiZQdUtVJeaPLjN", -22250, 6.20549983245015868150e-01);
-        callHelper(client, "InsertP1IX", 972, "ztgiZQdUtVJeaPLjN", -22250, 2.69767394221735901105e-01);
-        callHelper(client, "InsertP1IX", 973, "ztgiZQdUtVJeaPLjN", -22250, 2.69767394221735901105e-01);
-        callHelper(client, "InsertP1IX", 976, "XtQOuGWNzVKtrpnMj", 30861, 1.83913810933858279384e-01);
-        callHelper(client, "InsertP1IX", 977, "XtQOuGWNzVKtrpnMj", 30861, 1.83913810933858279384e-01);
-        callHelper(client, "InsertP1IX", 980, "XtQOuGWNzVKtrpnMj", 30861, 9.95833142789745329182e-01);
-        callHelper(client, "InsertP1IX", 981, "XtQOuGWNzVKtrpnMj", 30861, 9.95833142789745329182e-01);
-        callHelper(client, "InsertP1IX", 984, "XtQOuGWNzVKtrpnMj", 32677, 6.78465381526806687873e-01);
-        callHelper(client, "InsertP1IX", 985, "XtQOuGWNzVKtrpnMj", 32677, 6.78465381526806687873e-01);
-        callHelper(client, "InsertP1IX", 988, "XtQOuGWNzVKtrpnMj", 32677, 3.98623510723492113783e-01);
-        callHelper(client, "InsertP1IX", 989, "XtQOuGWNzVKtrpnMj", 32677, 3.98623510723492113783e-01);
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 44 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID<45)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 44 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID<43)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 66 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID<86)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 66 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID<96)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 65 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID<1)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 65 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID<73)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 9 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID<86)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 9 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID<40)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 53 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID>76)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 53 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID>44)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 9 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID>29)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 9 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID>100)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 10 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID>87)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 10 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID>74)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 79 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID>32)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 79 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID>8)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 76 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID = 44)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 76 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID = 99)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 26 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID = 15)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 26 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID = 89)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 39 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID = 92)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 39 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID = 8)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 11 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID = 83)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 11 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID = 72)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 53 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID<= 75)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 53 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID<= 30)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 54 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID<= 12)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 54 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID<= 21)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 82 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID<= 15)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 82 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID<= 49)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 22 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID<= 58)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 22 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID<= 36)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 48 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID>= 90)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 48 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID>= 48)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 38 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID>= 47)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 38 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID>= 98)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 75 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID>= 33)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 75 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID>= 33)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 54 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID>= 43)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 54 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID>= 29)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 19 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID != 1)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 19 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID != 33)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 4 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID != 52)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 4 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID != 54)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 56 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID != 37)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 56 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID != 94)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 7 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID != 81)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 7 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID != 65)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 72 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID<>67)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 72 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID<>45)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 94 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID<>5)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 94 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.ID<>63)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 57 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID<>18)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 57 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID<>18)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 78 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID<>24)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 78 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.ID<>44)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 23 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM<100)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 23 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM<64)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 21 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM<3)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 21 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM<11)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 17 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM<2)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 17 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM<16)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 99 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM<18)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 99 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM<73)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 96 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM>67)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 96 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM>86)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 21 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM>84)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 21 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM>19)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 0 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM>75)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 0 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM>34)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 100 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM>82)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 100 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM>2)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 86 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM = 44)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 86 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM = 16)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 35 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM = 100)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 35 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM = 12)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 99 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM = 3)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 99 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM = 94)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 49 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM = 68)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 49 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM = 43)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 49 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM<= 58)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 49 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM<= 63)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 59 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM<= 31)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 59 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM<= 85)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 37 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM<= 80)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 37 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM<= 57)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 9 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM<= 64)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 9 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM<= 88)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 86 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM>= 29)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 86 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM>= 98)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 48 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM>= 5)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 48 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM>= 46)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 14 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM>= 83)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 14 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM>= 60)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 91 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM>= 71)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 91 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM>= 62)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 63 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM != 82)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 63 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM != 86)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 11 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM != 57)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 11 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM != 46)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 11 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM != 88)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 11 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM != 70)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 69 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM != 50)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 69 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM != 95)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 28 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM<>71)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 28 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM<>28)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 87 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM<>4)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 87 WHERE (P1IX.ID<P1IX.NUM) AND (P1IX.NUM<>57)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 92 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM<>21)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 92 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM<>74)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 98 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM<>31)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 98 WHERE (P1IX.ID<P1IX.NUM) OR (P1IX.NUM<>60)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 3 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID<78)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 3 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID<41)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 94 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID<41)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 94 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID<30)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 73 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID<26)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 73 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID<7)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 78 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID<72)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 78 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID<28)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 89 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID>19)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 89 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID>40)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 45 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID>100)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 45 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID>92)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 18 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID>2)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 18 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID>71)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 97 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID>86)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 97 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID>22)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 62 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID = 46)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 62 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID = 82)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 16 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID = 67)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 16 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID = 92)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 79 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID = 90)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 79 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID = 61)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 36 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID = 57)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 36 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID = 31)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 35 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID<= 70)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 35 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID<= 71)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 10 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID<= 6)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 10 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID<= 68)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 9 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID<= 66)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 9 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID<= 46)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 61 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID<= 22)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 61 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID<= 66)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 32 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID>= 62)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 32 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID>= 86)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 11 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID>= 89)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 11 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID>= 88)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 51 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID>= 28)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 51 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID>= 4)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 76 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID>= 13)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 76 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID>= 29)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 3 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID != 93)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 3 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID != 98)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 77 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID != 41)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 77 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID != 30)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 70 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID != 62)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 70 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID != 79)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 25 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID != 31)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 25 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID != 40)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 33 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID<>4)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 33 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID<>57)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 46 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID<>21)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 46 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.ID<>19)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 72 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID<>4)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 72 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID<>45)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 99 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID<>45)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 99 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.ID<>43)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 30 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.NUM<55)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 30 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.NUM<5)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 25 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.NUM<46)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 25 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.NUM<48)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 9 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.NUM<91)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 9 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.NUM<87)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 29 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.NUM<39)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 29 WHERE (P1IX.ID>P1IX.NUM) OR (P1IX.NUM<61)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 89 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.NUM>37)");
-        callHelper(client, "@AdHoc", "UPDATE P1IX SET NUM = 89 WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.NUM>48)");
+        callHelper(client, "InsertR1IX", 960, "ztgiZQdUtVJeaPLjN", 1643, 4.95657525992782899138e-01);
+        callHelper(client, "InsertR1IX", 961, "ztgiZQdUtVJeaPLjN", 1643, 4.95657525992782899138e-01);
+        callHelper(client, "InsertR1IX", 964, "ztgiZQdUtVJeaPLjN", 1643, 8.68352518423806229997e-01);
+        callHelper(client, "InsertR1IX", 965, "ztgiZQdUtVJeaPLjN", 1643, 8.68352518423806229997e-01);
+        callHelper(client, "InsertR1IX", 968, "ztgiZQdUtVJeaPLjN", -22250, 6.20549983245015868150e-01);
+        callHelper(client, "InsertR1IX", 969, "ztgiZQdUtVJeaPLjN", -22250, 6.20549983245015868150e-01);
+        callHelper(client, "InsertR1IX", 972, "ztgiZQdUtVJeaPLjN", -22250, 2.69767394221735901105e-01);
+        callHelper(client, "InsertR1IX", 973, "ztgiZQdUtVJeaPLjN", -22250, 2.69767394221735901105e-01);
+        callHelper(client, "InsertR1IX", 976, "XtQOuGWNzVKtrpnMj", 30861, 1.83913810933858279384e-01);
+        callHelper(client, "InsertR1IX", 977, "XtQOuGWNzVKtrpnMj", 30861, 1.83913810933858279384e-01);
+        callHelper(client, "InsertR1IX", 980, "XtQOuGWNzVKtrpnMj", 30861, 9.95833142789745329182e-01);
+        callHelper(client, "InsertR1IX", 981, "XtQOuGWNzVKtrpnMj", 30861, 9.95833142789745329182e-01);
+        callHelper(client, "InsertR1IX", 984, "XtQOuGWNzVKtrpnMj", 32677, 6.78465381526806687873e-01);
+        callHelper(client, "InsertR1IX", 985, "XtQOuGWNzVKtrpnMj", 32677, 6.78465381526806687873e-01);
+        callHelper(client, "InsertR1IX", 988, "XtQOuGWNzVKtrpnMj", 32677, 3.98623510723492113783e-01);
+        callHelper(client, "InsertR1IX", 989, "XtQOuGWNzVKtrpnMj", 32677, 3.98623510723492113783e-01);
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 44 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID<45)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 44 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID<43)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 66 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID<86)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 66 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID<96)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 65 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID<1)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 65 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID<73)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 9 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID<86)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 9 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID<40)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 53 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID>76)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 53 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID>44)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 9 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID>29)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 9 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID>100)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 10 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID>87)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 10 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID>74)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 79 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID>32)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 79 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID>8)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 76 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID = 44)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 76 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID = 99)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 26 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID = 15)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 26 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID = 89)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 39 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID = 92)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 39 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID = 8)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 11 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID = 83)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 11 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID = 72)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 53 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID<= 75)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 53 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID<= 30)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 54 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID<= 12)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 54 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID<= 21)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 82 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID<= 15)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 82 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID<= 49)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 22 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID<= 58)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 22 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID<= 36)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 48 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID>= 90)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 48 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID>= 48)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 38 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID>= 47)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 38 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID>= 98)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 75 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID>= 33)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 75 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID>= 33)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 54 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID>= 43)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 54 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID>= 29)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 19 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID != 1)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 19 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID != 33)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 4 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID != 52)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 4 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID != 54)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 56 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID != 37)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 56 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID != 94)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 7 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID != 81)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 7 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID != 65)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 72 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID<>67)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 72 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID<>45)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 94 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID<>5)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 94 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID<>63)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 57 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID<>18)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 57 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID<>18)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 78 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID<>24)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 78 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.ID<>44)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 23 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM<100)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 23 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM<64)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 21 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM<3)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 21 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM<11)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 17 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM<2)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 17 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM<16)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 99 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM<18)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 99 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM<73)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 96 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM>67)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 96 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM>86)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 21 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM>84)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 21 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM>19)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 0 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM>75)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 0 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM>34)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 100 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM>82)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 100 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM>2)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 86 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM = 44)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 86 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM = 16)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 35 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM = 100)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 35 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM = 12)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 99 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM = 3)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 99 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM = 94)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 49 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM = 68)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 49 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM = 43)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 49 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM<= 58)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 49 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM<= 63)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 59 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM<= 31)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 59 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM<= 85)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 37 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM<= 80)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 37 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM<= 57)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 9 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM<= 64)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 9 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM<= 88)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 86 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM>= 29)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 86 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM>= 98)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 48 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM>= 5)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 48 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM>= 46)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 14 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM>= 83)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 14 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM>= 60)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 91 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM>= 71)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 91 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM>= 62)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 63 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM != 82)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 63 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM != 86)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 11 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM != 57)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 11 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM != 46)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 11 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM != 88)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 11 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM != 70)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 69 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM != 50)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 69 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM != 95)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 28 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM<>71)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 28 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM<>28)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 87 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM<>4)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 87 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.NUM<>57)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 92 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM<>21)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 92 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM<>74)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 98 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM<>31)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 98 WHERE (R1IX.ID<R1IX.NUM) OR (R1IX.NUM<>60)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 3 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID<78)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 3 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID<41)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 94 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID<41)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 94 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID<30)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 73 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID<26)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 73 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID<7)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 78 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID<72)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 78 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID<28)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 89 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID>19)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 89 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID>40)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 45 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID>100)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 45 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID>92)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 18 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID>2)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 18 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID>71)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 97 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID>86)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 97 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID>22)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 62 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID = 46)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 62 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID = 82)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 16 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID = 67)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 16 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID = 92)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 79 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID = 90)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 79 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID = 61)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 36 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID = 57)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 36 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID = 31)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 35 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID<= 70)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 35 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID<= 71)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 10 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID<= 6)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 10 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID<= 68)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 9 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID<= 66)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 9 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID<= 46)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 61 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID<= 22)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 61 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID<= 66)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 32 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID>= 62)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 32 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID>= 86)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 11 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID>= 89)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 11 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID>= 88)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 51 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID>= 28)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 51 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID>= 4)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 76 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID>= 13)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 76 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID>= 29)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 3 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID != 93)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 3 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID != 98)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 77 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID != 41)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 77 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID != 30)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 70 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID != 62)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 70 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID != 79)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 25 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID != 31)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 25 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID != 40)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 33 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID<>4)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 33 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID<>57)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 46 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID<>21)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 46 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.ID<>19)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 72 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID<>4)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 72 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID<>45)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 99 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID<>45)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 99 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.ID<>43)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 30 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.NUM<55)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 30 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.NUM<5)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 25 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.NUM<46)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 25 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.NUM<48)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 9 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.NUM<91)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 9 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.NUM<87)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 29 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.NUM<39)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 29 WHERE (R1IX.ID>R1IX.NUM) OR (R1IX.NUM<61)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 89 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.NUM>37)");
+        callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 89 WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.NUM>48)");
 
         client.drain();
 
-        results = client.callProcedure("@AdHoc", "select * from P1IX").getResults();
+        results = client.callProcedure("@AdHoc", "select * from R1IX").getResults();
         System.out.printf("Table has %d rows.\n", results[0].getRowCount());
         System.out.println(results[0]);
 
@@ -670,7 +781,7 @@ public class TestIndexesSuite extends RegressionSuite {
         assertEquals(1, results.length);
         VoltTable result = results[0];
         long modified = result.fetchRow(0).getLong(0);
-        System.out.printf("Update statment modified %d rows.\n", modified);
+        System.out.printf("Update statement modified %d rows.\n", modified);
         assertEquals(16, modified);
     }
 
@@ -695,32 +806,37 @@ public class TestIndexesSuite extends RegressionSuite {
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(Insert.class.getResource("indexes-ddl.sql"));
-        project.addPartitionInfo("P1", "ID");
-        project.addPartitionInfo("P2", "ID");
-        project.addPartitionInfo("P3", "ID");
         project.addProcedures(PROCEDURES);
         project.addStmtProcedure("Eng397LimitIndexR1", "select * from R1 where R1.ID > 2 Limit ?");
         project.addStmtProcedure("Eng397LimitIndexP1", "select * from P1 where P1.ID > 2 Limit ?");
         project.addStmtProcedure("Eng397LimitIndexR2", "select * from R2 where R2.ID > 2 Limit ?");
         project.addStmtProcedure("Eng397LimitIndexP2", "select * from P2 where P2.ID > 2 Limit ?");
         project.addStmtProcedure("Eng2914BigKeyP1", "select * from P1 where ID < 600000000000");
-        project.addStmtProcedure("Eng506UpdateRange", "UPDATE P1IX SET NUM = ? WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.NUM>?)");
-        project.addStmtProcedure("InsertP1IX", "insert into P1IX values (?, ?, ?, ?);");
+        project.addStmtProcedure("Eng506UpdateRange", "UPDATE R1IX SET NUM = ? WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.NUM>?)");
+        project.addStmtProcedure("InsertR1IX", "insert into R1IX values (?, ?, ?, ?);");
 
         boolean success;
 
-        // CONFIG #1: HSQL
+        //* CONFIG #1: HSQL -- keep this enabled by default with //
         config = new LocalCluster("testindexes-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
+        // end of easy-to-disable code section */
 
-
-        // CONFIG #2: JNI
+        //* CONFIG #2: JNI -- keep this enabled by default with //
         config = new LocalCluster("testindexes-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
+        // end of easy-to-disable code section */
+
+        /*/ CONFIG #3: IPC -- keep this normally disabled with / * vs. //
+        config = new LocalCluster("testindexes-threesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
+        success = config.compile(project);
+        assertTrue(success);
+        builder.addServerConfig(config);
+        // end of normally disabled section */
 
         // no clustering tests for indexes
 

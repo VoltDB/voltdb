@@ -56,7 +56,6 @@ namespace plannodeutil {
  *
  */
 voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type);
-std::string getTypeName(voltdb::PlanNodeType type);
 std::string debug(const voltdb::AbstractPlanNode* node);
 std::string debug(const voltdb::AbstractPlanNode* node, std::string spacer);
 

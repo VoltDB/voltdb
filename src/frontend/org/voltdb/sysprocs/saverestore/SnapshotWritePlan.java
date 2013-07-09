@@ -24,6 +24,7 @@ import java.io.StringWriter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 
+import java.util.Collection;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Deque;
 import java.util.HashMap;
@@ -216,7 +217,7 @@ public abstract class SnapshotWritePlan
         return m_targets;
     }
 
-    protected void placePartitionedTasks(List<SnapshotTableTask> tasks, List<Long> hsids)
+    protected void placePartitionedTasks(Collection<SnapshotTableTask> tasks, List<Long> hsids)
     {
         SNAP_LOG.debug("Placing partitioned tasks at sites: " + CoreUtils.hsIdCollectionToString(hsids));
         for (SnapshotTableTask task : tasks) {
@@ -236,7 +237,7 @@ public abstract class SnapshotWritePlan
         }
     }
 
-    protected void placeReplicatedTasks(List<SnapshotTableTask> tasks, List<Long> hsids)
+    protected void placeReplicatedTasks(Collection<SnapshotTableTask> tasks, List<Long> hsids)
     {
         SNAP_LOG.debug("Placing replicated tasks at sites: " + CoreUtils.hsIdCollectionToString(hsids));
         int siteIndex = 0;

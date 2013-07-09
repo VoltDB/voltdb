@@ -251,5 +251,13 @@ public class TupleValueExpression extends AbstractValueExpression {
         return false;
     }
 
+    @Override
+    public String explain(String impliedTableName) {
+        if (m_tableName.equals(impliedTableName)) {
+            return m_columnName;
+        } else {
+            return m_tableName + "." + m_columnName;
+        }
+    }
 
 }

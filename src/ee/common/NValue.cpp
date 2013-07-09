@@ -23,6 +23,7 @@
 #include <cstdio>
 #include <sstream>
 #include <algorithm>
+#include <set>
 
 namespace voltdb {
 
@@ -112,6 +113,9 @@ TTInt NValue::s_minDecimalValue("-9999999999"   //10 digits
                                  "9999999999"   //20 digits
                                  "9999999999"   //30 digits
                                  "99999999");    //38 digits
+
+const double NValue::s_gtMaxDecimalAsDouble = 1E26;
+const double NValue::s_ltMinDecimalAsDouble = -1E26;
 
 /*
  * Produce a debugging string describing an NValue.
@@ -428,7 +432,7 @@ struct NValueList {
 
     const size_t m_length;
     const ValueType m_elementType;
-    StlFriendlyNValue m_values[];
+    StlFriendlyNValue m_values[0];
 };
 
 /**
@@ -497,6 +501,53 @@ void NValue::setArrayElements(std::vector<NValue> &args) const
     // would likely require some kind of sorting/re-org of values at this point post-update pre-lookup.
 }
 
+int NValue::arrayLength() const
+{
+    assert(m_valueType == VALUE_TYPE_ARRAY);
+    NValueList* listOfNValues = (NValueList*)getObjectValue();
+    return static_cast<int>(listOfNValues->m_length);
+}
+
+NValue NValue::itemAtIndex(int index) const
+{
+    assert(m_valueType == VALUE_TYPE_ARRAY);
+    NValueList* listOfNValues = (NValueList*)getObjectValue();
+    assert(index >= 0);
+    assert(index < listOfNValues->m_length);
+    return listOfNValues->m_values[index];
+}
+
+void NValue::castAndSortAndDedupArrayForInList(const ValueType outputType, std::vector<NValue> &outList) const
+{
+    int size = arrayLength();
+
+    // make a set to eliminate unique values in O(nlogn) time
+    std::set<StlFriendlyNValue> uniques;
+
+    // iterate over the array of values and build a sorted set of unique
+    // values that don't overflow or violate unique constaints
+    // (n.b. sorted set means dups are removed)
+    for (int i = 0; i < size; i++) {
+        NValue value = itemAtIndex(i);
+        // cast the value to the right type and catch overflow/cast problems
+        try {
+            StlFriendlyNValue stlValue;
+            stlValue = value.castAs(outputType);
+            std::pair<std::set<StlFriendlyNValue>::iterator, bool> ret;
+            ret = uniques.insert(stlValue);
+        }
+        // cast exceptions mean the in-list test is redundant
+        // don't include these values in the materialized table
+        // TODO: make this less hacky
+        catch (SQLException &sqlException) {}
+    }
+
+    // insert all items in the set in order
+    std::set<StlFriendlyNValue>::const_iterator iter;
+    for (iter = uniques.begin(); iter != uniques.end(); iter++) {
+        outList.push_back(*iter);
+    }
+}
 
 int warn_if(int condition, const char* message)
 {

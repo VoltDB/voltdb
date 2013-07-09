@@ -300,4 +300,20 @@ public abstract class VoltTypeUtil {
         }
         return sb.toString();
     }
+
+    public static long getHashableLongFromObject(Object obj) {
+        if (obj == null || VoltType.isNullVoltType(obj)) {
+            return 0;
+        } else if (obj instanceof Long) {
+            return ((Long) obj).longValue();
+        } else if (obj instanceof Integer) {
+            return ((Integer)obj).intValue();
+        } else if (obj instanceof Short) {
+            return ((Short)obj).shortValue();
+        } else if (obj instanceof Byte) {
+            return ((Byte)obj).byteValue();
+        } else {
+            throw new RuntimeException(obj + " cannot be casted to a long");
+        }
+    }
 }

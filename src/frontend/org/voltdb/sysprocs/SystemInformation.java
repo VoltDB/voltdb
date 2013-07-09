@@ -360,13 +360,13 @@ public class SystemInformation extends VoltSystemProcedure
 
         // catalog path
         String path = VoltDB.instance().getConfig().m_pathToCatalog;
-        if (!path.startsWith("http"))
+        if (path != null && !path.startsWith("http"))
             path = (new File(path)).getAbsolutePath();
         vt.addRow(hostId, "CATALOG", path);
 
         // deployment path
         path = VoltDB.instance().getConfig().m_pathToDeployment;
-        if (!path.startsWith("http"))
+        if (path != null && !path.startsWith("http"))
             path = (new File(path)).getAbsolutePath();
         vt.addRow(hostId, "DEPLOYMENT", path);
 

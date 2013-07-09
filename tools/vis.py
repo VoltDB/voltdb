@@ -29,6 +29,25 @@ def COLORS(k):
 MARKERS = ['+', '*', '<', '>', '^', '_',
            'D', 'H', 'd', 'h', 'o', 'p']
 
+def get_branches(hostname, port, days):
+
+    mydate = datetime.datetime.today()-datetime.timedelta(days=days)
+
+    query = "select branch, count(*) from app_stats where ts >= '%s' group by branch order by 2 desc" % \
+                    mydate.strftime('%Y-%m-%d 00:00:00')
+
+    conn = FastSerializer(hostname, port)
+    proc = VoltProcedure(conn, '@AdHoc',
+                         [FastSerializer.VOLTTYPE_STRING])
+    resp = proc.call([query])
+    conn.close()
+
+    branches = []
+    for row in resp.tables[0].tuples:
+        branches.append(str(row[0]))
+
+    return branches
+
 def get_stats(hostname, port, days, branch):
     """Get statistics of all runs
 
@@ -90,13 +109,15 @@ class Plot:
 
     def plot(self, x, y, color, marker_shape, legend):
         self.ax.plot(x, y, linestyle="-", label=str(legend),
-                     marker=marker_shape, markerfacecolor=color, markersize=2)
+                     marker=marker_shape, markerfacecolor=color, markersize=4)
 
     def close(self):
         formatter = matplotlib.dates.DateFormatter("%b %d %y")
         self.ax.xaxis.set_major_formatter(formatter)
         ymin, ymax = plt.ylim()
-        plt.ylim((0, ymax * 1.1))
+        plt.ylim((ymin-(ymax-ymin)*0.1, ymax+(ymax-ymin)*0.1))
+        xmin, xmax = plt.xlim()
+        plt.xlim((xmin-0.3, xmax+0.3))
         plt.legend(prop={'size': 10}, loc=0)
         plt.savefig(self.filename, format="png", transparent=False,
                     bbox_inches="tight", pad_inches=0.2)
@@ -127,16 +148,37 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, data_type):
         pl.plot(v['time'], v[data_type], COLORS(i), MARKERS[i], k)
         i += 3
 
+    for k, v in sorted_data:
+        x = v['time'][-1]
+        y = v[data_type][-1]
+        pl.ax.annotate(str(y), xy=(x,y), xycoords='data', xytext=(5,-5),
+            textcoords='offset points', ha='left')
+        xmin, ymin = [(v['time'][i],y) for i,y in enumerate(v[data_type]) if y == min(v[data_type])][-1]
+        xmax, ymax= [(v['time'][i],y) for i,y in enumerate(v[data_type]) if y == max(v[data_type])][-1]
+        if ymax != ymin:
+            if xmax != x:
+                pl.ax.annotate(str(ymax), xy=(xmax,ymax),
+                    textcoords='offset points', ha='center', va='bottom', xytext=(0,5))
+            if xmin != x:
+                pl.ax.annotate(str(ymin), xy=(xmin,ymin),
+                    textcoords='offset points', ha='center', va='top', xytext=(0,-5))
+
     pl.close()
 
 def generate_index_file(filenames):
     row = """
       <tr>
-        <td>%s</td>
+        <td>%s on %s</td>
         <td><a href="%s"><img src="%s" width="400" height="200"/></a></td>
         <td><a href="%s"><img src="%s" width="400" height="200"/></a></td>
         <td><a href="%s"><img src="%s" width="400" height="200"/></a></td>
       </tr>
+"""
+
+    sep = """
+     </table>
+     <hr>
+     <table>
 """
 
     full_content = """
@@ -150,19 +192,28 @@ def generate_index_file(filenames):
     </table>
   </body>
 </html>
-""" % (''.join([row % (i[0], i[1], i[1], i[2], i[2], i[3], i[3]) for i in filenames]))
-    return full_content
+"""
+
+    rows = []
+    last_app = None
+    for i in filenames:
+        if i[0] != last_app:
+            rows.append(sep)
+            last_app = i[0]
+        rows.append(row % (i[0], i[4], i[1], i[1], i[2], i[2], i[3], i[3]))
+
+    return full_content % ''.join(rows)
 
 def usage():
     print "Usage:"
-    print "\t", sys.argv[0], "output_dir filename_base branch [ndays]" \
+    print "\t", sys.argv[0], "output_dir filename_base [ndays]" \
         " [width] [height]"
     print
     print "\t", "width in pixels"
     print "\t", "height in pixels"
 
 def main():
-    if len(sys.argv) < 4:
+    if len(sys.argv) < 3:
         usage()
         exit(-1)
 
@@ -172,44 +223,56 @@ def main():
 
     prefix = sys.argv[2]
     path = os.path.join(sys.argv[1], sys.argv[2])
-    branch = sys.argv[3]
     ndays = 1000
-    if len(sys.argv) >=5:
-        ndays = int(sys.argv[4])
+    if len(sys.argv) >=4:
+        ndays = int(sys.argv[3])
     width = None
     height = None
+    if len(sys.argv) >= 5:
+        width = int(sys.argv[4])
     if len(sys.argv) >= 6:
-        width = int(sys.argv[5])
-    if len(sys.argv) >= 7:
-        height = int(sys.argv[6])
+        height = int(sys.argv[7])
 
     # show all the history
-    stats = get_stats(STATS_SERVER, 21212, ndays, branch)
-
-    # Plot single node stats for all apps
+    branches = get_branches(STATS_SERVER, 21212, ndays)
+    if 'master' in branches:
+        branches.remove('master')
+        branches.insert(0,'master')
+    root_path = path
     filenames = []              # (appname, latency, throughput)
-    for app, data in stats.iteritems():
-        app_filename = app.replace(' ', '_')
-        latency95_filename = '%s-latency95-%s.png' % (prefix, app_filename)
-        latency99_filename = '%s-latency99-%s.png' % (prefix, app_filename)
-        throughput_filename = '%s-throughput-%s.png' % (prefix, app_filename)
-        filenames.append((app, latency95_filename, latency99_filename, throughput_filename))
+    iorder = 0
+    for branch in branches:
 
-        plot(app + " latency95", "Time", "Latency (ms)",
-             path + "-latency95-" + app_filename + ".png", width, height, app,
-             data, 'lat95')
+        iorder += 1
 
-        plot(app + " latency99", "Time", "Latency (ms)",
-             path + "-latency99-" + app_filename + ".png", width, height, app,
-             data, 'lat99')
+        stats = get_stats(STATS_SERVER, 21212, ndays, branch)
 
-        plot(app + " throughput(best)", "Time", "Throughput (txns/sec)",
-             path + "-throughput-" + app_filename + ".png", width, height, app,
-             data, 'tps')
+        prefix = sys.argv[2] + "-" + branch
+        path = root_path + "-" + branch
+
+        # Plot single node stats for all apps
+        for app, data in stats.iteritems():
+            app_filename = app.replace(' ', '_')
+            latency95_filename = '%s-latency95-%s.png' % (prefix, app_filename)
+            latency99_filename = '%s-latency99-%s.png' % (prefix, app_filename)
+            throughput_filename = '%s-throughput-%s.png' % (prefix, app_filename)
+            filenames.append((app, latency95_filename, latency99_filename, throughput_filename, branch, iorder))
+
+            plot(app + " latency95", "Time", "Latency (ms)",
+                 path + "-latency95-" + app_filename + ".png", width, height, app,
+                 data, 'lat95')
+
+            plot(app + " latency99", "Time", "Latency (ms)",
+                 path + "-latency99-" + app_filename + ".png", width, height, app,
+                 data, 'lat99')
+
+            plot(app + " throughput(best)", "Time", "Throughput (txns/sec)",
+                 path + "-throughput-" + app_filename + ".png", width, height, app,
+                 data, 'tps')
 
     # generate index file
-    index_file = open(path + '-index.html', 'w')
-    sorted_filenames = sorted(filenames, key=lambda f: f[0].lower())
+    index_file = open(root_path + '-index.html', 'w')
+    sorted_filenames = sorted(filenames, key=lambda f: f[0].lower()+str(f[5]))
     index_file.write(generate_index_file(sorted_filenames))
     index_file.close()
 

@@ -45,6 +45,11 @@ struct StlFriendlyNValue : public NValue {
         return *this;
     }
 
+    bool operator<(const StlFriendlyNValue& other) const
+    {
+        return compare(other) < 0;
+    }
+
 };
 
 }

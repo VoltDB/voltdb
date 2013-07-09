@@ -45,7 +45,7 @@ public abstract class ExpressionUtil {
      *
      * @param exps
      */
-    public static AbstractExpression combine(List<AbstractExpression> exps) {
+    public static AbstractExpression combine(Collection<AbstractExpression> exps) {
         if (exps.isEmpty()) {
             return null;
         }

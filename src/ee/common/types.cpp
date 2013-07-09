@@ -358,9 +358,6 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_RECEIVE: {
         return "RECEIVE";
     }
-    case PLAN_NODE_TYPE_PRINT: {
-        return "PRINT";
-    }
     case PLAN_NODE_TYPE_AGGREGATE: {
         return "AGGREGATE";
     }
@@ -385,8 +382,11 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_DISTINCT: {
         return "DISTINCT";
     }
+    case PLAN_NODE_TYPE_MATERIALIZEDSCAN: {
+        return "MATERIALIZEDSCAN";
     }
-    return "INVALID";
+    }
+    return "UNDEFINED";
 }
 
 PlanNodeType stringToPlanNode(string str )
@@ -415,8 +415,6 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_SEND;
     } else if (str == "RECEIVE") {
         return PLAN_NODE_TYPE_RECEIVE;
-    } else if (str == "PRINT") {
-        return PLAN_NODE_TYPE_PRINT;
     } else if (str == "AGGREGATE") {
         return PLAN_NODE_TYPE_AGGREGATE;
     } else if (str == "HASHAGGREGATE") {
@@ -433,6 +431,8 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_LIMIT;
     } else if (str == "DISTINCT") {
         return PLAN_NODE_TYPE_DISTINCT;
+    } else if (str == "MATERIALIZEDSCAN") {
+        return PLAN_NODE_TYPE_MATERIALIZEDSCAN;
     }
     return PLAN_NODE_TYPE_INVALID;
 }
@@ -536,8 +536,8 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_FUNCTION: {
         return "FUNCTION";
     }
-    case EXPRESSION_TYPE_INLISTBUILDER: {
-        return "INLISTBUILDER";
+    case EXPRESSION_TYPE_VALUE_VECTOR: {
+        return "VALUE_VECTOR";
     }
     case EXPRESSION_TYPE_HASH_RANGE: {
         return "HASH_RANGE";
@@ -612,8 +612,8 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_AGGREGATE_AVG;
     } else if (str == "FUNCTION") {
         return EXPRESSION_TYPE_FUNCTION;
-    } else if (str == "INLISTBUILDER") {
-        return EXPRESSION_TYPE_INLISTBUILDER;
+    } else if (str == "VALUE_VECTOR") {
+        return EXPRESSION_TYPE_VALUE_VECTOR;
     } else if (str == "HASH_RANGE") {
         return EXPRESSION_TYPE_HASH_RANGE;
     }

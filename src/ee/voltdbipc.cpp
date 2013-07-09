@@ -193,6 +193,12 @@ typedef struct {
     char data[0];
 }__attribute__((packed)) catalog_load;
 
+typedef struct {
+    struct ipc_command cmd;
+    int64_t taskId;
+    char task[0];
+}__attribute__((packed)) execute_task;
+
 
 using namespace voltdb;
 
@@ -328,6 +334,10 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
           break;
       case 27:
           updateHashinator(cmd);
+          result = kErrorCode_None;
+          break;
+      case 28:
+          executeTask(cmd);
           result = kErrorCode_None;
           break;
       default:
@@ -650,7 +660,7 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
     try {
         ReferenceSerializeInput serialize_in(offset, sz);
 
-        bool success = m_engine->loadTable(tableId, serialize_in, spHandle, lastCommittedSpHandle);
+        bool success = m_engine->loadTable(tableId, serialize_in, spHandle, lastCommittedSpHandle, false);
         if (success) {
             return kErrorCode_Success;
         } else {
@@ -1231,6 +1241,16 @@ void VoltDBIPC::pushExportBuffer(
         writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, index + 4);
     }
     delete [] block->rawPtr();
+}
+
+void VoltDBIPC::executeTask(struct ipc_command *cmd) {
+    execute_task *task = (execute_task*)cmd;
+    voltdb::TaskType taskId = static_cast<voltdb::TaskType>(ntohll(task->taskId));
+    m_engine->resetReusedResultOutputBuffer(1);
+    m_engine->executeTask(taskId, task->task);
+    int32_t responseLength = m_engine->getResultsSize();
+    char *resultsBuffer = m_engine->getReusedResultBuffer();
+    writeOrDie(m_fd, (unsigned char*)resultsBuffer, responseLength);
 }
 
 int main(int argc, char **argv) {

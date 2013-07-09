@@ -124,4 +124,21 @@ public class OperatorExpression extends AbstractExpression {
         m_valueSize = cast_type.getLengthInBytesForFixedTypes();
     }
 
+    @Override
+    public String explain(String impliedTableName) {
+        ExpressionType type = getExpressionType();
+        if (type == ExpressionType.OPERATOR_IS_NULL) {
+            return "(" + m_left.explain(impliedTableName) + " IS NULL)";
+        }
+        if (type == ExpressionType.OPERATOR_NOT) {
+            return "(NOT " + m_left.explain(impliedTableName) + ")";
+        }
+        if (type == ExpressionType.OPERATOR_CAST) {
+            return "(CAST " + m_left.explain(impliedTableName) + " AS " + m_valueType.toSQLString() + ")";
+        }
+        return "(" + m_left.explain(impliedTableName) +
+            " " + type.symbol() + " " +
+            m_right.explain(impliedTableName) + ")";
+    }
+
 }

@@ -160,7 +160,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
 }
 
-    public void UNtestNumericExpressionIndex() throws Exception {
+    public void testNumericExpressionIndex() throws Exception {
         System.out.println("STARTING testNumericExpressionIndex");
         Client client = getClient();
         initialLoad(client, "R1");
@@ -264,6 +264,76 @@ public class TestFunctionsSuite extends RegressionSuite {
         ClientResponse cr = null;
         cr = client.callProcedure("@AdHoc", "select abs(NUM) from P1 where ID = 0 limit 1");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+    }
+
+    public void testExtractQuickfix() throws Exception
+    {
+
+        System.out.println("STARTING testExtract quickfix");
+        Client client = getClient();
+        /*
+        CREATE TABLE P1 (
+                ID INTEGER DEFAULT '0' NOT NULL,
+                DESC VARCHAR(300),
+                NUM INTEGER,
+                RATIO FLOAT,
+                PAST TIMESTAMP DEFAULT NULL,
+                PRIMARY KEY (ID)
+                );
+        */
+        ClientResponse cr = null;
+        VoltTable r = null;
+        long result;
+
+        // Test Null timestamp, Human time (GMT): Mon, 02 Jul 1956 12:53:37 GMT
+        cr = client.callProcedure("P1.insert", 0, "X0", 10, 1.1, new Timestamp(-425991982877L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("@AdHoc", "select EXTRACT(YEAR FROM PAST), EXTRACT(MONTH FROM PAST), EXTRACT(DAY FROM PAST), " +
+                "EXTRACT(DAY_OF_WEEK FROM PAST), EXTRACT(DAY_OF_YEAR FROM PAST), EXTRACT(QUARTER FROM PAST), EXTRACT(HOUR FROM PAST), " +
+                "EXTRACT(MINUTE FROM PAST), EXTRACT(SECOND FROM PAST) from P1 where ID = 0");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
+        int columnIndex = 0;
+
+        System.out.println("Result: " + r);
+
+        int EXPECTED_YEAR = 1956;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_YEAR, result);
+
+        int EXPECTED_MONTH = 7;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_MONTH, result);
+
+        int EXPECTED_DAY = 2;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DAY, result);
+
+        int EXPECTED_DOW = 2;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DOW, result);
+
+        int EXPECTED_DOY = 184;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DOY, result);
+
+        int EXPECTED_QUARTER = 3;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_QUARTER, result);
+
+        int EXPECTED_HOUR = 12;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_HOUR, result);
+
+        int EXPECTED_MINUTE = 53;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_MINUTE, result);
+
+        BigDecimal EXPECTED_SECONDS = new BigDecimal("37.123000000000");
+        BigDecimal decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
+        assertEquals(EXPECTED_SECONDS, decimalResult);
+
     }
 
     public void testAbs() throws Exception

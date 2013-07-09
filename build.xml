@@ -728,6 +728,7 @@ JAR BUILDING
             <include name="org/eclipse/jetty_voltpatches/**" />
             <include name="javax/servlet_voltpatches/**" />
             <include name="au/com/bytecode/opencsv_voltpatches/**" />
+            <include name="org/cliffc_voltpatches/**" />
 	    <include name="org/supercsv_voltpatches/tokenizer/*" />
             <include name="org/hsqldb_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
@@ -968,6 +969,7 @@ JAVA COMPILATION
                   au/**/*.java,org/spearce_voltpatches/**/*.java
                   org/json_voltpatches/**/*.java
                   vanilla/**/*.java
+                  org/cliffc_voltpatches/**
 		  org/supercsv_voltpatches/tokenizer/*.java"/>
     <!-- non-voltcore voltdb code -->
     <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java" />
@@ -1331,6 +1333,8 @@ TEST CASES
                 <exclude name="**/TestRejoinFuzz.class" />
                 <exclude name="**/TestRejoinFuzz2.class" />
                 <exclude name="**/TestMaliciousClientSuite.class" /> <!-- fails legacy -->
+                <!-- Recorded as ENG-3038 -->
+                <exclude name="**/TestMultipleOuterJoinPlans.class" />
             </fileset>
         </tests>
     </run_junit>
@@ -1358,6 +1362,7 @@ TEST CASES
                 <exclude name="**/Test*Replication*.class" />
                 <exclude name="**/Test*Restore*.class" />
                 <exclude name="**/Test*Snapshot*.class" />
+                <exclude name="**/TestMultipleOuterJoinPlans.class" />
             </fileset>
         </tests>
     </run_junit>
@@ -1427,6 +1432,16 @@ TEST CASES
     </run_junit>
 </target>
 
+<target name="junit_lite_sql" description="lightweight junit tests for sql">
+	<run_junit>
+		<tests>
+			<fileset dir='${build.test.dir}'>
+		    	<include name="org/voltdb/regressionsuites/TestSQLFeaturesSuite.class"/>
+			</fileset>
+		</tests>
+	</run_junit>
+</target>
+	
 <target name="junit_quarantine" description="Run testcases which fail unpredictably.">
     <run_junit>
         <tests>
@@ -1829,7 +1844,7 @@ TEST CASES
 </target>
 
 <property name="ptdefaultconfigs"
-         value="json,voter,voltkv,voltcache,cust-report-2012-11-28,ENG-2549,joins,testplans-join,testjoins,aggs,join-order"
+         value="json,voter,voltkv,voltcache,cust-report-2012-11-28,ENG-2549,joins,testplans-join,testjoins,aggs,join-order,inlist,indexes"
    description="default hard-coded set of plannertester configs to run or refresh" />
 
 <target name="plannertester" description="Run plannertester">

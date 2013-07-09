@@ -31,6 +31,7 @@
 #include <iostream>
 #include "boost_ext/FastAllocator.hpp"
 #include "common/ThreadLocalPool.h"
+#include "common/tabletuple.h"
 #include <deque>
 
 namespace voltdb {
@@ -45,6 +46,7 @@ void intrusive_ptr_release(voltdb::TupleBlock * p);
 
 namespace voltdb {
 class Table;
+class TupleMovementListener;
 
 class TruncatedInt {
 public:
@@ -140,7 +142,7 @@ public:
         return m_bucketIndex;
     }
 
-    std::pair<int, int> merge(Table *table, TBPtr source);
+    std::pair<int, int> merge(Table *table, TBPtr source, TupleMovementListener *listener = NULL);
 
     inline std::pair<char*, int> nextFreeTuple() {
         char *retval = NULL;
@@ -221,9 +223,11 @@ public:
         return m_bucket;
     }
 private:
-    uint32_t m_references;
+#ifdef MEMCHECK
     Table* m_table;
+#endif
     char*   m_storage;
+    uint32_t m_references;
     uint32_t m_tupleLength;
     uint32_t m_tuplesPerBlock;
     uint32_t m_activeTuples;
@@ -240,8 +244,20 @@ private:
      **/
     std::deque<TruncatedInt, FastAllocator<TruncatedInt> > m_freeList;
 
-    int m_bucketIndex;
     TBBucketPtr m_bucket;
+    int m_bucketIndex;
+
+};
+
+/**
+ * Interface for tuple movement notification.
+ */
+class TupleMovementListener {
+public:
+    virtual ~TupleMovementListener() {}
+
+    virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
+                                     TableTuple &sourceTuple, TableTuple &targetTuple) = 0;
 };
 
 }

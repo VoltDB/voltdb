@@ -17,8 +17,6 @@
 
 package org.voltdb.expressions;
 
-import java.util.List;
-
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -54,16 +52,15 @@ public class InComparisonExpression extends ComparisonExpression {
         }
     }
 
-    /**
-     * @return the values to be matched by the lhs expression
-     */
-    public List<AbstractExpression> getValues() {
-        return m_args;
-    }
-    /**
-     * @param values the values to be matched by the lhs expression
-     */
-    public void setValues(List<AbstractExpression> values) {
-        m_args = values;
+    @Override
+    public void finalizeValueTypes()
+    {
+        // First, make sure this node and its children have valid types.
+        // This ignores the overall element type of the rhs.
+        super.finalizeValueTypes();
+        // Force the lhs type as the overall element type of the rhs.
+        // The element type gets used in the EE to handle overflow/underflow cases.
+        m_right.setValueType(m_left.getValueType());
+        m_right.setValueSize(m_left.getValueSize());
     }
 }

@@ -363,12 +363,6 @@ public abstract class AbstractParsedStmt {
         ExpressionType exprType = ExpressionType.get(optype);
         AbstractExpression expr = null;
 
-        // XXX remove this code to enable SQL-IN
-        // also re-enable sql-in tests in TestParsedStatements
-        if (exprType == ExpressionType.COMPARE_IN) {
-            throw new PlanningErrorException("VoltDB does not support SQL IN expressions.");
-        }
-
         if (exprType == ExpressionType.INVALID) {
             throw new PlanningErrorException("Unsupported operation type '" + optype + "'");
         }
@@ -601,16 +595,17 @@ public abstract class AbstractParsedStmt {
        if (joinTree == null) {
            joinTree = new JoinTree();
        }
-
-       JoinNode joinNode = new JoinNode(table, joinType, joinExpr, whereExpr);
+       // The join type of the leaf node is always INNER
+       // For a new tree its node's ids start with 0 and keep incrementing by 1
+       int nodeId = (joinTree.m_root == null) ? 0 : joinTree.m_root.m_id + 1;
+       JoinNode joinNode = new JoinNode(table, JoinType.INNER, joinExpr, whereExpr, nodeId);
        if (joinTree.m_root == null) {
            // this is the first table
            joinTree.m_root = joinNode;
        } else {
            // Build the tree by attaching the next table always to the right
-           JoinNode node = new JoinNode();
-           node.m_leftNode = joinTree.m_root;
-           node.m_rightNode = joinNode;
+           // The node's join type is determined by the type of its right node
+           JoinNode node = new JoinNode(joinType, joinTree.m_root, joinNode, nodeId + 1);
            joinTree.m_root = node;
        }
        if (joinType != JoinType.INNER) {
@@ -649,8 +644,6 @@ public abstract class AbstractParsedStmt {
                 }
             }
         }
-        // Once the join tree is build set isReplicated flag for each node
-        joinTree.setReplicatedFlag();
     }
 
     /**
@@ -739,7 +732,6 @@ public abstract class AbstractParsedStmt {
                         exprs = new ArrayList<AbstractExpression>();
                         joinTree.m_tableFilterList.put(table, exprs);
                     }
-                    expr.m_isJoiningClause = false;
                     exprs.add(expr);
                 }
                 else if (tableSet.size() == 2) {
@@ -755,7 +747,6 @@ public abstract class AbstractParsedStmt {
                         exprs = new ArrayList<AbstractExpression>();
                         joinTree.m_joinSelectionList.put(pair, exprs);
                     }
-                    expr.m_isJoiningClause = true;
                     exprs.add(expr);
                 }
                 else if (tableSet.size() > 2) {
@@ -774,28 +765,40 @@ public abstract class AbstractParsedStmt {
      */
     void analyzeOuterJoinExpressions(JoinNode joinNode) {
         assert (joinNode != null);
-        assert(joinNode.m_leftNode != null && joinNode.m_rightNode != null);
-        if (joinNode.m_leftNode.m_table == null) {
-            // The left node is not the leaf. Descend there
-            analyzeOuterJoinExpressions(joinNode.m_leftNode);
-        }
-        if (joinNode.m_rightNode.m_table == null) {
-            // The right node is not the leaf. Descend there
-            analyzeOuterJoinExpressions(joinNode.m_rightNode);
+        if (joinNode.m_table != null) {
+            // Leaf node. Simply uncombine expressions and move them to the inner lists
+            // The expressions will be classified later at the join node level.
+            // If this is a single table select then classification is not required.
+            assert(joinNode.m_leftNode == null && joinNode.m_rightNode == null);
+            joinNode.m_joinInnerList.addAll(ExpressionUtil.uncombineAny(joinNode.m_joinExpr));
+            joinNode.m_whereInnerList.addAll(ExpressionUtil.uncombineAny(joinNode.m_whereExpr));
+            return;
         }
 
+        assert(joinNode.m_leftNode != null && joinNode.m_rightNode != null);
+        analyzeOuterJoinExpressions(joinNode.m_leftNode);
+        analyzeOuterJoinExpressions(joinNode.m_rightNode);
+
         // At this moment all RIGHT joins are already converted to the LEFT ones
-        assert (joinNode.m_rightNode.m_joinType == JoinType.LEFT || joinNode.m_rightNode.m_joinType == JoinType.INNER);
-        assert (joinNode.m_leftNode.m_joinType == JoinType.INNER);
+        assert (joinNode.m_joinType == JoinType.LEFT || joinNode.m_joinType == JoinType.INNER);
 
         ArrayList<AbstractExpression> joinList = new ArrayList<AbstractExpression>();
         ArrayList<AbstractExpression> whereList = new ArrayList<AbstractExpression>();
 
-        joinList.addAll(ExpressionUtil.uncombineAny(joinNode.m_rightNode.m_joinExpr));
-        joinList.addAll(ExpressionUtil.uncombineAny(joinNode.m_leftNode.m_joinExpr));
+        // Collect children's and node's own join expressions
+        joinList.addAll(ExpressionUtil.uncombineAny(joinNode.m_joinExpr));
+        joinList.addAll(joinNode.m_rightNode.m_joinInnerList);
+        joinList.addAll(joinNode.m_leftNode.m_joinInnerList);
+        joinNode.m_rightNode.m_joinInnerList.clear();
+        joinNode.m_leftNode.m_joinInnerList.clear();
 
-        whereList.addAll(ExpressionUtil.uncombineAny(joinNode.m_leftNode.m_whereExpr));
-        whereList.addAll(ExpressionUtil.uncombineAny(joinNode.m_rightNode.m_whereExpr));
+        // Collect children's and node's own where expressions
+        whereList.addAll(ExpressionUtil.uncombineAny(joinNode.m_whereExpr));
+        whereList.addAll(joinNode.m_rightNode.m_whereInnerList);
+        whereList.addAll(joinNode.m_leftNode.m_whereInnerList);
+        joinNode.m_rightNode.m_whereInnerList.clear();
+        joinNode.m_leftNode.m_whereInnerList.clear();
+
 
         Collection<Table> innerTables = joinNode.m_rightNode.generateTableJoinOrder();
         Collection<Table> outerTables = joinNode.m_leftNode.generateTableJoinOrder();
@@ -837,6 +840,10 @@ public abstract class AbstractParsedStmt {
         // Apply implied transitive constant filter to where expressions
         applyTransitiveEquivalence(joinNode.m_whereInnerList,
                 joinNode.m_whereOuterList, joinNode.m_whereInnerOuterList);
+
+        // In case of multi-table joins certain expressions could be pushed down to the children
+        // to improve join performance.
+        reclassifyExpressions(joinNode);
     }
 
     /**
@@ -853,7 +860,7 @@ public abstract class AbstractParsedStmt {
      * @param innerList expressions with inner table only
      * @param innerOuterList with inner and outer tables
      */
-    void classifyOuterJoinExpressions(List<AbstractExpression> exprList,
+    void classifyOuterJoinExpressions(Collection<AbstractExpression> exprList,
             Collection<Table> outerTables, Collection<Table> innerTables,
             List<AbstractExpression> outerList, List<AbstractExpression> innerList,
             List<AbstractExpression> innerOuterList) {
@@ -954,6 +961,40 @@ public abstract class AbstractParsedStmt {
 
          twoTableExprs.removeAll(simplifiedExprs);
          return simplifiedExprs;
+    }
+
+    /**
+     * Push down outer expressions for a given node to its children.
+     *  1. The OUTER WHERE expressions can be pushed down to the outer (left) child for all joins
+     *    (INNER and LEFT).
+     *  2. The INNER WHERE expressions can be pushed down to the inner (right) child for the INNER joins.
+     * @param joinNode JoinNode
+     */
+    private void reclassifyExpressions(JoinNode joinNode) {
+        assert (joinNode != null && joinNode.m_leftNode != null && joinNode.m_rightNode != null);
+        JoinNode outerNode = joinNode.m_leftNode;
+        if (outerNode.m_table == null) {
+            reclassifyExpressionsRecursively(outerNode, joinNode.m_whereOuterList);
+        }
+        JoinNode innerNode = joinNode.m_rightNode;
+        if (innerNode.m_table == null && joinNode.m_joinType == JoinType.INNER) {
+                reclassifyExpressionsRecursively(innerNode, joinNode.m_whereInnerList);
+        }
+    }
+
+    private void reclassifyExpressionsRecursively(JoinNode joinNode, List<AbstractExpression> pushDownExprList) {
+        if (joinNode.m_table == null) {
+            // It is a join node. Classify pushed down expressions as inner, outer, or inner-outer
+            // WHERE expressions.
+            Collection<Table> innerTables = joinNode.m_rightNode.generateTableJoinOrder();
+            Collection<Table> outerTables = joinNode.m_leftNode.generateTableJoinOrder();
+            classifyOuterJoinExpressions(pushDownExprList, outerTables, innerTables,
+                    joinNode.m_whereOuterList, joinNode.m_whereInnerList, joinNode.m_whereInnerOuterList);
+            // Remove them from the original list
+            pushDownExprList.clear();
+            // Descend to the inner child
+            reclassifyExpressions(joinNode);
+        }
     }
 
     /**

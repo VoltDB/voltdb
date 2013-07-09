@@ -84,7 +84,7 @@ public class DefaultCommandLogReinitiator implements CommandLogReinitiator
     }
 
     @Override
-    public void generateReplayPlan() {
+    public void generateReplayPlan(int newPartitionCount) {
     }
 
     @Override
@@ -101,4 +101,7 @@ public class DefaultCommandLogReinitiator implements CommandLogReinitiator
         // check to get skipped entirely in RestoreAgent.generatePlans()
         return null;
     }
+
+    @Override
+    public void initPartitionTracking() {}
 };

@@ -143,7 +143,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    private static final String m_defaultVersionString = "3.3";
+    private static final String m_defaultVersionString = "3.4";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
@@ -555,21 +555,28 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_latencyStats = new LatencyStats(m_myHostId);
 
             /*
-             * Initialize the command log on rejoin before configuring the IV2
+             * Initialize the command log on rejoin and join before configuring the IV2
              * initiators.  This will prevent them from receiving transactions
              * which need logging before the internal file writers are
              * initialized.  Root cause of ENG-4136.
+             *
+             * If sync command log is on, not initializing the command log before the initiators
+             * are up would cause deadlock.
              */
-            if (m_commandLog != null && isRejoin) {
+            if (m_commandLog != null && (isRejoin || m_joining)) {
                 //On rejoin the starting IDs are all 0 so technically it will load any snapshot
                 //but the newest snapshot will always be the truncation snapshot taken after rejoin
                 //completes at which point the node will mark itself as actually recovered.
+                //
+                // Use the partition count from the cluster config instead of the cartographer
+                // here. Since the initiators are not started yet, the cartographer still doesn't
+                // know about the new partitions at this point.
                 m_commandLog.initForRejoin(
                         m_catalogContext,
                         Long.MIN_VALUE,
-                        m_iv2InitiatorStartingTxnIds,
+                        clusterConfig.getPartitionCount(),
                         true,
-                        m_config.m_commandLogBinding);
+                        m_config.m_commandLogBinding, m_iv2InitiatorStartingTxnIds);
             }
 
             /*
@@ -1333,7 +1340,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             try {
                 m_joinCoordinator.setClientInterface(m_clientInterfaces.get(0));
 
-                if (!m_joinCoordinator.startJoin(m_catalogContext.database, m_cartographer)) {
+                String clSnapshotPath = m_catalogContext.cluster.getLogconfig().get("log")
+                                                        .getInternalsnapshotpath();
+
+                if (!m_joinCoordinator.startJoin(m_catalogContext.database,
+                                                 m_cartographer,
+                                                 clSnapshotPath)) {
                     VoltDB.crashLocalVoltDB("Failed to join the cluster", true, null);
                 }
             } catch (Exception e) {
@@ -1822,7 +1834,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             } else {
                 logRecoveryCompleted = true;
             }
-            if (logRecoveryCompleted) {
+            // Join creates a truncation snapshot as part of the join process,
+            // so there is no need to wait for the truncation snapshot requested
+            // above to finish.
+            if (logRecoveryCompleted || m_joining) {
                 m_rejoining = false;
                 m_joining = false;
                 consoleLog.info("Node rejoin completed");
@@ -1906,7 +1921,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
          */
         if ((m_commandLog != null) && (m_commandLog.needsInitialization())) {
             // Initialize command logger
-            m_commandLog.init(m_catalogContext, txnId, perPartitionTxnIds, m_config.m_commandLogBinding);
+            m_commandLog.init(m_catalogContext, txnId, m_cartographer.getPartitionCount(),
+                              m_config.m_commandLogBinding,
+                              perPartitionTxnIds);
         }
 
         /*

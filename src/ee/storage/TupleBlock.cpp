@@ -25,17 +25,20 @@ namespace voltdb {
 volatile int tupleBlocksAllocated = 0;
 
 TupleBlock::TupleBlock(Table *table, TBBucketPtr bucket) :
-        m_references(0),
+#ifdef MEMCHECK
         m_table(table),
+#endif
         m_storage(NULL),
+        m_references(0),
         m_tupleLength(table->m_tupleLength),
         m_tuplesPerBlock(table->m_tuplesPerBlock),
         m_activeTuples(0),
         m_nextFreeTuple(0),
         m_lastCompactionOffset(0),
         m_tuplesPerBlockDivNumBuckets(m_tuplesPerBlock / static_cast<double>(TUPLE_BLOCK_NUM_BUCKETS)),
-        m_bucketIndex(0),
-        m_bucket(bucket) {
+        m_bucket(bucket),
+        m_bucketIndex(0)
+{
 #ifdef MEMCHECK
     m_storage = new char[table->m_tableAllocationSize];
 #else
@@ -73,7 +76,7 @@ TupleBlock::~TupleBlock() {
 #endif
 }
 
-std::pair<int, int> TupleBlock::merge(Table *table, TBPtr source) {
+std::pair<int, int> TupleBlock::merge(Table *table, TBPtr source, TupleMovementListener *listener) {
     assert(source != this);
     /*
       std::cout << "Attempting to merge " << static_cast<void*> (this)
@@ -122,6 +125,12 @@ std::pair<int, int> TupleBlock::merge(Table *table, TBPtr source) {
 
         destinationTuple.move(nextFreeTuple().first);
         table->swapTuples(sourceTupleWithNewValues, destinationTuple);
+
+        // Notify the listener if provided.
+        if (listener != NULL) {
+            listener->notifyTupleMovement(source, this, sourceTupleWithNewValues, destinationTuple);
+        }
+
         source->freeTuple(sourceTupleWithNewValues.address());
     }
     source->lastCompactionOffset(m_nextTupleInSourceOffset);

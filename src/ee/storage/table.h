@@ -59,6 +59,7 @@
 #include "common/TupleSchema.h"
 #include "common/Pool.hpp"
 #include "common/tabletuple.h"
+#include "common/TheHashinator.h"
 #include "storage/TupleBlock.h"
 #include "stx/btree_set.h"
 #include "common/ThreadLocalPool.h"
@@ -289,14 +290,16 @@ class Table {
      * Used for recovery where the schema is not sent.
      */
     void loadTuplesFromNoHeader(SerializeInput &serialize_in,
-                                Pool *stringPool = NULL);
+                                Pool *stringPool = NULL,
+                                ReferenceSerializeOutput *uniqueViolationOutput = NULL);
 
     /**
      * Loads only tuple data, not schema, from the serialized table.
      * Used for initial data loading and receiving dependencies.
      */
     void loadTuplesFrom(SerializeInput &serialize_in,
-                        Pool *stringPool = NULL);
+                        Pool *stringPool = NULL,
+                        ReferenceSerializeOutput *uniqueViolationOutput = NULL);
 
 
     // ------------------------------------------------------------------
@@ -354,12 +357,33 @@ class Table {
         return false;
     }
 
+    /**
+     * These metrics are needed by some iterators.
+     */
+    uint32_t getTupleLength() const {
+        return m_tupleLength;
+    }
+    int getTableAllocationSize() const {
+        return m_tableAllocationSize;
+    }
+    uint32_t getTuplesPerBlock() const {
+        return m_tuplesPerBlock;
+    }
+
+    virtual int64_t validatePartitioning(TheHashinator *hashinator, int32_t partitionId) {
+        throwFatalException("Validate partitioning unsupported on this table type");
+        return 0;
+    }
+
 protected:
     /*
      * Implemented by persistent table and called by Table::loadTuplesFrom
      * to do additional processing for views and Export
      */
-    virtual void processLoadedTuple(TableTuple &tuple) {
+    virtual void processLoadedTuple(TableTuple &tuple,
+                                    ReferenceSerializeOutput *uniqueViolationOutput,
+                                    int32_t &serializedTupleCount,
+                                    size_t &tupleCountPosition) {
     };
 
     virtual void swapTuples(TableTuple &sourceTupleWithNewValues, TableTuple &destinationTuple) {

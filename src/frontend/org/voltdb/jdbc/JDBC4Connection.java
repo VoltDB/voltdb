@@ -62,7 +62,6 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     public void clearWarnings() throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();
     }
 
     // Releases this Connection object's database and JDBC resources immediately instead of waiting for them to be automatically released.
@@ -174,7 +173,7 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     public boolean getAutoCommit() throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport(); // return true always instead?
+        return true; // supports only AutoCommit = true
     }
 
     // Retrieves this Connection object's current catalog name.
@@ -238,7 +237,7 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     public SQLWarning getWarnings() throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();
+        return null;
     }
 
     // Retrieves whether this Connection object has been closed.
