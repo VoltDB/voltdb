@@ -30,50 +30,25 @@
 
 namespace voltdb {
 
-/*
- * Recalculate how many tuples are remaining and compare to the countdown value.
- * This method does not work once we're in the middle of the temp table.
- * Only call it while m_finishedTableScan==false.
+/**
+ * Constructor.
  */
-void CopyOnWriteContext::checkRemainingTuples(const std::string &label) {
-    assert(!m_finishedTableScan);
-    intmax_t count1 = static_cast<CopyOnWriteIterator*>(m_iterator.get())->countRemaining();
-    TableTuple tuple(getTable().schema());
-    boost::scoped_ptr<TupleIterator> iter(m_backedUpTuples.get()->makeIterator());
-    intmax_t count2 = 0;
-    while (iter->next(tuple)) {
-        count2++;
-    }
-    if (m_tuplesRemaining != count1 + count2) {
-        VOLT_ERROR("CopyOnWriteContext::%s remaining tuple count mismatch: "
-                   "table=%s partcol=%d count=%jd count1=%jd count2=%jd "
-                   "expected=%jd compacted=%jd batch=%jd "
-                   "inserts=%jd updates=%jd",
-                   label.c_str(), getTable().name().c_str(), getTable().partitionColumn(),
-                   count1 + count2, count1, count2, (intmax_t)m_tuplesRemaining,
-                   (intmax_t)m_blocksCompacted, (intmax_t)m_serializationBatches,
-                   (intmax_t)m_inserts, (intmax_t)m_updates);
-    }
-}
-
 CopyOnWriteContext::CopyOnWriteContext(
         PersistentTable &table,
+        PersistentTableSurgeon &surgeon,
         TupleSerializer &serializer,
         int32_t partitionId,
         const std::vector<std::string> &predicateStrings,
         int64_t totalTuples) :
-             TableStreamerContext(table, predicateStrings),
+             TableStreamerContext(table, surgeon, partitionId, serializer, predicateStrings),
              m_backedUpTuples(TableFactory::getCopiedTempTable(table.databaseId(),
                                                                "COW of " + table.name(),
                                                                &table, NULL)),
-             m_serializer(serializer),
              m_pool(2097152, 320),
-             m_blocks(getTable().m_data),
-             m_iterator(new CopyOnWriteIterator(&table, m_blocks.begin(), m_blocks.end())),
-             m_maxTupleLength(serializer.getMaxSerializedTupleSize(table.schema())),
+             m_blocks(surgeon.getData()),
+             m_iterator(new CopyOnWriteIterator(&table, &surgeon, m_blocks.begin(), m_blocks.end())),
              m_tuple(table.schema()),
              m_finishedTableScan(false),
-             m_partitionId(partitionId),
              m_totalTuples(totalTuples),
              m_tuplesRemaining(totalTuples),
              m_blocksCompacted(0),
@@ -82,11 +57,18 @@ CopyOnWriteContext::CopyOnWriteContext(
              m_updates(0)
 {}
 
+/**
+ * Destructor.
+ */
+CopyOnWriteContext::~CopyOnWriteContext()
+{}
+
 /*
  * Serialize to multiple output streams.
  * Return remaining tuple count, 0 if done, or -1 on error.
  */
-int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStreams) {
+int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputStreams,
+                                             std::vector<int> &retPositions) {
     // Don't expect to be re-called after streaming all the tuples.
     if (m_tuplesRemaining == 0) {
         throwFatalException("serializeMore() was called again after streaming completed.")
@@ -96,7 +78,10 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
     if (outputStreams.empty()) {
         throwFatalException("serializeMore() expects at least one output stream.");
     }
-    outputStreams.open(getTable(), m_maxTupleLength, m_partitionId, getPredicates(),
+    outputStreams.open(getTable(),
+                       getMaxTupleLength(),
+                       getPartitionId(),
+                       getPredicates(),
                        getPredicateDeleteFlags());
 
     //=== Tuple processing loop
@@ -124,8 +109,7 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
              * The returned copy count helps decide when to delete if m_doDelete is true.
              */
             bool deleteTuple = false;
-            yield = outputStreams.writeRow(m_serializer, tuple, deleteTuple);
-
+            yield = outputStreams.writeRow(getSerializer(), tuple, deleteTuple);
             /*
              * May want to delete tuple if processing the actual table.
              */
@@ -138,7 +122,7 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
                     assert(!tuple.isPendingDeleteOnUndoRelease());
                     CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
                     //Save the extra lookup if possible
-                    table.deleteTupleStorage(tuple, iter->m_currentBlock);
+                    m_surgeon.deleteTupleStorage(tuple, iter->m_currentBlock);
                 }
 
                 /*
@@ -147,7 +131,7 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
                  * The delete for undo is generic enough to support this operation.
                  */
                 else if (deleteTuple) {
-                    table.deleteTupleForUndo(tuple.address(), true);
+                    m_surgeon.deleteTupleForUndo(tuple.address(), true);
                 }
             }
 
@@ -222,18 +206,25 @@ int64_t CopyOnWriteContext::serializeMore(TupleOutputStreamProcessor &outputStre
 
     // Need to close the output streams and insert row counts.
     outputStreams.close();
+    // If more was streamed copy current positions for return.
+    // Can this copy be avoided?
+    for (size_t i = 0; i < outputStreams.size(); i++) {
+        retPositions.push_back((int)outputStreams.at(i).position());
+    }
 
     m_serializationBatches++;
+
+    int64_t retValue = m_tuplesRemaining;
 
     // Handle the sentinel value of -1 which is passed in from tests that don't
     // care about the active tuple count. Return max int as if there are always
     // tuples remaining (until the counter is forced to zero when done).
     if (m_tuplesRemaining < 0) {
-        return std::numeric_limits<int32_t>::max();
+        retValue = std::numeric_limits<int32_t>::max();
     }
 
     // Done when the table scan is finished and iteration is complete.
-    return m_tuplesRemaining;
+    return retValue;
 }
 
 bool CopyOnWriteContext::canSafelyFreeTuple(TableTuple tuple) {
@@ -385,20 +376,6 @@ void CopyOnWriteContext::notifyBlockWasCompactedAway(TBPtr block) {
     }
 }
 
-CopyOnWriteContext::~CopyOnWriteContext()
-{}
-
-int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputStreams,
-                                             std::vector<int> &retPositions) {
-    int64_t remaining = serializeMore(outputStreams);
-    // If more was streamed copy current positions for return.
-    // Can this copy be avoided?
-    for (size_t i = 0; i < outputStreams.size(); i++) {
-        retPositions.push_back((int)outputStreams.at(i).position());
-    }
-    return remaining;
-}
-
 bool CopyOnWriteContext::notifyTupleInsert(TableTuple &tuple) {
     markTupleDirty(tuple, true);
     return true;
@@ -407,6 +384,32 @@ bool CopyOnWriteContext::notifyTupleInsert(TableTuple &tuple) {
 bool CopyOnWriteContext::notifyTupleUpdate(TableTuple &tuple) {
     markTupleDirty(tuple, false);
     return true;
+}
+
+/*
+ * Recalculate how many tuples are remaining and compare to the countdown value.
+ * This method does not work once we're in the middle of the temp table.
+ * Only call it while m_finishedTableScan==false.
+ */
+void CopyOnWriteContext::checkRemainingTuples(const std::string &label) {
+    assert(!m_finishedTableScan);
+    intmax_t count1 = static_cast<CopyOnWriteIterator*>(m_iterator.get())->countRemaining();
+    TableTuple tuple(getTable().schema());
+    boost::scoped_ptr<TupleIterator> iter(m_backedUpTuples.get()->makeIterator());
+    intmax_t count2 = 0;
+    while (iter->next(tuple)) {
+        count2++;
+    }
+    if (m_tuplesRemaining != count1 + count2) {
+        VOLT_ERROR("CopyOnWriteContext::%s remaining tuple count mismatch: "
+                   "table=%s partcol=%d count=%jd count1=%jd count2=%jd "
+                   "expected=%jd compacted=%jd batch=%jd "
+                   "inserts=%jd updates=%jd",
+                   label.c_str(), getTable().name().c_str(), getTable().partitionColumn(),
+                   count1 + count2, count1, count2, (intmax_t)m_tuplesRemaining,
+                   (intmax_t)m_blocksCompacted, (intmax_t)m_serializationBatches,
+                   (intmax_t)m_inserts, (intmax_t)m_updates);
+    }
 }
 
 }

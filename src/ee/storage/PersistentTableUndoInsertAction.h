@@ -27,7 +27,7 @@ namespace voltdb {
 class PersistentTableUndoInsertAction: public voltdb::UndoAction {
 public:
     inline PersistentTableUndoInsertAction(char* insertedTuple,
-                                           voltdb::PersistentTable *table)
+                                           voltdb::PersistentTableSurgeon *table)
         : m_tuple(insertedTuple), m_table(table)
     { }
 
@@ -45,7 +45,7 @@ public:
     void release() { }
 private:
     char* m_tuple;
-    PersistentTable *m_table;
+    PersistentTableSurgeon *m_table;
 };
 
 }

@@ -83,8 +83,38 @@ class MaterializedViewMetadata;
 class RecoveryProtoMsg;
 class TupleOutputStreamProcessor;
 class ReferenceSerializeInput;
-class ElasticScanner;
+class PersistentTable;
 
+/**
+ * Interface used by contexts, scanners, iterators, and undo actions
+ * to access some normally-private stuff in PersistentTable.
+ */
+class PersistentTableSurgeon {
+    friend class PersistentTable;
+
+public:
+
+    TBMap &getData();
+    void insertTupleForUndo(char *tuple);
+    void updateTupleForUndo(char* targetTupleToUpdate,
+                            char* sourceTupleWithNewValues,
+                            bool revertIndexes);
+    void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
+    void deleteTupleRelease(char* tuple);
+    void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
+    void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock);
+
+
+private:
+
+    PersistentTableSurgeon(PersistentTable &table) : m_table(table)
+    {}
+
+    virtual ~PersistentTableSurgeon()
+    {}
+
+    PersistentTable &m_table;
+};
 
 /**
  * Represents a non-temporary table which permanently resides in
@@ -114,17 +144,9 @@ class ElasticScanner;
 
 class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                         public TupleMovementListener {
-    friend class CopyOnWriteContext;
-    friend class CopyOnWriteIterator;
-    friend class ::CopyOnWriteTest;
+    friend class PersistentTableSurgeon;
     friend class TableFactory;
-    friend class TableTuple;
-    friend class TableIterator;
-    friend class PersistentTableStats;
-    friend class PersistentTableUndoDeleteAction;
-    friend class PersistentTableUndoInsertAction;
-    friend class PersistentTableUndoUpdateAction;
-    friend class ElasticScanner;
+    friend class ::CopyOnWriteTest;
     friend class ::CompactionTest_BasicCompaction;
     friend class ::CompactionTest_CompactionWithCopyOnWrite;
 
@@ -394,7 +416,41 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     int m_failedCompactionCount;
     // This is a testability feature not intended for use in product logic.
     int m_tuplesPendingDeleteCount;
+
+    // Surgeon passed to classes requiring "deep" access to avoid excessive friendship.
+    PersistentTableSurgeon m_surgeon;
 };
+
+inline TBMap &PersistentTableSurgeon::getData() {
+    return m_table.m_data;
+}
+
+inline void PersistentTableSurgeon::insertTupleForUndo(char *tuple) {
+    m_table.insertTupleForUndo(tuple);
+}
+
+inline void PersistentTableSurgeon::updateTupleForUndo(char* targetTupleToUpdate,
+                                                       char* sourceTupleWithNewValues,
+                                                       bool revertIndexes) {
+    m_table.updateTupleForUndo(targetTupleToUpdate, sourceTupleWithNewValues, revertIndexes);
+}
+
+inline void PersistentTableSurgeon::deleteTupleForUndo(char* tupleData, bool skipLookup) {
+    m_table.deleteTupleForUndo(tupleData, skipLookup);
+}
+
+inline void PersistentTableSurgeon::deleteTupleRelease(char* tuple) {
+    m_table.deleteTupleRelease(tuple);
+}
+
+inline void PersistentTableSurgeon::deleteTupleStorage(TableTuple &tuple, TBPtr block) {
+    m_table.deleteTupleStorage(tuple, block);
+}
+
+inline void PersistentTableSurgeon::snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
+    m_table.snapshotFinishedScanningBlock(finishedBlock, nextBlock);
+}
+
 
 inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {
     assert (m_tempTuple.m_data);

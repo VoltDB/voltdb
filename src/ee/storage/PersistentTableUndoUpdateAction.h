@@ -30,7 +30,7 @@ public:
 
     inline PersistentTableUndoUpdateAction(char* oldTuple, char* newTuple,
                                            std::vector<char*> const & oldObjects, std::vector<char*> const & newObjects,
-                                           PersistentTable *table, bool revertIndexes)
+                                           PersistentTableSurgeon *table, bool revertIndexes)
       : m_oldTuple(oldTuple), m_newTuple(newTuple),
         m_table(table), m_revertIndexes(revertIndexes),
         m_oldUninlineableColumns(oldObjects), m_newUninlineableColumns(newObjects)
@@ -59,7 +59,7 @@ public:
 private:
     char* const m_oldTuple;
     char* const m_newTuple;
-    PersistentTable * const m_table;
+    PersistentTableSurgeon * const m_table;
     bool const m_revertIndexes;
     std::vector<char*> const m_oldUninlineableColumns;
     std::vector<char*> const m_newUninlineableColumns;

@@ -24,6 +24,7 @@
 namespace voltdb
 {
     class TupleOutputStreamProcessor;
+    class PersistentTableSurgeon;
 
     /**
      * Defines the interface for table streaming.
@@ -38,7 +39,9 @@ namespace voltdb
         /**
          * Activate streaming.
          */
-        virtual bool activateStream(PersistentTable &table, CatalogId tableId) = 0;
+        virtual bool activateStream(PersistentTable &table,
+                                    PersistentTableSurgeon &surgeon,
+                                    CatalogId tableId) = 0;
 
         /**
          * Continue streaming.
