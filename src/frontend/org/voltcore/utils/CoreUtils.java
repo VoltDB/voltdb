@@ -65,6 +65,7 @@ public class CoreUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     public static final int SMALL_STACK_SIZE = 1024 * 128;
+    public static final int MEDIUM_STACK_SIZE = 1024 * 512;
 
     /**
      * Get a single thread executor that caches it's thread meaning that the thread will terminate
@@ -89,6 +90,12 @@ public class CoreUtils {
     public static ListeningExecutorService getSingleThreadExecutor(String name) {
         ExecutorService ste =
                 Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null));
+        return MoreExecutors.listeningDecorator(ste);
+    }
+
+    public static ListeningExecutorService getSingleThreadExecutor(String name, int size) {
+        ExecutorService ste =
+                Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory(null, name, size, false, null));
         return MoreExecutors.listeningDecorator(ste);
     }
 
