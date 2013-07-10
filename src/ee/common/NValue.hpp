@@ -1498,6 +1498,9 @@ class NValue {
         else {
             const int32_t objectLength = getObjectLength();
             if (objectLength > maxLength) {
+                if (maxLength == 0) {
+                    throwFatalLogicErrorStreamed("Zero maxLength for object type " << valueToString(getValueType()));
+                }
                 char msg[1024];
                 snprintf(msg, 1024,
                          "In NValue::inlineCopyObject, Object exceeds specified size. Size is %d and max is %d",

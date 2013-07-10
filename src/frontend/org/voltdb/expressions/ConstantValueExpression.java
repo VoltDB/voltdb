@@ -238,6 +238,7 @@ public class ConstantValueExpression extends AbstractValueExpression {
                                                  neededType.toSQLString() +
                                                  " value of size " + neededSize);
             }
+            setValueSize(neededSize);
             return;
         }
 
@@ -248,7 +249,8 @@ public class ConstantValueExpression extends AbstractValueExpression {
         }
 
         // Constant's apparent type may not exactly match the target type needed.
-        if (neededType == VoltType.VARBINARY && m_valueType == VoltType.STRING) {
+        if (neededType == VoltType.VARBINARY &&
+                (m_valueType == VoltType.STRING || m_valueType == null)) {
             if ( ! Encoder.isHexEncodedString(getValue())) {
                 throw new PlanningErrorException("Value (" + getValue() +
                                                  ") has an invalid format for a constant " +
@@ -266,8 +268,20 @@ public class ConstantValueExpression extends AbstractValueExpression {
             return;
         }
 
+        if (neededType == VoltType.STRING && m_valueType == null) {
+            if (getValue().length() > size_unit*neededSize ) {
+                throw new PlanningErrorException("Value (" + getValue() +
+                                                 ") is too wide for a constant " +
+                                                 neededType.toSQLString() +
+                                                 " value of size " + neededSize);
+            }
+            setValueType(neededType);
+            setValueSize(neededSize);
+            return;
+        }
+
         if (neededType == VoltType.TIMESTAMP) {
-            if (getValueType() == VoltType.STRING) {
+            if (m_valueType == VoltType.STRING) {
                 try {
                     // Convert date value in whatever format is supported by TimeStampType
                     // into VoltDB native microsecond count.
@@ -285,13 +299,11 @@ public class ConstantValueExpression extends AbstractValueExpression {
                 setValueSize(neededSize);
                 return;
             }
-            if (neededType.isInteger()) {
-                long value = 0;
-            }
         }
 
         if ((neededType == VoltType.FLOAT) || (neededType == VoltType.DECIMAL)) {
-            if ( m_valueType != VoltType.NUMERIC && ! m_valueType.isExactNumeric() ) {
+            if (m_valueType == null ||
+                    (m_valueType != VoltType.NUMERIC && ! m_valueType.isExactNumeric())) {
                 try {
                     Double.parseDouble(getValue());
                 } catch (NumberFormatException nfe) {

@@ -707,7 +707,7 @@ public class PlanAssembler {
                 if (column.getDefaulttype() != 0)
                 {
                     const_expr.setValue(column.getDefaultvalue());
-                    const_expr.setValueType(VoltType.get((byte) column.getDefaulttype()));
+                    const_expr.refineValueType(VoltType.get((byte) column.getDefaulttype()), column.getSize());
                 }
                 else
                 {
