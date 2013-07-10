@@ -175,7 +175,7 @@ public class TestIv2RejoinCoordinatorLive {
         createCoordinator(true);
         m_coordinator.startJoin(null, null, null);
         RejoinMessage msg = new RejoinMessage(10000l, RejoinMessage.Type.INITIATION, "Rejoin_1",
-                                              null);
+                                              1, null);
         List<Long> hsids = new ArrayList<Long>();
         hsids.add(1l);
         verifySent(hsids, msg);
@@ -196,7 +196,7 @@ public class TestIv2RejoinCoordinatorLive {
 
         // verify the second site is started
         RejoinMessage expected = new RejoinMessage(10000l, RejoinMessage.Type.INITIATION, "Rejoin_2",
-                                                   null);
+                                                   1, null);
         hsids.clear();
         hsids.add(2l);
         verifySent(hsids, expected);

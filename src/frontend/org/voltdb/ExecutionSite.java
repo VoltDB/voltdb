@@ -1009,7 +1009,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         // Construct a snapshot stream receiver
         m_rejoinSnapshotProcessor = new StreamSnapshotSink();
 
-        long hsId = m_rejoinSnapshotProcessor.initialize(null);
+        long hsId = m_rejoinSnapshotProcessor.initialize(1, null);
 
         // Construct task log and start logging task messages
         int partition = getCorrespondingPartitionId();
