@@ -47,7 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 
-public class TestStreanSnapshotDataTarget {
+public class TestStreamSnapshotDataTarget {
     private MockMailbox m_mb;
     private StreamSnapshotDataTarget.SnapshotSender m_sender;
     private Thread m_senderThread;
