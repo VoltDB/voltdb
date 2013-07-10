@@ -650,8 +650,31 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
 
             // Create the statistics manager and register it to JMX registry
-            // TODO: disable JMX for now
             m_statsManager = null;
+            try {
+                final Class<?> statsManagerClass =
+                        MiscUtils.loadProClass("org.voltdb.management.JMXStatsManager", "JMX", true);
+                if (statsManagerClass != null) {
+                    ArrayList<Long> localHSIds;
+                    Long MPHSId;
+                    if (isIV2Enabled()) {
+                        localHSIds = new ArrayList<Long>();
+                        for (Initiator iv2Initiator : m_iv2Initiators) {
+                            localHSIds.add(iv2Initiator.getInitiatorHSId());
+                        }
+                        MPHSId = m_MPI.getInitiatorHSId();
+                    } else {
+                        localHSIds = new ArrayList<Long>(m_localSites.keySet());
+                        MPHSId = null;
+                    }
+                    m_statsManager = (StatsManager)statsManagerClass.newInstance();
+                    m_statsManager.initialize();
+                }
+            } catch (Exception e) {
+                hostLog.error("Failed to instantiate the JMX stats manager: " + e.getMessage() +
+                              ". Disabling JMX.");
+                e.printStackTrace();
+            }
 
             try {
                 m_snapshotCompletionMonitor.init(m_messenger.getZK());
