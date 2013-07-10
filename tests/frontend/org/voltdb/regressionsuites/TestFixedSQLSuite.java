@@ -948,11 +948,14 @@ public class TestFixedSQLSuite extends RegressionSuite {
             client.callProcedure("Insert", table, id++, "desc", 200, 15.5);
             client.callProcedure("Insert", table, id++, "desc", 300, 16.5);
         }
-        String query = "select P1.ID from R1, P1 group by P1.ID";
+        String query = "select P1.ID from R1, P1 group by P1.ID order by P1.ID";
         VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
         results = client.callProcedure("@AdHoc", query).getResults();
         assertEquals(3, results[0].getRowCount());
         assertEquals(1, results[0].getColumnCount());
+
+        System.err.println(results[0].toFormattedString());
+
         for (int i = 0; results[0].advanceRow(); i++)
         {
             assertEquals(i, results[0].getLong(0));

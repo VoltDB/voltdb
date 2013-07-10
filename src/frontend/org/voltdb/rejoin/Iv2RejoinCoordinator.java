@@ -140,6 +140,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
                                               m_liveRejoin ? RejoinMessage.Type.INITIATION :
                                               RejoinMessage.Type.INITIATION_COMMUNITY,
                                               nonce,
+                                              1, // 1 source per rejoining site
                                               m_snapshotBufPool);
         send(com.google.common.primitives.Longs.toArray(HSIds), msg);
 
