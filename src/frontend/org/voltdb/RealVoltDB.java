@@ -17,13 +17,11 @@
 
 package org.voltdb;
 
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -769,8 +767,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             File configInfoDir = new File(pathToConfigInfoDir);
             configInfoDir.mkdirs();
 
-            String pathToConfigInfo = pathToConfigInfoDir + File.separator + "config.log";
+            String pathToConfigInfo = pathToConfigInfoDir + File.separator + "config.json";
             File configInfo = new File(pathToConfigInfo);
+
+            String deploymentPath = null;
+            File deploymentFile = new File(m_config.m_pathToDeployment);
+            try {
+                deploymentPath = deploymentFile.getCanonicalPath();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
 
             byte jsonBytes[] = null;
             try {
@@ -779,6 +785,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
                 stringer.key("workingDir").value(System.getProperty("user.dir"));
                 stringer.key("pid").value(CLibrary.getpid());
+                stringer.key("deployment").value(deploymentPath);
 
                 stringer.key("log4jDst").array();
                 Enumeration appenders = Logger.getRootLogger().getAllAppenders();
@@ -786,7 +793,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     Appender appender = (Appender) appenders.nextElement();
                     if (appender instanceof FileAppender){
                         stringer.object();
-                        stringer.key("path").value(((FileAppender) appender).getFile());
+                        stringer.key("path").value(new File(((FileAppender) appender).getFile()).getCanonicalPath());
                         if (appender instanceof DailyRollingFileAppender) {
                             stringer.key("format").value(((DailyRollingFileAppender)appender).getDatePattern());
                         }
@@ -802,7 +809,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         Appender appender = (Appender) appenders.nextElement();
                         if (appender instanceof FileAppender){
                             stringer.object();
-                            stringer.key("path").value(((FileAppender) appender).getFile());
+                            stringer.key("path").value(new File(((FileAppender) appender).getFile()).getCanonicalPath());
                             if (appender instanceof DailyRollingFileAppender) {
                                 stringer.key("format").value(((DailyRollingFileAppender)appender).getDatePattern());
                             }
@@ -817,6 +824,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 jsonBytes = jsObj.toString(4).getBytes(Charsets.UTF_8);
             } catch (JSONException e) {
                 Throwables.propagate(e);
+            } catch (IOException e) {
+                e.printStackTrace();
             }
 
             try {
@@ -826,28 +835,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 fos.close();
             } catch (IOException e) {
                 hostLog.error("Failed to log config info: " + e.getMessage());
-                e.printStackTrace();
-            }
-
-            String pathToDeploymentInfo = pathToConfigInfoDir + File.separator + "deployment.xml";
-            File deploymentInfo = new File(pathToDeploymentInfo);
-
-            try {
-                BufferedWriter bw = new BufferedWriter(new FileWriter(deploymentInfo));
-
-                File deploymentXMLFile = new File(m_config.m_pathToDeployment);
-                BufferedReader br = new BufferedReader(new FileReader(deploymentXMLFile));
-                String line = null;
-                while ((line = br.readLine()) != null) {
-                    bw.write(line);
-                    bw.newLine();
-                }
-                br.close();
-
-                bw.flush();
-                bw.close();
-            } catch (IOException e) {
-                hostLog.error("Failed to log deployment file: " + e.getMessage());
                 e.printStackTrace();
             }
         }
