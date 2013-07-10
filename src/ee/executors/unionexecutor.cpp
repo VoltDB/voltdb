@@ -81,6 +81,10 @@ struct SetOperator {
 
     std::vector<Table*>& m_input_tables;
 
+    // for debugging - may be unused
+    void printTupleMap(const char* nonce, TupleMap &tuples);
+    void printTupleSet(const char* nonce, TupleSet &tuples);
+
     protected:
         virtual bool processTuplesDo() = 0;
 
@@ -158,10 +162,6 @@ struct ExceptIntersectSetOperator : public SetOperator {
         void exceptTupleMaps(TupleMap& tuple_a, TupleMap& tuple_b);
         void intersectTupleMaps(TupleMap& tuple_a, TupleMap& tuple_b);
 
-        // for debugging - may be unused
-        void printTupleMap(const char* nonce, TupleMap &tuples);
-        void printTupleSet(const char* nonce, TupleSet &tuples);
-
         bool m_is_except;
 };
 
@@ -178,7 +178,7 @@ ExceptIntersectSetOperator::ExceptIntersectSetOperator(
 }
 
 // for debugging - may be unused
-void ExceptIntersectSetOperator::printTupleMap(const char* nonce, TupleMap &tuples) {
+void SetOperator::printTupleMap(const char* nonce, TupleMap &tuples) {
     printf("Printing TupleMap (%s): ", nonce);
     for (TupleMap::const_iterator mapIt = tuples.begin(); mapIt != tuples.end(); ++mapIt) {
         TableTuple tuple = mapIt->first;
@@ -189,7 +189,7 @@ void ExceptIntersectSetOperator::printTupleMap(const char* nonce, TupleMap &tupl
 }
 
 // for debugging - may be unused
-void ExceptIntersectSetOperator::printTupleSet(const char* nonce, TupleSet &tuples) {
+void SetOperator::printTupleSet(const char* nonce, TupleSet &tuples) {
     printf("Printing TupleSet (%s): ", nonce);
     for (TupleSet::const_iterator setIt = tuples.begin(); setIt != tuples.end(); ++setIt) {
         printf("%s, ", setIt->debugNoHeader().c_str());
@@ -255,25 +255,19 @@ void ExceptIntersectSetOperator::collectTuples(Table& input_table, TupleMap& tup
 }
 
 void ExceptIntersectSetOperator::exceptTupleMaps(TupleMap& map_a, TupleMap& map_b) {
-    const static size_t zero_val(0);
     TupleMap::iterator it_a = map_a.begin();
     while(it_a != map_a.end()) {
         TupleMap::iterator it_b = map_b.find(it_a->first);
         if (it_b != map_b.end()) {
             if (it_a->second > it_b->second) {
-                it_a->second = std::max(it_a->second - it_b->second, zero_val);
+                it_a->second -= it_b->second;
             }
             else {
-                it_a->second = zero_val;
-            }
-            if (it_a->second == zero_val) {
                 it_a = map_a.erase(it_a);
-            } else {
-                ++it_a;
+                continue;
             }
-        } else {
-            ++it_a;
         }
+        ++it_a;
     }
 }
 
