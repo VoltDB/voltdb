@@ -430,6 +430,32 @@ TEST_F(ExpressionTest, HashRange) {
     TupleSchema::freeTupleSchema(schema);
 }
 
+TEST_F(ExpressionTest, Timestamp) {
+    int64_t epoch_micros = -8881540068000000; // timestamp from "1688-07-21 09:32:12"
+    boost::posix_time::ptime input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros);
+    boost::gregorian::date as_date = input_ptime.date();
+    ASSERT_EQ(as_date.year(), 1688);
+    ASSERT_EQ(as_date.month(), 7);
+    ASSERT_EQ(as_date.day(), 21);
+    boost::posix_time::time_duration as_time = input_ptime.time_of_day();
+    ASSERT_EQ(as_time.hours(), 9);
+    ASSERT_EQ(as_time.minutes(), 32);
+    ASSERT_EQ(as_time.seconds(), 12);
+
+    // test loweset timestamp to support
+    epoch_micros = GREGORIAN_EPOCH;
+    input_ptime = EPOCH + boost::posix_time::microseconds(epoch_micros);
+    as_date = input_ptime.date();
+    ASSERT_EQ(as_date.year(), 1583);
+    ASSERT_EQ(as_date.month(), 1);
+    ASSERT_EQ(as_date.day(), 1);
+    as_time = input_ptime.time_of_day();
+    ASSERT_EQ(as_time.hours(), 0);
+    ASSERT_EQ(as_time.minutes(), 0);
+    ASSERT_EQ(as_time.seconds(), 0);
+
+}
+
 int main() {
      return TestSuite::globalInstance()->runAll();
 }
