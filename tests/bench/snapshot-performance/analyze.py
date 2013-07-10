@@ -33,6 +33,12 @@ RE_SNAP = re.compile('and took ([0-9.]+)')
 RE_THROUGHPUT = re.compile('Average throughput:\s*([0-9,]+)')
 RE_LATENCY = re.compile('Average latency:\s*([0-9.]+)')
 
+def format_name_value(label, value):
+    return '%22s: %s' % (label, str(value))
+
+def format_heading(text):
+    return '===== %s =====' % text
+
 class Results(object):
     def __init__(self, runname):
         self.runname = runname
@@ -41,18 +47,16 @@ class Results(object):
         self.throughput = 0
         self.latency = 0.0
     def __str__(self):
-        def format(label, value):
-            return '%20s: %s' % (label, str(value))
         if self.snapshot_count == 0:
             duration = 0.0
         else:
             duration = self.snapshot_total_duration / self.snapshot_count
         return '\n'.join([
-            '===== Results (%s) =====' % self.runname,
-            format('Throughput', self.throughput),
-            format('Latency', self.latency),
-            format('Snapshots', self.snapshot_count),
-            format('Snapshot duration', '%0.2f' % duration),
+            format_heading('Results (%s)' % self.runname),
+            format_name_value('Throughput', self.throughput),
+            format_name_value('Latency', self.latency),
+            format_name_value('Snapshots', self.snapshot_count),
+            format_name_value('Snapshot duration', '%0.2f' % duration),
         ])
 
 def delta(old, new):
@@ -97,7 +101,7 @@ if __name__ == '__main__':
     outroot = sys.argv[1]
     editions = ('old', 'new')
     tests = ('nosnap', 'snap')
-    metrics = ('throughput', 'latency')
+    metrics = ('Throughput', 'Latency')
     results = []
     for edition in editions:
         for test in tests:
@@ -106,10 +110,14 @@ if __name__ == '__main__':
     deltas = []
     for metric in metrics:
         for i in range(len(editions)):
-            deltas.append(delta_attr(results[i*len(editions)+0], results[i*len(editions)+1], metric))
-    print '\n===== Snapshot performance impact ====='
-    for i in range(len(deltas)):
-        print '   %10s (%d): %s' % (metrics[i/len(metrics)], i % len(metrics) + 1, format_delta(deltas[i]))
-    print '\n===== Change in snapshot performance impact ====='
-    for i in range(len(metrics)):
-        print '   %10s: %s' % (metrics[i], format_delta(delta(deltas[i*len(editions)+0], deltas[i*len(editions)+1])))
+            deltas.append(delta_attr(results[i*len(editions)+0], results[i*len(editions)+1], metric.lower()))
+    print ''
+    print format_heading('Concurrent snapshot performance impact')
+    i = 0
+    for metric in metrics:
+        for edition in editions:
+            name = '%s (%s)' % (metric, edition)
+            print format_name_value(name, format_delta(deltas[i]))
+            if i % len(editions) == len(editions) -1:
+                print format_name_value('%s (change)' % metric, format_delta(delta(deltas[i-1], deltas[i])))
+            i += 1

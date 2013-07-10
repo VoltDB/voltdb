@@ -20,8 +20,10 @@ initialize_configuration()
 DEVELOPMENT_ROOT=$DEVELOPMENT_ROOT
 # Comparison distribution version #, source root path, or distribution root path.
 COMPARISON_DISTRIBUTION=???
-# Where runtime files are saved
+# Where runtime files are saved.
 RUNTIME_ROOT=$WORK_ROOT/runtime
+# Where output files, including logs, profiles, etc. are saved.
+OUTPUT_ROOT=$WORK_ROOT/output
 SEED_ROOT=$WORK_ROOT/seed/$APPLICATION_NAME
 SNAPSHOT_ROOT=$WORK_ROOT/snapshots
 LOG4J_CONFIG=$WORK_ROOT/log4j.xml
@@ -35,11 +37,12 @@ CLIENT_HOST=localhost
 HOST_COUNT=1
 SITES_PER_HOST=6
 K_FACTOR=0
-DURATION=300
-DISPLAY_INTERVAL=10
+DURATION=240
+DISPLAY_INTERVAL=60
 SEED_NONCE=SEED
-SEED_DURATION=600
+SEED_DURATION=360
 JAVA_HEAP_MAX=1024m
+SNAPSHOT_FREQUENCY=5s
 EOF
         echo ""
         echo "Please edit $CONFIG_FILE before re-running."
@@ -79,11 +82,11 @@ EOF
     cat <<EOF > $DEPLOYMENT_SNAP || exit 1
 <?xml version="1.0"?>
 <deployment>
-    <cluster hostcount="1" sitesperhost="6" kfactor="0" />
+    <cluster hostcount="$HOST_COUNT" sitesperhost="$SITES_PER_HOST" kfactor="$K_FACTOR" />
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
-    <snapshot prefix="auto" frequency="5s" retain="1" />
+    <snapshot prefix="auto" frequency="$SNAPSHOT_FREQUENCY" retain="1" />
     <paths>
         <voltdbroot path="$RUNTIME_ROOT" />
         <snapshots path="$SNAPSHOT_ROOT/" />
@@ -115,26 +118,6 @@ prepare_comparison_distribution()
         tar xfz $COMPARISON_TARBALL || exit 1
         COMPARISON_DISTRIBUTION_ROOT=$PWD/voltdb-$COMPARISON_DISTRIBUTION
         popd > /dev/null
-    elif [ -f $COMPARISON_DISTRIBUTION/build.xml ]; then
-        # From the root of a source tree find the distribution root.
-        if [ -d $COMPARISON_DISTRIBUTION/obj/debug ]; then
-            if [ -d $COMPARISON_DISTRIBUTION/obj/debug/dist ]; then
-                COMPARISON_DISTRIBUTION_ROOT=$COMPARISON_DISTRIBUTION/obj/debug/dist
-            else
-                echo "ERROR: $COMPARISON_DISTRIBUTION/obj/debug looks like an incomplete build."
-                exit 1
-            fi
-        elif [ -d $COMPARISON_DISTRIBUTION/obj/release ]; then
-            if [ -d $COMPARISON_DISTRIBUTION/obj/release/dist ]; then
-                COMPARISON_DISTRIBUTION_ROOT=$COMPARISON_DISTRIBUTION/obj/release/dist
-            else
-                echo "ERROR: $COMPARISON_DISTRIBUTION/obj/release looks like an incomplete build."
-                exit 1
-            fi
-        else
-            echo "ERROR: Build not found for $COMPARISON_DISTRIBUTION."
-            exit 1
-        fi
     else
         # Otherwise assume it is a distribution root path.
         COMPARISON_DISTRIBUTION_ROOT=$COMPARISON_DISTRIBUTION
@@ -241,7 +224,7 @@ load_data()
             # Invoke through python in case execute permission is turned off, e.g. for a Parallels share.
             python $DISTRIBUTION_ROOT/bin/voltadmin restore $SEED_ROOT $SEED_NONCE || exit 1
         else
-            echo "Generating seed data..."
+            echo "Producing seed data..."
             LOG4JOPT=-Dlog4j.configuration=file://$LOG4J_CONFIG
             java -classpath obj:$BASE_CLASSPATH:$APPLICATION_CLASSPATH:obj \
                 $LOG4JOPT \
@@ -265,6 +248,14 @@ start_client()
     local OUTPUT_DIRECTORY=$RUN_OUTPUT_ROOT/$TEST_NAME
     echo "Starting $TEST_NAME client on $CLIENT_HOST..."
     ssh -t $CLIENT_HOST sh -c $CLIENT_SCRIPT | tee $OUTPUT_DIRECTORY/run.txt || exit 1
+}
+
+capture_stats()
+{
+    local TEST_NAME=$1
+    local DISTRIBUTION_ROOT=$2
+    local OUTPUT_DIRECTORY=$RUN_OUTPUT_ROOT/$TEST_NAME
+    (python $DEVELOPMENT_ROOT/tools/volt sql "exec @Statistics PROCEDURE 0" | tee -a $OUTPUT_DIRECTORY/statistics.txt) || exit 1
 }
 
 kill_server()
@@ -304,7 +295,7 @@ profiler()
             done
             if [ $ACTION = run ]; then
                 pushd $OUTPUT_DIRECTORY > /dev/null
-                zoom run --allow_zoomscript &
+                zoom run --allow_zoomscript --basename $TEST_NAME --output_text &
                 test $? -ne 0 && exit 1
                 ZOOM_PID=$!
                 popd > /dev/null
@@ -340,6 +331,7 @@ run_test()
     profiler $TEST_NAME start
     start_client $TEST_NAME $CLIENT_SCRIPT
     profiler $TEST_NAME stop
+    capture_stats $TEST_NAME $DISTRIBUTION_ROOT
     kill_server $TEST_NAME $SERVER_PID
     profiler $TEST_NAME quit
     finalize_run $TEST_NAME
@@ -367,7 +359,6 @@ initialize_configuration
 source $CONFIG_FILE
 
 # Derived globals
-OUTPUT_ROOT=$WORK_ROOT/output
 RUN_OUTPUT_ROOT="$OUTPUT_ROOT/$TIMESTAMP"
 DEPLOYMENT_NOSNAP=$WORK_ROOT/deployment_nosnap.xml
 DEPLOYMENT_SNAP=$WORK_ROOT/deployment_snap.xml
@@ -375,7 +366,7 @@ DEPLOYMENT_SNAP=$WORK_ROOT/deployment_snap.xml
 # Additional command line arguments for special behavior.
 if [ "$2" = "clean" ]; then
     echo "Cleaning old output and runtime directories..."
-    test -d $OUTPUT_ROOT && \rm -rf $OUTPUT_ROOT
+    test -d $OUTPUT_ROOT  && \rm -rf $OUTPUT_ROOT
     test -d $RUNTIME_ROOT && \rm -rf $RUNTIME_ROOT
 fi
 if [ "$2" = "seed" -o "$2" = "clean" ]; then
@@ -394,6 +385,6 @@ run_test old-snap   $COMPARISON_DISTRIBUTION_ROOT $DEPLOYMENT_SNAP
 run_test new-nosnap $DEVELOPMENT_ROOT             $DEPLOYMENT_NOSNAP
 run_test new-snap   $DEVELOPMENT_ROOT             $DEPLOYMENT_SNAP
 
-python analyze.py $RUN_OUTPUT_ROOT | tee $RUN_OUTPUT_ROOT/results.txt
+python analyze.py $RUN_OUTPUT_ROOT | tee -a $RUN_OUTPUT_ROOT/results.txt
 
 echo "Runtime output: $RUN_OUTPUT_ROOT"
