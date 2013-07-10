@@ -49,15 +49,22 @@ bool StreamPredicateList::parseStrings(
 
                     predicateDeletes.push_back(predicateObject.valueForKey("triggersDelete").asBool());
 
-                    AbstractExpression *expr =
-                            AbstractExpression::buildExpressionTree(predicateObject.valueForKey("predicateExpression"));
-                    if (expr != NULL) {
-                        // Got ourselves a predicate expression tree!
-                        push_back(expr);
+                    PlannerDomValue exprObject = predicateObject.valueForKey("predicateExpression");
+                    AbstractExpression *expr = NULL;
+                    if (exprObject.hasMembers()) {
+                        expr = AbstractExpression::buildExpressionTree(exprObject);
+                        if (expr != NULL) {
+                            // Got ourselves a predicate expression tree!
+                            push_back(expr);
+                        }
+                        else {
+                            errmsg << "Predicate JSON generated a NULL expression tree";
+                            predFailed = true;
+                        }
                     }
                     else {
-                        errmsg << "Predicate JSON generated a NULL expression tree";
-                        predFailed = true;
+                        // NULL represents an empty predicate object that should not be evaluated.
+                        push_back(NULL);
                     }
                 }
                 else {

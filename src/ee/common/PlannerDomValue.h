@@ -127,6 +127,10 @@ namespace voltdb {
             return !value.IsNull();
         }
 
+        bool hasMembers() const {
+            return m_value.MemberBegin() != m_value.MemberEnd();
+        }
+
         PlannerDomValue valueForKey(const char *key) const {
             rapidjson::Value &value = m_value[key];
             if (value.IsNull()) {
