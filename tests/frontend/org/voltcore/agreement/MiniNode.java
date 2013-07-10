@@ -193,7 +193,9 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
                         SiteFailureMessage sfm = (SiteFailureMessage)message;
 
                         for (long failedHostId : sfm.m_safeTxnIds.keySet()) {
-                            m_miniSite.reportFault(sfm.m_sourceHSId, failedHostId, sfm.m_survivors);
+                            if (sfm.hasDirectlyWitnessed(failedHostId)) {
+                                m_miniSite.reportFault(sfm.m_sourceHSId, failedHostId, sfm.m_survivors);
+                            }
                         }
                     }
                 }

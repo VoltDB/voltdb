@@ -81,12 +81,6 @@ public class MeshArbiter {
      * Historic list of failed sites
      */
     protected final Set<Long> m_failedSites = Sets.newTreeSet();
-    /**
-     * in single link failures some sites in {@link #m_inTrouble} remain
-     * alive after arbitration resolution. This set aides in the determination
-     * of which incoming message are deemed stale
-     */
-    protected final Set<Long> m_staleUnwitnessed = Sets.newTreeSet();
 
     protected final Map<Long,SiteFailureForwardMessage> m_forwardCandidates = Maps.newHashMap();
     /**
@@ -319,6 +313,15 @@ public class MeshArbiter {
         }
     }
 
+    /**
+     * In single link failure scenarios a site may have already chosen, and killed its link to
+     * to one of the ends of the failed link before receiving any notice on the opposite end of
+     * the same failed link. In this case others may still be waiting for data from this site,
+     * and this method notifies them to help them along their decision.
+     * @param hsIds a set of survivors
+     * @param fromUrecognized a list of {@link FaultMessage} that come from no longer recognized
+     *     sites, but contain directly witnessed faults on survivors
+     */
     protected void notifyOnUnrecognizedReporters(Set<Long> hsIds, List<FaultMessage> fromUrecognized) {
         if (fromUrecognized.isEmpty()) return;
 
@@ -348,7 +351,7 @@ public class MeshArbiter {
     }
 
     /**
-     * Notify all survivors when you are closing a link to nodes
+     * Notify all survivors when you are closing link to nodes
      * you can still communicate to.
      * @param decision map where the keys contain the kill sites
      *   and its values are their last known safe transaction ids
@@ -374,7 +377,6 @@ public class MeshArbiter {
     }
 
     protected void clearInTrouble() {
-        m_staleUnwitnessed.clear();
         m_forwardCandidates.clear();
 
         Iterator<Map.Entry<Pair<Long,Long>, Long>> litr =
@@ -388,15 +390,7 @@ public class MeshArbiter {
             }
         }
 
-        Iterator<Map.Entry<Long, Boolean>> itr = m_inTrouble.entrySet().iterator();
-
-        while (itr.hasNext()) {
-            Map.Entry<Long, Boolean> e = itr.next();
-            if (!e.getValue() && !m_failedSites.contains(e.getKey())) {
-                m_staleUnwitnessed.add(e.getKey());
-            }
-            itr.remove();
-        }
+        m_inTrouble.clear();
         m_inTroubleCount = 0;
     }
 
@@ -423,11 +417,11 @@ public class MeshArbiter {
             Long txnId = m_meshAide.getNewestSafeTransactionForInitiator(troubled);
             msgBuilder.addSafeTxnId(troubled, txnId != null ? txnId : Long.MIN_VALUE);
         }
+
         SiteFailureMessage sfm = msgBuilder.build();
+        m_mailbox.send(Longs.toArray(survivors), sfm);
 
         m_recoveryLog.info("Agreement, Sending survivors " + sfm);
-
-        m_mailbox.send(Longs.toArray(survivors), sfm);
     }
 
     protected void updateFailedSitesLedger(Set<Long> hsIds,SiteFailureMessage sfm) {
@@ -482,14 +476,20 @@ public class MeshArbiter {
                 // Send a heartbeat to keep the dead host timeout active.  Needed because IV2 doesn't
                 // generate its own heartbeats to keep this running.
                 m_meshAide.sendHeartbeats(hsIds);
+
+                if (!fromUnrecognized.isEmpty()) {
+                    notifyOnUnrecognizedReporters(m_seeker.getSurvivors(), fromUnrecognized);
+                    fromUnrecognized.clear();
+                }
+
                 continue;
             }
 
             if (m.getSubject() == Subject.SITE_FAILURE_UPDATE.getId()) {
+                SiteFailureMessage sfm = (SiteFailureMessage)m;
+
                 if (  !hsIds.contains(m.m_sourceHSId)
                     || m_failedSites.contains(m.m_sourceHSId)) continue;
-
-                SiteFailureMessage sfm = (SiteFailureMessage)m;
 
                 updateFailedSitesLedger(hsIds, sfm);
 
@@ -541,18 +541,16 @@ public class MeshArbiter {
                     Map.Entry<Long, SiteFailureForwardMessage> e = itr.next();
                     Set<Long> unseenBy = m_seeker.forWhomSiteIsDead(e.getKey());
                     if (unseenBy.size() > 0) {
+                        m_mailbox.send(Longs.toArray(unseenBy),e.getValue());
                         m_recoveryLog.info("Agreement, fowarding to "
                                 + CoreUtils.hsIdCollectionToString(unseenBy)
                                 + " " + e.getValue());
-                        m_mailbox.send(Longs.toArray(unseenBy),e.getValue());
                     }
                     itr.remove();
                 }
             }
 
         } while (!haveEnough || m_seeker.needForward());
-
-        notifyOnUnrecognizedReporters(m_seeker.getSurvivors(), fromUnrecognized);
 
         return true;
     }
@@ -598,6 +596,11 @@ public class MeshArbiter {
         }
 
         Set<Long> toBeKilled = m_seeker.nextKill();
+        if (toBeKilled.isEmpty()) {
+            m_recoveryLog.warn("Agreement, seeker could not decide on kill list: "
+                    + m_seeker.dumpDead() + ", " + m_seeker.dumpAlive());
+        }
+
         Map<Long, Long> initiatorSafeInitPoint = new HashMap<Long, Long>();
 
         Iterator<Map.Entry<Pair<Long, Long>, Long>> iter =

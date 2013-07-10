@@ -28,8 +28,10 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NavigableMap;
 import java.util.Random;
 import java.util.Set;
+import java.util.TreeMap;
 
 import junit.framework.TestCase;
 
@@ -39,6 +41,9 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSortedMap;
+import com.google.common.collect.Maps;
+
 
 public class TestFuzzMeshArbiter extends TestCase
 {
@@ -111,9 +116,9 @@ public class TestFuzzMeshArbiter extends TestCase
                 System.out.println("Node: " + CoreUtils.hsIdToString(node) +
                         " has an unexpected connected set.");
                 System.out.println("Node: " + CoreUtils.hsIdToString(node) +
-                        " Expected to see: " + nodes);
+                        " Expected to see: " + CoreUtils.hsIdCollectionToString(nodes));
                 System.out.println("Node: " + CoreUtils.hsIdToString(node) +
-                        " says it has: " + nodeGraph);
+                        " says it has: " + CoreUtils.hsIdCollectionToString(nodeGraph));
                 result = false;
             }
         }
@@ -155,7 +160,8 @@ public class TestFuzzMeshArbiter extends TestCase
 
         state.expect();
 
-        assertTrue(checkFullyConnectedGraphs(state.m_expectedLive));
+        checkFullyConnectedGraphs(state.m_expectedLive);
+        assertEquals(state.m_expectations, state.getFailedCountMap());
         state.pruneDeadNodes();
 
         state.killLink(2, 3);
@@ -163,7 +169,8 @@ public class TestFuzzMeshArbiter extends TestCase
 
         state.expect();
 
-        assertTrue(checkFullyConnectedGraphs(state.m_expectedLive));
+        checkFullyConnectedGraphs(state.m_expectedLive);
+        assertEquals(state.m_expectations, state.getFailedCountMap());
         state.pruneDeadNodes();
 
         state.killLink(0, 2);
@@ -171,7 +178,8 @@ public class TestFuzzMeshArbiter extends TestCase
 
         state.expect();
 
-        assertTrue(checkFullyConnectedGraphs(state.m_expectedLive));
+        checkFullyConnectedGraphs(state.m_expectedLive);
+        assertEquals(state.m_expectations, state.getFailedCountMap());
     }
 
     public void testSingleLinkInFollowedByKill() throws InterruptedException {
@@ -185,7 +193,8 @@ public class TestFuzzMeshArbiter extends TestCase
 
         state.expect();
 
-        assertTrue(checkFullyConnectedGraphs(state.m_expectedLive));
+        checkFullyConnectedGraphs(state.m_expectedLive);
+        assertEquals(state.m_expectations, state.getFailedCountMap());
         state.pruneDeadNodes();
 
         state.killNode(0);
@@ -193,7 +202,8 @@ public class TestFuzzMeshArbiter extends TestCase
 
         state.expect();
 
-        assertTrue(checkFullyConnectedGraphs(state.m_expectedLive));
+        checkFullyConnectedGraphs(state.m_expectedLive);
+        assertEquals(state.m_expectations, state.getFailedCountMap());
     }
 
     class FuzzTestState
@@ -202,7 +212,9 @@ public class TestFuzzMeshArbiter extends TestCase
         Set<Long> m_expectedLive;
         Set<Integer> m_alreadyPicked;
         Set<Long> m_killSet;
-        Map<Long,Integer> m_expectations;
+        Map<Long,Integer> m_failedCounts;
+        NavigableMap<Integer,Integer> m_expectations;
+
 
         FuzzTestState(long seed, Set<Long> startingNodes)
         {
@@ -210,7 +222,8 @@ public class TestFuzzMeshArbiter extends TestCase
             m_alreadyPicked = new HashSet<Integer>();
             m_killSet = new HashSet<Long>();
             m_expectedLive.addAll(startingNodes);
-            m_expectations = new HashMap<Long, Integer>();
+            m_failedCounts = new HashMap<Long, Integer>();
+            m_expectations = new TreeMap<Integer,Integer>();
             m_rand = new Random(seed);
         }
 
@@ -226,27 +239,34 @@ public class TestFuzzMeshArbiter extends TestCase
         }
 
         void killNode(int node) throws InterruptedException {
-            Preconditions.checkArgument(!m_alreadyPicked.contains(node),
-                    "%s was already picked for failure", node);
+            if (m_alreadyPicked.contains(node)) {
+                node = getRandomLiveNode();
+            }
             m_alreadyPicked.add(node);
             m_expectedLive.remove(getHSId(node));
             m_killSet.add(getHSId(node));
             MiniNode victim = m_nodes.get(getHSId(node));
             victim.shutdown();
+            victim.join();
         }
 
         void killLink(int end1, int end2) {
-            Preconditions.checkArgument( end1 != end2,
-                    "%s and %s may not be equal", end1, end2);
-            Preconditions.checkArgument(!m_alreadyPicked.contains(end1),
-                    "%s was already picked for failure", end1);
-            Preconditions.checkArgument(!m_alreadyPicked.contains(end1),
-                    "%s was already picked for failure", end2);
+            if (end1 == end2) {
+                end1 = getRandomLiveNode();
+                end2 = getRandomLiveNode();
+            } else if (m_alreadyPicked.contains(end1)) {
+                end1 = getRandomLiveNode();
+                if (m_alreadyPicked.contains(end2)) {
+                    end2 = getRandomLiveNode();
+                }
+            }
             int max = Math.max(end1, end2);
+
             m_expectedLive.remove(getHSId(max));
+            m_killSet.add(getHSId(max));
             m_alreadyPicked.add(end1);
             m_alreadyPicked.add(end2);
-            m_killSet.add(getHSId(max));
+
             m_fakeMesh.failLink(getHSId(end1), getHSId(end2));
             m_fakeMesh.failLink(getHSId(end2), getHSId(end1));
         }
@@ -256,12 +276,15 @@ public class TestFuzzMeshArbiter extends TestCase
             int nextToDie = getRandomLiveNode();
             m_expectedLive.remove(getHSId(nextToDie));
             m_killSet.add(getHSId(nextToDie));
+
             System.out.println("Next to die: " + nextToDie);
             int delay = m_rand.nextInt(10) + 1;
             System.out.println("Fuzz delay in ms: " + delay * 5);
             Thread.sleep(delay * 5);
+
             MiniNode victim = m_nodes.get(getHSId(nextToDie));
             victim.shutdown();
+            victim.join();
         }
 
         void killRandomLink() throws InterruptedException
@@ -269,44 +292,97 @@ public class TestFuzzMeshArbiter extends TestCase
             int end1 = getRandomLiveNode();
             int end2 = getRandomLiveNode();
             int max = Math.max(end1, end2);
+
             m_expectedLive.remove(getHSId(max));
             m_killSet.add(getHSId(max));
             System.out.println("Next link to die: " + end1 + ":" + end2);
+
             int delay = m_rand.nextInt(10) + 1;
             System.out.println("Fuzz delay in ms: " + delay * 5);
             m_fakeMesh.failLink(getHSId(end1), getHSId(end2));
+
             Thread.sleep(delay * 5);
             m_fakeMesh.failLink(getHSId(end2), getHSId(end1));
         }
 
         void setUpExpectations() {
+            m_expectations.clear();
+
             Iterator<Integer> itr = m_alreadyPicked.iterator();
             while (itr.hasNext()) {
-                if (m_expectedLive.contains(getHSId(itr.next()))) {
+                MiniNode node = m_nodes.get(getHSId(itr.next()));
+                if (node == null || node.getNodeState() != NodeState.STOP) {
                     itr.remove();
                 }
             }
-            for (Long alive: m_expectedLive) {
-                MiniSite site = m_nodes.get(alive).m_miniSite;
-                m_expectations.put(alive, site.getFailedSitesCount() + m_killSet.size());
+
+            m_failedCounts.clear();
+
+            for (Map.Entry<Long, MiniNode> e: m_nodes.entrySet()) {
+                if (e.getValue().getNodeState() == NodeState.STOP) continue;
+                MiniSite site = e.getValue().m_miniSite;
+                m_failedCounts.put(e.getKey(), site.getFailedSitesCount());
             }
-            for (Long dead: m_killSet) {
-                m_expectations.put(dead, m_nodes.size() - 1);
+
+            m_expectations.put(m_killSet.size(), m_expectedLive.size());
+
+            int killSetSize = m_killSet.size();
+            Iterator<Long> kitr = m_killSet.iterator();
+            while (kitr.hasNext()) {
+                MiniNode knode = m_nodes.get(kitr.next());
+                if (knode.getNodeState() == NodeState.STOP) {
+                    kitr.remove();
+                }
             }
+
+            if (!m_killSet.isEmpty()) {
+                m_expectations.put(
+                        m_expectedLive.size() + killSetSize - 1,
+                        m_killSet.size()
+                        );
+            }
+
             m_killSet.clear();
         }
 
-        boolean hasMetExpectations() {
-            boolean met = true;
+        NavigableMap<Integer,Integer> getFailedCountMap() {
+            TreeMap<Integer,Integer> expectations = Maps.newTreeMap();
+
             for (Map.Entry<Long, MiniNode> e: m_nodes.entrySet()) {
                 if (e.getValue().getNodeState() == NodeState.STOP) continue;
 
                 MiniSite site = e.getValue().m_miniSite;
-                met = met
-                   && (  !site.isInArbitration()
-                       && site.getFailedSitesCount() >= m_expectations.get(e.getKey()));
+                if (site.isInArbitration()) return ImmutableSortedMap.of();
+                int failedCount = site.getFailedSitesCount() - m_failedCounts.get(e.getKey());
+
+                Integer count = expectations.get(failedCount);
+                if (count == null) count = 0;
+                expectations.put(failedCount, ++count);
             }
-            return met;
+            return expectations;
+
+        }
+
+        boolean hasMetExpectations() {
+            NavigableMap<Integer,Integer> expectations = getFailedCountMap();
+            if (expectations.isEmpty()) return false;
+
+            if (expectations.size() != m_expectations.size()) return false;
+
+            Map.Entry<Integer, Integer> test = expectations.firstEntry();
+            Map.Entry<Integer, Integer> exp = m_expectations.firstEntry();
+
+            int diff = test.getKey() - exp.getKey();
+            if (test.getValue() != exp.getValue() - diff) return false;
+
+            if (expectations.size() == 2) {
+                test = expectations.lastEntry();
+                exp = m_expectations.lastEntry();
+
+                if (   !test.getKey().equals(exp.getKey())
+                    || test.getValue() != exp.getValue() + diff) return false;
+            }
+            return true;
         }
 
         void expect() throws InterruptedException {
@@ -316,6 +392,8 @@ public class TestFuzzMeshArbiter extends TestCase
                 if (now - start > 30000) {
                     start = now;
                     dumpNodeState();
+                    m_fuzzLog.info("m_expectations: " + m_expectations
+                            + ", failedCountMap: " + getFailedCountMap());
                 }
                 Thread.sleep(50);
             }
@@ -325,16 +403,18 @@ public class TestFuzzMeshArbiter extends TestCase
             Iterator<Map.Entry<Long, MiniNode>> itr = m_nodes.entrySet().iterator();
             while (itr.hasNext()) {
                 Map.Entry<Long, MiniNode> e = itr.next();
-                if (!m_expectedLive.contains(e.getKey())) {
-                    if (e.getValue().getNodeState() != NodeState.STOP) {
-                        e.getValue().shutdown();
-                        e.getValue().join();
+                MiniNode node = e.getValue();
+                int connectedCount =
+                        node.getNodeState() == NodeState.STOP ? 0 : node.getConnectedNodes().size();
+                if (connectedCount <= 1) {
+                    if (connectedCount == 1) {
+                        node.shutdown();
+                        node.join();
+                        m_alreadyPicked.add(getHostId(e.getKey()));
                     }
-                    m_expectations.remove(e.getKey());
                     itr.remove();
                 }
             }
-            expect();
         }
 
         void joinNode(int node) throws InterruptedException {
@@ -365,11 +445,27 @@ public class TestFuzzMeshArbiter extends TestCase
     {
         long seed = System.currentTimeMillis();
         System.out.println("SEED: " + seed);
-        constructCluster(15);
+        constructCluster(20);
         while (!getNodesInState(NodeState.START).isEmpty()) {
             Thread.sleep(50);
         }
         FuzzTestState state = new FuzzTestState(seed, m_nodes.keySet());
+
+        for (int i = 0; i < 5; i++) {
+            if (state.m_rand.nextInt(100) < 50) {
+                state.killRandomNode();
+            }
+            else {
+                state.killRandomLink();
+            }
+        }
+        state.setUpExpectations();
+
+        state.expect();
+
+        checkFullyConnectedGraphs(state.m_expectedLive);
+        assertEquals(state.m_expectations, state.getFailedCountMap());
+        state.pruneDeadNodes();
 
         for (int i = 0; i < 4; i++) {
             if (state.m_rand.nextInt(100) < 50) {
@@ -383,22 +479,8 @@ public class TestFuzzMeshArbiter extends TestCase
 
         state.expect();
 
-        assertTrue(checkFullyConnectedGraphs(state.m_expectedLive));
-        state.pruneDeadNodes();
-
-        for (int i = 0; i < 3; i++) {
-            if (state.m_rand.nextInt(100) < 50) {
-                state.killRandomNode();
-            }
-            else {
-                state.killRandomLink();
-            }
-        }
-        state.setUpExpectations();
-
-        state.expect();
-
-        assertTrue(checkFullyConnectedGraphs(state.m_expectedLive));
+        checkFullyConnectedGraphs(state.m_expectedLive);
+        assertEquals(state.m_expectations, state.getFailedCountMap());
 
     }
 

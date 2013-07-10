@@ -106,13 +106,17 @@ public class SiteFailureMessage extends VoltMessage {
         return Subject.SITE_FAILURE_UPDATE.getId();
     }
 
+    public boolean hasDirectlyWitnessed(long hSid) {
+        return !m_survivors.contains(hSid);
+    }
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(Subject.values()[getSubject()]);
         sb.append(" from site: ");
         sb.append(CoreUtils.hsIdToString(m_sourceHSId));
-        sb.append(" survivor set: [");
+        sb.append(" survivors: [");
         sb.append(CoreUtils.hsIdCollectionToString(m_survivors));
         sb.append("] safe transactions: [");
         int cnt = 0;

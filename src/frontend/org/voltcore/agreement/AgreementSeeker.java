@@ -215,7 +215,7 @@ public class AgreementSeeker {
 
     public String dumpDead() {
         StringBuilder sb = new StringBuilder();
-        sb.append("Alive: ");
+        sb.append("Dead: ");
         dumpGraph(m_dead, sb);
         return sb.toString();
     }
@@ -276,15 +276,15 @@ public class AgreementSeeker {
         // dead = pre failure mesh - survivors
         Set<Long> dead = Sets.difference(m_hsids, sfm.m_survivors);
 
+        removeValue(m_dead, reportingHsid);
+
         // add dead graph nodes
         for (long w: dead) {
             if (!m_hsids.contains(w)) continue;
             m_dead.put(w,reportingHsid);
         }
 
-        // once you are witnessed dead you cannot become undead,
-        // but it is not the case for alive nodes, as they can
-        // die. So remove all what the reporting site thought
+        // Remove all what the reporting site thought
         // was alive before this invocation
         removeValue(m_alive, reportingHsid);
 
