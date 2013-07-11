@@ -184,14 +184,14 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
 
                             byte[] data = new byte[compressedSize];
                             compressionBuffer.get(data);
-                            RejoinDataMessage msg = new RejoinDataMessage(data);
+                            RejoinDataMessage msg = new RejoinDataMessage(0, data);
                             m_mb.send(m_destHSId, msg);
                         } else {
                             byte compressedBytes[] =
                                     CompressionService.compressBytes(
                                             message.b.array(), message.b.position() + 4, message.b.remaining() - 4);
 
-                            RejoinDataMessage msg = new RejoinDataMessage(compressedBytes);
+                            RejoinDataMessage msg = new RejoinDataMessage(0, compressedBytes);
                             m_mb.send(m_destHSId, msg);
                         }
                     } catch (IOException e) {

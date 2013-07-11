@@ -46,6 +46,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
+import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashSet;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -63,7 +65,6 @@ import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.network.WriteStream;
-import org.voltcore.utils.COWMap;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
@@ -79,6 +80,7 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
@@ -101,6 +103,7 @@ import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.plannodes.SendPlanNode;
+import org.voltdb.sysprocs.SnapshotRestore;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
@@ -138,7 +141,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * in order to avoid ensure that nothing misses the end of backpressure notification
      */
     private final ReentrantLock m_backpressureLock = new ReentrantLock();
-    private final CopyOnWriteArrayList<Connection> m_connections = new CopyOnWriteArrayList<Connection>();
+    private final NonBlockingHashSet<Connection> m_connections = new NonBlockingHashSet<Connection>();
     private final SnapshotDaemon m_snapshotDaemon = new SnapshotDaemon();
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
 
@@ -160,8 +163,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * serviced by the associated network thread. They are paired so as to only do a single
      * lookup.
      */
-    private final COWMap<Long, ClientInterfaceHandleManager>
-            m_cihm = new COWMap<Long, ClientInterfaceHandleManager>();
+    private final NonBlockingHashMap<Long, ClientInterfaceHandleManager> m_cihm =
+            new NonBlockingHashMap<Long, ClientInterfaceHandleManager>();
     private final Cartographer m_cartographer;
 
     /**
@@ -1473,7 +1476,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 byte[] collByte = collByteArray.get(i);
                 if( collByte == null ) {
                     //signle partition query plan
-                    String plan = new String( aggByte, VoltDB.UTF8ENCODING);
+                    String plan = new String( aggByte, Constants.UTF8ENCODING);
                     PlanNodeTree pnt = new PlanNodeTree();
                     try {
                         JSONObject jobj = new JSONObject( plan );
@@ -1488,8 +1491,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
                 else {
                     //multi-partition query plan
-                    String aggplan = new String( aggByte, VoltDB.UTF8ENCODING);
-                    String collplan = new String( collByte, VoltDB.UTF8ENCODING);
+                    String aggplan = new String( aggByte, Constants.UTF8ENCODING);
+                    String collplan = new String( collByte, Constants.UTF8ENCODING);
                     PlanNodeTree pnt = new PlanNodeTree();
                     PlanNodeTree collpnt = new PlanNodeTree();
                     try {
@@ -1933,6 +1936,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
             else if (task.procName.equals("@SnapshotDelete")) {
                 return dispatchStatistics(OpsSelector.SNAPSHOTDELETE, task, ccxn);
+            } else if (task.procName.equals("@SnapshotRestore")) {
+                ClientResponseImpl retval = SnapshotRestore.transformRestoreParamsToJSON(task);
+                if (retval != null) return retval;
             }
 
 
@@ -2624,10 +2630,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_mailbox.send(initiatorHSId, message);
     }
 
-    public List<Iterator<Map.Entry<String, InvocationInfo>>> getIV2InitiatorStats() {
-        ArrayList<Iterator<Map.Entry<String, InvocationInfo>>> statsIterators =
-                new ArrayList<Iterator<Map.Entry<String, InvocationInfo>>>();
-        for (AdmissionControlGroup acg : m_allACGs) {
+    public List<Iterator<Map.Entry<Long, Map<String, InvocationInfo>>>> getIV2InitiatorStats() {
+        ArrayList<Iterator<Map.Entry<Long, Map<String, InvocationInfo>>>> statsIterators =
+                new ArrayList<Iterator<Map.Entry<Long, Map<String, InvocationInfo>>>>();
+        for(AdmissionControlGroup acg : m_allACGs) {
             statsIterators.add(acg.getInitiationStatsIterator());
         }
         return statsIterators;

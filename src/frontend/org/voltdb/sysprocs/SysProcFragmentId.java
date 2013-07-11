@@ -163,4 +163,7 @@ public class SysProcFragmentId
     // @Update topology
     public static final long PF_updateTopology = 230;
     public static final long PF_updateTopologyAggregate = 231;
+
+    public static final long PF_validatePartitioning = 240;
+    public static final long PF_validatePartitioningResults = 241;
 }

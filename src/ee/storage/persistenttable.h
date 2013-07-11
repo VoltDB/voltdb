@@ -56,15 +56,15 @@
 #include "storage/table.h"
 #include "storage/TupleStreamWrapper.h"
 #include "storage/TableStats.h"
-#include "storage/TableStreamer.h"
 #include "storage/PersistentTableStats.h"
+#include "storage/TableStreamerInterface.h"
 #include "storage/RecoveryContext.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
 
-class CopyOnWriteTest_CopyOnWriteIterator;
 class CompactionTest_BasicCompaction;
 class CompactionTest_CompactionWithCopyOnWrite;
+class CopyOnWriteTest;
 
 namespace catalog {
 class MaterializedViewInfo;
@@ -83,6 +83,8 @@ class MaterializedViewMetadata;
 class RecoveryProtoMsg;
 class TupleOutputStreamProcessor;
 class ReferenceSerializeInput;
+class ElasticScanner;
+
 
 /**
  * Represents a non-temporary table which permanently resides in
@@ -110,9 +112,11 @@ class ReferenceSerializeInput;
  * policy because we expect reverting rarely occurs.
  */
 
-class PersistentTable : public Table, public UndoQuantumReleaseInterest {
+class PersistentTable : public Table, public UndoQuantumReleaseInterest,
+                        public TupleMovementListener {
     friend class CopyOnWriteContext;
     friend class CopyOnWriteIterator;
+    friend class ::CopyOnWriteTest;
     friend class TableFactory;
     friend class TableTuple;
     friend class TableIterator;
@@ -120,7 +124,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     friend class PersistentTableUndoDeleteAction;
     friend class PersistentTableUndoInsertAction;
     friend class PersistentTableUndoUpdateAction;
-    friend class ::CopyOnWriteTest_CopyOnWriteIterator;
+    friend class ElasticScanner;
     friend class ::CompactionTest_BasicCompaction;
     friend class ::CompactionTest_CompactionWithCopyOnWrite;
 
@@ -203,7 +207,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     std::string tableType() const;
     virtual std::string debug();
 
-    int partitionColumn() { return m_partitionColumn; }
+    int partitionColumn() const { return m_partitionColumn; }
     /** inlined here because it can't be inlined in base Table, as it
      *  uses Tuple.copy.
      */
@@ -268,14 +272,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
         return m_data.size();
     }
 
-    bool isCopyOnWriteActive() const {
-        return m_tableStreamer.get() != NULL && m_tableStreamer->isCopyOnWriteActive();
-    }
-
-    bool isRecoveryActive() const {
-        return m_tableStreamer.get() != NULL && m_tableStreamer->isRecoveryActive();
-    }
-
     bool canSafelyFreeTuple(TableTuple &tuple) const {
         return m_tableStreamer.get() != NULL && m_tableStreamer->canSafelyFreeTuple(tuple);
     }
@@ -283,9 +279,11 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     // This is a testability feature not intended for use in product logic.
     int getTuplesPendingDeleteCount() const { return m_tuplesPendingDeleteCount; }
 
+    virtual int64_t validatePartitioning(TheHashinator *hashinator, int32_t partitionId);
+
   private:
 
-    bool activateStream(CatalogId tableId);
+    bool activateStreamInternal(CatalogId tableId, boost::shared_ptr<TableStreamerInterface> tableStreamer);
 
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
         if (nextBlock != NULL) {
@@ -315,10 +313,16 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
 
     bool checkNulls(TableTuple &tuple) const;
 
-    PersistentTable(int partitionColumn);
+    // Zero allocation size uses defaults.
+    PersistentTable(int partitionColumn, int tableAllocationTargetSize = 0);
     void onSetColumns();
 
     void notifyBlockWasCompactedAway(TBPtr block);
+
+    // Call-back from TupleBlock::merge() for each tuple moved.
+    virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
+                                     TableTuple &sourceTuple, TableTuple &targetTuple);
+
     void swapTuples(TableTuple &sourceTupleWithNewValues, TableTuple &destinationTuple);
 
     void insertTupleForUndo(char *tuple);
@@ -341,7 +345,10 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      * Implemented by persistent table and called by Table::loadTuplesFrom
      * to do additional processing for views and Export
      */
-    virtual void processLoadedTuple(TableTuple &tuple);
+    virtual void processLoadedTuple(TableTuple &tuple,
+                                    ReferenceSerializeOutput *uniqueViolationOutput,
+                                    int32_t &serializedTupleCount,
+                                    size_t &tupleCountPosition);
 
     TBPtr allocateNextBlock();
 
@@ -378,8 +385,8 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     // that have never been allocated
     stx::btree_set<TBPtr > m_blocksWithSpace;
 
-    // Provides access to all table streaming apparatuses, including COW and recovery.
-    boost::shared_ptr<TableStreamer> m_tableStreamer;
+    // Provides access to all table streaming apparati, including COW and recovery.
+    boost::shared_ptr<TableStreamerInterface> m_tableStreamer;
 
   private:
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
@@ -418,6 +425,11 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
         tuple.setPendingDeleteFalse();
         // This count is a testability feature not intended for use in product logic.
         --m_tuplesPendingDeleteCount;
+    }
+
+    // Let the context handle it as needed.
+    if (m_tableStreamer != NULL) {
+        m_tableStreamer->notifyTupleDelete(tuple);
     }
 
     if (block.get() == NULL) {

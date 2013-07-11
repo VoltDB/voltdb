@@ -95,7 +95,7 @@ public class TestTheHashinator {
         throw new RuntimeException();
     }
 
-    private Map<Long, Integer> deserializeElasticConfig(byte[] config) {
+    private static Map<Long, Integer> deserializeElasticConfig(byte[] config) {
         Map<Long, Integer> tokens = new HashMap<Long, Integer>();
         ByteBuffer buf = ByteBuffer.wrap(config);
         int count = buf.getInt();
@@ -105,6 +105,94 @@ public class TestTheHashinator {
         }
 
         return tokens;
+    }
+
+    /** make sure that every range hashes to partition */
+    private static void checkRangeBoundaries(ElasticHashinator hashinator,
+                                             int partition,
+                                             Map<Long, Long> range)
+    {
+        for (Map.Entry<Long, Long> entry : range.entrySet()) {
+            long start = entry.getKey();
+            long end = entry.getValue();
+            assertEquals(partition, hashinator.partitionForToken(start));
+            if (end != Long.MIN_VALUE) {
+                assertEquals(partition, hashinator.partitionForToken(end - 1));
+            } else {
+                assertEquals(partition, hashinator.partitionForToken(Long.MAX_VALUE));
+            }
+        }
+    }
+
+    /** make sure that every token for partition appears in the range map */
+    private static void checkTokensInRanges(ElasticHashinator hashinator,
+                                            int partition,
+                                            Map<Long, Long> range)
+    {
+        byte[] config = hashinator.pGetCurrentConfig().getSecond();
+        Map<Long, Integer> tokens = deserializeElasticConfig(config);
+        for (Map.Entry<Long, Integer> entry : tokens.entrySet()) {
+            long token = entry.getKey();
+            int pid = entry.getValue();
+
+            if (pid == partition) {
+                boolean foundRange = false;
+                for (Map.Entry<Long, Long> rangeEntry : range.entrySet()) {
+                    long start = rangeEntry.getKey();
+                    long end = rangeEntry.getValue();
+                    if (start <= token && token < end) {
+                        foundRange = true;
+                        break;
+                    } else if (end < start && (start <= token || token < end)) {
+                        // Boundary case, [start, end) wraps around the origin
+                        foundRange = true;
+                        break;
+                    }
+                }
+
+                assertTrue(foundRange);
+            }
+        }
+    }
+
+    private static Map<Long, Long> getRangesAndCheck(int partitionCount, int partitionToCheck)
+    {
+        ElasticHashinator hashinator =
+            new ElasticHashinator(ElasticHashinator.getConfigureBytes(partitionCount,
+                                                                      ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION));
+        Map<Long, Long> range1 = hashinator.pGetRanges(partitionToCheck);
+        assertEquals(ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION, range1.size());
+
+        // make sure that the returned map is sorted
+        long previous = Long.MIN_VALUE;
+        for (long k : range1.keySet()) {
+            assertTrue(k >= previous);
+            previous = k;
+        }
+
+        checkRangeBoundaries(hashinator, partitionToCheck, range1);
+        checkTokensInRanges(hashinator, partitionToCheck, range1);
+
+        // non-existing partition should have an empty range
+        assertTrue(hashinator.pGetRanges(partitionCount + 1).isEmpty());
+
+        return range1;
+    }
+
+    /**
+     * Compare the tokens of the covered partitions before and after adding new partitions to
+     * the hashinator. The tokens should match.
+     * @param beforePartitionCount    Partition count before adding new partitions
+     * @param afterPartitionCount     Partition count after adding new partitions
+     */
+    private static void checkRangesAfterExpansion(int beforePartitionCount, int afterPartitionCount) {
+        for (int i = 0; i < beforePartitionCount; i++) {
+            Map<Long, Long> oldrange = getRangesAndCheck(beforePartitionCount, i);
+            Map<Long, Long> newrange = getRangesAndCheck(afterPartitionCount, i);
+
+            // Only compare the begin tokens, end tokens are determined by the successors
+            assertEquals(oldrange.keySet(), newrange.keySet());
+        }
     }
 
     /*
@@ -713,54 +801,18 @@ public class TestTheHashinator {
     public void testElasticGetRanges() {
         if (hashinatorType == HashinatorType.LEGACY) return;
 
-        ElasticHashinator hashinator = new ElasticHashinator(ElasticHashinator.getConfigureBytes(24,
-                ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION));
-        Map<Long, Long> range1 = hashinator.pGetRanges(15);
-        assertFalse(range1.isEmpty());
+        getRangesAndCheck(/* partitionCount = */ 2,  /* partitionToCheck = */ 1);
+        getRangesAndCheck(/* partitionCount = */ 24, /* partitionToCheck = */ 15);
+    }
 
-        // make sure that the returned map is sorted
-        long previous = Long.MIN_VALUE;
-        for (long k : range1.keySet()) {
-            assertTrue(k >= previous);
-            previous = k;
-        }
+    @Test
+    public void testElasticExpansionDeterminism()
+    {
+        if (hashinatorType == HashinatorType.LEGACY) return;
 
-        // make sure that every range hashes to partition 15
-        for (Map.Entry<Long, Long> entry : range1.entrySet()) {
-            long start = entry.getKey();
-            long end = entry.getValue();
-            assertEquals(15, hashinator.partitionForToken(start));
-            if (end != Long.MIN_VALUE) {
-                assertEquals(15, hashinator.partitionForToken(end - 1));
-            } else {
-                assertEquals(15, hashinator.partitionForToken(Long.MAX_VALUE));
-            }
-            assertNotSame(15, hashinator.partitionForToken(end));
-        }
-
-        // make sure that every token for partition 15 appears in the range map
-        byte[] config = hashinator.pGetCurrentConfig().getSecond();
-        Map<Long, Integer> tokens = deserializeElasticConfig(config);
-        for (Map.Entry<Long, Integer> entry : tokens.entrySet()) {
-            long token = entry.getKey();
-            int partition = entry.getValue();
-
-            if (partition == 15) {
-                boolean foundRange = false;
-                for (Map.Entry<Long, Long> rangeEntry : range1.entrySet()) {
-                    long start = rangeEntry.getKey();
-                    long end = rangeEntry.getValue();
-                    if (start <= token && token < end) {
-                        foundRange = true;
-                        break;
-                    }
-                }
-                assertTrue(foundRange);
-            }
-        }
-
-        // non-existing partition should have an empty range
-        assertTrue(hashinator.pGetRanges(32).isEmpty());
+        checkRangesAfterExpansion(/* beforePartitionCount = */ 2, /* afterPartitionCount = */ 6);
+        checkRangesAfterExpansion(/* beforePartitionCount = */ 21, /* afterPartitionCount = */ 28);
+        checkRangesAfterExpansion(/* beforePartitionCount = */ 24, /* afterPartitionCount = */ 48);
     }
 }
 

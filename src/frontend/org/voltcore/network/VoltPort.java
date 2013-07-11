@@ -295,7 +295,7 @@ public class VoltPort implements Connection
             if (oldInterestOps != m_interestOps && !m_running) {
                 /*
                  * If this is a write, optimistically assume the write
-                 * will succede and try it without using the selector
+                 * will succeed and try it without using the selector
                  */
                 m_network.addToChangeList(this, (opsToAdd & SelectionKey.OP_WRITE) != 0);
             }

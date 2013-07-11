@@ -18,6 +18,7 @@
 package org.voltdb.rejoin;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -28,11 +29,13 @@ import java.util.Queue;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 
+import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.catalog.Database;
 
 import org.voltdb.SnapshotFormat;
@@ -43,6 +46,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.sysprocs.saverestore.StreamSnapshotRequestConfig;
+import org.voltdb.utils.FixedDBBPool;
 
 /**
  * Thread Safety: this is a reentrant class. All mutable datastructures
@@ -71,13 +75,15 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     // contains all sites that are waiting to start a snapshot
     private final Queue<Long>                   m_snapshotSites  = new LinkedList<Long>();
     // Mapping of source to destination HSIds for the current snapshot
-    private final ArrayListMultimap<Long, Long> m_destToSource   = ArrayListMultimap.create();
+    private final ArrayListMultimap<Long, Long> m_srcToDest = ArrayListMultimap.create();
     // contains all sites that haven't finished replaying transactions
     private final Queue<Long>                   m_rejoiningSites = new LinkedList<Long>();
     // true if performing live rejoin
     private final boolean m_liveRejoin;
     // Need to remember the nonces we're using here (for now)
     private final Map<Long, String> m_nonces = new HashMap<Long, String>();
+    // Node-wise stream snapshot receiver buffer pool
+    private final FixedDBBPool m_snapshotBufPool;
 
     public Iv2RejoinCoordinator(HostMessenger messenger,
                                 Collection<Long> sites,
@@ -94,6 +100,16 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
 
             // clear overflow dir in case there are files left from previous runs
             clearOverflowDir(voltroot);
+
+            // The buffer pool capacity is min(numOfSites to rejoin times 3, 16)
+            // or any user specified value.
+            Integer userPoolSize = Integer.getInteger("REJOIN_RECEIVE_BUFFER_POOL_SIZE");
+            int poolSize = userPoolSize != null ? userPoolSize : Math.min(sites.size() * 3, 16);
+            m_snapshotBufPool = new FixedDBBPool();
+            // Create a buffer pool for uncompressed stream snapshot data
+            m_snapshotBufPool.allocate(SnapshotSiteProcessor.m_snapshotBufferLength, poolSize);
+            // Create a buffer pool for compressed stream snapshot data
+            m_snapshotBufPool.allocate(SnapshotSiteProcessor.m_snapshotBufferCompressedLen, poolSize);
         }
     }
 
@@ -123,7 +139,9 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         RejoinMessage msg = new RejoinMessage(getHSId(),
                                               m_liveRejoin ? RejoinMessage.Type.INITIATION :
                                               RejoinMessage.Type.INITIATION_COMMUNITY,
-                                              nonce);
+                                              nonce,
+                                              1, // 1 source per rejoining site
+                                              m_snapshotBufPool);
         send(com.google.common.primitives.Longs.toArray(HSIds), msg);
 
         // For testing, exit if only one property is set...
@@ -133,15 +151,17 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         }
     }
 
-    private String makeSnapshotRequest(Map<Long, Collection<Long>> sourceToDests)
+    private String makeSnapshotRequest(Multimap<Long, Long> sourceToDests)
     {
+        StreamSnapshotRequestConfig.Stream stream =
+            new StreamSnapshotRequestConfig.Stream(sourceToDests, null, null);
         StreamSnapshotRequestConfig config =
-            new StreamSnapshotRequestConfig(null, sourceToDests, null);
+            new StreamSnapshotRequestConfig(null, Arrays.asList(stream), false);
         return makeSnapshotRequest(config);
     }
 
     @Override
-    public boolean startJoin(Database catalog, Cartographer cartographer) {
+    public boolean startJoin(Database catalog, Cartographer cartographer, String clSnapshotPath) {
         m_startTime = System.currentTimeMillis();
         if (m_liveRejoin) {
             long firstSite;
@@ -212,6 +232,9 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         }
 
         if (allDone) {
+            // All sites have finished snapshot streaming, clear buffer pool
+            m_snapshotBufPool.clear();
+
             long delta = (System.currentTimeMillis() - m_startTime) / 1000;
             REJOINLOG.info("" + (m_liveRejoin ? "Live" : "Blocking") + " rejoin data transfer completed in " +
                     delta + " seconds.");
@@ -226,12 +249,12 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         String data = null;
         synchronized(m_lock) {
             m_snapshotSites.remove(HSId);
-            m_destToSource.put(masterHSId, dataSinkHSId);
+            m_srcToDest.put(masterHSId, dataSinkHSId);
             m_rejoiningSites.add(HSId);
             nonce = m_nonces.get(HSId);
             if (m_snapshotSites.isEmpty()) {
-                data = makeSnapshotRequest(m_destToSource.asMap());
-                m_destToSource.clear();
+                data = makeSnapshotRequest(m_srcToDest);
+                m_srcToDest.clear();
             }
         }
         if (nonce == null) {

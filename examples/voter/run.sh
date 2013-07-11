@@ -24,6 +24,11 @@ APPCLASSPATH=$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
+CLIENTCLASSPATH=$CLASSPATH:$({ \
+    \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/commons-cli-1.2.jar; \
+    \ls -1 "$VOLTDB_LIB"/guava-12.0.jar; \
+} 2> /dev/null | paste -sd ':' - )
 VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
@@ -79,7 +84,7 @@ function client() {
 # Use this target for argument help
 function async-benchmark-help() {
     srccompile
-    java -classpath obj:$APPCLASSPATH:obj voter.AsyncBenchmark --help
+    java -classpath obj:$CLIENTCLASSPATH:obj voter.AsyncBenchmark --help
 }
 
 # latencyreport: default is OFF
@@ -87,7 +92,7 @@ function async-benchmark-help() {
 # Disable the comments to get latency report
 function async-benchmark() {
     srccompile
-    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    java -classpath obj:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voter.AsyncBenchmark \
         --displayinterval=5 \
         --warmup=5 \
@@ -101,7 +106,7 @@ function async-benchmark() {
 
 function simple-benchmark() {
     srccompile
-    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    java -classpath obj:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voter.SimpleBenchmark localhost
 }
 
@@ -109,12 +114,12 @@ function simple-benchmark() {
 # Use this target for argument help
 function sync-benchmark-help() {
     srccompile
-    java -classpath obj:$APPCLASSPATH:obj voter.SyncBenchmark --help
+    java -classpath obj:$CLIENTCLASSPATH:obj voter.SyncBenchmark --help
 }
 
 function sync-benchmark() {
     srccompile
-    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    java -classpath obj:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voter.SyncBenchmark \
         --displayinterval=5 \
         --warmup=5 \
@@ -129,12 +134,12 @@ function sync-benchmark() {
 # Use this target for argument help
 function jdbc-benchmark-help() {
     srccompile
-    java -classpath obj:$APPCLASSPATH:obj voter.JDBCBenchmark --help
+    java -classpath obj:$CLIENTCLASSPATH:obj voter.JDBCBenchmark --help
 }
 
 function jdbc-benchmark() {
     srccompile
-    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    java -classpath obj:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voter.JDBCBenchmark \
         --displayinterval=5 \
         --duration=120 \

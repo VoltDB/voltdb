@@ -20,12 +20,10 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.dtxn.InitiatorStats;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.dtxn.LatencyStats.LatencyInfo;
-
-import com.google.common.collect.ImmutableMap;
 
 /**
  * Manage admission control for incoming requests by tracking the size of outstanding requests
@@ -96,8 +94,8 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
      * Reads/writes to the actual InvocationInfo are unsynchronized. There is a single writer
      * so no issues there, but the reader is unprotected.
      */
-    private volatile ImmutableMap<String, org.voltdb.dtxn.InitiatorStats.InvocationInfo> m_connectionStats =
-            ImmutableMap.<String, org.voltdb.dtxn.InitiatorStats.InvocationInfo>builder().build();
+    private volatile NonBlockingHashMap<Long, Map<String, org.voltdb.dtxn.InitiatorStats.InvocationInfo>> m_connectionStates =
+            new NonBlockingHashMap<Long, Map<String, org.voltdb.dtxn.InitiatorStats.InvocationInfo>>();
 
     // Use the same-ish trick for the latency stats.  LatencyInfo keeps
     // volatile ImmutableLists for the buckets and a separate volatile max.
@@ -137,16 +135,7 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
     {
         assert(m_expectedThreadId == Thread.currentThread().getId());
         m_members.remove(member);
-        ImmutableMap.Builder<String, InitiatorStats.InvocationInfo> builder =
-                ImmutableMap.builder();
-        String endsWith = "$" + member.connectionId();
-        for (Map.Entry<String, InitiatorStats.InvocationInfo> entry : m_connectionStats.entrySet()) {
-            final String key = entry.getKey();
-            if (!key.endsWith(endsWith)) {
-                builder.put(entry);
-            }
-        }
-        m_connectionStats = builder.build();
+        m_connectionStates.remove(member.connectionId());
     }
 
     /*
@@ -292,26 +281,26 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
             String procedureName,
             int delta,
             byte status) {
-        //Allocate enough space to store the proc name + 8 characters of connection id
-        final StringBuilder key = new StringBuilder(procedureName.length() + 9);
-        key.append(procedureName).append('$').append(connectionId);
-        //StringBuilder.toString(), why you gotta make a copy?
-        final String keyString = key.toString();
-        InvocationInfo info = m_connectionStats.get(keyString);
-        if (info == null) {
+        boolean needToInsert = false;
+        Map<String, InvocationInfo> procInfoMap = m_connectionStates.get(connectionId);
+        if(procInfoMap == null) {
+            procInfoMap = new NonBlockingHashMap<String, InvocationInfo>();
+            needToInsert = true;
+        }
+        InvocationInfo info = procInfoMap.get(procedureName);
+        if(info == null){
             info = new InvocationInfo(connectionHostname);
-            ImmutableMap.Builder<String, InitiatorStats.InvocationInfo> builder =
-                    ImmutableMap.builder();
-            builder.putAll(m_connectionStats);
-            builder.put(keyString, info);
-            m_connectionStats = builder.build();
+            procInfoMap.put(procedureName, info);
         }
         info.processInvocation(delta, status);
+        if(needToInsert) {
+            m_connectionStates.put(connectionId, procInfoMap);
+        }
         m_latencyInfo.addSample(delta);
     }
 
-    public Iterator<Map.Entry<String, InvocationInfo>> getInitiationStatsIterator() {
-        return m_connectionStats.entrySet().iterator();
+    public Iterator<Map.Entry<Long, Map<String, InvocationInfo>>> getInitiationStatsIterator() {
+        return m_connectionStates.entrySet().iterator();
     }
 
     public LatencyInfo getLatencyInfo() {

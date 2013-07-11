@@ -21,7 +21,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 import org.hsqldb_voltpatches.HSQLInterface;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Column;
@@ -29,6 +28,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.PartitioningForStatement;
@@ -211,7 +211,7 @@ public abstract class StatementCompiler {
         String json = node_list.toJSONString();
         compiler.captureDiagnosticJsonFragment(json);
         // Place serialized version of PlanNodeTree into a PlanFragment
-        byte[] jsonBytes = json.getBytes(VoltDB.UTF8ENCODING);
+        byte[] jsonBytes = json.getBytes(Constants.UTF8ENCODING);
         String bin64String = Encoder.base64Encode(jsonBytes);
         fragment.setPlannodetree(bin64String);
         return jsonBytes;
