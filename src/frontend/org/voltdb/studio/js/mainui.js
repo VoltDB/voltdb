@@ -494,6 +494,7 @@ this.AddConnection = function(connection, success)
             {
                 paramType = connection.Metadata['procedurecolumns'].data[p][6];
                 paramName = connection.Metadata['procedurecolumns'].data[p][3];
+                paramOrder = connection.Metadata['procedurecolumns'].data[p][17] - 1;
                 if (connection.Metadata['procedurecolumns'].data[p][12] == "ARRAY_PARAMETER")
                 {
                     if (paramType.toLowerCase() == "tinyint") // ENG-2040 and ENG-3101, identify it as an array (byte[])
@@ -501,11 +502,9 @@ this.AddConnection = function(connection, success)
                     else
                         paramType += "_array";
                 }
-                procParams[procParams.length] = {'name': paramName, 'type': paramType.toLowerCase()};
+                procParams[paramOrder] = {'name': paramName, 'type': paramType.toLowerCase()};
             }
         }
-        // the name field is really ordinal position: 1, 2, 3...
-        procParams.sort(function(a,b) {return a.name - b.name;});
 
         src += '<li class="procedure closed"><span>' + procName + '</span>';
           src += '<ul>'
