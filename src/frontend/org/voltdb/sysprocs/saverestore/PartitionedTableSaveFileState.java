@@ -154,6 +154,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
         Iterator<Entry<Integer, Set<Pair<Integer, Integer>>>> partitionAtHostItr =
                 m_partitionsAtHost.entrySet().iterator();
 
+        // looping through all current hosts having .vpt files of this table
         while(partitionAtHostItr.hasNext()) {
             Entry<Integer, Set<Pair<Integer, Integer>>> partitionAtHost = partitionAtHostItr.next();
             Integer host = partitionAtHost.getKey();
@@ -161,6 +162,9 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
             List<Integer> loadOrigHosts = new ArrayList<Integer>();
             Set<Pair<Integer, Integer>> partitionAndOrigHostSet = partitionAtHost.getValue();
             Iterator<Pair<Integer, Integer>> itr = partitionAndOrigHostSet.iterator();
+
+            // calculate which available partitions not yet been covered and put
+            // its partition_id and orig_host_id in loadPartitions and loadOrigHosts
             while(itr.hasNext()) {
                 Pair<Integer, Integer> pair = itr.next();
                 if(!coveredPartitions.contains(pair.getFirst())) {
@@ -170,11 +174,13 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
                 }
             }
 
+            // if there are some work to do
             if(loadPartitions.size() > 0){
                 int[] relevantPartitionIds = com.google.common.primitives.Ints.toArray(loadPartitions);
                 int[] originalHosts = com.google.common.primitives.Ints.toArray(loadOrigHosts);
                 List<Long> sitesAtHost = st.getSitesForHost(host);
 
+                // for each site of this host, generate one work fragment and let them execute in parallel
                 for(Long site : sitesAtHost) {
                     restorePlan.add(constructDistributePartitionedTableFragment(
                             site, relevantPartitionIds, originalHosts, true));
@@ -297,9 +303,9 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
 
     private SynthesizedPlanFragment
     constructDistributePartitionedTableFragment(
-            long distributorSiteId,
-            int uncoveredPartitionsAtHost[],
-            int originalHostsArray[],
+            long distributorSiteId,     // site which will execute this plan fragment
+            int uncoveredPartitionsAtHost[],    // which partitions' data in the .vpt files will be extracted as TableSaveFile
+            int originalHostsArray[],           // used to locate .vpt files
             boolean asReplicated)
     {
         int result_dependency_id = getNextDependencyId();

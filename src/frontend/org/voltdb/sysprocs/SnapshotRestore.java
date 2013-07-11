@@ -1608,30 +1608,32 @@ public class SnapshotRestore extends VoltSystemProcedure
                         int partition_id = sites_to_partitions.get(site_id);
                         dependencyIds[pfs_index] = TableSaveFileState
                                 .getNextDependencyId();
-                        pfs[pfs_index] = new SynthesizedPlanFragment();
-                        pfs[pfs_index].fragmentId = SysProcFragmentId.PF_restoreLoadTable;
-                        pfs[pfs_index].siteId = m_actualToGenerated.get(site_id);
-                        pfs[pfs_index].multipartition = false;
-                        pfs[pfs_index].outputDepId = dependencyIds[pfs_index];
-                        pfs[pfs_index].inputDepIds = new int[] {};
-                        pfs[pfs_index].parameters = ParameterSet.fromArrayNoCopy(
+                        SynthesizedPlanFragment loadFragment = new SynthesizedPlanFragment();
+                        loadFragment.fragmentId = SysProcFragmentId.PF_restoreLoadTable;
+                        loadFragment.siteId = m_actualToGenerated.get(site_id);
+                        loadFragment.multipartition = false;
+                        loadFragment.outputDepId = dependencyIds[pfs_index];
+                        loadFragment.inputDepIds = new int[] {};
+                        loadFragment.parameters = ParameterSet.fromArrayNoCopy(
                                 tableName,
                                 dependencyIds[pfs_index],
                                 partitioned_tables[partition_id],
                                 1,
                                 new int[] {partition_id});
-                        ++pfs_index;
+
+                        pfs[pfs_index++] = loadFragment;
                     }
                     int result_dependency_id = TableSaveFileState
                             .getNextDependencyId();
-                    pfs[sites_to_partitions.size()] = new SynthesizedPlanFragment();
-                    pfs[sites_to_partitions.size()].fragmentId = SysProcFragmentId.PF_restoreReceiveResultTables;
-                    pfs[sites_to_partitions.size()].multipartition = false;
-                    pfs[sites_to_partitions.size()].outputDepId = result_dependency_id;
-                    pfs[sites_to_partitions.size()].inputDepIds = dependencyIds;
-                    pfs[sites_to_partitions.size()].parameters = ParameterSet.fromArrayNoCopy(
+                    SynthesizedPlanFragment aggregatorFragment = new SynthesizedPlanFragment();
+                    aggregatorFragment.fragmentId = SysProcFragmentId.PF_restoreReceiveResultTables;
+                    aggregatorFragment.multipartition = false;
+                    aggregatorFragment.outputDepId = result_dependency_id;
+                    aggregatorFragment.inputDepIds = dependencyIds;
+                    aggregatorFragment.parameters = ParameterSet.fromArrayNoCopy(
                             result_dependency_id,
                             "Received confirmation of successful partitioned-to-replicated table load");
+                    pfs[sites_to_partitions.size()] = aggregatorFragment;
                 } else {
                     byte compressedTable[] = table.getCompressedBytes();
                     pfs = new SynthesizedPlanFragment[2];
@@ -1759,15 +1761,15 @@ public class SnapshotRestore extends VoltSystemProcedure
                 for (long site_id : sites_to_partitions.keySet())
                 {
                     dependencyIds[pfs_index] = TableSaveFileState.getNextDependencyId();
-                    pfs[pfs_index] = new SynthesizedPlanFragment();
-                    pfs[pfs_index].fragmentId = SysProcFragmentId.PF_restoreLoadTable;
-                    pfs[pfs_index].siteId = m_actualToGenerated.get(site_id);
-                    pfs[pfs_index].multipartition = false;
-                    pfs[pfs_index].outputDepId = dependencyIds[pfs_index];
-                    pfs[pfs_index].inputDepIds = new int [] {};
+                    SynthesizedPlanFragment loadFragment = new SynthesizedPlanFragment();
+                    loadFragment.fragmentId = SysProcFragmentId.PF_restoreLoadTable;
+                    loadFragment.siteId = m_actualToGenerated.get(site_id);
+                    loadFragment.multipartition = false;
+                    loadFragment.outputDepId = dependencyIds[pfs_index];
+                    loadFragment.inputDepIds = new int [] {};
 
                     if(asReplicated) {
-                        pfs[pfs_index].parameters = ParameterSet.fromArrayNoCopy(
+                        loadFragment.parameters = ParameterSet.fromArrayNoCopy(
                                 tableName,
                                 dependencyIds[pfs_index],
                                 compressedTable,
@@ -1775,31 +1777,32 @@ public class SnapshotRestore extends VoltSystemProcedure
                                 relevantPartitionIds);
                     } else {
                         int partition_id = sites_to_partitions.get(site_id);
-                        pfs[pfs_index].parameters = ParameterSet.fromArrayNoCopy(
+                        loadFragment.parameters = ParameterSet.fromArrayNoCopy(
                                 tableName,
                                 dependencyIds[pfs_index],
                                 partitioned_tables[partition_id],
                                 1,
                                 new int[] {partition_id});
                     }
-                    ++pfs_index;
+                    pfs[pfs_index++] = loadFragment;
                 }
                 int result_dependency_id = TableSaveFileState.getNextDependencyId();
-                pfs[sites_to_partitions.size()] = new SynthesizedPlanFragment();
-                pfs[sites_to_partitions.size()].fragmentId =
+                SynthesizedPlanFragment aggregatorFragment = new SynthesizedPlanFragment();
+                aggregatorFragment.fragmentId =
                         SysProcFragmentId.PF_restoreReceiveResultTables;
-                pfs[sites_to_partitions.size()].multipartition = false;
-                pfs[sites_to_partitions.size()].outputDepId = result_dependency_id;
-                pfs[sites_to_partitions.size()].inputDepIds = dependencyIds;
+                aggregatorFragment.multipartition = false;
+                aggregatorFragment.outputDepId = result_dependency_id;
+                aggregatorFragment.inputDepIds = dependencyIds;
                 if(asReplicated) {
-                    pfs[sites_to_partitions.size()].parameters = ParameterSet.fromArrayNoCopy(
+                    aggregatorFragment.parameters = ParameterSet.fromArrayNoCopy(
                             result_dependency_id,
                             "Received confirmation of successful partitioned-to-replicated table load");
                 } else {
-                    pfs[sites_to_partitions.size()].parameters = ParameterSet.fromArrayNoCopy(
+                    aggregatorFragment.parameters = ParameterSet.fromArrayNoCopy(
                             result_dependency_id,
                             "Received confirmation of successful partitioned-to-partitioned table load");
                 }
+                pfs[sites_to_partitions.size()] = aggregatorFragment;
                 results = executeSysProcPlanFragments(pfs, m_mbox);
             }
         } catch (Exception e) {
