@@ -224,11 +224,11 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         assert(m_parsedStmt.multiTableSelectionList.size() == 0);
         assert(m_parsedStmt.noTableSelectionList.size() == 0);
 
-        if (m_parsedStmt.joinTree.m_hasOuterJoin) {
+//        if (m_parsedStmt.joinTree.m_hasOuterJoin) {
             queueSubJoinOrders();
-        } else {
-            queueSubJoinOrdersLegacy();
-        }
+//        } else {
+//            queueSubJoinOrdersLegacy();
+//        }
     }
 
     /**
@@ -241,10 +241,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         // Simplify the outer join if possible
         JoinTree simplifiedJoinTree = simplifyOuterJoin(m_parsedStmt.joinTree);
         // It is possible that simplified tree has inner joins only
-        if (simplifiedJoinTree.m_hasOuterJoin == false) {
-            queueSubJoinOrdersLegacy();
-            return;
-        }
+//        if (simplifiedJoinTree.m_hasOuterJoin == false) {
+//            queueSubJoinOrdersLegacy();
+//            return;
+//        }
 
         // The execution engine expects to see the outer table on the left side only
         // which means that RIGHT joins need to be converted to the LEFT ones
@@ -641,9 +641,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @param joinOrder An array of tables in the join order.
      */
     private void generateMorePlansForJoinTree(JoinTree joinTree) {
-        if (m_parsedStmt.joinTree.m_hasOuterJoin == false) {
-            generateMorePlansForJoinOrderLegacy(joinTree);
-        } else {
+//        if (m_parsedStmt.joinTree.m_hasOuterJoin == false) {
+//            generateMorePlansForJoinOrderLegacy(joinTree);
+//        } else {
             // Specialization for the outer join.
             JoinNode joinNode = joinTree.m_root;
             assert(joinNode != null);
@@ -653,7 +653,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
             List<JoinNode> nodes = joinNode.generateAllNodesJoinOrder();
             generateSubPlanForJoinNodeRecursively(joinNode, nodes);
-        }
+//        }
     }
 
     /**

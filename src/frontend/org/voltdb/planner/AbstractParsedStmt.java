@@ -691,11 +691,11 @@ public abstract class AbstractParsedStmt {
      * Analyze join and filter expressions for a given join tree
      */
     void analyzeJoinExpressions(JoinTree joinTree) {
-        if (joinTree.m_hasOuterJoin) {
+//        if (joinTree.m_hasOuterJoin) {
             analyzeJoinExpressions(joinTree.m_root);
-        } else {
-            analyzeJoinExpressionsLegacy(joinTree);
-        }
+//        } else {
+//            analyzeJoinExpressionsLegacy(joinTree);
+//        }
         joinTree.m_wasAnalyzed = true;
         // these just shouldn't happen right?
         assert(multiTableSelectionList.size() == 0);
