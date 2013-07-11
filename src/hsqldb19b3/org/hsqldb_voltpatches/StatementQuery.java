@@ -32,6 +32,7 @@
 package org.hsqldb_voltpatches;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
@@ -423,42 +424,18 @@ public class StatementQuery extends StatementDMQL {
          *
          * Serialize the display columns in the exprColumn order.
          */
+        List<Integer> nullColsIdx = new ArrayList<Integer>();
         for (int jj=0; jj < displayCols.size(); ++jj) {
             Expression expr = displayCols.get(jj);
-            if (expr == null) {
+            if (nullColsIdx.contains(jj)) {
                 continue;
             }
-            else if (expr.opType == OpTypes.SIMPLE_COLUMN)
-            {
-                // simple columns are not serialized as display columns
-                // but they are place holders for another column
-                // in the output schema. Go find that corresponding column
-                // and serialize it in this place.
-                for (int ii=jj; ii < displayCols.size(); ++ii)
-                {
-                    Expression otherCol = displayCols.get(ii);
-                    if (otherCol == null) {
-                        continue;
-                    }
-                    else if ((otherCol.opType != OpTypes.SIMPLE_COLUMN) &&
-                             (otherCol.columnIndex == expr.columnIndex))
-                    {
-                        // serialize the column this simple column stands-in for
-                        VoltXMLElement xml = otherCol.voltGetXML(session);
-                        cols.children.add(xml);
-                        assert(xml != null);
-                        // null-out otherCol to not serialize it twice
-                        displayCols.set(ii, null);
-                        // quit seeking simple_column's replacement
-                        break;
-                    }
-                }
-            }
-            else {
-                VoltXMLElement xml = expr.voltGetXML(session);
-                cols.children.add(xml);
-                assert(xml != null);
-            }
+            VoltXMLElement xml = expr.voltGetXML(session, displayCols, nullColsIdx);
+            cols.children.add(xml);
+            assert(xml != null);
+        }
+        for (int kk=0; kk < nullColsIdx.size(); ++kk) {
+            displayCols.set(kk, null);
         }
 
         // parameters
