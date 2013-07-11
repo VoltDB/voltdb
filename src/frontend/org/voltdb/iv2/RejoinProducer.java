@@ -245,7 +245,8 @@ public class RejoinProducer extends JoinProducerBase {
 
         // MUST choose the leader as the source.
         long sourceSite = m_mailbox.getMasterHsId(m_partitionId);
-        long hsId = m_rejoinSiteProcessor.initialize(message.getSnapshotBufferPool());
+        long hsId = m_rejoinSiteProcessor.initialize(message.getSnapshotSourceCount(),
+                                                     message.getSnapshotBufferPool());
 
         REJOINLOG.debug(m_whoami
                 + "received INITIATION message. Doing liverejoin: "
@@ -300,7 +301,7 @@ public class RejoinProducer extends JoinProducerBase {
      */
     void runForLiveRejoin(SiteProcedureConnection siteConnection)
     {
-        Pair<Integer, ByteBuffer> rejoinWork = m_rejoinSiteProcessor.poll();
+        Pair<Integer, ByteBuffer> rejoinWork = m_rejoinSiteProcessor.poll(m_snapshotBufferAllocator);
         if (rejoinWork != null) {
             restoreBlock(rejoinWork, siteConnection);
         }
@@ -351,7 +352,7 @@ public class RejoinProducer extends JoinProducerBase {
      */
     void runForCommunityRejoin(SiteProcedureConnection siteConnection)
     {
-        Pair<Integer, ByteBuffer> rejoinWork = m_rejoinSiteProcessor.poll();
+        Pair<Integer, ByteBuffer> rejoinWork = m_rejoinSiteProcessor.poll(m_snapshotBufferAllocator);
         // poll() could return null if the source indicated enf of stream,
         // need to check on that before retry
         if (rejoinWork == null && !m_rejoinSiteProcessor.isEOF()) {
@@ -366,7 +367,7 @@ public class RejoinProducer extends JoinProducerBase {
         while (rejoinWork != null) {
             restoreBlock(rejoinWork, siteConnection);
             try {
-                rejoinWork = m_rejoinSiteProcessor.take();
+                rejoinWork = m_rejoinSiteProcessor.take(m_snapshotBufferAllocator);
             } catch (InterruptedException e) {
                 REJOINLOG.warn("RejoinProducer interrupted at take()");
                 rejoinWork = null;

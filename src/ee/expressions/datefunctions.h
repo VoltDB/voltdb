@@ -120,8 +120,8 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_MINUTE>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    // divide by 60 million micros, and wrap at 60.
-    return getTinyIntValue((int8_t)((epoch_micros / 60000000) % 60));
+    boost::posix_time::time_duration as_time = time_of_day_from_epoch_micros(epoch_micros);
+    return getTinyIntValue((int8_t)(as_time.minutes()));
 }
 
 /** implement the timestamp SECOND extract function **/
@@ -130,9 +130,18 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_SECOND>() const {
         return *this;
     }
     int64_t epoch_micros = getTimestamp();
-    TTInt retval(epoch_micros % 60000000);
-    retval *= NValue::kMaxScaleFactor/1000000;
-    return getDecimalValue(retval);
+    boost::posix_time::time_duration as_time = time_of_day_from_epoch_micros(epoch_micros);
+    int fraction = static_cast<int>(epoch_micros % 1000000);
+    int second = as_time.seconds();
+    if (epoch_micros < 0 && fraction != 0) {
+        second -= 1;
+        fraction = 1000000 + fraction;
+    }
+    TTInt ttSecond(second);
+    ttSecond *= NValue::kMaxScaleFactor;
+    TTInt ttMicro(fraction);
+    ttMicro *= NValue::kMaxScaleFactor / 1000000;
+    return getDecimalValue(ttSecond + ttMicro);
 }
 
 /** implement the timestamp SINCE_EPOCH in SECONDs function **/

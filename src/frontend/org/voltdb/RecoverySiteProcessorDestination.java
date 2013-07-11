@@ -241,7 +241,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
         message.getLong(HSIdOffset);
         final int blockIndex = message.getInt(blockIndexOffset);
         final int tableId = message.getInt(tableIdOffset);
-        RejoinDataAckMessage ackMessage = new RejoinDataAckMessage(blockIndex);
+        RejoinDataAckMessage ackMessage = new RejoinDataAckMessage(0, blockIndex);
         if (type == RecoveryMessageType.ScanTuples) {
             if (m_toggleProfiling.tryAcquire()) {
                 m_engine.toggleProfiler(1);
