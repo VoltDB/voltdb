@@ -1305,7 +1305,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     {
         if (isValgrind()) return;
 
-        System.out.println("Starting testSaveReplicatedAndRestorePArtitionedTable");
+        System.out.println("Starting testSaveReplicatedAndRestorePartitionedTable");
 
         int num_replicated_items_per_chunk = 200;
         int num_replicated_chunks = 10;

@@ -146,16 +146,6 @@ public class SnapshotRestore extends VoltSystemProcedure
     private static HashSet<String>  m_initializedTableSaveFileNames = new HashSet<String>();
     private static ArrayDeque<TableSaveFile> m_saveFiles = new ArrayDeque<TableSaveFile>();
 
-    private synchronized void initializeTableSaveFiles(String tableName, SiteTracker st) throws IOException {
-        if (!m_initializedTableSaveFileNames.add(tableName)) {
-            return;
-        }
-        TableSaveFile savefile = getTableSaveFile(getSaveFileForReplicatedTable(tableName),
-                                                    st.getLocalSites().length * 4, null);
-        m_saveFiles.offer(savefile);
-        assert (m_saveFiles.peekLast().getCompleted());
-    }
-
     private static volatile DuplicateRowHandler m_duplicateRowHandler = null;
 
     private static synchronized void initializeTableSaveFiles(
@@ -246,27 +236,19 @@ public class SnapshotRestore extends VoltSystemProcedure
     {
         registerPlanFragment(SysProcFragmentId.PF_restoreScan);
         registerPlanFragment(SysProcFragmentId.PF_restoreScanResults);
-        registerPlanFragment(SysProcFragmentId.PF_restoreLoadReplicatedTable);
-        registerPlanFragment(SysProcFragmentId.PF_restoreLoadReplicatedTableResults);
-        registerPlanFragment(SysProcFragmentId.PF_restoreDistributeReplicatedTable);
-        registerPlanFragment(SysProcFragmentId.PF_restoreDistributePartitionedTable);
-        registerPlanFragment(SysProcFragmentId.PF_restoreDistributePartitionedTableResults);
-        registerPlanFragment(SysProcFragmentId.PF_restoreSendReplicatedTable);
-        registerPlanFragment(SysProcFragmentId.PF_restoreSendReplicatedTableResults);
-        registerPlanFragment(SysProcFragmentId.PF_restoreSendPartitionedTable);
-        registerPlanFragment(SysProcFragmentId.PF_restoreSendPartitionedTableResults);
-        registerPlanFragment(SysProcFragmentId.PF_restoreLoadPartitionedTable);
-        registerPlanFragment(SysProcFragmentId.PF_restoreLoadPartitionedTableResult);
-        registerPlanFragment(SysProcFragmentId.PF_restoreDistributeSendPartitionedTable);
-        registerPlanFragment(SysProcFragmentId.PF_restoreDistributeSendPartitionedTableResult);
-        registerPlanFragment(SysProcFragmentId.PF_restoreDispatchReplicatedTable);
-        registerPlanFragment(SysProcFragmentId.PF_restoreDispatchReplicatedTableResult);
         registerPlanFragment(SysProcFragmentId.PF_restoreDigestScan);
         registerPlanFragment(SysProcFragmentId.PF_restoreDigestScanResults);
         registerPlanFragment(SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbers);
         registerPlanFragment(SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbersResults);
         registerPlanFragment(SysProcFragmentId.PF_restoreAsyncRunLoop);
         registerPlanFragment(SysProcFragmentId.PF_restoreAsyncRunLoopResults);
+        registerPlanFragment(SysProcFragmentId.PF_restoreLoadTable);
+        registerPlanFragment(SysProcFragmentId.PF_restoreReceiveResultTables);
+        registerPlanFragment(SysProcFragmentId.PF_restoreLoadReplicatedTable);
+        registerPlanFragment(SysProcFragmentId.PF_restoreDistributeReplicatedTableAsReplicated);
+        registerPlanFragment(SysProcFragmentId.PF_restoreDistributePartitionedTableAsPartitioned);
+        registerPlanFragment(SysProcFragmentId.PF_restoreDistributePartitionedTableAsReplicated);
+        registerPlanFragment(SysProcFragmentId.PF_restoreDistributeReplicatedTableAsPartitioned);
         m_siteId = CoreUtils.getSiteIdFromHSId(m_site.getCorrespondingSiteId());
         m_hostId = m_site.getCorrespondingHostId();
         // XXX HACK GIANT HACK given the current assumption that there is
@@ -367,7 +349,8 @@ public class SnapshotRestore extends VoltSystemProcedure
             assert(dependencies.size() > 0);
             VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_restoreDistributeExportAndPartitionSequenceNumbers));
             return new DependencyPair(DEP_restoreDistributeExportAndPartitionSequenceNumbersResults, result);
-        } else if (fragmentId == SysProcFragmentId.PF_restoreDigestScan)
+        }
+        else if (fragmentId == SysProcFragmentId.PF_restoreDigestScan)
         {
             VoltTable result = new VoltTable(
                     new VoltTable.ColumnInfo("DIGEST", VoltType.STRING),
@@ -410,7 +393,8 @@ public class SnapshotRestore extends VoltSystemProcedure
             assert(dependencies.size() > 0);
             VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_restoreDigestScan));
             return new DependencyPair(DEP_restoreDigestScanResults, result);
-        } else if (fragmentId == SysProcFragmentId.PF_restoreScan)
+        }
+        else if (fragmentId == SysProcFragmentId.PF_restoreScan)
         {
             assert(params.toArray()[0] != null);
             assert(params.toArray()[1] != null);
@@ -510,6 +494,160 @@ public class SnapshotRestore extends VoltSystemProcedure
             VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_restoreScan));
             return new DependencyPair(DEP_restoreScanResults, result);
         }
+        else if (fragmentId == SysProcFragmentId.PF_restoreAsyncRunLoop)
+        {
+            Object paramsArray[] = params.toArray();
+            assert(paramsArray.length == 1);
+            assert(paramsArray[0] instanceof Long);
+            long coordinatorHSId = (Long)paramsArray[0];
+            Mailbox m = VoltDB.instance().getHostMessenger().createMailbox();
+            m_mbox = m;
+            TRACE_LOG.trace(
+                    "Entering async run loop at " + CoreUtils.hsIdToString(context.getSiteId()) +
+                    " listening on mbox " + CoreUtils.hsIdToString(m.getHSId()));
+
+            /*
+             * Send the generated mailbox id to the coordinator mapping
+             * from the actual execution site id to the mailbox that will
+             * be used for restore
+             */
+            ByteBuffer responseBuffer = ByteBuffer.allocate(16);
+            responseBuffer.putLong(m_site.getCorrespondingSiteId());
+            responseBuffer.putLong(m.getHSId());
+
+            BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], responseBuffer.array());
+            m.send(coordinatorHSId, bpm);
+            bpm = null;
+
+            /*
+             * Retrieve the mapping from actual site ids
+             * to the site ids generated for mailboxes used for restore
+             * The coordinator will generate this once it has heard from all sites
+             */
+            while (true) {
+                bpm = (BinaryPayloadMessage)m.recvBlocking();
+                if (bpm == null) continue;
+                ByteBuffer wrappedMap = ByteBuffer.wrap(bpm.m_payload);
+
+                while (wrappedMap.hasRemaining()) {
+                    long actualHSId = wrappedMap.getLong();
+                    long generatedHSId = wrappedMap.getLong();
+                    m_actualToGenerated.put(actualHSId, generatedHSId);
+                }
+                break;
+            }
+
+            /*
+             * Loop until the termination signal is received. Execute any plan fragments that
+             * are received
+             */
+            while (true) {
+                VoltMessage vm = m.recvBlocking(1000);
+                if (vm == null) continue;
+
+                if (vm instanceof FragmentTaskMessage) {
+                    FragmentTaskMessage ftm = (FragmentTaskMessage)vm;
+                    TRACE_LOG.trace(
+                            CoreUtils.hsIdToString(context.getSiteId()) + " received fragment id " +
+                    VoltSystemProcedure.hashToFragId(ftm.getPlanHash(0)));
+                    DependencyPair dp =
+                            m_runner.executeSysProcPlanFragment(
+                                    m_runner.getTxnState(),
+                                    null,
+                                    VoltSystemProcedure.hashToFragId(ftm.getPlanHash(0)),
+                                    ftm.getParameterSetForFragment(0));
+                    FragmentResponseMessage frm = new FragmentResponseMessage(ftm, m.getHSId());
+                    frm.addDependency(dp.depId, dp.dependency);
+                    m.send(ftm.getCoordinatorHSId(), frm);
+                } else if (vm instanceof BinaryPayloadMessage) {
+                    if (context.isLowestSiteId() && m_duplicateRowHandler != null) {
+                        try {
+                            m_duplicateRowHandler.close();
+                        } catch (Exception e) {
+                            VoltDB.crashLocalVoltDB("Error closing duplicate row handler during snapshot restore",
+                                                     true,
+                                                     e);
+                        }
+                    }
+                    //Null result table is intentional
+                    //The results of the process are propagated through a future in performTableRestoreWork
+                    return new DependencyPair( DEP_restoreAsyncRunLoop, constructResultsTable());
+                }
+            }
+        } else if (fragmentId == SysProcFragmentId.PF_restoreAsyncRunLoopResults) {
+            return new DependencyPair(DEP_restoreAsyncRunLoopResults, constructResultsTable());
+        }
+
+        // called by: performDistributeReplicatedTable() and performDistributePartitionedTable
+        // handle all 4 LOADING tasks:
+        //          1. load a replicated table as replicated table
+        //          2. load a partitioned table as replicated table
+        //          3. load a partitioned table as partitioned table (need to check unique violation)
+        //          4. load a partitioned table as replicated table (need to check unique violation)
+        else if (fragmentId == SysProcFragmentId.PF_restoreLoadTable) {
+            // the last parameter could be null for the replicatedToReplicated case
+            // and this parameter is used for log only for both load as replicated cases
+            assert (params.toArray()[0] != null);
+            assert (params.toArray()[1] != null);
+            assert (params.toArray()[2] != null);
+            assert (params.toArray()[3] != null);
+            String table_name = (String) params.toArray()[0];
+            int dependency_id = (Integer) params.toArray()[1];
+            byte compressedTable[] = (byte[]) params.toArray()[2];
+            int checkUniqueViolations = (Integer) params.toArray()[3];
+            int[] partition_ids = (int[]) params.toArray()[4];
+
+            if(checkUniqueViolations > 0) {
+                assert(partition_ids != null && partition_ids.length == 1);
+            }
+
+            TRACE_LOG.trace("Received table: " + table_name +
+                    (partition_ids == null ? "[REPLICATED]" : "of partition [" + partition_ids.toString()) + "]");
+
+            String result_str = "SUCCESS";
+            String error_msg = "";
+            try {
+                    VoltTable table = PrivateVoltTableFactory.createVoltTableFromBuffer(
+                                    ByteBuffer.wrap(CompressionService.decompressBytes(compressedTable)), true);
+
+                    if(checkUniqueViolations > 0) {
+                        byte uniqueViolations[] = voltLoadTable(context.getCluster().getTypeName(),
+                                context.getDatabase().getTypeName(),
+                                table_name, table, m_duplicateRowHandler != null);
+                        if (uniqueViolations != null && m_duplicateRowHandler != null) {
+                            m_duplicateRowHandler.handleDuplicates(table_name, uniqueViolations);
+                        }
+                    } else {
+                        voltLoadTable(context.getCluster().getTypeName(), context.getDatabase().getTypeName(), table_name, table, false);
+                    }
+
+            } catch (Exception e) {
+                result_str = "FAILURE";
+                error_msg = e.getMessage();
+            }
+            VoltTable result = constructResultsTable();
+            result.addRow(m_hostId, CoreUtils.getHostnameOrAddress(), CoreUtils.getSiteIdFromHSId(m_siteId), table_name,
+                            ((checkUniqueViolations > 0) ? partition_ids[0] : -1), result_str, error_msg);
+            return new DependencyPair(dependency_id, result);
+        }
+        else if (fragmentId == SysProcFragmentId.PF_restoreReceiveResultTables) {
+            assert (params.toArray()[0] != null);
+            assert (params.toArray()[1] != null);
+            int dependency_id = (Integer) params.toArray()[0];
+            String tracingLogMsg = (String) params.toArray()[1];
+
+            TRACE_LOG.trace(tracingLogMsg);
+
+            List<VoltTable> table_list = new ArrayList<VoltTable>();
+            for (int dep_id : dependencies.keySet())
+            {
+                table_list.addAll(dependencies.get(dep_id));
+            }
+            assert(table_list.size() == dependencies.size());
+            VoltTable result = VoltTableUtil.unionTables(table_list);
+            return new DependencyPair(dependency_id, result);
+        }
+
         else if (fragmentId == SysProcFragmentId.PF_restoreLoadReplicatedTable)
         {
             assert(params.toArray()[0] != null);
@@ -615,8 +753,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             }
             return new DependencyPair( dependency_id, result);
         }
-        else if (fragmentId ==
-                SysProcFragmentId.PF_restoreDistributeReplicatedTable)
+        else if (fragmentId == SysProcFragmentId.PF_restoreDistributeReplicatedTableAsReplicated)
         {
             // XXX I tested this with a hack that cannot be replicated
             // in a unit test since it requires hacks to this sysproc that
@@ -629,81 +766,10 @@ public class SnapshotRestore extends VoltSystemProcedure
             int dependency_id = (Integer) params.toArray()[2];
             TRACE_LOG.trace(CoreUtils.hsIdToString(context.getSiteId()) + " distributing replicated table: " + table_name +
                     " to: " + CoreUtils.hsIdToString(site_id));
-            VoltTable result = performDistributeReplicatedTable(table_name, site_id);
+            VoltTable result = performDistributeReplicatedTable(table_name, context, site_id, false);
             return new DependencyPair(dependency_id, result);
         }
-        else if (fragmentId ==
-                SysProcFragmentId.PF_restoreSendReplicatedTable)
-        {
-            assert(params.toArray()[0] != null);
-            assert(params.toArray()[1] != null);
-            assert(params.toArray()[2] != null);
-            String table_name = (String) params.toArray()[0];
-            int dependency_id = (Integer) params.toArray()[1];
-            byte compressedTable[] = (byte[]) params.toArray()[2];
-            TRACE_LOG.trace("Received replicated table at " + CoreUtils.hsIdToString(context.getSiteId()) +
-                    " dependency id " + dependency_id);
-            String result_str = "SUCCESS";
-            String error_msg = "";
-            try
-            {
-                VoltTable table =
-                        PrivateVoltTableFactory.createVoltTableFromBuffer(
-                                ByteBuffer.wrap(
-                                        CompressionService.decompressBytes(compressedTable)),
-                                        true);
-                voltLoadTable(context.getCluster().getTypeName(),
-                        context.getDatabase().getTypeName(),
-                        table_name, table, false);
-            }
-            catch (Exception e)
-            {
-                result_str = "FAILURE";
-                error_msg = e.getMessage();
-            }
-            VoltTable result = constructResultsTable();
-            //Use null hostname to avoid DNS lookup that might be slow
-            //if DNS caching is not enabled
-            result.addRow(m_hostId, null, CoreUtils.getSiteIdFromHSId(m_siteId), table_name, -1,
-                    result_str, error_msg);
-            return new DependencyPair(dependency_id, result);
-        }
-        else if (fragmentId ==
-                SysProcFragmentId.PF_restoreSendReplicatedTableResults)
-        {
-            assert(params.toArray()[0] != null);
-            int dependency_id = (Integer) params.toArray()[0];
-            TRACE_LOG.trace(
-                    "Received confirmation of successful replicated table load at " +
-                            CoreUtils.hsIdToString(context.getSiteId()));
-
-            List<VoltTable> table_list = new ArrayList<VoltTable>();
-            for (int dep_id : dependencies.keySet())
-            {
-                table_list.addAll(dependencies.get(dep_id));
-            }
-            assert(table_list.size() == dependencies.size());
-            VoltTable result = VoltTableUtil.unionTables(table_list);
-            return new DependencyPair(dependency_id, result);
-        }
-        else if (fragmentId ==
-                SysProcFragmentId.PF_restoreLoadReplicatedTableResults)
-        {
-            TRACE_LOG.trace("Aggregating replicated table restore results");
-            assert(params.toArray()[0] != null);
-            int dependency_id = (Integer) params.toArray()[0];
-            assert(dependencies.size() > 0);
-            List<VoltTable> table_list = new ArrayList<VoltTable>();
-            for (int dep_id : dependencies.keySet())
-            {
-                table_list.addAll(dependencies.get(dep_id));
-            }
-            assert(table_list.size() == dependencies.size());
-            VoltTable result = VoltTableUtil.unionTables(table_list);
-            return new DependencyPair(dependency_id, result);
-        }
-        else if (fragmentId ==
-                SysProcFragmentId.PF_restoreDistributePartitionedTable)
+        else if (fragmentId == SysProcFragmentId.PF_restoreDistributePartitionedTableAsPartitioned)
         {
             Object paramsA[] = params.toArray();
             assert(paramsA[0] != null);
@@ -723,80 +789,10 @@ public class SnapshotRestore extends VoltSystemProcedure
 
             VoltTable result =
                     performDistributePartitionedTable(table_name, originalHosts,
-                            relevantPartitions, context);
+                            relevantPartitions, context, false);
             return new DependencyPair( dependency_id, result);
         }
-        else if (fragmentId ==
-                SysProcFragmentId.PF_restoreDistributePartitionedTableResults)
-        {
-            TRACE_LOG.trace("Aggregating partitioned table restore results");
-            assert(params.toArray()[0] != null);
-            int dependency_id = (Integer) params.toArray()[0];
-            List<VoltTable> table_list = new ArrayList<VoltTable>();
-            for (int dep_id : dependencies.keySet())
-            {
-                table_list.addAll(dependencies.get(dep_id));
-            }
-            assert(table_list.size() == dependencies.size());
-            VoltTable result = VoltTableUtil.unionTables(table_list);
-            return new DependencyPair(dependency_id, result);
-        }
-        else if (fragmentId ==
-                SysProcFragmentId.PF_restoreSendPartitionedTable)
-        {
-            assert(params.toArray()[0] != null);
-            assert(params.toArray()[1] != null);
-            assert(params.toArray()[2] != null);
-            assert(params.toArray()[3] != null);
-            String table_name = (String) params.toArray()[0];
-            int partition_id = (Integer) params.toArray()[1];
-            int dependency_id = (Integer) params.toArray()[2];
-            byte compressedTable[] = (byte[]) params.toArray()[3];
-
-            TRACE_LOG.trace("Received partitioned table: " + table_name);
-            String result_str = "SUCCESS";
-            String error_msg = "";
-            try
-            {
-                VoltTable table =
-                        PrivateVoltTableFactory.createVoltTableFromBuffer(
-                                ByteBuffer.wrap(
-                                        CompressionService.decompressBytes(compressedTable)),
-                                        true);
-                byte uniqueViolations[] = voltLoadTable(context.getCluster().getTypeName(),
-                        context.getDatabase().getTypeName(),
-                        table_name, table, m_duplicateRowHandler != null);
-                if (uniqueViolations != null && m_duplicateRowHandler != null) {
-                    m_duplicateRowHandler.handleDuplicates(table_name, uniqueViolations);
-                }
-            }
-            catch (Exception e)
-            {
-                result_str = "FAILURE";
-                error_msg = e.getMessage();
-            }
-            VoltTable result = constructResultsTable();
-            //Use null hostname to avoid DNS lookup that might be slow
-            //if DNS caching is not enabled
-            result.addRow(m_hostId, null, CoreUtils.getSiteIdFromHSId(m_siteId), table_name, partition_id,
-                    result_str, error_msg);
-            return new DependencyPair(dependency_id, result);
-        }
-        else if (fragmentId ==
-                SysProcFragmentId.PF_restoreSendPartitionedTableResults)
-        {
-            assert(params.toArray()[0] != null);
-            int dependency_id = (Integer) params.toArray()[0];
-            TRACE_LOG.trace("Received confirmation of successful partitioned table load");
-            List<VoltTable> table_list = new ArrayList<VoltTable>();
-            for (int dep_id : dependencies.keySet())
-            {
-                table_list.addAll(dependencies.get(dep_id));
-            }
-            assert(table_list.size() == dependencies.size());
-            VoltTable result = VoltTableUtil.unionTables(table_list);
-            return new DependencyPair(dependency_id, result);
-        } else if (fragmentId == SysProcFragmentId.PF_restoreLoadPartitionedTable) {
+        else if (fragmentId == SysProcFragmentId.PF_restoreDistributePartitionedTableAsReplicated) {
             Object paramsA[] = params.toArray();
             assert (paramsA[0] != null);
             assert (paramsA[1] != null);
@@ -813,66 +809,11 @@ public class SnapshotRestore extends VoltSystemProcedure
                         + " partition id: " + partition_id);
             }
 
-            VoltTable result = performLoadPartitionedTable(table_name,
-                    originalHosts, relevantPartitions, context);
+            VoltTable result = performDistributePartitionedTable(table_name,
+                    originalHosts, relevantPartitions, context, true);
             return new DependencyPair(dependency_id, result);
-        } else if (fragmentId == SysProcFragmentId.PF_restoreDistributeSendPartitionedTable) {
-            assert (params.toArray()[0] != null);
-            assert (params.toArray()[1] != null);
-            assert (params.toArray()[2] != null);
-            assert (params.toArray()[3] != null);
-            String table_name = (String) params.toArray()[0];
-            int[] partition_ids = (int[]) params.toArray()[1];
-            int dependency_id = (Integer) params.toArray()[2];
-            byte compressedTable[] = (byte[]) params.toArray()[3];
-
-            TRACE_LOG.trace("Received partitioned-to-replicated table: " + table_name
-                                   + " for [" + partition_ids.toString() + "]");
-            String result_str = "SUCCESS";
-            String error_msg = "";
-            try {
-                    VoltTable table = PrivateVoltTableFactory
-                            .createVoltTableFromBuffer(
-                                    ByteBuffer
-                                            .wrap(CompressionService
-                                                    .decompressBytes(compressedTable)),
-                                    true);
-                    voltLoadTable(context.getCluster().getTypeName(), context
-                            .getDatabase().getTypeName(), table_name, table, false);
-            } catch (Exception e) {
-                result_str = "FAILURE";
-                error_msg = e.getMessage();
-            }
-            VoltTable result = constructResultsTable();
-            result.addRow(m_hostId, CoreUtils.getHostnameOrAddress(),
-                    CoreUtils.getSiteIdFromHSId(m_siteId), table_name,
-                    -1, result_str, error_msg);
-            return new DependencyPair(dependency_id, result);
-        } else if (fragmentId == SysProcFragmentId.PF_restoreDistributeSendPartitionedTableResult) {
-            assert (params.toArray()[0] != null);
-            int dependency_id = (Integer) params.toArray()[0];
-            TRACE_LOG
-                    .trace("Received confirmation of successful partitioned-to-replicated table load");
-            List<VoltTable> table_list = new ArrayList<VoltTable>();
-            for (int dep_id : dependencies.keySet()) {
-                table_list.addAll(dependencies.get(dep_id));
-            }
-            assert (table_list.size() == dependencies.size());
-            VoltTable result = VoltTableUtil.unionTables(table_list);
-            return new DependencyPair(dependency_id, result);
-        } else if (fragmentId == SysProcFragmentId.PF_restoreLoadPartitionedTableResult) {
-            TRACE_LOG.trace("Aggregating partitioned-to-replicated table restore results");
-            assert (params.toArray()[0] != null);
-            int dependency_id = (Integer) params.toArray()[0];
-            assert (dependencies.size() > 0);
-            List<VoltTable> table_list = new ArrayList<VoltTable>();
-            for (int dep_id : dependencies.keySet()) {
-                table_list.addAll(dependencies.get(dep_id));
-            }
-            assert (table_list.size() == dependencies.size());
-            VoltTable result = VoltTableUtil.unionTables(table_list);
-            return new DependencyPair(dependency_id, result);
-        } else if (fragmentId == SysProcFragmentId.PF_restoreDispatchReplicatedTable) {
+        }
+        else if (fragmentId == SysProcFragmentId.PF_restoreDistributeReplicatedTableAsPartitioned) {
             assert (params.toArray()[0] != null);
             assert (params.toArray()[1] != null);
             String table_name = (String) params.toArray()[0];
@@ -880,106 +821,9 @@ public class SnapshotRestore extends VoltSystemProcedure
 
             TRACE_LOG.trace("Loading replicated-to-partitioned table: " + table_name);
 
-            VoltTable result = performDispatchReplicatedTable(table_name, context);
+            VoltTable result = performDistributeReplicatedTable(table_name, context, -1, true);
             return new DependencyPair(dependency_id, result);
 
-        } else if (fragmentId == SysProcFragmentId.PF_restoreDispatchReplicatedTableResult) {
-            TRACE_LOG.trace("Aggregating replicated-to-partitioned table restore results");
-            assert (params.toArray()[0] != null);
-            int dependency_id = (Integer) params.toArray()[0];
-            assert (dependencies.size() > 0);
-            List<VoltTable> table_list = new ArrayList<VoltTable>();
-            for (int dep_id : dependencies.keySet()) {
-                table_list.addAll(dependencies.get(dep_id));
-            }
-            assert (table_list.size() == dependencies.size());
-            VoltTable result = VoltTableUtil.unionTables(table_list);
-            return new DependencyPair(dependency_id, result);
-        }
-        else if (fragmentId ==
-                SysProcFragmentId.PF_restoreAsyncRunLoop)
-        {
-            Object paramsArray[] = params.toArray();
-            assert(paramsArray.length == 1);
-            assert(paramsArray[0] instanceof Long);
-            long coordinatorHSId = (Long)paramsArray[0];
-            Mailbox m = VoltDB.instance().getHostMessenger().createMailbox();
-            m_mbox = m;
-            TRACE_LOG.trace(
-                    "Entering async run loop at " + CoreUtils.hsIdToString(context.getSiteId()) +
-                    " listening on mbox " + CoreUtils.hsIdToString(m.getHSId()));
-
-            /*
-             * Send the generated mailbox id to the coordinator mapping
-             * from the actual execution site id to the mailbox that will
-             * be used for restore
-             */
-            ByteBuffer responseBuffer = ByteBuffer.allocate(16);
-            responseBuffer.putLong(m_site.getCorrespondingSiteId());
-            responseBuffer.putLong(m.getHSId());
-
-            BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], responseBuffer.array());
-            m.send(coordinatorHSId, bpm);
-            bpm = null;
-
-            /*
-             * Retrieve the mapping from actual site ids
-             * to the site ids generated for mailboxes used for restore
-             * The coordinator will generate this once it has heard from all sites
-             */
-            while (true) {
-                bpm = (BinaryPayloadMessage)m.recvBlocking();
-                if (bpm == null) continue;
-                ByteBuffer wrappedMap = ByteBuffer.wrap(bpm.m_payload);
-
-                while (wrappedMap.hasRemaining()) {
-                    long actualHSId = wrappedMap.getLong();
-                    long generatedHSId = wrappedMap.getLong();
-                    m_actualToGenerated.put(actualHSId, generatedHSId);
-                }
-                break;
-            }
-
-            /*
-             * Loop until the termination signal is received. Execute any plan fragments that
-             * are received
-             */
-            while (true) {
-                VoltMessage vm = m.recvBlocking(1000);
-                if (vm == null) continue;
-
-                if (vm instanceof FragmentTaskMessage) {
-                    FragmentTaskMessage ftm = (FragmentTaskMessage)vm;
-                    TRACE_LOG.trace(
-                            CoreUtils.hsIdToString(context.getSiteId()) + " received fragment id " +
-                    VoltSystemProcedure.hashToFragId(ftm.getPlanHash(0)));
-                    DependencyPair dp =
-                            m_runner.executeSysProcPlanFragment(
-                                    m_runner.getTxnState(),
-                                    null,
-                                    VoltSystemProcedure.hashToFragId(ftm.getPlanHash(0)),
-                                    ftm.getParameterSetForFragment(0));
-                    FragmentResponseMessage frm = new FragmentResponseMessage(ftm, m.getHSId());
-                    frm.addDependency(dp.depId, dp.dependency);
-                    m.send(ftm.getCoordinatorHSId(), frm);
-                } else if (vm instanceof BinaryPayloadMessage) {
-                    if (context.isLowestSiteId() && m_duplicateRowHandler != null) {
-                        try {
-                            m_duplicateRowHandler.close();
-                        } catch (Exception e) {
-                            VoltDB.crashLocalVoltDB("Error closing duplicate row handler during snapshot restore",
-                                                     true,
-                                                     e);
-                        }
-                    }
-                    //Null result table is intentional
-                    //The results of the process are propagated through a future in performTableRestoreWork
-                    return new DependencyPair( DEP_restoreAsyncRunLoop, constructResultsTable());
-                }
-            }
-        } else if (fragmentId ==
-                SysProcFragmentId.PF_restoreAsyncRunLoopResults) {
-            return new DependencyPair(DEP_restoreAsyncRunLoopResults, constructResultsTable());
         }
 
         assert (false);
@@ -1696,8 +1540,11 @@ public class SnapshotRestore extends VoltSystemProcedure
     // I believe that it will work for at least one new node, but
     // there's not a good way to add a unit test for this at the moment,
     // so the emma coverage is weak.
-    private VoltTable performDistributeReplicatedTable(String tableName,
-            long siteId)
+    private VoltTable performDistributeReplicatedTable(
+            String tableName,
+            SystemProcedureExecutionContext ctx,    // only used in replicated-to-partitioned case
+            long siteId,                            // only used in replicated-to-replicated case
+            boolean asPartitioned)
     {
         String hostname = CoreUtils.getHostnameOrAddress();
         TableSaveFile savefile = null;
@@ -1725,9 +1572,10 @@ public class SnapshotRestore extends VoltSystemProcedure
         try {
             while (savefile.hasMoreChunks())
             {
+                VoltTable table = null;
                 final org.voltcore.utils.DBBPool.BBContainer c = savefile.getNextChunk();
                 if (c == null) {
-                    continue;//Should be equivalent to break
+                    continue;   // Should be equivalent to break
                 }
 
                 if (needsConversion == null) {
@@ -1736,49 +1584,86 @@ public class SnapshotRestore extends VoltSystemProcedure
                     needsConversion = SavedTableConverter.needsConversion(old_table, new_catalog_table);
                 }
 
-                byte compressedTable[];
-                if (needsConversion.booleanValue()) {
-                    VoltTable old_table =
-                            PrivateVoltTableFactory.createVoltTableFromBuffer(c.b , true);
-                    VoltTable new_table = SavedTableConverter.convertTable(old_table,
-                            new_catalog_table);
-                    compressedTable = new_table.getCompressedBytes();
+                final VoltTable old_table = PrivateVoltTableFactory
+                        .createVoltTableFromBuffer(c.b, true);
+                if (needsConversion) {
+                    table = SavedTableConverter.convertTable(old_table, new_catalog_table);
                 } else {
-                    compressedTable = CompressionService.compressBuffer(c.b);
+                    table = old_table;
+                }
+
+                SynthesizedPlanFragment[] pfs = null;
+                if (asPartitioned) {
+                    byte[][] partitioned_tables = createPartitionedTables(
+                            tableName, table, ctx.getNumberOfPartitions());
+                    Map<Long, Integer> sites_to_partitions = new HashMap<Long, Integer>();
+                    SiteTracker tracker = ctx.getSiteTrackerForSnapshot();
+                    sites_to_partitions.putAll(tracker.getSitesToPartitions());
+
+                    int[] dependencyIds = new int[sites_to_partitions.size()];
+                    pfs = new SynthesizedPlanFragment[sites_to_partitions.size() + 1];
+                    int pfs_index = 0;
+
+                    for (long site_id : sites_to_partitions.keySet()) {
+                        int partition_id = sites_to_partitions.get(site_id);
+                        dependencyIds[pfs_index] = TableSaveFileState
+                                .getNextDependencyId();
+                        pfs[pfs_index] = new SynthesizedPlanFragment();
+                        pfs[pfs_index].fragmentId = SysProcFragmentId.PF_restoreLoadTable;
+                        pfs[pfs_index].siteId = m_actualToGenerated.get(site_id);
+                        pfs[pfs_index].multipartition = false;
+                        pfs[pfs_index].outputDepId = dependencyIds[pfs_index];
+                        pfs[pfs_index].inputDepIds = new int[] {};
+                        pfs[pfs_index].parameters = ParameterSet.fromArrayNoCopy(
+                                tableName,
+                                dependencyIds[pfs_index],
+                                partitioned_tables[partition_id],
+                                1,
+                                new int[] {partition_id});
+                        ++pfs_index;
+                    }
+                    int result_dependency_id = TableSaveFileState
+                            .getNextDependencyId();
+                    pfs[sites_to_partitions.size()] = new SynthesizedPlanFragment();
+                    pfs[sites_to_partitions.size()].fragmentId = SysProcFragmentId.PF_restoreReceiveResultTables;
+                    pfs[sites_to_partitions.size()].multipartition = false;
+                    pfs[sites_to_partitions.size()].outputDepId = result_dependency_id;
+                    pfs[sites_to_partitions.size()].inputDepIds = dependencyIds;
+                    pfs[sites_to_partitions.size()].parameters = ParameterSet.fromArrayNoCopy(
+                            result_dependency_id,
+                            "Received confirmation of successful partitioned-to-replicated table load");
+                } else {
+                    byte compressedTable[] = table.getCompressedBytes();
+                    pfs = new SynthesizedPlanFragment[2];
+
+                    int result_dependency_id = TableSaveFileState.getNextDependencyId();
+                    pfs[0] = new SynthesizedPlanFragment();
+                    pfs[0].fragmentId = SysProcFragmentId.PF_restoreLoadTable;
+                    pfs[0].siteId = m_actualToGenerated.get(siteId);
+                    pfs[0].outputDepId = result_dependency_id;
+                    pfs[0].inputDepIds = new int[] {};
+                    pfs[0].multipartition = false;
+                    pfs[0].parameters = ParameterSet.fromArrayNoCopy(
+                            tableName, result_dependency_id, compressedTable,
+                            0, null);
+
+                    int final_dependency_id = TableSaveFileState.getNextDependencyId();
+                    pfs[1] = new SynthesizedPlanFragment();
+                    pfs[1].fragmentId =
+                            SysProcFragmentId.PF_restoreReceiveResultTables;
+                    pfs[1].outputDepId = final_dependency_id;
+                    pfs[1].inputDepIds = new int[] { result_dependency_id };
+                    pfs[1].multipartition = false;
+                    pfs[1].parameters = ParameterSet.fromArrayNoCopy(
+                            final_dependency_id,
+                            "Received confirmation of successful replicated table load at " + siteId);
+                    TRACE_LOG.trace("Sending replicated table: " + tableName + " to site id:" +
+                            siteId);
                 }
                 c.discard();
-
-                SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
-
-                int result_dependency_id = TableSaveFileState.getNextDependencyId();
-                pfs[0] = new SynthesizedPlanFragment();
-                pfs[0].fragmentId = SysProcFragmentId.PF_restoreSendReplicatedTable;
-                pfs[0].siteId = m_actualToGenerated.get(siteId);
-                pfs[0].outputDepId = result_dependency_id;
-                pfs[0].inputDepIds = new int[] {};
-                pfs[0].multipartition = false;
-                pfs[0].parameters = ParameterSet.fromArrayNoCopy(tableName, result_dependency_id, compressedTable);
-
-                int final_dependency_id = TableSaveFileState.getNextDependencyId();
-                pfs[1] = new SynthesizedPlanFragment();
-                pfs[1].fragmentId =
-                        SysProcFragmentId.PF_restoreSendReplicatedTableResults;
-                pfs[1].outputDepId = final_dependency_id;
-                pfs[1].inputDepIds = new int[] { result_dependency_id };
-                pfs[1].multipartition = false;
-                pfs[1].parameters = ParameterSet.fromArrayNoCopy(final_dependency_id);
-                TRACE_LOG.trace("Sending replicated table: " + tableName + " to site id:" +
-                        siteId);
                 results = executeSysProcPlanFragments(pfs, m_mbox);
             }
-        } catch (IOException e) {
-            VoltTable result = PrivateVoltTableFactory.createUninitializedVoltTable();
-            result = constructResultsTable();
-            result.addRow(m_hostId, hostname, CoreUtils.getSiteIdFromHSId(m_siteId), tableName, -1, "FAILURE",
-                    "Unable to load table: " + tableName +
-                    " error: " + e.getMessage());
-            return result;
-        } catch (VoltTypeException e) {
+        } catch (Exception e) {
             VoltTable result = PrivateVoltTableFactory.createUninitializedVoltTable();
             result = constructResultsTable();
             result.addRow(m_hostId, hostname, CoreUtils.getSiteIdFromHSId(m_siteId), tableName, -1, "FAILURE",
@@ -1786,13 +1671,15 @@ public class SnapshotRestore extends VoltSystemProcedure
                     " error: " + e.getMessage());
             return result;
         }
+
         return results[0];
     }
 
     private VoltTable performDistributePartitionedTable(String tableName,
             int originalHostIds[],
             int relevantPartitionIds[],
-            SystemProcedureExecutionContext ctx)
+            SystemProcedureExecutionContext ctx,
+            boolean asReplicated)
     {
         String hostname = CoreUtils.getHostnameOrAddress();
         // XXX This is all very similar to the splitting code in
@@ -1851,42 +1738,68 @@ public class SnapshotRestore extends VoltSystemProcedure
                     table = old_table;
                 }
 
-                byte[][] partitioned_tables =
-                        createPartitionedTables(tableName, table, ctx.getNumberOfPartitions());
+                // use if will load as partitioned table
+                byte[][] partitioned_tables = null;
+                // use if will load as replicated table
+                byte compressedTable[] = null;
+
+                if (asReplicated) {
+                    compressedTable = table.getCompressedBytes();
+                } else {
+                    partitioned_tables = createPartitionedTables(tableName, table, ctx.getNumberOfPartitions());
+                }
+
                 if (c != null) {
                     c.discard();
                 }
 
                 int[] dependencyIds = new int[sites_to_partitions.size()];
-                SynthesizedPlanFragment[] pfs =
-                        new SynthesizedPlanFragment[sites_to_partitions.size() + 1];
+                SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[sites_to_partitions.size() + 1];
                 int pfs_index = 0;
                 for (long site_id : sites_to_partitions.keySet())
                 {
-                    int partition_id = sites_to_partitions.get(site_id);
-                    dependencyIds[pfs_index] =
-                            TableSaveFileState.getNextDependencyId();
+                    dependencyIds[pfs_index] = TableSaveFileState.getNextDependencyId();
                     pfs[pfs_index] = new SynthesizedPlanFragment();
-                    pfs[pfs_index].fragmentId =
-                            SysProcFragmentId.PF_restoreSendPartitionedTable;
+                    pfs[pfs_index].fragmentId = SysProcFragmentId.PF_restoreLoadTable;
                     pfs[pfs_index].siteId = m_actualToGenerated.get(site_id);
                     pfs[pfs_index].multipartition = false;
                     pfs[pfs_index].outputDepId = dependencyIds[pfs_index];
                     pfs[pfs_index].inputDepIds = new int [] {};
-                    pfs[pfs_index].parameters = ParameterSet.fromArrayNoCopy(
-                            tableName, partition_id,
-                            dependencyIds[pfs_index],
-                            partitioned_tables[partition_id]);
+
+                    if(asReplicated) {
+                        pfs[pfs_index].parameters = ParameterSet.fromArrayNoCopy(
+                                tableName,
+                                dependencyIds[pfs_index],
+                                compressedTable,
+                                0,
+                                relevantPartitionIds);
+                    } else {
+                        int partition_id = sites_to_partitions.get(site_id);
+                        pfs[pfs_index].parameters = ParameterSet.fromArrayNoCopy(
+                                tableName,
+                                dependencyIds[pfs_index],
+                                partitioned_tables[partition_id],
+                                1,
+                                new int[] {partition_id});
+                    }
                     ++pfs_index;
                 }
                 int result_dependency_id = TableSaveFileState.getNextDependencyId();
                 pfs[sites_to_partitions.size()] = new SynthesizedPlanFragment();
                 pfs[sites_to_partitions.size()].fragmentId =
-                        SysProcFragmentId.PF_restoreSendPartitionedTableResults;
+                        SysProcFragmentId.PF_restoreReceiveResultTables;
                 pfs[sites_to_partitions.size()].multipartition = false;
                 pfs[sites_to_partitions.size()].outputDepId = result_dependency_id;
                 pfs[sites_to_partitions.size()].inputDepIds = dependencyIds;
-                pfs[sites_to_partitions.size()].parameters = ParameterSet.fromArrayNoCopy(result_dependency_id);
+                if(asReplicated) {
+                    pfs[sites_to_partitions.size()].parameters = ParameterSet.fromArrayNoCopy(
+                            result_dependency_id,
+                            "Received confirmation of successful partitioned-to-replicated table load");
+                } else {
+                    pfs[sites_to_partitions.size()].parameters = ParameterSet.fromArrayNoCopy(
+                            result_dependency_id,
+                            "Received confirmation of successful partitioned-to-partitioned table load");
+                }
                 results = executeSysProcPlanFragments(pfs, m_mbox);
             }
         } catch (Exception e) {
@@ -1900,230 +1813,6 @@ public class SnapshotRestore extends VoltSystemProcedure
 
         return results[0];
     }
-
-    private VoltTable performDispatchReplicatedTable(String tableName,
-            SystemProcedureExecutionContext ctx) {
-        String hostname = CoreUtils.getHostnameOrAddress();
-        Map<Long, Integer> sites_to_partitions = new HashMap<Long, Integer>();
-        SiteTracker tracker = ctx.getSiteTrackerForSnapshot();
-        sites_to_partitions.putAll(tracker.getSitesToPartitions());
-
-        try {
-            initializeTableSaveFiles(tableName, tracker);
-        } catch (IOException e) {
-            VoltTable result = constructResultsTable();
-            result.addRow(
-                    m_hostId,
-                    hostname,
-                    CoreUtils.getSiteIdFromHSId(m_siteId),
-                    tableName,
-                    -1,
-                    "FAILURE",
-                    "Unable to load table: " + tableName + " error: "
-                            + e.getMessage());
-            return result;
-        }
-
-        VoltTable[] results = new VoltTable[] { constructResultsTable() };
-        results[0].addRow(m_hostId, hostname,
-                CoreUtils.getSiteIdFromHSId(m_siteId), tableName, 0, "SUCCESS",
-                "NO DATA TO DISPATCH");
-        final Table new_catalog_table = getCatalogTable(tableName);
-        Boolean needsConversion = null;
-        org.voltcore.utils.DBBPool.BBContainer c = null;
-        try {
-            while (hasMoreChunks()) {
-                VoltTable table = null;
-
-                c = null;
-                c = getNextChunk();
-                if (c == null) {
-                    continue;// Should be equivalent to break
-                }
-
-                if (needsConversion == null) {
-                    VoltTable old_table = PrivateVoltTableFactory
-                            .createVoltTableFromBuffer(c.b.duplicate(), true);
-                    needsConversion = SavedTableConverter.needsConversion(
-                            old_table, new_catalog_table);
-                }
-
-                final VoltTable old_table = PrivateVoltTableFactory
-                        .createVoltTableFromBuffer(c.b, true);
-                if (needsConversion) {
-                    table = SavedTableConverter.convertTable(old_table,
-                            new_catalog_table);
-                } else {
-                    table = old_table;
-                }
-
-                byte[][] partitioned_tables = createPartitionedTables(
-                        tableName, table, ctx.getNumberOfPartitions());
-                if (c != null) {
-                    c.discard();
-                }
-
-                int[] dependencyIds = new int[sites_to_partitions.size()];
-                SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[sites_to_partitions
-                        .size() + 1];
-                int pfs_index = 0;
-                for (long site_id : sites_to_partitions.keySet()) {
-                    int partition_id = sites_to_partitions.get(site_id);
-                    dependencyIds[pfs_index] = TableSaveFileState
-                            .getNextDependencyId();
-                    pfs[pfs_index] = new SynthesizedPlanFragment();
-                    pfs[pfs_index].fragmentId = SysProcFragmentId.PF_restoreSendPartitionedTable;
-                    pfs[pfs_index].siteId = m_actualToGenerated.get(site_id);
-                    pfs[pfs_index].multipartition = false;
-                    pfs[pfs_index].outputDepId = dependencyIds[pfs_index];
-                    pfs[pfs_index].inputDepIds = new int[] {};
-                    pfs[pfs_index].parameters = ParameterSet.fromArrayNoCopy(
-                            tableName, partition_id, dependencyIds[pfs_index],
-                            partitioned_tables[partition_id]);
-                    ++pfs_index;
-                }
-                int result_dependency_id = TableSaveFileState
-                        .getNextDependencyId();
-                pfs[sites_to_partitions.size()] = new SynthesizedPlanFragment();
-                pfs[sites_to_partitions.size()].fragmentId = SysProcFragmentId.PF_restoreSendPartitionedTableResults;
-                pfs[sites_to_partitions.size()].multipartition = false;
-                pfs[sites_to_partitions.size()].outputDepId = result_dependency_id;
-                pfs[sites_to_partitions.size()].inputDepIds = dependencyIds;
-                pfs[sites_to_partitions.size()].parameters = ParameterSet
-                        .fromArrayNoCopy(result_dependency_id);
-                results = executeSysProcPlanFragments(pfs, m_mbox);
-            }
-        } catch (Exception e) {
-            VoltTable result = PrivateVoltTableFactory
-                    .createUninitializedVoltTable();
-            result = constructResultsTable();
-            result.addRow(
-                    m_hostId,
-                    hostname,
-                    CoreUtils.getSiteIdFromHSId(m_siteId),
-                    tableName,
-                    -1,
-                    "FAILURE",
-                    "Unable to load table: " + tableName + " error: "
-                            + e.getMessage());
-            return result;
-        }
-
-        return results[0];
-    }
-
-    private VoltTable performLoadPartitionedTable(String tableName,
-            int originalHostIds[], int relevantPartitionIds[],
-            SystemProcedureExecutionContext ctx) {
-        String hostname = CoreUtils.getHostnameOrAddress();
-        // XXX This is all very similar to the splitting code in
-        // LoadMultipartitionTable. Consider ways to consolidate later
-        Map<Long, Integer> sites_to_partitions = new HashMap<Long, Integer>();
-        SiteTracker tracker = ctx.getSiteTrackerForSnapshot();
-        sites_to_partitions.putAll(tracker.getSitesToPartitions());
-
-        try {
-            initializeTableSaveFiles(m_filePath, m_fileNonce, tableName,
-                    originalHostIds, relevantPartitionIds, tracker);
-        } catch (IOException e) {
-            VoltTable result = constructResultsTable();
-            result.addRow(
-                    m_hostId,
-                    hostname,
-                    CoreUtils.getSiteIdFromHSId(m_siteId),
-                    tableName,
-                    relevantPartitionIds[0],
-                    "FAILURE",
-                    "Unable to load table: " + tableName + " error: "
-                            + e.getMessage());
-            return result;
-        }
-
-        VoltTable[] results = new VoltTable[] { constructResultsTable() };
-        results[0].addRow(m_hostId, hostname,
-                CoreUtils.getSiteIdFromHSId(m_siteId), tableName, 0, "SUCCESS",
-                "NO DATA TO DISTRIBUTE");
-        final Table new_catalog_table = getCatalogTable(tableName);
-        Boolean needsConversion = null;
-        org.voltcore.utils.DBBPool.BBContainer c = null;
-        try {
-            while (hasMoreChunks()) {
-                c = null;
-                c = getNextChunk();
-                if (c == null) {
-                    continue;// Should be equivalent to break
-                }
-
-                if (needsConversion == null) {
-                    VoltTable old_table = PrivateVoltTableFactory
-                            .createVoltTableFromBuffer(c.b.duplicate(), true);
-                    needsConversion = SavedTableConverter.needsConversion(
-                            old_table, new_catalog_table);
-                }
-
-                byte compressedTable[];
-                if (needsConversion.booleanValue()) {
-                    VoltTable old_table = PrivateVoltTableFactory
-                            .createVoltTableFromBuffer(c.b, true);
-                    VoltTable new_table = SavedTableConverter.convertTable(
-                            old_table, new_catalog_table);
-                    compressedTable = new_table.getCompressedBytes();
-                } else {
-                    compressedTable = PrivateVoltTableFactory
-                            .createVoltTableFromBuffer(c.b, true).getCompressedBytes();
-                }
-                if(c != null) {
-                    c.discard();
-                }
-
-                int[] dependencyIds = new int[sites_to_partitions.size()];
-                SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[sites_to_partitions
-                        .size() + 1];
-                int pfs_index = 0;
-                for (long site_id : sites_to_partitions.keySet()) {
-                    dependencyIds[pfs_index] = TableSaveFileState
-                            .getNextDependencyId();
-                    pfs[pfs_index] = new SynthesizedPlanFragment();
-                    pfs[pfs_index].fragmentId = SysProcFragmentId.PF_restoreDistributeSendPartitionedTable;
-                    pfs[pfs_index].siteId = m_actualToGenerated.get(site_id);
-                    pfs[pfs_index].multipartition = false;
-                    pfs[pfs_index].outputDepId = dependencyIds[pfs_index];
-                    pfs[pfs_index].inputDepIds = new int[] {};
-                    pfs[pfs_index].parameters = ParameterSet.fromArrayNoCopy(
-                            tableName, relevantPartitionIds,
-                            dependencyIds[pfs_index], compressedTable);
-                    ++pfs_index;
-                }
-                int result_dependency_id = TableSaveFileState
-                        .getNextDependencyId();
-                pfs[sites_to_partitions.size()] = new SynthesizedPlanFragment();
-                pfs[sites_to_partitions.size()].fragmentId = SysProcFragmentId.PF_restoreDistributeSendPartitionedTableResult;
-                pfs[sites_to_partitions.size()].multipartition = false;
-                pfs[sites_to_partitions.size()].outputDepId = result_dependency_id;
-                pfs[sites_to_partitions.size()].inputDepIds = dependencyIds;
-                pfs[sites_to_partitions.size()].parameters = ParameterSet
-                        .fromArrayNoCopy(result_dependency_id);
-                results = executeSysProcPlanFragments(pfs, m_mbox);
-            }
-        } catch (Exception e) {
-            VoltTable result = PrivateVoltTableFactory
-                    .createUninitializedVoltTable();
-            result = constructResultsTable();
-            result.addRow(
-                    m_hostId,
-                    hostname,
-                    CoreUtils.getSiteIdFromHSId(m_siteId),
-                    tableName,
-                    relevantPartitionIds[0],
-                    "FAILURE",
-                    "Unable to load table: " + tableName + " error: "
-                            + e.getMessage());
-            return result;
-        }
-
-        return results[0];
-    }
-
 
     private byte[][] createPartitionedTables(String tableName,
             VoltTable loadedTable, int number_of_partitions) throws Exception
