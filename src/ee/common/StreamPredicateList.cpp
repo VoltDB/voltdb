@@ -33,7 +33,8 @@ namespace voltdb
  */
 bool StreamPredicateList::parseStrings(
         const std::vector<std::string> &predicateStrings,
-        std::ostringstream& errmsg)
+        std::ostringstream& errmsg,
+        std::vector<bool> &predicateDeletes)
 {
     bool failed = false;
     for (std::vector<std::string>::const_iterator iter = predicateStrings.begin();
@@ -43,7 +44,11 @@ bool StreamPredicateList::parseStrings(
             PlannerDomRoot domRoot((*iter).c_str());
             if (!domRoot.isNull()) {
                 PlannerDomValue predicateObject = domRoot.rootObject();
-                AbstractExpression *expr = AbstractExpression::buildExpressionTree(predicateObject);
+
+                predicateDeletes.push_back(predicateObject.valueForKey("triggersDelete").asBool());
+
+                AbstractExpression *expr =
+                        AbstractExpression::buildExpressionTree(predicateObject.valueForKey("predicateExpression"));
                 if (expr != NULL) {
                     // Got ourselves a predicate expression tree!
                     push_back(expr);

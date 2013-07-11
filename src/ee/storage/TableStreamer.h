@@ -15,27 +15,32 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef TABLE_STREAM_H
-#define TABLE_STREAM_H
+#ifndef TABLE_STREAMER_H
+#define TABLE_STREAMER_H
 
 #include <string>
 #include <vector>
+#include <list>
 #include <boost/scoped_ptr.hpp>
 #include "common/ids.h"
 #include "common/types.h"
 #include "common/TupleSerializer.h"
+#include "storage/TableStreamerInterface.h"
 #include "storage/TupleBlock.h"
+#include "storage/ElasticScanner.h"
+#include "storage/TableStreamerContext.h"
 
 namespace voltdb
 {
 
 class CopyOnWriteContext;
 class RecoveryContext;
+class ElasticContext;
 class ReferenceSerializeInput;
 class PersistentTable;
 class TupleOutputStreamProcessor;
 
-class TableStreamer
+class TableStreamer : public TableStreamerInterface
 {
 public:
 
@@ -55,60 +60,96 @@ public:
     /**
      * Return true if the stream has already been activated.
      */
-    bool isAlreadyActive() const;
+    virtual bool isAlreadyActive() const {
+        return m_context != NULL;
+    }
 
     /**
      * Activate streaming.
      */
-    bool activateStream(PersistentTable &table, CatalogId tableId);
+    virtual bool activateStream(PersistentTable &table, CatalogId tableId);
 
     /**
      * Continue streaming.
      */
-    int64_t streamMore(TupleOutputStreamProcessor &outputStreams, std::vector<int> &retPositions);
-
-    /**
-     * Block compaction hook.
-     */
-    void notifyBlockWasCompactedAway(TBPtr block);
+    virtual int64_t streamMore(TupleOutputStreamProcessor &outputStreams,
+                               std::vector<int> &retPositions);
 
     /**
      * Tuple insert hook.
      * Return true if it was handled by the COW context.
      */
-    bool notifyTupleInsert(TableTuple &tuple);
+    virtual bool notifyTupleInsert(TableTuple &tuple) {
+        bool handled = false;
+        if (m_context != NULL) {
+            handled = m_context->notifyTupleInsert(tuple);
+        }
+        return handled;
+    }
 
     /**
      * Tuple update hook.
      * Return true if it was handled by the COW context.
      */
-    bool notifyTupleUpdate(TableTuple &tuple);
+    virtual bool notifyTupleUpdate(TableTuple &tuple) {
+        bool handled = false;
+        if (m_context != NULL) {
+            handled = m_context->notifyTupleUpdate(tuple);
+        }
+        return handled;
+    }
 
     /**
-     * Return true if recovery is in progress.
+     * Tuple delete hook.
+     * Return true if it was handled by the COW context.
      */
-    bool isCopyOnWriteActive() const {
-        return m_COWContext.get() != NULL;
+    virtual bool notifyTupleDelete(TableTuple &tuple) {
+        bool handled = false;
+        if (m_context != NULL) {
+            handled = m_context->notifyTupleDelete(tuple);
+        }
+        return handled;
+    }
+
+    /**
+     * Block compaction hook.
+     */
+    virtual void notifyBlockWasCompactedAway(TBPtr block) {
+        if (m_context != NULL) {
+            m_context->notifyBlockWasCompactedAway(block);
+        }
+    }
+
+    /**
+     * Called for each tuple moved.
+     */
+    virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
+                                     TableTuple &sourceTuple, TableTuple &targetTuple) {
+        if (m_context != NULL) {
+            m_context->notifyTupleMovement(sourceBlock, targetBlock, sourceTuple, targetTuple);
+        }
     }
 
     /**
      * Return the stream type, snapshot, recovery, etc..
+     * TODO: Refactor so the caller doesn't need to know the stream type, just the context.
      */
-    TableStreamType getStreamType() const {
+    virtual TableStreamType getStreamType() const {
         return m_streamType;
     }
 
     /**
-     * Return true if recovery is in progress.
+     * Return the current active stream type or TABLE_STREAM_NONE if nothing is active.
+     * TODO: Refactor so the caller doesn't need to know the stream type, just the context.
      */
-    bool isRecoveryActive() const {
-        return m_recoveryContext.get() != NULL;
+    virtual TableStreamType getActiveStreamType() const {
+        return m_context.get() != NULL ? m_streamType : TABLE_STREAM_NONE;
     }
 
     /**
      * Return true if a tuple can be freed safely.
      */
-    bool canSafelyFreeTuple(TableTuple &tuple) const;
+    virtual bool canSafelyFreeTuple(TableTuple &tuple) const;
 
 private:
 
@@ -124,16 +165,10 @@ private:
     /// Predicate strings.
     std::vector<std::string> m_predicateStrings;
 
-    /// True if rows should be deleted after streaming.
-    bool m_doDelete;
-
     /// Context to keep track of snapshot scans.
-    boost::scoped_ptr<CopyOnWriteContext> m_COWContext;
-
-    /// Context to keep track of recovery scans.
-    boost::scoped_ptr<RecoveryContext> m_recoveryContext;
+    boost::scoped_ptr<TableStreamerContext> m_context;
 };
 
 } // namespace voltdb
 
-#endif // TABLE_STREAM_H
+#endif // TABLE_STREAMER_H

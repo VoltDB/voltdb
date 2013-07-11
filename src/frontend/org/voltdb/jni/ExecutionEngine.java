@@ -20,7 +20,6 @@ package org.voltdb.jni;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +51,16 @@ import org.voltdb.utils.VoltTableUtil;
  * for these implementations to the ExecutionSite.
  */
 public abstract class ExecutionEngine implements FastDeserializer.DeserializationMonitor {
+
+    public static enum TaskType {
+        VALIDATE_PARTITIONING(0);
+
+        private TaskType(int taskId) {
+            this.taskId = taskId;
+        }
+
+        public final int taskId;
+    }
 
     // is the execution site dirty
     protected boolean m_dirty;
@@ -376,9 +385,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     abstract public long getThreadLocalPoolAllocations();
 
-    abstract public void loadTable(
+    abstract public byte[] loadTable(
         int tableId, VoltTable table, long spHandle,
-        long lastCommittedSpHandle) throws EEException;
+        long lastCommittedSpHandle, boolean returnUniqueViolations) throws EEException;
 
     /**
      * Set the log levels to be used when logging in this engine
@@ -473,6 +482,16 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     public abstract void updateHashinator(TheHashinator.HashinatorType type, byte[] config);
 
+    /**
+     * Execute an arbitrary task that is described by the task id and serialized task parameters.
+     * The return value is also opaquely encoded. This means you don't have to update the IPC
+     * client when adding new task types
+     * @param taskId
+     * @param task
+     * @return
+     */
+    public abstract byte[] executeTask(TaskType taskType, byte task[]);
+
     /*
      * Declare the native interface. Structurally, in Java, it would be cleaner to
      * declare this in ExecutionEngineJNI.java. However, that would necessitate multiple
@@ -562,9 +581,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param serialized_table the table data to be loaded
      * @param Length of the serialized table
      * @param undoToken token for undo quantum where changes should be logged.
+     * @param returnUniqueViolations If true unique violations won't cause a fatal error and will be returned instead
      */
     protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table,
-            long spHandle, long lastCommittedSpHandle);
+            long spHandle, long lastCommittedSpHandle, boolean returnUniqueViolations);
 
     /**
      * Executes multiple plan fragments with the given parameter sets and gets the results.
@@ -710,6 +730,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     protected native long nativeTableHashCode(long pointer, int tableId);
 
     /**
+     * Execute an arbitrary task based on the task ID and serialized task parameters.
+     * This is a generic entry point into the EE that doesn't need to be updated in the IPC
+     * client every time you add a new task
+     * @param pointer
+     */
+    protected native void nativeExecuteTask(long pointer);
+
+    /**
      * Perform an export poll or ack action. Poll data will be returned via the usual
      * results buffer. A single action may encompass both a poll and ack.
      * @param pointer Pointer to an engine instance
@@ -760,4 +788,5 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             m_plannerStats.endStatsCollection(cacheSize, 0, cacheUse, m_partitionId);
         }
     }
+
 }

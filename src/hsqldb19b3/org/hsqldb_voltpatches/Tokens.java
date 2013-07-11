@@ -654,8 +654,10 @@ public class Tokens {
     static final String        T_LOGSIZE             = "LOGSIZE";
     static final String        T_MAXROWS             = "MAXROWS";
     static final String        T_MEMORY              = "MEMORY";
-    static final String        T_MICROS              = "MICROS"; // For Volt
+    static final String        T_MICROS              = "MICROS";         // For VoltDB
+    static final String        T_MICROSECOND         = "MICROSECOND";    // For VoltDB
     static final String        T_MILLIS              = "MILLIS";
+    static final String        T_MILLISECOND         = "MILLISECOND";    // For VoltDB
     static final String        T_MINUS_EXCEPT        = "MINUS";
     static final String        T_MVCC                = "MVCC";
     static final String        T_NIO                 = "NIO";
@@ -1349,8 +1351,10 @@ public class Tokens {
     static final int        LOGSIZE               = 570;
     static final int        MAXROWS               = 571;
     static final int        MEMORY                = 572;
-    static final int        MICROS                = 1000; // This is for VoltDB
+    static final int        MICROS                = 1000; // For VoltDB
+    static final int        MICROSECOND           = 1001; // For VoltDB
     static final int        MILLIS                = 573;
+    static final int        MILLISECOND           = 1002; // For VoltDB
     static final int        MINUS_EXCEPT          = 574;
     static final int        NOW                   = 575;
     static final int        OFF                   = 576;
@@ -1956,8 +1960,10 @@ public class Tokens {
         commandSet.put(T_MAXROWS, MAXROWS);
         commandSet.put(T_MAXVALUE, MAXVALUE);
         commandSet.put(T_MEMORY, MEMORY);
-        commandSet.put(T_MICROS, MICROS); // For Volt
+        commandSet.put(T_MICROS, MICROS);                // For VoltDB
+        commandSet.put(T_MICROSECOND, MICROSECOND);      // For VoltDB
         commandSet.put(T_MILLIS, MILLIS);
+        commandSet.put(T_MILLISECOND, MILLISECOND);      // For VoltDB
         commandSet.put(T_MINUS_EXCEPT, MINUS_EXCEPT);
         commandSet.put(T_MINVALUE, MINVALUE);
         commandSet.put(T_MVCC, MVCC);

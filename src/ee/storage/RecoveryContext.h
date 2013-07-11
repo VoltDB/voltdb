@@ -18,6 +18,8 @@
 #define RECOVERYCONTEXT_H_
 
 #include "storage/tableiterator.h"
+#include "storage/TableStreamer.h"
+#include "storage/TableStreamerContext.h"
 #include "common/DefaultTupleSerializer.h"
 
 /*
@@ -28,9 +30,11 @@ namespace voltdb {
 class PersistentTable;
 class ReferenceSerializeOutput;
 
-class RecoveryContext {
+class RecoveryContext : public TableStreamerContext {
+
+    friend bool TableStreamer::activateStream(PersistentTable&, CatalogId);
+
 public:
-    RecoveryContext(PersistentTable *table, int32_t tableId);
 
     /*
      * Generate the next recovery message. Eventually returns a message containing the message type
@@ -38,11 +42,19 @@ public:
      * have been sent. Returns false when there are no more recovery messages.
      */
     bool nextMessage(ReferenceSerializeOutput *out);
-private:
-    /*
-     * Table that is the source of the recovery data
+
+    /**
+     * Mandatory TableStreamContext override.
      */
-    PersistentTable *m_table;
+    virtual int64_t handleStreamMore(TupleOutputStreamProcessor &outputStreams,
+                                     std::vector<int> &retPositions);
+
+private:
+
+    /**
+     * Constructor - private so that only TableStreamer::activateStream() can call.
+     */
+    RecoveryContext(PersistentTable &table, int32_t tableId);
 
     bool m_firstMessage;
     /*
@@ -57,11 +69,11 @@ private:
      * in a recovery message
      */
 //    boost::unordered_set<uint32_t> m_updatedTupleIndices;
-
     /*
      * Not implemented yet, but a boost::unordered_set of the primary keys of tuples that were deleted
      * after being shipped in a recovery message
      */
+
     int32_t m_tableId;
 
     /*

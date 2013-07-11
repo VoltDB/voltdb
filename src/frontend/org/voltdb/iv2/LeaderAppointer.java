@@ -343,10 +343,17 @@ public class LeaderAppointer implements Promotable
             // appointed leaders publish themselves as the actual leaders.
             m_startupLatch = new CountDownLatch(1);
             writeKnownLiveNodes(m_hostMessenger.getLiveHostIds());
+
+            // Theoretically, the whole try/catch block below can be removed because the leader
+            // appointer now watches the parent dir for any new partitions. It doesn't have to
+            // create the partition dirs all at once, it can pick them up one by one as they are
+            // created. But I'm too afraid to remove this block just before the release,
+            // so leaving it here till later. - ning
             try {
                 final int initialPartitionCount = getInitialPartitionCount();
                 for (int i = 0; i < initialPartitionCount; i++) {
-                    addPartitionZKNode(m_zk, i);
+                    LeaderElector.createRootIfNotExist(m_zk,
+                                                       LeaderElector.electionDirForPartition(i));
                     watchPartition(i, m_es, true);
                 }
             } catch (IllegalAccessException e) {
@@ -377,26 +384,6 @@ public class LeaderAppointer implements Promotable
             }
             // just go ahead and promote our MPI
             m_MPI.acceptPromotion();
-        }
-    }
-
-    /**
-     * Creates the ZK node for the given partition.
-     *
-     * @param zk A ZK instance
-     * @param pid The partition ID
-     * @throws KeeperException
-     * @throws InterruptedException
-     */
-    public static void addPartitionZKNode(ZooKeeper zk, int pid)
-            throws KeeperException, InterruptedException
-    {
-        String dir = LeaderElector.electionDirForPartition(pid);
-        // Race along with all of the replicas for this partition to create the ZK parent node
-        try {
-            zk.create(dir, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-        } catch (KeeperException.NodeExistsException e) {
-            // expected on all nodes that don't start() first.
         }
     }
 
@@ -638,8 +625,17 @@ public class LeaderAppointer implements Promotable
             int pid = LeaderElector.getPartitionFromElectionDir(partitionDir);
             String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
             try {
+                // The data of the partition dir indicates whether the partition has finished
+                // initializing or not. If not, the replicas may still be in the process of
+                // adding themselves to the dir. So don't check for k-safety if that's the case.
+                byte[] partitionState = m_zk.getData(dir, null, null);
+                boolean isInitializing = false;
+                if (partitionState != null && partitionState.length == 1) {
+                    isInitializing = partitionState[0] == LeaderElector.INITIALIZING;
+                }
+
                 List<String> replicas = m_zk.getChildren(dir, null, null);
-                if (replicas.isEmpty()) {
+                if (!isInitializing && replicas.isEmpty()) {
                     tmLog.fatal("K-Safety violation: No replicas found for partition: " + pid);
                     retval = false;
                 }

@@ -57,11 +57,13 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.zk.ZKUtil.StringCallback;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.ProcInfo;
 import org.voltdb.StartAction;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
@@ -79,6 +81,7 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.sysprocs.saverestore.ClusterSaveFileState;
+import org.voltdb.sysprocs.saverestore.DuplicateRowHandler;
 import org.voltdb.sysprocs.saverestore.SavedTableConverter;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
@@ -88,6 +91,7 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.VoltFile;
 import org.voltdb.utils.VoltTableUtil;
 
+import com.google.common.base.Throwables;
 import com.google.common.primitives.Longs;
 
 @ProcInfo (
@@ -141,6 +145,8 @@ public class SnapshotRestore extends VoltSystemProcedure
 
     private static HashSet<String>  m_initializedTableSaveFileNames = new HashSet<String>();
     private static ArrayDeque<TableSaveFile> m_saveFiles = new ArrayDeque<TableSaveFile>();
+
+    private static volatile DuplicateRowHandler m_duplicateRowHandler = null;
 
     private static synchronized void initializeTableSaveFiles(
             String filePath,
@@ -398,6 +404,17 @@ public class SnapshotRestore extends VoltSystemProcedure
             // All other sites should just return empty results tables.
             if (context.isLowestSiteId())
             {
+                /*
+                 * Initialize a duplicate row handling policy for this restore
+                 */
+                m_duplicateRowHandler = null;
+                if (params.toArray()[2] != null) {
+                    m_duplicateRowHandler =
+                            new DuplicateRowHandler(
+                                    (String)params.toArray()[2],
+                                    getTransactionTime());
+                }
+
                 // implicitly synchronized by the way restore operates.
                 // this scan must complete on every site and return results
                 // to the coordinator for aggregation before it will send out
@@ -544,7 +561,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                     {
                         voltLoadTable(context.getCluster().getTypeName(),
                                 context.getDatabase().getTypeName(),
-                                table_name, table);
+                                table_name, table, false);
                     }
                     catch (VoltAbortException e)
                     {
@@ -621,7 +638,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                                         true);
                 voltLoadTable(context.getCluster().getTypeName(),
                         context.getDatabase().getTypeName(),
-                        table_name, table);
+                        table_name, table, false);
             }
             catch (Exception e)
             {
@@ -730,9 +747,12 @@ public class SnapshotRestore extends VoltSystemProcedure
                                 ByteBuffer.wrap(
                                         CompressionService.decompressBytes(compressedTable)),
                                         true);
-                voltLoadTable(context.getCluster().getTypeName(),
+                byte uniqueViolations[] = voltLoadTable(context.getCluster().getTypeName(),
                         context.getDatabase().getTypeName(),
-                        table_name, table);
+                        table_name, table, m_duplicateRowHandler != null);
+                if (uniqueViolations != null && m_duplicateRowHandler != null) {
+                    m_duplicateRowHandler.handleDuplicates(table_name, uniqueViolations);
+                }
             }
             catch (Exception e)
             {
@@ -827,6 +847,15 @@ public class SnapshotRestore extends VoltSystemProcedure
                     frm.addDependency(dp.depId, dp.dependency);
                     m.send(ftm.getCoordinatorHSId(), frm);
                 } else if (vm instanceof BinaryPayloadMessage) {
+                    if (context.isLowestSiteId() && m_duplicateRowHandler != null) {
+                        try {
+                            m_duplicateRowHandler.close();
+                        } catch (Exception e) {
+                            VoltDB.crashLocalVoltDB("Error closing duplicate row handler during snapshot restore",
+                                                     true,
+                                                     e);
+                        }
+                    }
                     //Null result table is intentional
                     //The results of the process are propagated through a future in performTableRestoreWork
                     return new DependencyPair( DEP_restoreAsyncRunLoop, constructResultsTable());
@@ -841,15 +870,28 @@ public class SnapshotRestore extends VoltSystemProcedure
         return null;
     }
 
+    public static final String JSON_PATH = "path";
+    public static final String JSON_NONCE = "nonce";
+    public static final String JSON_DUPLICATES_PATH = "duplicatesPath";
+
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
-            String path, String nonce) throws Exception
+                           String json) throws Exception
             {
+        JSONObject jsObj = new JSONObject(json);
+        final String path = jsObj.getString(JSON_PATH);
+        final String nonce = jsObj.getString(JSON_NONCE);
+        final String dupsPath = jsObj.optString(JSON_DUPLICATES_PATH, null);
         final long startTime = System.currentTimeMillis();
-        CONSOLE_LOG.info("Restoring from path: " + path + " with nonce: " + nonce);
+        if (dupsPath != null) {
+            CONSOLE_LOG.info("Restoring from path: " + path + " with nonce: " +
+                             nonce + " and duplicate rows will be output to " + dupsPath);
+        } else {
+            CONSOLE_LOG.info("Restoring from path: " + path + " with nonce: " + nonce);
+        }
 
         // Fetch all the savefile metadata from the cluster
         VoltTable[] savefile_data;
-        savefile_data = performRestoreScanWork(path, nonce);
+        savefile_data = performRestoreScanWork(path, nonce, dupsPath);
 
         List<JSONObject> digests;
         Map<String, Map<Integer, Long>> exportSequenceNumbers;
@@ -1173,6 +1215,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             int readAheadChunks,
             Integer relevantPartitionIds[]) throws IOException
             {
+        @SuppressWarnings("resource")
         FileInputStream savefile_input = new FileInputStream(saveFile);
         TableSaveFile savefile =
                 new TableSaveFile(
@@ -1211,7 +1254,8 @@ public class SnapshotRestore extends VoltSystemProcedure
     }
 
     private final VoltTable[] performRestoreScanWork(String filePath,
-            String fileNonce)
+            String fileNonce,
+            String dupsPath)
     {
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
 
@@ -1222,7 +1266,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         pfs[0].outputDepId = DEP_restoreScan;
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.fromArrayNoCopy(filePath, fileNonce);
+        pfs[0].parameters = ParameterSet.fromArrayNoCopy(filePath, fileNonce, dupsPath);
 
         // This fragment aggregates the save-to-disk sanity check results
         pfs[1] = new SynthesizedPlanFragment();
@@ -1790,6 +1834,58 @@ public class SnapshotRestore extends VoltSystemProcedure
     private Table getCatalogTable(String tableName)
     {
         return m_database.getTables().get(tableName);
+    }
+
+    /*
+     * Do parameter checking for the pre-JSON version of @SnapshotRestore old version
+     */
+    public static ClientResponseImpl transformRestoreParamsToJSON(StoredProcedureInvocation task) {
+        Object params[] = task.getParams().toArray();
+        if (params.length == 1) {
+            return null;
+        } else if (params.length == 2) {
+            if (params[0] == null) {
+                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                        new VoltTable[0],
+                        "@SnapshotRestore parameter 0 was null",
+                        task.getClientHandle());
+            }
+            if (params[1] == null) {
+                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                        new VoltTable[0],
+                        "@SnapshotRestore parameter 1 was null",
+                        task.getClientHandle());
+            }
+            if (!(params[0] instanceof String)) {
+                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                        new VoltTable[0],
+                        "@SnapshotRestore param 0 (path) needs to be a string, but was type "
+                        + params[0].getClass().getSimpleName(),
+                        task.getClientHandle());
+            }
+            if (!(params[1] instanceof String)) {
+                return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                        new VoltTable[0],
+                        "@SnapshotRestore param 1 (nonce) needs to be a string, but was type "
+                        + params[1].getClass().getSimpleName(),
+                        task.getClientHandle());
+            }
+            JSONObject jsObj = new JSONObject();
+            try {
+                jsObj.put(SnapshotRestore.JSON_PATH, (String)params[0]);
+                jsObj.put(SnapshotRestore.JSON_NONCE, (String)params[1]);
+            } catch (JSONException e) {
+                Throwables.propagate(e);
+            }
+            task.setParams( jsObj.toString() );
+            return null;
+        } else {
+            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                    new VoltTable[0],
+                    "@SnapshotRestore supports a single json document parameter or two parameters (path, nonce), " +
+                    params.length + " parameters provided",
+                    task.getClientHandle());
+        }
     }
 
     private Mailbox m_mbox;

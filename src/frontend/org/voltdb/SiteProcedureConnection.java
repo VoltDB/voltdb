@@ -65,18 +65,19 @@ public interface SiteProcedureConnection {
     /**
      * loadTable method used by user-facing voltLoadTable() call in ProcedureRunner
      */
-    public void loadTable(
+    public byte[] loadTable(
             long txnId,
             String clusterName,
             String databaseName,
             String tableName,
-            VoltTable data)
+            VoltTable data,
+            boolean returnUniqueViolations)
     throws VoltAbortException;
 
     /**
      * loadTable method used internally by ExecutionSite/Site clients
      */
-    public void loadTable(long txnId, int tableId, VoltTable data);
+    public byte[] loadTable(long txnId, int tableId, VoltTable data, boolean returnUniqueViolations);
 
     /**
      * Execute a set of plan fragments.
@@ -152,7 +153,7 @@ public interface SiteProcedureConnection {
                                 boolean interval, Long now);
 
     // Snapshot services provided by the site
-    public Future<?> doSnapshotWork(boolean ignoreQuietPeriod);
+    public Future<?> doSnapshotWork();
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds);
 
     /**
@@ -176,4 +177,6 @@ public interface SiteProcedureConnection {
      * Get the full JSON plan associated with a given site-local fragment id.
      */
     public byte[] planForFragmentId(long fragmentId);
+
+    public long[] validatePartitioning(long tableIds[], int hashinatorType, byte hashinatorConfig[]);
 }
