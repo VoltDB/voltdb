@@ -81,6 +81,10 @@ struct SetOperator {
 
     std::vector<Table*>& m_input_tables;
 
+    // for debugging - may be unused
+    void printTupleMap(const char* nonce, TupleMap &tuples);
+    void printTupleSet(const char* nonce, TupleSet &tuples);
+
     protected:
         virtual bool processTuplesDo() = 0;
 
@@ -173,6 +177,27 @@ ExceptIntersectSetOperator::ExceptIntersectSetOperator(
 
 }
 
+// for debugging - may be unused
+void SetOperator::printTupleMap(const char* nonce, TupleMap &tuples) {
+    printf("Printing TupleMap (%s): ", nonce);
+    for (TupleMap::const_iterator mapIt = tuples.begin(); mapIt != tuples.end(); ++mapIt) {
+        TableTuple tuple = mapIt->first;
+        printf("%s, ", tuple.debugNoHeader().c_str());
+    }
+    printf("\n");
+    fflush(stdout);
+}
+
+// for debugging - may be unused
+void SetOperator::printTupleSet(const char* nonce, TupleSet &tuples) {
+    printf("Printing TupleSet (%s): ", nonce);
+    for (TupleSet::const_iterator setIt = tuples.begin(); setIt != tuples.end(); ++setIt) {
+        printf("%s, ", setIt->debugNoHeader().c_str());
+    }
+    printf("\n");
+    fflush(stdout);
+}
+
 bool ExceptIntersectSetOperator::processTuplesDo() {
     // Map to keep candidate tuples. The key is the tuple itself
     // The value - tuple's repeat count in the final table.
@@ -230,21 +255,19 @@ void ExceptIntersectSetOperator::collectTuples(Table& input_table, TupleMap& tup
 }
 
 void ExceptIntersectSetOperator::exceptTupleMaps(TupleMap& map_a, TupleMap& map_b) {
-    const static size_t zero_val(0);
     TupleMap::iterator it_a = map_a.begin();
     while(it_a != map_a.end()) {
         TupleMap::iterator it_b = map_b.find(it_a->first);
         if (it_b != map_b.end()) {
-            it_a->second = (it_a->second > it_b->second) ?
-                std::max(it_a->second - it_b->second, zero_val) : zero_val;
-            if (it_a->second == zero_val) {
-                it_a = map_a.erase(it_a);
-            } else {
-                ++it_a;
+            if (it_a->second > it_b->second) {
+                it_a->second -= it_b->second;
             }
-        } else {
-            ++it_a;
+            else {
+                it_a = map_a.erase(it_a);
+                continue;
+            }
         }
+        ++it_a;
     }
 }
 
