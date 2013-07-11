@@ -88,7 +88,7 @@ public class TestParsedStatements extends TestCase {
         // get a parsed statement from the xml
         AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(stmtSQL, xmlSQL, null, m_db, null);
         // analyze expressions
-        parsedStmt.analyzeTreeExpressions(parsedStmt.joinTree);
+        parsedStmt.analyzeJoinExpressions(parsedStmt.joinTree);
         // output a description of the parsed stmt
         BuildDirectoryUtils.writeFile("statement-hsql-parsed", stmtName + ".txt", parsedStmt.toString());
 

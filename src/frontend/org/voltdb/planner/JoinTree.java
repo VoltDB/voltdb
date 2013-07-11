@@ -33,7 +33,9 @@ import org.voltdb.types.JoinType;
  * JoinTree class captures the hierarchical data model of a given SQl join.
  * @TODO ENG_3038
  * Once the inner and outer join evaluation paths are merged the whole JoinTree and
- * all its methods/attributes will be obsolete and will be replaced with the JoinNode class
+ * all its methods/attributes will be obsolete and will be replaced with the JoinNode class.
+ * At that point, JoinNode should be cleaned up with private/final members where possible
+ * and accessors as needed.
  *
  */
 public class JoinTree implements Cloneable {
@@ -97,39 +99,39 @@ public class JoinTree implements Cloneable {
 
         /**
          * Construct a leaf node
-         * @param table - join table
+         * @param id - node unique id
          * @param joinType - join type
+         * @param table - join table
          * @param joinExpr - join expression
          * @param whereExpr - filter expression
          * @param id - node id
          */
-        JoinNode(Table table, JoinType joinType, AbstractExpression joinExpr, AbstractExpression  whereExpr, int id) {
+        JoinNode(int id, JoinType joinType, Table table, AbstractExpression joinExpr, AbstractExpression  whereExpr) {
+            this(id, joinType);
             m_table = table;
-            m_joinType = joinType;
             m_joinExpr = joinExpr;
             m_whereExpr = whereExpr;
-            m_id = id;
         }
 
         /**
          * Construct a join node
+         * @param id - node unique id
          * @param joinType - join type
          * @param leftNode - left node
          * @param rightNode - right node
-         * @param id - node id
          */
-        JoinNode(JoinType joinType, JoinNode leftNode, JoinNode rightNode, int id) {
-            m_joinType = joinType;
+        JoinNode(int id, JoinType joinType, JoinNode leftNode, JoinNode rightNode) {
+            this(id, joinType);
             m_leftNode = leftNode;
             m_rightNode = rightNode;
-            m_id = id;
         }
 
         /**
          * Construct an empty join node
          */
-        JoinNode(int id) {
+        private JoinNode(int id, JoinType joinType) {
             m_id = id;
+            m_joinType = joinType;
         }
 
         /**
@@ -137,8 +139,7 @@ public class JoinTree implements Cloneable {
          */
         @Override
         public Object clone() {
-            JoinNode newNode = new JoinNode(m_id);
-            newNode.m_joinType = m_joinType;
+            JoinNode newNode = new JoinNode(m_id, m_joinType);
             if (m_joinExpr != null) {
                 newNode.m_joinExpr = (AbstractExpression) m_joinExpr.clone();
             }

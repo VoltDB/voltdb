@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
@@ -37,6 +38,7 @@ import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.types.JoinType;
+import org.voltdb.utils.PermutationGenerator;
 
 /**
  * For a select, delete or update plan, this class builds the part of the plan
@@ -130,31 +132,87 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     /**
      * Validate the specified join order against the join tree.
      * In general, outer joins are not associative and commutative. Not all orders are valid.
+     * In case of a valid join order, the initial join tree is rebuilt to match the specified order
      * @param tables list of tables to join
      * @return true if the join order is valid
      */
     private boolean isValidJoinOrder(List<String> tableNames)
     {
-        if ( ! m_parsedStmt.joinTree.m_hasOuterJoin) {
-            // The inner join is commutative. Any order is valid.
-            return true;
-        }
+        assert(m_parsedStmt.joinTree != null && m_parsedStmt.joinTree.m_root != null);
 
-        // In general, the outer joins are associative but changing the join order precedence
+        // Split the original tree into the sub-trees having the same join type for all nodes
+        List<JoinNode> subTrees = new ArrayList<JoinNode>();
+        extractSubTrees(m_parsedStmt.joinTree.m_root, subTrees);
+
+        // For a sub-tree with inner joins only any join order is valid. The only requirement is that
+        // each and every table from that sub-tree constitute an uninterrupted sequence in the specified join order
+        // The outer joins are associative but changing the join order precedence
         // includes moving ON clauses to preserve the initial SQL semantics. For example,
         // T1 right join T2 on T1.C1 = T2.C1 left join T3 on T2.C2=T3.C2 can be rewritten as
         // T1 right join (T2 left join T3 on T2.C2=T3.C2) on T1.C1 = T2.C1
         // At the moment, such transformations are not supported. The specified joined order must
         // match the SQL order
-        Table[] joinOrder = m_parsedStmt.joinTree.generateJoinOrder().toArray(new Table[0]);
-        assert(joinOrder.length == tableNames.size());
-        int i = 0;
-        for (Table table : joinOrder) {
-            if (!table.getTypeName().equalsIgnoreCase(tableNames.get(i))) {
-                return false;
+        int tableNameIdx = 0;
+        List<JoinNode> finalSubTrees = new ArrayList<JoinNode>();
+        // we need to process the sub-trees last one first because the top sub-tree is the first one on the list
+        for (int i = subTrees.size() - 1; i >= 0; --i) {
+            JoinNode subTree = subTrees.get(i);
+            // Get all tables for the subTree
+            List<JoinNode> subTableNodes = subTree.generateLeafNodesJoinOrder();
+
+            if (subTree.m_joinType == JoinType.INNER) {
+                // Collect all the "real" tables from the sub-tree skipping the nodes representing
+                // the sub-trees with the different join type (id < 0)
+                Map<String, JoinNode> nodeNameMap = new HashMap<String, JoinNode>();
+                for (JoinNode tableNode : subTableNodes) {
+                    assert(tableNode.m_table != null);
+                    if (tableNode.m_id >= 0) {
+                        nodeNameMap.put(tableNode.m_table.getTypeName(), tableNode);
+                    }
+                }
+
+                // rearrange the sub tree to match the order
+                List<JoinNode> joinOrderSubNodes = new ArrayList<JoinNode>();
+                for (int j = 0; j < subTableNodes.size(); ++j) {
+                    if (subTableNodes.get(j).m_id >= 0) {
+                        assert(tableNameIdx < tableNames.size());
+                        String tableName = tableNames.get(tableNameIdx);
+                        if (!nodeNameMap.containsKey(tableName)) {
+                            return false;
+                        }
+                        joinOrderSubNodes.add(nodeNameMap.get(tableName));
+                        ++tableNameIdx;
+                    } else {
+                        // It's dummy node
+                        joinOrderSubNodes.add(subTableNodes.get(j));
+                    }
+                }
+                JoinNode joinOrderSubTree = reconstructJoinTreeFromTableNodes(joinOrderSubNodes);
+                //Collect all the join/where conditions to reassign them later
+                Collection<AbstractExpression> combinedExprs = subTree.getAllExpressions();
+                AbstractExpression combinedWhereExpr = ExpressionUtil.combine(combinedExprs);
+                if (combinedWhereExpr != null) {
+                    joinOrderSubTree.m_whereExpr = (AbstractExpression)combinedWhereExpr.clone();
+                }
+                // The new tree root node id must match the original one to be able to reconnect the
+                // subtrees
+                joinOrderSubTree.m_id = subTree.m_id;
+                finalSubTrees.add(0, joinOrderSubTree);
+            } else {
+                for (JoinNode tableNode : subTableNodes) {
+                    assert(tableNode.m_table != null && tableNameIdx < tableNames.size());
+                    if (tableNode.m_id >= 0) {
+                        if (!tableNames.get(tableNameIdx++).equals(tableNode.m_table.getTypeName())) {
+                            return false;
+                        }
+                    }
+                }
+                // add the sub-tree as is
+                finalSubTrees.add(0, subTree);
             }
         }
-        // The outer join matched the specified join order.
+        // if we got there the join order is OK. Rebuild the whole tree
+        m_parsedStmt.joinTree = reconstructJoinTreeFromSubTrees(finalSubTrees);
         return true;
     }
 
@@ -167,9 +225,9 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         assert(m_parsedStmt.noTableSelectionList.size() == 0);
 
         if (m_parsedStmt.joinTree.m_hasOuterJoin) {
-            queueOuterSubJoinOrders();
+            queueSubJoinOrders();
         } else {
-            queueInnerSubJoinOrders();
+            queueSubJoinOrdersLegacy();
         }
     }
 
@@ -177,14 +235,14 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * Add all valid join orders (permutations) for the input join tree.
      *
      */
-    private void queueOuterSubJoinOrders() {
+    private void queueSubJoinOrders() {
         assert(m_parsedStmt.joinTree != null);
 
         // Simplify the outer join if possible
         JoinTree simplifiedJoinTree = simplifyOuterJoin(m_parsedStmt.joinTree);
         // It is possible that simplified tree has inner joins only
         if (simplifiedJoinTree.m_hasOuterJoin == false) {
-            queueInnerSubJoinOrders();
+            queueSubJoinOrdersLegacy();
             return;
         }
 
@@ -200,7 +258,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         // Generate possible join orders for each sub-tree separately
         ArrayList<ArrayList<JoinNode>> joinOrderList = generateJoinOrders(subTrees);
         // Reassemble the all possible combinations of the sub-tree and queue them
-        queueOuterSubJoinOrders(joinOrderList, new ArrayList<JoinNode>());
+        queueSubJoinOrders(joinOrderList, 0, new ArrayList<JoinNode>());
 }
 
     /**
@@ -235,17 +293,25 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         }
         JoinNode[] children = {root.m_leftNode, root.m_rightNode};
         for (JoinNode child : children) {
+
+            // Leaf nodes don't have a significant join type,
+            // test for them first and never attempt to start a new tree at a leaf.
+            if (child.m_table != null) {
+                continue;
+            }
+
             if (child.m_joinType == root.m_joinType) {
                 // The join type for this node is the same as the root's one
+                // Keep walking down the tree
                 extractSubTree(child, leafNodes);
-            } else if (child.m_table == null) {
+            } else {
                 // The join type for this join differs from the root's one
                 // Terminate the sub-tree
                 leafNodes.add(child);
-                // Replace the join node with the temporary node having the same id
-                // This will help to reassemble the tree at the later stage
+                // Replace the join node with the temporary node having the id negated
+                // This will help to distinguish it from a real node and to reassemble the tree at the later stage
                 JoinNode tempNode = new JoinNode(
-                        new Table(), child.m_joinType, child.m_joinExpr, child.m_whereExpr, child.m_id);
+                        -child.m_id, child.m_joinType, new Table(), child.m_joinExpr, child.m_whereExpr);
                 if (child == root.m_leftNode) {
                     root.m_leftNode = tempNode;
                 } else {
@@ -255,73 +321,25 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         }
     }
 
-    private void queueOuterSubJoinOrders(List<ArrayList<JoinNode>> joinOrderList, ArrayList<JoinNode> currentJoinOrder) {
-        if (joinOrderList.isEmpty()) {
+    private void queueSubJoinOrders(List<ArrayList<JoinNode>> joinOrderList, int joinOrderListIdx, ArrayList<JoinNode> currentJoinOrder) {
+        if (joinOrderListIdx == joinOrderList.size()) {
             // End of recursion
             assert(!currentJoinOrder.isEmpty());
-            JoinTree joinTree = new JoinTree();
-            joinTree.m_hasOuterJoin = true;
-            // Reconstruct the tree. The first element is the first sub-tree and so on
-            joinTree.m_root = reassembleJoinTree(
-                    currentJoinOrder.get(0), currentJoinOrder.subList(1, currentJoinOrder.size()));
+            JoinTree joinTree = reconstructJoinTreeFromSubTrees(currentJoinOrder);
             m_joinOrders.add(joinTree);
             return;
         }
         // Recursive step
-        ArrayList<JoinNode> headTrees = joinOrderList.get(0) ;
-        for (JoinNode headTree: headTrees) {
+        ArrayList<JoinNode> nextTrees = joinOrderList.get(joinOrderListIdx);
+        for (JoinNode headTree: nextTrees) {
             ArrayList<JoinNode> updatedJoinOrder = new ArrayList<JoinNode>();
             // Order is important: The top sub-trees must be first
             for (JoinNode node : currentJoinOrder) {
                 updatedJoinOrder.add((JoinNode)node.clone());
             }
             updatedJoinOrder.add((JoinNode)headTree.clone());
-            queueOuterSubJoinOrders(joinOrderList.subList(1, joinOrderList.size()), updatedJoinOrder);
+            queueSubJoinOrders(joinOrderList, joinOrderListIdx + 1, updatedJoinOrder);
         }
-    }
-
-    /**
-     * Reassemble the join tree by adding sub-trees to the root. The root of each sub-tree
-     * has a corresponding temporary node (same id) in the main tree.
-     * @param root - The root of the join tree
-     * @param leafNodes - the list of the sub-trees
-     */
-    private JoinNode reassembleJoinTree(JoinNode root, List<JoinNode> subTrees) {
-        assert(root != null);
-        if (subTrees.isEmpty()) {
-            return root;
-        }
-        // Attached the first sub-tree
-        JoinNode head = subTrees.get(0);
-        replaceChild(root, head);
-        // Continue with the rest
-        List<JoinNode> tail = subTrees.subList(1, subTrees.size());
-        return reassembleJoinTree(root, tail);
-    }
-
-    private boolean replaceChild(JoinNode root, JoinNode node) {
-        // can't replace self
-        assert (root != null && root.m_id != node.m_id);
-        if (root.m_table != null) {
-            return false;
-        }
-
-        JoinNode[] children = {root.m_leftNode, root.m_rightNode};
-        for (JoinNode child : children) {
-            if (child.m_id == node.m_id) {
-                if (child == root.m_leftNode) {
-                    root.m_leftNode = node;
-                } else {
-                    root.m_rightNode = node;
-                }
-                return true;
-            } else if (replaceChild(child, node) == true) {
-                return true;
-            }
-        }
-        // It better be a child node with the same id
-        assert(false);
-        return false;
     }
 
     /**
@@ -334,25 +352,23 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     ArrayList<ArrayList<JoinNode>> generateJoinOrders(List<JoinNode> subTrees) {
         ArrayList<ArrayList<JoinNode>> permutations = new ArrayList<ArrayList<JoinNode>>();
         for (JoinNode subTree : subTrees) {
-            // Clone it
-            //JoinNode joinNode = (JoinNode)subTree.clone();
             ArrayList<JoinNode> treePermutations = new ArrayList<JoinNode>();
             if (subTree.m_joinType != JoinType.INNER) {
                 // Permutations for Outer Join are not supported yet
                 treePermutations.add(subTree);
             } else {
-                // if all joins are inner then all join orders obtained by the permutation of
-                // the original tables are valid. Create arrays of the leaf nodes(tables) to permute them
-                JoinNode[] inputNodes = subTree.generateLeafNodesJoinOrder().toArray(new JoinNode[1]);
-                JoinNode[] outputNodes = new JoinNode[inputNodes.length];
-                // use recursion to solve...
+                // if all joins are inner then join orders can be obtained by the permutation of
+                // the original tables. Get a list of the leaf nodes(tables) to permute them
+                List<JoinNode> tableNodes = subTree.generateLeafNodesJoinOrder();
+                List<List<JoinNode>> joinOrders = PermutationGenerator.generatePurmutations(tableNodes);
                 List<JoinNode> newTrees = new ArrayList<JoinNode>();
-                queueInnerSubJoinOrdersRecursively(inputNodes, outputNodes, 0, newTrees);
+                for (List<JoinNode> joinOrder: joinOrders) {
+                    newTrees.add(reconstructJoinTreeFromTableNodes(joinOrder));
+                }
                 //Collect all the join/where conditions to reassign them later
                 Collection<AbstractExpression> combinedExprs = subTree.getAllExpressions();
                 AbstractExpression combinedWhereExpr = ExpressionUtil.combine(combinedExprs);
                 for (JoinNode newTree : newTrees) {
-                    //
                     if (combinedWhereExpr != null) {
                         newTree.m_whereExpr = (AbstractExpression)combinedWhereExpr.clone();
                     }
@@ -368,72 +384,75 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     }
 
     /**
-     * Recursively add all join orders (permutations) for the input node list.
-     * @TODO ENG_3038 This is a cut-and-paste copy of the queueInnerSubJoinOrdersRecursively for tables
-     * After the inner and outer join paths will be merged the original version can be retired
+     * Reconstruct a join tree from the list of tables always appending the next node to the right.
      *
-     * @param inputTables An array of tables to order.
-     * @param outputTables A scratch space for recursion for an array of tables. Making this a parameter
-     * might make the procedure a slight bit faster than if it was a return value.
-     * @param place The index of the table to permute (all tables before index=place are fixed).
-     * @param joinNodes - The list containing trees for all possible permutations of the input nodes
+     * @param tableNodes the list of tables to build the tree from.
+     * @return The reconstructed tree
      */
-    private void queueInnerSubJoinOrdersRecursively(JoinNode[] inputNodes,
-                                                    JoinNode[] outputNodes,
-                                                    int place,
-                                                    List<JoinNode> joinNodes) {
-        // recursive stopping condition:
-        //
-        // stop when there is only one place and one table to permute
-        if (place == inputNodes.length) {
-            // The inner join doesn't need a tree at all, only the the flat list of joined table.
-            // The join and where conditions are always the same regardless of the table order need to be
-            // analyzed only once.
-            // Rebuild the tree from the join order
-            JoinNode root = null;
-            for (JoinNode outputNode : outputNodes) {
-                assert(outputNode.m_table != null);
-                JoinNode node = new JoinNode(outputNode.m_table, outputNode.m_joinType, null, null, outputNode.m_id);
-                if (root == null) {
-                    root = node;
-                } else {
-                    // We only care about the root node id to be able to reconnect the sub-trees
-                    // The intermediate node id can be anything. For the final root node its id
-                    // will be set later to the original tree's root id
-                    root = new JoinNode(JoinType.INNER, root, node, -node.m_id);
-                }
+    private JoinNode reconstructJoinTreeFromTableNodes(List<JoinNode> tableNodes) {
+        JoinNode root = null;
+        for (JoinNode leafNode : tableNodes) {
+            assert(leafNode.m_table != null);
+            JoinNode node = new JoinNode(leafNode.m_id, leafNode.m_joinType, leafNode.m_table, null, null);
+            if (root == null) {
+                root = node;
+            } else {
+                // We only care about the root node id to be able to reconnect the sub-trees
+                // The intermediate node id can be anything. For the final root node its id
+                // will be set later to the original tree's root id
+                root = new JoinNode(-node.m_id, JoinType.INNER, root, node);
             }
-            joinNodes.add(root);
-            return;
+        }
+        return root;
+    }
+
+    /**
+     * Reconstruct a join tree from the list of sub-trees by replacing the nodes with the negative ids with
+     * the root of the next sub-tree.
+     *
+     * @param subTrees the list of sub trees.
+     * @return The reconstructed tree
+     */
+    JoinTree reconstructJoinTreeFromSubTrees(List<JoinNode> subTrees) {
+        JoinTree joinTree = new JoinTree();
+        joinTree.m_hasOuterJoin = m_parsedStmt.joinTree.m_hasOuterJoin;
+        // Reconstruct the tree. The first element is the first sub-tree and so on
+        JoinNode joinNode = subTrees.get(0);
+        for (int i = 1; i < subTrees.size(); ++i) {
+            JoinNode nextNode = subTrees.get(i);
+            boolean replaced = replaceChild(joinNode, nextNode);
+            // There must be a node in the current tree to be replaced
+            assert(replaced == true);
+        }
+        joinTree.m_root = joinNode;
+        return joinTree;
+    }
+
+    private boolean replaceChild(JoinNode root, JoinNode node) {
+        // can't replace self
+        assert (root != null && Math.abs(root.m_id) != Math.abs(node.m_id));
+        if (root.m_table != null) {
+            return false;
+        } else if (Math.abs(root.m_leftNode.m_id) == Math.abs(node.m_id)) {
+            root.m_leftNode  = node;
+            return true;
+        } else if (Math.abs(root.m_rightNode.m_id) == Math.abs(node.m_id)) {
+            root.m_rightNode  = node;
+            return true;
+        } else if (replaceChild(root.m_leftNode, node) == true) {
+            return true;
+        } else if (replaceChild(root.m_rightNode, node) == true) {
+            return true;
         }
 
-        // recursive step:
-        //
-        // pick all possible options for the current
-        for (int i = 0; i < outputNodes.length; i++) {
-            // choose a candidate table for this place
-            outputNodes[place] = inputNodes[i];
-
-            // don't select tables that have been chosen before
-            boolean duplicate = false;
-            for (int j = 0; j < place; j++) {
-                if (outputNodes[j].m_id == outputNodes[place].m_id) {
-                    duplicate = true;
-                    break;
-                }
-            }
-            if (duplicate)
-                continue;
-
-            // recursively call this function to permute the remaining places
-            queueInnerSubJoinOrdersRecursively(inputNodes, outputNodes, place + 1, joinNodes);
-        }
+        return false;
     }
 
     /**
      * Add all join orders (permutations) for the input table list.
+     * This method works for inner joins only.
      */
-    private void queueInnerSubJoinOrders() {
+    private void queueSubJoinOrdersLegacy() {
         // if all joins are inner then all join orders obtained by the permutation of
         // the original tables are valid. Create arrays of the tables to permute them
         Table[] inputTables = new Table[m_parsedStmt.tableList.size()];
@@ -444,7 +463,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             inputTables[i] = m_parsedStmt.tableList.get(i);
 
         // use recursion to solve...
-        queueInnerSubJoinOrdersRecursively(inputTables, outputTables, 0);
+        queueSubJoinOrdersLegacyRecursively(inputTables, outputTables, 0);
     }
 
     /**
@@ -455,7 +474,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * might make the procedure a slight bit faster than if it was a return value.
      * @param place The index of the table to permute (all tables before index=place are fixed).
      */
-    private void queueInnerSubJoinOrdersRecursively(Table[] inputTables,
+    private void queueSubJoinOrdersLegacyRecursively(Table[] inputTables,
                                                     Table[] outputTables,
                                                     int place) {
         // recursive stopping condition:
@@ -490,7 +509,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 continue;
 
             // recursively call this function to permute the remaining places
-            queueInnerSubJoinOrdersRecursively(inputTables, outputTables, place + 1);
+            queueSubJoinOrdersLegacyRecursively(inputTables, outputTables, place + 1);
         }
     }
 
@@ -605,10 +624,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 return null;
 
             // Analyze join and filter conditions
-            m_parsedStmt.analyzeTreeExpressions(joinTree);
+            m_parsedStmt.analyzeJoinExpressions(joinTree);
 
             // generate more plans
-            generateMorePlansForJoinOrder(joinTree);
+            generateMorePlansForJoinTree(joinTree);
         }
         return m_plans.poll();
     }
@@ -621,136 +640,137 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      *
      * @param joinOrder An array of tables in the join order.
      */
-    private void generateMorePlansForJoinOrder(JoinTree joinTree) {
+    private void generateMorePlansForJoinTree(JoinTree joinTree) {
         if (m_parsedStmt.joinTree.m_hasOuterJoin == false) {
-            generateMorePlansForInnerJoinOrder(joinTree);
+            generateMorePlansForJoinOrderLegacy(joinTree);
         } else {
-            generateMorePlansForOuterJoinOrder(joinTree);
+            // Specialization for the outer join.
+            JoinNode joinNode = joinTree.m_root;
+            assert(joinNode != null);
+
+            // generate the access paths for all nodes
+            generateAccessPaths(joinTree.m_root);
+
+            List<JoinNode> nodes = joinNode.generateAllNodesJoinOrder();
+            generateSubPlanForJoinNodeRecursively(joinNode, nodes);
         }
     }
 
     /**
-     * Specialization for the outer join.
+     * Generate all possible access paths for all nodes in the tree.
+     * The join and filter expressions are kept at the parent node
+     * 1- The OUTER-only join conditions - Testing the outer-only conditions COULD be considered as an
+     *   optimal first step to processing each outer tuple - PreJoin predicate for NLJ or NLIJ
+     * 2 -The INNER-only and INNER_OUTER join conditions are used for finding a matching inner tuple(s) for a
+     *   given outer tuple. Index and end-Index expressions for NLIJ and join predicate for NLJ.
+     * 3 -The OUTER-only filter conditions. - Can be pushed down to pre-qualify the outer tuples before they enter
+     *   the join - Where condition for the left child
+     * 4. The INNER-only and INNER_OUTER where conditions are used for filtering joined tuples. -
+     *   Post join predicate for NLIJ and NLJ .  Possible optimization -
+     *   if INNER-only condition is NULL-rejecting (inner_tuple is NOT NULL or inner_tuple > 0)
+     *   it can be pushed down as a filter expression to the inner child
      *
-     * @param joinTree A join tree.
+     * @param joinNode A root to the join tree to generate access paths to all nodes in that tree.
      */
-    private void generateMorePlansForOuterJoinOrder(JoinTree joinTree) {
-        JoinNode joinNode = joinTree.m_root;
+    private void generateAccessPaths(JoinNode joinNode) {
         assert(joinNode != null);
-
-        // generate the access paths for all nodes
-        generateAccessPaths(null, joinTree.m_root);
-
-        List<JoinNode> nodes = joinNode.generateAllNodesJoinOrder();
-        generateSubPlanForJoinNodeRecursively(joinNode, nodes);
-    }
-
-    /**
-     * generate all possible access paths for all nodes in the tree.
-     *
-     * @param parentNode A parent node to the node to generate paths to.
-     * @param childNode A node to generate paths to.
-     */
-    private void generateAccessPaths(JoinNode parentNode, JoinNode childNode) {
-        assert(childNode != null);
-        if (childNode.m_leftNode != null) {
-            generateAccessPaths(childNode, childNode.m_leftNode);
-        }
-        if (childNode.m_rightNode != null) {
-            generateAccessPaths(childNode, childNode.m_rightNode);
-        }
-        // The join and filter expressions are kept at the parent node
-        // 1- The OUTER-only join conditions - Testing the outer-only conditions COULD be considered as an
-        // optimal first step to processing each outer tuple - PreJoin predicate for NLJ or NLIJ
-        // 2 -The INNER-only and INNER_OUTER join conditions are used for finding a matching inner tuple(s) for a
-        // given outer tuple. Index and end-Index expressions for NLIJ and join predicate for NLJ.
-        // 3 -The OUTER-only filter conditions. - Can be pushed down to pre-qualify the outer tuples before they enter
-        // the join - Where condition for the left child
-        // 4. The INNER-only and INNER_OUTER where conditions are used for filtering joined tuples. -
-        // Post join predicate for NLIJ and NLJ
-        // Possible optimization - if INNER-only condition is NULL-rejecting (inner_tuple is NOT NULL or
-        // inner_tuple > 0) it can be pushed down as a filter expression to the inner child
-        if (parentNode != null) {
-            if (parentNode.m_leftNode == childNode) {
-                // This is the outer table which can have the naive access path and possible index path(s)
-                // Optimizations - outer-table-only where expressions can be pushed down to the child node
-                // to pre-qualify the outer tuples before they enter the join.
-                // For inner joins outer-table-only join expressions can be pushed down as well.
-                List<AbstractExpression> joinOuterList =  (parentNode.m_joinType == JoinType.INNER) ?
-                        parentNode.m_joinOuterList : null;
-                if (childNode.m_table != null) {
-                    childNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(childNode.m_table,
-                                                                                  joinOuterList,
-                                                                                  parentNode.m_whereOuterList,
-                                                                                  null));
-                } else {
-                    childNode.m_accessPaths.add(getRelevantNaivePathForTable(joinOuterList, parentNode.m_whereOuterList));
-                }
-            } else {
-                assert(parentNode.m_rightNode == childNode);
-                // This is the inner node
-                childNode.m_accessPaths.addAll(getRelevantAccessPathsForInnerNode(parentNode, childNode));
-            }
-        } else if (childNode.m_table != null) {
+        if (joinNode.m_table != null) {
             // This is a select from a single table
-            childNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(childNode.m_table,
-                    childNode.m_joinInnerList,
-                    childNode.m_whereInnerList,
+            joinNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(joinNode.m_table,
+                    joinNode.m_joinInnerList,
+                    joinNode.m_whereInnerList,
                     null));
         } else {
-            childNode.m_accessPaths.add(getRelevantNaivePathForTable(null, null));
+            assert (joinNode.m_leftNode != null && joinNode.m_rightNode != null);
+            generateOuterAccessPaths(joinNode);
+            generateInnerAccessPaths(joinNode);
+            // An empty access path for the root
+            joinNode.m_accessPaths.add(new AccessPath());
         }
-        assert(childNode.m_accessPaths.size() > 0);
     }
 
     /**
-     * Generate all possible access paths for an inner node in an outer join.
+     * Generate all possible access paths for an outer node in a join.
+     * The outer table and/or join can have the naive access path and possible index path(s)
+     * Optimizations - outer-table-only where expressions can be pushed down to the child node
+     * to pre-qualify the outer tuples before they enter the join.
+     * For inner joins outer-table-only join expressions can be pushed down as well
+     *
+     * @param parentNode A parent node to the node to generate paths to.
+     */
+    private void generateOuterAccessPaths(JoinNode parentNode) {
+        assert(parentNode.m_leftNode != null);
+        JoinNode outerChildNode = parentNode.m_leftNode;
+        List<AbstractExpression> joinOuterList =  (parentNode.m_joinType == JoinType.INNER) ?
+                parentNode.m_joinOuterList : null;
+        if (outerChildNode.m_table == null) {
+            assert (outerChildNode.m_leftNode != null && outerChildNode.m_rightNode != null);
+            generateOuterAccessPaths(outerChildNode);
+            generateInnerAccessPaths(outerChildNode);
+            // The join node can have only sequential scan access
+            outerChildNode.m_accessPaths.add(getRelevantNaivePath(joinOuterList, parentNode.m_whereOuterList));
+        } else {
+            assert (outerChildNode.m_table != null);
+            outerChildNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(outerChildNode.m_table,
+                    joinOuterList,
+                    parentNode.m_whereOuterList,
+                    null));
+        }
+        assert(outerChildNode.m_accessPaths.size() > 0);
+    }
+
+    /**
+     * Generate all possible access paths for an inner node in a join.
      * The set of potential index expressions depends whether the inner node can be inlined
      * with the NLIJ or not. In the former case, inner and inner-outer join expressions can
      * be considered for the index access. In the latter, only inner join expressions qualifies.
      *
-     * @param joinNode the join node
-     * @param innerNode the inner node
-     * @return List of valid access paths
+     * @param parentNode A parent node to the node to generate paths to.
      */
-    protected List<AccessPath> getRelevantAccessPathsForInnerNode(JoinNode joinNode, JoinNode innerNode) {
+    private void generateInnerAccessPaths(JoinNode parentNode) {
+        assert(parentNode.m_rightNode != null);
+        JoinNode innerChildNode = parentNode.m_rightNode;
         // In case of inner join WHERE and JOIN expressions can be merged
-        if (joinNode.m_joinType == JoinType.INNER) {
-            joinNode.m_joinInnerOuterList.addAll(joinNode.m_whereInnerOuterList);
-            joinNode.m_whereInnerOuterList.clear();
-            joinNode.m_joinInnerList.addAll(joinNode.m_whereInnerList);
-            joinNode.m_whereInnerList.clear();
+        if (parentNode.m_joinType == JoinType.INNER) {
+            parentNode.m_joinInnerOuterList.addAll(parentNode.m_whereInnerOuterList);
+            parentNode.m_whereInnerOuterList.clear();
+            parentNode.m_joinInnerList.addAll(parentNode.m_whereInnerList);
+            parentNode.m_whereInnerList.clear();
         }
-        if (innerNode.m_table == null) {
+        if (innerChildNode.m_table == null) {
+            assert (innerChildNode.m_leftNode != null && innerChildNode.m_rightNode != null);
+            generateOuterAccessPaths(innerChildNode);
+            generateInnerAccessPaths(innerChildNode);
             // The inner node is a join node itself. Only naive access path is possible
-            ArrayList<AccessPath> accessPaths = new ArrayList<AccessPath>();
-            accessPaths.add(getRelevantNaivePathForTable(joinNode.m_joinInnerOuterList, joinNode.m_joinInnerList));
-            return accessPaths;
+            innerChildNode.m_accessPaths.add(getRelevantNaivePath(parentNode.m_joinInnerOuterList, parentNode.m_joinInnerList));
+            return;
         }
 
         // The inner table can have multiple index access paths based on
         // inner and inner-outer join expressions plus the naive one.
-
         // If the join is INNER or the inner table is replicated or the send/receive pair can be deferred,
         // the join node can be NLIJ, otherwise it will be NLJ even for an index access path.
-        if (joinNode.m_joinType == JoinType.INNER || innerNode.m_table.getIsreplicated() || canDeferSendReceivePairForNode()) {
+        if (parentNode.m_joinType == JoinType.INNER || innerChildNode.m_table.getIsreplicated() ||
+                canDeferSendReceivePairForNode()) {
             // This case can support either NLIJ -- assuming joinNode.m_joinInnerOuterList
             // is non-empty AND at least ONE of its clauses can be leveraged in the IndexScan
             // -- or NLJ, otherwise.
-            return getRelevantAccessPathsForTable(innerNode.m_table,
-                    joinNode.m_joinInnerOuterList,
-                    joinNode.m_joinInnerList,
-                    null);
+            innerChildNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(innerChildNode.m_table,
+                    parentNode.m_joinInnerOuterList,
+                    parentNode.m_joinInnerList,
+                    null));
+        } else {
+            // Only NLJ is supported in this case.
+            // If the join is NLJ, the inner node won't be inlined
+            // which means that it can't use inner-outer join expressions
+            // -- they must be set aside to be processed within the NLJ.
+            innerChildNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(innerChildNode.m_table,
+                    null,
+                    parentNode.m_joinInnerList,
+                    parentNode.m_joinInnerOuterList));
         }
 
-        // Only NLJ is supported in this case.
-        // If the join is NLJ, the inner node won't be inlined
-        // which means that it can't use inner-outer join expressions
-        // -- they must be set aside to be processed within the NLJ.
-        return getRelevantAccessPathsForTable(innerNode.m_table,
-                null,
-                joinNode.m_joinInnerList,
-                joinNode.m_joinInnerOuterList);
+        assert(innerChildNode.m_accessPaths.size() > 0);
     }
 
     /**
@@ -789,7 +809,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      *
      * @param joinOrder An array of tables in the join order.
      */
-    private void generateMorePlansForInnerJoinOrder(JoinTree joinTree) {
+    private void generateMorePlansForJoinOrderLegacy(JoinTree joinTree) {
         assert(joinTree.m_joinOrder != null);
         assert(m_plans.size() == 0);
 
@@ -945,8 +965,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         return retval;
     }
 
-    // @TODO ENG_3038 just for now. Can be merged with the above version for inner joins
-    // if the order of inner/outer tables for NLJ can be reversed
     private AbstractPlanNode getSelectSubPlanForOuterAccessPathStep(JoinNode joinNode, AbstractPlanNode outerPlan, AbstractPlanNode innerPlan) {
         // Filter (post-join) expressions
         ArrayList<AbstractExpression> whereClauses  = new ArrayList<AbstractExpression>();
@@ -967,10 +985,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         // over the NLJ/IndexScan only if there is at least one inner-outer join expression
         // that is used for the index access. If this is the case then this expression
         // will be missing from the otherExprs list but is in the original joinNode.m_joinInnerOuterList
-        // An additional requirements for the outer joins is that the inner node should not require
+        // If not, NLJ/IndexScan is a better choice.
+        // An additional requirement for the outer joins is that the inner node should not require
         // the send/receive pair. Otherwise, the outer table will be joined with the individual
-        // partitions instead of the whole table leading to the erroneous rows in the result set
-        // If not, NLJ/IndexScan is a better choice
+        // partitions instead of the whole table leading to the erroneous rows in the result set.
         boolean canHaveNLIJ = innerPlan instanceof IndexScanPlanNode &&
                 hasInnerOuterIndexExpression(joinNode.m_joinInnerOuterList, innerAccessPath.otherExprs) &&
                 (joinNode.m_joinType == JoinType.INNER || !needInnerSendReceive);
