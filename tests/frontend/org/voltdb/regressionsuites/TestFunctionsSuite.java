@@ -642,15 +642,6 @@ public class TestFunctionsSuite extends RegressionSuite {
     {
         System.out.println("STARTING testExtract");
         Client client = getClient();
-        ProcedureCallback callback = new ProcedureCallback() {
-            @Override
-            public void clientCallback(ClientResponse clientResponse)
-                    throws Exception {
-                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                    throw new RuntimeException("Failed with response: " + clientResponse.getStatusString());
-                }
-            }
-        };
         /*
         CREATE TABLE P1 (
                 ID INTEGER DEFAULT '0' NOT NULL,
@@ -661,65 +652,206 @@ public class TestFunctionsSuite extends RegressionSuite {
                 PRIMARY KEY (ID)
                 );
         */
-        client.callProcedure(callback, "P1.insert", 0, "X0", 10, 1.1, new Timestamp(1000000000000L));
-        client.drain();
         ClientResponse cr = null;
         VoltTable r = null;
         long result;
+        int columnIndex = 0;
 
-        cr = client.callProcedure("@AdHoc",
-                                  "select " +
-                                  "EXTRACT(YEAR FROM PAST), EXTRACT(MONTH FROM PAST), EXTRACT(DAY FROM PAST), " +
-                                  "EXTRACT(DAY_OF_WEEK FROM PAST), EXTRACT(DAY_OF_YEAR FROM PAST), " +
-                                  //"EXTRACT(WEEK_OF_YEAR FROM PAST), " +
-                                  "EXTRACT(QUARTER FROM PAST), EXTRACT(HOUR FROM PAST), EXTRACT(MINUTE FROM PAST), EXTRACT(SECOND FROM PAST) " +
-                                  "from P1;");
+        // Test Null timestamp
+//        cr = client.callProcedure("P1.insert", 0, "X0", 10, 1.1, null);
+//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+//        cr = client.callProcedure("EXTRACT_TIMESTAMP", 0);
+//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+//        r = cr.getResults()[0];
+//        r.advanceRow();
+//        for (int i=0; i< 8; i++) {
+//            assertNull(r.getLong(i));
+//        }
+//        assertNull(r.getLong(8));
 
+
+        // Normal test case 2001-9-9 01:46:40
+        cr = client.callProcedure("P1.insert", 1, "X0", 10, 1.1, new Timestamp(1000000000789L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("EXTRACT_TIMESTAMP", 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         r.advanceRow();
-        int columnIndex = 0;
+        columnIndex = 0;
 
-        final int EXPECTED_YEAR = 2001;
+        int EXPECTED_YEAR = 2001;
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_YEAR, result);
 
-        final int EXPECTED_MONTH = 9;
+        int EXPECTED_MONTH = 9;
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_MONTH, result);
 
-        final int EXPECTED_DAY = 9;
+        int EXPECTED_DAY = 9;
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_DAY, result);
 
-        final int EXPECTED_DOW = 1;
+        int EXPECTED_DOW = 1;
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_DOW, result);
 
-        final int EXPECTED_DOY = 252;
+        int EXPECTED_DOY = 252;
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_DOY, result);
 
-//        final int EXPECTED_WOY = 36;
-//        result = r.getLong(columnIndex++);
-//        assertEquals(EXPECTED_WOY, result);
-
-        final int EXPECTED_QUARTER = 3;
+        int EXPECTED_QUARTER = 3;
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_QUARTER, result);
 
-        final int EXPECTED_HOUR = 1;
+        int EXPECTED_HOUR = 1;
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_HOUR, result);
 
-        final int EXPECTED_MINUTE = 46;
+        int EXPECTED_MINUTE = 46;
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_MINUTE, result);
 
-        final BigDecimal EXPECTED_SECONDS = new BigDecimal("40.000000000000");
+        BigDecimal EXPECTED_SECONDS = new BigDecimal("40.789000000000");
         BigDecimal decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
         assertEquals(EXPECTED_SECONDS, decimalResult);
 
+        // test timestamp before epoch, Human time (GMT): Thu, 18 Nov 1948 16:32:02 GMT
+        // Leap year!
+        // http://disc.gsfc.nasa.gov/julian_calendar.shtml
+        cr = client.callProcedure("P1.insert", 2, "X0", 10, 1.1, new Timestamp(-666430077123L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("EXTRACT_TIMESTAMP", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
+        columnIndex = 0;
+
+        EXPECTED_YEAR = 1948;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_YEAR, result);
+
+        EXPECTED_MONTH = 11;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_MONTH, result);
+
+        EXPECTED_DAY = 18;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DAY, result);
+
+        EXPECTED_DOW = 5;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DOW, result);
+
+        EXPECTED_DOY = 323;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DOY, result);
+
+        EXPECTED_QUARTER = 4;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_QUARTER, result);
+
+        EXPECTED_HOUR = 16;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_HOUR, result);
+
+        EXPECTED_MINUTE = 32;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_MINUTE, result);
+
+        EXPECTED_SECONDS = new BigDecimal("2.877000000000");
+        decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
+        assertEquals(EXPECTED_SECONDS, decimalResult);
+
+        // test timestamp with a very old date, Human time (GMT): Fri, 05 Jul 1658 14:22:27 GMT
+        cr = client.callProcedure("P1.insert", 3, "X0", 10, 1.1, new Timestamp(-9829676252456L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("EXTRACT_TIMESTAMP", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
+        columnIndex = 0;
+
+        EXPECTED_YEAR = 1658;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_YEAR, result);
+
+        EXPECTED_MONTH = 7;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_MONTH, result);
+
+        EXPECTED_DAY = 5;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DAY, result);
+
+        EXPECTED_DOW = 6;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DOW, result);
+
+        EXPECTED_DOY = 186;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DOY, result);
+
+        EXPECTED_QUARTER = 3;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_QUARTER, result);
+
+        EXPECTED_HOUR = 14;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_HOUR, result);
+
+        EXPECTED_MINUTE = 22;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_MINUTE, result);
+
+        EXPECTED_SECONDS = new BigDecimal("27.544000000000");
+        decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
+        assertEquals(EXPECTED_SECONDS, decimalResult);
+
+        // Move in this testcase of quickfix-extract(), Human time (GMT): Mon, 02 Jul 1956 12:53:37 GMT
+        cr = client.callProcedure("P1.insert", 4, "X0", 10, 1.1, new Timestamp(-425991982877L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("EXTRACT_TIMESTAMP", 4);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
+        columnIndex = 0;
+        //System.out.println("Result: " + r);
+
+        EXPECTED_YEAR = 1956;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_YEAR, result);
+
+        EXPECTED_MONTH = 7;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_MONTH, result);
+
+        EXPECTED_DAY = 2;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DAY, result);
+
+        EXPECTED_DOW = 2;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DOW, result);
+
+        EXPECTED_DOY = 184;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DOY, result);
+
+        EXPECTED_QUARTER = 3;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_QUARTER, result);
+
+        EXPECTED_HOUR = 12;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_HOUR, result);
+
+        EXPECTED_MINUTE = 53;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_MINUTE, result);
+
+        EXPECTED_SECONDS = new BigDecimal("37.123000000000");
+        decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
+        assertEquals(EXPECTED_SECONDS, decimalResult);
     }
 
     public void testParams() throws NoConnectionsException, IOException, ProcCallException {
@@ -2153,6 +2285,10 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         project.addStmtProcedure("DISPLAY_SUBSTRING", "select SUBSTRING (DESC FROM 2) from P1 where ID = -12");
         project.addStmtProcedure("DISPLAY_SUBSTRING2", "select SUBSTRING (DESC FROM 2 FOR 2) from P1 where ID = -12");
+
+        project.addStmtProcedure("EXTRACT_TIMESTAMP", "select EXTRACT(YEAR FROM PAST), EXTRACT(MONTH FROM PAST), EXTRACT(DAY FROM PAST), " +
+                "EXTRACT(DAY_OF_WEEK FROM PAST), EXTRACT(DAY_OF_YEAR FROM PAST), EXTRACT(QUARTER FROM PAST), EXTRACT(HOUR FROM PAST), " +
+                "EXTRACT(MINUTE FROM PAST), EXTRACT(SECOND FROM PAST) from P1 where ID = ?");
 
 
         project.addStmtProcedure("DISPLAY_VARCHAR", "select CAST(INTEGERNUM AS VARCHAR), CAST(TINYNUM AS VARCHAR), CAST(SMALLNUM AS VARCHAR), CAST(BIGNUM AS VARCHAR), CAST(FLOATNUM AS VARCHAR), CAST(DECIMALNUM AS VARCHAR) from NUMBER_TYPES order by INTEGERNUM");
