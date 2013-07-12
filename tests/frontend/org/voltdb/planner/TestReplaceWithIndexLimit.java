@@ -45,33 +45,34 @@ public class TestReplaceWithIndexLimit extends PlannerTestCase {
     }
 
     private void checkIndexLimit(List<AbstractPlanNode> pn, boolean replaced, String[] indexNames) {
-        assertTrue(pn.size() > 0);
+        assertTrue (pn.size() > 0);
 
         for ( AbstractPlanNode nd : pn) {
-            System.out.println("PlanNode Explan string:\n" + nd.toExplainPlanString());
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
         }
 
+        // Navigate to the leaf node of the last plan fragment.
         AbstractPlanNode p = pn.get(pn.size() - 1).getChild(0);
-        while(p.getChildCount() > 0) {
+        while (p.getChildCount() > 0) {
             p = p.getChild(0);
         }
 
         if (replaced) {
             Set<String> indexSet = new HashSet<String>();
-            for(String index : indexNames){
+            for (String index : indexNames){
                 indexSet.add(index);
             }
-            assertTrue(p instanceof IndexScanPlanNode);
-            assertTrue(p.getInlinePlanNode(PlanNodeType.LIMIT) != null);
-            assertTrue(indexSet.contains(((IndexScanPlanNode)p).getCatalogIndex().getTypeName()));
+            assertTrue (p instanceof IndexScanPlanNode);
+            assertTrue (p.getInlinePlanNode(PlanNodeType.LIMIT) != null);
+            assertTrue (indexSet.contains(((IndexScanPlanNode)p).getCatalogIndex().getTypeName()));
         }
         else {
             boolean flag = false;
-            if((p instanceof IndexScanPlanNode) == false)
+            if ((p instanceof IndexScanPlanNode) == false)
                 flag = true;
-            else if(p.getInlinePlanNode(PlanNodeType.LIMIT) == null)
+            else if (p.getInlinePlanNode(PlanNodeType.LIMIT) == null)
                 flag = true;
-            assertTrue(flag);
+            assertTrue (flag);
         }
     }
 
@@ -82,14 +83,48 @@ public class TestReplaceWithIndexLimit extends PlannerTestCase {
     // ========================================================================
 
     // simple min() on indexed col
-    public void testMin000() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C1) FROM T");
-        checkIndexLimit(pn, true, new String[]{"T_IDX1_TREE", "T_IDX2_TREE", "T_IDX4_TREE"});
+    public void testMin0001() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C1) FROM R");
+        checkIndexLimit(pn, true, new String[]{"R_IDX1_TREE", "R_IDX2_TREE", "R_IDX4_TREE"});
     }
 
     // simple min() on unindexed col
-    public void testMin001() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C4) FROM T");
+    public void testMin0002() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C4) FROM R");
+        checkIndexLimit(pn, false, null);
+    }
+
+    // simple max() on indexed col
+    public void testMax0001() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MAX(C1) FROM R");
+        checkIndexLimit(pn, true, new String[]{"R_IDX1_TREE", "R_IDX2_TREE", "R_IDX4_TREE"});
+    }
+
+    // simple max() on unindexed col
+    public void testMax0002() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MAX(C4) FROM R");
+        checkIndexLimit(pn, false, null);
+    }
+
+    // max() on indexed col with WHERE clause: should not replace
+    public void testMax0003() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MAX(C2) FROM R WHERE C1 = ?");
+        checkIndexLimit(pn, false, null);
+    }
+
+    // combination of [min(), max(), sum()] tests
+    public void testCom0001() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C1), MAX(C1) FROM R");
+        checkIndexLimit(pn, false, null);
+    }
+
+    public void testCom0002() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C1), SUM(C1) FROM R");
+        checkIndexLimit(pn, false, null);
+    }
+
+    public void testCom0003() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT SUM(C1), MAX(C1) FROM R");
         checkIndexLimit(pn, false, null);
     }
 
@@ -97,39 +132,49 @@ public class TestReplaceWithIndexLimit extends PlannerTestCase {
 
     // min() on indexed col with where (on indexed col): case 1
     public void testMin0021() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C2) FROM T WHERE C1 = ?");
-        checkIndexLimit(pn, true, new String[]{"T_IDX2_TREE", "T_IDX4_TREE"});
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C2) FROM R WHERE C1 = ?");
+        checkIndexLimit(pn, true, new String[]{"R_IDX2_TREE", "R_IDX4_TREE"});
     }
 
     // min() on indexed col with where (on indexed col): case 2
     public void testMin0022() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C1) FROM T WHERE C2 = ?");
-        checkIndexLimit(pn, true, new String[]{"T_IDX3_TREE"});
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C1) FROM R WHERE C2 = ?");
+        checkIndexLimit(pn, true, new String[]{"R_IDX3_TREE"});
     }
 
     // min() on indexed col which is also in where
     public void testMin0023() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C1) FROM T WHERE C1 = ?");
-        checkIndexLimit(pn, true, new String[]{"T_IDX1_TREE", "T_IDX2_TREE", "T_IDX4_TREE"});
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C1) FROM R WHERE C1 = ?");
+        checkIndexLimit(pn, true, new String[]{"R_IDX1_TREE", "R_IDX2_TREE", "R_IDX4_TREE"});
     }
 
     // ========================================================================
 
     // min() on indexed col with more complicated where
     public void testMin0031() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C3) FROM T WHERE C1 = ? AND C2 = ?");
-        checkIndexLimit(pn, true, new String[]{"T_IDX4_TREE"});
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C3) FROM R WHERE C1 = ? AND C2 = ?");
+        checkIndexLimit(pn, true, new String[]{"R_IDX4_TREE"});
     }
 
     // min() on indexed col with more complicated where: should not replace
     public void testMin0032() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C3) FROM T WHERE C1 = ? OR C2 = ?");
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C3) FROM R WHERE C1 = ? OR C2 = ?");
         checkIndexLimit(pn, false, null);
     }
 
     // min() on indexed col with more complicated where: should not replace
     public void testMin0033() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C3) FROM T WHERE C1 > ? OR C2 > ?");
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C3) FROM R WHERE C1 > ? OR C2 > ?");
+        checkIndexLimit(pn, false, null);
+    }
+
+    public void testMin0034() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C2) FROM R WHERE C1 > ?");
+        checkIndexLimit(pn, false, null);
+    }
+
+    public void testMin0035() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C3) FROM R WHERE C1 = ?");
         checkIndexLimit(pn, false, null);
     }
 
@@ -137,25 +182,25 @@ public class TestReplaceWithIndexLimit extends PlannerTestCase {
 
     // min() on indexed col with where (on indexed col), but should not replace: case 3
     public void testMin0041() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C2) FROM T WHERE C1 = ? AND C3 = ?");
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C2) FROM R WHERE C1 = ? AND C3 = ?");
         checkIndexLimit(pn, false, null);
     }
 
     // min() on indexed col with where (partially on indexed col)
     public void testMin0042() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C2) FROM T WHERE C1 = ? AND C4 = ?");
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C2) FROM R WHERE C1 = ? AND C4 = ?");
         checkIndexLimit(pn, false, null);
     }
 
     // min() on indexed col with where (none on indexed col)
     public void testMin0043() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C1) FROM T WHERE C4 = ?");
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C1) FROM R WHERE C4 = ?");
         checkIndexLimit(pn, false, null);
     }
 
     // min() on indexed col with group by
     public void testMin005() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C2) FROM T WHERE C1 = ? AND C3 = ?");
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C2) FROM R WHERE C1 = ? AND C3 = ?");
         checkIndexLimit(pn, false, null);
     }
 
@@ -170,19 +215,19 @@ public class TestReplaceWithIndexLimit extends PlannerTestCase {
 
     // no where clause, min() is expression matching index
     public void testMin10011() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C1 + C2) FROM ET");
-        checkIndexLimit(pn, true, new String[]{"ET_IDX1_TREE", "ET_IDX5_TREE"});
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C1 + C2) FROM ER");
+        checkIndexLimit(pn, true, new String[]{"ER_IDX1_TREE", "ER_IDX5_TREE"});
     }
 
     // no where clause, min() if function matching index
     public void testMin10012() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(ABS(C3-49)) FROM ET");
-        checkIndexLimit(pn, true, new String[]{"ET_IDX2_TREE"});
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(ABS(C3 - 100)) FROM ER");
+        checkIndexLimit(pn, true, new String[]{"ER_IDX2_TREE"});
     }
 
     // not replacable
     public void testMin10013() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C2) FROM ET");
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C2) FROM ER");
         checkIndexLimit(pn, false, null);
     }
 
@@ -190,20 +235,20 @@ public class TestReplaceWithIndexLimit extends PlannerTestCase {
 
     // where clause is expression, min() is column
     public void testMin10021() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C3) FROM ET WHERE C1 + C2 = ?");
-        checkIndexLimit(pn, true, new String[]{"ET_IDX5_TREE"});
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C3) FROM ER WHERE C1 + C2 = ?");
+        checkIndexLimit(pn, true, new String[]{"ER_IDX5_TREE"});
     }
 
     // where clause is column-based, min() is expression
     public void testMin10022() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C2 * C3) FROM ET WHERE C1 = ?");
-        checkIndexLimit(pn, true, new String[]{"ET_IDX4_TREE"});
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C2 * C3) FROM ER WHERE C1 = ?");
+        checkIndexLimit(pn, true, new String[]{"ER_IDX4_TREE"});
     }
 
     // both where and min() are expressions
     public void testMin10023() {
-        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C2 - C3) FROM ET WHERE C1 - C2 = ?");
-        checkIndexLimit(pn, true, new String[]{"ET_IDX3_TREE"});
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C2 - C3) FROM ER WHERE C1 - C2 = ?");
+        checkIndexLimit(pn, true, new String[]{"ER_IDX3_TREE"});
     }
 
     // ========================================================================
@@ -379,6 +424,4 @@ public class TestReplaceWithIndexLimit extends PlannerTestCase {
     }
 
     // ========================================================================
-
-
 }

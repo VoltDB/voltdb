@@ -101,6 +101,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         return true;
     }
 
+    // single min() without GROUP BY?
     public boolean isTableMin() {
         // do not support GROUP BY for now
         if (m_groupByExpressions.isEmpty() == false)
@@ -113,6 +114,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         return true;
     }
 
+    // single max() without GROUP BY?
     public boolean isTableMax() {
         // do not support GROUP BY for now
         if (m_groupByExpressions.isEmpty() == false)
@@ -125,8 +127,9 @@ public class AggregatePlanNode extends AbstractPlanNode {
         return true;
     }
 
-    public List<AbstractExpression> getAggregateExpressions() {
-        return m_aggregateExpressions;
+    // for single min() / max(), return the single aggregate expression
+    public AbstractExpression getFirstAggregateExpression() {
+        return m_aggregateExpressions.get(0);
     }
 
     public void setOutputSchema(NodeSchema schema)
@@ -192,22 +195,6 @@ public class AggregatePlanNode extends AbstractPlanNode {
         for (TupleValueExpression tve : agg_tves)
         {
             int index = input_schema.getIndexOfTve(tve);
-
-            // removed
-/*
-            // second part of the ReplaceWithIndexLimiter micro-optimization for partitioned table
-            if (index == -1) {
-                if(m_children.get(0).getPlanNodeType() == PlanNodeType.RECEIVE) {
-                    if(m_children.get(0).getOutputSchema().getColumns().size() == 1) {
-                        SchemaColumn srcColumnSchema = m_children.get(0).getOutputSchema().getColumns().get(0);
-                        tve.setTableName(srcColumnSchema.getTableName());
-                        tve.setColumnName(srcColumnSchema.getColumnName());
-                        tve.setColumnAlias(srcColumnSchema.getColumnAlias());
-                        index = input_schema.getIndexOfTve(tve);
-                    }
-                }
-            }
-*/
             tve.setColumnIndex(index);
         }
 

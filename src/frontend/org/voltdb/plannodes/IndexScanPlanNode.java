@@ -94,15 +94,24 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         super();
     }
 
-    public IndexScanPlanNode(AbstractScanPlanNode srcNode, AggregatePlanNode apn) {
+    public IndexScanPlanNode(AbstractScanPlanNode srcNode, AggregatePlanNode apn, Index index, SortDirectionType sortDirection) {
         super();
-        this.m_outputSchema = apn.m_outputSchema.clone();
-        this.m_tableSchema = srcNode.m_tableSchema;
-        this.m_tableScanSchema = srcNode.m_tableScanSchema.clone();
-        this.m_predicate = srcNode.m_predicate;
-        this.m_targetTableAlias = srcNode.m_targetTableAlias;
-        this.m_targetTableName = srcNode.m_targetTableName;
-        this.m_estimatedOutputTupleCount = 1;
+        m_tableSchema = srcNode.m_tableSchema;
+        m_predicate = srcNode.m_predicate;
+        m_targetTableAlias = srcNode.m_targetTableAlias;
+        m_targetTableName = srcNode.m_targetTableName;
+        for (AbstractPlanNode inlineChild : srcNode.getInlinePlanNodes().values()) {
+            addInlinePlanNode(inlineChild);
+        }
+        m_bindings = new ArrayList<AbstractExpression>();
+        m_catalogIndex = index;
+        m_targetIndexName = index.getTypeName();
+        m_lookupType = IndexLookupType.GTE;    // a safe way
+        m_sortDirection = sortDirection;
+        if (apn != null) {
+            m_outputSchema = apn.m_outputSchema.clone();
+            m_tableScanSchema = srcNode.m_tableScanSchema.clone();
+        }
     }
 
     @Override
@@ -391,10 +400,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             m_estimatedOutputTupleCount = 1;
         }
 
-        if(!m_inlineNodes.isEmpty()) {
-            LimitPlanNode limit = (LimitPlanNode)m_inlineNodes.get(PlanNodeType.LIMIT);
-            if (limit != null && m_predicate == null) {
-                m_estimatedOutputTupleCount = limit.getLimit();
+        LimitPlanNode limit = (LimitPlanNode)m_inlineNodes.get(PlanNodeType.LIMIT);
+        if (limit != null && limit.getLimit() > 0) {
+            m_estimatedOutputTupleCount = Math.min(m_estimatedOutputTupleCount, limit.getLimit());
+            if (m_predicate == null) {
                 m_estimatedProcessedTupleCount = limit.getLimit();
             }
         }
