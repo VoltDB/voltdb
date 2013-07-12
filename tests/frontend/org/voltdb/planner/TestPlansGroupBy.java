@@ -37,7 +37,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         super.tearDown();
     }
 
-
+/*
     public void testGroupByA1() {
         AbstractPlanNode pn = compile("SELECT A1 from T1 group by A1");
         System.out.println(pn.toJSONString());
@@ -63,5 +63,27 @@ public class TestPlansGroupBy extends PlannerTestCase {
         AbstractPlanNode pn = compile("SELECT DISTINCT A1 FROM T1");
         System.out.println(pn.toJSONString());
     }
+
+*/
+
+//    public void testReplicatedTableComplexAggregate1() {
+//        AbstractPlanNode pn = compile("SELECT A1, SUM(PKEY) FROM R1 GROUP BY A1");
+//        System.out.println(pn.toJSONString());
+//    }
+//
+//    public void testPartitionedTableComplexAggregate1() {
+//        AbstractPlanNode pn = compile("SELECT A1, SUM(PKEY) FROM T1 GROUP BY A1");
+//        System.out.println(pn.toJSONString());
+//    }
+
+    public void testReplicatedTableComplexAggregate() {
+        AbstractPlanNode pn = compile("SELECT A1, SUM(PKEY) as A2, (SUM(PKEY) / 888) as A3, (SUM(PKEY) + 1) as A4 FROM R1 GROUP BY A1");
+        System.out.println(pn.toExplainPlanString());
+    }
+//
+//    public void testPartitionedTableComplexAggregate() {
+//        AbstractPlanNode pn = compile("SELECT A1, SUM(PKEY) / 3 FROM T1 GROUP BY A1");
+//        System.out.println(pn.toJSONString());
+//    }
 
 }
