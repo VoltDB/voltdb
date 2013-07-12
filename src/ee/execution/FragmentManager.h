@@ -21,6 +21,7 @@
 #include <cstring>
 #include <algorithm>
 #include <boost/shared_ptr.hpp>
+#define BOOST_MULTI_INDEX_DISABLE_SERIALIZATION
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/identity.hpp>

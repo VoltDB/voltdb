@@ -24,11 +24,7 @@ import java.util.List;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ComparisonExpression;
-import org.voltdb.expressions.ConstantValueExpression;
-import org.voltdb.types.ExpressionType;
 
 import com.google.common.base.Charsets;
 
@@ -46,11 +42,6 @@ public class SnapshotPredicates {
 
     public byte[] toBytes()
     {
-        // Special case common case where there's only one target with no predicate
-        if (m_predicates.isEmpty() || m_predicates.get(0) == null) {
-            return serializeEmpty();
-        }
-
         byte[][] predicates = new byte[m_predicates.size()][];
         int i = 0;
         int size = 0;
@@ -60,13 +51,16 @@ public class SnapshotPredicates {
                 JSONStringer stringer = new JSONStringer();
                 stringer.object();
                 stringer.key("triggersDelete").value(p.getSecond());
-                stringer.key("predicateExpression").object();
-                if (predicate == null) {
-                    createAcceptAllPredicate().toJSONString(stringer);
-                } else {
+                // If the predicate is null, EE will serialize all rows to the corresponding data
+                // target. It's the same as passing an always-true expression,
+                // but without the overhead of the evaluating the expression. This avoids the
+                // overhead when there is only one data target that wants all the rows.
+                if (predicate != null) {
+                    stringer.key("predicateExpression").object();
                     predicate.toJSONString(stringer);
+                    stringer.endObject();
                 }
-                stringer.endObject().endObject();
+                stringer.endObject();
                 predicates[i] = stringer.toString().getBytes(Charsets.UTF_8);
                 size += predicates[i].length;
                 i++;
@@ -74,7 +68,6 @@ public class SnapshotPredicates {
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Failed to serialize snapshot predicates", true, e);
         }
-
 
         ByteBuffer buf = ByteBuffer.allocate(4 + // predicate count
                                              4 * predicates.length + // predicate byte lengths
@@ -87,28 +80,5 @@ public class SnapshotPredicates {
         }
 
         return buf.array();
-    }
-
-    private byte[] serializeEmpty()
-    {
-        assert m_predicates.size() == 0;
-
-        ByteBuffer buf = ByteBuffer.allocate(4); // predicate count
-
-        buf.putInt(0);
-
-        return buf.array();
-    }
-
-    /**
-     * Create a dummy always-true predicate so that EE won't complain.
-     */
-    private static AbstractExpression createAcceptAllPredicate()
-    {
-        ConstantValueExpression constant = new ConstantValueExpression();
-        constant.setValueType(VoltType.TINYINT);
-        constant.setValueSize(VoltType.TINYINT.getLengthInBytesForFixedTypes());
-        constant.setValue("1");
-        return new ComparisonExpression(ExpressionType.COMPARE_EQUAL, constant, constant);
     }
 }
