@@ -29,16 +29,16 @@ namespace voltdb
 /**
  * A list (vector) of predicates.
  */
-class StreamPredicateList : public boost::ptr_vector<AbstractExpression>
+class StreamPredicateList : public boost::ptr_vector< boost::nullable<AbstractExpression> >
 {
 public:
 
     /** Default vconstructor. */
-    StreamPredicateList() : boost::ptr_vector<AbstractExpression>()
+    StreamPredicateList() : boost::ptr_vector< boost::nullable<AbstractExpression> >()
     {}
 
     /** Constructor with reserved size. */
-    StreamPredicateList(std::size_t size) : boost::ptr_vector<AbstractExpression>(size)
+    StreamPredicateList(std::size_t size) : boost::ptr_vector< boost::nullable<AbstractExpression> >(size)
     {}
 
     /** Destructor. */
