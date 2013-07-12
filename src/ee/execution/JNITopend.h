@@ -32,6 +32,7 @@ public:
 
     inline JNITopend* updateJNIEnv(JNIEnv *env) { m_jniEnv = env; return this; }
     int loadNextDependency(int32_t dependencyId, Pool *stringPool, Table* destination);
+    void logStats(int64_t stats);
     std::string planForFragmentId(int64_t fragmentId);
     void crashVoltDB(FatalException e);
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
@@ -53,6 +54,7 @@ private:
     jobject m_javaExecutionEngine;
     jmethodID m_fallbackToEEAllocatedBufferMID;
     jmethodID m_nextDependencyMID;
+    jmethodID m_logStatsMID;
     jmethodID m_planForFragmentIdMID;
     jmethodID m_crashVoltDBMID;
     jmethodID m_pushExportBufferMID;

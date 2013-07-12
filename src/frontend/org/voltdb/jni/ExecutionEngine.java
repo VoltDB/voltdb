@@ -306,6 +306,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
     }
 
+    public void logStats(long stats) {
+        System.err.println(stats);
+    }
+
     /**
      * Called from the execution engine to fetch a plan for a given hash.
      * Also update cache stats.

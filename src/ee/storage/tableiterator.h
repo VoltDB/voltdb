@@ -188,6 +188,9 @@ inline bool TableIterator::next(TableTuple &out) {
 }
 
 inline bool TableIterator::persistentNext(TableTuple &out) {
+	if(m_foundTuples % 100000 == 0){
+		m_topend->logStats(m_foundTuples);
+	}
     while (m_foundTuples < m_activeTuples) {
         if (m_currentBlock == NULL ||
             m_blockOffset >= m_currentBlock->unusedTupleBoundry()) {

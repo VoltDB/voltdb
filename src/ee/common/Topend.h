@@ -35,6 +35,7 @@ class Topend {
   public:
     virtual int loadNextDependency(
         int32_t dependencyId, voltdb::Pool *pool, Table* destination) = 0;
+    virtual void logStats(int64_t stats);
     virtual std::string planForFragmentId(int64_t fragmentId) = 0;
 
     virtual void crashVoltDB(voltdb::FatalException e) = 0;

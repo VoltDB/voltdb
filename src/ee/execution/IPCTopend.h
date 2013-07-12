@@ -31,6 +31,7 @@ class IPCTopend : public Topend {
 public:
     IPCTopend( VoltDBIPC *vdbipc);
     int loadNextDependency(int32_t dependencyId, Pool *stringPool, Table* destination);
+    void logStats(int64_t stats);
     std::string planForFragmentId(int64_t fragmentId);
     void crashVoltDB(FatalException e);
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);

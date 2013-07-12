@@ -97,6 +97,14 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
+    //what's this signature thing?
+    m_logStatsMID = m_jniEnv->GetMethodID(jniClass, "logStats", "(J)[C");
+    if (m_logStatsMID == NULL) {
+    	m_jniEnv->ExceptionDescribe();
+    	assert(m_logStatsMID != 0);
+    	throw std::exception();
+    }
+
     m_planForFragmentIdMID = m_jniEnv->GetMethodID(jniClass, "planForFragmentId", "(J)[B");
     if (m_planForFragmentIdMID == NULL) {
         m_jniEnv->ExceptionDescribe();
@@ -213,6 +221,19 @@ int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
         return 0;
     }
 }
+
+std::string JNITopend::logStats(int64_t stats) {
+    VOLT_DEBUG("sending integer %d", (int) stats);
+
+    JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, 10);
+    if (jni_frame.checkResult() < 0) {
+        VOLT_ERROR("Unable to load dependency: jni frame error.");
+        throw std::exception();
+    }
+
+    m_jniEnv->CallObjectMethod(m_javaExecutionEngine,m_logStatsMID,stats);
+}
+
 
 std::string JNITopend::planForFragmentId(int64_t fragmentId) {
     VOLT_DEBUG("fetching plan for id %d", (int) fragmentId);
