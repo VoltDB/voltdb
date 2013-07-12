@@ -916,7 +916,6 @@ bool PersistentTable::activateStream(
     int32_t partitionId,
     CatalogId tableId,
     ReferenceSerializeInput &serializeIn) {
-
     return activateStreamInternal(
         tableId,
         boost::shared_ptr<TableStreamer>(
