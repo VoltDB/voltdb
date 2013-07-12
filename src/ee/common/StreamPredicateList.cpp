@@ -49,10 +49,10 @@ bool StreamPredicateList::parseStrings(
 
                     predicateDeletes.push_back(predicateObject.valueForKey("triggersDelete").asBool());
 
-                    PlannerDomValue exprObject = predicateObject.valueForKey("predicateExpression");
                     AbstractExpression *expr = NULL;
-                    if (exprObject.hasMembers()) {
-                        expr = AbstractExpression::buildExpressionTree(exprObject);
+                    if (predicateObject.hasKey("predicateExpression")) {
+                        expr = AbstractExpression::buildExpressionTree(
+                                    predicateObject.valueForKey("predicateExpression"));
                         if (expr != NULL) {
                             // Got ourselves a predicate expression tree!
                             push_back(expr);
