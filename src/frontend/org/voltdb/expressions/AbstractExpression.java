@@ -18,6 +18,7 @@
 package org.voltdb.expressions;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 import org.json_voltpatches.JSONArray;
@@ -524,6 +525,54 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             result.add(fromJSONObject(tempjobj, db));
         }
         return result;
+    }
+
+    /**
+     *
+     * @param aggTableIndexMap
+     * @return
+     */
+    public AbstractExpression replaceWithTVE( HashMap <AbstractExpression, Integer> aggTableIndexMap ) {
+        Integer ii = aggTableIndexMap.get(this);
+        if (ii != null) {
+            TupleValueExpression tve = new TupleValueExpression();
+            tve.setValueType(getValueType());
+            tve.setValueSize(getValueSize());
+            tve.setColumnIndex(ii);
+            tve.setColumnName("");
+            tve.setTableName("VOLT_TEMP_TABLE");
+            return tve;
+        }
+
+        AbstractExpression lnode = null, rnode = null;
+        ArrayList<AbstractExpression> newArgs = new ArrayList<AbstractExpression>();
+        if (m_left != null) {
+            lnode = m_left.replaceWithTVE(aggTableIndexMap);
+        }
+        if (m_right != null) {
+            rnode = m_right.replaceWithTVE(aggTableIndexMap);
+        }
+
+        boolean changed = false;
+        if (m_args != null) {
+            for (int jj = 0; jj < m_args.size(); jj++) {
+                AbstractExpression exp = m_args.get(jj).replaceWithTVE(aggTableIndexMap);
+                newArgs.set(jj, exp);
+                if (exp != m_args.get(jj)) {
+                    changed = true;
+                }
+            }
+        }
+
+        if (m_left != lnode || m_right != rnode || changed) {
+            AbstractExpression resExpr = (AbstractExpression) this.clone();
+            resExpr.setLeft(lnode);
+            resExpr.setRight(rnode);
+            resExpr.setArgs(newArgs);
+            return resExpr;
+        }
+
+        return this;
     }
 
     public ArrayList<AbstractExpression> findBaseTVEs() {

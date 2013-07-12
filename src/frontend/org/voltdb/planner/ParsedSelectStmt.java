@@ -20,6 +20,7 @@ package org.voltdb.planner;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 
@@ -32,6 +33,8 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.plannodes.NodeSchema;
+import org.voltdb.plannodes.SchemaColumn;
 
 public class ParsedSelectStmt extends AbstractParsedStmt {
 
@@ -50,12 +53,53 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         // groupby
         public boolean groupBy = false;
+
+        @Override
+        public boolean equals (Object obj) {
+            if (obj instanceof ParsedColInfo == false) return false;
+            ParsedColInfo col = (ParsedColInfo) obj;
+            if (alias == col.alias && columnName == col.columnName && tableName == col.tableName
+                    && expression.equals(col.expression) && index == col.index && size == col.size
+                    && orderBy == col.orderBy && ascending == col.ascending && groupBy == col.groupBy
+                    && finalOutput == col.finalOutput) {
+                return true;
+            }
+            return false;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = 0;
+            if (alias != null)
+                result += alias.hashCode();
+            if (columnName != null)
+                result += columnName.hashCode();
+            if (tableName != null)
+                result += tableName.hashCode();
+            if (expression != null)
+                result += expression.hashCode();
+
+            // calculate hash for other member variable
+            int hash = 1;
+            hash += hash * 17 + index;
+            hash += hash * 31 + size;
+            hash += new Boolean(finalOutput).hashCode();
+            hash += new Boolean(orderBy).hashCode();
+            hash += new Boolean(ascending).hashCode();
+            hash += new Boolean(groupBy).hashCode();
+
+            return hash + result;
+        }
     }
 
     public ArrayList<ParsedColInfo> displayColumns = new ArrayList<ParsedColInfo>();
     public ArrayList<ParsedColInfo> orderColumns = new ArrayList<ParsedColInfo>();
     public AbstractExpression having = null;
     public ArrayList<ParsedColInfo> groupByColumns = new ArrayList<ParsedColInfo>();
+
+    public ArrayList<ParsedColInfo> aggResultColumns = new ArrayList<ParsedColInfo>();
+    public ArrayList<ParsedColInfo> postAggColumns = new ArrayList<ParsedColInfo>();
+    private final HashSet<ParsedColInfo> aggColumns = new HashSet<ParsedColInfo>();
 
     public long limit = -1;
     public long offset = 0;
@@ -100,10 +144,77 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 parseGroupByColumns(child);
             }
         }
+
+        // Construct the aggResultColumns
+        aggColumns.addAll(groupByColumns);
+        aggResultColumns = new ArrayList<ParsedSelectStmt.ParsedColInfo>(aggColumns);
+    }
+
+    /**
+     * Pick up all the AGG element and put the ParsedColInfo into an ArrayList aggColumns.
+     * @param root
+     */
+    void parseAggColumns (VoltXMLElement root) {
+        if (root.name.equals("aggregation")) {
+            ParsedColInfo col = new ParsedColInfo();
+            col.expression = parseExpressionTree(root);
+            ExpressionUtil.finalizeValueTypes(col.expression);
+            col.alias = root.attributes.get("alias");
+
+            // Aggregation column use the the hacky stuff
+            col.tableName = "VOLT_TEMP_TABLE";
+            col.columnName = "";
+
+            boolean notExists = true;
+            for (ParsedColInfo ic: aggColumns) {
+                if (ic.equals(col)) {
+                    notExists = false;
+                }
+            }
+            if (notExists)
+                aggColumns.add(col);
+        }
+        for (VoltXMLElement child : root.children) {
+            parseAggColumns(child);
+        }
+    }
+
+    /**
+     * Construct the newSchema for projection node as the parent of the agg node
+     * @return
+     */
+    NodeSchema evaluatePostAggColumns () {
+        // Build the association between the table column with its index
+        HashMap <AbstractExpression, Integer> aggTableIndexMap = new HashMap <AbstractExpression, Integer>();
+        for (int i = 0; i < aggResultColumns.size(); i++) {
+            ParsedColInfo col = aggResultColumns.get(i);
+            aggTableIndexMap.put(col.expression, i);
+        }
+
+        NodeSchema agg_schema = new NodeSchema();
+        for (ParsedColInfo col : displayColumns) {
+            SchemaColumn schema_col = null;
+            if (col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+                // Recursively mutate the expression tree with available TVE substitutes
+                AbstractExpression expr = col.expression.replaceWithTVE(aggTableIndexMap);
+                schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "", col.alias, expr);
+            } else {
+                schema_col = new SchemaColumn(col.tableName,
+                        col.columnName,
+                        col.alias,
+                        col.expression);
+            }
+
+            agg_schema.addColumn(schema_col);
+        }
+        return agg_schema;
     }
 
     void parseDisplayColumns(VoltXMLElement columnsNode) {
         for (VoltXMLElement child : columnsNode.children) {
+            // DONE(xin): work to pick up all the agg ParsedColInfo.
+            parseAggColumns(child);
+
             ParsedColInfo col = new ParsedColInfo();
             col.expression = parseExpressionTree(child);
             if (col.expression instanceof ConstantValueExpression) {

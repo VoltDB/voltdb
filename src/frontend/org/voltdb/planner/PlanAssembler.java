@@ -1171,8 +1171,9 @@ public class PlanAssembler {
 
             int outputColumnIndex = 0;
             NodeSchema agg_schema = new NodeSchema();
+
             // TODO: Aggregates could theoretically ONLY appear in the ORDER BY clause but not the display columns, but we don't support that yet.
-            for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns) {
+            for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.aggResultColumns) {
                 AbstractExpression rootExpr = col.expression;
                 AbstractExpression agg_input_expr = null;
                 SchemaColumn schema_col = null;
@@ -1263,6 +1264,7 @@ public class PlanAssembler {
                 // aggregate (potentially containing aggregate functions and expressions of aggregate functions) and the pushed-down
                 // aggregate (potentially containing aggregate functions and aggregate functions of expressions).
                 else if (rootExpr.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+                    // (XIN): we may never come to this case after using the aggResultColumns
                     throw new PlanningErrorException("Unsupported operation on the result of an aggregate function in a column expression");
                 }
                 else
@@ -1292,22 +1294,25 @@ public class PlanAssembler {
                 }
 
                 aggNode.addGroupByExpression(col.expression);
+
                 if (topAggNode != null) {
                     // This assumes that the group keys are simple columns in a fixed order as presented as input to aggNode,
                     // as projected out of aggNode as input to topAggNode, and as projected out of topAggNode.
                     // This is not likely to hold up in more general cases involving expressions.
+
+                    // FIXME(XIN):
                     topAggNode.addGroupByExpression(col.expression);
                 }
             }
-
-            aggNode.setOutputSchema(agg_schema);
+            NodeSchema newSchema = m_parsedSelect.evaluatePostAggColumns();
+            aggNode.setOutputSchema(newSchema);
             /*
              * Is there a necessary coordinator-aggregate node...
              */
             if (topAggNode != null) {
-                topAggNode.setOutputSchema(agg_schema);
+                topAggNode.setOutputSchema(newSchema);
             }
-            root = pushDownAggregate(root, aggNode, topAggNode);
+            root = pushDownAggregate(root, aggNode, topAggNode, newSchema);
         }
 
         if (m_parsedSelect.isGrouped()) {
@@ -1347,7 +1352,7 @@ public class PlanAssembler {
      */
     AbstractPlanNode pushDownAggregate(AbstractPlanNode root,
                                        AggregatePlanNode distNode,
-                                       AggregatePlanNode coordNode) {
+                                       AggregatePlanNode coordNode, NodeSchema schema) {
 
         // remember that coordinating aggregation has a pushed-down
         // counterpart deeper in the plan. this allows other operators
@@ -1372,7 +1377,13 @@ public class PlanAssembler {
 
         distNode.addAndLinkChild(root);
         distNode.generateOutputSchema(m_catalogDb);
-        root = distNode;
+
+        ProjectionPlanNode projectionNode = new ProjectionPlanNode();
+        projectionNode.setOutputSchema(schema);
+        projectionNode.addAndLinkChild(distNode);
+        projectionNode.generateOutputSchema(m_catalogDb);
+
+        root = projectionNode;
 
         // Put the send/receive pair back into place
         if (accessPlanTemp != null) {
