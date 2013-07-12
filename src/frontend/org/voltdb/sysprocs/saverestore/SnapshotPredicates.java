@@ -55,15 +55,16 @@ public class SnapshotPredicates {
                 JSONStringer stringer = new JSONStringer();
                 stringer.object();
                 stringer.key("triggersDelete").value(p.getSecond());
-                stringer.key("predicateExpression").object();
                 // If the predicate is null, EE will serialize all rows to the corresponding data
                 // target. It's the same as passing an always-true expression,
                 // but without the overhead of the evaluating the expression. This avoids the
                 // overhead when there is only one data target that wants all the rows.
                 if (predicate != null) {
+                    stringer.key("predicateExpression").object();
                     predicate.toJSONString(stringer);
+                    stringer.endObject();
                 }
-                stringer.endObject().endObject();
+                stringer.endObject();
                 predicates[i] = stringer.toString().getBytes(Charsets.UTF_8);
                 size += predicates[i].length;
                 i++;
