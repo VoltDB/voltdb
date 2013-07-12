@@ -24,11 +24,7 @@ import java.util.List;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ComparisonExpression;
-import org.voltdb.expressions.ConstantValueExpression;
-import org.voltdb.types.ExpressionType;
 
 import com.google.common.base.Charsets;
 
