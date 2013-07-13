@@ -121,8 +121,15 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
         m_miniSite = new MiniSite(m_mailbox, HSIds, this, m_nodeLog);
     }
 
-    void joinWith(long HSId) {
+    synchronized void stopTracking(long HSId) {
+        m_deadTracker.stopTracking(HSId);
+        m_mailbox.deliver(m_miniSite.createSitePruneMessage(HSId));
+    }
+
+    synchronized void joinWith(long HSId) {
         m_HSIds.add(HSId);
+        m_mailbox.deliver(m_miniSite.createSiteJoinMessage(HSId));
+        m_deadTracker.startTracking(HSId);
     }
 
     void shutdown()
@@ -185,7 +192,6 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
                     m_deadTracker.updateHSId(msg.m_src);
                     // inject actual message into mailbox
                     VoltMessage message = msg.m_msg;
-                    m_mailbox.deliver(message);
 
                     // snoop for SiteFailureMessage, inject into MiniSite's mailbox
                     if (   message instanceof SiteFailureMessage
@@ -198,6 +204,7 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
                             }
                         }
                     }
+                    m_mailbox.deliver(message);
                 }
                 // Do dead host detection.  Need to keep track of receive gaps from the remaining set
                 // of live hosts.

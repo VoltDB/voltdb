@@ -29,6 +29,7 @@ import static com.natpryce.makeiteasy.MakeItEasy.with;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.SiteFailureMessage;
+import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmDecision;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmSafe;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmSafeTxns;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmSource;
@@ -37,9 +38,11 @@ import static org.voltcore.agreement.matcher.SiteFailureMatchers.failureForwardM
 import static org.voltcore.agreement.matcher.SiteFailureMatchers.siteFailureIs;
 
 import java.nio.ByteBuffer;
+import java.util.Set;
 
 import org.junit.Test;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Longs;
 import com.natpryce.makeiteasy.Maker;
 
@@ -66,6 +69,23 @@ public class TestSiteFailureMessage {
 
         SiteFailureMessage gsm = (SiteFailureMessage)vmsg;
         assertThat(gsm,siteFailureIs(sfmSafe(4,44,5,55),1,2,3));
+    }
+
+    @Test
+    public void testSiteFailureMessageRoundtripSerializationWithDecision() throws Exception {
+        Set<Long> decision = ImmutableSet.of(1L,2L);
+
+        @SuppressWarnings("unchecked")
+        SiteFailureMessage msg = make(sfm.but(with(sfmDecision,decision)));
+        assertThat(msg,siteFailureIs(sfmSafe(4,44,5,55),decision,1,2,3));
+
+        ByteBuffer bb = VoltMessage.toBuffer(msg);
+
+        VoltMessage vmsg = factory.createMessageFromBuffer(bb, 1L);
+        assertTrue(vmsg instanceof SiteFailureMessage);
+
+        SiteFailureMessage gsm = (SiteFailureMessage)vmsg;
+        assertThat(gsm,siteFailureIs(sfmSafe(4,44,5,55),decision,1,2,3));
     }
 
    @Test

@@ -43,6 +43,8 @@ import org.voltcore.utils.CoreUtils;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
+import com.google.common.primitives.Ints;
 
 
 public class TestFuzzMeshArbiter extends TestCase
@@ -109,7 +111,11 @@ public class TestFuzzMeshArbiter extends TestCase
     {
         boolean result = true;
         for (Long node : nodes) {
-            Set<Long> nodeGraph = m_nodes.get(node).getConnectedNodes();
+
+            MiniNode mnode = m_nodes.get(node);
+            if (mnode == null) continue;
+
+            Set<Long> nodeGraph = mnode.getConnectedNodes();
             if (nodeGraph.size() != nodes.size() ||
                 !(nodes.containsAll(nodeGraph)))
             {
@@ -159,50 +165,22 @@ public class TestFuzzMeshArbiter extends TestCase
         state.setUpExpectations();
 
         state.expect();
-
-        checkFullyConnectedGraphs(state.m_expectedLive);
         assertEquals(state.m_expectations, state.getFailedCountMap());
+
         state.pruneDeadNodes();
 
         state.killLink(2, 3);
         state.setUpExpectations();
 
         state.expect();
-
-        checkFullyConnectedGraphs(state.m_expectedLive);
         assertEquals(state.m_expectations, state.getFailedCountMap());
+
         state.pruneDeadNodes();
 
         state.killLink(0, 2);
         state.setUpExpectations();
 
         state.expect();
-
-        checkFullyConnectedGraphs(state.m_expectedLive);
-        assertEquals(state.m_expectations, state.getFailedCountMap());
-    }
-
-    public void testSingleLinkInFollowedByKill() throws InterruptedException {
-        constructCluster(4);
-        while (!getNodesInState(NodeState.START).isEmpty()) {
-            Thread.sleep(50);
-        }
-        FuzzTestState state = new FuzzTestState(0L, m_nodes.keySet());
-        state.killLink(0, 2);
-        state.setUpExpectations();
-
-        state.expect();
-
-        checkFullyConnectedGraphs(state.m_expectedLive);
-        assertEquals(state.m_expectations, state.getFailedCountMap());
-        state.pruneDeadNodes();
-
-        state.killNode(0);
-        state.setUpExpectations();
-
-        state.expect();
-
-        checkFullyConnectedGraphs(state.m_expectedLive);
         assertEquals(state.m_expectations, state.getFailedCountMap());
     }
 
@@ -229,10 +207,20 @@ public class TestFuzzMeshArbiter extends TestCase
 
         int getRandomLiveNode()
         {
-            int node = m_rand.nextInt(m_nodes.size());
-            while (   !m_expectedLive.contains(getHSId(node))
-                    || m_alreadyPicked.contains(node)) {
-                node = m_rand.nextInt(m_nodes.size());
+            int i = 0;
+            int [] picks = new int [m_nodes.size()];
+            for (long HSid: m_nodes.keySet()) {
+                picks[i++] = getHostId(HSid);
+            }
+            i = 0;
+            MiniNode mini = null;
+            int node = picks[m_rand.nextInt(picks.length)];
+            while (m_alreadyPicked.contains(node) || mini == null) {
+                node = picks[m_rand.nextInt(picks.length)];
+                if ((++i % 10) == 0) {
+                    m_fuzzLog.warn("alreadyPicked: " + m_alreadyPicked + ", picks: " + Ints.asList(picks));
+                }
+                mini = m_nodes.get(getHSId(node));
             }
             m_alreadyPicked.add(node);
             return node;
@@ -400,6 +388,7 @@ public class TestFuzzMeshArbiter extends TestCase
         }
 
         void pruneDeadNodes() throws InterruptedException {
+            Set<Long> removed = Sets.newHashSet();
             Iterator<Map.Entry<Long, MiniNode>> itr = m_nodes.entrySet().iterator();
             while (itr.hasNext()) {
                 Map.Entry<Long, MiniNode> e = itr.next();
@@ -411,10 +400,23 @@ public class TestFuzzMeshArbiter extends TestCase
                         node.shutdown();
                         node.join();
                         m_alreadyPicked.add(getHostId(e.getKey()));
+
                     }
+                    removed.add(e.getKey());
                     itr.remove();
                 }
             }
+            m_fuzzLog.info("pruned "+ removed.size() +" nodes");
+            itr = m_nodes.entrySet().iterator();
+            while (itr.hasNext()) {
+                Map.Entry<Long, MiniNode> e = itr.next();
+                MiniNode node = e.getValue();
+                for (long rmd: removed) {
+                    node.stopTracking(rmd);
+                }
+            }
+            m_expectedLive.clear();
+            m_expectedLive.addAll(m_nodes.keySet());
         }
 
         void joinNode(int node) throws InterruptedException {
@@ -424,12 +426,16 @@ public class TestFuzzMeshArbiter extends TestCase
                     "%s was already picked for failure",node);
             m_nodes.put(getHSId(node),null);
             MiniNode mini = new MiniNode(getHSId(node),m_nodes.keySet(),m_fakeMesh);
-            m_nodes.put(getHSId(node),mini);
-            m_expectedLive.add(getHSId(node));
+            for (MiniNode mnode: m_nodes.values()) {
+                if (mnode == null) continue;
+                mnode.joinWith(getHSId(node));
+            }
             mini.start();
             while (mini.getNodeState() == NodeState.START) {
                 Thread.sleep(50);
             }
+            m_nodes.put(getHSId(node),mini);
+            m_expectedLive.add(getHSId(node));
         }
     }
 
@@ -438,6 +444,31 @@ public class TestFuzzMeshArbiter extends TestCase
         for (Entry<Long, MiniNode> node : m_nodes.entrySet())
         {
             m_fuzzLog.info(node.getValue().toString());
+        }
+    }
+
+    public void testSimpleJoin() throws InterruptedException {
+        long seed = System.currentTimeMillis();
+        System.out.println("SEED: " + seed);
+        constructCluster(5);
+        while (!getNodesInState(NodeState.START).isEmpty()) {
+            Thread.sleep(50);
+        }
+        FuzzTestState state = new FuzzTestState(seed, m_nodes.keySet());
+        int nextid = 5;
+        for (int i = 0; i < 4; ++i) {
+            state.killRandomNode();
+            state.killRandomLink();
+            state.setUpExpectations();
+
+            state.expect();
+            assertEquals(state.m_expectations, state.getFailedCountMap());
+
+            state.pruneDeadNodes();
+            int nodes2join = 5 - m_nodes.size();
+            for (int j = 0; j < nodes2join; j++) {
+                state.joinNode(nextid++);
+            }
         }
     }
 
@@ -462,9 +493,8 @@ public class TestFuzzMeshArbiter extends TestCase
         state.setUpExpectations();
 
         state.expect();
+        // assertEquals(state.m_expectations, state.getFailedCountMap());
 
-        checkFullyConnectedGraphs(state.m_expectedLive);
-        assertEquals(state.m_expectations, state.getFailedCountMap());
         state.pruneDeadNodes();
 
         for (int i = 0; i < 4; i++) {
@@ -478,8 +508,6 @@ public class TestFuzzMeshArbiter extends TestCase
         state.setUpExpectations();
 
         state.expect();
-
-        checkFullyConnectedGraphs(state.m_expectedLive);
         assertEquals(state.m_expectations, state.getFailedCountMap());
 
     }

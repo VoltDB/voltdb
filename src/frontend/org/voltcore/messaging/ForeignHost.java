@@ -306,18 +306,11 @@ public class ForeignHost {
         final VoltMessage message =
             m_hostMessenger.getMessageFactory().createMessageFromBuffer(in, sourceHSId);
 
-        for (int i = 0; i < destCount; i++) {
-            deliverMessage( recvDests[i], message);
-        }
-
-        //m_lastMessageMillis = System.currentTimeMillis();
-        m_lastMessageMillis.lazySet(EstTime.currentTimeMillis());
-
         // ENG-1608.  We sniff for SiteFailureMessage here so
         // that a node will participate in the failure resolution protocol
         // even if it hasn't directly witnessed a node fault.
         if (   message instanceof SiteFailureMessage
-            && !(message instanceof SiteFailureForwardMessage))
+                && !(message instanceof SiteFailureForwardMessage))
         {
             SiteFailureMessage sfm = (SiteFailureMessage)message;
 
@@ -327,6 +320,14 @@ public class ForeignHost {
                 }
             }
         }
+
+        for (int i = 0; i < destCount; i++) {
+            deliverMessage( recvDests[i], message);
+        }
+
+        //m_lastMessageMillis = System.currentTimeMillis();
+        m_lastMessageMillis.lazySet(EstTime.currentTimeMillis());
+
     }
 
     public void sendPoisonPill(String err) {

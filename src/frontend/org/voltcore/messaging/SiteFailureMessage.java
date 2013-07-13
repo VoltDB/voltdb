@@ -35,6 +35,9 @@ public class SiteFailureMessage extends VoltMessage {
     /** Greatest 2PC transaction id at source m_sourceSiteId seen from failed initiator */
     public Map<Long,Long> m_safeTxnIds = ImmutableMap.of();
 
+    /** indicates that this is a site decision */
+    public Set<Long> m_decision = ImmutableSet.of();
+
     /**
      * For VoltMessage factory.
      */
@@ -49,10 +52,21 @@ public class SiteFailureMessage extends VoltMessage {
         m_safeTxnIds = safeTxnIds;
     }
 
+    protected SiteFailureMessage(
+            final Set<Long> survivors,
+            final Map<Long,Long> safeTxnIds,
+            final Set<Long> decision) {
+
+        m_survivors = survivors;
+        m_safeTxnIds = safeTxnIds;
+        m_decision = decision;
+    }
+
     @Override
     protected void initFromBuffer(ByteBuffer buf) {
         int srvrcnt = buf.getInt();
         int safecnt = buf.getInt();
+        int dcncnt  = buf.getInt();
 
         Builder bldr = new Builder();
 
@@ -61,6 +75,9 @@ public class SiteFailureMessage extends VoltMessage {
         }
         for (int i = 0; i < safecnt; ++i) {
             bldr.addSafeTxnId(buf.getLong(), buf.getLong());
+        }
+        for (int i = 0; i < dcncnt; ++i) {
+            bldr.addDecision(buf.getLong());
         }
         bldr.initialize(this);
 
@@ -80,6 +97,7 @@ public class SiteFailureMessage extends VoltMessage {
 
         buf.putInt(m_survivors.size());
         buf.putInt(m_safeTxnIds.size());
+        buf.putInt(m_decision.size());
 
         for (long h: m_survivors) {
             buf.putLong(h);
@@ -88,6 +106,9 @@ public class SiteFailureMessage extends VoltMessage {
             buf.putLong(e.getKey());
             buf.putLong(e.getValue());
         }
+        for (long d: m_decision) {
+            buf.putLong(d);
+        }
     }
 
     @Override
@@ -95,7 +116,9 @@ public class SiteFailureMessage extends VoltMessage {
         int msgsize =
             4 + // survivor host count int
             4 + // safe transactions ids count
+            4 + // decision hosts count
             8 * m_survivors.size() +
+            8 * m_decision.size() +
             (8 + 8) * m_safeTxnIds.size();
         msgsize += super.getSerializedSize();
         return msgsize;
@@ -114,6 +137,11 @@ public class SiteFailureMessage extends VoltMessage {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(Subject.values()[getSubject()]);
+        if (!m_decision.isEmpty()) {
+            sb.append(" final decision: [");
+            sb.append(CoreUtils.hsIdCollectionToString(m_decision));
+            sb.append("]");
+        }
         sb.append(" from site: ");
         sb.append(CoreUtils.hsIdToString(m_sourceHSId));
         sb.append(" survivors: [");
@@ -132,16 +160,29 @@ public class SiteFailureMessage extends VoltMessage {
 
     public static class Builder {
         ImmutableSet.Builder<Long> srvrb = ImmutableSet.builder();
+        ImmutableSet.Builder<Long> dcsnb = ImmutableSet.builder();
         ImmutableMap.Builder<Long, Long> safeb = ImmutableMap.builder();
 
-        public void addSurvivor(long survivor) {
-            srvrb.add(survivor);
+        public Builder addDecision(Set<Long> decision) {
+            dcsnb.addAll(decision);
+            return this;
         }
 
-        public void addSurvivors(Set<Long> survivors) {
+        public Builder addDecision(long decisionSite) {
+            dcsnb.add(decisionSite);
+            return this;
+        }
+
+        public Builder addSurvivor(long survivor) {
+            srvrb.add(survivor);
+            return this;
+        }
+
+        public Builder addSurvivors(Set<Long> survivors) {
             for (long survivor: survivors) {
                 addSurvivor(survivor);
             }
+            return this;
         }
 
         public void addSafeTxnId(long failedHsid, long safeTxnId) {
@@ -149,10 +190,11 @@ public class SiteFailureMessage extends VoltMessage {
         }
 
         public SiteFailureMessage build() {
-            return new SiteFailureMessage(srvrb.build(), safeb.build());
+            return new SiteFailureMessage(srvrb.build(), safeb.build(), dcsnb.build());
         }
 
         protected void initialize(SiteFailureMessage m) {
+            m.m_decision = dcsnb.build();
             m.m_survivors = srvrb.build();
             m.m_safeTxnIds = safeb.build();
         }

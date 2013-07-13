@@ -99,6 +99,7 @@ public class SiteFailureMessageMaker {
     }
 
     public static final Property<SiteFailureMessage,Long> sfmSource = newProperty();
+    public static final Property<SiteFailureMessage, Iterable<Long>> sfmDecision = newProperty();
     public static final Property<SiteFailureMessage, Iterable<Long>> sfmSurvivors = newProperty();
     public static final Property<SiteFailureMessage, Iterable<Pair<Long,Long>>> sfmSafeTxns = newProperty();
 
@@ -112,6 +113,7 @@ public class SiteFailureMessageMaker {
                    SiteFailureMessage.Builder builder =  new SiteFailureMessage.Builder();
 
                    builder.addSurvivors(Sets.newHashSet(lookup.valueOf(sfmSurvivors, Longs.asList(1))));
+                   builder.addDecision(Sets.newHashSet(lookup.valueOf(sfmDecision, Longs.asList(1))));
 
                    for (Pair<Long,Long> sp: lookup.valueOf(sfmSafeTxns, listOf(a(safePair)))) {
                        builder.addSafeTxnId(sp.getFirst(), sp.getSecond());

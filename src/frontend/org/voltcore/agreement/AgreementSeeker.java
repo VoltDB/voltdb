@@ -269,7 +269,8 @@ public class AgreementSeeker {
     public void add(long reportingHsid, SiteFailureMessage sfm) {
         // skip if the reporting site did not belong to the pre
         // failure mesh, or the reporting site is reporting itself
-        // dead
+        // dead, or none of the sites in the safe transaction map
+        // are among the known hsids
         if (   !m_hsids.contains(reportingHsid)
             || !sfm.m_survivors.contains(reportingHsid)) return;
 
@@ -508,6 +509,34 @@ public class AgreementSeeker {
             isb.addAll(Sets.filter(deadBy, amongSurvivors));
         }
         return isb.build();
+    }
+
+    public long bestKillCandidateAmong(Set<Long> candidates) {
+        long pick = Long.MIN_VALUE;
+        int dings = Integer.MIN_VALUE;
+        for (long candidate: candidates) {
+            int siteDings = m_dead.get(candidate).size();
+            if (siteDings > dings) {
+                dings = siteDings;
+                pick = candidate;
+            } else if (dings == siteDings && candidate > pick) {
+                pick = candidate;
+            }
+        }
+        return pick;
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("AgreementSeeker { hsId: ").append(CoreUtils.hsIdToString(m_selfHsid));
+        sb.append(", survivors: [").append(CoreUtils.hsIdCollectionToString(m_survivors));
+        sb.append("], alive: ");
+        dumpGraph(m_alive, sb);
+        sb.append(", dead: ");
+        dumpGraph(m_dead, sb);
+        sb.append("}");
+        return sb.toString();
     }
 
     protected class Scenario {

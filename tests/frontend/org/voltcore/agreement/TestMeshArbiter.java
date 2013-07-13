@@ -107,7 +107,7 @@ public class TestMeshArbiter {
 
         Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(0,1));
 
-        verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
+        verify(mbox,times(2)).send(any(long[].class), any(VoltMessage.class));
         verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(1,11), 0,2,3)));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of(1L,11L));
@@ -137,7 +137,7 @@ public class TestMeshArbiter {
 
         Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(0,1));
 
-        verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
+        verify(mbox,times(2)).send(any(long[].class), any(VoltMessage.class));
         verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(1,11), 0,2,3)));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of(1L,11L));
@@ -151,7 +151,7 @@ public class TestMeshArbiter {
         decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(0,2));
 
         verify(mbox,never()).deliverFront(any(VoltMessage.class));
-        verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
+        verify(mbox,times(2)).send(any(long[].class), any(VoltMessage.class));
         verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(2,22), 0,3)));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of(2L,22L));
@@ -178,7 +178,7 @@ public class TestMeshArbiter {
 
         Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(0,1));
 
-        verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
+        verify(mbox,times(2)).send(any(long[].class), any(VoltMessage.class));
         verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(1,11,2,22), 0,3)));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of(1L,11L,2L,22L));
@@ -221,7 +221,7 @@ public class TestMeshArbiter {
         decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(0,2));
 
         verify(mbox,never()).deliverFront(any(VoltMessage.class));
-        verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
+        verify(mbox,times(2)).send(any(long[].class), any(VoltMessage.class));
         verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(1,11,2,22), 0,3)));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of(1L,11L,2L,22L));
@@ -246,7 +246,7 @@ public class TestMeshArbiter {
 
         Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(0,1));
 
-        verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
+        verify(mbox,times(2)).send(any(long[].class), any(VoltMessage.class));
         verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(1,11), 0,2,3)));
         verify(aide,atLeast(2)).sendHeartbeats(destinationCaptor.capture());
         assertEquals(destinationCaptor.getValue(), hsids);
@@ -270,7 +270,7 @@ public class TestMeshArbiter {
         Map<Long,Long> decision =
                 arbiter.reconfigureOnFault(hsids, new FaultMessage(2,1,ImmutableSet.of(0L,2L,3L)));
 
-        verify(mbox,times(1)).deliverFront(any(VoltMessage.class));
+        verify(mbox,times(2)).deliverFront(any(VoltMessage.class));
         verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
         verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(1,11), 0,1,2,3)));
 
@@ -284,7 +284,7 @@ public class TestMeshArbiter {
         decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(0,1));
 
         verify(mbox,never()).deliverFront(any(VoltMessage.class));
-        verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
+        verify(mbox,times(2)).send(any(long[].class), any(VoltMessage.class));
         verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(1,11), 0,2,3)));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of(1L,11L));
@@ -322,7 +322,7 @@ public class TestMeshArbiter {
         Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(0,1));
 
         verify(mbox,times(0)).deliverFront(any(VoltMessage.class));
-        verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
+        verify(mbox,times(2)).send(any(long[].class), any(VoltMessage.class));
         verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(1,11), 0,2,3)));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of(1L,11L));
@@ -355,7 +355,7 @@ public class TestMeshArbiter {
 
         Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(2,1,ImmutableSet.of(0L,2L,3L)));
 
-        verify(mbox,times(1)).deliverFront(any(VoltMessage.class));
+        verify(mbox,times(2)).deliverFront(any(VoltMessage.class));
         verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
         verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(1,11), 0,1,2,3)));
 
@@ -370,7 +370,8 @@ public class TestMeshArbiter {
 
         decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1,2,ImmutableSet.of(0L,1L,3L)));
 
-        verify(mbox,times(0)).deliverFront(any(VoltMessage.class));
+        // promotion from un to witnessed
+        verify(mbox,times(1)).deliverFront(any(VoltMessage.class));
         verify(mbox,atLeast(2)).send(any(long[].class), any(VoltMessage.class));
         verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(1,11,2,22), 0,1,2,3)));
         verify(mbox).send(eq(new long[]{1}), argThat(failureForwardMsgIs(2,sfmSafe(1,11), 0,2,3)));

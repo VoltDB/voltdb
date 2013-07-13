@@ -70,6 +70,37 @@ public class SiteFailureMatchers {
         };
     }
 
+    static public final Matcher<SiteFailureMessage> siteFailureIs(
+            final Donor<List<Pair<Long,Long>>> safeTxns,
+            final Set<Long> decision,
+            final long...survivors) {
+
+        final Map<Long,Long> safeTxnIds = Maps.newHashMap();
+        for (Pair<Long,Long> sp: safeTxns.value()) {
+            safeTxnIds.put(sp.getFirst(),sp.getSecond());
+        }
+        final Set<Long> survivorSet = ImmutableSet.copyOf(Longs.asList(survivors));
+
+        return new TypeSafeMatcher<SiteFailureMessage>() {
+
+            @Override
+            public void describeTo(Description d) {
+                d.appendText("SiteFailureMessage [")
+                .appendText("decision: ").appendValueList("", ", ", "", decision)
+                .appendText(", survivors: ").appendValueList("", ", ", "", Longs.asList(survivors))
+                .appendText(", safeTxnIds: ").appendValue(safeTxnIds)
+                .appendText("]");
+            }
+
+            @Override
+            protected boolean matchesSafely(SiteFailureMessage m) {
+                return equalTo(survivorSet).matches(m.m_survivors)
+                    && equalTo(decision).matches(m.m_decision)
+                    && equalTo(safeTxnIds).matches(m.m_safeTxnIds);
+            }
+        };
+    }
+
     static public final Matcher<SiteFailureForwardMessage> failureForwardMsgIs(
             final long reportingHsid,
             final Donor<List<Pair<Long,Long>>> safeTxns, final long...survivors) {

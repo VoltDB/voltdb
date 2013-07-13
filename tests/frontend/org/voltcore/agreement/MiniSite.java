@@ -32,6 +32,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.DisconnectFailedHostsCallback;
 import org.voltcore.messaging.FaultMessage;
 import org.voltcore.messaging.HeartbeatMessage;
+import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
@@ -49,8 +50,6 @@ class MiniSite extends Thread implements MeshAide
     Set<Long> m_currentHSIds = new HashSet<Long>();
     Set<Long> m_failedHSIds = new HashSet<Long>();
 
-    private volatile int m_failedCountStamp;
-
     MiniSite(Mailbox mbox, Set<Long> HSIds, DisconnectFailedHostsCallback callback,
             VoltLogger logger)
     {
@@ -59,17 +58,7 @@ class MiniSite extends Thread implements MeshAide
         m_currentHSIds.addAll(HSIds);
         m_mailbox = mbox;
         m_arbiter = new MeshArbiter(mbox.getHSId(), mbox, this);
-        m_failedCountStamp = m_arbiter.getFailedSitesCount();
         m_failedHosts = callback;
-    }
-
-    public int stamp() {
-        m_failedCountStamp = m_arbiter.getFailedSitesCount();
-        return m_failedCountStamp;
-    }
-
-    public int hasProgressedBy() {
-        return m_arbiter.getFailedSitesCount() - m_failedCountStamp;
     }
 
     void shutdown()
@@ -113,13 +102,38 @@ class MiniSite extends Thread implements MeshAide
         super.start();
     }
 
+    public LocalObjectMessage createSiteJoinMessage(final long hSId) {
+        Runnable siteJoiner = new Runnable() {
+            @Override
+            public void run() {
+                m_currentHSIds.add(hSId);
+            }
+        };
+        return new LocalObjectMessage(siteJoiner);
+    }
+
+    public LocalObjectMessage createSitePruneMessage(final long hSId) {
+        Runnable sitePruner = new Runnable() {
+            @Override
+            public void run() {
+                m_currentHSIds.remove(hSId);
+            }
+        };
+        return new LocalObjectMessage(sitePruner);
+    }
+
     @Override
     public void run() {
         long lastHeartbeatTime = System.currentTimeMillis();
         while (m_shouldContinue.get()) {
             VoltMessage msg = m_mailbox.recvBlocking(5);
             if (msg != null) {
-                processMessage(msg);
+                if (msg instanceof LocalObjectMessage) {
+                    LocalObjectMessage lomsg = (LocalObjectMessage)msg;
+                    ((Runnable)lomsg.payload).run();
+                } else {
+                    processMessage(msg);
+                }
             }
             long now = System.currentTimeMillis();
             if (now - lastHeartbeatTime > 5) {
