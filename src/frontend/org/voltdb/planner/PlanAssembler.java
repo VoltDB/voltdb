@@ -1385,12 +1385,7 @@ public class PlanAssembler {
             coordNode.generateOutputSchema(m_catalogDb);
             root = coordNode;
         } else {
-            // No distributed plan, add a projection node on distNode
-            ProjectionPlanNode ppn = new ProjectionPlanNode();
-            ppn.setOutputSchema(newSchema);
-            ppn.addAndLinkChild(root);
-            ppn.generateOutputSchema(m_catalogDb);
-            root = ppn;
+            ((AggregatePlanNode)root).setOutputSchema(newSchema);
         }
         return root;
     }
