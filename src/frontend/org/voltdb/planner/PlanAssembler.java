@@ -1305,13 +1305,7 @@ public class PlanAssembler {
                 }
             }
             NodeSchema newSchema = m_parsedSelect.evaluatePostAggColumns();
-            aggNode.setOutputSchema(newSchema);
-            /*
-             * Is there a necessary coordinator-aggregate node...
-             */
-            if (topAggNode != null) {
-                topAggNode.setOutputSchema(newSchema);
-            }
+            aggNode.setOutputSchema(agg_schema);
             root = pushDownAggregate(root, aggNode, topAggNode, newSchema);
         }
 
@@ -1352,13 +1346,14 @@ public class PlanAssembler {
      */
     AbstractPlanNode pushDownAggregate(AbstractPlanNode root,
                                        AggregatePlanNode distNode,
-                                       AggregatePlanNode coordNode, NodeSchema schema) {
+                                       AggregatePlanNode coordNode, NodeSchema newSchema) {
 
         // remember that coordinating aggregation has a pushed-down
         // counterpart deeper in the plan. this allows other operators
         // to be pushed down past the receive as well.
         if (coordNode != null) {
             coordNode.m_isCoordinatingAggregator = true;
+            coordNode.setOutputSchema(newSchema);
         }
 
         /*
@@ -1377,13 +1372,7 @@ public class PlanAssembler {
 
         distNode.addAndLinkChild(root);
         distNode.generateOutputSchema(m_catalogDb);
-
-        ProjectionPlanNode projectionNode = new ProjectionPlanNode();
-        projectionNode.setOutputSchema(schema);
-        projectionNode.addAndLinkChild(distNode);
-        projectionNode.generateOutputSchema(m_catalogDb);
-
-        root = projectionNode;
+        root = distNode;
 
         // Put the send/receive pair back into place
         if (accessPlanTemp != null) {
@@ -1395,6 +1384,13 @@ public class PlanAssembler {
             coordNode.addAndLinkChild(root);
             coordNode.generateOutputSchema(m_catalogDb);
             root = coordNode;
+        } else {
+            // No distributed plan, add a projection node on distNode
+            ProjectionPlanNode ppn = new ProjectionPlanNode();
+            ppn.setOutputSchema(newSchema);
+            ppn.addAndLinkChild(root);
+            ppn.generateOutputSchema(m_catalogDb);
+            root = ppn;
         }
         return root;
     }
