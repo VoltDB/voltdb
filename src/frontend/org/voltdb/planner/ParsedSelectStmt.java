@@ -98,8 +98,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     public ArrayList<ParsedColInfo> groupByColumns = new ArrayList<ParsedColInfo>();
 
     public ArrayList<ParsedColInfo> aggResultColumns = new ArrayList<ParsedColInfo>();
-    public ArrayList<ParsedColInfo> postAggColumns = new ArrayList<ParsedColInfo>();
-    private final HashSet<ParsedColInfo> aggColumns = new HashSet<ParsedColInfo>();
+    public HashMap <AbstractExpression, Integer> aggTableIndexMap = new HashMap <AbstractExpression,Integer>();
 
     public long limit = -1;
     public long offset = 0;
@@ -146,8 +145,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
 
         // Construct the aggResultColumns
-        aggColumns.addAll(groupByColumns);
-        aggResultColumns = new ArrayList<ParsedSelectStmt.ParsedColInfo>(aggColumns);
+        aggResultColumns.addAll(groupByColumns);
     }
 
     /**
@@ -166,13 +164,13 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             col.columnName = "";
 
             boolean notExists = true;
-            for (ParsedColInfo ic: aggColumns) {
+            for (ParsedColInfo ic: aggResultColumns) {
                 if (ic.equals(col)) {
                     notExists = false;
                 }
             }
             if (notExists)
-                aggColumns.add(col);
+                aggResultColumns.add(col);
         }
         for (VoltXMLElement child : root.children) {
             parseAggColumns(child);
@@ -185,7 +183,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      */
     NodeSchema evaluatePostAggColumns () {
         // Build the association between the table column with its index
-        HashMap <AbstractExpression, Integer> aggTableIndexMap = new HashMap <AbstractExpression, Integer>();
         for (int i = 0; i < aggResultColumns.size(); i++) {
             ParsedColInfo col = aggResultColumns.get(i);
             aggTableIndexMap.put(col.expression, i);
