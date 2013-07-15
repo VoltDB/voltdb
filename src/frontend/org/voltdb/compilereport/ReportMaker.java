@@ -64,7 +64,8 @@ public class ReportMaker {
         if (color != null) {
             sb.append("-").append(color);
         }
-        sb.append(" l-").append(text).append("'>").append(text).append("</span>");
+        String classText = text.replace(' ', '_');
+        sb.append(" l-").append(classText).append("'>").append(text).append("</span>");
     }
 
     static String genrateIndexRow(Table table, Index index) {
@@ -158,7 +159,7 @@ public class ReportMaker {
         // column 2: type
         sb.append("<td>");
         if (table.getMaterializer() != null) {
-            tag(sb, "info", "MaterialziedView");
+            tag(sb, "info", "Materialized View");
         }
         else {
             tag(sb, null, "Table");
@@ -205,10 +206,10 @@ public class ReportMaker {
             }
         }
         if (found) {
-            tag(sb, "info", "Has-Pkey");
+            tag(sb, "info", "Has-PKey");
         }
         else {
-            tag(sb, null, "No-Pkey");
+            tag(sb, null, "No-PKey");
         }
         sb.append("</td>");
 
@@ -293,7 +294,7 @@ public class ReportMaker {
         List<StmtParameter> params = CatalogUtil.getSortedCatalogItems(statement.getParameters(), "index");
         List<String> paramTypes = new ArrayList<String>();
         for (StmtParameter param : params) {
-            paramTypes.add(VoltType.get((byte) param.getJavatype()).name());
+            paramTypes.add(VoltType.get((byte) param.getSqltype()).name());
         }
         if (paramTypes.size() == 0) {
             sb.append("<i>None</i>");
@@ -400,7 +401,11 @@ public class ReportMaker {
         List<ProcParameter> params = CatalogUtil.getSortedCatalogItems(procedure.getParameters(), "index");
         List<String> paramTypes = new ArrayList<String>();
         for (ProcParameter param : params) {
-            paramTypes.add(VoltType.get((byte) param.getType()).name());
+            String paramType = VoltType.get((byte) param.getType()).name();
+            if (param.getIsarray()) {
+                paramType += "[]";
+            }
+            paramTypes.add(paramType);
         }
         if (paramTypes.size() == 0) {
             sb.append("<i>None</i>");
@@ -573,8 +578,9 @@ public class ReportMaker {
         sb.append(VoltDB.instance().getVersionString()).append("</td></tr>\n");
 
         // timestamp
-        sb.append("<tr><td>Compile Timestamp</td><td>");
-        sb.append(SimpleDateFormat.getInstance().format(m_timestamp)).append("</td></tr>\n");
+        sb.append("<tr><td>Compiled on</td><td>");
+        SimpleDateFormat sdf = new SimpleDateFormat("EEE, d MMM yyyy HH:mm:ss z");
+        sb.append(sdf.format(m_timestamp)).append("</td></tr>\n");
 
         // tables
         sb.append("<tr><td>Table Count</td><td>");
