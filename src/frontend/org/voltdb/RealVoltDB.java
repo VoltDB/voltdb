@@ -21,6 +21,7 @@ import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -56,11 +57,16 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
+import org.apache.log4j.Appender;
+import org.apache.log4j.DailyRollingFileAppender;
+import org.apache.log4j.FileAppender;
+import org.apache.log4j.Logger;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
@@ -99,6 +105,7 @@ import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.rejoin.Iv2RejoinCoordinator;
 import org.voltdb.rejoin.JoinCoordinator;
+import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.HTTPAdminListener;
@@ -108,6 +115,8 @@ import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.VoltSampler;
 
+import com.google.common.base.Charsets;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.SettableFuture;
@@ -255,6 +264,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     private ListeningExecutorService m_computationService;
 
+    private Thread m_configLogger;
+
     // methods accessed via the singleton
     @Override
     public void startSampler() {
@@ -333,6 +344,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_hostIdWithStartupCatalog = 0;
             m_pathToStartupCatalog = m_config.m_pathToCatalog;
             m_replicationActive = false;
+            m_configLogger = null;
 
             // set up site structure
             m_localSites = new COWMap<Long, ExecutionSite>();
@@ -746,6 +758,109 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_restoreAgent.setCatalogContext(m_catalogContext);
                 m_restoreAgent.setInitiator(new Iv2TransactionCreator(m_clientInterfaces.get(0)));
             }
+
+            m_configLogger = new Thread(new ConfigLogging());
+            m_configLogger.start();
+        }
+    }
+
+    private class ConfigLogging implements Runnable {
+        private void logConfigInfo() {
+            hostLog.info("Logging config info");
+
+            File voltDbRoot = CatalogUtil.getVoltDbRoot(m_deployment.getPaths());
+
+            String pathToConfigInfoDir = voltDbRoot.getPath() + File.separator + "config_log";
+            File configInfoDir = new File(pathToConfigInfoDir);
+            configInfoDir.mkdirs();
+
+            String pathToConfigInfo = pathToConfigInfoDir + File.separator + "config.json";
+            File configInfo = new File(pathToConfigInfo);
+
+            String deploymentPath = null;
+            File deploymentFile = new File(m_config.m_pathToDeployment);
+            try {
+                deploymentPath = deploymentFile.getCanonicalPath();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            byte jsonBytes[] = null;
+            try {
+                JSONStringer stringer = new JSONStringer();
+                stringer.object();
+
+                stringer.key("workingDir").value(System.getProperty("user.dir"));
+                stringer.key("pid").value(CLibrary.getpid());
+                stringer.key("deployment").value(deploymentPath);
+
+                stringer.key("log4jDst").array();
+                Enumeration appenders = Logger.getRootLogger().getAllAppenders();
+                while (appenders.hasMoreElements()) {
+                    Appender appender = (Appender) appenders.nextElement();
+                    if (appender instanceof FileAppender){
+                        stringer.object();
+                        stringer.key("path").value(new File(((FileAppender) appender).getFile()).getCanonicalPath());
+                        if (appender instanceof DailyRollingFileAppender) {
+                            stringer.key("format").value(((DailyRollingFileAppender)appender).getDatePattern());
+                        }
+                        stringer.endObject();
+                    }
+                }
+
+                Enumeration loggers = Logger.getRootLogger().getLoggerRepository().getCurrentLoggers();
+                while (loggers.hasMoreElements()) {
+                    Logger logger = (Logger) loggers.nextElement();
+                    appenders = logger.getAllAppenders();
+                    while (appenders.hasMoreElements()) {
+                        Appender appender = (Appender) appenders.nextElement();
+                        if (appender instanceof FileAppender){
+                            stringer.object();
+                            stringer.key("path").value(new File(((FileAppender) appender).getFile()).getCanonicalPath());
+                            if (appender instanceof DailyRollingFileAppender) {
+                                stringer.key("format").value(((DailyRollingFileAppender)appender).getDatePattern());
+                            }
+                            stringer.endObject();
+                        }
+                    }
+                }
+                stringer.endArray();
+
+                stringer.endObject();
+                JSONObject jsObj = new JSONObject(stringer.toString());
+                jsonBytes = jsObj.toString(4).getBytes(Charsets.UTF_8);
+            } catch (JSONException e) {
+                Throwables.propagate(e);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            try {
+                FileOutputStream fos = new FileOutputStream(configInfo);
+                fos.write(jsonBytes);
+                fos.getFD().sync();
+                fos.close();
+            } catch (IOException e) {
+                hostLog.error("Failed to log config info: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+
+        private void logCatalog() {
+            File voltDbRoot = CatalogUtil.getVoltDbRoot(m_deployment.getPaths());
+            String pathToConfigInfoDir = voltDbRoot.getPath() + File.separator + "config_log";
+
+            try {
+                m_catalogContext.writeCatalogJarToFile(pathToConfigInfoDir, "catalog.jar");
+            } catch (IOException e) {
+                hostLog.error("Failed to log catalog: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+
+        public void run() {
+            logConfigInfo();
+            logCatalog();
         }
     }
 
@@ -1466,6 +1581,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     }
                 }
 
+                if (m_configLogger != null) {
+                    m_configLogger.join();
+                }
+
                 // shut down Export and its connectors.
                 ExportManager.instance().shutdown();
 
@@ -1681,6 +1800,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_MPI.updateCatalog(diffCommands, m_catalogContext, csp);
             }
 
+            new ConfigLogging().logCatalog();
 
             return Pair.of(m_catalogContext, csp);
         }
