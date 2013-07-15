@@ -299,7 +299,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             int count = parseAggColumns(child);
             if (count == 0) {
                 for (ParsedColInfo ic: groupByColumns) {
-                    if (ic.equals(col)) {
+                    if (ic.simpleEquals(col)) {
                         insertToAggResultColumns(col);
                     }
                 }
