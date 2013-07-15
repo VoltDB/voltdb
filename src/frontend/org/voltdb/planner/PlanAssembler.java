@@ -1353,7 +1353,6 @@ public class PlanAssembler {
         // to be pushed down past the receive as well.
         if (coordNode != null) {
             coordNode.m_isCoordinatingAggregator = true;
-            coordNode.setOutputSchema(newSchema);
         }
 
         /*
@@ -1374,6 +1373,7 @@ public class PlanAssembler {
         distNode.generateOutputSchema(m_catalogDb);
         root = distNode;
 
+        ProjectionPlanNode proj = new ProjectionPlanNode();
         // Put the send/receive pair back into place
         if (accessPlanTemp != null) {
             accessPlanTemp.getChild(0).clearChildren();
@@ -1383,10 +1383,14 @@ public class PlanAssembler {
             // Add the top node
             coordNode.addAndLinkChild(root);
             coordNode.generateOutputSchema(m_catalogDb);
-            root = coordNode;
+            proj.addAndLinkChild(coordNode);
         } else {
-            ((AggregatePlanNode)root).setOutputSchema(newSchema);
+            proj.addAndLinkChild(root);
         }
+
+        proj.setOutputSchema(newSchema);
+        proj.generateOutputSchema(m_catalogDb);
+        root = proj;
         return root;
     }
 
