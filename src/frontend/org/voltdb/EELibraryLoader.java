@@ -62,7 +62,7 @@ public class EELibraryLoader {
                                 "platform.\n";
                         msg +=  "VoltDB provides builds on our website for 64-bit OSX systems >= 10.6, " +
                                 "and 64-bit Linux systems with kernels >= 2.6.18.";
-                        VoltDB.crashLocalVoltDB(msg, false, null);
+                        VoltDB.crashLocalVoltDB(msg, true, e);
                     } else {
                         hostLog.info("Library VOLTDB JNI shared library loading failed. Library path "
                                 + System.getProperty("java.library.path"));

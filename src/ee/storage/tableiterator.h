@@ -267,5 +267,5 @@ inline int TableIterator::getLocation() const {
 inline int TableIterator::getTuplesFound() {
 	return m_foundTuples;
 }
-
+}
 #endif

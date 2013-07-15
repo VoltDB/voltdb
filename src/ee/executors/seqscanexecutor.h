@@ -49,6 +49,7 @@
 #include "common/common.h"
 #include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
+#include "execution/VoltDBEngine.h"
 
 namespace voltdb
 {
@@ -65,7 +66,7 @@ namespace voltdb
                     TempTableLimits* limits);
         bool p_execute(const NValueArray& params);
         bool needsOutputTableClear();
-        /** reference to the engine/context to store the number of tuples scanned*/
+        /** reference to the engine/context to log the number of tuples scanned*/
         VoltDBEngine* m_engine;
     };
 }

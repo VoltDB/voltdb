@@ -98,7 +98,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     }
 
     //what's this signature thing?
-    m_logStatsMID = m_jniEnv->GetMethodID(jniClass, "logStats", "(J)[C");
+    m_logStatsMID = m_jniEnv->GetMethodID(jniClass, "logStats", "(J)V");
     if (m_logStatsMID == NULL) {
     	m_jniEnv->ExceptionDescribe();
     	assert(m_logStatsMID != 0);
