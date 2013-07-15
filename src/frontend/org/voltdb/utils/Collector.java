@@ -50,6 +50,7 @@ public class Collector {
     private static String m_voltDbRootPath = null;
     private static String m_configInfoPath = null;
     private static String m_catalogJarPath = null;
+    private static String m_deploymentPath = null;
     private static String m_outputTgzPath = null;
 
     private static String m_nonce = "";
@@ -58,7 +59,6 @@ public class Collector {
 
     private static int m_pid = 0;
     private static String m_workingDir = null;
-    private static String m_deployment = null;
     private static ArrayList<String> m_logPaths = new ArrayList<String>();
 
     private static final VoltLogger m_log = new VoltLogger("CONSOLE");
@@ -78,6 +78,7 @@ public class Collector {
         TimestampType ts = new TimestampType(new java.util.Date());
         m_configInfoPath = m_voltDbRootPath + File.separator + "config_log" + File.separator + "config.json";
         m_catalogJarPath = m_voltDbRootPath + File.separator + "config_log" + File.separator + "catalog.jar";
+        m_deploymentPath = m_voltDbRootPath + File.separator + "config_log" + File.separator + "deployment.xml";
         m_outputTgzPath = m_voltDbRootPath + File.separator + m_nonce + ts.toString().replace(' ', '-') + ".tgz";
 
         JSONObject jsonObject = parseJSONFile(m_configInfoPath);
@@ -117,7 +118,6 @@ public class Collector {
         try {
             m_pid = jsonObject.getInt("pid");
             m_workingDir = jsonObject.getString("workingDir");
-            m_deployment = jsonObject.getString("deployment");
             JSONArray jsonArray = jsonObject.getJSONArray("log4jDst");
             for (int i = 0; i < jsonArray.length(); i++) {
                 String path = jsonArray.getJSONObject(i).getString("path");
@@ -135,7 +135,7 @@ public class Collector {
                     TarFileOutputStream.Compression.DEFAULT_BLOCKS_PER_RECORD * 512);
             TarGenerator tarGenerator = new TarGenerator(outputStream);
 
-            File deploymentXmlFile = new File(m_deployment);
+            File deploymentXmlFile = new File(m_deploymentPath);
             tarGenerator.queueEntry(deploymentXmlFile.getName(), deploymentXmlFile);
 
             File catalogJar = new File(m_catalogJarPath);
