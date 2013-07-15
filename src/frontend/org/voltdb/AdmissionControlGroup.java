@@ -19,6 +19,7 @@ package org.voltdb;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
@@ -88,14 +89,13 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
     private final HashSet<ACGMember> m_members = new HashSet<ACGMember>();
 
     /*
-     * There will be unsynchronized reads of the map hence volatile to ensure
-     * new versions of the map are completely constructed on read.
-     *
      * Reads/writes to the actual InvocationInfo are unsynchronized. There is a single writer
      * so no issues there, but the reader is unprotected.
+     *
+     * There is only one writer so a single stripe is fine
      */
-    private volatile NonBlockingHashMap<Long, Map<String, org.voltdb.dtxn.InitiatorStats.InvocationInfo>> m_connectionStates =
-            new NonBlockingHashMap<Long, Map<String, org.voltdb.dtxn.InitiatorStats.InvocationInfo>>();
+    private ConcurrentHashMap<Long, Map<String, org.voltdb.dtxn.InitiatorStats.InvocationInfo>> m_connectionStates =
+                 new ConcurrentHashMap<Long, Map<String, org.voltdb.dtxn.InitiatorStats.InvocationInfo>>(1024, .75f, 1);
 
     // Use the same-ish trick for the latency stats.  LatencyInfo keeps
     // volatile ImmutableLists for the buckets and a separate volatile max.
@@ -129,6 +129,7 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
     {
         assert(m_expectedThreadId == Thread.currentThread().getId());
         m_members.add(member);
+        m_connectionStates.put(member.connectionId(), new NonBlockingHashMap<String, InvocationInfo>());
     }
 
     public void removeMember(ACGMember member)
@@ -281,21 +282,13 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
             String procedureName,
             int delta,
             byte status) {
-        boolean needToInsert = false;
-        Map<String, InvocationInfo> procInfoMap = m_connectionStates.get(connectionId);
-        if(procInfoMap == null) {
-            procInfoMap = new NonBlockingHashMap<String, InvocationInfo>();
-            needToInsert = true;
-        }
+        final Map<String, InvocationInfo> procInfoMap = m_connectionStates.get(connectionId);
         InvocationInfo info = procInfoMap.get(procedureName);
         if(info == null){
             info = new InvocationInfo(connectionHostname);
             procInfoMap.put(procedureName, info);
         }
         info.processInvocation(delta, status);
-        if(needToInsert) {
-            m_connectionStates.put(connectionId, procInfoMap);
-        }
         m_latencyInfo.addSample(delta);
     }
 
