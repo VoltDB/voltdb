@@ -132,7 +132,10 @@ namespace boost {
             // increment
             void increment()
             {
-                m_Match=this->do_find(m_Match.end(),m_End);
+                if(m_Match.begin() == m_Match.end())
+                    m_Match=this->do_find(m_Match.end(),m_End);
+                else
+                    m_Match=this->do_find(m_Match.begin()+1,m_End);
             }
 
             // comparison
@@ -259,7 +262,11 @@ namespace boost {
                 m_End(End),
                 m_bEof(false)
             {
-                increment();
+                // force the correct behavior for empty sequences and yield at least one token
+                if(Begin!=End)
+                {
+                    increment();
+                }
             }
             //! Constructor
             /*!
@@ -278,7 +285,11 @@ namespace boost {
                 m_Next=::boost::begin(lit_col);
                 m_End=::boost::end(lit_col);
 
-                increment();
+                // force the correct behavior for empty sequences and yield at least one token
+                if(m_Next!=m_End)
+                {
+                    increment();
+                }
             }
 
 

@@ -31,7 +31,7 @@
 #include <vector>
 
 #include "boost/scoped_ptr.hpp"
-#include "boost/unordered_map.hpp"
+#include "boost/functional/hash.hpp"
 #include "ttmath/ttmathint.h"
 
 #include "common/ExportSerializeIo.h"
@@ -2902,7 +2902,20 @@ inline void NValue::hashCombine(std::size_t &seed) const {
       case VALUE_TYPE_TIMESTAMP:
         boost::hash_combine( seed, getBigInt()); break;
       case VALUE_TYPE_DOUBLE:
+        // This method was observed to fail on Centos 5 / GCC 4.1.2, returning different hashes
+        // for identical inputs, so the conditional was added,
+        // mutated from the one in boost/type_traits/intrinsics.hpp,
+        // and the broken overload for "double" was by-passed in favor of the more reliable
+        // one for int64 -- even if this may give sub-optimal hashes for typical collections of double.
+        // This conditional can be dropped when Centos 5 support is dropped.
+#if defined(__GNUC__) && ((__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 2) && !defined(__GCCXML__))) && !defined(BOOST_CLANG)
         boost::hash_combine( seed, getDouble()); break;
+#else
+        {
+        const int64_t proxyForDouble =  *reinterpret_cast<const int64_t*>(m_data);
+        boost::hash_combine( seed, proxyForDouble); break;
+        }
+#endif
       case VALUE_TYPE_VARCHAR: {
         if (getObjectValue() == NULL) {
             boost::hash_combine( seed, std::string(""));

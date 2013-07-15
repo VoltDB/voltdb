@@ -367,7 +367,6 @@ public class TestNIOWriteStream extends TestCase {
         wstream.swapAndSerializeQueuedWrites(pool);
         wstream.drainTo( channel );
         assertEquals( 5, wstream.calculatePendingWriteDelta(EstTime.currentTimeMillis() + 5));
-
         wstream.shutdown();
     }
 

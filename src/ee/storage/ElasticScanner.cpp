@@ -27,7 +27,7 @@ namespace voltdb
 ElasticScanner::ElasticScanner(PersistentTable &table) :
     m_table(table),
     m_blockMap(m_table.m_data),
-    m_tupleSize(table.getTupleLength()),
+    m_tupleSize(m_table.getTupleLength()),
     m_blockIterator(m_blockMap.begin()),
     m_blockEnd(m_blockMap.end()),
     m_currentBlockPtr(NULL),
