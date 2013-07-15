@@ -222,7 +222,7 @@ int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
     }
 }
 
-std::string JNITopend::logStats(int64_t stats) {
+void JNITopend::logStats(int64_t stats) {
     VOLT_DEBUG("sending integer %d", (int) stats);
 
     JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, 10);

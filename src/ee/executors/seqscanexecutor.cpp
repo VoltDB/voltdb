@@ -181,7 +181,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
         {
         	if(iterator.m_foundTuples % 10000 == 0) {
-        		m_engine->m_topend->logStats(iterator.m_foundTuples);
+        		m_engine->m_topend->logStats(iterator.getTuplesFound());
         	}
             VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
                        tuple.debug(target_table->name()).c_str(), tuple_ctr,

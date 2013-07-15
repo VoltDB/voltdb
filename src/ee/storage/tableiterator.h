@@ -83,6 +83,7 @@ public:
     bool next(TableTuple &out);
     bool hasNext();
     int getLocation() const;
+    int getTuplesFound();
 
 private:
     // Get an iterator via table->iterator()
@@ -263,6 +264,8 @@ inline int TableIterator::getLocation() const {
     return m_location;
 }
 
+inline int TableIterator::getTuplesFound() {
+	return m_foundTuples;
 }
 
 #endif
