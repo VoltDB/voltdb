@@ -108,6 +108,7 @@ public class PushdownReceiveDominators extends MicroOptimization {
         // TODO: Determine if distinct.getDistinctColumnIndex() is a uniquely-valued column
         boolean distinct_on_unique_column = false;
         if (distinct_on_unique_column) {
+            //distinct_parent.replaceChild(distinct, receive);
             distinct.removeFromGraph();
             distinct_parent.addAndLinkChild(receive);
             send.addIntermediary(distinct);

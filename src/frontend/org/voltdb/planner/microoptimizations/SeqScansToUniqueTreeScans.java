@@ -88,6 +88,7 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
             if (newChild == child) {
                 continue;
             }
+            //plan.replaceChild(child, newChild);
             child.removeFromGraph();
             plan.addAndLinkChild(newChild);
         }

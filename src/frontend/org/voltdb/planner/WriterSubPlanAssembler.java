@@ -18,10 +18,10 @@
 package org.voltdb.planner;
 
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.planner.JoinTree.JoinNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 
 /**
@@ -69,13 +69,32 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
             m_parsedStmt.analyzeJoinExpressions(m_parsedStmt.joinTree);
 
             m_generatedPlans = true;
-            Table nextTables[] = new Table[0];
-            ArrayList<AccessPath> paths = getRelevantAccessPathsForTable(m_targetTable, nextTables);
-            // for each access path
-            for (AccessPath accessPath : paths) {
-                // get a plan
-                AbstractPlanNode scanPlan = getAccessPlanForTable(m_targetTable, accessPath);
-                m_plans.add(scanPlan);
+            assert (m_parsedStmt.joinTree.m_root != null);
+            JoinNode tableNode = m_parsedStmt.joinTree.m_root;
+            // This is either UPDATE or DELETE statement. Consolidate all expressions
+            // in the WHERE list.
+            tableNode.m_whereInnerList.addAll(tableNode.m_joinInnerList);
+            tableNode.m_joinInnerList.clear();
+            assert (tableNode.m_table != null);
+            tableNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(tableNode.m_table,
+                    null,
+                    tableNode.m_whereInnerList,
+                    null));
+
+            for (AccessPath path : tableNode.m_accessPaths) {
+                tableNode.m_currentAccessPath = path;
+
+                AbstractPlanNode plan = getAccessPlanForTable(tableNode.m_table, tableNode.m_currentAccessPath);
+
+                /*
+                 * If the access plan for the table in the join order was for a
+                 * distributed table scan there will be a send/receive pair at the top.
+                 */
+                if (m_partitioning.getCountOfPartitionedTables() > 1 && m_partitioning.requiresTwoFragments()) {
+                    plan = addSendReceivePair(plan);
+                }
+
+                m_plans.add(plan);
             }
 
         }

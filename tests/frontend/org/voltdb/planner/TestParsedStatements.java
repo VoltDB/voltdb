@@ -92,17 +92,10 @@ public class TestParsedStatements extends TestCase {
         // output a description of the parsed stmt
         BuildDirectoryUtils.writeFile("statement-hsql-parsed", stmtName + ".txt", parsedStmt.toString());
 
-        int clausesFound = 0;
-        clausesFound += parsedStmt.noTableSelectionList.size();
-        for (Entry<Table, ArrayList<AbstractExpression>> pair : parsedStmt.joinTree.m_tableFilterList.entrySet())
-            clausesFound += pair.getValue().size();
-        for (Entry<JoinTree.TablePair, ArrayList<AbstractExpression>> pair : parsedStmt.joinTree.m_joinSelectionList.entrySet())
-            clausesFound += pair.getValue().size();
-        clausesFound += parsedStmt.multiTableSelectionList.size();
+        assertTrue(parsedStmt.noTableSelectionList.isEmpty());
+        assertTrue(parsedStmt.multiTableSelectionList.isEmpty());
 
         System.out.println(parsedStmt.toString());
-
-        assertEquals(clausesFound, parsedStmt.joinTree.getAllExpressions().size());
     }
 
     public void testParsedInsertStatements() {

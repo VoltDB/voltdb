@@ -763,7 +763,10 @@ public abstract class AbstractParsedStmt {
      * Analyze join expressions
      */
     void analyzeJoinExpressions(JoinNode joinNode) {
-        assert (joinNode != null);
+        //assert (joinNode != null);
+        if (joinNode == null) {
+            return;
+        }
         if (joinNode.m_table != null) {
             // Leaf node. Simply un-combine expressions and move them to the inner lists
             // The expressions will be classified later at the join node level.
