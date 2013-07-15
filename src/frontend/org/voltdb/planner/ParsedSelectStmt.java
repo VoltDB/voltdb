@@ -98,7 +98,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     public ArrayList<ParsedColInfo> groupByColumns = new ArrayList<ParsedColInfo>();
 
     public ArrayList<ParsedColInfo> aggResultColumns = new ArrayList<ParsedColInfo>();
-    public HashMap <AbstractExpression, Integer> aggTableIndexMap = new HashMap <AbstractExpression,Integer>();
 
     public long limit = -1;
     public long offset = 0;
@@ -183,9 +182,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      */
     NodeSchema evaluatePostAggColumns () {
         // Build the association between the table column with its index
+        HashMap <AbstractExpression, Integer> aggTableIndexMap = new HashMap <AbstractExpression,Integer>();
+        HashMap <AbstractExpression, String> exprToAliasMap = new HashMap <AbstractExpression,String>();
         for (int i = 0; i < aggResultColumns.size(); i++) {
             ParsedColInfo col = aggResultColumns.get(i);
             aggTableIndexMap.put(col.expression, i);
+            exprToAliasMap.put(col.expression, col.alias);
         }
 
         NodeSchema agg_schema = new NodeSchema();
@@ -193,7 +195,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             SchemaColumn schema_col = null;
             if (col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
                 // Recursively mutate the expression tree with available TVE substitutes
-                AbstractExpression expr = col.expression.replaceWithTVE(aggTableIndexMap);
+                AbstractExpression expr = col.expression.replaceWithTVE(aggTableIndexMap, exprToAliasMap);
                 schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "", col.alias, expr);
             } else {
                 schema_col = new SchemaColumn(col.tableName,

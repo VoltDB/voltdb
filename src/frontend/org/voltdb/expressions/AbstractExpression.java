@@ -532,7 +532,10 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * @param aggTableIndexMap
      * @return
      */
-    public AbstractExpression replaceWithTVE( HashMap <AbstractExpression, Integer> aggTableIndexMap ) {
+    public AbstractExpression replaceWithTVE(
+            HashMap <AbstractExpression, Integer> aggTableIndexMap,
+            HashMap <AbstractExpression, String> exprToAliasMap)
+    {
         Integer ii = aggTableIndexMap.get(this);
         if (ii != null) {
             TupleValueExpression tve = new TupleValueExpression();
@@ -540,6 +543,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             tve.setValueSize(getValueSize());
             tve.setColumnIndex(ii);
             tve.setColumnName("");
+            tve.setColumnAlias(exprToAliasMap.get(this));
             tve.setTableName("VOLT_TEMP_TABLE");
             return tve;
         }
@@ -547,16 +551,16 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         AbstractExpression lnode = null, rnode = null;
         ArrayList<AbstractExpression> newArgs = new ArrayList<AbstractExpression>();
         if (m_left != null) {
-            lnode = m_left.replaceWithTVE(aggTableIndexMap);
+            lnode = m_left.replaceWithTVE(aggTableIndexMap, exprToAliasMap);
         }
         if (m_right != null) {
-            rnode = m_right.replaceWithTVE(aggTableIndexMap);
+            rnode = m_right.replaceWithTVE(aggTableIndexMap, exprToAliasMap);
         }
 
         boolean changed = false;
         if (m_args != null) {
             for (int jj = 0; jj < m_args.size(); jj++) {
-                AbstractExpression exp = m_args.get(jj).replaceWithTVE(aggTableIndexMap);
+                AbstractExpression exp = m_args.get(jj).replaceWithTVE(aggTableIndexMap, exprToAliasMap);
                 newArgs.set(jj, exp);
                 if (exp != m_args.get(jj)) {
                     changed = true;
