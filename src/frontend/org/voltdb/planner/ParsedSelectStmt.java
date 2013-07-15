@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 
+import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
@@ -54,8 +55,21 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // groupby
         public boolean groupBy = false;
 
+        public boolean simpleEquals (Object obj) {
+            if (obj == null) return false;
+            if (obj == this) return true;
+            if (obj instanceof ParsedColInfo == false) return false;
+            ParsedColInfo col = (ParsedColInfo) obj;
+            if (alias == col.alias && columnName == col.columnName && tableName == col.tableName
+                    && expression.equals(col.expression) )
+                return true;
+            return false;
+        }
+
         @Override
         public boolean equals (Object obj) {
+            if (obj == null) return false;
+            if (obj == this) return true;
             if (obj instanceof ParsedColInfo == false) return false;
             ParsedColInfo col = (ParsedColInfo) obj;
             if (alias == col.alias && columnName == col.columnName && tableName == col.tableName
@@ -70,25 +84,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         @Override
         public int hashCode() {
             int result = 0;
-            if (alias != null)
-                result += alias.hashCode();
-            if (columnName != null)
-                result += columnName.hashCode();
-            if (tableName != null)
-                result += tableName.hashCode();
             if (expression != null)
                 result += expression.hashCode();
-
             // calculate hash for other member variable
-            int hash = 1;
-            hash += hash * 17 + index;
-            hash += hash * 31 + size;
-            hash += new Boolean(finalOutput).hashCode();
-            hash += new Boolean(orderBy).hashCode();
-            hash += new Boolean(ascending).hashCode();
-            hash += new Boolean(groupBy).hashCode();
-
-            return hash + result;
+            result = new HashCodeBuilder(17, 31).
+                    append(alias).append(columnName).append(tableName).
+                    append(index).append(size).
+                    append(finalOutput).append(orderBy).append(ascending).append(groupBy).
+                    toHashCode();
+            return result;
         }
     }
 
@@ -97,6 +101,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     public AbstractExpression having = null;
     public ArrayList<ParsedColInfo> groupByColumns = new ArrayList<ParsedColInfo>();
 
+    // It may has the consistent element order as the displayColumns
     public ArrayList<ParsedColInfo> aggResultColumns = new ArrayList<ParsedColInfo>();
 
     public long limit = -1;
@@ -104,6 +109,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private long limitParameterId = -1;
     private long offsetParameterId = -1;
     public boolean distinct = false;
+    private boolean complexAggs = false;
 
     /**
     * Class constructor
@@ -133,25 +139,31 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (limit != -1) assert limitParameterId == -1 : "Parsed value and param. limit.";
         if (offset != 0) assert offsetParameterId == -1 : "Parsed value and param. offset.";
 
+        // I want to extract groupby, orderby first before processing displayColumns
+        // Because I may have a fancy complex display
         for (VoltXMLElement child : stmtNode.children) {
-            if (child.name.equalsIgnoreCase("columns"))
-                parseDisplayColumns(child);
-            else if (child.name.equalsIgnoreCase("ordercolumns"))
+            if (child.name.equalsIgnoreCase("ordercolumns"))
                 parseOrderColumns(child);
             else if (child.name.equalsIgnoreCase("groupcolumns")) {
                 parseGroupByColumns(child);
             }
         }
+        for (VoltXMLElement child : stmtNode.children) {
+            if (child.name.equalsIgnoreCase("columns"))
+                parseDisplayColumns(child);
+        }
 
-        // Construct the aggResultColumns
-        aggResultColumns.addAll(groupByColumns);
+        insertToAggResultColumns(groupByColumns);
+        //TODO(XIN): double check whether should we add orderColumns
+        //insertToAggResultColumns(orderColumns);
     }
 
     /**
      * Pick up all the AGG element and put the ParsedColInfo into an ArrayList aggColumns.
      * @param root
      */
-    void parseAggColumns (VoltXMLElement root) {
+    int parseAggColumns (VoltXMLElement root) {
+        int count = 0;
         if (root.name.equals("aggregation")) {
             ParsedColInfo col = new ParsedColInfo();
             col.expression = parseExpressionTree(root);
@@ -160,24 +172,41 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
             // Aggregation column use the the hacky stuff
             col.tableName = "VOLT_TEMP_TABLE";
+            col.index = displayColumns.size();
             col.columnName = "";
+            count += 1;
 
-            boolean notExists = true;
-            for (ParsedColInfo ic: aggResultColumns) {
-                if (ic.equals(col)) {
-                    notExists = false;
-                }
-            }
-            if (notExists)
-                aggResultColumns.add(col);
+            insertToAggResultColumns(col);
         }
         for (VoltXMLElement child : root.children) {
-            parseAggColumns(child);
+            count += parseAggColumns(child);
+        }
+        return count;
+    }
+
+    // Concat elements to the aggResultColumns
+    void insertToAggResultColumns (ParsedColInfo col) {
+        boolean notExists = true;
+        for (ParsedColInfo ic: aggResultColumns) {
+            if (ic.simpleEquals(col)) {
+                notExists = false;
+                break;
+            }
+        }
+        if (notExists)
+            aggResultColumns.add(col);
+    }
+
+    // Concat elements to the aggResultColumns
+    void insertToAggResultColumns (List<ParsedColInfo> colCollection) {
+        for (ParsedColInfo col: colCollection) {
+           insertToAggResultColumns(col);
         }
     }
 
     /**
      * Construct the newSchema for projection node as the parent of the agg node
+     * replaceWithTVE() is the core part.
      * @return
      */
     NodeSchema evaluatePostAggColumns () {
@@ -206,14 +235,38 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
             agg_schema.addColumn(schema_col);
         }
+
+        // Now I am good to setup the column, but I want to check whether it hasComplexAgg
+        if (!hasComplexAgg()) {
+            if (displayColumns.size() == aggResultColumns.size())
+                for (int ii=0; ii < displayColumns.size(); ii++) {
+                    ParsedColInfo dcol = displayColumns.get(ii);
+                    Integer idx = aggTableIndexMap.get(dcol.expression);
+                    if (( idx != null && idx.intValue() == ii
+                            && dcol.simpleEquals(aggResultColumns.get(ii))) == false) {
+                        setComlexAgg(true);
+                        break;
+                    }
+                }
+            else {
+                setComlexAgg(true);
+            }
+        }
+        // Finished checking, Now I can return
         return agg_schema;
+    }
+
+
+    public boolean hasComplexAgg() {
+        return complexAggs;
+    }
+
+    private void setComlexAgg(boolean flag) {
+        complexAggs = flag;
     }
 
     void parseDisplayColumns(VoltXMLElement columnsNode) {
         for (VoltXMLElement child : columnsNode.children) {
-            // DONE(xin): work to pick up all the agg ParsedColInfo.
-            parseAggColumns(child);
-
             ParsedColInfo col = new ParsedColInfo();
             col.expression = parseExpressionTree(child);
             if (col.expression instanceof ConstantValueExpression) {
@@ -240,6 +293,20 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // don't go through the planner pass that does more involved
             // column index resolution).
             col.index = displayColumns.size();
+
+
+            // DONE(xin): work to pick up all the agg ParsedColInfo if this child contains.
+            int count = parseAggColumns(child);
+            if (count == 0) {
+                for (ParsedColInfo ic: groupByColumns) {
+                    if (ic.equals(col)) {
+                        insertToAggResultColumns(col);
+                    }
+                }
+            } else if (count > 1) {
+                if (!hasComplexAgg()) setComlexAgg(true);
+            }
+
             displayColumns.add(col);
         }
     }

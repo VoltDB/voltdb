@@ -1304,9 +1304,13 @@ public class PlanAssembler {
                     topAggNode.addGroupByExpression(col.expression);
                 }
             }
-            NodeSchema newSchema = m_parsedSelect.evaluatePostAggColumns();
             aggNode.setOutputSchema(agg_schema);
-            root = pushDownAggregate(root, aggNode, topAggNode, newSchema);
+            if (topAggNode != null) {
+                topAggNode.setOutputSchema(agg_schema);
+            }
+
+            NodeSchema newSchema = m_parsedSelect.evaluatePostAggColumns();
+            root = pushDownAggregate(root, aggNode, topAggNode, m_parsedSelect.hasComplexAgg(), newSchema);
         }
 
         if (m_parsedSelect.isGrouped()) {
@@ -1346,7 +1350,8 @@ public class PlanAssembler {
      */
     AbstractPlanNode pushDownAggregate(AbstractPlanNode root,
                                        AggregatePlanNode distNode,
-                                       AggregatePlanNode coordNode, NodeSchema newSchema) {
+                                       AggregatePlanNode coordNode,
+                                       boolean neeProjectionNode, NodeSchema newSchema) {
 
         // remember that coordinating aggregation has a pushed-down
         // counterpart deeper in the plan. this allows other operators
@@ -1384,13 +1389,16 @@ public class PlanAssembler {
             coordNode.addAndLinkChild(root);
             coordNode.generateOutputSchema(m_catalogDb);
             proj.addAndLinkChild(coordNode);
+            root = coordNode;
         } else {
             proj.addAndLinkChild(root);
         }
 
-        proj.setOutputSchema(newSchema);
-        proj.generateOutputSchema(m_catalogDb);
-        root = proj;
+        if (neeProjectionNode) {
+            proj.setOutputSchema(newSchema);
+            proj.generateOutputSchema(m_catalogDb);
+            root = proj;
+        }
         return root;
     }
 
