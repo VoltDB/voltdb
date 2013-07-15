@@ -233,7 +233,7 @@ public class FunctionExpression extends AbstractExpression {
     }
 
     @Override
-    public void refineValueType(VoltType columnType, int columnSize) {
+    public void refineValueType(VoltType neededType, int neededSize) {
         if (m_parameterArg == NOT_PARAMETERIZED) {
             // Non-parameterized functions should have a fixed SPECIFIC type.
             // Further refinement should be useless/un-possible.
@@ -251,7 +251,7 @@ public class FunctionExpression extends AbstractExpression {
         }
         // No assumption is made that functions that are parameterized by
         // variably-sized types are size-preserving, so allow any size
-        arg.refineValueType(columnType, columnType.getMaxLengthInBytes());
+        arg.refineValueType(neededType, neededType.getMaxLengthInBytes());
         m_valueType = arg.getValueType();
         m_valueSize = m_valueType.getMaxLengthInBytes();
     }

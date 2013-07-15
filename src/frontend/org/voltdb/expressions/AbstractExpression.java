@@ -706,44 +706,54 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     /**
-     * Helper function to patch up NUMERIC or untyped constants and parameters and
-     * the functions and operators that they parameterize,
-     * especially when they need to match an expected INSERT/UPDATE column
-     * or to match a parameterized function that HSQL or other planner
-     * processing has determined the return type for.
-     * This default implementation is currently a no-op which is fine for most purposes --
-     * 99% of the time, we are trying to refine a type to itself.
-     * TODO: we might want to enable asserts when we fall out of well-known non-no-op cases.
-     * We don't just go ahead and arbitrarily change any AbstractExpression's value type on the assumption
-     * that AbstractExpression classes usually either have immutable value types
-     * (hard-coded or easily determined up front by HSQL),
-     * OR they have their own specific restrictions or side effects -- and so their own refineValueType method.
+     * Specify or specialize the type and optionally the maximum size of an expression value.
+     * This is used when the expression's type or size is implied or constrained by its usage,
+     * especially to match the type/size of a target column in an INSERT or UPDATE statement.
+     * This default implementation is currently a no-op, which covers expressions whose value
+     * type/size is pre-determined, like logical expressions, comparisons, tuple address
+     * expressions, etc.
+     * Derived classes define custom implementations typically to allow refinement of types or
+     * sizes for expressions that the HSQL parser was unable to determine the type of, leaving
+     * the type as null, or was only able to narrow down to NUMERIC (of some undetermined type).
+     * Type refinement can have an effect on the interpretation of constant values.
+     * E.g. is this constant string being used as a timestamp? If so, a compile-time check for
+     * a valid date/time format could provide a valuable heads-up to the user.
+     * It also can bolster parameter type checking.
+     * E.g. should values for this parameter only be allowed in the tiny int range?
+     * @param neededType - the target type of the value as suggested by its usage.
+     * @param neededSize - the maximum allowed size for the value as suggested by its usage.
+     * TODO: we might want to enable asserts when we appear to be trying to refine a type or size
+     * on an expression that expects to have a fixed pre-determined type -- at least when
+     * non-trivially trying to refine the type/size to something other than its current type/size.
+     * The ONLY reason this default no-op implementation contains any code at all is to make it
+     * easier to catch such cases in a debugger, possibly in preparation for a more agressive assert.
      */
-    public void refineValueType(VoltType columnType, int columnSize) {
-        if (columnType.equals(m_valueType)) {
+    public void refineValueType(VoltType neededType, int neededSize) {
+        if (neededType.equals(m_valueType)) {
             return; // HSQL already initialized the expression to have the refined type.
         }
         //TODO: For added safety, we MAY want to (re)enable this general assert
-        // OR the one after we give a pass for the "generic types". See the comment below.
+        // OR only assert after we give a pass for refining from "generic types". See the comment below.
         // assert(false);
         if ((m_valueType != null) && (m_valueType != VoltType.NUMERIC)) {
-            // This code path leaves a generic type (null or NUMERIC) in the expression tree rather than assume that
-            // it's safe to change the value type of an arbitrary AbstractExpression.
+            // This code path leaves a generic type (null or NUMERIC) in the expression tree rather
+            // than assume that it's safe to change the value type of an arbitrary AbstractExpression.
             // The EE MAY complain about it later.
-            // There may be special cases where we want to assert(false) rather than waiting for the EE to complain.
-            // or even special cases where we want to go ahead and switch the type (scary!).
+            // There may be special cases where we want to assert(false) rather than waiting for the EE
+            // to complain or even special cases where we want to go ahead and switch the type (scary!).
             return;
         }
-        // A request to switch an arbitrary AbstractExpression from the specific value type that HSQL assigned to it
-        // to a different specific value type that SEEMS to be called for by the usage (target column) is a hard thing.
+        // A request to switch an arbitrary AbstractExpression from the specific value type that HSQL
+        // assigned to it to a different specific value type that SEEMS to be called for by the usage
+        // (target column) is a hard thing to know how to handle.
         // It seems equally dangerous to ignore the HSQL type OR the target type.
         // Maybe this will never occur because HSQL is so smart (and we keep it that way),
         // or maybe the type difference won't really matter to the EE because it's so flexible.
         // Or maybe some of each -- this no-op behavior assumes something like that.
         // BUT maybe it's just always wrong to be trying any such thing, so we should assert(false).
         // Or maybe there need to be special cases.
-        // The sad news is that when this assert first went live, it just caused quiet thread death and hanging rather
-        // than an identifiable assert, even when run in the debugger.
+        // The sad news is that when this assert first went live, it inexplicably caused quiet
+        // thread death and hanging rather than an identifiable assert, even when run in the debugger.
         // assert(false);
     }
 

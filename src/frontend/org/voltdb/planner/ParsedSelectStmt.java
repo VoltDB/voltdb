@@ -338,7 +338,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     /// This is for use with integer-valued row count parameters, namely LIMITs and OFFSETs.
     /// It should be called (at least) once for each LIMIT or OFFSET parameter to establish that
-    /// the parameter is being used in an INTEGER context.
+    /// the parameter is being used in a BIGINT context.
+    /// There may be limitations elsewhere that restrict limits and offsets to 31-bit unsigned values,
+    /// but enforcing that at parameter passing/checking time seems a little arbitrary, so we keep
+    /// the parameters at maximum width -- a 63-bit unsigned BIGINT.
     private int parameterCountIndexById(long paramId) {
         if (paramId == -1) {
             return -1;
@@ -348,10 +351,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // As a side effect, re-establish these parameters as integer-typed
         // -- this helps to catch type errors earlier in the invocation process
         // and prevents a more serious error in HSQLBackend statement reconstruction.
-        // The HSQL parser originally had these correctly pegged as INTEGERs,
+        // The HSQL parser originally had these correctly pegged as BIGINTs,
         // but the VoltDB code ( @see AbstractParsedStmt#parseParameters )
         // skeptically second-guesses that pending its own verification. This case is now verified.
-        pve.refineValueType(VoltType.INTEGER, VoltType.INTEGER.getLengthInBytesForFixedTypes());
+        pve.refineValueType(VoltType.BIGINT, VoltType.BIGINT.getLengthInBytesForFixedTypes());
         return pve.getParameterIndex();
     }
 
@@ -370,11 +373,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (id != -1) {
             return m_paramsById.get(id);
         }
-        // The limit/offset is a non-parameterized literal value that needs to be wrapped in an
-        // INTEGER constant so it can be used in the addition expression for the pushed-down limit.
+        // The limit/offset is a non-parameterized literal value that needs to be wrapped in a
+        // BIGINT constant so it can be used in the addition expression for the pushed-down limit.
         ConstantValueExpression constant = new ConstantValueExpression();
         constant.setValue(Long.toString(value));
-        constant.refineValueType(VoltType.INTEGER, VoltType.INTEGER.getLengthInBytesForFixedTypes());
+        constant.refineValueType(VoltType.BIGINT, VoltType.BIGINT.getLengthInBytesForFixedTypes());
         return constant;
     }
 
