@@ -65,6 +65,7 @@ public class CoreUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     public static final int SMALL_STACK_SIZE = 1024 * 128;
+    public static final int MEDIUM_STACK_SIZE = 1024 * 512;
 
     /**
      * Get a single thread executor that caches it's thread meaning that the thread will terminate
@@ -89,6 +90,12 @@ public class CoreUtils {
     public static ListeningExecutorService getSingleThreadExecutor(String name) {
         ExecutorService ste =
                 Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null));
+        return MoreExecutors.listeningDecorator(ste);
+    }
+
+    public static ListeningExecutorService getSingleThreadExecutor(String name, int size) {
+        ExecutorService ste =
+                Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory(null, name, size, false, null));
         return MoreExecutors.listeningDecorator(ste);
     }
 
@@ -445,6 +452,20 @@ public class CoreUtils {
             first = false;
             sb.append(CoreUtils.hsIdToString(entry.getKey()));
             sb.append(entry.getValue());
+        }
+        sb.append('}');
+        return sb.toString();
+    }
+
+    public static String hsIdEntriesToString(Collection<Map.Entry<Long, Long>> entries) {
+        StringBuilder sb = new StringBuilder();
+        sb.append('{');
+        boolean first = true;
+        for (Map.Entry<Long, Long> entry : entries) {
+            if (!first) sb.append(", ");
+            first = false;
+            sb.append(CoreUtils.hsIdToString(entry.getKey())).append(" -> ");
+            sb.append(CoreUtils.hsIdToString(entry.getValue()));
         }
         sb.append('}');
         return sb.toString();

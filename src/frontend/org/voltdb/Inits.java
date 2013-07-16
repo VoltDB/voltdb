@@ -675,7 +675,8 @@ public class Inits {
                                                       cl.getInternalsnapshotpath(),
                                                       snapshotPath,
                                                       allPartitions,
-                                                      ImmutableSet.copyOf(m_rvdb.m_messenger.getLiveHostIds()));
+                                                      ImmutableSet.copyOf(m_rvdb.m_messenger.getLiveHostIds()),
+                                                      CatalogUtil.getVoltDbRoot(m_deployment.getPaths()).getAbsolutePath());
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Unable to establish a ZooKeeper connection: " +
                             e.getMessage(), false, e);

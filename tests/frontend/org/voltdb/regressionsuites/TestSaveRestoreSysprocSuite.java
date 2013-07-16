@@ -52,6 +52,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
+import org.voltdb.VoltZK;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
@@ -64,6 +65,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
+import org.voltdb.sysprocs.SnapshotRestore;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.SnapshotConverter;
 import org.voltdb.utils.SnapshotVerifier;
@@ -1298,6 +1300,253 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         validateSnapshot(true);
     }
 
+    public void testSaveReplicatedAndRestorePartitionedTable()
+    throws Exception
+    {
+        if (isValgrind()) return;
+
+        System.out.println("Starting testSaveReplicatedAndRestorePartitionedTable");
+
+        int num_replicated_items_per_chunk = 200;
+        int num_replicated_chunks = 10;
+
+        Client client = getClient();
+
+        loadLargeReplicatedTable(client, "REPLICATED_TESTER",
+                                 num_replicated_items_per_chunk,
+                                 num_replicated_chunks);
+
+        // hacky, need to sleep long enough so the internal server tick
+        // updates the memory stats
+        Thread.sleep(1000);
+
+        VoltTable orig_mem = null;
+        try
+        {
+            orig_mem = client.callProcedure("@Statistics", "memory", 0).getResults()[0];
+            System.out.println("STATS: " + orig_mem.toString());
+        }
+        catch (Exception ex)
+        {
+            ex.printStackTrace();
+            fail("Statistics exception: " + ex.getMessage());
+        }
+
+        VoltTable[] results = null;
+        results = saveTablesWithDefaultOptions(client);
+
+        // Kill and restart all the execution sites after changing the catalog
+        m_config.shutDown();
+        CatalogChangeSingleProcessServer config =
+            (CatalogChangeSingleProcessServer) m_config;
+        SaveRestoreTestProjectBuilder project =
+            new SaveRestoreTestProjectBuilder();
+        project.addDefaultProcedures();
+        project.addDefaultPartitioning();
+        // partition the original replicated table on its primary key
+        project.addPartitionInfo("REPLICATED_TESTER", "RT_ID");
+        project.addSchema(SaveRestoreTestProjectBuilder.class.
+                          getResource("saverestore-ddl.sql"));
+        config.recompile(project);
+        m_config.startUp();
+
+        client = getClient();
+
+        try
+        {
+            client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE);
+
+            while (results[0].advanceRow()) {
+                if (results[0].getString("RESULT").equals("FAILURE")) {
+                    fail(results[0].getString("ERR_MSG"));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            ex.printStackTrace();
+            fail("SnapshotRestore exception: " + ex.getMessage());
+        }
+
+        // hacky, need to sleep long enough so the internal server tick
+        // updates the memory stats
+        Thread.sleep(1000);
+
+        VoltTable final_mem = null;
+        try
+        {
+            final_mem = client.callProcedure("@Statistics", "memory", 0).getResults()[0];
+            System.out.println("STATS: " + final_mem.toString());
+        }
+        catch (Exception ex)
+        {
+            ex.printStackTrace();
+            fail("Statistics exception: " + ex.getMessage());
+        }
+
+        checkTable(client, "REPLICATED_TESTER", "RT_ID",
+                   num_replicated_items_per_chunk * num_replicated_chunks);
+
+        results = client.callProcedure("@Statistics", "table", 0).getResults();
+
+        System.out.println("@Statistics after restore:");
+        System.out.println(results[0]);
+
+        boolean ok = false;
+        int foundItem = 0;
+        long tupleCounts[] = null;
+        while (!ok) {
+            ok = true;
+            foundItem = 0;
+            tupleCounts = new long[3];
+            results = client.callProcedure("@Statistics", "table", 0).getResults();
+            while (results[0].advanceRow())
+            {
+                if (results[0].getString("TABLE_NAME").equals("REPLICATED_TESTER"))
+                {
+                    tupleCounts[foundItem] = results[0].getLong("TUPLE_COUNT");
+                    ++foundItem;
+                }
+            }
+            ok = ok & (foundItem == 3);
+        }
+
+        long totalTupleCount = 0;
+        for (long c : tupleCounts) {
+            totalTupleCount += c;
+        }
+        assertEquals((num_replicated_chunks * num_replicated_items_per_chunk), totalTupleCount);
+
+        // make sure all sites were loaded
+        validateSnapshot(true);
+
+        // revert back to replicated table
+        config.revertCompile();
+
+    }
+
+    public void testSavePartitionedAndRestoreReplicatedTable()
+    throws Exception
+    {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
+        System.out.println("Starting testSaveAndRestorePartitionedTable");
+        int num_partitioned_items_per_chunk = 120; // divisible by 3
+        int num_partitioned_chunks = 10;
+        Client client = getClient();
+
+        loadLargePartitionedTable(client, "PARTITION_TESTER",
+                                  num_partitioned_items_per_chunk,
+                                  num_partitioned_chunks);
+        VoltTable[] results = null;
+
+        // hacky, need to sleep long enough so the internal server tick
+        // updates the memory stats
+        Thread.sleep(1000);
+
+        VoltTable orig_mem = null;
+        try
+        {
+            orig_mem = client.callProcedure("@Statistics", "memory", 0).getResults()[0];
+            System.out.println("STATS: " + orig_mem.toString());
+        }
+        catch (Exception ex)
+        {
+            ex.printStackTrace();
+            fail("Statistics exception: " + ex.getMessage());
+        }
+
+        DefaultSnapshotDataTarget.m_simulateFullDiskWritingHeader = false;
+
+        validateSnapshot(false);
+
+        results = saveTablesWithDefaultOptions(client);
+
+        validateSnapshot(true);
+
+        while (results[0].advanceRow()) {
+            if (!results[0].getString("RESULT").equals("SUCCESS")) {
+                System.out.println(results[0].getString("ERR_MSG"));
+            }
+            assertTrue(results[0].getString("RESULT").equals("SUCCESS"));
+        }
+
+        try
+        {
+            checkSnapshotStatus(client, TMPDIR, TESTNONCE, null, "SUCCESS", 8);
+        }
+        catch (Exception ex)
+        {
+            ex.printStackTrace();
+            fail("SnapshotRestore exception: " + ex.getMessage());
+        }
+
+        // Kill and restart all the execution sites after removing partitioning column
+        m_config.shutDown();
+        CatalogChangeSingleProcessServer config =
+            (CatalogChangeSingleProcessServer) m_config;
+        SaveRestoreTestProjectBuilder project =
+            new SaveRestoreTestProjectBuilder();
+        project.addDefaultProcedures();
+        project.addSchema(SaveRestoreTestProjectBuilder.class.
+                          getResource("saverestore-ddl.sql"));
+        config.recompile(project);
+        m_config.startUp();
+
+        client = getClient();
+
+        try
+        {
+            results = client.callProcedure("@SnapshotRestore", TMPDIR,
+                                           TESTNONCE).getResults();
+
+            while (results[0].advanceRow()) {
+                if (results[0].getString("RESULT").equals("FAILURE")) {
+                    fail(results[0].getString("ERR_MSG"));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            ex.printStackTrace();
+            fail("SnapshotRestore exception: " + ex.getMessage());
+        }
+
+        checkTable(client, "PARTITION_TESTER", "PT_ID",
+                   num_partitioned_items_per_chunk * num_partitioned_chunks);
+
+        boolean ok = false;
+        int foundItem = 0;
+        while (!ok) {
+            ok = true;
+            foundItem = 0;
+            results = client.callProcedure("@Statistics", "table", 0).getResults();
+            while (results[0].advanceRow())
+            {
+                if (results[0].getString("TABLE_NAME").equals("PARTITION_TESTER"))
+                {
+                    long tupleCount = results[0].getLong("TUPLE_COUNT");
+                    ok = (ok & (tupleCount == (num_partitioned_items_per_chunk * num_partitioned_chunks)));
+                    ++foundItem;
+                }
+            }
+            ok = ok & (foundItem == 3);
+        }
+
+        results = client.callProcedure("@Statistics", "table", 0).getResults();
+        while (results[0].advanceRow())
+        {
+            if (results[0].getString("TABLE_NAME").equals("PARTITION_TESTER"))
+            {
+                assertEquals((num_partitioned_items_per_chunk * num_partitioned_chunks),
+                        results[0].getLong("TUPLE_COUNT"));
+            }
+        }
+
+        config.revertCompile();
+    }
+
+
     public void testSaveAndRestoreReplicatedTable()
     throws Exception
     {
@@ -1515,6 +1764,51 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             threwException = true;
         }
         assertTrue(threwException);
+
+        /*
+         * Now check that doing a restore and logging duplicates works.
+         * Delete the ZK nodes created by the restore already done and
+         * it will go again.
+         */
+        VoltDB.instance().getHostMessenger().getZK().delete(VoltZK.restoreMarker, -1);
+        VoltDB.instance().getHostMessenger().getZK().delete(VoltZK.perPartitionTxnIds, -1);
+        threwException = false;
+        try
+        {
+            JSONObject jsObj = new JSONObject();
+            jsObj.put(SnapshotRestore.JSON_NONCE, TESTNONCE);
+            jsObj.put(SnapshotRestore.JSON_PATH, TMPDIR);
+            jsObj.put(SnapshotRestore.JSON_DUPLICATES_PATH, TMPDIR);
+
+            results = client.callProcedure("@SnapshotRestore", jsObj.toString()).getResults();
+
+            while (results[0].advanceRow()) {
+                if (results[0].getString("RESULT").equals("FAILURE")) {
+                    fail(results[0].getString("ERR_MSG"));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            threwException = true;
+        }
+        assertFalse(threwException);
+
+        /*
+         * Assert a non-empty CSV file containing duplicates was created
+         */
+        boolean haveCSVFile = false;
+        for (File f : new File(TMPDIR).listFiles()) {
+          final String name = f.getName();
+          if (name.startsWith("PARTITION_TESTER") && name.endsWith(".csv")) {
+              haveCSVFile = true;
+              if (!(f.length() > 30000)) {
+                  //It should be about 37k, make sure it isn't unusually small
+                  fail("Duplicates file is not as large as expected");
+              }
+          }
+        }
+        assertTrue(haveCSVFile);
 
         checkTable(client, "PARTITION_TESTER", "PT_ID",
                    num_partitioned_items_per_chunk * num_partitioned_chunks);
@@ -2012,6 +2306,9 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             ex.printStackTrace();
             fail("SnapshotRestore exception: " + ex.getMessage());
         }
+
+        // because stats are not synchronous :(
+        Thread.sleep(5000);
 
         // XXX consider adding a check that the newly materialized table is
         // not loaded

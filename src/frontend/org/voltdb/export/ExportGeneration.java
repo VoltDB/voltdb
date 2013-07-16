@@ -51,6 +51,7 @@ import org.voltdb.VoltZK;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Table;
+import org.voltdb.common.Constants;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.utils.VoltFile;
@@ -397,7 +398,7 @@ public class ExportGeneration {
                     final int length = buf.getInt();
                     byte stringBytes[] = new byte[length];
                     buf.get(stringBytes);
-                    String signature = new String(stringBytes, VoltDB.UTF8ENCODING);
+                    String signature = new String(stringBytes, Constants.UTF8ENCODING);
                     final long ackUSO = buf.getLong();
 
                     final HashMap<String, ExportDataSource> partitionSources = m_dataSourcesByPartition.get(partition);

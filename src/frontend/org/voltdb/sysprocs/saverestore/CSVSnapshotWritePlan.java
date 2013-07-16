@@ -94,7 +94,8 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
         }
 
         NativeSnapshotWritePlan.createFileBasedCompletionTasks(file_path, file_nonce,
-                txnId, partitionTransactionIds, context, exportSequenceNumbers, timestamp);
+                txnId, partitionTransactionIds, context, exportSequenceNumbers, timestamp,
+                context.getNumberOfPartitions());
 
         final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
         final AtomicInteger numTables = new AtomicInteger(tables.size());
@@ -122,6 +123,9 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
              */
             if (table.getIsreplicated() && !tracker.isFirstHost()) {
                 snapshotRecord.removeTable(table.getTypeName());
+                // We'll expect one less table in the global table count
+                // in order to be done, too (ENG-4802)
+                numTables.decrementAndGet();
                 continue;
             }
 

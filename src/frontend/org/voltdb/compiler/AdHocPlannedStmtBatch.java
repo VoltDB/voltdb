@@ -22,8 +22,8 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.voltdb.VoltDB;
 import org.voltdb.client.ProcedureInvocationType;
+import org.voltdb.common.Constants;
 
 /**
  * Holds a batch of planned SQL statements.
@@ -121,7 +121,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
     public List<String> getSQLStatements() {
         List<String> sqlStatements = new ArrayList<String>(plannedStatements.size());
         for (AdHocPlannedStatement plannedStatement : plannedStatements) {
-            sqlStatements.add(new String(plannedStatement.sql, VoltDB.UTF8ENCODING));
+            sqlStatements.add(new String(plannedStatement.sql, Constants.UTF8ENCODING));
         }
         return sqlStatements;
     }

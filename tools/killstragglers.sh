@@ -17,8 +17,8 @@
 # if you need to run overnight, please choose a machine which is not hit by this. thanks.
 
 HOUR=`date +%H`
-if [ $USER = "test" ] && ( [ $HOUR -ge 22 ] || [ $HOUR -le 7 ] ); then
-   for H in volt{3{a,b,c,d,e,f,g,h,i},7{b,c,d},5{b,c,d},12{a,b,c,d,e,f,i,j,k,l,m,n}}
+if [ $USER = "test" ] && ( [ $HOUR -ge 20 ] || [ $HOUR -le 8 ] ); then
+   for H in volt{3{a,b,c,d,e,f,g,h,i},7{b,c,d},5{b,c,d},12{a,b,c,d,e,f,i,j,k,l,m,n,o,p,q,r,s,t,u,v},13{a,b,c,d,e,f,g,h}}
    do
       if [ $HOSTNAME = $H ]; then
         SUDO=sudo

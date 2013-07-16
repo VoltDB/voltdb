@@ -22,7 +22,8 @@ prunelist = ('hsqldb19b3',
              'xml',
              'helloworld',
              'jaxb',
-             'pmsg')
+             'pmsg',
+             'customer-workloads')
 
 def licenseStartsHere(content, approvedLicenses):
     for license in approvedLicenses:
@@ -69,6 +70,12 @@ def verifyLicense(f, content, approvedLicensesJavaC, approvedLicensesPython):
 def verifyTrailingWhitespace(f, content):
     if re.search(r'[\t\f\v ]\n', content):
         print("ERROR: \"%s\" contains trailing whitespace." % (f))
+        return 1
+    return 0
+
+def verifyTrailingNewline(f, content):
+    if content[-1] != '\n':
+        print("ERROR: \"%s\" has no trailing newline." % (f))
         return 1
     return 0
 
@@ -174,15 +181,21 @@ def fixTrailingWhitespace(f, content):
     print "Fix: Removing trailing whitespace."
     return writeRepairedContent(f, "\n".join(cleanlines),  content)
 
+def fixTrailingNewline(f, content):
+    print "Fix: Add trailing newline."
+    return writeRepairedContent(f, content+'\n',  content)
+
 FIX_LICENSES_LEVEL = 2
 
-def processFile(f, fix, approvedLicensesJavaC, approvedLicensesPython): 
+def processFile(f, fix, approvedLicensesJavaC, approvedLicensesPython):
     for suffix in ('.java', '.cpp', '.cc', '.h', '.hpp', '.py'):
         if f.endswith(suffix):
             break
     else:
         return (0, 0)
- 
+
+    extension = os.path.splitext(f)[1]
+
     content = readFile(f)
     if fix:
         rmBakFile(f)
@@ -211,6 +224,15 @@ def processFile(f, fix, approvedLicensesJavaC, approvedLicensesPython):
             fixed += retval
             content = fixTrailingWhitespace(f, content)
         found += retval
+
+    # Only do it for C, because only the Linux C compiler cares.
+    if extension in ('.cpp', '.cc', '.h', '.hpp'):
+        retval = verifyTrailingNewline(f, content)
+        if (retval != 0):
+            if fix:
+                fixed += retval
+                content = fixTrailingNewline(f, content)
+            found += retval
 
     retval = verifySprintf(f, content)
     found += retval
@@ -295,7 +317,7 @@ if not ascommithook:
         if parsing_options and arg[0:2] == "--":
             if arg == "--":
                 parsing_options = False
-            
+
         elif arg != "${voltpro}":
             print "Checking additional repository: " + arg;
             proLicenses = ["../" + arg + '/tools/approved_licenses/license.txt']

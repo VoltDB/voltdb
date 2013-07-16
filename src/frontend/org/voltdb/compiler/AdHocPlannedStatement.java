@@ -22,7 +22,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 import org.voltdb.ParameterSet;
-import org.voltdb.VoltDB;
+import org.voltdb.common.Constants;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CorePlan;
@@ -43,7 +43,7 @@ public class AdHocPlannedStatement {
     public final Object partitionParam; // not serialized
 
     AdHocPlannedStatement(CompiledPlan plan, int catalogVersion, String[] extractedLiterals) {
-        sql = plan.sql.getBytes(VoltDB.UTF8ENCODING);
+        sql = plan.sql.getBytes(Constants.UTF8ENCODING);
         core = new CorePlan(plan, catalogVersion);
         extractedParamValues = plan.extractedParamValues;
         boundParamIndexes = plan.boundParamIndexes();

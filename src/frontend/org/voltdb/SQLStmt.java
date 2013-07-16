@@ -20,6 +20,7 @@ package org.voltdb;
 import java.nio.ByteBuffer;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
+import org.voltdb.common.Constants;
 
 /**
  * <p>A simple wrapper of a parameterized SQL statement. VoltDB uses this instead of
@@ -85,7 +86,7 @@ public class SQLStmt {
      * @param joinOrder separated list of tables used by the query specifying the order they should be joined in
      */
     public SQLStmt(String sqlText, String joinOrder) {
-        this(sqlText.getBytes(VoltDB.UTF8ENCODING), joinOrder);
+        this(sqlText.getBytes(Constants.UTF8ENCODING), joinOrder);
     }
 
     /**
@@ -178,14 +179,14 @@ public class SQLStmt {
      */
     public String getText() {
         if (sqlTextStr == null) {
-            sqlTextStr = new String(sqlText, VoltDB.UTF8ENCODING);
+            sqlTextStr = new String(sqlText, Constants.UTF8ENCODING);
         }
         return sqlTextStr;
     }
 
     public byte[] getSQLBytes() {
         if (sqlText == null) {
-            sqlText = sqlTextStr.getBytes(VoltDB.UTF8ENCODING);
+            sqlText = sqlTextStr.getBytes(Constants.UTF8ENCODING);
         }
         return sqlText;
     }

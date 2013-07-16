@@ -17,16 +17,18 @@
 #include "storage/RecoveryContext.h"
 #include "common/RecoveryProtoMessageBuilder.h"
 #include "common/DefaultTupleSerializer.h"
+#include "common/TupleOutputStream.h"
+#include "common/TupleOutputStreamProcessor.h"
 #include "storage/persistenttable.h"
 
 #include <cstdio>
 using namespace std;
 
 namespace voltdb {
-RecoveryContext::RecoveryContext(PersistentTable *table, int32_t tableId) :
-        m_table(table),
+RecoveryContext::RecoveryContext(PersistentTable &table, int32_t tableId) :
+        TableStreamerContext(table),
         m_firstMessage(true),
-        m_iterator(m_table->iterator()),
+        m_iterator(getTable().iterator()),
         m_tableId(tableId),
         m_recoveryPhase(RECOVERY_MSG_TYPE_SCAN_TUPLES) {
 }
@@ -48,7 +50,7 @@ bool RecoveryContext::nextMessage(ReferenceSerializeOutput *out) {
     // us with an inconsistent iterator).
     if (m_firstMessage)
     {
-        m_iterator = m_table->iterator();
+        m_iterator = getTable().iterator();
         m_firstMessage = false;
 
     }
@@ -68,19 +70,42 @@ bool RecoveryContext::nextMessage(ReferenceSerializeOutput *out) {
     }
     DefaultTupleSerializer serializer;
     //Use allocated tuple count to size stuff at the other end
-    uint32_t allocatedTupleCount = static_cast<uint32_t>(m_table->allocatedTupleCount());
+    uint32_t allocatedTupleCount = static_cast<uint32_t>(getTable().allocatedTupleCount());
     RecoveryProtoMsgBuilder message(
             m_recoveryPhase,
             m_tableId,
             allocatedTupleCount,
             out,
             &m_serializer,
-            m_table->schema());
-    TableTuple tuple(m_table->schema());
+            getTable().schema());
+    TableTuple tuple(getTable().schema());
     while (message.canAddMoreTuples() && m_iterator.next(tuple)) {
         message.addTuple(tuple);
     }
     message.finalize();
     return true;
 }
+
+/**
+ * Mandatory TableStreamContext override.
+ */
+int64_t RecoveryContext::handleStreamMore(TupleOutputStreamProcessor &outputStreams,
+                                          std::vector<int> &retPositions) {
+    if (outputStreams.size() != 1) {
+        throwFatalException("RecoveryContext::handleStreamMore: Expect 1 output stream "
+                            "for recovery, received %ld", outputStreams.size());
+    }
+    /*
+     * Table ids don't change during recovery because
+     * catalog changes are not allowed.
+     */
+    bool hasMore = nextMessage(&outputStreams[0]);
+    // Non-zero if some tuples remain, we're just not sure how many.
+    int64_t remaining = (hasMore ? 1 : 0);
+    for (size_t i = 0; i < outputStreams.size(); i++) {
+        retPositions.push_back((int)outputStreams.at(i).position());
+    }
+    return remaining;
+}
+
 }

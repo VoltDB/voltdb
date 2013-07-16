@@ -24,6 +24,7 @@ import org.voltcore.utils.Pair;
 public interface SnapshotCompletionInterest {
 
     public static class SnapshotCompletionEvent {
+        public final String path;
         public final String nonce;
         // multipartTxnId is the txnId of the snapshot itself.
         // as well as the last snapshotted MP transaction.
@@ -34,12 +35,14 @@ public interface SnapshotCompletionInterest {
         public final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers;
 
         public SnapshotCompletionEvent(
+                String path,
                 String nonce,
                 final long multipartTxnId,
                 final Map<Integer, Long> partitionTxnIds,
                 final boolean truncationSnapshot,
                 final String requestId,
                 final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers) {
+            this.path = path;
             this.nonce = nonce;
             this.multipartTxnId = multipartTxnId;
             this.partitionTxnIds = partitionTxnIds;

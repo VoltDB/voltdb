@@ -135,7 +135,7 @@ public class AsyncBenchmark {
         int duration = 120;
 
         @Option(desc = "Warmup duration in seconds.")
-        int warmup = 5;
+        int warmup = 0;
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
@@ -145,6 +145,15 @@ public class AsyncBenchmark {
 
         @Option(desc = "Whether to preload a specified number of keys and values.")
         boolean preload = true;
+
+        @Option(desc = "Preload starting key value.")
+        int preloadLowKey = 0;
+
+        @Option(desc = "Whether to run the benchmark (permits exiting after the preload.")
+        boolean runbenchmark = true;
+
+        @Option(desc = "Controls if counts are checked at end of run.")
+        boolean checkdata = true;
 
         @Option(desc = "Fraction of ops that are gets (vs puts).")
         double getputratio = 0.90;
@@ -202,6 +211,7 @@ public class AsyncBenchmark {
 
             if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
             if (latencytarget <= 0) exitWithMessageAndUsage("latencytarget must be > 0");
+            if (preloadLowKey < 0) exitWithMessageAndUsage("preloadlowkey must be >= 0");
         }
     }
 
@@ -254,6 +264,7 @@ public class AsyncBenchmark {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+
         if (config.autotune) {
             clientConfig.enableAutoTune();
             clientConfig.setAutoTuneTargetInternalLatency(config.latencytarget);
@@ -355,7 +366,7 @@ public class AsyncBenchmark {
     void connect(String servers, final String info) throws InterruptedException {
         String[] serverArray = servers.split(",");
         String msg;
-        final CountDownLatch connections = new CountDownLatch(serverArray.length);
+        final CountDownLatch connections = new CountDownLatch(1);
         if(debug) {
             msg = "\n=========\n" + info + "\nIn connect Server counts: " + serverArray.length +
                     ", Server Names: " + servers;
@@ -372,7 +383,6 @@ public class AsyncBenchmark {
                 }
             }).start();
         }
-        // block until all have connected
         connections.await();
     }
 
@@ -381,7 +391,7 @@ public class AsyncBenchmark {
      * It calls printStatistics() every displayInterval seconds
      */
     public void schedulePeriodicStats() {
-        timer = new Timer();
+        timer = new Timer(true);
         TimerTask statsPrinting = new TimerTask() {
             @Override
             public void run() { printStatistics(); }
@@ -398,9 +408,8 @@ public class AsyncBenchmark {
     public synchronized void printStatistics() {
         try {
             ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
-            long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
 
-            System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
+            System.out.printf("%s ", dateformat(getTime()));
             System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
             System.out.printf("Aborts/Failures %d/%d, ",
                     stats.getInvocationAborts(), stats.getInvocationErrors());
@@ -673,7 +682,7 @@ public class AsyncBenchmark {
         System.out.println();
         if (config.preload) {
             System.out.println("Preloading data store...");
-            for(int i=0; i < config.poolsize; i++) {
+            for(int i=config.preloadLowKey; i < config.poolsize; i++) {
                 client.callProcedure(new NullCallback(),
                                      "Put",
                                      String.format(processor.KeyFormat, i),
@@ -683,26 +692,33 @@ public class AsyncBenchmark {
             System.out.println("Preloading complete.\n");
         }
 
+        if (!config.runbenchmark) {
+            System.out.println("Benchmark run disabled by --runbenchmark option, exiting now");
+            System.exit(0);
+        }
+
         System.out.print(HORIZONTAL_RULE);
         System.out.println("Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
 
         // Run the benchmark loop for the requested warmup time
         // The throughput may be throttled depending on client configuration
-//        System.out.println("Warming up...");
-//        final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
-//        while (warmupEndTime > System.currentTimeMillis()) {
-//            // Decide whether to perform a GET or PUT operation
-//            if (rand.nextDouble() < config.getputratio) {
-//                // Get a key/value pair, asynchronously
-//                client.callProcedure(new NullCallback(), "Get", processor.generateRandomKeyForRetrieval());
-//            }
-//            else {
-//                // Put a key/value pair, asynchronously
-//                final PayloadProcessor.Pair pair = processor.generateForStore();
-//                client.callProcedure(new NullCallback(), "Put", pair.Key, pair.getStoreValue());
-//            }
-//        }
+        if (config.warmup > 0) {
+            System.out.println("Warming up...");
+            final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
+            while (warmupEndTime > System.currentTimeMillis()) {
+                // Decide whether to perform a GET or PUT operation
+                if (rand.nextDouble() < config.getputratio) {
+                    // Get a key/value pair, asynchronously
+                    client.callProcedure(new NullCallback(), "Get", processor.generateRandomKeyForRetrieval());
+                }
+                else {
+                    // Put a key/value pair, asynchronously
+                    final PayloadProcessor.Pair pair = processor.generateForStore();
+                    client.callProcedure(new NullCallback(), "Put", pair.Key, pair.getStoreValue());
+                }
+            }
+        }
 
         // reset the stats after warmup
         fullStatsContext.fetchAndResetBaseline();
@@ -723,7 +739,7 @@ public class AsyncBenchmark {
         long currentTime = System.currentTimeMillis();
         long diff = benchmarkEndTime - currentTime;
         int i = 1;
-        //throw new SpellException("Cannot spell client");
+
         double mpRand;
         String msg = "";
         while (benchmarkEndTime > currentTime) {
@@ -779,6 +795,7 @@ public class AsyncBenchmark {
             currentTime = System.currentTimeMillis();
             diff = benchmarkEndTime - currentTime;
         }
+        timer.cancel();
     }
 
     public void closeClient() {
@@ -819,7 +836,8 @@ public class AsyncBenchmark {
             e.printStackTrace();
         }
 
-        summary4qa();
+        if (config.checkdata)
+            summary4qa();
 
         try {
             client.drain();
@@ -1019,6 +1037,8 @@ public class AsyncBenchmark {
             else {
                 msg = "Lost all connections without recover. Exit...";
                 prt(msg);
+                benchmark.timer.cancel();
+                System.exit(1);
             }
         } // catch(org.voltdb.client.NoConnectionsException x)
     }

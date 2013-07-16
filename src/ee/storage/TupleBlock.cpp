@@ -76,7 +76,7 @@ TupleBlock::~TupleBlock() {
 #endif
 }
 
-std::pair<int, int> TupleBlock::merge(Table *table, TBPtr source) {
+std::pair<int, int> TupleBlock::merge(Table *table, TBPtr source, TupleMovementListener *listener) {
     assert(source != this);
     /*
       std::cout << "Attempting to merge " << static_cast<void*> (this)
@@ -125,6 +125,12 @@ std::pair<int, int> TupleBlock::merge(Table *table, TBPtr source) {
 
         destinationTuple.move(nextFreeTuple().first);
         table->swapTuples(sourceTupleWithNewValues, destinationTuple);
+
+        // Notify the listener if provided.
+        if (listener != NULL) {
+            listener->notifyTupleMovement(source, this, sourceTupleWithNewValues, destinationTuple);
+        }
+
         source->freeTuple(sourceTupleWithNewValues.address());
     }
     source->lastCompactionOffset(m_nextTupleInSourceOffset);
