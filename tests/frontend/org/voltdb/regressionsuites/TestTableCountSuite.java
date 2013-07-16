@@ -65,7 +65,7 @@ public class TestTableCountSuite extends RegressionSuite {
             assertTrue(e instanceof ProcCallException);
             ex = e;
         } finally {
-            assertNotNull(ex);
+            assertNull(ex);
         }
     }
 

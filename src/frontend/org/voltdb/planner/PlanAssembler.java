@@ -1309,7 +1309,7 @@ public class PlanAssembler {
                 topAggNode.setOutputSchema(agg_schema);
             }
 
-            NodeSchema newSchema = m_parsedSelect.evaluatePostAggColumns();
+            NodeSchema newSchema = m_parsedSelect.getNewSchema();
             root = pushDownAggregate(root, aggNode, topAggNode, m_parsedSelect.hasComplexAgg(), newSchema);
         }
 

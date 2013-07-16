@@ -18,8 +18,8 @@
 package org.voltdb.expressions;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -533,8 +533,8 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * @return
      */
     public AbstractExpression replaceWithTVE(
-            HashMap <AbstractExpression, Integer> aggTableIndexMap,
-            HashMap <AbstractExpression, String> exprToAliasMap)
+            Map <AbstractExpression, Integer> aggTableIndexMap,
+            Map <AbstractExpression, String> exprToAliasMap)
     {
         Integer ii = aggTableIndexMap.get(this);
         if (ii != null) {
@@ -545,6 +545,10 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             tve.setColumnName("");
             tve.setColumnAlias(exprToAliasMap.get(this));
             tve.setTableName("VOLT_TEMP_TABLE");
+            if (this instanceof TupleAddressExpression &&
+                    hasAnySubexpressionOfClass(AggregateExpression.class))
+                tve.setHasAggregate(true);
+
             return tve;
         }
 

@@ -425,18 +425,7 @@ public class StatementQuery extends StatementDMQL {
          * Serialize the display columns in the exprColumn order.
          */
         List<Integer> nullColsIdx = new ArrayList<Integer>();
-        for (int jj=0; jj < displayCols.size(); ++jj) {
-            Expression expr = displayCols.get(jj);
-            if (nullColsIdx.contains(jj)) {
-                continue;
-            }
-            VoltXMLElement xml = expr.voltGetXML(session, displayCols, nullColsIdx, jj);
-            cols.children.add(xml);
-            assert(xml != null);
-        }
-        for (int kk=0; kk < nullColsIdx.size(); ++kk) {
-            displayCols.set(kk, null);
-        }
+        insetElementsAndReplaceSimpleColumns(session,cols, displayCols, nullColsIdx);
 
         // parameters
         voltAppendParameters(session, query);
@@ -464,28 +453,57 @@ public class StatementQuery extends StatementDMQL {
         if (select.isGrouped) {
             VoltXMLElement groupCols = new VoltXMLElement("groupcolumns");
             query.children.add(groupCols);
-            for (Expression groupByCol : groupByCols) {
-                groupCols.children.add(groupByCol.voltGetXML(session));
-            }
+            insertElementsAndReplaceSimpleColumns(session, groupCols, groupByCols, displayCols, nullColsIdx);
         }
+
         // orderby
         if (orderByCols.size() > 0) {
             VoltXMLElement orderCols = new VoltXMLElement("ordercolumns");
             query.children.add(orderCols);
-            for (Expression orderByCol : orderByCols) {
-                orderCols.children.add(orderByCol.voltGetXML(session));
-            }
+            insertElementsAndReplaceSimpleColumns(session, orderCols, orderByCols, displayCols, nullColsIdx);
         }
 
-        // query condition should be covered by table scans, but can un-comment
-        // this to see if anything is missed
-        /*if (select.queryCondition != null) {
-            VoltXMLElement queryCond = new VoltXMLElement("querycondition");
-            query.children.add(queryCond);
-            queryCond.children.add(select.queryCondition.voltGetXML(session));
-        }*/
-
         return query;
+    }
+
+    /**
+     * Substitues of Simple Columns are assumed to appear only in DisplayCols
+     * @param session
+     * @param ele
+     * @param displayCols
+     * @param nullColsIdx
+     * @throws HSQLParseException
+     */
+    private void insetElementsAndReplaceSimpleColumns (Session session, VoltXMLElement ele,
+            List<Expression> displayCols, List<Integer> nullColsIdx) throws HSQLParseException {
+        for (int jj=0; jj < displayCols.size(); ++jj) {
+            Expression expr = displayCols.get(jj);
+            if (nullColsIdx.contains(jj)) {
+                continue;
+            }
+            VoltXMLElement xml = expr.voltGetXML(session, displayCols, nullColsIdx, jj);
+            ele.children.add(xml);
+            assert(xml != null);
+        }
+    }
+    /**
+     * Insert VoltXMLElement got from voltGetXML() to ele. Replace simple columns if it has.
+     * @param session
+     * @param ele
+     * @param columns
+     * @param displayCols
+     * @param nullColsIdx
+     * @throws HSQLParseException
+     */
+    private void insertElementsAndReplaceSimpleColumns (Session session, VoltXMLElement ele,
+            List<Expression> columns, List<Expression> displayCols, List<Integer> nullColsIdx)
+            throws HSQLParseException {
+        for (int jj=0; jj < columns.size(); ++jj) {
+            Expression expr = columns.get(jj);
+            VoltXMLElement xml = expr.voltGetXML(session, displayCols, nullColsIdx, jj);
+            ele.children.add(xml);
+            assert(xml != null);
+        }
     }
 
     /**

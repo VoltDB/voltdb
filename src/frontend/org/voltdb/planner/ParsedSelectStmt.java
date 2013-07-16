@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -103,6 +104,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     // It may has the consistent element order as the displayColumns
     public ArrayList<ParsedColInfo> aggResultColumns = new ArrayList<ParsedColInfo>();
+    private NodeSchema newAggSchema;
 
     public long limit = -1;
     public long offset = 0;
@@ -156,6 +158,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         insertToAggResultColumns(groupByColumns);
         //TODO(XIN): double check whether should we add orderColumns
         //insertToAggResultColumns(orderColumns);
+
+        // Generate New output Schema, replace Aggs with TVEs for group by and order by
+        evaluateColumns();
     }
 
     /**
@@ -205,21 +210,21 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     /**
-     * Construct the newSchema for projection node as the parent of the agg node
-     * replaceWithTVE() is the core part.
-     * @return
+     * TODO(xin): clean this function if possible
      */
-    NodeSchema evaluatePostAggColumns () {
+    void evaluateColumns () {
+        Map <AbstractExpression, Integer> aggTableIndexMap = new HashMap <AbstractExpression,Integer>();
+        Map <AbstractExpression, String> exprToAliasMap = new HashMap <AbstractExpression,String>();
+
         // Build the association between the table column with its index
-        HashMap <AbstractExpression, Integer> aggTableIndexMap = new HashMap <AbstractExpression,Integer>();
-        HashMap <AbstractExpression, String> exprToAliasMap = new HashMap <AbstractExpression,String>();
         for (int i = 0; i < aggResultColumns.size(); i++) {
             ParsedColInfo col = aggResultColumns.get(i);
             aggTableIndexMap.put(col.expression, i);
             exprToAliasMap.put(col.expression, col.alias);
         }
 
-        NodeSchema agg_schema = new NodeSchema();
+        // Replace TVE for display cols
+        newAggSchema = new NodeSchema();
         for (ParsedColInfo col : displayColumns) {
             SchemaColumn schema_col = null;
             if (col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
@@ -232,8 +237,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                         col.alias,
                         col.expression);
             }
-
-            agg_schema.addColumn(schema_col);
+            newAggSchema.addColumn(schema_col);
         }
 
         // Now I am good to setup the column, but I want to check whether it hasComplexAgg
@@ -252,8 +256,31 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 setComlexAgg(true);
             }
         }
-        // Finished checking, Now I can return
-        return agg_schema;
+        // Finished checking
+
+        for (ParsedColInfo col : groupByColumns) {
+            if (col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+                AbstractExpression expr = col.expression.replaceWithTVE(aggTableIndexMap, exprToAliasMap);
+                col.expression = expr;
+                // I think I already have tablename, alias, columnName setted up
+            }
+        }
+        for (ParsedColInfo col : orderColumns) {
+            if (col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+                AbstractExpression expr = col.expression.replaceWithTVE(aggTableIndexMap, exprToAliasMap);
+                col.expression = expr;
+                // I think I already have tablename, alias, columnName setted up
+            }
+        }
+    }
+
+    /**
+     * Construct the newSchema for projection node as the parent of the agg node
+     * replaceWithTVE() is the core part.
+     * @return
+     */
+    NodeSchema getNewSchema () {
+        return newAggSchema;
     }
 
 
@@ -298,10 +325,26 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // DONE(xin): work to pick up all the agg ParsedColInfo if this child contains.
             int count = parseAggColumns(child);
             if (count == 0) {
+                int addOne = 0;
                 for (ParsedColInfo ic: groupByColumns) {
                     if (ic.simpleEquals(col)) {
                         insertToAggResultColumns(col);
+                        addOne += 1;
+                        break;
                     }
+                }
+                if (addOne == 0) {
+                    for (ParsedColInfo ic: orderColumns) {
+                        if (ic.simpleEquals(col)) {
+                            insertToAggResultColumns(col);
+                            addOne += 1;
+                            break;
+                        }
+                    }
+                }
+                if (addOne == 0) {
+                    // You select a column that does not contain Aggs, group by and order by column
+                    if (!hasComplexAgg()) setComlexAgg(true);
                 }
             } else if (count > 1) {
                 if (!hasComplexAgg()) setComlexAgg(true);
@@ -392,56 +435,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 orig_col.ascending = order_col.ascending;
             }
         }
-        else if (child.name.equals("simplecolumn")) {
-            order_col.columnName = "";
-            // I'm not sure anyone actually cares about this table name
-            order_col.tableName = "VOLT_TEMP_TABLE";
-
-            // If it's a simplecolumn operation.  This means that the alias that
-            //    we have should refer to a column that we compute
-            //    somewhere else (like an aggregate, mostly).
-            //    Look up that column in the displayColumns list,
-            //    and then create a new order by column with a magic TVE.
-            // This case seems to be the result of cross-referencing a display column
-            // by its position, as in "ORDER BY 2, 3". Otherwise the ORDER BY column
-            // is a columnref as handled in the prior code block.
-            assert(order_exp instanceof TupleValueExpression);
-            TupleValueExpression tve = (TupleValueExpression) order_exp;
-            String alias = tve.getColumnAlias();
+        else if (order_exp.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+            String alias = child.attributes.get("alias");
             order_col.alias = alias;
-            ParsedColInfo orig_col = null;
-            for (ParsedColInfo col : displayColumns) {
-                if (col.alias.equals(alias)) {
-                    orig_col = col;
-                    break;
-                }
-            }
-
-            // We need the original column expression so we can extract
-            // the value size and type for our TVE that refers back to it.
-            // XXX: This check runs into problems for some cases where a display column expression gets re-used in the ORDER BY.
-            // I THINK one problem case was "select x, max(y) from t group by x order by max(y);" --paul
-            if (orig_col == null) {
-                throw new PlanningErrorException("Unable to find source " +
-                                                 "column for simplecolumn: " +
-                                                 alias);
-            }
-
-            // Tagging the actual display column as being also an order by column
-            // helps later when trying to determine ORDER BY coverage (for determinism).
-            orig_col.orderBy = true;
-            orig_col.ascending = order_col.ascending;
-
-            assert(orig_col.tableName.equals("VOLT_TEMP_TABLE"));
-            // Fill in our fake TVE that will point back at the input column.
-            tve.setColumnName("");
-            tve.setColumnIndex(-1);
-            tve.setTableName("VOLT_TEMP_TABLE");
-            tve.setValueSize(orig_col.expression.getValueSize());
-            tve.setValueType(orig_col.expression.getValueType());
-            if (orig_col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
-                tve.setHasAggregate(true);
-            }
+            order_col.tableName = "VOLT_TEMP_TABLE";
+            order_col.columnName = "";
+            // Replace its expression to TVE later
         }
         else if ((child.name.equals("operation") == false) &&
                  (child.name.equals("aggregation") == false) &&
@@ -450,6 +449,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         assert( ! (order_exp instanceof ConstantValueExpression));
         assert( ! (order_exp instanceof ParameterValueExpression));
+
         ExpressionUtil.finalizeValueTypes(order_exp);
         order_col.expression = order_exp;
         orderColumns.add(order_col);
