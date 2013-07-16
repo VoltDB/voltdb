@@ -94,13 +94,13 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
      *
      * There is only one writer so a single stripe is fine
      */
-    private ConcurrentHashMap<Long, Map<String, org.voltdb.dtxn.InitiatorStats.InvocationInfo>> m_connectionStates =
+    private final ConcurrentHashMap<Long, Map<String, org.voltdb.dtxn.InitiatorStats.InvocationInfo>> m_connectionStates =
                  new ConcurrentHashMap<Long, Map<String, org.voltdb.dtxn.InitiatorStats.InvocationInfo>>(1024, .75f, 1);
 
     // Use the same-ish trick for the latency stats.  LatencyInfo keeps
     // volatile ImmutableLists for the buckets and a separate volatile max.
     // Same single-writer, unsynchronized reader pattern as initiator stats.
-    private LatencyInfo m_latencyInfo = new LatencyInfo();
+    private final LatencyInfo m_latencyInfo = new LatencyInfo();
 
     public AdmissionControlGroup(int maxBytes, int maxRequests)
     {
@@ -129,7 +129,6 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
     {
         assert(m_expectedThreadId == Thread.currentThread().getId());
         m_members.add(member);
-        m_connectionStates.put(member.connectionId(), new NonBlockingHashMap<String, InvocationInfo>());
     }
 
     public void removeMember(ACGMember member)
