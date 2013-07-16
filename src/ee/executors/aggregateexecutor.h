@@ -108,7 +108,7 @@ protected:
     std::vector<AbstractExpression*> m_inputExpressions;
     std::vector<AbstractExpression*> m_outputColumnExpressions;
     std::vector<int> m_aggregateOutputColumns;
-    AbstractExpression* m_predicate;	// ENG-1565: for enabling max() using index purpose only
+    AbstractExpression* m_predicate;    // ENG-1565: for enabling max() using index purpose only
 };
 
 

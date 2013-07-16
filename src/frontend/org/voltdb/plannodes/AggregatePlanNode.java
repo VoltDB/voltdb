@@ -293,8 +293,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
             stringer.endArray();
         }
         if (m_predicate != null) {
-            stringer.key(Members.PREDICATE.name());
-            stringer.value(m_predicate);
+            stringer.key(Members.PREDICATE.name()).value(m_predicate);
         }
     }
 
@@ -315,6 +314,9 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
         // trim the last ", " from the string
         sb.setLength(sb.length() - 2);
+        if (m_predicate != null) {
+            sb.append(" (" + m_predicate.explain(m_outputSchema.getColumns().get(0).getTableName()) + ")");
+        }
         return sb.toString();
     }
 

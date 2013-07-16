@@ -107,7 +107,7 @@ protected:
 
     PlanNodeType m_type; //AGGREGATE OR HASHAGGREGATE
 
-    AbstractExpression* m_predicate;	// ENG-1565: for accelerating min() / max() using index purpose only
+    AbstractExpression* m_predicate;    // ENG-1565: for accelerating min() / max() using index purpose only
 };
 
 }
