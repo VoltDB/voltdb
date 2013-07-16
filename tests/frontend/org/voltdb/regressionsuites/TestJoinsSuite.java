@@ -596,7 +596,7 @@ public void testThreeTableIndexInnerMultiJoin() throws NoConnectionsException, I
 }
 
   /**
-   * Two table left and right NLIJ
+   * IN LIST JOIN/WHERE Expressions
    * @throws NoConnectionsException
    * @throws IOException
    * @throws ProcCallException
