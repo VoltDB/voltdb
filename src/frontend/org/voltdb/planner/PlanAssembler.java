@@ -1388,10 +1388,13 @@ public class PlanAssembler {
             // Add the top node
             coordNode.addAndLinkChild(root);
             coordNode.generateOutputSchema(m_catalogDb);
-            proj.addAndLinkChild(coordNode);
             root = coordNode;
+            if (neeProjectionNode)
+                proj.addAndLinkChild(coordNode);
+
         } else {
-            proj.addAndLinkChild(root);
+            if (neeProjectionNode)
+                proj.addAndLinkChild(root);
         }
 
         if (neeProjectionNode) {
