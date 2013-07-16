@@ -419,8 +419,6 @@ public class MeshArbiter {
         boolean haveEnough = false;
 
         do {
-            // promoteGoodUnwitnessedCandidates();
-
             VoltMessage m = m_mailbox.recvBlocking(receiveSubjects, 5);
 
             /*
@@ -447,9 +445,7 @@ public class MeshArbiter {
 
                 if (  !m_seeker.getSurvivors().contains(m.m_sourceHSId)
                     || m_failedSites.contains(m.m_sourceHSId)
-                    || Sets.filter(sfm.m_safeTxnIds.keySet(), in(hsIds)).isEmpty()
-                    || (   !sfm.m_decision.isEmpty()
-                        && Sets.filter(sfm.m_decision, in(hsIds)).isEmpty())) continue;
+                    || Sets.filter(sfm.getFailedSites(), in(hsIds)).isEmpty()) continue;
 
                 updateFailedSitesLedger(hsIds, sfm);
 
@@ -464,6 +460,8 @@ public class MeshArbiter {
 
                         if (Boolean.FALSE.equals(m_inTrouble.get(closedSite))) {
                             FaultMessage fm = new FaultMessage(m_hsId, closedSite);
+                            fm.m_sourceHSId = m_hsId;
+
                             m_mailbox.deliverFront(fm);
                             m_recoveryLog.info("Agreement, Promoting un to witnessed: " + fm);
                         }

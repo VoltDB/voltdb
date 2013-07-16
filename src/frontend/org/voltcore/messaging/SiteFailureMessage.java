@@ -111,6 +111,14 @@ public class SiteFailureMessage extends VoltMessage {
         }
     }
 
+    public Set<Long> getFailedSites() {
+        if (m_decision.isEmpty()) {
+            return m_safeTxnIds.keySet();
+        } else {
+            return m_decision;
+        }
+    }
+
     @Override
     public int getSerializedSize() {
         int msgsize =
