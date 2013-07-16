@@ -53,8 +53,10 @@
 #include <cassert>
 
 #include <boost/ptr_container/ptr_vector.hpp>
-#include "json_spirit/json_spirit.h"
 #include "boost/shared_ptr.hpp"
+// The next #define limits the number of features pulled into the build
+// We don't use those features.
+#define BOOST_MULTI_INDEX_DISABLE_SERIALIZATION
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/member.hpp>
