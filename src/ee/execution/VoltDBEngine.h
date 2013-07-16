@@ -587,6 +587,12 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         Topend *m_topend;
 
+        bool m_noInterrupt;
+
+        inline bool isNoInterrupt() { return m_noInterrupt; };
+
+        inline void setInterrupt() { m_noInterrupt = false; };
+
         // For data from engine that must be shared/distributed to
         // other components. (Components MUST NOT depend on VoltDBEngine.h).
         ExecutorContext *m_executorContext;

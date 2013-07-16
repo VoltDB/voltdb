@@ -605,6 +605,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long spHandle, long lastCommittedSpHandle, long uniqueId, long undoToken);
 
     /**
+     * Set the interrupt bit in EE to interrupt a running query.
+     */
+    protected native void setInterrupt();
+
+    /**
      * Serialize the result temporary table.
      * @param pointer the VoltDBEngine pointer
      * @param table_id Id of the table to be serialized

@@ -178,7 +178,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
         int tuple_ctr = 0;
         int tuple_skipped = 0;
-        while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
+        while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple) && m_engine->isNoInterrupt())
         {
         	if(iterator.getTuplesFound() % 10000 == 0) {
         		m_engine->getTopend()->logStats(iterator.getTuplesFound());
