@@ -123,6 +123,9 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
              */
             if (table.getIsreplicated() && !tracker.isFirstHost()) {
                 snapshotRecord.removeTable(table.getTypeName());
+                // We'll expect one less table in the global table count
+                // in order to be done, too (ENG-4802)
+                numTables.decrementAndGet();
                 continue;
             }
 
