@@ -1541,7 +1541,7 @@ public class Expression {
      */
     VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
-        return voltGetXML(session, null, null);
+        return voltGetXML(session, null, null, -1);
     }
     /**
      * VoltDB added method to get a non-catalog-dependent
@@ -1551,7 +1551,7 @@ public class Expression {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    VoltXMLElement voltGetXML(Session session, List<Expression> displayCols, List<Integer> nullCols) throws HSQLParseException
+    VoltXMLElement voltGetXML(Session session, List<Expression> displayCols, List<Integer> nullCols, int startKey) throws HSQLParseException
     {
         // The voltXML representations of expressions tends to be driven much more by the expression's opType
         // than its Expression class.
@@ -1569,7 +1569,7 @@ public class Expression {
         // That case gets explicitly enabled here by fudging the opType from SIMPLE_COLUMN to COLUMN.
         if (exprOp == OpTypes.SIMPLE_COLUMN) {
             // find the substitue from displayCols list
-            for (int ii=0; ii < displayCols.size(); ++ii)
+            for (int ii=startKey+1; ii < displayCols.size(); ++ii)
             {
                 Expression otherCol = displayCols.get(ii);
                 if (otherCol == null) {
@@ -1581,7 +1581,7 @@ public class Expression {
                     // serialize the column this simple column stands-in for
                     nullCols.add(ii);
                     // quit seeking simple_column's replacement
-                    return otherCol.voltGetXML(session, displayCols, nullCols);
+                    return otherCol.voltGetXML(session, displayCols, nullCols, startKey);
                 }
             }
         }
@@ -1605,7 +1605,7 @@ public class Expression {
 
         for (Expression expr : nodes) {
             if (expr != null) {
-                VoltXMLElement vxmle = expr.voltGetXML(session, displayCols, nullCols);
+                VoltXMLElement vxmle = expr.voltGetXML(session, displayCols, nullCols, startKey);
                 exp.children.add(vxmle);
                 assert(vxmle != null);
             }

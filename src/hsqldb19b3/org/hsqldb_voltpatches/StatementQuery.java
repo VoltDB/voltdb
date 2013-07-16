@@ -430,7 +430,7 @@ public class StatementQuery extends StatementDMQL {
             if (nullColsIdx.contains(jj)) {
                 continue;
             }
-            VoltXMLElement xml = expr.voltGetXML(session, displayCols, nullColsIdx);
+            VoltXMLElement xml = expr.voltGetXML(session, displayCols, nullColsIdx, jj);
             cols.children.add(xml);
             assert(xml != null);
         }
