@@ -128,7 +128,11 @@ public class TestPushDownAggregates extends PlannerTestCase {
     }
 
     public void testGroupByNotInDisplayColumn() {
-        failToCompile("SELECT count(A1) FROM T1 GROUP BY A1", "display column");
+        List<AbstractPlanNode> pn = compileToFragments ("SELECT count(A1) FROM T1 GROUP BY A1");
+        checkPushedDown(pn, true,
+                new ExpressionType[] {ExpressionType.AGGREGATE_COUNT},
+                new ExpressionType[] {ExpressionType.AGGREGATE_SUM}, true);
+
     }
 
     public void testGroupByWithoutAggregates() {
@@ -236,9 +240,20 @@ public class TestPushDownAggregates extends PlannerTestCase {
      */
     private void checkPushedDown(List<AbstractPlanNode> pn, boolean isMultiPart,
                                  ExpressionType[] aggTypes, ExpressionType[] pushDownTypes) {
+        checkPushedDown(pn, isMultiPart, aggTypes, pushDownTypes, false);
+    }
+
+    private void checkPushedDown(List<AbstractPlanNode> pn, boolean isMultiPart,
+            ExpressionType[] aggTypes, ExpressionType[] pushDownTypes, boolean hasProjectionNode) {
         assertTrue(pn.size() > 0);
 
-        AbstractPlanNode p = pn.get(0).getChild(0);
+        AbstractPlanNode p = null;
+        if (hasProjectionNode) {
+            p = pn.get(0).getChild(0).getChild(0);
+        } else {
+            p = pn.get(0).getChild(0);
+        }
+
         assertTrue(p instanceof AggregatePlanNode);
         String fragmentString = p.toJSONString();
         ExpressionType[] topTypes = (pushDownTypes != null) ? pushDownTypes : aggTypes;
