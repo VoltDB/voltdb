@@ -543,55 +543,139 @@ public void testThreeTableIndexInnerMultiJoin() throws NoConnectionsException, I
 }
 
   /**
-  * Two table left and right NLIJ
-  * @throws NoConnectionsException
-  * @throws IOException
-  * @throws ProcCallException
-  */
+   * Two table left and right NLIJ
+   * @throws NoConnectionsException
+   * @throws IOException
+   * @throws ProcCallException
+   */
   public void testDistributedOuterJoin() throws NoConnectionsException, IOException, ProcCallException {
-    Client client = this.getClient();
-    client.callProcedure("InsertP2", 1, 1);
-    client.callProcedure("InsertP2", 2, 2);
-    client.callProcedure("InsertP2", 3, 3);
-    client.callProcedure("InsertP2", 4, 4);
-    client.callProcedure("InsertR3", 1, 1);
-    client.callProcedure("InsertR3", 2, 2);
-    client.callProcedure("InsertR3", 4, 4);
-    client.callProcedure("InsertR3", 5, 5);
-    // R3 1st joined with P2 not null and eliminated by P2.A IS NULL
-    // R3 2nd joined with P2 not null and eliminated by P2.A IS NULL
-    // R3 3rd joined with P2 null (P2.A < 3)
-    // R3 4th joined with P2 null
+      Client client = this.getClient();
+      client.callProcedure("InsertP2", 1, 1);
+      client.callProcedure("InsertP2", 2, 2);
+      client.callProcedure("InsertP2", 3, 3);
+      client.callProcedure("InsertP2", 4, 4);
+      client.callProcedure("InsertR3", 1, 1);
+      client.callProcedure("InsertR3", 2, 2);
+      client.callProcedure("InsertR3", 4, 4);
+      client.callProcedure("InsertR3", 5, 5);
+      // R3 1st joined with P2 not null and eliminated by P2.A IS NULL
+      // R3 2nd joined with P2 not null and eliminated by P2.A IS NULL
+      // R3 3rd joined with P2 null (P2.A < 3)
+      // R3 4th joined with P2 null
 
-    VoltTable result = client.callProcedure(
-            "@AdHoc", "select *  FROM P2 RIGHT JOIN R3 ON R3.A = P2.A AND P2.A < 3 WHERE P2.A IS NULL")
-                             .getResults()[0];
-    System.out.println(result.toString());
-    if ( ! isHSQL()) assertEquals(2, result.getRowCount()); //// PENDING HSQL flaw investigation
+      VoltTable result = client.callProcedure(
+              "@AdHoc", "select *  FROM P2 RIGHT JOIN R3 ON R3.A = P2.A AND P2.A < 3 WHERE P2.A IS NULL")
+              .getResults()[0];
+      System.out.println(result.toString());
+      if ( ! isHSQL()) assertEquals(2, result.getRowCount()); //// PENDING HSQL flaw investigation
 
-    client.callProcedure("InsertP3", 1, 1);
-    client.callProcedure("InsertP3", 2, 2);
-    client.callProcedure("InsertP3", 4, 4);
-    client.callProcedure("InsertP3", 5, 5);
-    // P3 1st joined with P2 not null and eliminated by P2.A IS NULL
-    // P3 2nd joined with P2 not null and eliminated by P2.A IS NULL
-    // P3 3rd joined with P2 null (P2.A < 3)
-    // P3 4th joined with P2 null
-    result = client.callProcedure(
-            "@AdHoc", "select *  FROM P2 RIGHT JOIN P3 ON P3.A = P2.A AND P2.A < 3 WHERE P2.A IS NULL")
-                             .getResults()[0];
-    System.out.println(result.toString());
-    if ( ! isHSQL()) assertEquals(2, result.getRowCount()); //// PENDING HSQL flaw investigation
-    // Outer table index scan
-    // P3 1st eliminated by P3.A > 0 where filter
-    // P3 2nd joined with P2 2
-    // P3 3nd joined with P2 4
-    // R3 4th joined with P2 null
-    result = client.callProcedure(
-            "@AdHoc", "select * FROM P3 LEFT JOIN P2 ON P3.A = P2.A WHERE P3.A > 1")
-                             .getResults()[0];
-    System.out.println(result.toString());
-    assertEquals(3, result.getRowCount());
+      client.callProcedure("InsertP3", 1, 1);
+      client.callProcedure("InsertP3", 2, 2);
+      client.callProcedure("InsertP3", 4, 4);
+      client.callProcedure("InsertP3", 5, 5);
+      // P3 1st joined with P2 not null and eliminated by P2.A IS NULL
+      // P3 2nd joined with P2 not null and eliminated by P2.A IS NULL
+      // P3 3rd joined with P2 null (P2.A < 3)
+      // P3 4th joined with P2 null
+      result = client.callProcedure(
+              "@AdHoc", "select *  FROM P2 RIGHT JOIN P3 ON P3.A = P2.A AND P2.A < 3 WHERE P2.A IS NULL")
+              .getResults()[0];
+      System.out.println(result.toString());
+      if ( ! isHSQL()) assertEquals(2, result.getRowCount()); //// PENDING HSQL flaw investigation
+      // Outer table index scan
+      // P3 1st eliminated by P3.A > 0 where filter
+      // P3 2nd joined with P2 2
+      // P3 3nd joined with P2 4
+      // R3 4th joined with P2 null
+      result = client.callProcedure(
+              "@AdHoc", "select * FROM P3 LEFT JOIN P2 ON P3.A = P2.A WHERE P3.A > 1")
+              .getResults()[0];
+      System.out.println(result.toString());
+      assertEquals(3, result.getRowCount());
+
+}
+
+  /**
+   * Two table left and right NLIJ
+   * @throws NoConnectionsException
+   * @throws IOException
+   * @throws ProcCallException
+   */
+  public void testInListJoin() throws NoConnectionsException, IOException, ProcCallException {
+      Client client = this.getClient();
+      client.callProcedure("InsertR1", 1, 1, 1);
+      client.callProcedure("InsertR1", 2, 2, 2);
+      client.callProcedure("InsertR1", 3, 3, 3);
+      client.callProcedure("InsertR1", 4, 4, 4);
+      client.callProcedure("InsertR3", 1, 1);
+      client.callProcedure("InsertR3", 2, 2);
+      client.callProcedure("InsertR3", 4, 4);
+      client.callProcedure("InsertR3", 5, 5);
+      client.callProcedure("InsertR3", 6, 6);
+
+      // Outer join - IN LIST is outer table join index expression
+      VoltTable result = client.callProcedure(
+              "@AdHoc", "select *  FROM R3 LEFT JOIN R1 on R3.A = R1.A and R3.A in (1,2)")
+              .getResults()[0];
+      System.out.println(result.toString());
+      assertEquals(5, result.getRowCount());
+      // Outer join - IN LIST is outer table join non-index expression
+      result = client.callProcedure(
+              "@AdHoc", "select *  FROM R3 LEFT JOIN R1 on R3.A = R1.A and R3.C in (1,2)")
+              .getResults()[0];
+      System.out.println(result.toString());
+      assertEquals(5, result.getRowCount());
+      // Inner join - IN LIST is join index expression
+      result = client.callProcedure(
+              "@AdHoc", "select *  FROM R3 JOIN R1 on R3.A = R1.A and R3.A in (1,2)")
+              .getResults()[0];
+      System.out.println(result.toString());
+      assertEquals(2, result.getRowCount());
+
+      // Outer join - IN LIST is inner table join index expression
+      result = client.callProcedure(
+              "@AdHoc", "select *  FROM R1 LEFT JOIN R3 on R3.A = R1.A and R3.A in (1,2)")
+              .getResults()[0];
+      System.out.println(result.toString());
+      assertEquals(4, result.getRowCount());
+
+      // Outer join - IN LIST is inner table join scan expression
+      result = client.callProcedure(
+              "@AdHoc", "select *  FROM R1 LEFT JOIN R3 on R3.A = R1.A and R3.C in (1,2)")
+              .getResults()[0];
+      System.out.println(result.toString());
+      assertEquals(4, result.getRowCount());
+
+      // Outer join - IN LIST is outer table where index expression
+      result = client.callProcedure(
+              "@AdHoc", "select *  FROM R3 LEFT JOIN R1 on R3.A = R1.A WHERE R3.A in (1,2)")
+              .getResults()[0];
+      System.out.println(result.toString());
+      assertEquals(2, result.getRowCount());
+      // Outer join - IN LIST is outer table where scan expression
+      result = client.callProcedure(
+              "@AdHoc", "select *  FROM R3 LEFT JOIN R1 on R3.A = R1.A WHERE R3.C in (1,2)")
+              .getResults()[0];
+      System.out.println(result.toString());
+      assertEquals(2, result.getRowCount());
+      // Inner join - IN LIST is where index expression
+      result = client.callProcedure(
+              "@AdHoc", "select *  FROM R3 JOIN R1 on R3.A = R1.A WHERE R3.A in (1,2)")
+              .getResults()[0];
+      System.out.println(result.toString());
+      assertEquals(2, result.getRowCount());
+      // Inner join - IN LIST is where scan expression
+      result = client.callProcedure(
+              "@AdHoc", "select *  FROM R3 JOIN R1 on R3.A = R1.A WHERE R3.C in (1,2)")
+              .getResults()[0];
+      System.out.println(result.toString());
+      assertEquals(2, result.getRowCount());
+      // Outer join - IN LIST is inner table where index expression
+      result = client.callProcedure(
+              "@AdHoc", "select *  FROM R1 LEFT JOIN R3 on R3.A = R1.A WHERE R3.A in (1,2)")
+              .getResults()[0];
+      System.out.println(result.toString());
+      assertEquals(2, result.getRowCount());
 
   }
 
