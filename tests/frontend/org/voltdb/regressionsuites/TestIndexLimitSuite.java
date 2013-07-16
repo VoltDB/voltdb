@@ -121,11 +121,333 @@ public class TestIndexLimitSuite extends RegressionSuite {
 
         callWithExpectedResult(client, 1, "EXPR_TU1_MIN_FUNC");
         callWithExpectedResult(client, 0, "EXPR_TU1_MIN_ARTH");
-        callWithExpectedResult(client, "thea", "EXPR_TU2_MIN_UNAME", 4);
+        callWithExpectedResult(client, "thea", "EXPR_TU2_MAX_UNAME", 4);
         callWithExpectedResult(client, 2, "EXPR_TU2_MIN_ABS_POINTS", 2);
         callWithExpectedResult(client, 3, "EXPR_TU2_MAX_POINTS", "betty");
         callWithExpectedResult(client, 5, "EXPR_TU2_MAX_LENGTH_UNAME", 1);
+    }
 
+    public void testSpecialCases() throws Exception {
+        Client client = getClient();
+
+        client.callProcedure("TU1.insert", 1, 1);
+        client.callProcedure("TU1.insert", 2, 2);
+        client.callProcedure("TU1.insert", 3, -3);
+        client.callProcedure("TU2.insert", 1, -1, "jim");
+        client.callProcedure("TU2.insert", 2, 2, "jim");
+        client.callProcedure("TU2.insert", 3, 3, "jim");
+        client.callProcedure("TU2.insert", 4, -1, "thea");
+        client.callProcedure("TU2.insert", 5, 2, "thea");
+        client.callProcedure("TU2.insert", 6, 3, "thea");
+        client.callProcedure("TU2.insert", 7, -1, "betty");
+        client.callProcedure("TU2.insert", 8, 2, "betty");
+        client.callProcedure("TU2.insert", 9, 3, "betty");
+
+        callWithExpectedResult(client, 1, "EDGE_TU1_MIN_POINTS1", 0);
+        callWithExpectedResult(client, 2, "EDGE_TU1_MIN_POINTS2", 2);
+        callWithExpectedResult(client, -3, "EDGE_TU1_MIN_POINTS3", 1);
+        callWithExpectedResult(client, -3, "EDGE_TU1_MIN_POINTS4", 2);
+        callWithExpectedResult(client, 2, "EDGE_TU1_MAX_POINTS1", 0);
+        callWithExpectedResult(client, 2, "EDGE_TU1_MAX_POINTS2", 2);
+        callWithExpectedResult(client, 1, "EDGE_TU1_MAX_POINTS3", 2);
+        callWithExpectedResult(client, 1, "EDGE_TU1_MAX_POINTS4", 1);
+        callWithExpectedResult(client, -1, "EDGE_TU2_MIN_POINTS1", "jim", 5);
+        callWithExpectedResult(client, 3, "EDGE_TU2_MAX_POINTS1", "thea", 1);
+        callWithExpectedResult(client, -1, "EDGE_TU2_MIN_POINTS2", 5, "jim");
+        callWithExpectedResult(client, 3, "EDGE_TU2_MAX_POINTS2", 1, "thea");
+        callWithExpectedResult(client, 9, "EDGE_TU2_MIN_POINTS_EXPR", "jim", 5);
+        callWithExpectedResult(client, 13, "EDGE_TU2_MAX_POINTS_EXPR", "betty", 7);
+    }
+
+    public void testAdHoc() throws Exception {
+        Client client = getClient();
+
+        client.callProcedure("TU1.insert", 1, 1);
+        client.callProcedure("TU1.insert", 2, 2);
+        client.callProcedure("TU1.insert", 3, -3);
+        client.callProcedure("TU2.insert", 1, -1, "jim");
+        client.callProcedure("TU2.insert", 2, 2, "jim");
+        client.callProcedure("TU2.insert", 3, 3, "jim");
+        client.callProcedure("TU2.insert", 4, -1, "thea");
+        client.callProcedure("TU2.insert", 5, 2, "thea");
+        client.callProcedure("TU2.insert", 6, 3, "thea");
+        client.callProcedure("TU2.insert", 7, -1, "betty");
+        client.callProcedure("TU2.insert", 8, 2, "betty");
+        client.callProcedure("TU2.insert", 9, 3, "betty");
+        client.callProcedure("TU3.insert", 1, 1, 1);
+        client.callProcedure("TU3.insert", 2, 2, 1);
+        client.callProcedure("TU3.insert", 3, 3, 1);
+        client.callProcedure("TU3.insert", 4, 1, 2);
+        client.callProcedure("TU3.insert", 5, 2, 2);
+        client.callProcedure("TU3.insert", 6, 3, 2);
+        client.callProcedure("TU3.insert", 7, 1, 3);
+        client.callProcedure("TU3.insert", 8, 2, 3);
+        client.callProcedure("TU3.insert", 9, 3, 3);
+        client.callProcedure("TU4.insert", 1, 1, "jim", 0);
+        client.callProcedure("TU4.insert", 2, 2, "jim", 0);
+        client.callProcedure("TU4.insert", 3, 3, "jim", 0);
+        client.callProcedure("TU4.insert", 4, 4, "thea", 1);
+        client.callProcedure("TU4.insert", 5, 5, "betty", 1);
+
+        VoltTable table;
+
+        table = client.callProcedure("@AdHoc", "SELECT MIN(POINTS) FROM TU1").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(-3, table.getLong(0));
+        table = client.callProcedure("@Explain", "SELECT MIN(POINTS) FROM TU1").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertTrue(table.getString(0).contains("LIMIT"));
+
+        table = client.callProcedure("@AdHoc", "SELECT MAX(UNAME) FROM TU2").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals("thea", table.getString(0));
+        table = client.callProcedure("@Explain", "SELECT MAX(UNAME) FROM TU2").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertTrue(table.getString(0).contains("LIMIT"));
+
+        table = client.callProcedure("@AdHoc", "SELECT MAX(POINTS) FROM TU3 WHERE TEL = 3").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(3, table.getLong(0));
+        table = client.callProcedure("@Explain", "SELECT MAX(POINTS) FROM TU3 WHERE TEL = 3").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertFalse(table.getString(0).contains("LIMIT"));
+
+        table = client.callProcedure("@AdHoc", "SELECT MIN(TEL) FROM TU3 WHERE TEL = 3").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(3, table.getLong(0));
+        table = client.callProcedure("@Explain", "SELECT MIN(TEL) FROM TU3 WHERE TEL = 3").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertTrue(table.getString(0).contains("LIMIT"));
+
+        table = client.callProcedure("@AdHoc", "SELECT MIN(POINTS) FROM TU4 WHERE UNAME = 'jim' AND SEX = 0").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(1, table.getLong(0));
+        table = client.callProcedure("@Explain", "SELECT MIN(POINTS) FROM TU4 WHERE UNAME = 'jim' AND SEX = 0").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertTrue(table.getString(0).contains("LIMIT"));
+
+        table = client.callProcedure("@AdHoc", "SELECT MIN(ABS(POINTS)) FROM TU1").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(1, table.getLong(0));
+        table = client.callProcedure("@Explain", "SELECT MIN(ABS(POINTS)) FROM TU1").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertTrue(table.getString(0).contains("LIMIT"));
+
+        table = client.callProcedure("@AdHoc", "SELECT MIN(POINTS + ID) FROM TU1").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(0, table.getLong(0));
+        table = client.callProcedure("@Explain", "SELECT MIN(POINTS + ID) FROM TU1").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertTrue(table.getString(0).contains("LIMIT"));
+
+        table = client.callProcedure("@AdHoc", "SELECT MAX(POINTS) FROM TU2 WHERE UNAME = 'betty'").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(3, table.getLong(0));
+        table = client.callProcedure("@Explain", "SELECT MAX(POINTS) FROM TU2 WHERE UNAME = 'betty'").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertFalse(table.getString(0).contains("LIMIT"));
+
+        table = client.callProcedure("@AdHoc", "SELECT MAX(UNAME) FROM TU2 WHERE POINTS * 2 = 4").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals("thea", table.getString(0));
+        table = client.callProcedure("@Explain", "SELECT MAX(UNAME) FROM TU2 WHERE POINTS * 2 = 4").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertFalse(table.getString(0).contains("LIMIT"));
+
+        table = client.callProcedure("@AdHoc", "SELECT MIN(ABS(POINTS)) FROM TU2 WHERE ABS(POINTS) = 2").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(2, table.getLong(0));
+        table = client.callProcedure("@Explain", "SELECT MIN(ABS(POINTS)) FROM TU2 WHERE ABS(POINTS) = 2").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertTrue(table.getString(0).contains("LIMIT"));
+
+        table = client.callProcedure("@AdHoc", "SELECT MAX(CHAR_LENGTH(UNAME)) FROM TU2 WHERE ABS(POINTS) = 1").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(5, table.getLong(0));
+        table = client.callProcedure("@Explain", "SELECT MAX(CHAR_LENGTH(UNAME)) FROM TU2 WHERE ABS(POINTS) = 1").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertFalse(table.getString(0).contains("LIMIT"));
+
+        table = client.callProcedure("@AdHoc", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS > 0").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(1, table.getLong(0));
+        table = client.callProcedure("@Explain", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS > 0").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertTrue(table.getString(0).contains("LIMIT"));
+
+        table = client.callProcedure("@AdHoc", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS >= 2").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(2, table.getLong(0));
+        table = client.callProcedure("@Explain", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS >= 2").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertTrue(table.getString(0).contains("LIMIT"));
+
+        table = client.callProcedure("@AdHoc", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS < 1").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(-3, table.getLong(0));
+        table = client.callProcedure("@Explain", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS < 1").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertTrue(table.getString(0).contains("LIMIT"));
+
+        table = client.callProcedure("@AdHoc", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS <= 2").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(-3, table.getLong(0));
+        table = client.callProcedure("@Explain", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS <= 2").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertTrue(table.getString(0).contains("LIMIT"));
+
+        table = client.callProcedure("@AdHoc", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS > 0").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(2, table.getLong(0));
+        table = client.callProcedure("@Explain", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS > 0").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertTrue(table.getString(0).contains("LIMIT"));
+
+        table = client.callProcedure("@AdHoc", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS >= 2").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(2, table.getLong(0));
+        table = client.callProcedure("@Explain", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS >= 2").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertTrue(table.getString(0).contains("LIMIT"));
+
+        table = client.callProcedure("@AdHoc", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS < 2").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(1, table.getLong(0));
+        table = client.callProcedure("@Explain", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS < 2").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertFalse(table.getString(0).contains("LIMIT"));
+
+        table = client.callProcedure("@AdHoc", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS <= 2").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(2, table.getLong(0));
+        table = client.callProcedure("@Explain", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS <= 2").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertFalse(table.getString(0).contains("LIMIT"));
+
+        table = client.callProcedure("@AdHoc", "SELECT MIN(POINTS) FROM TU2 WHERE UNAME = 'jim' AND POINTS < 5").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(-1, table.getLong(0));
+        table = client.callProcedure("@Explain", "SELECT MIN(POINTS) FROM TU2 WHERE UNAME = 'jim' AND POINTS < 5").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertTrue(table.getString(0).contains("LIMIT"));
+
+        table = client.callProcedure("@AdHoc", "SELECT MAX(POINTS) FROM TU2 WHERE UNAME = 'thea' AND POINTS > 1").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(3, table.getLong(0));
+        table = client.callProcedure("@Explain", "SELECT MAX(POINTS) FROM TU2 WHERE UNAME = 'thea' AND POINTS > 1").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertFalse(table.getString(0).contains("LIMIT"));
+
+        table = client.callProcedure("@AdHoc", "SELECT MIN(POINTS) FROM TU2 WHERE POINTS < 5 AND UNAME = 'jim'").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(-1, table.getLong(0));
+        table = client.callProcedure("@Explain", "SELECT MIN(POINTS) FROM TU2 WHERE POINTS < 5 AND UNAME = 'jim'").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertTrue(table.getString(0).contains("LIMIT"));
+
+        table = client.callProcedure("@AdHoc", "SELECT MAX(POINTS) FROM TU2 WHERE POINTS > 1 AND UNAME = 'thea'").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(3, table.getLong(0));
+        table = client.callProcedure("@Explain", "SELECT MAX(POINTS) FROM TU2 WHERE POINTS > 1 AND UNAME = 'thea'").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertFalse(table.getString(0).contains("LIMIT"));
+
+        // receive optimizable query first, then non-optimizable query
+        table = client.callProcedure("@Explain", "SELECT MIN(POINTS * 2) FROM TU2").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertTrue(table.getString(0).contains("LIMIT"));
+        table = client.callProcedure("@Explain", "SELECT MIN(POINTS * 3) FROM TU2").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertFalse(table.getString(0).contains("LIMIT"));
+        table = client.callProcedure("@Explain", "SELECT MIN(POINTS * 2) FROM TU2").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertTrue(table.getString(0).contains("LIMIT"));
+
+        table = client.callProcedure("@Explain", "SELECT MIN(POINTS * 2) FROM TU2 WHERE POINTS * 2 = 100").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertTrue(table.getString(0).contains("LIMIT"));
+
+        // receive non-optimizable query first, then optimizable query
+        table = client.callProcedure("@Explain", "SELECT MIN(POINTS + 200) FROM TU3").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertFalse(table.getString(0).contains("LIMIT"));
+        table = client.callProcedure("@Explain", "SELECT MIN(POINTS + 100) FROM TU3").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertFalse(table.getString(0).contains("LIMIT"));
+
+        table = client.callProcedure("@AdHoc", "SELECT MIN(POINTS + 10) FROM TU2 WHERE UNAME = 'jim' AND POINTS + 10 > 5").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(9, table.getLong(0));
+        table = client.callProcedure("@Explain", "SELECT MIN(POINTS + 10) FROM TU2 WHERE UNAME = 'jim' AND POINTS + 10 > 5").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertTrue(table.getString(0).contains("LIMIT"));
+        table = client.callProcedure("@Explain", "SELECT MIN(POINTS + 11) FROM TU2 WHERE UNAME = 'jim' AND POINTS + 10 > 5").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertFalse(table.getString(0).contains("LIMIT"));
+
+        table = client.callProcedure("@AdHoc", "SELECT MAX(POINTS + 10) FROM TU2 WHERE UNAME = 'betty' AND POINTS + 10 > 7").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(13, table.getLong(0));
+        table = client.callProcedure("@Explain", "SELECT MAX(POINTS + 10) FROM TU2 WHERE UNAME = 'betty' AND POINTS + 10 > 7").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertFalse(table.getString(0).contains("LIMIT"));
     }
 
     /**
@@ -162,11 +484,25 @@ public class TestIndexLimitSuite extends RegressionSuite {
         project.addStmtProcedure("EXPR_TU1_MIN_FUNC", "SELECT MIN(ABS(POINTS)) FROM TU1");
         project.addStmtProcedure("EXPR_TU1_MIN_ARTH", "SELECT MIN(POINTS + ID) FROM TU1");
         project.addStmtProcedure("EXPR_TU2_MAX_POINTS", "SELECT MAX(POINTS) FROM TU2 WHERE UNAME = ?");
-        project.addStmtProcedure("EXPR_TU2_MIN_UNAME", "SELECT MAX(UNAME) FROM TU2 WHERE POINTS * 2 = ?");
+        project.addStmtProcedure("EXPR_TU2_MAX_UNAME", "SELECT MAX(UNAME) FROM TU2 WHERE POINTS * 2 = ?");
         project.addStmtProcedure("EXPR_TU2_MIN_ABS_POINTS", "SELECT MIN(ABS(POINTS)) FROM TU2 WHERE ABS(POINTS) = ?");
         project.addStmtProcedure("EXPR_TU2_MAX_LENGTH_UNAME", "SELECT MAX(CHAR_LENGTH(UNAME)) FROM TU2 WHERE ABS(POINTS) = ?");
-        project.addStmtProcedure("EXPR_TU2_LENGTH_UNAME", "SELECT CHAR_LENGTH(UNAME) FROM TU2 WHERE ABS(POINTS) = ?");
-        project.addStmtProcedure("EXPR_TU2_LENGTH_UNAME_LIMIT", "SELECT CHAR_LENGTH(UNAME) FROM TU2 WHERE ABS(POINTS) = ? ORDER BY CHAR_LENGTH(UNAME) DESC LIMIT 1");
+
+        // edge cases:
+        project.addStmtProcedure("EDGE_TU1_MIN_POINTS1", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS > ?");
+        project.addStmtProcedure("EDGE_TU1_MIN_POINTS2", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS >= ?");
+        project.addStmtProcedure("EDGE_TU1_MIN_POINTS3", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS < ?");
+        project.addStmtProcedure("EDGE_TU1_MIN_POINTS4", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS <= ?");
+        project.addStmtProcedure("EDGE_TU1_MAX_POINTS1", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS > ?");
+        project.addStmtProcedure("EDGE_TU1_MAX_POINTS2", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS >= ?");
+        project.addStmtProcedure("EDGE_TU1_MAX_POINTS3", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS < ?");
+        project.addStmtProcedure("EDGE_TU1_MAX_POINTS4", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS <= ?");
+        project.addStmtProcedure("EDGE_TU2_MIN_POINTS1", "SELECT MIN(POINTS) FROM TU2 WHERE UNAME = ? AND POINTS < ?");
+        project.addStmtProcedure("EDGE_TU2_MAX_POINTS1", "SELECT MAX(POINTS) FROM TU2 WHERE UNAME = ? AND POINTS > ?");
+        project.addStmtProcedure("EDGE_TU2_MIN_POINTS2", "SELECT MIN(POINTS) FROM TU2 WHERE POINTS < ? AND UNAME = ?");
+        project.addStmtProcedure("EDGE_TU2_MAX_POINTS2", "SELECT MAX(POINTS) FROM TU2 WHERE POINTS > ? AND UNAME = ?");
+        project.addStmtProcedure("EDGE_TU2_MIN_POINTS_EXPR", "SELECT MIN(POINTS + 10) FROM TU2 WHERE UNAME = ? AND POINTS + 10 > ?");
+        project.addStmtProcedure("EDGE_TU2_MAX_POINTS_EXPR", "SELECT MAX(POINTS + 10) FROM TU2 WHERE UNAME = ? AND POINTS + 10 > ?");
 
         boolean success;
 

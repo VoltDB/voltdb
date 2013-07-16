@@ -112,7 +112,7 @@ public class TestReplaceWithIndexLimit extends PlannerTestCase {
         checkIndexLimit(pn, false, null);
     }
 
-    // combination of [min(), max(), sum()] tests
+    // combination of [min(), max(), sum()] tests: should not replace
     public void testCom0001() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C1), MAX(C1) FROM R");
         checkIndexLimit(pn, false, null);
@@ -424,4 +424,81 @@ public class TestReplaceWithIndexLimit extends PlannerTestCase {
     }
 
     // ========================================================================
+
+    /**
+     * Test edge cases.
+     */
+
+    // ========================================================================
+
+    public void testMin4011() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C1) FROM R WHERE C1 > ?");
+        checkIndexLimit(pn, true, new String[] {"R_IDX1_TREE", "R_IDX2_TREE", "R_IDX4_TREE"});
+    }
+
+    public void testMin4012() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C1) FROM R WHERE C1 >= ?");
+        checkIndexLimit(pn, true, new String[] {"R_IDX1_TREE", "R_IDX2_TREE", "R_IDX4_TREE"});
+    }
+
+    public void testMin4013() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C1) FROM R WHERE C1 < ?");
+        checkIndexLimit(pn, true, new String[] {"R_IDX1_TREE", "R_IDX2_TREE", "R_IDX4_TREE"});
+    }
+
+    public void testMin4014() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C1) FROM R WHERE C1 <= ?");
+        checkIndexLimit(pn, true, new String[] {"R_IDX1_TREE", "R_IDX2_TREE", "R_IDX4_TREE"});
+    }
+
+    public void testMin4015() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C2) FROM R WHERE C1 = ? AND C2 > ?");
+        checkIndexLimit(pn, true, new String[] {"R_IDX2_TREE"});
+    }
+
+    public void testMin4016() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C2) FROM R WHERE C1 = ? AND C2 < ?");
+        checkIndexLimit(pn, true, new String[] {"R_IDX2_TREE"});
+    }
+
+    public void testMin4017() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C3) FROM R WHERE C1 = ? AND C3 < ?");
+        checkIndexLimit(pn, false, null);
+    }
+
+    public void testMin4018() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MIN(C1) FROM R WHERE C1 > ? AND C2 = ? AND C3 = ?");
+        checkIndexLimit(pn, false, null);
+    }
+
+    public void testMin4021() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MAX(C1) FROM R WHERE C1 > ?");
+        checkIndexLimit(pn, true, new String[] {"R_IDX1_TREE", "R_IDX2_TREE", "R_IDX4_TREE"});
+    }
+
+    public void testMin4022() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MAX(C1) FROM R WHERE C1 >= ?");
+        checkIndexLimit(pn, true, new String[] {"R_IDX1_TREE", "R_IDX2_TREE", "R_IDX4_TREE"});
+    }
+
+    public void testMin4023() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MAX(C1) FROM R WHERE C1 < ?");
+        checkIndexLimit(pn, false, null);
+    }
+
+    public void testMin4024() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MAX(C1) FROM R WHERE C1 <= ?");
+        checkIndexLimit(pn, false, null);
+    }
+
+    public void testMin4025() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MAX(C2) FROM R WHERE C1 = ? AND C2 > ?");
+        checkIndexLimit(pn, false, null);
+    }
+
+    public void testMin4026() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT MAX(C2) FROM R WHERE C2 = ?");
+        checkIndexLimit(pn, true, new String[] {"R_IDX3_TREE"});
+    }
+
 }

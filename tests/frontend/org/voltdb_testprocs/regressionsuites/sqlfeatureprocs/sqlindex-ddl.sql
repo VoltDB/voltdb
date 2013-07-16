@@ -25,6 +25,7 @@ CREATE TABLE TU3 (
        PRIMARY KEY (ID)
 );
 create unique index idx_U3_TREE on TU3 (TEL,POINTS);
+create unique index idx2_U3_TREE on TU3 (POINTS + 100, TEL);
 
 CREATE TABLE TU4 (
        ID INTEGER NOT NULL,

@@ -86,7 +86,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // this index scan is going to use
     protected Index m_catalogIndex = null;
 
-    private ArrayList<AbstractExpression> m_bindings = null;
+    private ArrayList<AbstractExpression> m_bindings = new ArrayList<AbstractExpression>();;
 
     private boolean m_forDeterminismOnly = false;
 
@@ -100,17 +100,16 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         m_predicate = srcNode.m_predicate;
         m_targetTableAlias = srcNode.m_targetTableAlias;
         m_targetTableName = srcNode.m_targetTableName;
+        m_tableScanSchema = srcNode.m_tableScanSchema.clone();
         for (AbstractPlanNode inlineChild : srcNode.getInlinePlanNodes().values()) {
             addInlinePlanNode(inlineChild);
         }
-        m_bindings = new ArrayList<AbstractExpression>();
         m_catalogIndex = index;
         m_targetIndexName = index.getTypeName();
         m_lookupType = IndexLookupType.GTE;    // a safe way
         m_sortDirection = sortDirection;
         if (apn != null) {
             m_outputSchema = apn.m_outputSchema.clone();
-            m_tableScanSchema = srcNode.m_tableScanSchema.clone();
         }
     }
 
@@ -252,6 +251,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             // don't get bashed by other nodes or subsequent planner runs
             m_endExpression = (AbstractExpression) endExpression.clone();
         }
+    }
+
+    public void clearSearchKeyExpression()
+    {
+        m_searchkeyExpressions.clear();
     }
 
     public void addSearchKeyExpression(AbstractExpression expr)
@@ -404,7 +408,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         if (limit != null && limit.getLimit() > 0) {
             m_estimatedOutputTupleCount = Math.min(m_estimatedOutputTupleCount, limit.getLimit());
             if (m_predicate == null) {
-                m_estimatedProcessedTupleCount = limit.getLimit();
+                m_estimatedProcessedTupleCount = limit.getLimit() + limit.getOffset();
             }
         }
     }
@@ -609,6 +613,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     public ArrayList<AbstractExpression> getBindings() {
         return m_bindings;
+    }
+
+    public void addBindings(List<AbstractExpression> bindings) {
+        m_bindings.addAll(bindings);
     }
 
     public void setForDeterminismOnly() {

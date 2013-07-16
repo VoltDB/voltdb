@@ -152,6 +152,10 @@ AggregatePlanNode::loadFromJSONObject(PlannerDomValue obj)
             m_groupByExpressions.push_back(AbstractExpression::buildExpressionTree(groupByExpressionsArray.valueAtIndex(i)));
         }
     }
+
+    if (obj.hasNonNullKey("PREDICATE")) {
+        m_predicate = AbstractExpression::buildExpressionTree(obj.valueForKey("PREDICATE"));
+    }
 }
 
 void AggregatePlanNode::collectOutputExpressions(std::vector<AbstractExpression*>& outputColumnExpressions) const
