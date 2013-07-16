@@ -282,7 +282,12 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
             String procedureName,
             int delta,
             byte status) {
-        final Map<String, InvocationInfo> procInfoMap = m_connectionStates.get(connectionId);
+        boolean needToInsert = false;
+        Map<String, InvocationInfo> procInfoMap = m_connectionStates.get(connectionId);
+        if (procInfoMap == null) {
+            procInfoMap = new NonBlockingHashMap<String, InvocationInfo>();
+            needToInsert = true;
+        }
         InvocationInfo info = procInfoMap.get(procedureName);
         if(info == null){
             info = new InvocationInfo(connectionHostname);
@@ -290,6 +295,9 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
         }
         info.processInvocation(delta, status);
         m_latencyInfo.addSample(delta);
+        if (needToInsert) {
+            m_connectionStates.put(connectionId, procInfoMap);
+        }
     }
 
     public Iterator<Map.Entry<Long, Map<String, InvocationInfo>>> getInitiationStatsIterator() {
