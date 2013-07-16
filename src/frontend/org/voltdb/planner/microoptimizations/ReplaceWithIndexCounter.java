@@ -68,9 +68,8 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
             if (newChild == child) {
                 continue;
             }
-            //plan.replaceChild(child, newChild);
-            child.removeFromGraph();
-            plan.addAndLinkChild(newChild);
+            boolean replaced = plan.replaceChild(child, newChild);
+            assert(true == replaced);
         }
 
         // check for an aggregation of the right form

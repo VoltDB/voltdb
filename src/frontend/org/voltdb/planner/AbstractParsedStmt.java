@@ -38,7 +38,7 @@ import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
-import org.voltdb.planner.JoinTree.JoinNode;
+import org.voltdb.planner.JoinNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
@@ -60,7 +60,7 @@ public abstract class AbstractParsedStmt {
     public ArrayList<AbstractExpression> multiTableSelectionList = new ArrayList<AbstractExpression>();
 
     // Hierarchical join representation
-    public JoinTree joinTree = new JoinTree();
+    public JoinNode joinTree = null;
 
     //User specified join order, null if none is specified
     public String joinOrder = null;
@@ -534,7 +534,7 @@ public abstract class AbstractParsedStmt {
      * Build a combined WHERE expressions for the entire statement.
      */
     public AbstractExpression getCombinedFilterExpression() {
-        return joinTree.getCombinedExpression();
+        return (joinTree != null) ? joinTree.getCombinedExpression() : null;
     }
 
     /**
@@ -589,12 +589,12 @@ public abstract class AbstractParsedStmt {
 
         // The join type of the leaf node is always INNER
         // For a new tree its node's ids start with 0 and keep incrementing by 1
-        int nodeId = (joinTree.m_root == null) ? 0 : joinTree.m_root.m_id + 1;
+        int nodeId = (joinTree == null) ? 0 : joinTree.m_id + 1;
         JoinNode leafNode = new JoinNode(nodeId, JoinType.INNER, table, joinExpr, whereExpr);
 
-        if (joinTree.m_root == null) {
+        if (joinTree == null) {
             // this is the first table
-            joinTree.m_root = leafNode;
+            joinTree = leafNode;
         } else {
             // Build the tree by attaching the next table always to the right
             // The node's join type is determined by the type of its right node
@@ -605,11 +605,8 @@ public abstract class AbstractParsedStmt {
                 throw new PlanningErrorException("VoltDB does not support full outer joins");
             }
 
-            JoinNode joinNode = new JoinNode(nodeId + 1, joinType, joinTree.m_root, leafNode);
-            joinTree.m_root = joinNode;
-            if (joinType != JoinType.INNER) {
-                 joinTree.m_hasOuterJoin  = true;
-            }
+            JoinNode joinNode = new JoinNode(nodeId + 1, joinType, joinTree, leafNode);
+            joinTree = joinNode;
        }
     }
 
@@ -638,7 +635,7 @@ public abstract class AbstractParsedStmt {
                 parseTable(node);
                 visited.add(table);
                 ++tableCount;                                                                   //        2nd of 2 ALLOWED differences
-                if (joinTree.m_hasOuterJoin && tableCount > 2) {                                //     between AbstractParsedStmt.java
+                if (joinTree.hasOuterJoin() && tableCount > 2) {                                //     between AbstractParsedStmt.java
                     throw new PlanningErrorException("VoltDB does not support outer joins with more than two tables involved"); // and
                 }                                                                               // AbstractParsedStmt.java_multi_table
             }
@@ -668,7 +665,7 @@ public abstract class AbstractParsedStmt {
      * Collect value equivalence expressions across the entire SQL statement
      */
     void analyzeValueEquivalence() {
-        if (joinTree == null || joinTree.m_root == null) {
+        if (joinTree == null) {
             return;
         }
         // collect individual where/join expressions
@@ -685,78 +682,6 @@ public abstract class AbstractParsedStmt {
             addExprToEquivalenceSets(expr, equivalenceSet);
         }
         return equivalenceSet;
-    }
-
-    /**
-     * Analyze join and filter expressions for a given join tree
-     */
-    void analyzeJoinExpressions(JoinTree joinTree) {
-//        if (joinTree.m_hasOuterJoin) {
-            analyzeJoinExpressions(joinTree.m_root);
-//        } else {
-//            analyzeJoinExpressionsLegacy(joinTree);
-//        }
-        joinTree.m_wasAnalyzed = true;
-        // these just shouldn't happen right?
-        assert(multiTableSelectionList.size() == 0);
-        assert(noTableSelectionList.size() == 0);
-    }
-
-    /**
-     * Analyze join expressions for inner joins only.
-     */
-    void analyzeJoinExpressionsLegacy(JoinTree nextJoinTree) {
-        assert (!nextJoinTree.m_hasOuterJoin);
-        // Inner join optimization: The join filters need to be analyzed only once
-        // for all possible join orders
-        if (joinTree.m_wasAnalyzed == false) {
-            // Collect all expressions
-            Collection<AbstractExpression> exprList = joinTree.getAllExpressions();
-            // This next bit of code identifies which tables get classified how
-            HashSet<Table> tableSet = new HashSet<Table>();
-            for (AbstractExpression expr : exprList) {
-                tableSet.clear();
-                getTablesForExpression(expr, tableSet);
-                if (tableSet.size() == 0) {
-                    noTableSelectionList.add(expr);
-                }
-                else if (tableSet.size() == 1) {
-                    Table table = (Table) tableSet.toArray()[0];
-
-                    ArrayList<AbstractExpression> exprs;
-                    if (joinTree.m_tableFilterList.containsKey(table)) {
-                        exprs = joinTree.m_tableFilterList.get(table);
-                    }
-                    else {
-                        exprs = new ArrayList<AbstractExpression>();
-                        joinTree.m_tableFilterList.put(table, exprs);
-                    }
-                    exprs.add(expr);
-                }
-                else if (tableSet.size() == 2) {
-                    JoinTree.TablePair pair = new JoinTree.TablePair();
-                    pair.t1 = (Table) tableSet.toArray()[0];
-                    pair.t2 = (Table) tableSet.toArray()[1];
-
-                    ArrayList<AbstractExpression> exprs;
-                    if (joinTree.m_joinSelectionList.containsKey(pair)) {
-                        exprs = joinTree.m_joinSelectionList.get(pair);
-                    }
-                    else {
-                        exprs = new ArrayList<AbstractExpression>();
-                        joinTree.m_joinSelectionList.put(pair, exprs);
-                    }
-                    exprs.add(expr);
-                }
-                else if (tableSet.size() > 2) {
-                    multiTableSelectionList.add(expr);
-                }
-            }
-            // Mark the join tree analyzed
-            joinTree.m_wasAnalyzed = true;
-        }
-        nextJoinTree.m_tableFilterList = joinTree.m_tableFilterList;
-        nextJoinTree.m_joinSelectionList = joinTree.m_joinSelectionList;
     }
 
     /**
@@ -847,6 +772,10 @@ public abstract class AbstractParsedStmt {
         // In case of multi-table joins certain expressions could be pushed down to the children
         // to improve join performance.
         pushDownExpressions(joinNode);
+
+        // these just shouldn't happen right?
+        assert(multiTableSelectionList.size() == 0);
+        assert(noTableSelectionList.size() == 0);
     }
 
     /**
@@ -1051,12 +980,12 @@ public abstract class AbstractParsedStmt {
             retval += "\tALL\n";
         }
 
-        if (joinTree.m_root != null ) {
+        if (joinTree != null ) {
             retval += "\nTABLES:\n";
-            ArrayDeque<JoinTree.JoinNode> joinNodes = new ArrayDeque<JoinTree.JoinNode>();
-            joinNodes.add(joinTree.m_root);
+            ArrayDeque<JoinNode> joinNodes = new ArrayDeque<JoinNode>();
+            joinNodes.add(joinTree);
             while (!joinNodes.isEmpty()) {
-                JoinTree.JoinNode joinNode = joinNodes.poll();
+                JoinNode joinNode = joinNodes.poll();
                 if (joinNode == null) {
                     continue;
                 }

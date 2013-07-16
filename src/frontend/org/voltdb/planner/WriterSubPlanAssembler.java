@@ -21,7 +21,7 @@ import java.util.ArrayDeque;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
-import org.voltdb.planner.JoinTree.JoinNode;
+import org.voltdb.planner.JoinNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 
 /**
@@ -69,10 +69,10 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
             m_parsedStmt.analyzeJoinExpressions(m_parsedStmt.joinTree);
 
             m_generatedPlans = true;
-            assert (m_parsedStmt.joinTree.m_root != null);
-            JoinNode tableNode = m_parsedStmt.joinTree.m_root;
+            assert (m_parsedStmt.joinTree != null);
+            JoinNode tableNode = m_parsedStmt.joinTree;
             // This is either UPDATE or DELETE statement. Consolidate all expressions
-            // in the WHERE list.
+            // into the WHERE list.
             tableNode.m_whereInnerList.addAll(tableNode.m_joinInnerList);
             tableNode.m_joinInnerList.clear();
             assert (tableNode.m_table != null);

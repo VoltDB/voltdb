@@ -34,7 +34,6 @@ import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
-import org.voltdb.planner.JoinTree.TablePair;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -95,36 +94,6 @@ public abstract class SubPlanAssembler {
      * @return The next plan to solve the subselect or null if no more plans.
      */
     abstract AbstractPlanNode nextPlan();
-
-    /**
-     * Given a table (and optionally the next table in the join order), using the
-     * set of predicate expressions, figure out all the possible ways to get at
-     * the data we want. One way will always be the naive sequential scan.
-     *
-     * @param table
-     *     The table to get the data from.
-     * @param nextTable
-     *     The next tables in the join order or an empty array if there
-     *     are none.
-     * @return A list of access paths to access the data in the table.
-     */
-    protected ArrayList<AccessPath> getRelevantAccessPathsForTable(Table table, Table nextTables[]) {
-        List<AbstractExpression> filterExprs = m_parsedStmt.joinTree.m_tableFilterList.get(table);
-        List<AbstractExpression> joinExprs = new ArrayList<AbstractExpression>();
-        for (int ii = 0; ii < nextTables.length; ii++) {
-            final Table nextTable = nextTables[ii];
-            // create a key to search the TablePair->Clause map
-            TablePair pair = new TablePair();
-            pair.t1 = table;
-            pair.t2 = nextTable;
-            List<AbstractExpression> pairExprs = m_parsedStmt.joinTree.m_joinSelectionList.get(pair);
-            if (pairExprs != null) {
-                joinExprs.addAll(pairExprs);
-            }
-        }
-        // do the actual work
-        return getRelevantAccessPathsForTable(table, joinExprs, filterExprs, null);
-    }
 
     /**
      * Generate all possible access paths for given sets of join and filter expressions for a table.
