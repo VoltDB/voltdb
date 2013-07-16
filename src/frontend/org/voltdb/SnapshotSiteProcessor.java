@@ -54,6 +54,7 @@ import org.voltdb.iv2.SnapshotTask;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.MiscUtils;
 
 import com.google.common.collect.ListMultimap;
@@ -146,6 +147,8 @@ public class SnapshotSiteProcessor {
      * in the system (2 megabytes). Add a fudge factor for metadata.
      */
     public static final int m_snapshotBufferLength = (1024 * 1024 * 2) + Short.MAX_VALUE;
+    public static final int m_snapshotBufferCompressedLen =
+        CompressionService.maxCompressedLength(m_snapshotBufferLength);
     private final ArrayList<BBContainer> m_snapshotBufferOrigins =
         new ArrayList<BBContainer>();
     /**

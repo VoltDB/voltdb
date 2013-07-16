@@ -35,6 +35,7 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 
+import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.catalog.Database;
 
 import org.voltdb.SnapshotFormat;
@@ -45,6 +46,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.sysprocs.saverestore.StreamSnapshotRequestConfig;
+import org.voltdb.utils.FixedDBBPool;
 
 /**
  * Thread Safety: this is a reentrant class. All mutable datastructures
@@ -80,6 +82,8 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     private final boolean m_liveRejoin;
     // Need to remember the nonces we're using here (for now)
     private final Map<Long, String> m_nonces = new HashMap<Long, String>();
+    // Node-wise stream snapshot receiver buffer pool
+    private final FixedDBBPool m_snapshotBufPool;
 
     public Iv2RejoinCoordinator(HostMessenger messenger,
                                 Collection<Long> sites,
@@ -96,6 +100,16 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
 
             // clear overflow dir in case there are files left from previous runs
             clearOverflowDir(voltroot);
+
+            // The buffer pool capacity is min(numOfSites to rejoin times 3, 16)
+            // or any user specified value.
+            Integer userPoolSize = Integer.getInteger("REJOIN_RECEIVE_BUFFER_POOL_SIZE");
+            int poolSize = userPoolSize != null ? userPoolSize : Math.min(sites.size() * 3, 16);
+            m_snapshotBufPool = new FixedDBBPool();
+            // Create a buffer pool for uncompressed stream snapshot data
+            m_snapshotBufPool.allocate(SnapshotSiteProcessor.m_snapshotBufferLength, poolSize);
+            // Create a buffer pool for compressed stream snapshot data
+            m_snapshotBufPool.allocate(SnapshotSiteProcessor.m_snapshotBufferCompressedLen, poolSize);
         }
     }
 
@@ -125,7 +139,9 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         RejoinMessage msg = new RejoinMessage(getHSId(),
                                               m_liveRejoin ? RejoinMessage.Type.INITIATION :
                                               RejoinMessage.Type.INITIATION_COMMUNITY,
-                                              nonce);
+                                              nonce,
+                                              1, // 1 source per rejoining site
+                                              m_snapshotBufPool);
         send(com.google.common.primitives.Longs.toArray(HSIds), msg);
 
         // For testing, exit if only one property is set...
@@ -216,6 +232,9 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         }
 
         if (allDone) {
+            // All sites have finished snapshot streaming, clear buffer pool
+            m_snapshotBufPool.clear();
+
             long delta = (System.currentTimeMillis() - m_startTime) / 1000;
             REJOINLOG.info("" + (m_liveRejoin ? "Live" : "Blocking") + " rejoin data transfer completed in " +
                     delta + " seconds.");

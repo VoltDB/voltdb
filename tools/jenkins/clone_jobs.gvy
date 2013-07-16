@@ -1,3 +1,6 @@
+import jenkins.*
+import jenkins.model.*
+import hudson.*
 import hudson.model.*
 import hudson.plugins.cloneworkspace.*
 import hudson.tasks.Mailer
@@ -5,23 +8,36 @@ import hudson.tasks.Mailer
 def str_nextrelease = "nextrelease"
 def str_search_1 = "system-test-" + str_nextrelease
 def str_search_2 = "performance-" + str_nextrelease
+def str_search_3 = "endurance-" + str_nextrelease
 def str_oldbranch = "master"
 
-def str_branch = "start_heap"
-boolean enable_performance = true
+def str_branch = "stream-refactor"
+boolean enable_performance = false
 boolean enable_systemtest = false
 
 def workspace_name = str_search_1.replace("nextrelease", str_branch)
 //whitespace separated list of email addresses
-def recipientlist = "qa@voltdb.com"
+def recipientlist = "prosegay@voltdb.com"
 
 AbstractProject kit = null
 downstream = ""
 
-for(item in Hudson.instance.items)
-{
-  if ( ! item.disabled && (item.getName().contains(str_search_1) || item.getName().contains(str_search_2))) {
+alljobs = []
 
+for (item in Hudson.instance.items) {
+   if (! item.disabled && (item.getName().contains(str_search_1) ||
+                item.getName().contains(str_search_2) ||
+                           item.getName().contains(str_search_3))) {
+                  
+    if (item.getName().contains("kit-"))
+      alljobs.add(0, item)
+    else
+      alljobs.add(item)
+   }
+}
+
+for(item in alljobs)
+{
       println("\n\nprocessing JOB : "+item.name)
 
       //create the new project name
@@ -99,7 +115,6 @@ for(item in Hudson.instance.items)
       project.save()
 
       println(" $item.name copied as $newName")
-  }
 }
 
 if (downstream.length() > 0) {

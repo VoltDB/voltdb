@@ -19,9 +19,8 @@ package org.voltdb;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListMap;
 
+import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.dtxn.LatencyStats.LatencyInfo;
@@ -95,8 +94,8 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
      * Reads/writes to the actual InvocationInfo are unsynchronized. There is a single writer
      * so no issues there, but the reader is unprotected.
      */
-    private volatile ConcurrentHashMap<Long, Map<String, InvocationInfo>> m_connectionStates =
-            new ConcurrentHashMap<Long, Map<String, InvocationInfo>>();
+    private volatile NonBlockingHashMap<Long, Map<String, org.voltdb.dtxn.InitiatorStats.InvocationInfo>> m_connectionStates =
+            new NonBlockingHashMap<Long, Map<String, org.voltdb.dtxn.InitiatorStats.InvocationInfo>>();
 
     // Use the same-ish trick for the latency stats.  LatencyInfo keeps
     // volatile ImmutableLists for the buckets and a separate volatile max.
@@ -285,7 +284,7 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
         boolean needToInsert = false;
         Map<String, InvocationInfo> procInfoMap = m_connectionStates.get(connectionId);
         if(procInfoMap == null) {
-            procInfoMap = new ConcurrentSkipListMap<String, InvocationInfo>();
+            procInfoMap = new NonBlockingHashMap<String, InvocationInfo>();
             needToInsert = true;
         }
         InvocationInfo info = procInfoMap.get(procedureName);

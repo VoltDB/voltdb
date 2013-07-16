@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<project>
+    <database>
+        <schemas>
+            <schema path='ddl_withexport.sql' />
+        </schemas>
+        <procedures>
+            <procedure class='voltkvqa.procedures.Initialize' />
+            <procedure class='voltkvqa.procedures.Get' />
+            <procedure class='voltkvqa.procedures.GetMp' />
+            <procedure class='voltkvqa.procedures_withexport.Put' />
+            <procedure class='voltkvqa.procedures_withexport.PutMp' />
+            <procedure class='voltkvqa.procedures.Remove' />
+        </procedures>
+    </database>
+</project>
