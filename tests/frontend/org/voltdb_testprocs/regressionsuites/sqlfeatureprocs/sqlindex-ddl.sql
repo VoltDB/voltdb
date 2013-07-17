@@ -18,6 +18,13 @@ create unique index idx2_U2_TREE ON TU2 (UNAME, POINTS + 10);
 create unique index idx3_U2_TREE ON TU2 (POINTS * 2, UNAME);
 create unique index idx4_U2_TREE ON TU2 (ABS(POINTS), CHAR_LENGTH(UNAME));
 
+CREATE TABLE T1 (
+       ID INTEGER NOT NULL,
+       POINTS INTEGER NOT NULL
+);
+create index idx_T1_HASH on T1 (ID);
+create index id2_T1_HASH on T1 (ID, POINTS);
+
 CREATE TABLE TU3 (
        ID INTEGER NOT NULL,
        POINTS INTEGER NOT NULL,

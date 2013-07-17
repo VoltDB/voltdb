@@ -34,6 +34,7 @@ import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
+import org.voltdb.types.IndexType;
 import org.voltdb.types.SortDirectionType;
 import org.voltdb.utils.CatalogUtil;
 
@@ -295,6 +296,11 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
 
     private boolean checkIndex(Index index, AbstractExpression aggExpr,
             List<AbstractExpression> filterExprs, List<AbstractExpression> bindingExprs) {
+
+        if (!IndexType.isScannable(index.getType())) {
+            return false;
+        }
+
         String exprsjson = index.getExpressionsjson();
 
         if (exprsjson.isEmpty()) {

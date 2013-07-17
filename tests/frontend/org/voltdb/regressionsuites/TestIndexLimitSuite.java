@@ -179,6 +179,9 @@ public class TestIndexLimitSuite extends RegressionSuite {
         client.callProcedure("TU1.insert", 1, 1);
         client.callProcedure("TU1.insert", 2, 2);
         client.callProcedure("TU1.insert", 3, -3);
+        client.callProcedure("T1.insert", 1, 1);
+        client.callProcedure("T1.insert", 2, 2);
+        client.callProcedure("T1.insert", 3, -3);
         client.callProcedure("TU2.insert", 1, -1, "jim");
         client.callProcedure("TU2.insert", 2, 2, "jim");
         client.callProcedure("TU2.insert", 3, 3, "jim");
@@ -302,6 +305,14 @@ public class TestIndexLimitSuite extends RegressionSuite {
 
         callWithExpectedResult(client, 13, "@AdHoc", "SELECT MAX(POINTS + 10) FROM TU2 WHERE UNAME = 'betty' AND POINTS + 10 > 7");
         callWithExpectedResult(client, false, "@Explain", "SELECT MAX(POINTS + 10) FROM TU2 WHERE UNAME = 'betty' AND POINTS + 10 > 7");
+
+        // do not optimize using hash index
+        callWithExpectedResult(client, 1, "@AdHoc", "SELECT MIN(ID) FROM T1;");
+        callWithExpectedResult(client, false, "@Explain", "SELECT MIN(ID) FROM T1");
+        callWithExpectedResult(client, 1, "@AdHoc", "SELECT MIN(POINTS) FROM T1 WHERE ID = 1;");
+        callWithExpectedResult(client, false, "@Explain", "SELECT MIN(POINTS) FROM T1 WHERE ID = 1");
+
+
     }
 
     /**
