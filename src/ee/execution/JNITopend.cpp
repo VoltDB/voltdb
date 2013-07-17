@@ -98,10 +98,10 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     }
 
     //what's this signature thing?
-    m_logStatsMID = m_jniEnv->GetMethodID(jniClass, "logStats", "(J)V");
-    if (m_logStatsMID == NULL) {
+    m_updateStatsMID = m_jniEnv->GetMethodID(jniClass, "updateStats", "(J)V");
+    if (m_updateStatsMID == NULL) {
     	m_jniEnv->ExceptionDescribe();
-    	assert(m_logStatsMID != 0);
+    	assert(m_updateStatsMID != 0);
     	throw std::exception();
     }
 
@@ -222,7 +222,7 @@ int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
     }
 }
 
-void JNITopend::logStats(int64_t stats) {
+bool JNITopend::updateStats(int64_t stats) {
     VOLT_DEBUG("sending integer %d", (int) stats);
 
     JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, 10);
@@ -231,7 +231,8 @@ void JNITopend::logStats(int64_t stats) {
         throw std::exception();
     }
 
-    m_jniEnv->CallObjectMethod(m_javaExecutionEngine,m_logStatsMID,stats);
+    jboolean isInterrupt = m_jniEnv->CallBooleanMethod(m_javaExecutionEngine,m_updateStatsMID,stats);
+    return (bool)(isInterrupt == JNI_TRUE);
 }
 
 

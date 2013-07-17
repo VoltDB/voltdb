@@ -304,7 +304,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         }
 
         inline void setUndoToken(int64_t nextUndoToken) {
-            if (nextUndoToken == INT64_MAX) { return; }
+            if (nextUndoToken == INT64_MAX) {
+            	m_interruptable = true;
+            	return; }
             if (m_currentUndoQuantum != NULL) {
                 if (m_currentUndoQuantum->getUndoToken() == nextUndoToken) {
                     return;
@@ -328,6 +330,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         inline voltdb::UndoQuantum* getCurrentUndoQuantum() { return m_currentUndoQuantum; }
 
         inline Topend* getTopend() { return m_topend; }
+
+        inline bool isInterruptable() { return m_interruptable; };
+
+        inline void setInterruptable(bool interruptable) { m_interruptable = interruptable; };
 
         /**
          * Activate a table stream of the specified type for the specified table.
@@ -587,11 +593,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         Topend *m_topend;
 
-        bool m_noInterrupt;
-
-        inline bool isNoInterrupt() { return m_noInterrupt; };
-
-        inline void setInterrupt() { m_noInterrupt = false; };
+        bool m_interruptable;
 
         // For data from engine that must be shared/distributed to
         // other components. (Components MUST NOT depend on VoltDBEngine.h).

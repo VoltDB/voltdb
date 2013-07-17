@@ -122,8 +122,7 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_numResultDependencies(0),
       m_logManager(logProxy),
       m_templateSingleLongTable(NULL),
-      m_topend(topend),
-      m_noInterrupt(true)
+      m_topend(topend)
 {
     // init the number of planfragments executed
     m_pfCount = 0;

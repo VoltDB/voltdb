@@ -306,8 +306,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
     }
 
-    public void logStats(long stats) {
+    public boolean updateStats(long stats) {
         System.err.println(stats);
+        //Set timer and time out read only queries.
+        return false;
     }
 
     /**
@@ -607,7 +609,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /**
      * Set the interrupt bit in EE to interrupt a running query.
      */
-    protected native void setInterrupt();
+    protected native void nativeSetInterrupt(boolean isInterrupt);
 
     /**
      * Serialize the result temporary table.
