@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -118,9 +119,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
         }
         else
         {
-            // XXX Not implemented until we're going to support catalog changes
-            SNAP_LOG.error("Unable to convert partitioned table " + getTableName() + " to replicated because " +
-                "the conversion is currently unsupported.");
+            restore_plan = generatePartitionedToReplicatedPlan(st);
         }
         return restore_plan;
     }
@@ -146,6 +145,51 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
             m_consistencyResult = error;
             throw new IOException(error);
         }
+    }
+
+    private SynthesizedPlanFragment[] generatePartitionedToReplicatedPlan(SiteTracker st) {
+        ArrayList<SynthesizedPlanFragment> restorePlan = new ArrayList<SynthesizedPlanFragment>();
+        Set<Integer> coveredPartitions = new HashSet<Integer>();
+
+        Iterator<Entry<Integer, Set<Pair<Integer, Integer>>>> partitionAtHostItr =
+                m_partitionsAtHost.entrySet().iterator();
+
+        // looping through all current hosts having .vpt files of this table
+        while(partitionAtHostItr.hasNext()) {
+            Entry<Integer, Set<Pair<Integer, Integer>>> partitionAtHost = partitionAtHostItr.next();
+            Integer host = partitionAtHost.getKey();
+            List<Integer> loadPartitions = new ArrayList<Integer>();
+            List<Integer> loadOrigHosts = new ArrayList<Integer>();
+            Set<Pair<Integer, Integer>> partitionAndOrigHostSet = partitionAtHost.getValue();
+            Iterator<Pair<Integer, Integer>> itr = partitionAndOrigHostSet.iterator();
+
+            // calculate which available partitions not yet been covered and put
+            // its partition_id and orig_host_id in loadPartitions and loadOrigHosts
+            while(itr.hasNext()) {
+                Pair<Integer, Integer> pair = itr.next();
+                if(!coveredPartitions.contains(pair.getFirst())) {
+                    loadPartitions.add(pair.getFirst());
+                    loadOrigHosts.add(pair.getSecond());
+                    coveredPartitions.add(pair.getFirst());
+                }
+            }
+
+            // if there are some work to do
+            if(loadPartitions.size() > 0){
+                int[] relevantPartitionIds = com.google.common.primitives.Ints.toArray(loadPartitions);
+                int[] originalHosts = com.google.common.primitives.Ints.toArray(loadOrigHosts);
+                List<Long> sitesAtHost = st.getSitesForHost(host);
+
+                // for each site of this host, generate one work fragment and let them execute in parallel
+                for(Long site : sitesAtHost) {
+                    restorePlan.add(constructDistributePartitionedTableFragment(
+                            site, relevantPartitionIds, originalHosts, true));
+                }
+            }
+        }
+        restorePlan.add(constructDistributePartitionedTableAggregatorFragment(true));
+        assert(coveredPartitions.size() == m_partitionsSeen.size());
+        return restorePlan.toArray(new SynthesizedPlanFragment[0]);
     }
 
     private SynthesizedPlanFragment[] generatePartitionedToPartitionedPlan(SiteTracker st) {
@@ -249,24 +293,26 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
              */
             for (Long site : sitesAtHost) {
                 restorePlan.add(constructDistributePartitionedTableFragment(
-                        site, uncoveredPartitionsAtHost, originalHostsArray));
+                        site, uncoveredPartitionsAtHost, originalHostsArray, false));
             }
         }
         restorePlan
-                .add(constructDistributePartitionedTableAggregatorFragment());
+                .add(constructDistributePartitionedTableAggregatorFragment(false));
         return restorePlan.toArray(new SynthesizedPlanFragment[0]);
     }
 
     private SynthesizedPlanFragment
     constructDistributePartitionedTableFragment(
-            long distributorSiteId,
-            int uncoveredPartitionsAtHost[],
-            int originalHostsArray[])
+            long distributorSiteId,     // site which will execute this plan fragment
+            int uncoveredPartitionsAtHost[],    // which partitions' data in the .vpt files will be extracted as TableSaveFile
+            int originalHostsArray[],           // used to locate .vpt files
+            boolean asReplicated)
     {
         int result_dependency_id = getNextDependencyId();
         SynthesizedPlanFragment plan_fragment = new SynthesizedPlanFragment();
         plan_fragment.fragmentId =
-            SysProcFragmentId.PF_restoreDistributePartitionedTable;
+                (asReplicated ? SysProcFragmentId.PF_restoreDistributePartitionedTableAsReplicated
+                              : SysProcFragmentId.PF_restoreDistributePartitionedTableAsPartitioned);
         plan_fragment.multipartition = false;
         plan_fragment.siteId = distributorSiteId;
         plan_fragment.outputDepId = result_dependency_id;
@@ -281,17 +327,21 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
     }
 
     private SynthesizedPlanFragment
-    constructDistributePartitionedTableAggregatorFragment()
+    constructDistributePartitionedTableAggregatorFragment(boolean asReplicated)
     {
         int result_dependency_id = getNextDependencyId();
         SynthesizedPlanFragment plan_fragment = new SynthesizedPlanFragment();
         plan_fragment.fragmentId =
-            SysProcFragmentId.PF_restoreDistributePartitionedTableResults;
+            SysProcFragmentId.PF_restoreReceiveResultTables;
         plan_fragment.multipartition = false;
         plan_fragment.outputDepId = result_dependency_id;
         plan_fragment.inputDepIds = getPlanDependencyIds();
         setRootDependencyId(result_dependency_id);
-        plan_fragment.parameters = ParameterSet.fromArrayNoCopy(result_dependency_id);
+        plan_fragment.parameters = ParameterSet.fromArrayNoCopy(
+                result_dependency_id,
+                (asReplicated ?
+                        "Aggregating partitioned-to-replicated table restore results"
+                        : "Aggregating partitioned table restore results"));
         return plan_fragment;
     }
 
