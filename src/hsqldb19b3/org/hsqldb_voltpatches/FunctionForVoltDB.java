@@ -34,7 +34,10 @@ package org.hsqldb_voltpatches;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.hsqldb_voltpatches.types.CharacterType;
+import org.hsqldb_voltpatches.types.DateTimeType;
 import org.hsqldb_voltpatches.types.Type;
+import org.voltdb.types.TimestampType;
 
 
 
@@ -360,6 +363,20 @@ public class FunctionForVoltDB extends FunctionSQL {
                     continue;
                 }
                 else if (paramTypes[i].canConvertFrom(nodes[i].dataType)) {
+                    if (paramTypes[i] instanceof DateTimeType && nodes[i].dataType instanceof CharacterType) {
+                        String longtime = ((String) nodes[i].valueData).trim();
+                        Exception ex = null;
+                        try {
+                            new TimestampType(longtime);
+                        }
+                        catch (IllegalArgumentException e) {
+                            ex = e;
+                        }
+                        if (ex == null) {
+                            nodes[i].dataType = paramTypes[i];
+                            continue;
+                        }
+                    }
                     continue; // accept compatible argument types
                 }
                 throw Error.error(ErrorCode.X_42565); // incompatible data type
