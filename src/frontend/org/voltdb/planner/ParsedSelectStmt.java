@@ -155,8 +155,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 parseDisplayColumns(child);
         }
 
+        // Assume that we do not support group by Complex expressions right now
+        // Use parseAggColumns() to parse the group by ParsedColInfo when we want to support it
         insertToAggResultColumns(groupByColumns);
         //TODO(XIN): double check whether should we add orderColumns
+        // Assume that we do not support order by Complex expressions which do not appear in
+        // display columns right now
         //insertToAggResultColumns(orderColumns);
 
         // Generate New output Schema, replace Aggs with TVEs for group by and order by
@@ -331,15 +335,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                         insertToAggResultColumns(col);
                         addOne += 1;
                         break;
-                    }
-                }
-                if (addOne == 0) {
-                    for (ParsedColInfo ic: orderColumns) {
-                        if (ic.simpleEquals(col)) {
-                            insertToAggResultColumns(col);
-                            addOne += 1;
-                            break;
-                        }
                     }
                 }
                 if (addOne == 0) {

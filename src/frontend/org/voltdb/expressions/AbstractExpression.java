@@ -545,8 +545,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             tve.setColumnName("");
             tve.setColumnAlias(exprToAliasMap.get(this));
             tve.setTableName("VOLT_TEMP_TABLE");
-            if (this instanceof TupleAddressExpression &&
-                    hasAnySubexpressionOfClass(AggregateExpression.class))
+            if (hasAnySubexpressionOfClass(AggregateExpression.class))
                 tve.setHasAggregate(true);
 
             return tve;
