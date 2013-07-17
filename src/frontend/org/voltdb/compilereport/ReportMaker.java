@@ -42,7 +42,6 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.catalog.Table;
-import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.CatalogUtil;
@@ -558,18 +557,36 @@ public class ReportMaker {
                 views++;
             }
             else {
-                if (t.getIsreplicated()) replicatedTables++;
-                else partitionedTables++;
+                if (t.getIsreplicated()) {
+                    replicatedTables++;
+                }
+                else {
+                    partitionedTables++;
+                }
             }
+
             indexes += t.getIndexes().size();
         }
         for (Procedure p : db.getProcedures()) {
             // skip auto-generated crud procs
-            if (p.getDefaultproc()) continue;
-            if (p.getSinglepartition()) partitionedProcs++;
-            else replicatedProcs++;
-            if (p.getReadonly()) readProcs++;
-            else writeProcs++;
+            if (p.getDefaultproc()) {
+                continue;
+            }
+
+            if (p.getSinglepartition()) {
+                partitionedProcs++;
+            }
+            else {
+                replicatedProcs++;
+            }
+
+            if (p.getReadonly()) {
+                readProcs++;
+            }
+            else {
+                writeProcs++;
+            }
+
             statements += p.getStatements().size();
         }
 
@@ -641,7 +658,6 @@ public class ReportMaker {
         String platformData = PlatformProperties.getPlatformProperties().toHTML();
         contents = contents.replace("##PLATFORM##", platformData);
 
-
         contents = contents.replace("##VERSION##", VoltDB.instance().getVersionString());
 
         DateFormat df = SimpleDateFormat.getInstance();
@@ -679,18 +695,5 @@ public class ReportMaker {
         }
 
         return report;
-    }
-
-    /**
-     * Some test code that needs to be moved.
-     */
-    public static void main(String args[]) throws IOException {
-        CatalogBuilder builder = new CatalogBuilder();
-        builder.addSchema("/Users/jhugg/Documents/workspace/voltdb2/examples/voter/ddl.sql");
-        builder.compile("dummy.jar");
-
-        /*TPCCProjectBuilder pb = new TPCCProjectBuilder();
-        pb.addAllDefaults();
-        pb.compile("dummy.jar");*/
     }
 }
