@@ -26,6 +26,8 @@ import geb.spock.*
 import geb.driver.CachingDriverFactory
 import org.openqa.selenium.interactions.Actions
 import spock.lang.*
+import groovy.json.*
+
 
 class StudioWebPage extends Page {
 
@@ -35,11 +37,12 @@ class StudioWebPage extends Page {
 
 class StudioWebDiag extends GebReportingSpec {
 
-    static String QUERY_ERROR = 'Query error | Query Duration:'
+    static String FAILURE = 'Query error | Query Duration:'
     static String SUCCESS = 'Query Duration:'
     static String ERROR = 'Error:' //all errors are handled server-side
 
-    
+    @Shared def slurper = new JsonSlurper()
+    @Shared def response
 
     ////specify paths to files with correct elements////
     @Shared def prgrm = $('span', text: 'Programmability')
@@ -48,13 +51,13 @@ class StudioWebDiag extends GebReportingSpec {
     @Shared def correctReadme = new File('src/test/resources/readme.htm')
     @Shared def chkReadme = new File('../../../src/frontend/org/voltdb/studio/readme.htm')
     @Shared def sqlFile = new File('src/test/resources/sql.txt')
-    
+
     ///////////////////////////////////////////////////////////
     def testFile = new File ('../../../../../Desktop/test.txt')
     ///////////////////////////////////////////////////////////
 
     ////// Server MUST have been initialized//////
-    
+
     def 'To StudioWeb'() {
         setup: 'Open Studio web'
         to StudioWebPage
@@ -73,7 +76,7 @@ class StudioWebDiag extends GebReportingSpec {
         expect: 'compare page contents to file contents and expect them to be the same'
         chkElements(chk, eleFile)
     }
-    
+
     def 'Connect to server'(){
         when: 'connect button is clicked'
         $('span.connect').click()
@@ -96,7 +99,7 @@ class StudioWebDiag extends GebReportingSpec {
 
     def 'Check readMe file'(){
         expect: 'them to be the same'
-        correctReadme.getText() == chkReadme.getText() & correctReadme.size() != 0 
+        correctReadme.getText() == chkReadme.getText() & correctReadme.size() != 0
     }
 
     @Ignore
@@ -112,97 +115,43 @@ class StudioWebDiag extends GebReportingSpec {
     }
 
     @Unroll //performs this method for each item in type
-    def 'SQL #testName test'(){
+    def '#testName test'(){
         try{
-        setup: 'open new query'       
-        $('#new-query').click()
-        def inputField = $('#worktabs').find('div', 0).find('textarea')
 
-        and: 'issue SQL query'
-        inputField.value(input)
-        $('#execute-query').click()
+            setup: 'open new query'
+            response = res
+            $('#new-query').click()
+            def inputField = $('#worktabs').find('div', 0).find('textarea')
 
-        and: 'obtain reponse status'
-        def statusField = $('#worktabs').find('span.status')
+            and: 'execute SQL query'
+            inputField.value(input)
+            $('#execute-query').click()
 
-        when: 'ensure status field displays proper response'
-        statusField.text().contains(status)
+            and: 'obtain response status and result'
+            def statusField = $('#worktabs').find('span.status')
+            def resultField = $('#worktabs').find('div.resultbar').children('div')
 
-        and: 'response field is located'
-        def responseField = $('#worktabs').find('div.resultbar').children('div')
-        
-        then:'determine if reponse was appropriate for query'
-        if(statusField.text() =~ /Query error.*/){
-            assert responseField.text() == response
-        }else if(responseField.children().is('table')){ //if response is table
-            def table = tablify(responseField.find('table'), match)
-            assert table
-        }
+            when: 'ensure appropriate status and result are displayed'
+            assert checkResponse(statusField, resultField)
+
+
         }finally{
 
-        then: 'close query'
-        $('#worktabs').find('ul').find('li', 0).find('span').click()
+            then: 'close query'
+            $('#worktabs').find('ul').find('li', 0).find('span').click()
 
-        and: 'ensure query was closed'
-        assert $('#worktabs').children('div').isEmpty()
+            and: 'ensure query was closed'
+            assert $('#worktabs').children('div').isEmpty()
         }
-                                        //ADD NEW TEST CASES HERE
+
         where: "list of inputs to test and expected responses"
-        [testName, input, response,match,status] << [
-
-                                ////////
-                                //SQL///
-                                /////////
-                                
-                                ///////////////
-                                //VALID INSERTS
-                                ///////////////
-                                ['InsertBigInt','INSERT INTO partitioned_table () VALUES ()',modTup(1),SUCCESS],
-                                ['InsertTinyInt','INSERT INTO partitioned_table () VALUES ()',modTup(1),SUCCESS],
-                                ['InsertInteger','INSERT INTO partitioned_table () VALUES ()',modTup(1),SUCCESS],
-                                ['InsertSmallInt','INSERT INTO partitioned_table () VALUES ()',modTup(1),SUCCESS],
-                                ['InsertFloat','INSERT INTO partitioned_table () VALUES ()',modTup(1),SUCCESS],
-                                ['InsertDecimal','INSERT INTO partitioned_table () VALUES ()',modTup(1),SUCCESS],
-                                ['InsertTimestamp','INSERT INTO partitioned_table () VALUES ()',modTup(1),SUCCESS],
-                                ['InsertVarchar','INSERT INTO partitioned_table () VALUES ()',modTup(1),SUCCESS],
-                                ['NullAsNull','INSERT INTO partitioned_table () VALUES ()',modTup(1),SUCCESS],
-                                //////////////////
-                                //INVALID INSERTS
-                                //////////////////
-                                ['ExtraVarchar','INSERT INTO partitioned_table () VALUES ()',ERROR,QUERY_ERROR],
-                                ['VarcharAsInt','INSERT INTO partitioned_table () VALUES ()',ERROR,QUERY_ERROR],
-                                ['BadParamCount','INSERT INTO partitioned_table () VALUES ()',ERROR,QUERY_ERROR],
-                                ['NullAsNotNull','INSERT INTO partitioned_table () VALUES ()',ERROR,QUERY_ERROR],
-                                
-                                
-                                ['BadQuery','THIS IS NOT A VALID QUERY',ERROR,QUERY_ERROR],
-                                /////////
-                                //SELECTS
-                                /////////
-
-                                /////////
-                                //DELETES
-                                /////////
-                                ['DeleteAll','DELETE FROM partitioned_table',modTup(),SUCCESS],
-                                ['VarcharAsInt','INSERT INTO partitioned_table () VALUES ()',modTup(1),SUCCESS],
-                                ['BadParamCount','INSERT INTO partitioned_table () VALUES ()',modTup(1),SUCCESS],
-                                ['NullAsNotNull','INSERT INTO partitioned_table () VALUES ()',modTup(1),SUCCESS],
-
-                                /////////
-                                //SELECTS
-                                /////////
-
-                                /////////////////////
-                                //SYSTEM STORED PROCS
-                                //////////////////////
-                               ['insert','exec PARTITIONED_TABLE.insert',ERROR,QUERY_ERROR],
-                               ['delete','exec PARTITIONED_TABLE.delete',ERROR,QUERY_ERROR],
-                               ['select','exec PARTITIONED_TABLE.select',ERROR,QUERY_ERROR],
-                               ['update','exec PARTITIONED_TABLE.update',ERROR,QUERY_ERROR],
-                               ['InvalidStoredProc','exec PARTITIONED_TABLE.badProc',ERROR,QUERY_ERROR],
-        ]
-
+        line << sqlFile.readLines()
+        iter = slurper.parseText(line)
+        testName = iter.testName
+        input = iter.sqlCmd
+        res = iter.response
     }
+
 
     def 'Disconnect from server'(){
         setup: 'Actions interface to enable right click'
@@ -229,18 +178,39 @@ class StudioWebDiag extends GebReportingSpec {
 
     def cleanupSpec(){}
 
-    def modTup(def changes){
-        @Shared def response = [['modified_tuples'],[changes]]
-        response
+    def checkResponse(def statusField, def resultField){
+        //check status--false if bad status
+        waitFor(){statusField.text() != null}
+        testFile << response.status
+        if(response.status == 'SUCCESS' | response.status == 'FAILURE'){
+            def status = response.status == 'SUCCESS' ? SUCCESS : FAILURE
+
+            assert statusField.text().contains(status)
+        }else{return false}
+
+
+        //check result
+        if(resultField.children().is('table')){
+            assert makeAndCheckTable(resultField.find('table'))
+        }else if(response.result == 'ERROR') {assert resultField.text().contains(ERROR)}
     }
 
-    def tablify(def tableLoc, def matchExact){
-        def rows = tableLoc.find("tr") //1st row contains names of columns
-        def table = []
-        rows.each { row -> table.add(row.children()*.text()) }
-        if(matchExact){table == response
-        }else{table}
 
+    def makeAndCheckTable(def tableLoc){
+
+        def table = [:]
+        def columns = tableLoc.find('thead').find('th')*.text()
+        def rows = tableLoc.find('tbody').find('tr')
+
+        //make table
+        def colNum = 0
+        def makeCol = {index,rowset -> def list = []; rowset.each{row -> list.add(row.find('td',index).text())}; list}
+        columns = columns.collect{it.toLowerCase()}
+        columns.each{table.put(it,makeCol(colNum++, rows))}
+
+        //check table
+        def checkColumn = {assert response.result."$it" == table[it]}
+        columns.each(checkColumn)
     }
 
     void expandFolds(){
@@ -257,6 +227,9 @@ class StudioWebDiag extends GebReportingSpec {
         file.eachLine {correct.add(it)}
         correct == eles
         /* items are retrieved in nondeterministic order due to potential changes to webpage.
-        The test fails when this happens to indicate need for update */   
+        The test fails when this happens to indicate need for update */
     }
 }
+
+
+
