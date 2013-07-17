@@ -329,8 +329,9 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         if ( ! checkUpdateOnUniqueIndexes(targetTupleToUpdate,
                                           sourceTupleWithNewValues,
                                           indexesToUpdate)) {
-            throw ConstraintFailureException(this, targetTupleToUpdate,
+            throw ConstraintFailureException(this,
                                              sourceTupleWithNewValues,
+                                             targetTupleToUpdate,
                                              CONSTRAINT_TYPE_UNIQUE);
         }
 
@@ -338,8 +339,9 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
          * Check for null constraint violations. Assumes source tuple is fully fleshed out.
          */
         FAIL_IF(!checkNulls(sourceTupleWithNewValues)) {
-            throw ConstraintFailureException(this, targetTupleToUpdate,
+            throw ConstraintFailureException(this,
                                              sourceTupleWithNewValues,
+                                             targetTupleToUpdate,
                                              CONSTRAINT_TYPE_NOT_NULL);
         }
 

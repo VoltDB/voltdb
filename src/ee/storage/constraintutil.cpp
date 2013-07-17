@@ -93,6 +93,12 @@ std::string getTypeName(voltdb::ConstraintType type) {
             ret = "NotNull";
             break;
         // ------------------------------------------------------------------
+        // Partitioning
+        // ------------------------------------------------------------------
+        case (voltdb::CONSTRAINT_TYPE_PARTITIONING):
+            ret = "Partitioning";
+            break;
+        // ------------------------------------------------------------------
         // UNKNOWN
         // ------------------------------------------------------------------
         default: {
