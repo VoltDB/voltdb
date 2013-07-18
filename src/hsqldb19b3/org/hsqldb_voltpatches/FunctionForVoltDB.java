@@ -369,7 +369,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                         try {
                             new TimestampType(longtime);
                         }
-                        catch (IllegalArgumentException e) {
+                        catch (Exception e) {
                             ex = e;
                         }
                         if (ex == null) {
