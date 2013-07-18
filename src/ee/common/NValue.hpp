@@ -1555,54 +1555,55 @@ class NValue {
     }
 
     int compareDoubleValue (const NValue rhs) const {
+        const double lhsValue = getDouble();
+        double rhsValue;
+
         switch (rhs.getValueType()) {
-          case VALUE_TYPE_DOUBLE: {
-              const double lhsValue = getDouble();
-              const double rhsValue = rhs.getDouble();
-              if (lhsValue == rhsValue) {
-                  return VALUE_COMPARE_EQUAL;
-              } else if (lhsValue > rhsValue) {
-                  return VALUE_COMPARE_GREATERTHAN;
-              } else {
-                  return VALUE_COMPARE_LESSTHAN;
-              }
-          }
-          case VALUE_TYPE_TINYINT:
-          case VALUE_TYPE_SMALLINT:
-          case VALUE_TYPE_INTEGER:
-          case VALUE_TYPE_BIGINT:
-          case VALUE_TYPE_TIMESTAMP: {
-              const double lhsValue = getDouble();
-              const double rhsValue = rhs.castAsDouble().getDouble();
-              if (lhsValue == rhsValue) {
-                  return VALUE_COMPARE_EQUAL;
-              } else if (lhsValue > rhsValue) {
-                  return VALUE_COMPARE_GREATERTHAN;
-              } else {
-                  return VALUE_COMPARE_LESSTHAN;
-              }
-          }
-          case VALUE_TYPE_DECIMAL:
-          {
-              double val = rhs.castAsDoubleAndGetValue();
-              if (rhs.isNegative()) {
-                  val *= -1;
-              }
-              return ((getDouble() > val) - (getDouble() < val));
-          }
-          default:
-          {
-              char message[128];
-              snprintf(message, 128,
-                       "Type %s cannot be cast for comparison to type %s",
-                       valueToString(rhs.getValueType()).c_str(),
-                       valueToString(getValueType()).c_str());
-              throw SQLException(SQLException::
-                                 data_exception_most_specific_type_mismatch,
-                                 message);
-              // Not reached
-              return 0;
-          }
+            case VALUE_TYPE_DOUBLE:
+                rhsValue = rhs.getDouble();
+                break;
+            case VALUE_TYPE_TINYINT:
+            case VALUE_TYPE_SMALLINT:
+            case VALUE_TYPE_INTEGER:
+            case VALUE_TYPE_BIGINT:
+            case VALUE_TYPE_TIMESTAMP:
+                rhsValue = rhs.castAsDouble().getDouble();
+                break;
+            case VALUE_TYPE_DECIMAL:
+                rhsValue = rhs.castAsDoubleAndGetValue();
+                if (rhs.isNegative()) {
+                    rhsValue *= -1;
+                }
+                break;
+            default:
+                char message[128];
+                snprintf(message, 128,
+                         "Type %s cannot be cast for comparison to type %s",
+                         valueToString(rhs.getValueType()).c_str(),
+                         valueToString(getValueType()).c_str());
+                throw SQLException(SQLException::
+                                   data_exception_most_specific_type_mismatch,
+                                   message);
+                // Not reached
+                return 0;
+        }
+
+        // Treat NaN values as equals and also make them smaller than neagtive infinity.
+        // This breaks IEEE754 for expressions slightly.
+        if (std::isnan(lhsValue)) {
+            return std::isnan(rhsValue) ? VALUE_COMPARE_EQUAL : VALUE_COMPARE_LESSTHAN;
+        }
+        else if (std::isnan(rhsValue)) {
+            return VALUE_COMPARE_GREATERTHAN;
+        }
+        else if (lhsValue > rhsValue) {
+            return VALUE_COMPARE_GREATERTHAN;
+        }
+        else if (lhsValue < rhsValue) {
+            return VALUE_COMPARE_LESSTHAN;
+        }
+        else {
+            return VALUE_COMPARE_EQUAL;
         }
     }
 
