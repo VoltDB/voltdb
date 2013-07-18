@@ -19,7 +19,6 @@ package org.voltdb.planner;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -31,7 +30,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.JoinTree.JoinNode;
+import org.voltdb.planner.JoinNode;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
@@ -55,7 +54,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     ArrayDeque<AbstractPlanNode> m_plans = new ArrayDeque<AbstractPlanNode>();
 
     /** The list of all possible join orders, assembled by queueAllJoinOrders */
-    ArrayDeque<JoinTree> m_joinOrders = new ArrayDeque<JoinTree>();
+    ArrayDeque<JoinNode> m_joinOrders = new ArrayDeque<JoinNode>();
 
     /**
      *
@@ -122,7 +121,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             if ( ! isValidJoinOrder(tableNames)) {
                 throw new RuntimeException("The specified join order is invalid for the given query");
             }
-            m_parsedStmt.joinTree.m_joinOrder = tables;
+            //m_parsedStmt.joinTree.m_joinOrder = tables;
             m_joinOrders.add(m_parsedStmt.joinTree);
         } else {
             queueAllJoinOrders();
@@ -138,11 +137,11 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      */
     private boolean isValidJoinOrder(List<String> tableNames)
     {
-        assert(m_parsedStmt.joinTree != null && m_parsedStmt.joinTree.m_root != null);
+        assert(m_parsedStmt.joinTree != null);
 
         // Split the original tree into the sub-trees having the same join type for all nodes
         List<JoinNode> subTrees = new ArrayList<JoinNode>();
-        extractSubTrees(m_parsedStmt.joinTree.m_root, subTrees);
+        extractSubTrees(m_parsedStmt.joinTree, subTrees);
 
         // For a sub-tree with inner joins only any join order is valid. The only requirement is that
         // each and every table from that sub-tree constitute an uninterrupted sequence in the specified join order
@@ -224,11 +223,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         assert(m_parsedStmt.multiTableSelectionList.size() == 0);
         assert(m_parsedStmt.noTableSelectionList.size() == 0);
 
-//        if (m_parsedStmt.joinTree.m_hasOuterJoin) {
-            queueSubJoinOrders();
-//        } else {
-//            queueSubJoinOrdersLegacy();
-//        }
+        queueSubJoinOrders();
     }
 
     /**
@@ -239,18 +234,13 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         assert(m_parsedStmt.joinTree != null);
 
         // Simplify the outer join if possible
-        JoinTree simplifiedJoinTree = simplifyOuterJoin(m_parsedStmt.joinTree);
-        // It is possible that simplified tree has inner joins only
-//        if (simplifiedJoinTree.m_hasOuterJoin == false) {
-//            queueSubJoinOrdersLegacy();
-//            return;
-//        }
+        JoinNode simplifiedJoinTree = simplifyOuterJoin(m_parsedStmt.joinTree);
 
         // The execution engine expects to see the outer table on the left side only
         // which means that RIGHT joins need to be converted to the LEFT ones
-        simplifiedJoinTree.m_root.toLeftJoin();
+        simplifiedJoinTree.toLeftJoin();
         // Clone the original
-        JoinNode clonedTree = (JoinNode) simplifiedJoinTree.m_root.clone();
+        JoinNode clonedTree = (JoinNode) simplifiedJoinTree.clone();
         // Split join tree into a set of subtrees. The join type for all nodes in a subtree is the same
         List<JoinNode> subTrees = new ArrayList<JoinNode>();
         extractSubTrees(clonedTree, subTrees);
@@ -325,7 +315,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         if (joinOrderListIdx == joinOrderList.size()) {
             // End of recursion
             assert(!currentJoinOrder.isEmpty());
-            JoinTree joinTree = reconstructJoinTreeFromSubTrees(currentJoinOrder);
+            JoinNode joinTree = reconstructJoinTreeFromSubTrees(currentJoinOrder);
             m_joinOrders.add(joinTree);
             return;
         }
@@ -413,9 +403,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @param subTrees the list of sub trees.
      * @return The reconstructed tree
      */
-    JoinTree reconstructJoinTreeFromSubTrees(List<JoinNode> subTrees) {
-        JoinTree joinTree = new JoinTree();
-        joinTree.m_hasOuterJoin = m_parsedStmt.joinTree.m_hasOuterJoin;
+    JoinNode reconstructJoinTreeFromSubTrees(List<JoinNode> subTrees) {
         // Reconstruct the tree. The first element is the first sub-tree and so on
         JoinNode joinNode = subTrees.get(0);
         for (int i = 1; i < subTrees.size(); ++i) {
@@ -424,8 +412,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             // There must be a node in the current tree to be replaced
             assert(replaced == true);
         }
-        joinTree.m_root = joinNode;
-        return joinTree;
+        return joinNode;
     }
 
     private boolean replaceChild(JoinNode root, JoinNode node) {
@@ -449,71 +436,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     }
 
     /**
-     * Add all join orders (permutations) for the input table list.
-     * This method works for inner joins only.
-     */
-    private void queueSubJoinOrdersLegacy() {
-        // if all joins are inner then all join orders obtained by the permutation of
-        // the original tables are valid. Create arrays of the tables to permute them
-        Table[] inputTables = new Table[m_parsedStmt.tableList.size()];
-        Table[] outputTables = new Table[m_parsedStmt.tableList.size()];
-
-        // fill the input table with tables from the parsed statement structure
-        for (int i = 0; i < inputTables.length; i++)
-            inputTables[i] = m_parsedStmt.tableList.get(i);
-
-        // use recursion to solve...
-        queueSubJoinOrdersLegacyRecursively(inputTables, outputTables, 0);
-    }
-
-    /**
-     * Recursively add all join orders (permutations) for the input table list.
-     *
-     * @param inputTables An array of tables to order.
-     * @param outputTables A scratch space for recursion for an array of tables. Making this a parameter
-     * might make the procedure a slight bit faster than if it was a return value.
-     * @param place The index of the table to permute (all tables before index=place are fixed).
-     */
-    private void queueSubJoinOrdersLegacyRecursively(Table[] inputTables,
-                                                    Table[] outputTables,
-                                                    int place) {
-        // recursive stopping condition:
-        //
-        // stop when there is only one place and one table to permute
-        if (place == inputTables.length) {
-            // The inner join doesn't need a tree at all, only the the flat list of joined table.
-            // The join and where conditions are always the same regardless of the table order need to be
-            // analyzed only once.
-            JoinTree joinNode = new JoinTree();
-            joinNode.m_joinOrder = outputTables.clone();
-            m_joinOrders.add(joinNode);
-            return;
-        }
-
-        // recursive step:
-        //
-        // pick all possible options for the current
-        for (int i = 0; i < outputTables.length; i++) {
-            // choose a candidate table for this place
-            outputTables[place] = inputTables[i];
-
-            // don't select tables that have been chosen before
-            boolean duplicate = false;
-            for (int j = 0; j < place; j++) {
-                if (outputTables[j].getTypeName().equalsIgnoreCase(outputTables[place].getTypeName())) {
-                    duplicate = true;
-                    break;
-                }
-            }
-            if (duplicate)
-                continue;
-
-            // recursively call this function to permute the remaining places
-            queueSubJoinOrdersLegacyRecursively(inputTables, outputTables, place + 1);
-        }
-    }
-
-    /**
      * Outer join simplification using null rejection.
      * http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.43.2531
      * Outerjoin Simplification and Reordering for Query Optimization
@@ -527,18 +449,17 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      *          then convert n2 to an inner join. If n2 is a full join then need repeat this step
      *          for n2 inner and outer tables
      */
-    private JoinTree simplifyOuterJoin(JoinTree joinTree) {
-        assert(joinTree.m_root != null);
+    private JoinNode simplifyOuterJoin(JoinNode joinTree) {
+        assert(joinTree != null);
         List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
         // For the top level node only WHERE expressions need to be evaluated for NULL-rejection
-        if (joinTree.m_root.m_leftNode != null && joinTree.m_root.m_leftNode.m_whereExpr != null) {
-            exprs.add(joinTree.m_root.m_leftNode.m_whereExpr);
+        if (joinTree.m_leftNode != null && joinTree.m_leftNode.m_whereExpr != null) {
+            exprs.add(joinTree.m_leftNode.m_whereExpr);
         }
-        if (joinTree.m_root.m_rightNode != null && joinTree.m_root.m_rightNode.m_whereExpr != null) {
-            exprs.add(joinTree.m_root.m_rightNode.m_whereExpr);
+        if (joinTree.m_rightNode != null && joinTree.m_rightNode.m_whereExpr != null) {
+            exprs.add(joinTree.m_rightNode.m_whereExpr);
         }
-        simplifyOuterJoinRecursively(joinTree.m_root, exprs);
-        joinTree.m_hasOuterJoin = joinTree.m_root.hasOuterJoin();
+        simplifyOuterJoinRecursively(joinTree, exprs);
         return joinTree;
     }
 
@@ -617,7 +538,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         // or no more plans can be created
         while (m_plans.size() == 0) {
             // get the join order for us to make plans out of
-            JoinTree joinTree = m_joinOrders.poll();
+            JoinNode joinTree = m_joinOrders.poll();
 
             // no more join orders => no more plans to generate
             if (joinTree == null)
@@ -640,20 +561,13 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      *
      * @param joinOrder An array of tables in the join order.
      */
-    private void generateMorePlansForJoinTree(JoinTree joinTree) {
-//        if (m_parsedStmt.joinTree.m_hasOuterJoin == false) {
-//            generateMorePlansForJoinOrderLegacy(joinTree);
-//        } else {
-            // Specialization for the outer join.
-            JoinNode joinNode = joinTree.m_root;
-            assert(joinNode != null);
+    private void generateMorePlansForJoinTree(JoinNode joinTree) {
+        assert(joinTree != null);
+        // generate the access paths for all nodes
+        generateAccessPaths(joinTree);
 
-            // generate the access paths for all nodes
-            generateAccessPaths(joinTree.m_root);
-
-            List<JoinNode> nodes = joinNode.generateAllNodesJoinOrder();
-            generateSubPlanForJoinNodeRecursively(joinNode, nodes);
-//        }
+        List<JoinNode> nodes = joinTree.generateAllNodesJoinOrder();
+        generateSubPlanForJoinNodeRecursively(joinTree, nodes);
     }
 
     /**
@@ -805,51 +719,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     }
 
     /**
-     * Specialization for all inner join.
-     *
-     * @param joinOrder An array of tables in the join order.
-     */
-    private void generateMorePlansForJoinOrderLegacy(JoinTree joinTree) {
-        assert(joinTree.m_joinOrder != null);
-        assert(m_plans.size() == 0);
-
-        // compute the reasonable access paths for all tables
-        //HashMap<Table, ArrayList<Index[]>> accessPathOptions = generateAccessPathsForEachTable(joinOrder);
-        // compute all combinations of access paths for this particular join order
-        ArrayList<AccessPath[]> listOfAccessPathCombos = generateAllAccessPathCombinationsForJoinOrder(joinTree.m_joinOrder);
-
-        // for each access path
-        for (AccessPath[] accessPath : listOfAccessPathCombos) {
-            // get a plan
-            AbstractPlanNode scanPlan = getSelectSubPlanForAccessPath(joinTree.m_joinOrder, accessPath);
-            m_plans.add(scanPlan);
-        }
-    }
-
-    /**
-     * Given a specific join order and access path set for that join order, construct the plan
-     * that gives the right tuples. This method is the meat of sub-plan-graph generation, but all
-     * of the smarts are probably done by now, so this is just boring actual construction.
-     *
-     * @param joinOrder An array of tables in a specific join order.
-     * @param accessPath An array of access paths that match with the input tables.
-     * @return A completed plan-sub-graph that should match the correct tuples from the
-     * correct tables.
-     */
-    private AbstractPlanNode getSelectSubPlanForAccessPath(Table[] joinOrder, AccessPath[] accessPath) {
-
-        // do the actual work
-        AbstractPlanNode retv = getSelectSubPlanForAccessPathsIterative(joinOrder, accessPath);
-        // If there is a multi-partition statement on one or more partitioned Tables
-        // and the pre-join Send/Receive nodes were suppressed,
-        // they need to come into play "post-join".
-        if (m_partitioning.getCountOfPartitionedTables() > 1 && m_partitioning.requiresTwoFragments()) {
-            retv = addSendReceivePair(retv);
-        }
-        return retv;
-    }
-
-    /**
      * Given a specific join node and access path set for inner and outer tables, construct the plan
      * that gives the right tuples.
      *
@@ -888,83 +757,14 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
 
    /**
-     * Given a specific join order and access path set for that join order, construct the plan
-     * that gives the right tuples. This method is the meat of sub-plan-graph generation, but all
-     * of the smarts are probably done by now, so this is just boring actual construction.
-     * In case of all participant tables are joined on respective partition keys generation of
-     * Send/Received node pair is suppressed.
+     * Given a join node and plan-sub-graph for outer and inner sub-nodes,
+     * construct the plan-sub-graph for that node.
      *
-     * @param joinOrder An array of tables in a specific join order.
-     * @param accessPath An array of access paths that match with the input tables.
-     * @return A completed plan-sub-graph that should match the correct tuples from the
-     * correct tables.
+     * @param joinNode A parent join node.
+     * @param outerPlan The outer node plan-sub-graph.
+     * @param innerPlan The inner node plan-sub-graph.
+     * @return A completed plan-sub-graph.
      */
-    protected AbstractPlanNode getSelectSubPlanForAccessPathsIterative(Table[] joinOrder, AccessPath[] accessPath) {
-        AbstractPlanNode resultPlan = null;
-        for (int at = joinOrder.length-1; at >= 0; --at) {
-            AbstractPlanNode scanPlan = getAccessPlanForTable(joinOrder[at], accessPath[at]);
-            if (resultPlan == null) {
-                resultPlan = scanPlan;
-            } else {
-                /*
-                 * The optimizations (nestloop, nestloopindex) that follow don't care
-                 * about the send/receive pair. Send in the IndexScanPlanNode or
-                 * ScanPlanNode for them to work on.
-                 */
-                resultPlan = getSelectSubPlanForAccessPathStep(accessPath[at], resultPlan, scanPlan);
-            }
-            /*
-             * If the access plan for the table in the join order was for a
-             * distributed table scan there will be a send/receive pair at the top.
-             */
-            if (joinOrder[at].getIsreplicated() || canDeferSendReceivePairForNode()) {
-                continue;
-            }
-            resultPlan = addSendReceivePair(resultPlan);
-        }
-        return resultPlan;
-    }
-
-    private AbstractPlanNode getSelectSubPlanForAccessPathStep(AccessPath accessPath, AbstractPlanNode subPlan, AbstractPlanNode nljAccessPlan) {
-        AbstractJoinPlanNode retval = null;
-        if (nljAccessPlan instanceof IndexScanPlanNode) {
-            NestLoopIndexPlanNode nlijNode = new NestLoopIndexPlanNode();
-
-            nlijNode.setJoinType(JoinType.INNER);
-
-            @SuppressWarnings("unused")
-            IndexScanPlanNode innerNode = (IndexScanPlanNode) nljAccessPlan;
-
-            nlijNode.addInlinePlanNode(nljAccessPlan);
-
-            // combine the tails plan graph with the new head node
-            nlijNode.addAndLinkChild(subPlan);
-            // now generate the output schema for this join
-            nlijNode.generateOutputSchema(m_db);
-
-            retval = nlijNode;
-        }
-        else {
-            // get all the clauses that join the applicable two tables
-            ArrayList<AbstractExpression> joinClauses = accessPath.joinExprs;
-            NestLoopPlanNode nljNode = new NestLoopPlanNode();
-            if ((joinClauses != null) && (joinClauses.size() > 0))
-                nljNode.setJoinPredicate(ExpressionUtil.combine(joinClauses));
-            nljNode.setJoinType(JoinType.INNER);
-
-            // combine the tails plan graph with the new head node
-            nljNode.addAndLinkChild(nljAccessPlan);
-
-            nljNode.addAndLinkChild(subPlan);
-
-            // now generate the output schema for this join
-            nljNode.generateOutputSchema(m_db);
-
-            retval = nljNode;
-        }
-        return retval;
-    }
-
     private AbstractPlanNode getSelectSubPlanForOuterAccessPathStep(JoinNode joinNode, AbstractPlanNode outerPlan, AbstractPlanNode innerPlan) {
         // Filter (post-join) expressions
         ArrayList<AbstractExpression> whereClauses  = new ArrayList<AbstractExpression>();
@@ -1083,90 +883,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         HashSet<AbstractExpression> otherSet = new HashSet<AbstractExpression>();
         otherSet.addAll(nonIndexInnerOuterList);
         return !otherSet.containsAll(originalInnerOuterExprs);
-    }
-
-    /**
-     * For each table in the list, compute the set of all valid access paths that will get
-     * tuples that match the right predicate (assuming there is a predicate).
-     *
-     * @param tables The array of tables we are computing paths for.
-     * @return A map that contains a list of access paths for each table in the input array.
-     * An access path is an array of indexes (possibly empty).
-     */
-    private HashMap<Table, ArrayList<AccessPath>> generateAccessPathsForEachTable(Table[] tables) {
-        // this means just use full scans for all access paths (for now).
-        // an access path is a list of indexes (possibly empty)
-        HashMap<Table, ArrayList<AccessPath>> retval = new HashMap<Table, ArrayList<AccessPath>>();
-
-        // for each table, just add the empty access path (the full table scan)
-        for (int i = 0; i < tables.length; i++) {
-            Table currentTable = tables[i];
-            Table nextTables[] = new Table[tables.length - (i + 1)];
-            System.arraycopy(tables, i + 1, nextTables, 0, tables.length - (i + 1));
-            ArrayList<AccessPath> paths = getRelevantAccessPathsForTable(currentTable, nextTables);
-            retval.put(tables[i], paths);
-        }
-
-        return retval;
-    }
-
-    /**
-     * Given a join order, compute a list of all combinations of access paths. This will return a list
-     * of sets of specific ways to access each table in a join order. It is called recursively.
-     *
-     * @param joinOrder The list of tables in this sub-select in a particular order.
-     * @return A list of lists of lists (ugh). For a given table, an access path is a list of indexes
-     * which might be empty. Given a join order, a complete access path for that join order is an
-     * array (one slot per table) of access paths. The list of all possible complete access paths is
-     * returned.
-     */
-    private ArrayList<AccessPath[]> generateAllAccessPathCombinationsForJoinOrder(Table[] joinOrder){
-
-        HashMap<Table, ArrayList<AccessPath>> accessPathOptions = generateAccessPathsForEachTable(joinOrder);
-
-        // An access path for a table is a an Index[]
-        // A complete access path for a join order is an Index[][]
-        // All possible complete access paths is an ArrayList<Index[][]>
-        ArrayList<AccessPath[]> retval = new ArrayList<AccessPath[]>();
-
-        // recursive stopping condition:
-        //
-        // if this is a single-table select, then this will be pretty easy
-        if (joinOrder.length == 1) {
-            // walk through all the access paths for this single table and put them
-            // in the list of all possible access paths
-            for (AccessPath path : accessPathOptions.get(joinOrder[0])) {
-                AccessPath[] paths = new AccessPath[1];
-                paths[0] = path;
-                retval.add(paths);
-            }
-            return retval;
-        }
-
-        // recursive step:
-        //
-        // if we get here, assume join order is multi-table
-
-        // make a copy of the tail (list - head) of the join order array
-        Table[] subJoinOrder = Arrays.copyOfRange(joinOrder, 1, joinOrder.length);
-
-        // recursively get all possible access path combinations for the tail of the join order
-        ArrayList<AccessPath[]> subList = generateAllAccessPathCombinationsForJoinOrder(subJoinOrder);
-
-        // get all possible access paths for the head, and glue them onto the options for the tail
-        for (AccessPath path : accessPathOptions.get(joinOrder[0])) {
-            // take the selected path for the head and cross-product with all tail options
-            for (AccessPath[] choice : subList) {
-                AccessPath[] paths = new AccessPath[joinOrder.length];
-                paths[0] = path;
-                assert(choice.length == subJoinOrder.length);
-                for (int i = 0; i < choice.length; i++)
-                    paths[i + 1] = choice[i];
-                retval.add(paths);
-            }
-        }
-
-        return retval;
     }
 
 }

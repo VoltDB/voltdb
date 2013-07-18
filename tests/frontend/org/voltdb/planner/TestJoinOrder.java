@@ -24,6 +24,7 @@
 package org.voltdb.planner;
 
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 
@@ -74,6 +75,13 @@ public class TestJoinOrder extends PlannerTestCase {
         } catch (Exception ex) {
             assertTrue("The specified join order is invalid for the given query".equals(ex.getMessage()));
         }
+    }
+
+    public void testMicroOptimizationJoinOrder() {
+        AbstractPlanNode pn = compileWithJoinOrder("select * from J1, P2 where A=B", "J1, P2");
+        AbstractPlanNode n = pn.getChild(0).getChild(0);
+        assertTrue(((IndexScanPlanNode)n.getChild(0)).getTargetTableName().equals("J1"));
+        assertTrue(((SeqScanPlanNode)n.getChild(1)).getTargetTableName().equals("P2"));
     }
 
     public void testInnerOuterJoinOrder() {
