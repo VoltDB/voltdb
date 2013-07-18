@@ -398,6 +398,30 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     /**
+     * Replace an existing child with a new one preserving the child's position.
+     * @param oldChild The node to replace.
+     * @param newChild The new node.
+     * @return true if the child was replaced
+     */
+    public boolean replaceChild(AbstractPlanNode oldChild, AbstractPlanNode newChild) {
+        int idx = 0;
+        for (AbstractPlanNode child : m_children) {
+            if (child.equals(oldChild)) {
+                break;
+            }
+            ++idx;
+        }
+        if (idx == m_children.size()) {
+            return false;
+        }
+        oldChild.removeFromGraph();
+        m_children.add(idx, newChild);
+        newChild.m_parents.add(this);
+        return true;
+    }
+
+
+    /**
      * Gets the children.
      * @return the children
      */

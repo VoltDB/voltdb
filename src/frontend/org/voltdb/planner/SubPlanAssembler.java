@@ -34,7 +34,6 @@ import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
-import org.voltdb.planner.JoinTree.TablePair;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -97,36 +96,6 @@ public abstract class SubPlanAssembler {
     abstract AbstractPlanNode nextPlan();
 
     /**
-     * Given a table (and optionally the next table in the join order), using the
-     * set of predicate expressions, figure out all the possible ways to get at
-     * the data we want. One way will always be the naive sequential scan.
-     *
-     * @param table
-     *     The table to get the data from.
-     * @param nextTable
-     *     The next tables in the join order or an empty array if there
-     *     are none.
-     * @return A list of access paths to access the data in the table.
-     */
-    protected ArrayList<AccessPath> getRelevantAccessPathsForTable(Table table, Table nextTables[]) {
-        List<AbstractExpression> filterExprs = m_parsedStmt.joinTree.m_tableFilterList.get(table);
-        List<AbstractExpression> joinExprs = new ArrayList<AbstractExpression>();
-        for (int ii = 0; ii < nextTables.length; ii++) {
-            final Table nextTable = nextTables[ii];
-            // create a key to search the TablePair->Clause map
-            TablePair pair = new TablePair();
-            pair.t1 = table;
-            pair.t2 = nextTable;
-            List<AbstractExpression> pairExprs = m_parsedStmt.joinTree.m_joinSelectionList.get(pair);
-            if (pairExprs != null) {
-                joinExprs.addAll(pairExprs);
-            }
-        }
-        // do the actual work
-        return getRelevantAccessPathsForTable(table, joinExprs, filterExprs, null);
-    }
-
-    /**
      * Generate all possible access paths for given sets of join and filter expressions for a table.
      * The list includes the naive (scan) pass and possible index scans
      *
@@ -155,7 +124,7 @@ public abstract class SubPlanAssembler {
             allExprs.addAll(filterExprs);
         }
 
-        AccessPath naivePath = getRelevantNaivePathForTable(allJoinExprs, filterExprs);
+        AccessPath naivePath = getRelevantNaivePath(allJoinExprs, filterExprs);
         paths.add(naivePath);
 
         CatalogMap<Index> indexes = table.getIndexes();
@@ -174,14 +143,13 @@ public abstract class SubPlanAssembler {
     }
 
     /**
-     * Generate the naive (scan) pass for the table
+     * Generate the naive (scan) pass given a join and filter expressions
      *
-     * @param table Table to generate naive pass for
-     * @param joinExprs join expressions this table is part of
-     * @param filterExprs filter expressions this table is part of
+     * @param joinExprs join expressions
+     * @param filterExprs filter expressions
      * @return Naive access path
      */
-    protected AccessPath getRelevantNaivePathForTable(List<AbstractExpression> joinExprs, List<AbstractExpression> filterExprs) {
+    protected AccessPath getRelevantNaivePath(List<AbstractExpression> joinExprs, List<AbstractExpression> filterExprs) {
         AccessPath naivePath = new AccessPath();
 
         if (filterExprs != null) {

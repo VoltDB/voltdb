@@ -127,7 +127,9 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         for (AbstractParsedStmt selectStmt : m_children) {
             selectStmt.postParse(sql, joinOrder);
             // Propagate parsing results to the parent union
-            m_filterSelectionList.addAll(selectStmt.joinTree.getAllExpressions());
+            if (selectStmt.joinTree != null) {
+                m_filterSelectionList.addAll(selectStmt.joinTree.getAllExpressions());
+            }
         }
         // Analyze children's where expressions together to identify possible identically
         // partitioned tables
