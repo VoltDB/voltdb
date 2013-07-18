@@ -337,6 +337,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                         break;
                     }
                 }
+                if (col.expression instanceof TupleValueExpression) {
+                    insertToAggResultColumns(col);
+                    addOne += 1;
+                }
                 if (addOne == 0) {
                     // You select a column that does not contain Aggs, group by and order by column
                     if (!hasComplexAgg()) setComlexAgg(true);
