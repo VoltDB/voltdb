@@ -52,7 +52,7 @@
 #                   "normalizer": "normalizer.py"},
 # HSQL SEEMS TO HAVE A BAD DEFAULT PRECISION, DISABLING
 #    "basic-decimal": {"schema": "decimal-schema.py",
-#                      "ddl": "decimal-DDL.sql",
+#                      "ddl": "DDL.sql",
 #                      "template": "basic-decimal.sql",
 #                      "normalizer": "normalizer.py"},
 # Floating point rounding differences lead to deltas
@@ -65,17 +65,17 @@
 # Template "UPDATE _table SET BIG = _value[int64] WHERE (_variable _cmp _variable) _logic (_variable _cmp _value[int64])" failed to yield SQL statements
 # Template "DELETE FROM _table WHERE (_variable _cmp _variable) _logic (_variable _cmp _value[int64])" failed to yield SQL statements
 #    "basic-matview": {"schema": "matview-schema.py",
-#                      "ddl": "matview-DDL.sql",
+#                      "ddl": "int-DDL.sql",
 #                      "template": "basic-matview.sql",
 #                      "normalizer": "normalizer.py"},
-#     "basic-joins": {"schema": "schema.py",
-#                    "ddl": "DDL.sql",
-#                     "template": "basic-joins.sql",
-#                     "normalizer": "normalizer.py"},
-#     "basic-index-joins": {"schema": "schema.py",
-#                           "ddl": "index-DDL.sql",
-#                           "template": "basic-joins.sql",
-#                           "normalizer": "normalizer.py"},
+     "basic-joins": {"schema": "schema.py",
+                     "ddl": "DDL.sql",
+                      "template": "basic-joins.sql",
+                      "normalizer": "normalizer.py"},
+     "basic-index-joins": {"schema": "schema.py",
+                           "ddl": "index-DDL.sql",
+                           "template": "basic-joins.sql",
+                           "normalizer": "normalizer.py"},
     "advanced": {"schema": "schema.py",
                  "ddl": "DDL.sql",
                  "template": "advanced.sql",
@@ -88,29 +88,30 @@
                          "ddl": "strings-DDL.sql",
                          "template": "advanced-strings.sql",
                          "normalizer": "normalizer.py"},
-# BIGINT OVERFLOW CAUSES FAILURES IN THIS SUITE
-# also, the generator failed to create statements for:
-# Template "SELECT * FROM _table WHERE _variable _cmp (_variable _math _value[int:0,1000])" failed to yield SQL statements
-# Template "SELECT _variable, _variable FROM _table WHERE _variable _cmp _variable LIMIT _value[int:1,100]" failed to yield SQL statements
-# Template "SELECT _variable FROM _table WHERE (_variable _cmp _variable) _logic (_variable _cmp _variable)" failed to yield SQL statements
-# Template "SELECT _variable[@order1] _math _variable[@order2] AS FOO FROM _table ORDER BY FOO" failed to yield SQL statements
-# Template "SELECT SUM(_variable _math _variable) FROM _table" failed to yield SQL statements
-# Template "SELECT _variable _math _variable FROM _table" failed to yield SQL statements
-#    "advanced-ints": {"schema": "int-schema.py",
-#                      "ddl": "int-DDL.sql",
-#                      "template": "advanced-ints.sql",
-#                      "normalizer": "normalizer.py"},
+# TODO: Need to scale down precision of values to keep HSQL happy even after math
+#    "numeric-decimals": {"schema": "decimal-schema.py",
+#                         "ddl": "DDL.sql",
+#                         "template": "numeric-decimals.sql",
+#                        "normalizer": "normalizer.py"},
+    "numeric-ints": {"schema": "int-schema.py",
+                     "ddl": "int-DDL.sql",
+                     "template": "numeric-ints.sql",
+                     "normalizer": "normalizer.py"},
+    "advanced-ints": {"schema": "int-schema.py",
+                      "ddl": "int-DDL.sql",
+                      "template": "advanced-ints.sql",
+                      "normalizer": "normalizer.py"},
 # HSQL SEEMS TO HAVE A BAD DEFAULT PRECISION, DISABLING
 #    "advanced-decimal": {"schema": "decimal-schema.py",
-#                         "ddl": "decimal-DDL.sql",
+#                         "ddl": "DDL.sql",
 #                         "template": "advanced-decimal.sql",
 #                         "normalizer": "normalizer.py"},
-#    "advanced-joins": {"schema": "schema.py",
-#                       "ddl": "DDL.sql",
-#                       "template": "advanced-joins.sql",
-#                       "normalizer": "normalizer.py"},
-#    "advanced-index-joins": {"schema": "schema.py",
-#                             "ddl": "index-DDL.sql",
-#                             "template": "advanced-joins.sql",
-#                             "normalizer": "normalizer.py"},
+    "advanced-joins": {"schema": "schema.py",
+                       "ddl": "DDL.sql",
+                       "template": "advanced-joins.sql",
+                       "normalizer": "normalizer.py"},
+    "advanced-index-joins": {"schema": "schema.py",
+                             "ddl": "index-DDL.sql",
+                             "template": "advanced-joins.sql",
+                             "normalizer": "normalizer.py"},
 }

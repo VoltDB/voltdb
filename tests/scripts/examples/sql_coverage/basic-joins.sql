@@ -1,11 +1,14 @@
--- Run the join-template against the default table in schema.py
+<configure-for-joins.sql>
+<join-template.sql>
 
-{@insert_vals = "_id, _value[string], _value[int16], _value[float]"}
-{@from_tables = "_table"}
-{@col_type = "int"}
-{@cmp_type = "_value[int:0,100]"}
-{@id_col = "ID"}
-{@num_col = "NUM"}
-{@join_type = "_pick[<options=,INNER,LEFT,RIGHT>]"}
+-- Force some non-random values to get overlaps -- yes sadly this breaks the schema-independence of the test.
+INSERT INTO _table VALUES (1000, 'desc_1000', 1000, 1000.5)
+INSERT INTO _table VALUES (1001, 'desc_1000', 1000, 1000.5)
+INSERT INTO _table VALUES (1010, 'desc_1010', 1010, 1010.5)
+INSERT INTO _table VALUES (1011, 'desc_1010', 1010, 1010.5)
+-- Purposely excluding rows from some _tables to tease out different cases.
+INSERT INTO P1 VALUES (1020, 'desc_1020', 1020, 1020.5)
+INSERT INTO R1 VALUES (1020, 'desc_1020', 1020, 1020.5)
 
+-- Repeat queries with forced data value overlaps between tables.
 <join-template.sql>

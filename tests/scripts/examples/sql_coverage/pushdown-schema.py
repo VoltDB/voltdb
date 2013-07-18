@@ -28,15 +28,15 @@
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("NUM", FastSerializer.VOLTTYPE_INTEGER),
                     ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
-        "partitions": (),
+        "partitions": ("ID"),
         "indexes": ("ID")
         },
     "P2": {
-        "columns": (("P2_DESC", FastSerializer.VOLTTYPE_STRING),
-                    ("P2_ID", FastSerializer.VOLTTYPE_INTEGER),
-                    ("P2_NUM1", FastSerializer.VOLTTYPE_INTEGER),
-                    ("P2_NUM2", FastSerializer.VOLTTYPE_INTEGER)),
-        "partitions": (),
+        "columns": (("DESC", FastSerializer.VOLTTYPE_STRING),
+                    ("ID", FastSerializer.VOLTTYPE_INTEGER),
+                    ("NUM", FastSerializer.VOLTTYPE_INTEGER),
+                    ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
+        "partitions": ("ID"),
         "indexes": ("ID")
         },
     "R1": {
@@ -46,5 +46,13 @@
                     ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
         "partitions": (),
         "indexes": ("ID")
-        }
+        },
+    "R2": {
+        "columns": (("DESC", FastSerializer.VOLTTYPE_STRING),
+                    ("ID", FastSerializer.VOLTTYPE_INTEGER),
+                    ("NUM", FastSerializer.VOLTTYPE_INTEGER),
+                    ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
+        "partitions": (),
+        "indexes": ("ID")
+        },
 }

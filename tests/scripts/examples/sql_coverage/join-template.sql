@@ -3,21 +3,35 @@
 -- keywords that we want to support for a version 1 release.
 --
 -- Required preprocessor template:
--- @insert_vals: the list of types of the table columns for INSERT
--- @cmp_type
--- @assign_col
--- @assign_type
+-- @columntype
+-- @dmltable
+-- @idcol
+-- @insertvals
 
 -- DML, generate random data first.
 --INSERT
 -- test basic INSERT
-INSERT INTO _table VALUES (@insert_vals)
+INSERT INTO @dmltable VALUES (@insertvals)
+
+SELECT * FROM _table LHS11 ,              _table RHS WHERE                                 LHS11._variable[@columntype] = RHS._variable[@comparabletype]
+SELECT * FROM _table LHS12 ,              _table RHS WHERE LHS12.@idcol = RHS.@idcol
+SELECT * FROM _table LHS13 ,              _table RHS WHERE LHS13.@idcol = RHS.@idcol AND     RHS._variable[numeric] = 2 
+SELECT * FROM _table LHS14 ,              _table RHS WHERE LHS14.@idcol = RHS.@idcol AND   LHS14._variable[numeric] = 2
+SELECT * FROM _table LHS15 ,              _table RHS WHERE LHS15.@idcol = RHS.@idcol AND   LHS15._variable[@columntype] < 45 AND LHS15._variable[@columntype] = RHS._variable[@comparabletype]
+
+SELECT * FROM _table LHS16 ,              _table RHS WHERE LHS16.@idcol = RHS.@idcol AND   LHS16._variable[#joined numeric] = RHS.__[#joined] AND   RHS.@idcol > 10 AND LHS16.__[#joined] < 30 AND LHS16.__[#joined] >= RHS.@idcol
 
 
-SELECT * FROM _table[@lhs] @join_type JOIN _table[@rhs] ON __[@lhs]._variable[@col_type] = __[@rhs]._variable
-SELECT * FROM _table[@lhs] @join_type JOIN _table[@rhs] ON __[@lhs].@id_col = __[@rhs].@id_col
-SELECT * FROM _table[@lhs] @join_type JOIN _table[@rhs] ON __[@lhs].@id_col = __[@rhs].@id_col AND __[@rhs].@num_col = 2 
-SELECT * FROM _table[@lhs] @join_type JOIN _table[@rhs] ON __[@lhs].@id_col = __[@rhs].@id_col AND __[@lhs].@num_col = 2
-SELECT * FROM _table[@lhs] @join_type JOIN _table[@rhs] ON __[@lhs].@id_col = __[@rhs].@id_col WHERE __[@lhs]._variable[@col_type] < 45 AND __[@lhs]._variable[@col_type] = __[@rhs]._variable
+SELECT * FROM _table LHS21 @jointype JOIN _table RHS ON                                    LHS21._variable[@columntype] = RHS._variable[@comparabletype]
+SELECT * FROM _table LHS22 @jointype JOIN _table RHS ON    LHS22.@idcol = RHS.@idcol
+SELECT * FROM _table LHS23 @jointype JOIN _table RHS ON    LHS23.@idcol = RHS.@idcol AND     RHS._variable[numeric] = 2 
+SELECT * FROM _table LHS24 @jointype JOIN _table RHS ON    LHS24.@idcol = RHS.@idcol AND   LHS24._variable[numeric] = 2
+SELECT * FROM _table LHS25 @jointype JOIN _table RHS ON    LHS25.@idcol = RHS.@idcol WHERE LHS25._variable[@columntype] < 45 AND LHS25._variable[@columntype] = RHS._variable[@comparabletype]
 
-SELECT * FROM _table[@lhs] @join_type JOIN _table[@rhs] USING(@id_col, @num_column) WHERE __[@rhs].@id_col > 10 AND __[@lhs].@num_column < 30 AND __[@rhs].@id_col = __[@lhs].@num_column
+SELECT * FROM _table LHS26 @jointype JOIN _table RHS ON    LHS26.@idcol = RHS.@idcol AND   LHS26._variable[#joined numeric] = RHS.__[#joined] WHERE RHS.@idcol > 10 AND LHS26.__[#joined] < 30 AND LHS26.__[#joined] >= RHS.@idcol
+
+--TODO: Investigate why are these getting timeout errors
+-- when the supposedly equivalent LHS16 and LHS26 queries above work?
+--SELECT * FROM _table LHS36 @jointype JOIN _table RHS USING(      @idcol,                         _variable[#joined numeric])          WHERE     @idcol > 10 AND       __[#joined] < 30 AND       __[#joined] >=     @idcol
+-- it's not (just) the select * that fails:
+-- SELECT @idcol, __[#joined] FROM _table LHS36 @jointype JOIN _table RHS USING(      @idcol,                         _variable[#joined numeric])          WHERE     @idcol > 10 AND       __[#joined] < 30 AND       __[#joined] >=     @idcol

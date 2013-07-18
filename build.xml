@@ -1713,7 +1713,7 @@ TEST CASES
     <samplecheck app="voter" />
 </target>
 
-<target name='sqlcoverage' depends="ee,compile"
+<target name='sqlcoverage'
     description="Run the SQL coverage tests.">
     <property name="build.dir.suffix" value="" /> <!-- Default -->
     <property name="sqlcoverage.failonerror" value="true" />
@@ -1749,6 +1749,9 @@ TEST CASES
     </condition>
     <condition property="debug_output" value="" else="quietadhoc">
         <isset property="sql_coverage_verbose"/>
+    </condition>
+    <condition property="generate_only" value="-g" else="">
+        <isset property="generate_only"/>
     </condition>
     <condition property="hosts" value="${sql_coverage_hosts}" else="1">
         <isset property="sql_coverage_hosts"/>
@@ -1812,6 +1815,7 @@ TEST CASES
         <arg line="${kfactor}" />
         <arg line="${sitescount}" />
         <arg line="${flushddl}" />
+        <arg line="${generate_only}" />
     </exec>
 </target>
 
