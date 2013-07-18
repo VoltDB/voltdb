@@ -1,4 +1,53 @@
-{"testName":"insert","sqlCmd":"exec PARTITIONED_TABLE.insert 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1","response":{"result":{"modified_tuples":[1]},"status":"SUCCESS"}}
-{"testName":"Select","sqlCmd":"select * from partitioned_table","response":{"result":{"rowid":[1],"rowid_group":[1],"type_null_tinyint":[1],"type_not_null_tinyint":[1],"type_null_smallint":[1],"type_not_null_smallint":[1],"type_null_integer":[1],"type_not_null_integer":[1],"type_null_bigint":[1],"type_not_null_bigint":[1],"type_null_timestamp":[1],"type_not_null_timestamp":[1],"type_null_float":[1],"type_not_null_float":[1],"type_null_decimal":[1],"type_not_null_decimal":[1],"type_null_varchar25":[1],"type_not_null_varchar25":[1],"type_null_varchar128":[1],"type_not_null_varchar128":[1],"type_null_varchar1024":[1],"type_not_null_varchar1024":[1]},"status":"SUCCESS"}}
-{"testName":"delete","sqlCmd":"delete from partitioned_table","response":{"result":{"modified_tuples":[1]},"status":"SUCCESS"}}
-{"testName":"badQuery","sqlCmd":"I don't like this query","response":{"result":"ERROR","status":"FAILURE"}}
+#{"testName":"insert","sqlCmd":"exec PARTITIONED_TABLE.insert 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+#{"testName":"Select","sqlCmd":"select * from partitioned_table","response":{"result":{"rowid":["1"],"rowid_group":["1"],"type_null_tinyint":["1"],"type_not_null_tinyint":["1"],"type_null_smallint":["1"],"type_not_null_smallint":["1"],"type_null_integer":["1"],"type_not_null_integer":["1"],"type_null_bigint":["1"],"type_not_null_bigint":["1"],"type_null_timestamp":["1"],"type_not_null_timestamp":["1"],"type_null_float":["1"],"type_not_null_float":["1"],"type_null_decimal":["1.000000000000"],"type_not_null_decimal":["1.000000000000"],"type_null_varchar25":["1"],"type_not_null_varchar25":["1"],"type_null_varchar128":["1"],"type_not_null_varchar128":["1"],"type_null_varchar1024":["1"],"type_not_null_varchar1024":["1"]},"status":"SUCCESS"}}
+#{"testName":"delete","sqlCmd":"delete from partitioned_table","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+#{"testName":"badQuery","sqlCmd":"I don't like this query","response":{"result":"ERROR","status":"FAILURE"}}
+
+
+                ///////
+                //SQL//
+                ///////
+
+                ///////////////
+                //VALID INSERTS
+                ///////////////
+                ['InsertBigInt','INSERT INTO partitioned_table (type_null_bigint,type_not_null_bigint) VALUES (922337203685477,922337203685477)',modTup(1),SUCCESS],
+                ['InsertTinyInt','INSERT INTO partitioned_table (type_null_tinyint,type_not_null_tinyint) VALUES (64,64)',modTup(1),SUCCESS],
+                ['InsertInteger','INSERT INTO partitioned_table (type_null_integer,type_not_null_integer) VALUES (214748364,214748364)',modTup(1),SUCCESS],
+                ['InsertSmallInt','INSERT INTO partitioned_table (type_null_smallint,type_not_null_smallint) VALUES (3276,3276)',modTup(1),SUCCESS],
+                ['InsertFloat','INSERT INTO partitioned_table () VALUES ()',modTup(1),SUCCESS],
+                ['InsertDecimal','INSERT INTO partitioned_table () VALUES ()',modTup(1),SUCCESS],
+                ['InsertTimestamp','INSERT INTO partitioned_table () VALUES ()',modTup(1),SUCCESS],
+                ['InsertVarchar','INSERT INTO partitioned_table () VALUES ()',modTup(1),SUCCESS],
+                ['NullAsNull','INSERT INTO partitioned_table () VALUES ()',modTup(1),SUCCESS],
+                //////////////////
+                //INVALID INSERTS
+                //////////////////
+                ['ExtraVarchar','INSERT INTO partitioned_table () VALUES ()',ERROR,QUERY_ERROR],
+                ['VarcharAsInt','INSERT INTO partitioned_table () VALUES ()',ERROR,QUERY_ERROR],
+                ['BadParamCount','INSERT INTO partitioned_table () VALUES ()',ERROR,QUERY_ERROR],
+                ['NullAsNotNull','INSERT INTO partitioned_table () VALUES ()',ERROR,QUERY_ERROR],
+                ['BadQuery','THIS IS NOT A VALID QUERY',ERROR,QUERY_ERROR],
+                /////////
+                //SELECTS
+                /////////
+                ['SelectAll','SELECT * FROM partitioned_table',modTup(1),SUCCESS],
+                ['SelectColumns','SELECT () FROM partitioned_table',modTup(1),SUCCESS],
+                ['SelectBadColumn','SELECT () FROM partitioned_table',modTup(1),SUCCESS],
+                ['SelectBadTable','SELECT * FROM bad_table',modTup(1),SUCCESS],
+                /////////
+                //DELETES ------  you must know how many rows will be removed
+                /////////
+                ['DeleteAll','DELETE FROM partitioned_table',modTup(0),SUCCESS],
+                ['VarcharAsInt','INSERT INTO partitioned_table () VALUES ()',modTup(1),SUCCESS],
+                ['BadParamCount','INSERT INTO partitioned_table () VALUES ()',modTup(1),SUCCESS],
+                ['NullAsNotNull','INSERT INTO partitioned_table () VALUES ()',modTup(1),SUCCESS],
+                /////////////////////
+                //SYSTEM STORED PROCS
+                //////////////////////
+                ['insert','exec PARTITIONED_TABLE.insert',ERROR,QUERY_ERROR],
+                ['delete','exec PARTITIONED_TABLE.delete',ERROR,QUERY_ERROR],
+                ['select','exec PARTITIONED_TABLE.select',ERROR,QUERY_ERROR],
+                ['update','exec PARTITIONED_TABLE.update',ERROR,QUERY_ERROR],
+                ['InvalidStoredProc','exec PARTITIONED_TABLE.badProc',ERROR,QUERY_ERROR],
+        ]
