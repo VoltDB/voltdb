@@ -147,7 +147,7 @@ PRIMARY ENTRY POINTS
 -->
 
 <target name="default"
-    depends="compile, ee, voltdb.jar"
+    depends="compile, ee, voltdb.jar, voltdbclient.jar"
     description="Compile Java classes and C++ JNI library."
 />
 <target name="check"
