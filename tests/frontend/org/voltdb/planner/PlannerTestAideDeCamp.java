@@ -202,8 +202,8 @@ public class PlannerTestAideDeCamp {
         // We then stick a serialized version of PlanNodeTree into a PlanFragment
         //
         try {
-            BuildDirectoryUtils.writeFile("statement-plans", name + "_json.txt", json);
-            BuildDirectoryUtils.writeFile("statement-plans", name + ".dot", nodeLists.get(0).toDOTString("name"));
+            BuildDirectoryUtils.writeFile("statement-plans", name + "_json.txt", json, true);
+            BuildDirectoryUtils.writeFile("statement-plans", name + ".dot", nodeLists.get(0).toDOTString("name"), true);
         } catch (Exception e) {
             e.printStackTrace();
         }

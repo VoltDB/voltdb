@@ -30,6 +30,7 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
+import org.voltdb.compilereport.StatementAnnotation;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.planner.PlanningErrorException;
@@ -44,6 +45,7 @@ import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
 /**
@@ -151,12 +153,25 @@ public abstract class StatementCompiler {
         // output the explained plan to disk (or caller) for debugging
         StringBuilder planDescription = new StringBuilder(1000); // Initial capacity estimate.
         planDescription.append("SQL: ").append(plan.sql);
-        planDescription.append("\nCOST: ").append(plan.cost);
+        // Only output the cost in debug mode.
+        // Cost seems to only confuse people who don't understand how this number is used/generated.
+        if (VoltCompiler.DEBUG_MODE) {
+            planDescription.append("\nCOST: ").append(plan.cost);
+        }
         planDescription.append("\nPLAN:\n");
         planDescription.append(plan.explainedPlan);
         String planString = planDescription.toString();
-        BuildDirectoryUtils.writeFile("statement-winner-plans", name + ".txt", planString);
+        BuildDirectoryUtils.writeFile(null, name + ".txt", planString, false);
         compiler.captureDiagnosticContext(planString);
+
+        // Stuff the explain plan in an annotation for report generation.
+        // N.B. The explain plan is actually in the catalog as of 5/28/13, but
+        // plans are in place to remove it shortly.
+        StatementAnnotation annotation = new StatementAnnotation();
+        annotation.explainPlan = plan.explainedPlan;
+        catalogStmt.setAnnotation(annotation);
+        // build usage links for report generation
+        CatalogUtil.updateUsageAnnotations(db, catalogStmt, plan.rootPlanGraph, plan.subPlanGraph);
 
         // set the explain plan output into the catalog (in hex)
         catalogStmt.setExplainplan(Encoder.hexEncode(plan.explainedPlan));

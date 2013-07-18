@@ -20,6 +20,7 @@ package org.voltdb.compiler;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
@@ -71,6 +72,7 @@ import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.projectfile.ClassdependenciesType.Classdependency;
 import org.voltdb.compiler.projectfile.DatabaseType;
 import org.voltdb.compiler.projectfile.ExportType;
@@ -82,6 +84,7 @@ import org.voltdb.compiler.projectfile.ProceduresType;
 import org.voltdb.compiler.projectfile.ProjectType;
 import org.voltdb.compiler.projectfile.RolesType;
 import org.voltdb.compiler.projectfile.SchemasType;
+import org.voltdb.compilereport.ReportMaker;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -102,6 +105,10 @@ public class VoltCompiler {
     public static enum Severity { INFORMATIONAL, WARNING, ERROR, UNEXPECTED }
     public static final int NO_LINE_NUMBER = -1;
 
+    // Causes the "debugoutput" folder to be generated and populated.
+    // Also causes explain plans on disk to include cost.
+    public final static boolean DEBUG_MODE = System.getProperties().contains("compilerdebug");
+
     // feedback by filename
     ArrayList<Feedback> m_infos = new ArrayList<Feedback>();
     ArrayList<Feedback> m_warnings = new ArrayList<Feedback>();
@@ -114,6 +121,9 @@ public class VoltCompiler {
     String m_jarOutputPath = null;
     String m_currentFilename = null;
     Map<String, String> m_ddlFilePaths = new HashMap<String, String>();
+
+    // generated html text for catalog report
+    String m_report = null;
 
     InMemoryJarfile m_jarOutput = null;
     Catalog m_catalog = null;
@@ -416,9 +426,8 @@ public class VoltCompiler {
             }
             for (final Entry<String, String> e : m_ddlFilePaths.entrySet())
                 m_jarOutput.put(e.getKey(), new File(e.getValue()));
-            // write all the plans to a folder in the jarfile
-            for (final Entry<String, byte[]> e : explainPlans.entrySet())
-                m_jarOutput.put("plans/" + e.getKey(), e.getValue());
+            // put the compiler report into the jarfile
+            m_jarOutput.put("catalog-report.html", m_report.getBytes(Constants.UTF8ENCODING));
             m_jarOutput.writeToFile(new File(jarOutputPath)).run();
         }
         catch (final Exception e) {
@@ -552,6 +561,19 @@ public class VoltCompiler {
         // add epoch info to catalog
         final int epoch = (int)(TransactionIdManager.getEpoch() / 1000);
         m_catalog.getClusters().get("cluster").setLocalepoch(epoch);
+
+        // generate the catalog report and write it to disk
+        try {
+            m_report = ReportMaker.report(m_catalog);
+            File file = new File("catalog-report.html");
+            FileWriter fw = new FileWriter(file);
+            fw.write(m_report);
+            fw.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+
         return m_catalog;
     }
 
@@ -789,12 +811,6 @@ public class VoltCompiler {
                 }
             }
         }
-
-        // this should reorder the tables and partitions all alphabetically
-        String catData = m_catalog.serialize();
-        m_catalog = new Catalog();
-        m_catalog.execute(catData);
-        db = getCatalogDatabase();
 
         // add database estimates info
         addDatabaseEstimatesInfo(m_estimates, db);
