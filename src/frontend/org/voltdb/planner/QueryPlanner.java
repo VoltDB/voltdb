@@ -120,7 +120,7 @@ public class QueryPlanner {
         m_detMode = detMode;
         m_planSelector = new PlanSelector(m_cluster, m_db, m_estimates, m_stmtName,
                 m_procName, m_sql, m_costModel, m_paramHints, m_detMode,
-                suppressDebugOutput, System.getProperties().containsKey("compilerdebug"));
+                suppressDebugOutput);
     }
 
     /**
