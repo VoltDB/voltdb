@@ -834,6 +834,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(1371808830L, result.getLong(0));
         assertEquals(1371808830000000L, result.getTimestampAsLong(1));
 
+        // Test constants timestamp with string
         cr = client.callProcedure("@AdHoc", "select TM, TO_TIMESTAMP(MICROS, SINCE_EPOCH (MICROS, '2013-07-18 02:00:00.123457') ) from P2 where id = 5");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
@@ -841,8 +842,19 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(result.advanceRow());
         assertEquals(result.getTimestampAsLong(0), result.getTimestampAsLong(1));
 
+        // Test non-constant-value expression
+        cr = client.callProcedure("@AdHoc", "select TM, TM, TO_TIMESTAMP(MICROS, SINCE_EPOCH (MICROS, '2013-07-' || SUBSTRING('18', 0 , 2) || ' 02:00:00.123457') )  from P2 where id = 5;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(result.getTimestampAsLong(0), result.getTimestampAsLong(1));
+
+        // FIXME(XIN): Commented query next crashed the system...
+        // select TM, SINCE_EPOCH (MICROS, '2013-07-' || '18' || ' 02:00:00.123457')  from P2 where id = 5;
+
         try {
-            cr = client.callProcedure("@AdHoc", "select SINCE_EPOCH (MICROS, '2013-7-2 2:34:12')  from P2 where id = 3");
+            cr = client.callProcedure("@AdHoc", "select SINCE_EPOCH (MICROS, '2013-7-2 2:34:12')  from P2 where id = 5");
         } catch (Exception ex) {
             assertTrue(ex.getMessage().contains("PlanningErrorException"));
             assertTrue(ex.getMessage().contains("incompatible data type"));
