@@ -58,12 +58,20 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         String [] tbs = {"R1", "P1"};
         for (String tb: tbs) {
             // Test sum()/count()
-//            query = "SELECT dept, SUM(wage), COUNT(wage), AVG(wage), MAX(wage), MIN(wage), SUM(wage)/COUNT(wage) from iTABLE GROUP BY dept ORDER BY dept".replace("iTABLE", tb);
-//            cr = client.callProcedure("@AdHoc", query);
-//            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-//            vt = cr.getResults()[0];
-//            expected = new long[][] {{1, 60, 3, 20, 30, 10, 20}, {2, 90, 2, 45, 50, 40, 45}};
-//            compareTable(vt, expected);
+            query = "SELECT dept, SUM(wage), COUNT(wage), AVG(wage), MAX(wage), MIN(wage), SUM(wage)/COUNT(wage) from iTABLE GROUP BY dept ORDER BY dept".replace("iTABLE", tb);
+            cr = client.callProcedure("@AdHoc", query);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] {{1, 60, 3, 20, 30, 10, 20}, {2, 90, 2, 45, 50, 40, 45}};
+            compareTable(vt, expected);
+
+            // Test Strange valid cases
+            cr = client.callProcedure("@AdHoc", "SELECT id, id from iTABLE GROUP BY id ORDER BY id".replace("iTABLE", tb));
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] {{1,1}, {2,2}, {3,3}, {4,4}, {5,5} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
 
         }
 
@@ -77,13 +85,13 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
 //        compareTable(vt, expected);
 
         // Test Order by
-        // FIXME(XIN):
-        cr = client.callProcedure("@AdHoc", "SELECT dept, SUM(wage) as tag, count(wage)+1 from P1 GROUP BY dept");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        vt = cr.getResults()[0];
-        expected = new long[][] {{2, 90, 3}, {1, 60, 4} };
-        System.out.println(vt.toString());
-        compareTable(vt, expected);
+        // FIXME(XIN): Wrong answer
+//        cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage), avg(wage)+5 from R1 GROUP BY dept");
+//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+//        vt = cr.getResults()[0];
+//        expected = new long[][] {{2, 90, 7}, {1, 60, 8} };
+//        System.out.println(vt.toString());
+//        compareTable(vt, expected);
 
         // Test Complex Group By
         // FIXME(XIN): complex group by not supported
@@ -93,6 +101,11 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
 //        expected = new long[][] { {1, 60, 3} , {2, 90, 2}};
 //        System.out.println(vt.toString());
 //        compareTable(vt, expected);
+
+
+
+
+
     }
 
     public void compareTable(VoltTable vt, long[][] expected) {

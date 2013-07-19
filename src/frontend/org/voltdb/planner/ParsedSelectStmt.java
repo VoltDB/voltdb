@@ -61,8 +61,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (obj == this) return true;
             if (obj instanceof ParsedColInfo == false) return false;
             ParsedColInfo col = (ParsedColInfo) obj;
-            if (alias.equals(col.alias ) && columnName.equals(col.columnName) && tableName.equals(col.tableName)
-                    && expression.equals(col.expression) )
+            if ( alias != null && alias.equals(col.alias )
+                    && columnName != null && columnName.equals(col.columnName)
+                    && tableName != null && tableName.equals(col.tableName) &&
+                    expression != null && expression.equals(col.expression) )
                 return true;
             return false;
         }
@@ -73,7 +75,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (obj == this) return true;
             if (obj instanceof ParsedColInfo == false) return false;
             ParsedColInfo col = (ParsedColInfo) obj;
-            if (alias.equals(col.alias ) && columnName.equals(col.columnName) && tableName.equals(col.tableName)
+            if ( alias != null && alias.equals(col.alias )
+                    && columnName != null && columnName.equals(col.columnName)
+                    && tableName != null && tableName.equals(col.tableName)
                     && expression.equals(col.expression) && index == col.index && size == col.size
                     && orderBy == col.orderBy && ascending == col.ascending && groupBy == col.groupBy
                     && finalOutput == col.finalOutput) {
@@ -178,6 +182,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             col.expression = parseExpressionTree(root);
             ExpressionUtil.finalizeValueTypes(col.expression);
             col.alias = root.attributes.get("alias");
+            if (col.alias == null)
+                col.alias = "";
 
             // Aggregation column use the the hacky stuff
             col.tableName = "VOLT_TEMP_TABLE";
@@ -337,10 +343,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                         break;
                     }
                 }
-                if (col.expression instanceof TupleValueExpression) {
-                    insertToAggResultColumns(col);
-                    addOne += 1;
-                }
+//                if (col.expression instanceof TupleValueExpression) {
+//                    insertToAggResultColumns(col);
+//                    addOne += 1;
+//                }
                 if (addOne == 0) {
                     // You select a column that does not contain Aggs, group by and order by column
                     if (!hasComplexAgg()) setComlexAgg(true);

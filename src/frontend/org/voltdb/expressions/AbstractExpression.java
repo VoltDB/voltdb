@@ -552,7 +552,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         }
 
         AbstractExpression lnode = null, rnode = null;
-        ArrayList<AbstractExpression> newArgs = new ArrayList<AbstractExpression>();
+        ArrayList<AbstractExpression> newArgs = null;
         if (m_left != null) {
             lnode = m_left.replaceWithTVE(aggTableIndexMap, exprToAliasMap);
         }
@@ -562,6 +562,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
         boolean changed = false;
         if (m_args != null) {
+            newArgs = new ArrayList<AbstractExpression>();
             for (int jj = 0; jj < m_args.size(); jj++) {
                 AbstractExpression exp = m_args.get(jj).replaceWithTVE(aggTableIndexMap, exprToAliasMap);
                 newArgs.set(jj, exp);
