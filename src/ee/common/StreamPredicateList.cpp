@@ -40,36 +40,50 @@ bool StreamPredicateList::parseStrings(
     for (std::vector<std::string>::const_iterator iter = predicateStrings.begin();
          iter != predicateStrings.end(); ++iter) {
         bool predFailed = false;
-        try {
-            PlannerDomRoot domRoot((*iter).c_str());
-            if (!domRoot.isNull()) {
-                PlannerDomValue predicateObject = domRoot.rootObject();
+        std::string predicateString = *iter;
+        if (!predicateString.empty()) {
+            try {
+                PlannerDomRoot domRoot((*iter).c_str());
+                if (!domRoot.isNull()) {
+                    PlannerDomValue predicateObject = domRoot.rootObject();
 
-                predicateDeletes.push_back(predicateObject.valueForKey("triggersDelete").asBool());
+                    predicateDeletes.push_back(predicateObject.valueForKey("triggersDelete").asBool());
 
-                AbstractExpression *expr =
-                        AbstractExpression::buildExpressionTree(predicateObject.valueForKey("predicateExpression"));
-                if (expr != NULL) {
-                    // Got ourselves a predicate expression tree!
-                    push_back(expr);
+                    AbstractExpression *expr = NULL;
+                    if (predicateObject.hasKey("predicateExpression")) {
+                        expr = AbstractExpression::buildExpressionTree(
+                                    predicateObject.valueForKey("predicateExpression"));
+                        if (expr != NULL) {
+                            // Got ourselves a predicate expression tree!
+                            push_back(expr);
+                        }
+                        else {
+                            errmsg << "Predicate JSON generated a NULL expression tree";
+                            predFailed = true;
+                        }
+                    }
+                    else {
+                        // NULL represents an empty predicate object that should not be evaluated.
+                        push_back(NULL);
+                    }
                 }
                 else {
-                    errmsg << "Predicate JSON generated a NULL expression tree";
+                    errmsg << "Stream predicate JSON document is NULL";
                     predFailed = true;
                 }
             }
-            else {
-                errmsg << "Stream predicate JSON document is NULL";
+            catch(std::exception &exc) {
+                errmsg << "Exception occurred while parsing stream predicate: " << exc.what();
                 predFailed = true;
             }
+            if (predFailed) {
+                errmsg << std::endl << (*iter) << std::endl;
+                failed = true;
+            }
         }
-        catch(std::exception &exc) {
-            errmsg << "Exception occurred while parsing stream predicate: " << exc.what();
-            predFailed = true;
-        }
-        if (predFailed) {
-            errmsg << std::endl << (*iter) << std::endl;
-            failed = true;
+        else {
+            // NULL predicates are okay.
+            push_back(NULL);
         }
     }
     return !failed;

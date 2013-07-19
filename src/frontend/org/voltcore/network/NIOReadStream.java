@@ -145,6 +145,9 @@ public class NIOReadStream {
                     } else {
                         break;
                     }
+                } else if (m_writeBuffer.b.position() == 0) {
+                    m_writeBuffer.discard();
+                    m_writeBuffer = null;
                 }
             }
         } finally {
