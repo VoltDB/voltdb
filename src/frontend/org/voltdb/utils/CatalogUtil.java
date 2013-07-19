@@ -1081,6 +1081,7 @@ public abstract class CatalogUtil {
             case CUSTOM:
                 try {
                     CatalogUtil.class.getClassLoader().loadClass(exportOnServer.getExportpluginclass());
+                    exportClientClassName = exportOnServer.getExportpluginclass();
                 } catch (ClassNotFoundException ex) {
                     hostLog.error(
                             "Custom Export failed to configure, failed to load " +
@@ -1094,9 +1095,9 @@ public abstract class CatalogUtil {
 
             // this is OK as the deployment file XML schema does not allow for
             // export configuration property names that begin with underscores
-            ConnectorProperty prop = catconn.getConfig().add(GuestProcessor.EXPORT_TO_TYPE);
-            prop.setName(GuestProcessor.EXPORT_TO_TYPE);
             if (exportClientClassName != null && exportClientClassName.length() > 0) {
+                ConnectorProperty prop = catconn.getConfig().add(GuestProcessor.EXPORT_TO_TYPE);
+                prop.setName(GuestProcessor.EXPORT_TO_TYPE);
                 prop.setValue(exportClientClassName);
             }
 
@@ -1107,7 +1108,7 @@ public abstract class CatalogUtil {
                 if (configProperties != null && ! configProperties.isEmpty()) {
 
                     for( PropertyType configProp: configProperties) {
-                        prop = catconn.getConfig().add(configProp.getName());
+                        ConnectorProperty prop = catconn.getConfig().add(configProp.getName());
                         prop.setName(configProp.getName());
                         prop.setValue(configProp.getValue());
                     }

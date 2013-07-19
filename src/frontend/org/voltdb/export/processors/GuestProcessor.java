@@ -66,7 +66,7 @@ public class GuestProcessor implements ExportDataProcessor {
     @Override
     public void setProcessorConfig( Properties config) {
         String exportClientClass = config.getProperty(EXPORT_TO_TYPE);
-        Preconditions.checkNotNull(exportClientClass, "export to type is undefined");
+        Preconditions.checkNotNull(exportClientClass, "export to type is undefined or custom export plugin class missing.");
 
         try {
             final Class<?> clientClass = Class.forName(exportClientClass);
