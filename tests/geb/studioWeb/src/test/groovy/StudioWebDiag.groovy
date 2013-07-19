@@ -42,8 +42,9 @@ class StudioWebDiag extends GebReportingSpec {
     static String ERROR = 'Error:' //all errors are handled server-side
 
     @Shared def slurper = new JsonSlurper()
-    @Shared def response
-
+    @Shared def response //shared object that stores expected response so that it may be accessed by all helper methods
+    @Shared def sqlList = []
+    
     ////specify paths to files with correct elements////
     @Shared def prgrm = $('span', text: 'Programmability')
     @Shared def eleFile = new File('src/test/resources/elems.txt')
@@ -53,9 +54,10 @@ class StudioWebDiag extends GebReportingSpec {
     @Shared def sqlFile = new File('src/test/resources/sql.txt')
 
     ///////////////////////////////////////////////////////////
-    def testFile = new File ('../../../../../Desktop/test.txt')
+    @Shared def testFile = new File ('../../../../../Desktop/test.txt')
     ///////////////////////////////////////////////////////////
 
+	def setupSpec() {sqlFile.eachLine{line -> if (line[0] != '#'){sqlList.add(line)}}; testFile << sqlList}
     ////// Server MUST have been initialized//////
 
     def 'To StudioWeb'() {
@@ -114,7 +116,7 @@ class StudioWebDiag extends GebReportingSpec {
 
     @Unroll //performs this method for each item in type
     def '#testName test'(){
-        try{
+        
 
             setup: 'open new query'
             response = res
@@ -129,12 +131,18 @@ class StudioWebDiag extends GebReportingSpec {
             def statusField = $('#worktabs').find('span.status')
             def resultField = $('#worktabs').find('div.resultbar').children('div')
 
+        try{
+
             when: 'ensure appropriate status and result are displayed'
             assert checkResponse(statusField, resultField)
 
         }finally{
 
-            then: 'close query'
+        	then: 'clear all tables'
+        	inputField.value('DELETE FROM partitioned_table')
+            $('#execute-query').click()
+
+            and: 'close query'
             $('#worktabs').find('ul').find('li', 0).find('span').click()
 
             and: 'ensure query was closed'
@@ -142,7 +150,7 @@ class StudioWebDiag extends GebReportingSpec {
         }
 
         where: "list of inputs to test and expected responses"
-        line << sqlFile.eachLine{line -> def list = []; if (line[0] != '#'){list.add(line)}; list }
+        line << sqlList
         iter = slurper.parseText(line)
         testName = iter.testName
         input = iter.sqlCmd
