@@ -30,6 +30,7 @@ public class SiteFailureForwardMessage extends SiteFailureMessage {
     public SiteFailureForwardMessage(SiteFailureMessage sfm) {
         m_reportingHSId = sfm.m_sourceHSId;
         m_survivors = ImmutableSet.copyOf(sfm.m_survivors);
+        m_failed = ImmutableSet.copyOf(sfm.m_failed);
         m_safeTxnIds = ImmutableMap.copyOf(sfm.m_safeTxnIds);
     }
 

@@ -41,9 +41,12 @@ import static org.voltcore.agreement.maker.SiteFailureMessageMaker.FailureSiteFo
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.SiteFailureMessage;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.fsfmMsg;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.fsfmSource;
+import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmFailed;
+import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmFailures;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmSafe;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmSafeTxns;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmSource;
+import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmSurvived;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmSurvivors;
 import static org.voltcore.agreement.matcher.SiteFailureMatchers.failureForwardMsgIs;
 import static org.voltcore.agreement.matcher.SiteFailureMatchers.siteFailureIs;
@@ -94,8 +97,9 @@ public class TestMeshArbiter {
     @Test
     public void testBasicScenario() throws Exception {
         Maker<SiteFailureMessage> siteOneSfm = a(SiteFailureMessage,
-                with(sfmSurvivors,Longs.asList(0,2,3)),
-                with(sfmSafeTxns,sfmSafe(1,11))
+                with(sfmSurvivors,sfmSurvived(0,2,3)),
+                with(sfmFailures,sfmFailed(1)),
+                with(sfmSafeTxns,sfmSafe(0,10,1,11,2,22,3,33))
                 );
 
         when(aide.getNewestSafeTransactionForInitiator(anyLong())).thenReturn(11L);
@@ -107,8 +111,7 @@ public class TestMeshArbiter {
 
         Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(0,1));
 
-        verify(mbox,times(2)).send(any(long[].class), any(VoltMessage.class));
-        verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(1,11), 0,2,3)));
+        verify(mbox,times(2)).send(any(long[].class), argThat(siteFailureIs(sfmFailed(1), sfmSurvived(0,2,3))));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of(1L,11L));
     }
@@ -118,12 +121,14 @@ public class TestMeshArbiter {
 
         Maker<SiteFailureMessage> siteOneSfm = a(SiteFailureMessage,
                 with(sfmSurvivors,Longs.asList(0,2,3)),
-                with(sfmSafeTxns,sfmSafe(1,11))
+                with(sfmFailures,sfmFailed(1)),
+                with(sfmSafeTxns,sfmSafe(0,10,1,11,2,22,3,33))
                 );
 
         Maker<SiteFailureMessage> siteTwoSfm = a(SiteFailureMessage,
                 with(sfmSurvivors,Longs.asList(0,3)),
-                with(sfmSafeTxns,sfmSafe(2,22))
+                with(sfmFailures,sfmFailed(2)),
+                with(sfmSafeTxns,sfmSafe(0,10,1,11,2,22,3,33))
                 );
 
         when(aide.getNewestSafeTransactionForInitiator(1L)).thenReturn(11L);
@@ -137,8 +142,7 @@ public class TestMeshArbiter {
 
         Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(0,1));
 
-        verify(mbox,times(2)).send(any(long[].class), any(VoltMessage.class));
-        verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(1,11), 0,2,3)));
+        verify(mbox,times(2)).send(any(long[].class), argThat(siteFailureIs(sfmFailed(1),sfmSurvived(0,2,3))));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of(1L,11L));
 
@@ -151,8 +155,7 @@ public class TestMeshArbiter {
         decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(0,2));
 
         verify(mbox,never()).deliverFront(any(VoltMessage.class));
-        verify(mbox,times(2)).send(any(long[].class), any(VoltMessage.class));
-        verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(2,22), 0,3)));
+        verify(mbox,times(2)).send(any(long[].class), argThat(siteFailureIs(sfmFailed(2), sfmSurvived(0,3))));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of(2L,22L));
     }
@@ -162,7 +165,8 @@ public class TestMeshArbiter {
 
         Maker<SiteFailureMessage> site12Sfm = a(SiteFailureMessage,
                 with(sfmSurvivors,Longs.asList(0,3)),
-                with(sfmSafeTxns,sfmSafe(1,11, 2,22))
+                with(sfmFailures,sfmFailed(1,2)),
+                with(sfmSafeTxns,sfmSafe(0,10,1,11,2,22,3,33))
                 );
 
         when(aide.getNewestSafeTransactionForInitiator(1L)).thenReturn(11L);
@@ -178,8 +182,7 @@ public class TestMeshArbiter {
 
         Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(0,1));
 
-        verify(mbox,times(2)).send(any(long[].class), any(VoltMessage.class));
-        verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(1,11,2,22), 0,3)));
+        verify(mbox,times(2)).send(any(long[].class), argThat(siteFailureIs(sfmFailed(1,2), sfmSurvived(0,3))));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of(1L,11L,2L,22L));
     }
@@ -188,12 +191,14 @@ public class TestMeshArbiter {
     public void testInterleavedFailures() throws Exception {
         Maker<SiteFailureMessage> siteOneSfm = a(SiteFailureMessage,
                 with(sfmSurvivors,Longs.asList(0,2,3)),
-                with(sfmSafeTxns,sfmSafe(1,11))
+                with(sfmFailures,sfmFailed(1)),
+                with(sfmSafeTxns,sfmSafe(0,10,1,11,2,22,3,33))
                 );
 
         Maker<SiteFailureMessage> siteTwoSfm = a(SiteFailureMessage,
                 with(sfmSurvivors,Longs.asList(0,3)),
-                with(sfmSafeTxns,sfmSafe(1,11,2,22))
+                with(sfmFailures,sfmFailed(1,2)),
+                with(sfmSafeTxns,sfmSafe(0,10,1,11,2,22,3,33))
                 );
 
         when(aide.getNewestSafeTransactionForInitiator(1L)).thenReturn(11L);
@@ -207,7 +212,7 @@ public class TestMeshArbiter {
 
         verify(mbox,times(1)).deliverFront(any(VoltMessage.class));
         verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
-        verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(1,11), 0,2,3)));
+        verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmFailed(1), sfmSurvived(0,2,3))));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of());
 
@@ -222,7 +227,7 @@ public class TestMeshArbiter {
 
         verify(mbox,never()).deliverFront(any(VoltMessage.class));
         verify(mbox,times(2)).send(any(long[].class), any(VoltMessage.class));
-        verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(1,11,2,22), 0,3)));
+        verify(mbox,times(2)).send(any(long[].class), argThat(siteFailureIs(sfmFailed(1,2),sfmSurvived(0,3))));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of(1L,11L,2L,22L));
     }
@@ -231,7 +236,8 @@ public class TestMeshArbiter {
     public void testPingsOnLongReceives() throws Exception {
         Maker<SiteFailureMessage> siteOneSfm = a(SiteFailureMessage,
                 with(sfmSurvivors,Longs.asList(0,2,3)),
-                with(sfmSafeTxns,sfmSafe(1,11))
+                with(sfmFailures,sfmFailed(1)),
+                with(sfmSafeTxns,sfmSafe(0,10,1,11,2,22,3,33))
                 );
 
         when(aide.getNewestSafeTransactionForInitiator(1L)).thenReturn(11L);
@@ -246,10 +252,9 @@ public class TestMeshArbiter {
 
         Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(0,1));
 
-        verify(mbox,times(2)).send(any(long[].class), any(VoltMessage.class));
-        verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(1,11), 0,2,3)));
+        verify(mbox,times(2)).send(any(long[].class), argThat(siteFailureIs(sfmFailed(1), sfmSurvived(0,2,3))));
         verify(aide,atLeast(2)).sendHeartbeats(destinationCaptor.capture());
-        assertEquals(destinationCaptor.getValue(), hsids);
+        assertEquals(destinationCaptor.getValue(), sfmSurvived(0,2,3));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of(1L,11L));
     }
@@ -258,7 +263,8 @@ public class TestMeshArbiter {
     public void testMixOfWitnessedAndNon() throws Exception {
         Maker<SiteFailureMessage> um = a(SiteFailureMessage,
                 with(sfmSurvivors,Longs.asList(0,2,3)),
-                with(sfmSafeTxns,sfmSafe(1,11))
+                with(sfmFailures,sfmFailed(1)),
+                with(sfmSafeTxns,sfmSafe(0,10,1,11,2,22,3,33))
                 );
 
         when(aide.getNewestSafeTransactionForInitiator(1L)).thenReturn(11L);
@@ -270,9 +276,9 @@ public class TestMeshArbiter {
         Map<Long,Long> decision =
                 arbiter.reconfigureOnFault(hsids, new FaultMessage(2,1,ImmutableSet.of(0L,2L,3L)));
 
-        verify(mbox,times(2)).deliverFront(any(VoltMessage.class));
+        verify(mbox,times(1)).deliverFront(any(VoltMessage.class));
         verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
-        verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(1,11), 0,1,2,3)));
+        verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmFailed(1), sfmSurvived(0,1,2,3))));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of());
 
@@ -284,8 +290,7 @@ public class TestMeshArbiter {
         decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(0,1));
 
         verify(mbox,never()).deliverFront(any(VoltMessage.class));
-        verify(mbox,times(2)).send(any(long[].class), any(VoltMessage.class));
-        verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(1,11), 0,2,3)));
+        verify(mbox,times(2)).send(any(long[].class), argThat(siteFailureIs(sfmFailed(1), sfmSurvived(0,2,3))));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of(1L,11L));
     }
@@ -294,16 +299,19 @@ public class TestMeshArbiter {
     public void testOneLinkDownFromThePerspictiveOfWitness() throws Exception {
         Maker<SiteFailureMessage> s1f = a(SiteFailureMessage,
                 with(sfmSurvivors,Longs.asList(0,2,3)),
-                with(sfmSafeTxns,sfmSafe(1,11))
+                with(sfmFailures,sfmFailed(1)),
+                with(sfmSafeTxns,sfmSafe(0,10,1,11,2,22,3,33))
                 );
         Maker<SiteFailureMessage> s0f = a(SiteFailureMessage,
                 with(sfmSurvivors,Longs.asList(1,2,3)),
-                with(sfmSafeTxns,sfmSafe(0,10))
+                with(sfmFailures,sfmFailed(0)),
+                with(sfmSafeTxns,sfmSafe(0,10,1,11,2,22,3,33))
                 );
 
         Maker<SiteFailureMessage> s23f = a(SiteFailureMessage,
                 with(sfmSurvivors,Longs.asList(0,1,2,3)),
-                with(sfmSafeTxns,sfmSafe(0,10,1,11))
+                with(sfmFailures,sfmFailed(0,1)),
+                with(sfmSafeTxns,sfmSafe(0,10,1,11,2,22,3,33))
                 );
         Maker<SiteFailureForwardMessage> uf = a(FailureSiteForwardMessage);
 
@@ -311,7 +319,7 @@ public class TestMeshArbiter {
         when(aide.getNewestSafeTransactionForInitiator(1L)).thenReturn(11L);
 
         when(mbox.recvBlocking(any(Subject[].class), eq(5L)))
-            .thenReturn(make(s23f.but(with(sfmSource,2L),with(sfmSafeTxns,sfmSafe(0,10)))))
+            .thenReturn(make(s23f.but(with(sfmSource,2L),with(sfmFailures,sfmFailed(0)))))
             .thenReturn(new FaultMessage(2L,0L,ImmutableSet.of(1L,2L,3L)))
             .thenReturn(make(s1f.but(with(sfmSource,0L))))
             .thenReturn(make(s23f.but(with(sfmSource,2L))))
@@ -322,8 +330,7 @@ public class TestMeshArbiter {
         Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(0,1));
 
         verify(mbox,times(0)).deliverFront(any(VoltMessage.class));
-        verify(mbox,times(2)).send(any(long[].class), any(VoltMessage.class));
-        verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(1,11), 0,2,3)));
+        verify(mbox,times(2)).send(any(long[].class), argThat(siteFailureIs(sfmFailed(1), sfmSurvived(0,2,3))));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of(1L,11L));
     }
@@ -332,16 +339,19 @@ public class TestMeshArbiter {
     public void testOneLinkDownFromThePerspectiveOfNonWitness() throws Exception {
         Maker<SiteFailureMessage> s1f = a(SiteFailureMessage,
                 with(sfmSurvivors,Longs.asList(0,2,3)),
-                with(sfmSafeTxns,sfmSafe(1,11))
+                with(sfmFailures,sfmFailed(1)),
+                with(sfmSafeTxns,sfmSafe(0,10,1,11,2,22,3,33))
                 );
         Maker<SiteFailureMessage> s2f = a(SiteFailureMessage,
                 with(sfmSurvivors,Longs.asList(0,1,3)),
-                with(sfmSafeTxns,sfmSafe(2,22))
+                with(sfmFailures,sfmFailed(2)),
+                with(sfmSafeTxns,sfmSafe(0,10,1,11,2,22,3,33))
                 );
 
         Maker<SiteFailureMessage> s03f = a(SiteFailureMessage,
                 with(sfmSurvivors,Longs.asList(0,1,2,3)),
-                with(sfmSafeTxns,sfmSafe(1,11,2,22))
+                with(sfmFailures,sfmFailed(1,2)),
+                with(sfmSafeTxns,sfmSafe(0,10,1,11,2,22,3,33))
                 );
 
         when(aide.getNewestSafeTransactionForInitiator(1L)).thenReturn(11L);
@@ -349,15 +359,15 @@ public class TestMeshArbiter {
 
         when(mbox.recvBlocking(any(Subject[].class), eq(5L)))
             .thenReturn(make(s2f.but(with(sfmSource,1L))))
-            .thenReturn(make(s03f.but(with(sfmSource,3L),with(sfmSafeTxns,sfmSafe(1,11)))))
+            .thenReturn(make(s03f.but(with(sfmSource,3L),with(sfmFailures,sfmFailed(1)))))
             .thenReturn(new FaultMessage(1,2, ImmutableSet.of(0L,1L,3L)))
         ;
 
         Map<Long,Long> decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(2,1,ImmutableSet.of(0L,2L,3L)));
 
-        verify(mbox,times(2)).deliverFront(any(VoltMessage.class));
+        verify(mbox,times(1)).deliverFront(any(VoltMessage.class));
         verify(mbox,times(1)).send(any(long[].class), any(VoltMessage.class));
-        verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(1,11), 0,1,2,3)));
+        verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmFailed(1), sfmSurvived(0,1,2,3))));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of());
 
@@ -371,10 +381,9 @@ public class TestMeshArbiter {
         decision = arbiter.reconfigureOnFault(hsids, new FaultMessage(1,2,ImmutableSet.of(0L,1L,3L)));
 
         // promotion from un to witnessed
-        verify(mbox,times(1)).deliverFront(any(VoltMessage.class));
         verify(mbox,atLeast(2)).send(any(long[].class), any(VoltMessage.class));
-        verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmSafe(1,11,2,22), 0,1,2,3)));
-        verify(mbox).send(eq(new long[]{1}), argThat(failureForwardMsgIs(2,sfmSafe(1,11), 0,2,3)));
+        verify(mbox).send(any(long[].class), argThat(siteFailureIs(sfmFailed(1,2), sfmSurvived(0,1,2,3))));
+        verify(mbox).send(eq(new long[]{1}), argThat(failureForwardMsgIs(2,sfmFailed(1), sfmSurvived(0,2,3))));
 
         assertEquals(decision,ImmutableMap.<Long,Long>of(2L,22L));
     }

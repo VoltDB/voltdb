@@ -23,6 +23,9 @@
 
 package org.voltcore.agreement;
 
+import static com.google.common.base.Predicates.equalTo;
+import static com.google.common.base.Predicates.not;
+
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -353,24 +356,21 @@ public class TestFuzzMeshArbiter extends TestCase
 
         boolean hasMetExpectations() {
             NavigableMap<Integer,Integer> expectations = getFailedCountMap();
-            if (expectations.isEmpty()) return false;
+            if (   expectations.isEmpty()
+                || m_expectations.size() > expectations.size()) return false;
 
-            if (expectations.size() != m_expectations.size()) return false;
-
-            Map.Entry<Integer, Integer> test = expectations.firstEntry();
-            Map.Entry<Integer, Integer> exp = m_expectations.firstEntry();
-
-            int diff = test.getKey() - exp.getKey();
-            if (test.getValue() != exp.getValue() - diff) return false;
-
-            if (expectations.size() == 2) {
-                test = expectations.lastEntry();
-                exp = m_expectations.lastEntry();
-
-                if (   !test.getKey().equals(exp.getKey())
-                    || test.getValue() != exp.getValue() + diff) return false;
+            int sumtest = 0;
+            for (int fc: expectations.values()) {
+                sumtest += fc;
             }
-            return true;
+
+            int sumexp = 0;
+            for (int fc: m_expectations.values()) {
+                sumexp += fc;
+            }
+
+            return sumexp == sumtest;
+
         }
 
         void expect() throws InterruptedException {
@@ -385,39 +385,110 @@ public class TestFuzzMeshArbiter extends TestCase
                 }
                 Thread.sleep(50);
             }
+            Map<Integer,Integer> failedCounts = getFailedCountMap();
+            if (!m_expectations.equals(failedCounts)) {
+                dumpNodeState();
+                m_fuzzLog.info("Failed count map: "+ failedCounts);
+            }
         }
 
         void pruneDeadNodes() throws InterruptedException {
-            Set<Long> removed = Sets.newHashSet();
-            Iterator<Map.Entry<Long, MiniNode>> itr = m_nodes.entrySet().iterator();
-            while (itr.hasNext()) {
-                Map.Entry<Long, MiniNode> e = itr.next();
-                MiniNode node = e.getValue();
-                int connectedCount =
-                        node.getNodeState() == NodeState.STOP ? 0 : node.getConnectedNodes().size();
-                if (connectedCount <= 1) {
-                    if (connectedCount == 1) {
-                        node.shutdown();
-                        node.join();
-                        m_alreadyPicked.add(getHostId(e.getKey()));
-
-                    }
-                    removed.add(e.getKey());
-                    itr.remove();
-                }
+            NavigableMap<Integer, Integer> expectations = getFailedCountMap();
+            while (expectations.isEmpty()) {
+                expect();
+                expectations = getFailedCountMap();
             }
-            m_fuzzLog.info("pruned "+ removed.size() +" nodes");
+            m_fuzzLog.info("expectations at prune: "+ expectations);
+            Map<Integer,Integer> laggers =  Maps.filterKeys(
+                    expectations,
+                    not(equalTo(expectations.firstKey()))
+                    );
+
+            int expectedFails = 0;
+            Set<Integer> pruneSizes = Sets.newHashSet();
+            for (Map.Entry<Integer, Integer> e: laggers.entrySet()) {
+                pruneSizes.add(m_nodes.size() - e.getKey());
+                expectedFails += e.getValue();
+            }
+
+            m_fuzzLog.info("pruneSizes are: " + pruneSizes);
+
+            Map<Long,MiniNode> removed = Maps.newHashMap();
+            Iterator<Map.Entry<Long, MiniNode>> itr;
+
+            int attempts = 50;
+            int actualFails = 0;
+
+            while (--attempts > 0 && actualFails < expectedFails) {
+                itr = m_nodes.entrySet().iterator();
+                while (itr.hasNext()) {
+                    Map.Entry<Long, MiniNode> e = itr.next();
+                    MiniNode node = e.getValue();
+                    int connectedCount =
+                            node.getNodeState() == NodeState.STOP ? 0 : node.getConnectedNodes().size();
+                    m_fuzzLog.info("Connection count for "
+                            + CoreUtils.hsIdToString(e.getKey())
+                            + " is " + connectedCount);
+                    if (connectedCount == 0 || pruneSizes.contains(connectedCount)) {
+                        if (pruneSizes.contains(connectedCount)) {
+                            actualFails += 1;
+                        }
+                        removed.put(e.getKey(),e.getValue());
+                        itr.remove();
+                    }
+                }
+                Thread.sleep(100);
+            }
+
+            assertEquals("timeout while waiting for mini node to catch up with minisite",expectedFails, actualFails);
+
             itr = m_nodes.entrySet().iterator();
             while (itr.hasNext()) {
                 Map.Entry<Long, MiniNode> e = itr.next();
                 MiniNode node = e.getValue();
-                for (long rmd: removed) {
+                for (long rmd: removed.keySet()) {
                     node.stopTracking(rmd);
                 }
             }
+            for (Map.Entry<Long, MiniNode> e: removed.entrySet()) {
+                MiniNode node = e.getValue();
+                if (node.getNodeState() != NodeState.STOP) {
+                    node.shutdown();
+                    node.join();
+                }
+            }
+            m_fuzzLog.info("pruned "+ removed.size() +" nodes");
+
             m_expectedLive.clear();
             m_expectedLive.addAll(m_nodes.keySet());
+            m_alreadyPicked.clear();
+            settleMesh();
         }
+
+        void settleMesh() throws InterruptedException {
+            boolean same = false;
+            for (int i = 0; i < 150 && !same; ++i) {
+                same = true;
+                if (i >= 50 && (i % 50) == 0) {
+                    for (Map.Entry<Long, MiniNode> e: m_nodes.entrySet()) {
+                        m_fuzzLog.info(
+                                CoreUtils.hsIdToString(e.getKey())
+                                + " is connected to ["
+                                + CoreUtils.hsIdCollectionToString(e.getValue().getConnectedNodes())
+                                + "]"
+                                );
+                    }
+                }
+                Iterator<Map.Entry<Long, MiniNode>>itr = m_nodes.entrySet().iterator();
+                Set<Long> base = itr.next().getValue().getConnectedNodes();
+                while (same && itr.hasNext()) {
+                    same = same && base.equals(itr.next().getValue().getConnectedNodes());
+                }
+                Thread.sleep(100);
+            }
+            assertTrue("mesh could not be settled in 15 seconds",same);
+        }
+
 
         void joinNode(int node) throws InterruptedException {
             Preconditions.checkArgument(!m_nodes.containsKey(getHSId(node)),
@@ -448,27 +519,34 @@ public class TestFuzzMeshArbiter extends TestCase
     }
 
     public void testSimpleJoin() throws InterruptedException {
+        final int clusterSize = 5;
+        final int killSize = 2;
         long seed = System.currentTimeMillis();
         System.out.println("SEED: " + seed);
-        constructCluster(5);
+        constructCluster(clusterSize);
         while (!getNodesInState(NodeState.START).isEmpty()) {
             Thread.sleep(50);
         }
         FuzzTestState state = new FuzzTestState(seed, m_nodes.keySet());
-        int nextid = 5;
-        for (int i = 0; i < 4; ++i) {
-            state.killRandomNode();
-            state.killRandomLink();
+        int nextid = clusterSize;
+        for (int i = 0; i < 8; ++i) {
+            for (int k = 0; k < killSize; ++k){
+                if ((k % 2) == 1) {
+                    state.killRandomLink();
+                } else {
+                    state.killRandomNode();
+                }
+            }
             state.setUpExpectations();
 
             state.expect();
-            assertEquals(state.m_expectations, state.getFailedCountMap());
 
             state.pruneDeadNodes();
-            int nodes2join = 5 - m_nodes.size();
+            int nodes2join = clusterSize - m_nodes.size();
             for (int j = 0; j < nodes2join; j++) {
                 state.joinNode(nextid++);
             }
+            state.settleMesh();
         }
     }
 
@@ -509,7 +587,39 @@ public class TestFuzzMeshArbiter extends TestCase
 
         state.expect();
         assertEquals(state.m_expectations, state.getFailedCountMap());
+    }
 
+    public void thereBeDragonsHeretestNastyFuzz() throws InterruptedException {
+        long seed = System.currentTimeMillis();
+        final int clusterSize = 30;
+        final int killSize = 12;
+        System.out.println("SEED: " + seed);
+        constructCluster(clusterSize);
+        while (!getNodesInState(NodeState.START).isEmpty()) {
+            Thread.sleep(50);
+        }
+        FuzzTestState state = new FuzzTestState(seed, m_nodes.keySet());
+        int nextid = clusterSize;
+        for (int i = 0; i < 20; ++i) {
+            for (int k = 0; k < killSize; ++k){
+                if ((k % 2) == 0) {
+                    state.killRandomLink();
+                } else {
+                    state.killRandomNode();
+                }
+            }
+            state.setUpExpectations();
+
+            state.expect();
+
+            state.pruneDeadNodes();
+
+            int nodes2join = clusterSize - m_nodes.size();
+            for (int j = 0; j < nodes2join; j++) {
+                state.joinNode(nextid++);
+            }
+            state.settleMesh();
+        }
     }
 
     // Partition the nodes in subset out of the nodes in nodes

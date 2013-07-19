@@ -29,6 +29,7 @@ public final class FaultMessage extends VoltMessage {
 
     public final long failedSite;
     public final boolean witnessed;
+    public final boolean decided;
     public final long reportingSite;
     public final Set<Long> survivors;
 
@@ -37,6 +38,7 @@ public final class FaultMessage extends VoltMessage {
         this.reportingSite = reportingSite;
         this.witnessed = true;
         this.survivors = ImmutableSet.of();
+        this.decided = false;
     }
 
     public FaultMessage(final long reportingSite,
@@ -45,6 +47,19 @@ public final class FaultMessage extends VoltMessage {
         this.reportingSite = reportingSite;
         this.witnessed = false;
         this.survivors = ImmutableSet.copyOf(survivors);
+        this.decided = false;
+    }
+
+    public FaultMessage(
+            final long reportingSite,
+            final long failedSite,
+            final Set<Long> survivors,
+            final boolean decision) {
+        this.failedSite = failedSite;
+        this.reportingSite = reportingSite;
+        this.witnessed = false;
+        this.survivors = ImmutableSet.copyOf(survivors);
+        this.decided = decision;
     }
 
     @Override
@@ -75,6 +90,9 @@ public final class FaultMessage extends VoltMessage {
         sb.append(", reporting: ");
         sb.append(CoreUtils.hsIdToString(reportingSite));
         if (!witnessed) {
+            if (decided) {
+                sb.append(", decided:").append(decided);
+            }
             sb.append(", survivors: [");
             sb.append(CoreUtils.hsIdCollectionToString(survivors));
             sb.append("]");

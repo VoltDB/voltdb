@@ -16,10 +16,10 @@
  */
 package org.voltcore.agreement;
 
-import java.util.Set;
+import org.voltcore.messaging.FaultMessage;
 
 public interface InterfaceToMessenger {
     public void reportForeignHostFailed(int hostId);
-    public void relayForeignHostFailed(long reportingSite, int hostId, Set<Long> survivors);
+    public void relayForeignHostFailed(FaultMessage fm);
     public String getHostnameForHostID(int hostId);
 }

@@ -670,6 +670,11 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         m_mailbox.deliver(fm);
     }
 
+    public void reportFault(FaultMessage fm) {
+        fm.m_sourceHSId = m_hsId;
+        m_mailbox.deliver(fm);
+    }
+
     public void waitForRecovery() throws InterruptedException {
         if (!m_recovering) {
             return;

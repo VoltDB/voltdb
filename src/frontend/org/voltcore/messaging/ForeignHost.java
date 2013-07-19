@@ -313,11 +313,8 @@ public class ForeignHost {
                 && !(message instanceof SiteFailureForwardMessage))
         {
             SiteFailureMessage sfm = (SiteFailureMessage)message;
-
-            for (long failedHostId : sfm.m_safeTxnIds.keySet()) {
-                if (sfm.hasDirectlyWitnessed(failedHostId)) {
-                    m_hostMessenger.relayForeignHostFailed(message.m_sourceHSId, (int)failedHostId, sfm.m_survivors);
-                }
+            for (FaultMessage fm: sfm.asFaultMessages()) {
+                m_hostMessenger.relayForeignHostFailed(fm);
             }
         }
 

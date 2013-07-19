@@ -72,6 +72,58 @@ public class SiteFailureMatchers {
 
     static public final Matcher<SiteFailureMessage> siteFailureIs(
             final Donor<List<Pair<Long,Long>>> safeTxns,
+            final Set<Long> failures,
+            final Set<Long> survivors) {
+
+        final Map<Long,Long> safeTxnIds = Maps.newHashMap();
+        for (Pair<Long,Long> sp: safeTxns.value()) {
+            safeTxnIds.put(sp.getFirst(),sp.getSecond());
+        }
+
+        return new TypeSafeMatcher<SiteFailureMessage>() {
+
+            @Override
+            public void describeTo(Description d) {
+                d.appendText("SiteFailureMessage [")
+                .appendText("failed: ").appendValueList("", ", ", "", failures)
+                .appendText(", survivors: ").appendValueList("", ", ", "", survivors)
+                .appendText(", safeTxnIds: ").appendValue(safeTxnIds)
+                .appendText("]");
+            }
+
+            @Override
+            protected boolean matchesSafely(SiteFailureMessage m) {
+                return equalTo(survivors).matches(m.m_survivors)
+                    && equalTo(failures).matches(m.m_failed)
+                    && equalTo(safeTxnIds).matches(m.m_safeTxnIds);
+            }
+        };
+    }
+
+    static public final Matcher<SiteFailureMessage> siteFailureIs(
+            final Set<Long> failures,
+            final Set<Long> survivors) {
+
+        return new TypeSafeMatcher<SiteFailureMessage>() {
+
+            @Override
+            public void describeTo(Description d) {
+                d.appendText("SiteFailureMessage [")
+                .appendText("failed: ").appendValueList("", ", ", "", failures)
+                .appendText(", survivors: ").appendValueList("", ", ", "", survivors)
+                .appendText("]");
+            }
+
+            @Override
+            protected boolean matchesSafely(SiteFailureMessage m) {
+                return equalTo(failures).matches(m.m_failed)
+                    && equalTo(survivors).matches(m.m_survivors);
+            }
+        };
+    }
+
+    static public final Matcher<SiteFailureMessage> siteFailureIs(
+            final Donor<List<Pair<Long,Long>>> safeTxns,
             final Set<Long> decision,
             final long...survivors) {
 
@@ -109,6 +161,59 @@ public class SiteFailureMatchers {
 
             final Matcher<SiteFailureMessage> sfmIs =
                     siteFailureIs(safeTxns,survivors);
+
+            @Override
+            public void describeTo(Description d) {
+                d.appendText("FailureSiteForwardMessage [ ")
+                .appendText("reportingSite: ").appendValue(reportingHsid)
+                .appendText(", ").appendDescriptionOf(sfmIs)
+                .appendText(" ]");
+            }
+
+            @Override
+            protected boolean matchesSafely(SiteFailureForwardMessage m) {
+                return sfmIs.matches(m)
+                    && equalTo(reportingHsid).matches(m.m_reportingHSId);
+            }
+        };
+    }
+
+    static public final Matcher<SiteFailureForwardMessage> failureForwardMsgIs(
+            final long reportingHsid,
+            final Donor<List<Pair<Long,Long>>> safeTxns,
+            final Set<Long> failures,
+            final Set<Long> survivors) {
+
+        return new TypeSafeMatcher<SiteFailureForwardMessage>() {
+
+            final Matcher<SiteFailureMessage> sfmIs =
+                    siteFailureIs(safeTxns,failures,survivors);
+
+            @Override
+            public void describeTo(Description d) {
+                d.appendText("FailureSiteForwardMessage [ ")
+                .appendText("reportingSite: ").appendValue(reportingHsid)
+                .appendText(", ").appendDescriptionOf(sfmIs)
+                .appendText(" ]");
+            }
+
+            @Override
+            protected boolean matchesSafely(SiteFailureForwardMessage m) {
+                return sfmIs.matches(m)
+                    && equalTo(reportingHsid).matches(m.m_reportingHSId);
+            }
+        };
+    }
+
+    static public final Matcher<SiteFailureForwardMessage> failureForwardMsgIs(
+            final long reportingHsid,
+            final Set<Long> failures,
+            final Set<Long> survivors) {
+
+        return new TypeSafeMatcher<SiteFailureForwardMessage>() {
+
+            final Matcher<SiteFailureMessage> sfmIs =
+                    siteFailureIs(failures,survivors);
 
             @Override
             public void describeTo(Description d) {

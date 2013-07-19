@@ -30,9 +30,12 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.SiteFailureMessage;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmDecision;
+import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmFailed;
+import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmFailures;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmSafe;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmSafeTxns;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmSource;
+import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmSurvived;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmSurvivors;
 import static org.voltcore.agreement.matcher.SiteFailureMatchers.failureForwardMsgIs;
 import static org.voltcore.agreement.matcher.SiteFailureMatchers.siteFailureIs;
@@ -43,7 +46,6 @@ import java.util.Set;
 import org.junit.Test;
 
 import com.google.common.collect.ImmutableSet;
-import com.google.common.primitives.Longs;
 import com.natpryce.makeiteasy.Maker;
 
 public class TestSiteFailureMessage {
@@ -53,14 +55,15 @@ public class TestSiteFailureMessage {
     @SuppressWarnings("unchecked")
     Maker<SiteFailureMessage> sfm = a(SiteFailureMessage,
             with(sfmSource,1L),
-            with(sfmSurvivors, Longs.asList(1,2,3)),
+            with(sfmSurvivors, sfmSurvived(1,2,3)),
+            with(sfmFailures, sfmFailed(4,5,6)),
             with(sfmSafeTxns, sfmSafe(4,44,5,55))
             );
 
     @Test
     public void testSiteFailureMessageRoundtripSerialization() throws Exception {
         SiteFailureMessage msg = make(sfm);
-        assertThat(msg,siteFailureIs(sfmSafe(4,44,5,55),1,2,3));
+        assertThat(msg,siteFailureIs(sfmSafe(4,44,5,55),sfmFailed(4,5,6),sfmSurvived(1,2,3)));
 
         ByteBuffer bb = VoltMessage.toBuffer(msg);
 
@@ -68,7 +71,7 @@ public class TestSiteFailureMessage {
         assertTrue(vmsg instanceof SiteFailureMessage);
 
         SiteFailureMessage gsm = (SiteFailureMessage)vmsg;
-        assertThat(gsm,siteFailureIs(sfmSafe(4,44,5,55),1,2,3));
+        assertThat(gsm,siteFailureIs(sfmSafe(4,44,5,55),sfmFailed(4,5,6),sfmSurvived(1,2,3)));
     }
 
     @Test
@@ -91,7 +94,7 @@ public class TestSiteFailureMessage {
    @Test
    public void testForwardRoundTripSerialization() throws Exception {
        SiteFailureMessage msg = make(sfm);
-       assertThat(msg,siteFailureIs(sfmSafe(4,44,5,55),1,2,3));
+       assertThat(msg,siteFailureIs(sfmSafe(4,44,5,55),sfmFailed(4,5,6),sfmSurvived(1,2,3)));
 
        ByteBuffer bb = VoltMessage.toBuffer(msg);
 
@@ -99,10 +102,10 @@ public class TestSiteFailureMessage {
        assertTrue(vmsg instanceof SiteFailureMessage);
 
        SiteFailureMessage gsm = (SiteFailureMessage)vmsg;
-       assertThat(gsm,siteFailureIs(sfmSafe(4,44,5,55),1,2,3));
+       assertThat(gsm,siteFailureIs(sfmSafe(4,44,5,55),sfmFailed(4,5,6),sfmSurvived(1,2,3)));
 
        SiteFailureForwardMessage fmsg = new SiteFailureForwardMessage(gsm);
-       assertThat(fmsg, failureForwardMsgIs(1L, sfmSafe(4,44,5,55),1,2,3));
+       assertThat(fmsg, failureForwardMsgIs(1, sfmSafe(4,44,5,55),sfmFailed(4,5,6),sfmSurvived(1,2,3)));
 
        bb = VoltMessage.toBuffer(fmsg);
 
@@ -110,7 +113,7 @@ public class TestSiteFailureMessage {
        assertTrue(vmsg instanceof SiteFailureForwardMessage);
 
        SiteFailureForwardMessage gsmf = (SiteFailureForwardMessage)vmsg;
-       assertThat(gsmf, failureForwardMsgIs(1L, sfmSafe(4,44,5,55),1,2,3));
+       assertThat(gsmf, failureForwardMsgIs(1, sfmSafe(4,44,5,55),sfmFailed(4,5,6),sfmSurvived(1,2,3)));
    }
 
 }

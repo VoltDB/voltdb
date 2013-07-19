@@ -46,6 +46,8 @@ import com.google.common.primitives.Longs;
 
 public class MeshArbiter {
 
+    protected static int FORWARD_STALL_COUNT = 20 * 5; // 5 seconds
+
     protected static final VoltLogger m_recoveryLog = new VoltLogger("REJOIN");
 
     protected static final Subject [] justFailures = new Subject [] { Subject.FAILURE };
@@ -99,12 +101,6 @@ public class MeshArbiter {
      * resolved arbitration increments this counter
      */
     protected volatile int m_failedSitesCount = 0;
-
-    /**
-     * Set of host site ids that were decided on by peers
-     * (decided as kill victims)
-     */
-    Set<Long> m_decidedOn = Sets.newTreeSet();
 
     public MeshArbiter(final long hsId, final Mailbox mailbox,
             final MeshAide meshAide) {
@@ -180,7 +176,8 @@ public class MeshArbiter {
                 m_recoveryLog.info("Agreement, Discarding " + name() + " "
                         + CoreUtils.hsIdToString(fm.failedSite)
                         + " reporter: "
-                        + CoreUtils.hsIdToString(fm.reportingSite));
+                        + CoreUtils.hsIdToString(fm.reportingSite)
+                        + (fm.decided ? " decided: true" : ""));
             }
         },
         StaleUnwitnessed {
@@ -236,7 +233,8 @@ public class MeshArbiter {
         } else if (!fm.witnessed && fm.reportingSite == m_hsId) {
             return Discard.SelfUnwitnessed;
         } else if (   alreadyWitnessed != null
-                   && (alreadyWitnessed || alreadyWitnessed == fm.witnessed)) {
+                   && (   alreadyWitnessed
+                       || alreadyWitnessed == (fm.witnessed || fm.decided))) {
             return Discard.AlreadyKnow;
         } else if (fm.survivors.contains(fm.failedSite)) {
             /*
@@ -266,7 +264,7 @@ public class MeshArbiter {
         do {
             Discard ignoreIt = mayIgnore(hsIds,fm);
             if (Discard.DoNot == ignoreIt) {
-                m_inTrouble.put(fm.failedSite,fm.witnessed || m_decidedOn.contains(fm.failedSite));
+                m_inTrouble.put(fm.failedSite,fm.witnessed || fm.decided);
                 m_recoveryLog.info("Agreement, Processing " + fm);
                 proceed = true;
             } else {
@@ -286,7 +284,7 @@ public class MeshArbiter {
         // or it was previously recorded but it became witnessed from unwitnessed
         m_seeker.startSeekingFor(Sets.difference(hsIds, m_failedSites), m_inTrouble);
 
-        discoverGlobalFaultData_send();
+        discoverGlobalFaultData_send(hsIds);
 
         if (discoverGlobalFaultData_rcv(hsIds)) {
             Map<Long,Long> lastTxnIdByFailedSite = extractGlobalFaultData(hsIds);
@@ -294,7 +292,15 @@ public class MeshArbiter {
                 return ImmutableMap.of();
             }
 
-            notifyOnKill(lastTxnIdByFailedSite);
+            Set<Long> witnessed = Maps.filterValues(m_inTrouble, equalTo(Boolean.TRUE)).keySet();
+            Set<Long> notClosed = Sets.difference(witnessed, lastTxnIdByFailedSite.keySet());
+            if ( !notClosed.isEmpty()) {
+                m_recoveryLog.warn("Agreement, witnessed but not decided: ["
+                        + CoreUtils.hsIdCollectionToString(notClosed)
+                        + "] seeker: " + m_seeker);
+            }
+
+            notifyOnKill(hsIds, lastTxnIdByFailedSite);
 
             m_failedSites.addAll( lastTxnIdByFailedSite.keySet());
             m_failedSitesCount = m_failedSites.size();
@@ -304,7 +310,7 @@ public class MeshArbiter {
                   + CoreUtils.hsIdCollectionToString(lastTxnIdByFailedSite.keySet())
                   + " to failed sites history");
 
-            clearInTrouble();
+            clearInTrouble(lastTxnIdByFailedSite.keySet());
             m_seeker.clear();
 
             return lastTxnIdByFailedSite;
@@ -318,26 +324,18 @@ public class MeshArbiter {
      * @param decision map where the keys contain the kill sites
      *   and its values are their last known safe transaction ids
      */
-    protected void notifyOnKill(Map<Long,Long> decision) {
+    protected void notifyOnKill(Set<Long> hsIds, Map<Long,Long> decision) {
 
-        SiteFailureMessage.Builder sfmb =
-                SiteFailureMessage.builder().addDecision(decision.keySet());
+        SiteFailureMessage.Builder sfmb = SiteFailureMessage.
+                builder()
+                .decisions(decision.keySet())
+                .failures(decision.keySet());
 
         Set<Long> dests = Sets.filter(m_seeker.getSurvivors(),not(equalTo(m_hsId)));
         if (dests.isEmpty()) return;
 
-        sfmb.addSurvivors(Sets.difference(m_seeker.getSurvivors(), decision.keySet()));
-
-        for (Map.Entry<Long, Long> e: decision.entrySet()) {
-            sfmb.addSafeTxnId(e.getKey(), e.getValue());
-        }
-
-        for (long dest: Sets.difference(dests,decision.keySet())) {
-            sfmb.addSafeTxnId(
-                    dest,
-                    m_meshAide.getNewestSafeTransactionForInitiator(dest)
-                    );
-        }
+        sfmb.survivors(Sets.difference(m_seeker.getSurvivors(), decision.keySet()));
+        sfmb.safeTxnIds(getSafeTxnIdsForSites(hsIds));
 
         SiteFailureMessage sfm = sfmb.build();
         m_mailbox.send(Longs.toArray(dests), sfm);
@@ -346,12 +344,19 @@ public class MeshArbiter {
                 + CoreUtils.hsIdCollectionToString(dests) + "]  " + sfm);
     }
 
-    protected void clearInTrouble() {
+    protected void clearInTrouble(Set<Long> decision) {
         m_forwardCandidates.clear();
         m_failedSitesLedger.clear();
         m_inTrouble.clear();
-        m_decidedOn.clear();
         m_inTroubleCount = 0;
+    }
+
+    protected Map<Long,Long> getSafeTxnIdsForSites(Set<Long> hsIds) {
+        ImmutableMap.Builder<Long,Long> safeb = ImmutableMap.builder();
+        for (long h: Sets.filter(hsIds, not(equalTo(m_hsId)))) {
+            safeb.put(h,m_meshAide.getNewestSafeTransactionForInitiator(h));
+        }
+        return safeb.build();
     }
 
     /**
@@ -361,24 +366,22 @@ public class MeshArbiter {
      * own partition). Do this once for each failed initiator that we know about.
      * Sends all data all the time to avoid a need for request/response.
      */
-    private void discoverGlobalFaultData_send() {
-        Set<Long> survivors = m_seeker.getSurvivors();
+    private void discoverGlobalFaultData_send(Set<Long> hsIds) {
+        Set<Long> dests = Sets.filter(m_seeker.getSurvivors(),not(equalTo(m_hsId)));
 
-        SiteFailureMessage.Builder msgBuilder = SiteFailureMessage.builder();
-        msgBuilder.addSurvivors(survivors);
-        for (long troubled: m_inTrouble.keySet()) {
-            if (troubled == m_hsId) continue;
-            /*
-             * Check the queue for the data and get it from the ledger if necessary.\
-             * It might not even be in the ledger if the site has been failed
-             * since recovery of this node began.
-             */
-            Long txnId = m_meshAide.getNewestSafeTransactionForInitiator(troubled);
-            msgBuilder.addSafeTxnId(troubled, txnId != null ? txnId : Long.MIN_VALUE);
-        }
+        SiteFailureMessage.Builder msgBuilder = SiteFailureMessage.
+                builder()
+                .survivors(m_seeker.getSurvivors())
+                .failures(m_inTrouble.keySet())
+                .safeTxnIds(getSafeTxnIdsForSites(hsIds));
 
         SiteFailureMessage sfm = msgBuilder.build();
-        m_mailbox.send(Longs.toArray(survivors), sfm);
+        sfm.m_sourceHSId = m_hsId;
+
+        updateFailedSitesLedger(hsIds, sfm);
+        m_seeker.add(sfm);
+
+        m_mailbox.send(Longs.toArray(dests), sfm);
 
         m_recoveryLog.info("Agreement, Sending survivors " + sfm);
     }
@@ -396,12 +399,12 @@ public class MeshArbiter {
         }
     }
 
-    protected void updateFailedSiteLedger(Set<Long> hsIds) {
-        for (Long site: m_inTrouble.keySet()) {
-            if (site == m_hsId) continue;
-            long txnid = m_meshAide.getNewestSafeTransactionForInitiator(site);
-            m_failedSitesLedger.put(Pair.of(m_hsId, site), txnid);
-        }
+    protected void addForwardCandidate(SiteFailureForwardMessage sffm) {
+        SiteFailureForwardMessage prev = m_forwardCandidates.get(sffm.m_reportingHSId);
+
+        if (prev != null && prev.m_survivors.size() < sffm.m_survivors.size()) return;
+
+        m_forwardCandidates.put(sffm.m_reportingHSId, sffm);
     }
 
     /**
@@ -417,6 +420,7 @@ public class MeshArbiter {
         long blockedOnReceiveStart = System.currentTimeMillis();
         long lastReportTime = 0;
         boolean haveEnough = false;
+        int [] forwardStallCount = new int[] {FORWARD_STALL_COUNT};
 
         do {
             VoltMessage m = m_mailbox.recvBlocking(receiveSubjects, 5);
@@ -435,12 +439,10 @@ public class MeshArbiter {
             if (m == null) {
                 // Send a heartbeat to keep the dead host timeout active.  Needed because IV2 doesn't
                 // generate its own heartbeats to keep this running.
-                m_meshAide.sendHeartbeats(hsIds);
+                m_meshAide.sendHeartbeats(m_seeker.getSurvivors());
 
-                continue;
-            }
+            } else if (m.getSubject() == Subject.SITE_FAILURE_UPDATE.getId()) {
 
-            if (m.getSubject() == Subject.SITE_FAILURE_UPDATE.getId()) {
                 SiteFailureMessage sfm = (SiteFailureMessage)m;
 
                 if (  !m_seeker.getSurvivors().contains(m.m_sourceHSId)
@@ -450,31 +452,15 @@ public class MeshArbiter {
                 updateFailedSitesLedger(hsIds, sfm);
 
                 m_seeker.add(sfm);
-                m_forwardCandidates.put(sfm.m_sourceHSId, new SiteFailureForwardMessage(sfm));
-
-                if (   sfm.m_sourceHSId != m_hsId && !sfm.m_decision.isEmpty()
-                    && !m_inTrouble.containsKey(sfm.m_sourceHSId)) {
-
-                    for (long closedSite: sfm.m_decision) {
-                        if (!m_seeker.getSurvivors().contains(closedSite)) continue;
-
-                        if (Boolean.FALSE.equals(m_inTrouble.get(closedSite))) {
-                            FaultMessage fm = new FaultMessage(m_hsId, closedSite);
-                            fm.m_sourceHSId = m_hsId;
-
-                            m_mailbox.deliverFront(fm);
-                            m_recoveryLog.info("Agreement, Promoting un to witnessed: " + fm);
-                        }
-                        m_decidedOn.add(closedSite);
-                    }
-                }
+                addForwardCandidate(new SiteFailureForwardMessage(sfm));
 
                 m_recoveryLog.info("Agreement, Received " + sfm);
 
             } else if (m.getSubject() == Subject.SITE_FAILURE_FORWARD.getId()) {
+
                 SiteFailureForwardMessage fsfm = (SiteFailureForwardMessage)m;
 
-                m_forwardCandidates.put(fsfm.m_reportingHSId, fsfm);
+                addForwardCandidate(fsfm);
 
                 if (   !hsIds.contains(fsfm.m_sourceHSId)
                     || m_seeker.getSurvivors().contains(fsfm.m_reportingHSId)
@@ -483,6 +469,8 @@ public class MeshArbiter {
                 m_seeker.add(fsfm);
 
                 m_recoveryLog.info("Agreement, Received forward " + fsfm);
+
+                forwardStallCount[0] = FORWARD_STALL_COUNT;
 
             } else if (m.getSubject() == Subject.FAILURE.getId()) {
                 /*
@@ -523,7 +511,7 @@ public class MeshArbiter {
                 }
             }
 
-        } while (!haveEnough || m_seeker.needForward());
+        } while (!haveEnough || m_seeker.needForward(forwardStallCount));
 
         return true;
     }
@@ -551,7 +539,7 @@ public class MeshArbiter {
                 sb.append(CoreUtils.hsIdToString(p.getSecond()));
             }
             sb.append(']');
-            if (missingMessages.isEmpty()) {
+            if (missingMessages.isEmpty() && m_seeker.needForward()) {
                 sb.append(" ");
                 sb.append(m_seeker);
             }
@@ -570,8 +558,7 @@ public class MeshArbiter {
 
         Set<Long> toBeKilled = m_seeker.nextKill();
         if (toBeKilled.isEmpty()) {
-            m_recoveryLog.warn("Agreement, seeker could not decide on kill list: "
-                    + m_seeker);
+            m_recoveryLog.warn("Agreement, seeker failed to yield a kill set: "+m_seeker);
         }
 
         Map<Long, Long> initiatorSafeInitPoint = new HashMap<Long, Long>();
@@ -600,8 +587,6 @@ public class MeshArbiter {
         }
 
         assert(!initiatorSafeInitPoint.containsValue(Long.MIN_VALUE));
-
-        initiatorSafeInitPoint.remove(m_hsId);
 
         return ImmutableMap.copyOf(initiatorSafeInitPoint);
     }

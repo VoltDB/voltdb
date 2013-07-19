@@ -44,12 +44,21 @@ public class FakeMesh extends Thread
         public final long m_src;
         public final long m_dest;
         public final VoltMessage m_msg;
+        public final boolean m_close;
 
         public Message(long src, long dest, VoltMessage msg)
         {
             m_src = src;
             m_dest = dest;
             m_msg = msg;
+            m_close = false;
+        }
+
+        public Message(long src, long dest, boolean close) {
+            m_src = src;
+            m_dest = dest;
+            m_msg = null;
+            m_close = true;
         }
     }
 
@@ -83,12 +92,26 @@ public class FakeMesh extends Thread
     {
         meshLog.info("Failing link between source: " + CoreUtils.hsIdToString(src) +
                 " and destination: " + CoreUtils.hsIdToString(dst));
+        internalFailLink(src, dst);
+    }
+
+    synchronized private void internalFailLink(long src,long dst) {
         Set<Long> dsts = m_failedLinks.get(src);
         if (dsts == null) {
             dsts = new HashSet<Long>();
             m_failedLinks.put(src, dsts);
         }
         dsts.add(dst);
+    }
+
+    synchronized void closeLink(long src, long dst) {
+        meshLog.info("Close link between source: " + CoreUtils.hsIdToString(src) +
+                " and destination: " + CoreUtils.hsIdToString(dst));
+        if (m_recvQs.containsKey(dst)) {
+            m_recvQs.get(dst).offer(new Message(src,dst,true));
+        }
+        internalFailLink(src,dst);
+        internalFailLink(dst,src);
     }
 
     private boolean linkFailed(long src, long dst)

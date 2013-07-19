@@ -36,6 +36,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.voltcore.agreement.FakeMesh.Message;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.DisconnectFailedHostsCallback;
+import org.voltcore.messaging.FaultMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.SiteFailureForwardMessage;
 import org.voltcore.messaging.SiteFailureMessage;
@@ -123,6 +124,8 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
 
     synchronized void stopTracking(long HSId) {
         m_deadTracker.stopTracking(HSId);
+        m_mesh.failLink(m_HSId, HSId);
+        m_mesh.failLink(HSId, m_HSId);
         m_mailbox.deliver(m_miniSite.createSitePruneMessage(HSId));
     }
 
@@ -189,22 +192,28 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
             Message msg = m_recvQ.poll();
             synchronized(this) {
                 if (msg != null) {
-                    m_deadTracker.updateHSId(msg.m_src);
-                    // inject actual message into mailbox
-                    VoltMessage message = msg.m_msg;
+                    if (msg.m_close) {
+                        int failedHostId = CoreUtils.getHostIdFromHSId(msg.m_src);
+                        long agreementHSId = CoreUtils.getHSIdFromHostAndSite(failedHostId,
+                                HostMessenger.AGREEMENT_SITE_ID);
+                        m_miniSite.reportFault(agreementHSId);
+                        m_deadTracker.stopTracking(msg.m_src);
+                    } else {
+                        m_deadTracker.updateHSId(msg.m_src);
+                        // inject actual message into mailbox
+                        VoltMessage message = msg.m_msg;
 
-                    // snoop for SiteFailureMessage, inject into MiniSite's mailbox
-                    if (   message instanceof SiteFailureMessage
-                        && !(message instanceof SiteFailureForwardMessage)) {
-                        SiteFailureMessage sfm = (SiteFailureMessage)message;
+                        // snoop for SiteFailureMessage, inject into MiniSite's mailbox
+                        if (   message instanceof SiteFailureMessage
+                                && !(message instanceof SiteFailureForwardMessage)) {
+                            SiteFailureMessage sfm = (SiteFailureMessage)message;
 
-                        for (long failedHostId : sfm.m_safeTxnIds.keySet()) {
-                            if (sfm.hasDirectlyWitnessed(failedHostId)) {
-                                m_miniSite.reportFault(sfm.m_sourceHSId, failedHostId, sfm.m_survivors);
+                            for (FaultMessage fm: sfm.asFaultMessages()) {
+                                m_miniSite.reportFault(fm);
                             }
                         }
+                        m_mailbox.deliver(message);
                     }
-                    m_mailbox.deliver(message);
                 }
                 // Do dead host detection.  Need to keep track of receive gaps from the remaining set
                 // of live hosts.
@@ -228,8 +237,7 @@ class MiniNode extends Thread implements DisconnectFailedHostsCallback
                 m_HSIds.remove(HSId);
                 m_deadTracker.stopTracking(HSId);
                 // Ghetto way to disconnect ourselves from someone we've decided is dead
-                m_mesh.failLink(m_HSId, HSId);
-                m_mesh.failLink(HSId, m_HSId);
+                m_mesh.closeLink(m_HSId, HSId);
             }
         }
     }

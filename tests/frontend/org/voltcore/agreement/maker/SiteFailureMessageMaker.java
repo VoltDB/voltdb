@@ -30,11 +30,13 @@ import static com.natpryce.makeiteasy.MakeItEasy.with;
 import static com.natpryce.makeiteasy.Property.newProperty;
 
 import java.util.List;
+import java.util.Set;
 
 import org.voltcore.messaging.SiteFailureForwardMessage;
 import org.voltcore.messaging.SiteFailureMessage;
 import org.voltcore.utils.Pair;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.common.primitives.Longs;
 import com.natpryce.makeiteasy.Donor;
@@ -98,7 +100,20 @@ public class SiteFailureMessageMaker {
                 );
     }
 
+    public static Set<Long> sfmFailed(long...vals) {
+        return ImmutableSet.copyOf(Longs.asList(vals));
+    }
+
+    public static Set<Long> sfmSurvived(long...vals) {
+        return ImmutableSet.copyOf(Longs.asList(vals));
+    }
+
+    public static Set<Long> sfmDecided(long...vals) {
+        return ImmutableSet.copyOf(Longs.asList(vals));
+    }
+
     public static final Property<SiteFailureMessage,Long> sfmSource = newProperty();
+    public static final Property<SiteFailureMessage, Iterable<Long>> sfmFailures = newProperty();
     public static final Property<SiteFailureMessage, Iterable<Long>> sfmDecision = newProperty();
     public static final Property<SiteFailureMessage, Iterable<Long>> sfmSurvivors = newProperty();
     public static final Property<SiteFailureMessage, Iterable<Pair<Long,Long>>> sfmSafeTxns = newProperty();
@@ -112,11 +127,12 @@ public class SiteFailureMessageMaker {
 
                    SiteFailureMessage.Builder builder =  new SiteFailureMessage.Builder();
 
-                   builder.addSurvivors(Sets.newHashSet(lookup.valueOf(sfmSurvivors, Longs.asList(1))));
-                   builder.addDecision(Sets.newHashSet(lookup.valueOf(sfmDecision, Longs.asList(1))));
+                   builder.survivors(Sets.newHashSet(lookup.valueOf(sfmSurvivors, Longs.asList(1))));
+                   builder.failures(Sets.newHashSet(lookup.valueOf(sfmFailures, Longs.asList(1))));
+                   builder.decisions(Sets.newHashSet(lookup.valueOf(sfmDecision, Longs.asList(1))));
 
                    for (Pair<Long,Long> sp: lookup.valueOf(sfmSafeTxns, listOf(a(safePair)))) {
-                       builder.addSafeTxnId(sp.getFirst(), sp.getSecond());
+                       builder.safeTxnId(sp.getFirst(), sp.getSecond());
                    }
                    SiteFailureMessage msg = builder.build();
 

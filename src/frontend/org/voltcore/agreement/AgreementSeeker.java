@@ -17,6 +17,7 @@
 
 package org.voltcore.agreement;
 
+import static com.google.common.base.Predicates.equalTo;
 import static com.google.common.base.Predicates.in;
 import static com.google.common.base.Predicates.not;
 
@@ -295,7 +296,7 @@ public class AgreementSeeker {
             m_alive.put(s, reportingHsid);
         }
 
-        for (long s: sfm.m_safeTxnIds.keySet()) {
+        for (long s: sfm.getFailedSites()) {
             if (!m_hsids.contains(s)) continue;
             m_reported.put(s, reportingHsid);
         }
@@ -396,7 +397,9 @@ public class AgreementSeeker {
          */
         @Override
         public Boolean visitMatchingCardinality(Void nada) {
-            Set<Long> unreachable = Sets.filter(m_hsids, not(amongSurvivors));
+            if (m_survivors.size() == 1) return false;
+
+            Set<Long> unreachable = Sets.filter(m_hsids, not(in(m_survivors)));
             Set<Long> butAlive = Sets.intersection(m_alive.keySet(), unreachable);
 
             return !butAlive.isEmpty()
@@ -479,7 +482,11 @@ public class AgreementSeeker {
                             }
                         }
                         if (pick == null) {
-                            return ImmutableSet.of();
+                            /*
+                             * You only get here if and ONLY if yourself are the ONLY viable kill
+                             */
+                            return ImmutableSet.copyOf(
+                                    Sets.filter(m_hsids, not(equalTo(m_selfHsid))));
                         }
 
                         // pick can no longer see anyone dead or alive
