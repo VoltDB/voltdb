@@ -1,5 +1,3 @@
-package org.voltdb.regressionsuites;
-
 /* This file is part of VoltDB.
  * Copyright (C) 2008-2013 VoltDB Inc.
  *
@@ -22,6 +20,8 @@ package org.voltdb.regressionsuites;
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
+package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
@@ -78,12 +78,12 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
 
         // Test Order by
         // FIXME(XIN):
-//        cr = client.callProcedure("@AdHoc", "SELECT dept, SUM(wage) as tag, count(wage)+1 from R1 GROUP BY dept ORDER BY tag DESC");
-//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-//        vt = cr.getResults()[0];
-//        expected = new long[][] {{2, 90, 3}, {1, 60, 4} };
-//        System.out.println(vt.toString());
-//        compareTable(vt, expected);
+        cr = client.callProcedure("@AdHoc", "SELECT dept, SUM(wage) as tag, count(wage)+1 from P1 GROUP BY dept");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        expected = new long[][] {{2, 90, 3}, {1, 60, 4} };
+        System.out.println(vt.toString());
+        compareTable(vt, expected);
 
         // Test Complex Group By
         // FIXME(XIN): complex group by not supported

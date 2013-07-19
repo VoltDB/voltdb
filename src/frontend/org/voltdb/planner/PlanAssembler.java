@@ -1369,7 +1369,7 @@ public class PlanAssembler {
     AbstractPlanNode pushDownAggregate(AbstractPlanNode root,
                                        AggregatePlanNode distNode,
                                        AggregatePlanNode coordNode,
-                                       boolean neeProjectionNode, NodeSchema newSchema) {
+                                       boolean needProjectionNode, NodeSchema newSchema) {
 
         // remember that coordinating aggregation has a pushed-down
         // counterpart deeper in the plan. this allows other operators
@@ -1407,15 +1407,15 @@ public class PlanAssembler {
             coordNode.addAndLinkChild(root);
             coordNode.generateOutputSchema(m_catalogDb);
             root = coordNode;
-            if (neeProjectionNode)
+            if (needProjectionNode)
                 proj.addAndLinkChild(coordNode);
 
         } else {
-            if (neeProjectionNode)
+            if (needProjectionNode)
                 proj.addAndLinkChild(root);
         }
 
-        if (neeProjectionNode) {
+        if (needProjectionNode) {
             proj.setOutputSchema(newSchema);
             proj.generateOutputSchema(m_catalogDb);
             root = proj;
