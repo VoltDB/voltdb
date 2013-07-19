@@ -527,7 +527,7 @@ class Schema:
         self.__col_by_type["nonnumeric"] = {}
         for code, supertype in Schema.TYPE_NAMES.iteritems():
             self.__col_by_type[supertype] = {}
-        
+
         for table, tabledict in self.__schema.iteritems():
             for column in tabledict["columns"]:
                 column_name = column[0];
@@ -670,7 +670,7 @@ class Template:
             result = []
         # Add the clause list or table as the next listed choice.
         result.append(choice)
-    
+
         # Since options don't contain recursive unresolved references to generators
         # only the tail needs to be recursively processed and its resulting choice list
         # tacked on to the result.
@@ -706,7 +706,7 @@ class SQLGenerator:
 
     GENERATOR_TYPES = (TableGenerator, ColumnGenerator, ConstantGenerator, IdGenerator)
 
-    UNRESOLVED_PUNCTUATION = re.compile(r'[][#@]') # Literally, ']', '[', '#', or '@'. 
+    UNRESOLVED_PUNCTUATION = re.compile(r'[][#@]') # Literally, ']', '[', '#', or '@'.
     UNRESOLVED_GENERATOR = re.compile(r'(^|\W)[_]')
     # The presence of an underbar apparently inside a quoted string after the LIKE keyword
     # is likely enough to be a false positive for an unresolved generator that it is
@@ -729,7 +729,7 @@ class SQLGenerator:
                                                                               generators,
                                                                               field_map):
                 yield generated_stmt
-            
+
     def generate(self, summarize_successes = False):
         for s in self.__statements:
             results = 0
