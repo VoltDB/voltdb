@@ -114,10 +114,10 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         }
 
         // Block until all blocks for partitioned tables are streamed over.
-        JOINLOG.info("P" + m_partitionId + " blocking partitioned table transfer starts");
+        JOINLOG.info("P" + m_partitionId + " blocking data transfer starts");
         while (tableBlock != null) {
             if (JOINLOG.isTraceEnabled()) {
-                JOINLOG.trace(m_whoami + "restoring partitioned table " + tableBlock.getFirst() +
+                JOINLOG.trace(m_whoami + "restoring table " + tableBlock.getFirst() +
                               " block of (" + tableBlock.getSecond().position() + "," +
                               tableBlock.getSecond().limit() + ")");
             }
@@ -137,13 +137,13 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         assert m_dataSink.isEOF();
         m_dataSink.close();
 
-        JOINLOG.debug(m_whoami + " partitioned table snapshot transfer is finished");
+        JOINLOG.debug(m_whoami + " data transfer is finished");
 
         SnapshotCompletionEvent event = null;
         try {
             event = m_snapshotCompletionMonitor.get();
             assert(event != null);
-            JOINLOG.debug("P" + m_partitionId + " noticed partitioned table snapshot completion");
+            JOINLOG.debug("P" + m_partitionId + " noticed data transfer completion");
             m_completionAction.setSnapshotTxnId(event.multipartTxnId);
         } catch (InterruptedException e) {
             // isDone() already returned true, this shouldn't happen
