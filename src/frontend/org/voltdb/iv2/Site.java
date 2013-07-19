@@ -96,7 +96,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     final int m_snapshotPriority;
 
-    // Partition count is important for some reason.
+    // Partition count is important on SPIs, MPI doesn't use it.
     int m_numberOfPartitions;
 
     // What type of EE is controlled
@@ -419,6 +419,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     ExecutionEngine initializeEE(String serializedCatalog, final long timestamp)
     {
         String hostname = CoreUtils.getHostnameOrAddress();
+        Pair<TheHashinator.HashinatorType, byte[]> hashinatorConfig = TheHashinator.getCurrentConfig();
         ExecutionEngine eeTemp = null;
         try {
             if (m_backend == BackendTarget.NATIVE_EE_JNI) {
@@ -431,8 +432,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         hostname,
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getMaxtemptablesize(),
-                        TheHashinator.getConfiguredHashinatorType(),
-                        TheHashinator.getConfigureBytes(m_numberOfPartitions),
+                        hashinatorConfig.getFirst(),
+                        hashinatorConfig.getSecond(),
                         this);
                 eeTemp.loadCatalog( timestamp, serializedCatalog);
             }
@@ -449,8 +450,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             getSystemsettings().get("systemsettings").getMaxtemptablesize(),
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPorts.remove(0),
-                            TheHashinator.getConfiguredHashinatorType(),
-                            TheHashinator.getConfigureBytes(m_numberOfPartitions),
+                            hashinatorConfig.getFirst(),
+                            hashinatorConfig.getSecond(),
                             this);
                 eeTemp.loadCatalog( timestamp, serializedCatalog);
             }
