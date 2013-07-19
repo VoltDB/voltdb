@@ -41,8 +41,8 @@ implements Runnable {
      * element is a pair of <sourceHSId, blockData>. The hsId should remain the
      * same for the length of the data transfer process for this partition.
      */
-    private final LinkedBlockingQueue<Pair<Long, BBContainer>> m_queue =
-            new LinkedBlockingQueue<Pair<Long, BBContainer>>();
+    private final LinkedBlockingQueue<Pair<Long, Pair<Long, BBContainer>>> m_queue =
+            new LinkedBlockingQueue<Pair<Long, Pair<Long, BBContainer>>>();
 
     private final Mailbox m_mb;
     private final FixedDBBPool m_bufferPool;
@@ -63,7 +63,7 @@ implements Runnable {
      *
      * @return null if the queue is empty.
      */
-    public Pair<Long, BBContainer> poll() {
+    public Pair<Long, Pair<Long, BBContainer>> poll() {
         return m_queue.poll();
     }
 
@@ -73,7 +73,7 @@ implements Runnable {
      * @return
      * @throws InterruptedException
      */
-    public Pair<Long, BBContainer> take() throws InterruptedException {
+    public Pair<Long, Pair<Long, BBContainer>> take() throws InterruptedException {
         return m_queue.take();
     }
 
@@ -123,7 +123,7 @@ implements Runnable {
                                     compressionBuffer.b,
                                     messageBuffer);
                     messageBuffer.limit(uncompressedSize);
-                    m_queue.offer(Pair.of(dataMsg.m_sourceHSId, container));
+                    m_queue.offer(Pair.of(dataMsg.m_sourceHSId, Pair.of(dataMsg.getTargetId(), container)));
                     success = true;
                 } finally {
                     if (!success && container != null) {

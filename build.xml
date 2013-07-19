@@ -147,7 +147,7 @@ PRIMARY ENTRY POINTS
 -->
 
 <target name="default"
-    depends="compile, ee, voltdb.jar"
+    depends="compile, ee, voltdb.jar, voltdbclient.jar"
     description="Compile Java classes and C++ JNI library."
 />
 <target name="check"
@@ -728,6 +728,7 @@ JAR BUILDING
             <include name="org/eclipse/jetty_voltpatches/**" />
             <include name="javax/servlet_voltpatches/**" />
             <include name="au/com/bytecode/opencsv_voltpatches/**" />
+            <include name="org/cliffc_voltpatches/**" />
 	    <include name="org/supercsv_voltpatches/tokenizer/*" />
             <include name="org/hsqldb_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
@@ -894,7 +895,7 @@ JAVA COMPILATION
         <fileset dir="${src.hsqldb.dir}" includes="**/*.properties" />
         <fileset dir="${src.gpl.dir}" includes="**/*.properties"/>
         <fileset dir="${src.gpl.dir}" includes="**/*.xml" />
-        <fileset dir="${src.gpl.dir}" includes="**/admintemplate.html" />
+        <fileset dir="${src.gpl.dir}" includes="**/*template.html" />
     </copy>
 
     <copy todir='${build.prod.dir}/org/hsqldb_voltpatches/resources'>
@@ -968,6 +969,7 @@ JAVA COMPILATION
                   au/**/*.java,org/spearce_voltpatches/**/*.java
                   org/json_voltpatches/**/*.java
                   vanilla/**/*.java
+                  org/cliffc_voltpatches/**
 		  org/supercsv_voltpatches/tokenizer/*.java"/>
     <!-- non-voltcore voltdb code -->
     <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java" />

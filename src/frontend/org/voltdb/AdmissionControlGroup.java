@@ -20,8 +20,8 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListMap;
 
+import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.dtxn.LatencyStats.LatencyInfo;
@@ -89,19 +89,18 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
     private final HashSet<ACGMember> m_members = new HashSet<ACGMember>();
 
     /*
-     * There will be unsynchronized reads of the map hence volatile to ensure
-     * new versions of the map are completely constructed on read.
-     *
      * Reads/writes to the actual InvocationInfo are unsynchronized. There is a single writer
      * so no issues there, but the reader is unprotected.
+     *
+     * There is only one writer so a single stripe is fine
      */
-    private volatile ConcurrentHashMap<Long, Map<String, InvocationInfo>> m_connectionStates =
-            new ConcurrentHashMap<Long, Map<String, InvocationInfo>>();
+    private final ConcurrentHashMap<Long, Map<String, org.voltdb.dtxn.InitiatorStats.InvocationInfo>> m_connectionStates =
+                 new ConcurrentHashMap<Long, Map<String, org.voltdb.dtxn.InitiatorStats.InvocationInfo>>(1024, .75f, 1);
 
     // Use the same-ish trick for the latency stats.  LatencyInfo keeps
     // volatile ImmutableLists for the buckets and a separate volatile max.
     // Same single-writer, unsynchronized reader pattern as initiator stats.
-    private LatencyInfo m_latencyInfo = new LatencyInfo();
+    private final LatencyInfo m_latencyInfo = new LatencyInfo();
 
     public AdmissionControlGroup(int maxBytes, int maxRequests)
     {
@@ -284,8 +283,8 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
             byte status) {
         boolean needToInsert = false;
         Map<String, InvocationInfo> procInfoMap = m_connectionStates.get(connectionId);
-        if(procInfoMap == null) {
-            procInfoMap = new ConcurrentSkipListMap<String, InvocationInfo>();
+        if (procInfoMap == null) {
+            procInfoMap = new NonBlockingHashMap<String, InvocationInfo>();
             needToInsert = true;
         }
         InvocationInfo info = procInfoMap.get(procedureName);
@@ -294,10 +293,10 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
             procInfoMap.put(procedureName, info);
         }
         info.processInvocation(delta, status);
-        if(needToInsert) {
+        m_latencyInfo.addSample(delta);
+        if (needToInsert) {
             m_connectionStates.put(connectionId, procInfoMap);
         }
-        m_latencyInfo.addSample(delta);
     }
 
     public Iterator<Map.Entry<Long, Map<String, InvocationInfo>>> getInitiationStatsIterator() {

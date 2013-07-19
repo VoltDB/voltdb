@@ -245,7 +245,8 @@ public class RejoinProducer extends JoinProducerBase {
 
         // MUST choose the leader as the source.
         long sourceSite = m_mailbox.getMasterHsId(m_partitionId);
-        long hsId = m_rejoinSiteProcessor.initialize(message.getSnapshotBufferPool());
+        long hsId = m_rejoinSiteProcessor.initialize(message.getSnapshotSourceCount(),
+                                                     message.getSnapshotBufferPool());
 
         REJOINLOG.debug(m_whoami
                 + "received INITIATION message. Doing liverejoin: "

@@ -400,8 +400,7 @@ public class TestPartitionedTableSaveFileState extends TestCase
         HashSet<Integer> partitionsDistributed = new HashSet<Integer>();
         for (int i = 0; i < plan.length - 1; ++i)
         {
-            assertEquals(SysProcFragmentId.
-                         PF_restoreDistributePartitionedTable,
+            assertEquals(SysProcFragmentId.PF_restoreDistributePartitionedTableAsPartitioned,
                          plan[i].fragmentId);
             assertTrue(plan[i].siteId == 0 || plan[i].siteId == CoreUtils.getHSIdFromHostAndSite(i,i));
             assertFalse(plan[i].multipartition);
@@ -415,7 +414,7 @@ public class TestPartitionedTableSaveFileState extends TestCase
         }
         assertTrue(partitionsDistributed.containsAll(partitionsToDistribute));
         assertEquals(SysProcFragmentId.
-                     PF_restoreDistributePartitionedTableResults,
+                     PF_restoreReceiveResultTables,
                      plan[plan.length - 1].fragmentId);
         assertFalse(plan[plan.length - 1].multipartition);
         checkPlanDependencies(plan);

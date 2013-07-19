@@ -170,8 +170,8 @@ public class MockMailbox implements Mailbox {
         return null;
     }
 
-    public VoltMessage popLastMessage() {
-        return outgoingMessages.pollLast().contents;
+    public VoltMessage pollMessage() {
+        return outgoingMessages.poll().contents;
     }
 
     public boolean noSentMessages() {

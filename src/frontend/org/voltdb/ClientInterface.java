@@ -140,7 +140,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * in order to avoid ensure that nothing misses the end of backpressure notification
      */
     private final ReentrantLock m_backpressureLock = new ReentrantLock();
-    private final ConcurrentHashMap<Connection, Object> m_connections = new ConcurrentHashMap<Connection, Object>();
+    private final ConcurrentHashMap<Connection, Object> m_connections =
+            new ConcurrentHashMap<Connection, Object>(10240, .75f, 128);
     private final SnapshotDaemon m_snapshotDaemon = new SnapshotDaemon();
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
 
@@ -163,7 +164,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * lookup.
      */
     private final ConcurrentHashMap<Long, ClientInterfaceHandleManager> m_cihm =
-              new ConcurrentHashMap<Long, ClientInterfaceHandleManager>();
+            new ConcurrentHashMap<Long, ClientInterfaceHandleManager>(10240, .75f, 128);
     private final Cartographer m_cartographer;
 
     /**
@@ -446,7 +447,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                     if (!m_hasDTXNBackPressure) {
                                                         c.enableReadSelection();
                                                     }
-                                                    m_connections.put(c, "CONN");
+                                                    m_connections.put(c, "");
                                                 } finally {
                                                     m_backpressureLock.unlock();
                                                 }
@@ -781,7 +782,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 if (!m_acg.get().hasBackPressure()) {
                     c.enableReadSelection();
                 }
-                m_connections.put(c, "CONN");
+                m_connections.put(c, "");
             }
         }
 

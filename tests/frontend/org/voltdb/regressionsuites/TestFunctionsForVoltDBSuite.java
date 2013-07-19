@@ -25,8 +25,11 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 import java.sql.Timestamp;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -126,7 +129,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
         } catch (ProcCallException e) {
             String msg = e.getMessage();
-            assertTrue(msg.indexOf("INTEGER") != -1); // TODO match a more explicit pattern
+            assertTrue(msg.matches(".*SQL ERROR\n.*VARCHAR.*"));
             caught = true;
         }
         assertTrue(caught);
@@ -1006,6 +1009,182 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
     }
 
+    public void testTRUNCATE() throws Exception {
+        System.out.println("STARTING TRUNCATE with timestamp");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+        VoltDB.setDefaultTimezone();
+
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+        //System.out.println(dateFormat.getTimeZone());
+        Date time = null;
+
+        // Test Standard TRUNCATE function for floating numbers
+        Exception ex = null;
+        try {
+            cr = client.callProcedure("@AdHoc", "select TRUNCATE (1.2, 1), TM from P2 where id = 0");
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            ex = e;
+        } finally {
+            assertNotNull(ex);
+            assertTrue((ex.getMessage().contains("Error compiling query")));
+            assertTrue((ex.getMessage().contains("PlanningErrorException")));
+        }
+
+        // Test date before Gregorian calendar beginning.
+        cr = client.callProcedure("P2.insert", 0, Timestamp.valueOf("1582-03-06 13:56:40.123456"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        ex = null;
+        try {
+            cr = client.callProcedure("TRUNCATE", 0);
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            ex = e;
+        } finally {
+            assertNotNull(ex);
+            assertTrue((ex.getMessage().contains("SQL ERROR")));
+        }
+
+        // Test Timestamp Null value
+        cr = client.callProcedure("P2.insert", 1, null);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("TRUNCATE", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        for (int i=0; i< 11; i++) {
+            assertNull(result.getTimestampAsTimestamp(i));
+        }
+
+        // Test normal TRUNCATE functionalities
+        cr = client.callProcedure("P2.insert", 2, Timestamp.valueOf("2001-09-09 01:46:40.035123"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("TRUNCATE", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+
+        cr = client.callProcedure("TRUNCATE", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+
+        time = dateFormat.parse("2001-01-01 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(0));
+
+        time = dateFormat.parse("2001-07-01 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(1));
+
+        time = dateFormat.parse("2001-09-01 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(2));
+
+        time = dateFormat.parse("2001-09-09 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(3));
+
+        time = dateFormat.parse("2001-09-09 01:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(4));
+
+        time = dateFormat.parse("2001-09-09 01:46:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(5));
+
+        time = dateFormat.parse("2001-09-09 01:46:40.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(6));
+
+        time = dateFormat.parse("2001-09-09 01:46:40.035");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(7));
+
+        time = dateFormat.parse("2001-09-09 01:46:40.035");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(8));
+
+        assertEquals(1000000000035123L, result.getTimestampAsLong(9));
+        assertEquals(1000000000035123L, result.getTimestampAsLong(10));
+
+        // Test time before EPOCH
+        cr = client.callProcedure("P2.insert", 3, Timestamp.valueOf("1583-11-24 13:56:40.123456"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("TRUNCATE", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+
+        time = dateFormat.parse("1583-01-01 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(0));
+
+        time = dateFormat.parse("1583-10-01 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(1));
+
+        time = dateFormat.parse("1583-11-01 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(2));
+
+        time = dateFormat.parse("1583-11-24 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(3));
+
+        time = dateFormat.parse("1583-11-24 13:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(4));
+
+        time = dateFormat.parse("1583-11-24 13:56:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(5));
+
+        time = dateFormat.parse("1583-11-24 13:56:40.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(6));
+
+        time = dateFormat.parse("1583-11-24 13:56:40.123");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(7));
+
+        time = dateFormat.parse("1583-11-24 13:56:40.123");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(7));
+
+        assertEquals(-12184250599876544L, result.getTimestampAsLong(9));
+        assertEquals(-12184250599876544L, result.getTimestampAsLong(10));
+
+        // Test date in far future
+        cr = client.callProcedure("P2.insert", 4, Timestamp.valueOf("2608-03-06 13:56:40.123456"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("TRUNCATE", 4);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+
+        time = dateFormat.parse("2608-01-01 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(0));
+
+        time = dateFormat.parse("2608-01-01 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(1));
+
+        time = dateFormat.parse("2608-03-01 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(2));
+
+        time = dateFormat.parse("2608-03-06 00:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(3));
+
+        time = dateFormat.parse("2608-03-06 13:00:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(4));
+
+        time = dateFormat.parse("2608-03-06 13:56:00.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(5));
+
+        time = dateFormat.parse("2608-03-06 13:56:40.000");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(6));
+
+        time = dateFormat.parse("2608-03-06 13:56:40.123");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(7));
+
+        time = dateFormat.parse("2608-03-06 13:56:40.123");
+        assertEquals(time.getTime() * 1000, result.getTimestampAsLong(7));
+
+        assertEquals(20138939800123456L, result.getTimestampAsLong(9));
+        assertEquals(20138939800123456L, result.getTimestampAsLong(10));
+    }
+
     public void testFunctionsWithInvalidJSON() throws Exception {
 
         Client client = getClient();
@@ -1192,6 +1371,10 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         project.addStmtProcedure("TO_TIMESTAMP_MILLISECOND", "select TO_TIMESTAMP (MILLISECOND, ?) from P2 where id = ?");
         project.addStmtProcedure("TO_TIMESTAMP_MICROS", "select TO_TIMESTAMP (MICROS, ?) from P2 where id = ?");
         project.addStmtProcedure("TO_TIMESTAMP_MICROSECOND", "select TO_TIMESTAMP (MICROSECOND, ?) from P2 where id = ?");
+
+        project.addStmtProcedure("TRUNCATE", "select TRUNCATE(YEAR, TM), TRUNCATE(QUARTER, TM), TRUNCATE(MONTH, TM), " +
+                "TRUNCATE(DAY, TM), TRUNCATE(HOUR, TM),TRUNCATE(MINUTE, TM),TRUNCATE(SECOND, TM), TRUNCATE(MILLIS, TM), " +
+                "TRUNCATE(MILLISECOND, TM), TRUNCATE(MICROS, TM), TRUNCATE(MICROSECOND, TM) from P2 where id = ?");
 
         // CONFIG #1: Local Site/Partition running on JNI backend
         config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
