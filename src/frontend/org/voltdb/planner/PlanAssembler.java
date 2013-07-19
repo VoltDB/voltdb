@@ -942,8 +942,21 @@ public class PlanAssembler {
                                 col.ascending ? SortDirectionType.ASC
                                               : SortDirectionType.DESC);
         }
-        orderByNode.addAndLinkChild(root);
-        orderByNode.generateOutputSchema(m_catalogDb);
+
+        AbstractPlanNode projectionNode = root;
+        if (m_parsedSelect.hasComplexAgg()) {
+            AbstractPlanNode aggNode = root.getChild(0);
+            projectionNode.clearChildren();
+            aggNode.clearParents();
+
+            orderByNode.addAndLinkChild(aggNode);
+            orderByNode.generateOutputSchema(m_catalogDb);
+            projectionNode.addAndLinkChild(orderByNode);
+
+        } else {
+            orderByNode.addAndLinkChild(root);
+            orderByNode.generateOutputSchema(m_catalogDb);
+        }
 
         // get all of the columns in the sort
         List<AbstractExpression> orderExpressions = orderByNode.getSortExpressions();
@@ -1022,6 +1035,11 @@ public class PlanAssembler {
         if (allScansAreDeterministic) {
             orderByNode.setOrderingByUniqueColumns();
         }
+
+        if (m_parsedSelect.hasComplexAgg()) {
+            return projectionNode;
+        }
+
         return orderByNode;
     }
 

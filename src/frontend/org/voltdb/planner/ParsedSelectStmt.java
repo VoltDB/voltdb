@@ -61,7 +61,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (obj == this) return true;
             if (obj instanceof ParsedColInfo == false) return false;
             ParsedColInfo col = (ParsedColInfo) obj;
-            if (alias == col.alias && columnName == col.columnName && tableName == col.tableName
+            if (alias.equals(col.alias ) && columnName.equals(col.columnName) && tableName.equals(col.tableName)
                     && expression.equals(col.expression) )
                 return true;
             return false;
@@ -73,7 +73,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (obj == this) return true;
             if (obj instanceof ParsedColInfo == false) return false;
             ParsedColInfo col = (ParsedColInfo) obj;
-            if (alias == col.alias && columnName == col.columnName && tableName == col.tableName
+            if (alias.equals(col.alias ) && columnName.equals(col.columnName) && tableName.equals(col.tableName)
                     && expression.equals(col.expression) && index == col.index && size == col.size
                     && orderBy == col.orderBy && ascending == col.ascending && groupBy == col.groupBy
                     && finalOutput == col.finalOutput) {
@@ -161,7 +161,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         //TODO(XIN): double check whether should we add orderColumns
         // Assume that we do not support order by Complex expressions which do not appear in
         // display columns right now
-        //insertToAggResultColumns(orderColumns);
+        insertToAggResultColumns(orderColumns);
 
         // Generate New output Schema, replace Aggs with TVEs for group by and order by
         evaluateColumns();
@@ -244,7 +244,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             newAggSchema.addColumn(schema_col);
         }
 
-        // Now I am good to setup the column, but I want to check whether it hasComplexAgg
+        // Now I want to check whether it hasComplexAgg
         if (!hasComplexAgg()) {
             if (displayColumns.size() == aggResultColumns.size())
                 for (int ii=0; ii < displayColumns.size(); ii++) {

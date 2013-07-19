@@ -521,6 +521,8 @@ inline void AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
     }
 
     output_table->insertTupleNonVirtual(tmptup);
+
+    VOLT_TRACE("output_table:\n%s", output_table->debug().c_str());
 }
 
 inline void AggregateExecutorBase::advanceAggs(AggregateRow* aggregateRow)
