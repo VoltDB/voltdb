@@ -52,6 +52,7 @@
 #include "table.h"
 #include "storage/TupleIterator.h"
 #include "execution/VoltDBEngine.h"
+#include "common/TimeOutException.h"
 
 namespace voltdb {
 
@@ -196,16 +197,15 @@ inline bool TableIterator::next(TableTuple &out, VoltDBEngine* engine) {
 		//Update stats in java and let java determine if we should cancel this query.
 		if( engine->getTopend()->updateStats(m_foundTuples) ){
 			VOLT_ERROR("Time out read only query.");
-			throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_SQL,
-					"Time out read only query.");
+			throw TimeOutException("Time out read only query.");
 		}
 	}
-	if (!m_tempTableIterator) {
-		return persistentNext(out);
-	}
-	else {
-		return tempNext(out);
-	}
+    if (!m_tempTableIterator) {
+        return persistentNext(out);
+    }
+    else {
+        return tempNext(out);
+    }
 }
 
 inline bool TableIterator::persistentNext(TableTuple &out) {
