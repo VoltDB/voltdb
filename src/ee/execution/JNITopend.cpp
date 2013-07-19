@@ -97,8 +97,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
-    //what's this signature thing?
-    m_updateStatsMID = m_jniEnv->GetMethodID(jniClass, "updateStats", "(J)V");
+    m_updateStatsMID = m_jniEnv->GetMethodID(jniClass, "updateStats", "(J)Z");
     if (m_updateStatsMID == NULL) {
     	m_jniEnv->ExceptionDescribe();
     	assert(m_updateStatsMID != 0);

@@ -84,6 +84,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     private int m_cacheMisses = 0;
     private int m_eeCacheSize = 0;
 
+    private boolean m_readOnly;
+    private long m_startTime;
+
     protected FragmentPlanSource m_planSource;
 
     /** Make the EE clean and ready to do new transactional work. */
@@ -309,7 +312,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public boolean updateStats(long stats) {
         System.err.println(stats);
         //Set timer and time out read only queries.
-        return false;
+        long currentTime = System.currentTimeMillis();
+        if(m_readOnly && currentTime - m_startTime > 50)
+            return true;
+        else
+            return false;
     }
 
     /**
@@ -363,6 +370,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                             long undoQuantumToken) throws EEException
     {
         try {
+            //For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
+            m_readOnly = (undoQuantumToken == Long.MAX_VALUE) ? true : false;
+            //Consider put the following line in EEJNI.coreExecutePlanFrag... before where the native method is called?
+            m_startTime = System.currentTimeMillis();
             VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
                     parameterSets, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
             m_plannerStats.updateEECacheStats(m_eeCacheSize, numFragmentIds - m_cacheMisses,

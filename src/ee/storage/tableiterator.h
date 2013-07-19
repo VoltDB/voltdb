@@ -51,6 +51,7 @@
 #include "common/tabletuple.h"
 #include "table.h"
 #include "storage/TupleIterator.h"
+#include "execution/VoltDBEngine.h"
 
 namespace voltdb {
 
@@ -81,6 +82,7 @@ public:
      * @return true if succeeded. false if no more active tuple is there.
     */
     bool next(TableTuple &out);
+    bool next(TableTuple &out, VoltDBEngine* engine);
     bool hasNext();
     int getLocation() const;
     int getTuplesFound();
@@ -88,7 +90,9 @@ public:
 private:
     // Get an iterator via table->iterator()
     TableIterator(Table *, TBMapI);
+    TableIterator(Table *, TBMapI, VoltDBEngine* engine);
     TableIterator(Table *, std::vector<TBPtr>::iterator);
+    TableIterator(Table *, std::vector<TBPtr>::iterator, VoltDBEngine* engine);
 
 
     bool persistentNext(TableTuple &out);
@@ -135,7 +139,6 @@ inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator 
       m_tempTableIterator(true)
     {
     }
-
 
 inline TableIterator::TableIterator(Table *parent, TBMapI start)
     :
@@ -186,6 +189,23 @@ inline bool TableIterator::next(TableTuple &out) {
     else {
         return tempNext(out);
     }
+}
+
+inline bool TableIterator::next(TableTuple &out, VoltDBEngine* engine) {
+	if(m_foundTuples % 10000 == 0 && m_foundTuples != 0) {
+		//Update stats in java and let java determine if we should cancel this query.
+		if( engine->getTopend()->updateStats(m_foundTuples) ){
+			VOLT_ERROR("Time out read only query.");
+			throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_SQL,
+					"Time out read only query.");
+		}
+	}
+	if (!m_tempTableIterator) {
+		return persistentNext(out);
+	}
+	else {
+		return tempNext(out);
+	}
 }
 
 inline bool TableIterator::persistentNext(TableTuple &out) {
