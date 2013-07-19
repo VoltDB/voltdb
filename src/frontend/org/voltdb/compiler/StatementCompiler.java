@@ -122,9 +122,9 @@ public abstract class StatementCompiler {
         // Input Parameters
         // We will need to update the system catalogs with this new information
         for (int i = 0; i < plan.parameters.length; ++i) {
-            VoltType type = plan.parameters[i];
             StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(i));
-            catalogParam.setJavatype(type.getValue());
+            catalogParam.setJavatype(plan.parameters[i].getValueType().getValue());
+            catalogParam.setIsarray(plan.parameters[i].getParamIsVector());
             catalogParam.setIndex(i);
         }
 
