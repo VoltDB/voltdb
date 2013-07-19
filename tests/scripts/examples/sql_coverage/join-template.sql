@@ -30,8 +30,7 @@ SELECT * FROM _table LHS25 @jointype JOIN _table RHS ON    LHS25.@idcol = RHS.@i
 
 SELECT * FROM _table LHS26 @jointype JOIN _table RHS ON    LHS26.@idcol = RHS.@idcol AND   LHS26._variable[#joined numeric] = RHS.__[#joined] WHERE RHS.@idcol > 10 AND LHS26.__[#joined] < 30 AND LHS26.__[#joined] >= RHS.@idcol
 
---TODO: Investigate why are these getting timeout errors
--- when the supposedly equivalent LHS16 and LHS26 queries above work?
+--TODO: ENG-4929 Investigate why these get a planner NullPointerException for a timeout.
 --SELECT * FROM _table LHS36 @jointype JOIN _table RHS USING(      @idcol,                         _variable[#joined numeric])          WHERE     @idcol > 10 AND       __[#joined] < 30 AND       __[#joined] >=     @idcol
 -- it's not (just) the select * that fails:
--- SELECT @idcol, __[#joined] FROM _table LHS36 @jointype JOIN _table RHS USING(      @idcol,                         _variable[#joined numeric])          WHERE     @idcol > 10 AND       __[#joined] < 30 AND       __[#joined] >=     @idcol
+--SELECT @idcol, __[#joined] FROM _table LHS36 @jointype JOIN _table RHS USING(      @idcol,       _variable[#joined numeric])          WHERE     @idcol > 10 AND       __[#joined] < 30 AND       __[#joined] >=     @idcol

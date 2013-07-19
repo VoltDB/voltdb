@@ -129,7 +129,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
         } catch (ProcCallException e) {
             String msg = e.getMessage();
-            assertTrue(msg.indexOf("INTEGER") != -1); // TODO match a more explicit pattern
+            assertTrue(msg.matches(".*SQL ERROR\n.*VARCHAR.*"));
             caught = true;
         }
         assertTrue(caught);
