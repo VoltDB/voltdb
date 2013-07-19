@@ -78,8 +78,10 @@
 --{_instrings |= "_insomefixedstrings"}
 
 {_numericvalue |= "_value[int]"}
-{_numericvalue |= "_value[float]"}
-{_numericvalue |= "_value[decimal]"}
+--HSQL and VoltDB disagree about how to make mixed types agree when comparing int columns
+-- to float/decimal constants.
+--{_numericvalue |= "_value[float]"}
+--{_numericvalue |= "_value[decimal]"}
 
 {_numericcolumnpredicate |= "_variable[numeric] _cmp _numericvalue"}
 --{_numericcolumnpredicate |= "_inints"}

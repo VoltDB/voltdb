@@ -35,25 +35,6 @@ from optparse import OptionParser # for use in standalone test mode
 COUNT = 2                       # number of random values to generate by default
 IS_VOLT = False
 
-# Python 2.4 doesn't have these two methods in the itertools module, so here's
-# the equivalent implementations.
-def product(*args, **kwds):
-    # product('ABCD', 'xy') --> Ax Ay Bx By Cx Cy Dx Dy
-    # product(range(2), repeat=3) --> 000 001 010 011 100 101 110 111
-    pools = map(tuple, args) * kwds.get("repeat", 1)
-    result = [[]]
-    for pool in pools:
-        result = [x + [y] for x in result for y in pool]
-    return result
-
-def permutations(iterable, r = None):
-    pool = tuple(iterable)
-    n = len(pool)
-    r = (r is None) and n or r
-    for indices in product(range(n), repeat=r):
-        if len(set(indices)) == r:
-            yield [pool[i] for i in indices]
-
 def field_name_generator():
     i = 0
     while True:
@@ -127,13 +108,16 @@ class DecimalValueGenerator:
     """
 
     def __init__(self):
-        # currently we only support 12 digits of precision
-        decimal.getcontext().prec = 12
+        # currently VoltDB values support 12 digits of precision.
+        # generate constant values to 3 digits of precision to give HSQL room
+        # to do exact math (multiplications) within 12 bits of precision.
+        # Otherwise, it complains rather than rounding.
+        decimal.getcontext().prec = 3
 
     def generate_values(self, count):
         for i in xrange(count):
             # we support 7 digits of scale, so magnify those tiny floats
-            yield decimal.Decimal(str(random.random() * 1e2))
+            yield decimal.Decimal(str(random.random() * 100.00))
 
 
 class StringValueGenerator:

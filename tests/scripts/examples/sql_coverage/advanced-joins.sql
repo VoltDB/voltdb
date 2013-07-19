@@ -6,7 +6,7 @@
 {@comparabletype = "numeric"}
 {@comparableconstant = "44"}
 {@columnpredicate = "_numericcolumnpredicate"}
-{@dmlcolumnpredicate = "_variable[numeric] _cmp _value[numeric]"}
+{@dmlcolumnpredicate = "_variable[numeric] _cmp _value[int16]"}
 {@updatecolumn = "NUM"}
 {@updatevalue = "_value[int:0,100]"}
 {@optionalfn = "_numfun"}

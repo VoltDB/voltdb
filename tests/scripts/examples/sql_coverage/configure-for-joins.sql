@@ -8,7 +8,7 @@
 {@comparableconstant = "44"}
 {@comparabletype = "numeric"}
 {@comparablevalue = "_numericvalue"}
-{@dmlcolumnpredicate = "_variable[numeric] _cmp _value[numeric]"}
+{@dmlcolumnpredicate = "_variable[numeric] _cmp _value[int16]"}
 {@dmltable = "_table"}
 {@idcol = "ID"}
 -- reducing the random values to int16 until overflow detection works

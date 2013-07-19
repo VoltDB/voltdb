@@ -8,7 +8,7 @@
 {@comparableconstant = "42.42"}
 {@comparabletype = "numeric"}
 {@comparablevalue = "_value[int:200,250]"}
-{@dmlcolumnpredicate = "_variable[numeric] _cmp _value[numeric]"}
+{@dmlcolumnpredicate = "_variable[numeric] _cmp _value[int16]"}
 {@dmltable = "_table"}
 {@fromtables = "_table"}
 {@idcol = "ID"}
