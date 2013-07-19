@@ -114,6 +114,7 @@ import org.voltdb.types.IndexType;
 import org.xml.sax.SAXException;
 
 import com.google.common.base.Charsets;
+import static org.voltdb.compiler.deploymentfile.ServerExportEnum.JDBC;
 
 /**
  *
@@ -1071,13 +1072,32 @@ public abstract class CatalogUtil {
         ExportOnServerType exportOnServer = exportType.getOnserver();
         if (exportOnServer != null) {
 
+            String exportClientClassName = null;
+
+            switch( exportOnServer.getExportto()) {
+            case FILE: exportClientClassName = ExportToFileClient.class.getName(); break;
+            case JDBC: exportClientClassName = "org.voltdb.exportclient.JDBCExportClient"; break;
+            //Validate that we can load the class.
+            case CUSTOM:
+                try {
+                    CatalogUtil.class.getClassLoader().loadClass(exportOnServer.getExportpluginclass());
+                } catch (ClassNotFoundException ex) {
+                    hostLog.error(
+                            "Custom Export failed to configure, failed to load " +
+                            " export plugin class: " + exportOnServer.getExportpluginclass() +
+                            " Disabling export.");
+                    exportType.setEnabled(false);
+                    return;
+                }
+                break;
+            }
+
             // this is OK as the deployment file XML schema does not allow for
             // export configuration property names that begin with underscores
             ConnectorProperty prop = catconn.getConfig().add(GuestProcessor.EXPORT_TO_TYPE);
             prop.setName(GuestProcessor.EXPORT_TO_TYPE);
-            switch( exportOnServer.getExportto()) {
-            case FILE: prop.setValue(ExportToFileClient.class.getName()); break;
-            case JDBC: prop.setValue("org.voltdb.exportclient.JDBCExportClient"); break;
+            if (exportClientClassName != null && exportClientClassName.length() > 0) {
+                prop.setValue(exportClientClassName);
             }
 
             ExportConfigurationType exportConfiguration = exportOnServer.getConfiguration();

@@ -46,6 +46,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.ConstraintType;
 
 import com.google.common.base.Joiner;
+import static junit.framework.Assert.assertTrue;
 
 public class TestCatalogUtil extends TestCase {
 
@@ -230,6 +231,24 @@ public class TestCatalogUtil extends TestCase {
                             "</users>" +
                             "</deployment>";
 
+        final String dep10 = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+                            "<deployment>" +
+                            "<security enabled=\"true\"/>" +
+                            "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+                            "<paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+                            "<httpd port='0'>" +
+                            "<jsonapi enabled='true'/>" +
+                            "</httpd>" +
+                            "<export enabled='true' >" +
+                                "<onserver exportto='custom' exportpluginclass=\"com.foo.export.ExportClient\"  >" +
+                                "</onserver>" +
+                            "</export>" +
+                            "<users> " +
+                            "<user name=\"joe\" password=\"aaa\" roles=\"lotre,lodue\"/>" +
+                            "<user name=\"jone\" password=\"bbb\" roles=\"launo,ladue,latre,laquattro\"/>" +
+                            "</users>" +
+                            "</deployment>";
+
         final File tmpDep1 = VoltProjectBuilder.writeStringToTempFile(dep1);
         final File tmpDep2 = VoltProjectBuilder.writeStringToTempFile(dep2);
         final File tmpDep3 = VoltProjectBuilder.writeStringToTempFile(dep3);
@@ -239,6 +258,7 @@ public class TestCatalogUtil extends TestCase {
         final File tmpDep7 = VoltProjectBuilder.writeStringToTempFile(dep7);
         final File tmpDep8 = VoltProjectBuilder.writeStringToTempFile(dep8);
         final File tmpDep9 = VoltProjectBuilder.writeStringToTempFile(dep9);
+        final File tmpDep10 = VoltProjectBuilder.writeStringToTempFile(dep10);
 
         final long crcDep1 = CatalogUtil.getDeploymentCRC(tmpDep1.getPath());
         final long crcDep2 = CatalogUtil.getDeploymentCRC(tmpDep2.getPath());
@@ -249,6 +269,7 @@ public class TestCatalogUtil extends TestCase {
         final long crcDep7 = CatalogUtil.getDeploymentCRC(tmpDep7.getPath());
         final long crcDep8 = CatalogUtil.getDeploymentCRC(tmpDep8.getPath());
         final long crcDep9 = CatalogUtil.getDeploymentCRC(tmpDep9.getPath());
+        final long crcDep10 = CatalogUtil.getDeploymentCRC(tmpDep10.getPath());
 
         assertTrue(crcDep1 > 0);
         assertTrue(crcDep2 > 0);
@@ -259,6 +280,7 @@ public class TestCatalogUtil extends TestCase {
         assertTrue(crcDep7 > 0);
         assertTrue(crcDep8 > 0);
         assertTrue(crcDep9 > 0);
+        assertTrue(crcDep10 > 0);
 
         assertTrue(crcDep1 != crcDep2);
         assertTrue(crcDep1 == crcDep3);
