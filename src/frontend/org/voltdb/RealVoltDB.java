@@ -956,7 +956,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         scheduleWork(new Runnable() {
             @Override
             public void run() {
-                m_statsManager.sendNotification();
+                // A null here was causing a steady stream of annoying but apparently inconsequential
+                // NPEs during a debug session of an unrelated unit test.
+                if (m_statsManager != null) {
+                    m_statsManager.sendNotification();
+                }
             }
         }, 0, StatsManager.POLL_INTERVAL, TimeUnit.MILLISECONDS);
 

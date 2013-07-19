@@ -78,7 +78,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
     }
 
     /** Utility to compare two instances of a VoltType for equality */
-    @SuppressWarnings({ "incomplete-switch", "null" })
+    @SuppressWarnings({ "incomplete-switch" })
     private boolean comparisonHelper(final Object lhs, final Object rhs,
             final VoltType vt) {
         switch (vt) {
