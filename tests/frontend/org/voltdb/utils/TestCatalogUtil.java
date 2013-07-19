@@ -46,6 +46,8 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.ConstraintType;
 
 import com.google.common.base.Joiner;
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertTrue;
 
 public class TestCatalogUtil extends TestCase {
@@ -701,4 +703,26 @@ public class TestCatalogUtil extends TestCase {
         cluster = catalog.getClusters().get("cluster");
         assertFalse(cluster.getNetworkpartition());
     }
+
+    public void testExportConfiguration() throws Exception
+    {
+        final String depCustom = "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+                            "<deployment>" +
+                            "<security enabled=\"true\"/>" +
+                            "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+                            "<paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+                            "<httpd port='0'>" +
+                            "<jsonapi enabled='true'/>" +
+                            "</httpd>" +
+                            "<export enabled='true' >" +
+                                "<onserver exportto='custom' exportpluginclass=\"com.foo.export.ExportClient\"  >" +
+                                "</onserver>" +
+                            "</export>" +
+                            "</deployment>";
+
+        final File tmpDepOff = VoltProjectBuilder.writeStringToTempFile(depCustom);
+        CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDepOff.getPath(), true);
+        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+    }
+
 }
