@@ -850,11 +850,18 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(result.advanceRow());
         assertEquals(result.getTimestampAsLong(0), result.getTimestampAsLong(1));
 
+        // Test user error input, Only accept JDBC's timestamp format: YYYY-MM-DD-SS.sss.
+        try {
+            cr = client.callProcedure("@AdHoc", "select SINCE_EPOCH (MICROS, 'I am a timestamp')  from P2 where id = 5");
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("PlanningErrorException"));
+            assertTrue(ex.getMessage().contains("incompatible data type in conversion"));
+        }
         try {
             cr = client.callProcedure("@AdHoc", "select SINCE_EPOCH (MICROS, '2013-7-2 2:34:12')  from P2 where id = 5");
         } catch (Exception ex) {
             assertTrue(ex.getMessage().contains("PlanningErrorException"));
-            assertTrue(ex.getMessage().contains("incompatible data type"));
+            assertTrue(ex.getMessage().contains("incompatible data type in conversion"));
         }
 
         String[] procedures = {"SINCE_EPOCH_SECOND", "SINCE_EPOCH_MILLIS",
