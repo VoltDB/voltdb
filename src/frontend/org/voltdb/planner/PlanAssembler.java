@@ -538,7 +538,8 @@ public class PlanAssembler {
             root = handleLimitOperator(root);
         }
 
-        root.generateOutputSchema(m_catalogDb);
+        if ( (root.getPlanNodeType() == PlanNodeType.PROJECTION && m_parsedSelect.hasComplexAgg()) == false )
+            root.generateOutputSchema(m_catalogDb);
 
         return root;
     }

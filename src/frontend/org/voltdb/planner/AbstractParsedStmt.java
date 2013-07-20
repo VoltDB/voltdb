@@ -59,6 +59,8 @@ public abstract class AbstractParsedStmt {
 
     public ArrayList<AbstractExpression> multiTableSelectionList = new ArrayList<AbstractExpression>();
 
+    protected ArrayList<AbstractExpression> aggregationList = null;
+
     // Hierarchical join representation
     public JoinTree joinTree = new JoinTree();
 
@@ -223,11 +225,11 @@ public abstract class AbstractParsedStmt {
         return exprTree;
     }
 
-    // TODO: This static function and the functions (below) that it calls to deal with various Expression types
+    // TODO: This function and the functions (below) that it calls to deal with various Expression types
     // are only marginally related to AbstractParsedStmt
     // -- the function is now also called by DDLCompiler with no AbstractParsedStmt in sight --
     // so, the methods COULD be relocated to class AbstractExpression or ExpressionUtil.
-    static public AbstractExpression parseExpressionTree(HashMap<Long, Integer> paramsById, VoltXMLElement root) {
+    public AbstractExpression parseExpressionTree(HashMap<Long, Integer> paramsById, VoltXMLElement root) {
         String elementName = root.name.toLowerCase();
         AbstractExpression retval = null;
 
@@ -245,6 +247,10 @@ public abstract class AbstractParsedStmt {
         }
         else if (elementName.equals("aggregation")) {
             retval = parseAggregationExpression(paramsById, root);
+            if (aggregationList != null) {
+                ExpressionUtil.finalizeValueTypes(retval);
+                aggregationList.add(retval);
+            }
         }
         else if (elementName.equals("simplecolumn")) {
             retval = parseSimpleColumnExpression(root);
@@ -265,7 +271,7 @@ public abstract class AbstractParsedStmt {
     /**
      * Parse a Vector value for SQL-IN
      */
-    private static AbstractExpression parseVectorExpression(HashMap<Long, Integer> paramsById, VoltXMLElement exprNode) {
+    private AbstractExpression parseVectorExpression(HashMap<Long, Integer> paramsById, VoltXMLElement exprNode) {
         ArrayList<AbstractExpression> args = new ArrayList<AbstractExpression>();
         for (VoltXMLElement argNode : exprNode.children) {
             assert(argNode != null);
@@ -358,7 +364,7 @@ public abstract class AbstractParsedStmt {
      * @param exprNode
      * @return
      */
-    private static AbstractExpression parseOperationExpression(HashMap<Long, Integer> paramsById, VoltXMLElement exprNode) {
+    private AbstractExpression parseOperationExpression(HashMap<Long, Integer> paramsById, VoltXMLElement exprNode) {
         String optype = exprNode.attributes.get("optype");
         ExpressionType exprType = ExpressionType.get(optype);
         AbstractExpression expr = null;
@@ -435,7 +441,7 @@ public abstract class AbstractParsedStmt {
      * @param exprNode
      * @return
      */
-    private static AbstractExpression parseAggregationExpression(HashMap<Long, Integer> paramsById, VoltXMLElement exprNode)
+    private AbstractExpression parseAggregationExpression(HashMap<Long, Integer> paramsById, VoltXMLElement exprNode)
     {
         String type = exprNode.attributes.get("optype");
         ExpressionType exprType = ExpressionType.get(type);
@@ -479,7 +485,7 @@ public abstract class AbstractParsedStmt {
      * @param exprNode
      * @return a new Function Expression
      */
-    private static AbstractExpression parseFunctionExpression(HashMap<Long, Integer> paramsById, VoltXMLElement exprNode) {
+    private AbstractExpression parseFunctionExpression(HashMap<Long, Integer> paramsById, VoltXMLElement exprNode) {
         String name = exprNode.attributes.get("name").toLowerCase();
         String disabled = exprNode.attributes.get("disabled");
         if (disabled != null) {

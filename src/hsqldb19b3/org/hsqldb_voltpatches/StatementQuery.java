@@ -32,7 +32,8 @@
 package org.hsqldb_voltpatches;
 
 import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
@@ -424,8 +425,16 @@ public class StatementQuery extends StatementDMQL {
          *
          * Serialize the display columns in the exprColumn order.
          */
-        List<Integer> nullColsIdx = new ArrayList<Integer>();
-        insetElementsAndReplaceSimpleColumns(session,cols, displayCols, nullColsIdx);
+        Set<Integer> nullColsIdx = new HashSet<Integer>();
+        for (int jj=0; jj < displayCols.size(); ++jj) {
+            Expression expr = displayCols.get(jj);
+            if (nullColsIdx.contains(jj)) {
+                continue;
+            }
+            VoltXMLElement xml = expr.voltGetXML(session, displayCols, nullColsIdx, jj);
+            cols.children.add(xml);
+            assert(xml != null);
+        }
 
         // parameters
         voltAppendParameters(session, query);
@@ -453,57 +462,26 @@ public class StatementQuery extends StatementDMQL {
         if (select.isGrouped) {
             VoltXMLElement groupCols = new VoltXMLElement("groupcolumns");
             query.children.add(groupCols);
-            insertElementsAndReplaceSimpleColumns(session, groupCols, groupByCols, displayCols, nullColsIdx);
+
+            for (int jj=0; jj < groupByCols.size(); ++jj) {
+                Expression expr = groupByCols.get(jj);
+                VoltXMLElement xml = expr.voltGetXML(session, displayCols, nullColsIdx, jj);
+                groupCols.children.add(xml);
+            }
         }
 
         // orderby
         if (orderByCols.size() > 0) {
             VoltXMLElement orderCols = new VoltXMLElement("ordercolumns");
             query.children.add(orderCols);
-            insertElementsAndReplaceSimpleColumns(session, orderCols, orderByCols, displayCols, nullColsIdx);
+            for (int jj=0; jj < orderByCols.size(); ++jj) {
+                Expression expr = orderByCols.get(jj);
+                VoltXMLElement xml = expr.voltGetXML(session, displayCols, nullColsIdx, jj);
+                orderCols.children.add(xml);
+            }
         }
 
         return query;
-    }
-
-    /**
-     * Substitues of Simple Columns are assumed to appear only in DisplayCols
-     * @param session
-     * @param ele
-     * @param displayCols
-     * @param nullColsIdx
-     * @throws HSQLParseException
-     */
-    private void insetElementsAndReplaceSimpleColumns (Session session, VoltXMLElement ele,
-            List<Expression> displayCols, List<Integer> nullColsIdx) throws HSQLParseException {
-        for (int jj=0; jj < displayCols.size(); ++jj) {
-            Expression expr = displayCols.get(jj);
-            if (nullColsIdx.contains(jj)) {
-                continue;
-            }
-            VoltXMLElement xml = expr.voltGetXML(session, displayCols, nullColsIdx, jj);
-            ele.children.add(xml);
-            assert(xml != null);
-        }
-    }
-    /**
-     * Insert VoltXMLElement got from voltGetXML() to ele. Replace simple columns if it has.
-     * @param session
-     * @param ele
-     * @param columns
-     * @param displayCols
-     * @param nullColsIdx
-     * @throws HSQLParseException
-     */
-    private void insertElementsAndReplaceSimpleColumns (Session session, VoltXMLElement ele,
-            List<Expression> columns, List<Expression> displayCols, List<Integer> nullColsIdx)
-            throws HSQLParseException {
-        for (int jj=0; jj < columns.size(); ++jj) {
-            Expression expr = columns.get(jj);
-            VoltXMLElement xml = expr.voltGetXML(session, displayCols, nullColsIdx, jj);
-            ele.children.add(xml);
-            assert(xml != null);
-        }
     }
 
     /**

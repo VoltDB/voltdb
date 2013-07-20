@@ -23,7 +23,14 @@
 
 package org.voltdb.planner;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.ProjectionPlanNode;
+
+
+
 
 public class TestPlansGroupBy extends PlannerTestCase {
     @Override
@@ -37,10 +44,14 @@ public class TestPlansGroupBy extends PlannerTestCase {
         super.tearDown();
     }
 
-/*
+    List<AbstractPlanNode> pns = new ArrayList<AbstractPlanNode>();
+
+    /*
     public void testGroupByA1() {
-        AbstractPlanNode pn = compile("SELECT A1 from T1 group by A1");
-        System.out.println(pn.toJSONString());
+        List<AbstractPlanNode> pns = compileToFragments("SELECT A1 from T1 group by A1");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
     }
 
     public void testCountA1() {
@@ -64,26 +75,43 @@ public class TestPlansGroupBy extends PlannerTestCase {
         System.out.println(pn.toJSONString());
     }
 
-*/
+    */
 
-//    public void testReplicatedTableComplexAggregate1() {
-//        AbstractPlanNode pn = compile("SELECT A1, SUM(PKEY) FROM R1 GROUP BY A1");
-//        System.out.println(pn.toJSONString());
-//    }
+    public void testSimpleComplexCase() {
+//        pns = compileToFragments("SELECT A1, sum(A1), sum(A1)+11 FROM P1 GROUP BY A1");
+//        checkComplexAgg(pns, true, true);
 //
-//    public void testPartitionedTableComplexAggregate1() {
-//        AbstractPlanNode pn = compile("SELECT A1, SUM(PKEY) FROM T1 GROUP BY A1");
-//        System.out.println(pn.toJSONString());
-//    }
+//        pns = compileToFragments("SELECT A1, SUM(PKEY) as A2, (SUM(PKEY) / 888) as A3, (SUM(PKEY) + 1) as A4 FROM P1 GROUP BY A1");
+//        checkComplexAgg(pns, true, true);
+//
+//        pns = compileToFragments("SELECT A1, count(*) as tag FROM P1 group by A1 order by tag, A1 limit 1");
+//        checkComplexAgg(pns, true, false);
+    }
 
     public void testReplicatedTableComplexAggregate() {
-        AbstractPlanNode pn = compile("SELECT A1, SUM(PKEY) as A2, (SUM(PKEY) / 888) as A3, (SUM(PKEY) + 1) as A4 FROM R1 GROUP BY A1");
-        System.out.println(pn.toExplainPlanString());
+          pns = compileToFragments("SELECT PKEY, PKEY  FROM P1 group by PKEY order by PKEY");
+          checkComplexAgg(pns, true, true);
+
     }
-//
-//    public void testPartitionedTableComplexAggregate() {
-//        AbstractPlanNode pn = compile("SELECT A1, SUM(PKEY) / 3 FROM T1 GROUP BY A1");
-//        System.out.println(pn.toJSONString());
-//    }
+
+    private void checkComplexAgg(List<AbstractPlanNode> pns, boolean isDistributed, boolean hasProjectionNode) {
+        assertTrue(pns.size() > 0);
+        assertEquals(isDistributed, pns.size() > 1 ? true: false);
+
+        for ( AbstractPlanNode nd : pns) {
+            System.out.println("PlanNode Explan string:\n" + nd.toExplainPlanString());
+        }
+        AbstractPlanNode p = pns.get(0).getChild(0);
+        if (hasProjectionNode)
+            assertTrue(p instanceof ProjectionPlanNode);
+
+        if (isDistributed) {
+            p = pns.get(1).getChild(0);
+            assertFalse(p instanceof ProjectionPlanNode);
+        }
+
+
+    }
+
 
 }

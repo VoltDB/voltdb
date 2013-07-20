@@ -84,6 +84,10 @@ bool ProjectionExecutor::p_init(AbstractPlanNode *abstractNode,
     expression_array = expression_array_ptr.get();
     for (int ctr = 0; ctr < m_columnCount; ctr++) {
         assert (node->getOutputColumnExpressions()[ctr] != NULL);
+
+        VOLT_TRACE("OutputColumnExpressions [%d]: %s", ctr,
+                node->getOutputColumnExpressions()[ctr]->debug(true).c_str());
+
         expression_array_ptr[ctr] = node->getOutputColumnExpressions()[ctr];
         needs_substitute_ptr[ctr] = node->getOutputColumnExpressions()[ctr]->hasParameter();
     }
@@ -155,6 +159,9 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
             }
         }
         output_table->insertTupleNonVirtual(temp_tuple);
+
+        VOLT_DEBUG("OUTPUT TABLE: %s\n", output_table->debug().c_str());
+
         /*if (!output_table->insertTupleNonVirtual(temp_tuple)) {
             // TODO: DEBUG
             VOLT_ERROR("Failed to insert projection tuple from input table '%s' into output table '%s'", input_table->name().c_str(), output_table->name().c_str());

@@ -1534,7 +1534,7 @@ public class Expression {
     }
 
     /**
-     * Xin: add a new function to do operator overloading
+     * DONE(Xin): add a new function to do operator overloading
      * @param session
      * @return
      * @throws HSQLParseException
@@ -1543,6 +1543,7 @@ public class Expression {
     {
         return voltGetXML(session, null, null, -1);
     }
+
     /**
      * VoltDB added method to get a non-catalog-dependent
      * representation of this HSQLDB object.
@@ -1551,7 +1552,7 @@ public class Expression {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    VoltXMLElement voltGetXML(Session session, List<Expression> displayCols, List<Integer> nullCols, int startKey) throws HSQLParseException
+    VoltXMLElement voltGetXML(Session session, List<Expression> displayCols, java.util.Set<Integer> nullCols, int startKey) throws HSQLParseException
     {
         // The voltXML representations of expressions tends to be driven much more by the expression's opType
         // than its Expression class.

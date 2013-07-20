@@ -51,10 +51,6 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     protected AbstractExpression m_right = null;
     protected List<AbstractExpression> m_args = null; // Never includes left and right "operator args".
 
-    public void setArgs(List<AbstractExpression> arguments) {
-        m_args = arguments;
-    }
-
     protected VoltType m_valueType = null;
     protected int m_valueSize = 0;
 
@@ -202,6 +198,21 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      */
     public void setRight(AbstractExpression right) {
         m_right = right;
+    }
+
+    /**
+     *
+     * @return the list of args
+     */
+    public List<AbstractExpression> getArgs () {
+        return m_args;
+    }
+
+    /**
+     * @param arguments to set
+     */
+    public void setArgs(List<AbstractExpression> arguments) {
+        m_args = arguments;
     }
 
     /**
@@ -545,6 +556,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             tve.setColumnName("");
             tve.setColumnAlias(exprToAliasMap.get(this));
             tve.setTableName("VOLT_TEMP_TABLE");
+            // Set hasAggregate flag (For not pushdown limit if has Aggs. ENG-3487)
             if (hasAnySubexpressionOfClass(AggregateExpression.class))
                 tve.setHasAggregate(true);
 

@@ -54,25 +54,22 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             cr = client.callProcedure(tb, 5,  50,  2 , 1.2);
         }
 
-        String query = "";
         String [] tbs = {"R1", "P1"};
         for (String tb: tbs) {
-            // Test sum()/count()
-            query = "SELECT dept, SUM(wage), COUNT(wage), AVG(wage), MAX(wage), MIN(wage), SUM(wage)/COUNT(wage) from iTABLE GROUP BY dept ORDER BY dept".replace("iTABLE", tb);
-            cr = client.callProcedure("@AdHoc", query);
+            // Test sum()/count(), Addition
+            cr = client.callProcedure("@AdHoc", "SELECT dept, SUM(wage), COUNT(wage), AVG(wage), MAX(wage), MIN(wage), SUM(wage)/COUNT(wage),  MAX(wage)+MIN(wage)+1 from " + tb + " GROUP BY dept ORDER BY dept");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
-            expected = new long[][] {{1, 60, 3, 20, 30, 10, 20}, {2, 90, 2, 45, 50, 40, 45}};
+            expected = new long[][] {{1, 60, 3, 20, 30, 10, 20, 41}, {2, 90, 2, 45, 50, 40, 45, 91}};
             compareTable(vt, expected);
 
             // Test Strange valid cases
-            cr = client.callProcedure("@AdHoc", "SELECT id, id from iTABLE GROUP BY id ORDER BY id".replace("iTABLE", tb));
+            cr = client.callProcedure("@AdHoc", "SELECT id, id from " + tb + " GROUP BY id ORDER BY id");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] {{1,1}, {2,2}, {3,3}, {4,4}, {5,5} };
             System.out.println(vt.toString());
             compareTable(vt, expected);
-
         }
 
         // Test non-grouped TVE, sum for column, division
@@ -86,7 +83,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
 
         // Test Order by
         // FIXME(XIN): Wrong answer
-//        cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage), avg(wage)+5 from R1 GROUP BY dept");
+//        cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage), avg(wage)+5 from R1 GROUP BY dept;");
 //        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 //        vt = cr.getResults()[0];
 //        expected = new long[][] {{2, 90, 7}, {1, 60, 8} };
@@ -101,9 +98,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
 //        expected = new long[][] { {1, 60, 3} , {2, 90, 2}};
 //        System.out.println(vt.toString());
 //        compareTable(vt, expected);
-
-
-
 
 
     }
