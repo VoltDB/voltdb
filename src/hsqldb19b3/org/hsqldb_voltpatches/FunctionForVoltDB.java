@@ -31,11 +31,11 @@
 
 package org.hsqldb_voltpatches;
 
+import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.hsqldb_voltpatches.types.Type;
-import org.voltdb.types.TimestampType;
 
 
 
@@ -366,7 +366,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                         if (datetimestring != null) {
                             datetimestring = datetimestring.trim();
                             try {
-                                new TimestampType(datetimestring);
+                                Timestamp.valueOf(datetimestring);
                             }
                             catch (Exception e) {
                                 throw Error.error(ErrorCode.X_42565);

@@ -850,9 +850,6 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(result.advanceRow());
         assertEquals(result.getTimestampAsLong(0), result.getTimestampAsLong(1));
 
-        // FIXME(XIN): Commented query next crashed the system...
-        // select TM, SINCE_EPOCH (MICROS, '2013-07-' || '18' || ' 02:00:00.123457')  from P2 where id = 5;
-
         try {
             cr = client.callProcedure("@AdHoc", "select SINCE_EPOCH (MICROS, '2013-7-2 2:34:12')  from P2 where id = 5");
         } catch (Exception ex) {
