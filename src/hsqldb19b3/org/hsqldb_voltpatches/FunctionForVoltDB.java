@@ -369,7 +369,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                                 Timestamp.valueOf(datetimestring);
                             }
                             catch (Exception e) {
-                                throw Error.error(ErrorCode.X_42565);
+                                throw Error.error(ErrorCode.X_42561);
                             }
                             nodes[i].dataType = paramTypes[i];
                         }
