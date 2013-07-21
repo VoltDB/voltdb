@@ -184,6 +184,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     private boolean needComplexAggregation () {
         if (complexAggs) return true;
+
+        // Hack for query like: Select COUNT(*) from T order by col
+        // Select P+A From T Order by P+A
+
         if (aggResultColumns.size() > displayColumns.size()) {
             complexAggs = true;
             return true;
@@ -533,10 +537,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         order_col.expression = order_exp;
 
         insertAggExpressionsToAggResultColumns(aggregationList, order_col);
-        List<TupleValueExpression> tveList = new ArrayList<TupleValueExpression>();
-        findAllTVEs(order_exp, tveList);
-        insertTVEsToAggResultColumns(tveList);
 
+        // Add TVEs in ORDER BY statement
+        List<TupleValueExpression> tveList = new ArrayList<TupleValueExpression>();
+        findAllTVEs(order_col.expression, tveList);
+        insertTVEsToAggResultColumns(tveList);
         orderColumns.add(order_col);
     }
 
