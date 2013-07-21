@@ -248,7 +248,22 @@ public abstract class AbstractParsedStmt {
         else if (elementName.equals("aggregation")) {
             retval = parseAggregationExpression(paramsById, root);
             if (aggregationList != null) {
+                retval.resolveForDB(m_db);
+
+                // TODO(XIN): you need to understand why
+                if (m_paramValues != null) {
+                    List<AbstractExpression> params = retval.findAllSubexpressionsOfClass(ParameterValueExpression.class);
+                    for (AbstractExpression ae : params) {
+                        ParameterValueExpression pve = (ParameterValueExpression) ae;
+                        ConstantValueExpression cve = pve.getOriginalValue();
+                        if (cve != null) {
+                            cve.setValue(m_paramValues[pve.getParameterIndex()]);
+                        }
+                    }
+
+                }
                 ExpressionUtil.finalizeValueTypes(retval);
+                // Now I prepare the agg expr well
                 aggregationList.add(retval);
             }
         }
