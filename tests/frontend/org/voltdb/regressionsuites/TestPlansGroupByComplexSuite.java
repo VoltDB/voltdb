@@ -70,6 +70,14 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             expected = new long[][] {{1,1}, {2,2}, {3,3}, {4,4}, {5,5} };
             System.out.println(vt.toString());
             compareTable(vt, expected);
+
+            //
+            cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage), count(wage)+5 from R1 GROUP BY dept;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] {{2, 90, 7}, {1, 60, 8} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
         }
 
         // Test non-grouped TVE, sum for column, division
@@ -83,12 +91,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
 
         // Test Order by
         // FIXME(XIN): Wrong answer
-//        cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage), avg(wage)+5 from R1 GROUP BY dept;");
-//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-//        vt = cr.getResults()[0];
-//        expected = new long[][] {{2, 90, 7}, {1, 60, 8} };
-//        System.out.println(vt.toString());
-//        compareTable(vt, expected);
+
 
         // Test Complex Group By
         // FIXME(XIN): complex group by not supported

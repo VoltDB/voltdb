@@ -78,28 +78,28 @@ public class TestPlansGroupBy extends PlannerTestCase {
     */
 
     public void testEdgeComplexCase() {
-//        pns = compileToFragments("SELECT count(*)  FROM P1 order by PKEY");
-//        // Make it to false when we fix ENG-4397
-//        // ENG-4937 - As a developer, I want to ignore the "order by" clause on non-grouped aggregate queries.
-//        checkComplexAgg(pns, true);
+        pns = compileToFragments("SELECT count(*)  FROM P1 order by PKEY");
+        // Make it to false when we fix ENG-4397
+        // ENG-4937 - As a developer, I want to ignore the "order by" clause on non-grouped aggregate queries.
+        checkComplexAgg(pns, true);
     }
 
     public void testSimpleComplexCase() {
-//        pns = compileToFragments("SELECT A1, sum(A1), sum(A1)+11 FROM P1 GROUP BY A1");
-//        checkComplexAgg(pns, true, true);
-//
-//        pns = compileToFragments("SELECT A1, SUM(PKEY) as A2, (SUM(PKEY) / 888) as A3, (SUM(PKEY) + 1) as A4 FROM P1 GROUP BY A1");
-//        checkComplexAgg(pns, true, true);
-//
-//        pns = compileToFragments("SELECT A1, count(*) as tag FROM P1 group by A1 order by tag, A1 limit 1");
-//        checkComplexAgg(pns, true, false);
+        pns = compileToFragments("SELECT A1, sum(A1), sum(A1)+11 FROM P1 GROUP BY A1");
+        checkComplexAgg(pns, true);
 
+        pns = compileToFragments("SELECT A1, SUM(PKEY) as A2, (SUM(PKEY) / 888) as A3, (SUM(PKEY) + 1) as A4 FROM P1 GROUP BY A1");
+        checkComplexAgg(pns, true);
+
+        pns = compileToFragments("SELECT A1, count(*) as tag FROM P1 group by A1 order by tag, A1 limit 1");
+        checkComplexAgg(pns, false);
 
     }
 
     public void testReplicatedTableComplexAggregate() {
-          pns = compileToFragments("select SUM(distinct(A1 * 2)), SUM(A1 * 2) from P1");
-          checkComplexAgg(pns, false);
+          //pns = compileToFragments("select SUM(distinct(A1 * 2)), SUM(A1 * 2) from P1");
+          pns = compileToFragments("select A1, sum(B1), count(B1) + 5 from R1 group by A1");
+          checkComplexAgg(pns, true);
     }
 
     private void checkComplexAgg(List<AbstractPlanNode> pns, boolean hasProjectionNode) {

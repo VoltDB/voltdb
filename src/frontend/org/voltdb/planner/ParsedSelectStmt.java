@@ -235,9 +235,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         Map <AbstractExpression, Integer> aggTableIndexMap = new HashMap <AbstractExpression,Integer>();
         Map <AbstractExpression, String> exprToAliasMap = new HashMap <AbstractExpression,String>();
         int index = 0;
+        // TODO(XIN): pick up any hack string
+        String alias = "xin";
         for (ParsedColInfo col: aggResultColumns) {
             aggTableIndexMap.put(col.expression, index);
+            if (col.alias == "") {
+                col.alias = alias + index;
+            }
             exprToAliasMap.put(col.expression, col.alias);
+            index++;
         }
 
         // Replace TVE for display columns
@@ -357,7 +363,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
+    /**
+     * Find all TVEs except inside of AggregationExpression
+     * @param expr
+     * @param tveList
+     */
     private void findAllTVEs(AbstractExpression expr, List<TupleValueExpression> tveList) {
+        if (expr instanceof AggregateExpression)
+            return;
         if (expr instanceof TupleValueExpression) {
             // TODO(XIN): optimize it without clone if this TVE is already in AggResultColumns...
             tveList.add((TupleValueExpression) expr.clone());
