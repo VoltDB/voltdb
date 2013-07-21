@@ -71,36 +71,31 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             System.out.println(vt.toString());
             compareTable(vt, expected);
 
-            //
-            cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage), count(wage)+5 from R1 GROUP BY dept;");
+            // Test Order by
+            cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage), count(wage)+5 from " + tb + " GROUP BY dept ORDER BY dept DESC;");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] {{2, 90, 7}, {1, 60, 8} };
             System.out.println(vt.toString());
             compareTable(vt, expected);
+
+            // Test non-grouped TVE, sum for column, division
+            cr = client.callProcedure("@AdHoc", "SELECT sum(wage)/count(wage) + 1, dept, SUM(wage+1), SUM(wage)/2 from " + tb + " GROUP BY dept ORDER BY dept");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] {{21 ,1, 63, 30}, {46, 2, 92, 45}};
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            // Test Complex Agg with functions
+            cr = client.callProcedure("@AdHoc", "SELECT dept, SUM(ABS(wage) - 1) as tag, (count(*)+sum(dept*2))/2 from " + tb + " GROUP BY dept ORDER BY ABS(dept)");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {1, 57, 4} , {2, 88, 5}};
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
         }
 
-        // Test non-grouped TVE, sum for column, division
-        // FIXME(XIN)
-//        cr = client.callProcedure("@AdHoc", "SELECT dept, SUM(wage+1), SUM(wage)/2 from R1 GROUP BY dept ORDER BY dept");
-//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-//        vt = cr.getResults()[0];
-//        expected = new long[][] {{1, 63, 30}, {2, 92, 45}};
-//        System.out.println(vt.toString());
-//        compareTable(vt, expected);
-
-        // Test Order by
-        // FIXME(XIN): Wrong answer
-
-
-        // Test Complex Group By
-        // FIXME(XIN): complex group by not supported
-//        cr = client.callProcedure("@AdHoc", "SELECT ABS(dept), SUM(ABS(dept)) as tag, count(*) from R1 GROUP BY ABS(dept) ORDER BY ABS(dept)");
-//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-//        vt = cr.getResults()[0];
-//        expected = new long[][] { {1, 60, 3} , {2, 90, 2}};
-//        System.out.println(vt.toString());
-//        compareTable(vt, expected);
 
 
     }
