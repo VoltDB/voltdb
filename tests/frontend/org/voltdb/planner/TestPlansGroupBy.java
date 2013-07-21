@@ -77,6 +77,13 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
     */
 
+    public void testEdgeComplexCase() {
+//        pns = compileToFragments("SELECT count(*)  FROM P1 order by PKEY");
+//        // Make it to false when we fix ENG-4397
+//        // ENG-4937 - As a developer, I want to ignore the "order by" clause on non-grouped aggregate queries.
+//        checkComplexAgg(pns, true);
+    }
+
     public void testSimpleComplexCase() {
 //        pns = compileToFragments("SELECT A1, sum(A1), sum(A1)+11 FROM P1 GROUP BY A1");
 //        checkComplexAgg(pns, true, true);
@@ -86,17 +93,18 @@ public class TestPlansGroupBy extends PlannerTestCase {
 //
 //        pns = compileToFragments("SELECT A1, count(*) as tag FROM P1 group by A1 order by tag, A1 limit 1");
 //        checkComplexAgg(pns, true, false);
+
+
     }
 
     public void testReplicatedTableComplexAggregate() {
-          pns = compileToFragments("SELECT PKEY, PKEY  FROM P1 group by PKEY order by PKEY");
-          checkComplexAgg(pns, true, true);
-
+          pns = compileToFragments("select SUM(distinct(A1 * 2)), SUM(A1 * 2) from P1");
+          checkComplexAgg(pns, false);
     }
 
-    private void checkComplexAgg(List<AbstractPlanNode> pns, boolean isDistributed, boolean hasProjectionNode) {
+    private void checkComplexAgg(List<AbstractPlanNode> pns, boolean hasProjectionNode) {
         assertTrue(pns.size() > 0);
-        assertEquals(isDistributed, pns.size() > 1 ? true: false);
+        boolean isDistributed = pns.size() > 1 ? true: false;
 
         for ( AbstractPlanNode nd : pns) {
             System.out.println("PlanNode Explan string:\n" + nd.toExplainPlanString());

@@ -174,9 +174,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (needComplexAggregation()) {
             fillUpAggResultColumns();
             // Generate new output Schema, replace Aggs with TVEs for group by and order by
-            evaluateColumns();
+            evaluateComplexColumns();
         } else {
             aggResultColumns = displayColumns;
+            // replace Aggs with TVEs for order by
+            replaceSimpleColumnsWithTVEsForOrderbyColumns();
         }
     }
 
@@ -228,7 +230,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     /**
      * TODO(xin): clean this function if possible
      */
-    private void evaluateColumns () {
+    private void evaluateComplexColumns () {
         // Build the association between the table column with its index
         Map <AbstractExpression, Integer> aggTableIndexMap = new HashMap <AbstractExpression,Integer>();
         Map <AbstractExpression, String> exprToAliasMap = new HashMap <AbstractExpression,String>();
@@ -267,6 +269,33 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 AbstractExpression expr = col.expression.replaceWithTVE(aggTableIndexMap, exprToAliasMap);
                 col.expression = expr;
                 // I think I already have tablename, alias, columnName setted up
+            }
+        }
+    }
+
+    private void replaceSimpleColumnsWithTVEsForOrderbyColumns () {
+        for (ParsedColInfo orderCol : orderColumns) {
+            ParsedColInfo orig_col = null;
+            for (ParsedColInfo col : displayColumns) {
+                if (col.alias.equals(orderCol.alias)) {
+                    orig_col = col;
+                    break;
+                }
+            }
+            if (orig_col != null && orig_col.tableName.equals("VOLT_TEMP_TABLE")) {
+                orig_col.orderBy = true;
+                orig_col.ascending = orderCol.ascending;
+
+                TupleValueExpression tve = new TupleValueExpression();
+                tve.setColumnName("");
+                tve.setColumnIndex(-1);
+                tve.setTableName("VOLT_TEMP_TABLE");
+                tve.setValueSize(orig_col.expression.getValueSize());
+                tve.setValueType(orig_col.expression.getValueType());
+                if (orig_col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+                    tve.setHasAggregate(true);
+                }
+                orderCol.expression = tve;
             }
         }
     }
