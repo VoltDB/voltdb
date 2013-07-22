@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.json_voltpatches.JSONArray;
@@ -41,7 +42,7 @@ import org.voltdb.utils.MiscUtils;
  * the partitions and tables that are actively being exported.
  */
 
-public abstract class ExportClientBase {
+public abstract class ExportClientConnectorBase {
 
     protected AtomicBoolean m_connected = new AtomicBoolean(false);
 
@@ -82,7 +83,7 @@ public abstract class ExportClientBase {
             final VoltLogger log = new VoltLogger("ExportClient");
             log.info("Received request to shutdown.");
 
-            // the ExportClientBase.work() holds this lock during
+            // the ExportClientConnectorBase.work() holds this lock during
             // each iteration of its work
             m_atomicWorkLock.lock();
             log.info("Work lock aquired. About to shutdown.");
@@ -92,16 +93,16 @@ public abstract class ExportClientBase {
         }
     }
 
-    public ExportClientBase() {
+    public ExportClientConnectorBase() {
         this(false);
     }
 
-    public ExportClientBase(boolean useAdminPorts)
+    public ExportClientConnectorBase(boolean useAdminPorts)
     {
         this(false, 0, true);
     }
 
-    public ExportClientBase(boolean useAdminPorts, int throughputDisplayPeriod, boolean autodiscoverTopolgy)
+    public ExportClientConnectorBase(boolean useAdminPorts, int throughputDisplayPeriod, boolean autodiscoverTopolgy)
     {
         m_useAdminPorts = useAdminPorts;
         if (throughputDisplayPeriod > 0)
@@ -109,6 +110,22 @@ public abstract class ExportClientBase {
         else
             m_bandwidthMonitor = null;
         m_autodiscoverTopolgy = autodiscoverTopolgy;
+    }
+
+    /**
+     * Override this to take in  configuration properties and setup your export client connector.
+     * @param config
+     * @throws Exception
+     */
+    public void configure( Properties config) throws Exception {
+
+    }
+    
+    /**
+     * Called when the export client is going to shutdown.
+     */
+    public void shutdown( ) {
+
     }
 
     /**
@@ -142,7 +159,7 @@ public abstract class ExportClientBase {
      * for the data sources provided by the server on this Export connection.
      * @param source
      */
-    public abstract ExportDecoderBase constructExportDecoder(AdvertisedDataSource source);
+    public abstract ExportClientDecoderBase constructExportDecoder(AdvertisedDataSource source);
 
     private void constructExportDataSinks(ExportConnection elConnection) {
         m_logger.debug("Num data sources is " + elConnection.dataSources.size());
@@ -170,7 +187,7 @@ public abstract class ExportClientBase {
             if (!part_map.containsKey(part_id)) {
                 m_logger.debug("Creating decoder for generation " + source.m_generation + " table: " + source.tableName +
                         ", table ID, " + source.signature + " part ID: " + source.partitionId);
-                ExportDecoderBase decoder = constructExportDecoder(source);
+                ExportClientDecoderBase decoder = constructExportDecoder(source);
                 sink = new ExportDataSink( source.m_generation,
                                       source.partitionId,
                                       source.signature,

@@ -35,7 +35,7 @@ import com.google.common.util.concurrent.MoreExecutors;
  * protocol into arrays of POJOs.
  *
  */
-public abstract class ExportDecoderBase {
+public abstract class ExportClientDecoderBase {
 
     public static class RestartBlockException extends Exception {
         public final boolean requestBackoff;
@@ -48,7 +48,7 @@ public abstract class ExportDecoderBase {
     // This is available as a convenience, could go away.
     protected ArrayList<VoltType> m_tableSchema;
 
-    public ExportDecoderBase(AdvertisedDataSource source) {
+    public ExportClientDecoderBase(AdvertisedDataSource source) {
         m_source = source;
         m_tableSchema = source.columnTypes;
     }

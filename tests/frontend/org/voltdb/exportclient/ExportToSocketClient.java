@@ -33,12 +33,12 @@ import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 /**
  * @see TestCtrlC for use of this test-only export client
  */
-public class ExportToSocketClient extends ExportClientBase
+public class ExportToSocketClient extends ExportClientConnectorBase
 {
     Socket m_socket = null;
     OutputStream m_debugOut = null;
 
-    static class SocketDecoder extends ExportDecoderBase {
+    static class SocketDecoder extends ExportClientDecoderBase {
 
         public SocketDecoder(AdvertisedDataSource source) {
             super(source);
@@ -67,7 +67,7 @@ public class ExportToSocketClient extends ExportClientBase
     }
 
     @Override
-    public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source) {
+    public ExportClientDecoderBase constructExportDecoder(AdvertisedDataSource source) {
         return new SocketDecoder(source);
     }
 

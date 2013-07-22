@@ -31,7 +31,7 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
 
-public class PostgreSQLExportClient extends ExportClientBase {
+public class PostgreSQLExportClient extends ExportClientConnectorBase {
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
     private static Connection conn = null;
     private static String postgres_schema_prefix;
@@ -40,7 +40,7 @@ public class PostgreSQLExportClient extends ExportClientBase {
         super(useAdminPorts);
     }
 
-    static class PostgresDecoder extends ExportDecoderBase {
+    static class PostgresDecoder extends ExportClientDecoderBase {
         private PreparedStatement pstmt = null;
 
         public PostgresDecoder(AdvertisedDataSource source) {
@@ -228,7 +228,7 @@ public class PostgreSQLExportClient extends ExportClientBase {
     }
 
     @Override
-    public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source) {
+    public ExportClientDecoderBase constructExportDecoder(AdvertisedDataSource source) {
         return new PostgresDecoder(source);
     }
 

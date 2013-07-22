@@ -34,7 +34,7 @@ import org.voltdb.messaging.FastDeserializer;
 
 public class TestExportDecoderBase extends TestCase
 {
-    class StubExportDecoder extends ExportDecoderBase
+    class StubExportDecoder extends ExportClientDecoderBase
     {
         public StubExportDecoder(AdvertisedDataSource source)
         {

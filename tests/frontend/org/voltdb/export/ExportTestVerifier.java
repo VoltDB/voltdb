@@ -26,10 +26,10 @@ import java.io.IOException;
 import java.util.ArrayDeque;
 
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
-import org.voltdb.exportclient.ExportDecoderBase;
+import org.voltdb.exportclient.ExportClientDecoderBase;
 import org.voltdb.utils.Encoder;
 
-public class ExportTestVerifier extends ExportDecoderBase
+public class ExportTestVerifier extends ExportClientDecoderBase
 {
     private final ArrayDeque<Object[]> m_data;
     private boolean m_rowFailed = false;

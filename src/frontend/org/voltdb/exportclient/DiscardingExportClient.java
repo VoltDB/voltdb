@@ -24,13 +24,13 @@ import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
  * never does anythign with it.
  *
  */
-public class DiscardingExportClient extends ExportClientBase {
+public class DiscardingExportClient extends ExportClientConnectorBase {
 
     public DiscardingExportClient(boolean useAdminPorts) {
         super(useAdminPorts);
     }
 
-    static class DiscardDecoder extends ExportDecoderBase {
+    static class DiscardDecoder extends ExportClientDecoderBase {
 
         public DiscardDecoder(AdvertisedDataSource source) {
             super(source);
@@ -47,7 +47,7 @@ public class DiscardingExportClient extends ExportClientBase {
     }
 
     @Override
-    public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source) {
+    public ExportClientDecoderBase constructExportDecoder(AdvertisedDataSource source) {
         return new DiscardDecoder(source);
     }
 

@@ -42,8 +42,8 @@ public class TestExportOpsEvents extends TestCase {
         VoltDBFickleCluster.compile();
     }
 
-    protected class NullExportClient extends ExportClientBase {
-        public class TrivialDecoder extends ExportDecoderBase {
+    protected class NullExportClient extends ExportClientConnectorBase {
+        public class TrivialDecoder extends ExportClientDecoderBase {
             public TrivialDecoder(AdvertisedDataSource source) {
                 super(source);
             }
@@ -63,7 +63,7 @@ public class TestExportOpsEvents extends TestCase {
         }
 
         @Override
-        public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source) {
+        public ExportClientDecoderBase constructExportDecoder(AdvertisedDataSource source) {
             return new TrivialDecoder(source);
         }
     }
