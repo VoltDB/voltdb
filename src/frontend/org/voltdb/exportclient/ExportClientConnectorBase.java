@@ -14,7 +14,6 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 package org.voltdb.exportclient;
 
 import java.io.IOException;
@@ -37,47 +36,36 @@ import org.voltdb.utils.BandwidthMonitor;
 import org.voltdb.utils.MiscUtils;
 
 /**
- * Provides an extensible base class for writing Export clients
- * Manages a set of connections to servers and a record of all of
- * the partitions and tables that are actively being exported.
+ * Provides an extensible base class for writing Export clients Manages a set of
+ * connections to servers and a record of all of the partitions and tables that
+ * are actively being exported.
  */
-
 public abstract class ExportClientConnectorBase {
 
     protected AtomicBoolean m_connected = new AtomicBoolean(false);
-
     // object used to synchronize on so the shutdown hook can behave
     final java.util.concurrent.locks.ReentrantLock m_atomicWorkLock =
-        new java.util.concurrent.locks.ReentrantLock(true);
+            new java.util.concurrent.locks.ReentrantLock(true);
     final ShutdownHook m_shutdownHook = new ShutdownHook();
-
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
-
-    protected final List<InetSocketAddress> m_servers
-        = new ArrayList<InetSocketAddress>();
-    protected final HashMap<InetSocketAddress, ExportConnection> m_exportConnections
-        = new HashMap<InetSocketAddress, ExportConnection>();
-
+    protected final List<InetSocketAddress> m_servers = new ArrayList<InetSocketAddress>();
+    protected final HashMap<InetSocketAddress, ExportConnection> m_exportConnections = new HashMap<InetSocketAddress, ExportConnection>();
     protected final boolean m_useAdminPorts;
     protected final boolean m_autodiscoverTopolgy;
     protected boolean m_hasPrintedAutodiscoveryWarning = false;
-
     // First hash by table signature, second by partition
-    private final HashMap<Long, HashMap<String, HashMap<Integer, ExportDataSink>>> m_sinks
-        = new HashMap<Long, HashMap<String, HashMap<Integer, ExportDataSink>>>();
-
+    private final HashMap<Long, HashMap<String, HashMap<Integer, ExportDataSink>>> m_sinks = new HashMap<Long, HashMap<String, HashMap<Integer, ExportDataSink>>>();
     private final HashSet<AdvertisedDataSource> m_knownDataSources = new HashSet<AdvertisedDataSource>();
-
     final BandwidthMonitor m_bandwidthMonitor;
-
     // credentials
     protected String m_username = "", m_password = "";
 
     /**
-     * Shutdown hook that waits until work is done and then kills the JVM
-     * BE AFRAID...
+     * Shutdown hook that waits until work is done and then kills the JVM BE
+     * AFRAID...
      */
     class ShutdownHook extends Thread {
+
         @Override
         public void run() {
             final VoltLogger log = new VoltLogger("ExportClient");
@@ -97,39 +85,39 @@ public abstract class ExportClientConnectorBase {
         this(false);
     }
 
-    public ExportClientConnectorBase(boolean useAdminPorts)
-    {
+    public ExportClientConnectorBase(boolean useAdminPorts) {
         this(false, 0, true);
     }
 
-    public ExportClientConnectorBase(boolean useAdminPorts, int throughputDisplayPeriod, boolean autodiscoverTopolgy)
-    {
+    public ExportClientConnectorBase(boolean useAdminPorts, int throughputDisplayPeriod, boolean autodiscoverTopolgy) {
         m_useAdminPorts = useAdminPorts;
-        if (throughputDisplayPeriod > 0)
+        if (throughputDisplayPeriod > 0) {
             m_bandwidthMonitor = new BandwidthMonitor(throughputDisplayPeriod, m_logger);
-        else
+        } else {
             m_bandwidthMonitor = null;
+        }
         m_autodiscoverTopolgy = autodiscoverTopolgy;
     }
 
     /**
-     * Override this to take in  configuration properties and setup your export client connector.
+     * Override this to take in configuration properties and setup your export
+     * client connector.
+     *
      * @param config
      * @throws Exception
      */
-    public void configure( Properties config) throws Exception {
-
+    public void configure(Properties config) throws Exception {
     }
-    
+
     /**
      * Called when the export client is going to shutdown.
      */
-    public void shutdown( ) {
-
+    public void shutdown() {
     }
 
     /**
      * Add a server to the list that ExportClient will try to connect to
+     *
      * @param server
      */
     public void addServerInfo(InetSocketAddress server) {
@@ -138,6 +126,7 @@ public abstract class ExportClientConnectorBase {
 
     /**
      * Add a server to the list that ExportClient will try to connect to
+     *
      * @param server
      */
     public void addServerInfo(String server, boolean adminIfNoPort) {
@@ -155,8 +144,10 @@ public abstract class ExportClientConnectorBase {
     }
 
     /**
-     * Allow derived clients to implement their own construction of ExportDecoders
-     * for the data sources provided by the server on this Export connection.
+     * Allow derived clients to implement their own construction of
+     * ExportDecoders for the data sources provided by the server on this Export
+     * connection.
+     *
      * @param source
      */
     public abstract ExportClientDecoderBase constructExportDecoder(AdvertisedDataSource source);
@@ -172,30 +163,29 @@ public abstract class ExportClientConnectorBase {
             String table_signature = source.signature;
             int part_id = source.partitionId;
             HashMap<String, HashMap<Integer, ExportDataSink>> gen_map =
-                m_sinks.get(source.m_generation);
+                    m_sinks.get(source.m_generation);
             if (gen_map == null) {
                 gen_map = new HashMap<String, HashMap<Integer, ExportDataSink>>();
                 m_sinks.put(source.m_generation, gen_map);
             }
 
             HashMap<Integer, ExportDataSink> part_map =
-                gen_map.get(table_signature);
+                    gen_map.get(table_signature);
             if (part_map == null) {
                 part_map = new HashMap<Integer, ExportDataSink>();
                 gen_map.put(table_signature, part_map);
             }
             if (!part_map.containsKey(part_id)) {
-                m_logger.debug("Creating decoder for generation " + source.m_generation + " table: " + source.tableName +
-                        ", table ID, " + source.signature + " part ID: " + source.partitionId);
+                m_logger.debug("Creating decoder for generation " + source.m_generation + " table: " + source.tableName
+                        + ", table ID, " + source.signature + " part ID: " + source.partitionId);
                 ExportClientDecoderBase decoder = constructExportDecoder(source);
-                sink = new ExportDataSink( source.m_generation,
-                                      source.partitionId,
-                                      source.signature,
-                                      source.tableName,
-                                      decoder);
+                sink = new ExportDataSink(source.m_generation,
+                        source.partitionId,
+                        source.signature,
+                        source.tableName,
+                        decoder);
                 part_map.put(part_id, sink);
-            }
-            else {
+            } else {
                 // verify the export data is the same across partitions
                 //sink = part_map.pu
             }
@@ -216,16 +206,15 @@ public abstract class ExportClientConnectorBase {
             }
 
             for (String hostname : retval.hosts) {
-                assert(hostname.contains(":"));
+                assert (hostname.contains(":"));
                 /*String[] parts = hostname.split(":");
-                InetSocketAddress addr2 = new InetSocketAddress(parts[0], Integer.valueOf(parts[1]));
-                assert(m_servers.contains(addr2));*/
+                 InetSocketAddress addr2 = new InetSocketAddress(parts[0], Integer.valueOf(parts[1]));
+                 assert(m_servers.contains(addr2));*/
             }
 
             constructExportDataSinks(retval);
             return retval;
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             m_logger.warn("Error connecting to export server " + addr, e);
             if (e instanceof java.nio.channels.ClosedByInterruptException) {
                 throw new InterruptedException(e.getMessage());
@@ -237,6 +226,7 @@ public abstract class ExportClientConnectorBase {
 
     /**
      * Disconnect from any connected servers.
+     *
      * @throws IOException
      */
     public void disconnect() {
@@ -254,8 +244,7 @@ public abstract class ExportClientConnectorBase {
         m_connected.set(false);
     }
 
-    boolean checkConnections()
-    {
+    boolean checkConnections() {
         boolean retval = true;
         for (ExportConnection connection : m_exportConnections.values()) {
             if (!connection.isConnected()) {
@@ -269,24 +258,26 @@ public abstract class ExportClientConnectorBase {
     /**
      * Attempt to connect to the complete mesh. Fail fast.
      *
-     * @param foundSources A set that will be destroyed and used to return the set of discovered sources.
-     * @return True if any connections succeeded. False on a failure that isn't worth retying.
+     * @param foundSources A set that will be destroyed and used to return the
+     * set of discovered sources.
+     * @return True if any connections succeeded. False on a failure that isn't
+     * worth retying.
      * @throws ExportClientException If the input is wrong.
      */
     private boolean tryToConnectToAllNodes(HashSet<AdvertisedDataSource> foundSources) throws ExportClientException {
         if (m_connected.get()) {
             m_logger.error("Export client already connected.");
             throw new ExportClientException(ExportClientException.Type.USER_ERROR,
-                                            "Export client already connected.");
+                    "Export client already connected.");
         }
         if (m_servers.size() == 0) {
             m_logger.error("No servers provided for export client.");
             throw new ExportClientException(ExportClientException.Type.USER_ERROR,
-                                            "No servers provided for export client.");
+                    "No servers provided for export client.");
         }
 
         // to be safe
-        assert(m_exportConnections.size() == 0);
+        assert (m_exportConnections.size() == 0);
 
         // Connect to one of the specified servers.  This will open the sockets,
         // advance the Export protocol to the open state to each server, retrieve
@@ -294,7 +285,7 @@ public abstract class ExportClientConnectorBase {
         // table/partition pair.
         boolean foundOneActiveServer = false;
         ArrayList<Pair<Exception, InetSocketAddress>> connectErrors =
-            new ArrayList<Pair<Exception, InetSocketAddress>>();
+                new ArrayList<Pair<Exception, InetSocketAddress>>();
         for (InetSocketAddress serverAddr : m_servers) {
             ExportConnection exportConnection = null;
             try {
@@ -302,8 +293,9 @@ public abstract class ExportClientConnectorBase {
                 exportConnection.openExportConnection();
 
                 // failed to connect
-                if (!exportConnection.isConnected())
+                if (!exportConnection.isConnected()) {
                     continue;
+                }
 
                 // from here down, assume we connected
 
@@ -326,14 +318,13 @@ public abstract class ExportClientConnectorBase {
                             m_logger.error("JSON parsing exception while attempting to process: " + hostInfo, e);
                         }
                     }
-                }
-                else {
+                } else {
                     // notify the user we're skipping auto-discovery
                     m_logger.warn("Skipping topology auto-discovery per command line configuration.");
                     // warn user once about the perils of their choice
                     if (!m_hasPrintedAutodiscoveryWarning) {
-                        m_logger.warn("Running without auto-discovery may produce unexpected results " +
-                                "and should only be run if the implications are understood.");
+                        m_logger.warn("Running without auto-discovery may produce unexpected results "
+                                + "and should only be run if the implications are understood.");
                         m_logger.warn("Please contact VoltDB support if more information is required.");
                         m_hasPrintedAutodiscoveryWarning = true;
                     }
@@ -342,37 +333,35 @@ public abstract class ExportClientConnectorBase {
                 // exit out of the loop
                 foundOneActiveServer = true;
                 break;
-            }
-            catch (IOException e) {
+            } catch (IOException e) {
                 if (e instanceof java.nio.channels.ClosedByInterruptException) {
                     return false;
                 }
                 if (e.getMessage().contains("Export")) {
                     throw new ExportClientException(ExportClientException.Type.AUTH_FAILURE,
                             "Export is not enabled on this server.", e);
-                }
-                else if (e.getMessage().contains("Authentication")) {
+                } else if (e.getMessage().contains("Authentication")) {
                     throw new ExportClientException(ExportClientException.Type.AUTH_FAILURE,
                             "Authentication failure", e);
                 } else {
-                    connectErrors.add(Pair.of((Exception)e, serverAddr));
+                    connectErrors.add(Pair.of((Exception) e, serverAddr));
                 }
                 // ignore non-auth errors
-            }
-            finally {
+            } finally {
                 // disconnect from the "discovery server"
-                if (exportConnection != null)
+                if (exportConnection != null) {
                     exportConnection.closeExportConnection();
+                }
             }
         }
 
         // if not one server is connect-able, then don't bother retrying
         if (!foundOneActiveServer) {
             for (Pair<Exception, InetSocketAddress> p : connectErrors) {
-                m_logger.warn("Failed to connect to server " +
-                              p.getSecond() +
-                              " with error: " +
-                              p.getFirst().getMessage());
+                m_logger.warn("Failed to connect to server "
+                        + p.getSecond()
+                        + " with error: "
+                        + p.getFirst().getMessage());
             }
             m_logger.warn("Unable to connect to a given server to discover the cluster topology");
             return false;
@@ -381,7 +370,9 @@ public abstract class ExportClientConnectorBase {
         foundSources.clear();
         // connect to the rest of the servers
         for (InetSocketAddress addr : m_servers) {
-            if (m_exportConnections.containsKey(addr)) continue;
+            if (m_exportConnections.containsKey(addr)) {
+                continue;
+            }
             ExportConnection connection;
             try {
                 connection = connectToServer(addr);
@@ -413,13 +404,15 @@ public abstract class ExportClientConnectorBase {
 
             if (m_servers.size() == m_exportConnections.size()) {
                 break; // successfully connected to all nodes
-            }
-            else {
+            } else {
                 disconnect();
             }
 
             // sleep before a retry
-            try { Thread.sleep(500); } catch (Exception e) {}
+            try {
+                Thread.sleep(500);
+            } catch (Exception e) {
+            }
         }
 
         // check for non-complete connection after multiple attempts and roll back if so
@@ -454,16 +447,22 @@ public abstract class ExportClientConnectorBase {
     }
 
     // HOOKS FOR TEST/SUBCLASSES THAT ARE USUALLY NOOPS
-    protected void preWorkHook() {}
-    protected void startWorkHook() {}
-    protected void endWorkHook() {}
-    protected void extraShutdownHookWork() {}
+    protected void preWorkHook() {
+    }
+
+    protected void startWorkHook() {
+    }
+
+    protected void endWorkHook() {
+    }
+
+    protected void extraShutdownHookWork() {
+    }
 
     /**
-     * Perform one iteration of Export Client work.
-     * Connect if not connected.
-     * Override if the specific client has strange workflow/termination conditions.
-     * Largely for Export clients used for test.
+     * Perform one iteration of Export Client work. Connect if not connected.
+     * Override if the specific client has strange workflow/termination
+     * conditions. Largely for Export clients used for test.
      */
     public int work() throws ExportClientException {
         int offeredMsgs = 0;
@@ -478,7 +477,7 @@ public abstract class ExportClientConnectorBase {
             // noop if not running test code
             startWorkHook();
 
-            assert(m_connected.get());
+            assert (m_connected.get());
 
             // work all the ExportDataSinks.
             // process incoming data and generate outgoing ack/polls
@@ -515,9 +514,9 @@ public abstract class ExportClientConnectorBase {
     }
 
     protected long getNextPollDuration(long currentDuration,
-                                       boolean isIdle,
-                                       boolean disconnectedWithError,
-                                       boolean disconnectedForUpdate) {
+            boolean isIdle,
+            boolean disconnectedWithError,
+            boolean disconnectedForUpdate) {
 
         // milliseconds to increment wait time when idle
         final long pollBackOffAddend = 100;
@@ -526,13 +525,13 @@ public abstract class ExportClientConnectorBase {
         // maximum value of poll_wait_time
         final long maxPollWaitTime = 4000;
 
-        if (disconnectedForUpdate || disconnectedWithError)
+        if (disconnectedForUpdate || disconnectedWithError) {
             return maxPollWaitTime;
+        }
 
         if (!isIdle) {
             return currentDuration / pollAccelerateFactor;
-        }
-        else {
+        } else {
             if (currentDuration < maxPollWaitTime) {
                 return currentDuration + pollBackOffAddend;
             }
@@ -576,24 +575,26 @@ public abstract class ExportClientConnectorBase {
                         // handle the problem and decide whether
                         // to continue or to punt up a stack frame
                         switch (e.type) {
-                        case AUTH_FAILURE:
-                            throw e;
-                        case DISCONNECT_UNEXPECTED:
-                            if (m_logger.isTraceEnabled())
-                                m_logger.warn(e.getMessage(), e);
-                            else
-                                m_logger.warn(e.getMessage());
-                            disconnectedWithError = true;
-                            break;
-                        case DISCONNECT_UPDATE:
-                            if (m_logger.isTraceEnabled())
-                                m_logger.info(e.getMessage(), e);
-                            else
-                                m_logger.info(e.getMessage());
-                            disconnectedForUpdate = true;
-                            break;
-                        case USER_ERROR:
-                            throw e;
+                            case AUTH_FAILURE:
+                                throw e;
+                            case DISCONNECT_UNEXPECTED:
+                                if (m_logger.isTraceEnabled()) {
+                                    m_logger.warn(e.getMessage(), e);
+                                } else {
+                                    m_logger.warn(e.getMessage());
+                                }
+                                disconnectedWithError = true;
+                                break;
+                            case DISCONNECT_UPDATE:
+                                if (m_logger.isTraceEnabled()) {
+                                    m_logger.info(e.getMessage(), e);
+                                } else {
+                                    m_logger.info(e.getMessage());
+                                }
+                                disconnectedForUpdate = true;
+                                break;
+                            case USER_ERROR:
+                                throw e;
                         }
                     }
                 }
@@ -603,30 +604,31 @@ public abstract class ExportClientConnectorBase {
                     // suck down some export data (if available)
                     try {
                         offeredMsgs = work();
-                    }
-                    catch (ExportClientException e) {
+                    } catch (ExportClientException e) {
                         // handle the problem and decide whether
                         // to continue or to punt up a stack frame
                         switch (e.type) {
-                        case AUTH_FAILURE:
-                            m_logger.fatal(e.getMessage(), e);
-                            throw new RuntimeException("Got a unexpect auth error from connected server", e);
-                        case DISCONNECT_UNEXPECTED:
-                            if (m_logger.isTraceEnabled())
-                                m_logger.warn(e.getMessage(), e);
-                            else
-                                m_logger.warn(e.getMessage());
-                            disconnectedWithError = true;
-                            break;
-                        case DISCONNECT_UPDATE:
-                            if (m_logger.isTraceEnabled())
-                                m_logger.info(e.getMessage(), e);
-                            else
-                                m_logger.info(e.getMessage());
-                            disconnectedForUpdate = true;
-                            break;
-                        case USER_ERROR:
-                            throw e;
+                            case AUTH_FAILURE:
+                                m_logger.fatal(e.getMessage(), e);
+                                throw new RuntimeException("Got a unexpect auth error from connected server", e);
+                            case DISCONNECT_UNEXPECTED:
+                                if (m_logger.isTraceEnabled()) {
+                                    m_logger.warn(e.getMessage(), e);
+                                } else {
+                                    m_logger.warn(e.getMessage());
+                                }
+                                disconnectedWithError = true;
+                                break;
+                            case DISCONNECT_UPDATE:
+                                if (m_logger.isTraceEnabled()) {
+                                    m_logger.info(e.getMessage(), e);
+                                } else {
+                                    m_logger.info(e.getMessage());
+                                }
+                                disconnectedForUpdate = true;
+                                break;
+                            case USER_ERROR:
+                                throw e;
                         }
                     }
                 }
@@ -636,14 +638,14 @@ public abstract class ExportClientConnectorBase {
                         disconnectedWithError, disconnectedForUpdate);
                 if (pollTimeMS > 0) {
                     m_logger.trace(String.format("Sleeping for %d ms due to inactivity or no connection.", pollTimeMS));
-                    try { Thread.sleep(pollTimeMS); }
-                    catch (InterruptedException e) {
+                    try {
+                        Thread.sleep(pollTimeMS);
+                    } catch (InterruptedException e) {
                         throw new ExportClientException(e);
                     }
                 }
             }
-        }
-        finally {
+        } finally {
             // ensure the shutdown hook is removed when not doing work
             Runtime.getRuntime().removeShutdownHook(m_shutdownHook);
         }
