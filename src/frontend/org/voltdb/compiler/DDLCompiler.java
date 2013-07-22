@@ -1112,14 +1112,6 @@ public class DDLCompiler {
         // fyi: Historically, VoltType class initialization errors get reported on this line (?).
         VoltType type = VoltType.typeFromString(typename);
         columnTypes.add(type);
-        int size = Integer.parseInt(sizeString);
-        // check valid length if varchar
-        if (type == VoltType.STRING) {
-            if ((size == 0) || (size > VoltType.MAX_VALUE_LENGTH)) {
-                String msg = "VARCHAR Column " + name + " in table " + table.getTypeName() + " has unsupported length " + sizeString;
-                throw m_compiler.new VoltCompilerException(msg);
-            }
-        }
         if (defaultvalue != null && (type == VoltType.DECIMAL || type == VoltType.NUMERIC))
         {
             // Until we support deserializing scientific notation in the EE, we'll
@@ -1135,6 +1127,15 @@ public class DDLCompiler {
 
         column.setType(type.getValue());
         column.setNullable(nullable.toLowerCase().startsWith("t") ? true : false);
+        int size = type.getMaxLengthInBytes();
+        // Require a valid length if variable length is supported for a type
+        if (type == VoltType.STRING || type == VoltType.VARBINARY) {
+            size = Integer.parseInt(sizeString);
+            if ((size == 0) || (size > VoltType.MAX_VALUE_LENGTH)) {
+                String msg = type.toSQLString() + " column " + name + " in table " + table.getTypeName() + " has unsupported length " + sizeString;
+                throw m_compiler.new VoltCompilerException(msg);
+            }
+        }
         column.setSize(size);
 
         column.setDefaultvalue(defaultvalue);
