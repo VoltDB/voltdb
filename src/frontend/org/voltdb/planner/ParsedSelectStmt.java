@@ -123,6 +123,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private long offsetParameterId = -1;
     public boolean distinct = false;
     private boolean complexAggs = false;
+    private boolean hasAggregateExpression = false;
 
     /**
     * Class constructor
@@ -183,10 +184,13 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     private boolean needComplexAggregation () {
-        if (complexAggs) return true;
-
         // Hack for query like: Select COUNT(*) from T order by col
         // Select P+A From T Order by P+A
+        if (!hasAggregateExpression && !isGrouped()) {
+            complexAggs = false;
+            return false;
+        }
+        if (complexAggs) return true;
 
         if (aggResultColumns.size() > displayColumns.size()) {
             complexAggs = true;
@@ -429,6 +433,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if ((aggregationList.size() == 1 && !aggregationList.get(0).equals(col.expression))
                     || aggregationList.size() > 1)
                 complexAggs = true;
+            if (aggregationList.size() >= 1)
+                hasAggregateExpression = true;
 
             displayColumns.add(col);
         }
@@ -573,6 +579,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         retval = retval.trim();
 
         return retval;
+    }
+
+    public boolean hasAggregateExpression () {
+        return hasAggregateExpression;
     }
 
     public NodeSchema getNewSchema () {

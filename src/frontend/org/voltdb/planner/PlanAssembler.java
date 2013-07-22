@@ -1141,16 +1141,10 @@ public class PlanAssembler {
     }
 
     AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
-        boolean containsAggregateExpression = false;
         AggregatePlanNode aggNode = null;
 
         /* Check if any aggregate expressions are present */
-        for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns) {
-            if (col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
-                containsAggregateExpression = true;
-                break;
-            }
-        }
+        boolean containsAggregateExpression = m_parsedSelect.hasAggregateExpression();
 
         /*
          * "Select A from T group by A" is grouped but has no aggregate operator
