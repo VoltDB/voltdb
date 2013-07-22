@@ -152,23 +152,25 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertFalse(true);
         }
         project.addPartitionInfo("P1", "ID");
-
-        //project.addStmtProcedure("failedProcedure", "SELECT wage, SUM(wage) from R1 group by ID;");
+        boolean success;
+        project.addStmtProcedure("failedProcedure", "SELECT wage, SUM(wage) from R1 group by ID;");
 
         config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        boolean success = config.compile(project);
+        success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
 
+        // TODO(XIN): HSQL, Can not support complex Agg...
 //        config = new LocalCluster("plansgroupby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
 //        success = config.compile(project);
 //        assertTrue(success);
 //        builder.addServerConfig(config);
-//
-//        // Cluster
-//        config = new LocalCluster("plansgroupby-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-//        success = config.compile(project);
-//        assertTrue(success);
+
+        // Cluster
+        config = new LocalCluster("plansgroupby-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        success = config.compile(project);
+        assertTrue(success);
+        builder.addServerConfig(config);
 
         return builder;
     }

@@ -29,9 +29,6 @@ import java.util.List;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 
-
-
-
 public class TestPlansGroupBy extends PlannerTestCase {
     @Override
     protected void setUp() throws Exception {
@@ -46,41 +43,46 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
     List<AbstractPlanNode> pns = new ArrayList<AbstractPlanNode>();
 
-    /*
     public void testGroupByA1() {
-        List<AbstractPlanNode> pns = compileToFragments("SELECT A1 from T1 group by A1");
+        pns = compileToFragments("SELECT A1 from T1 group by A1");
         for (AbstractPlanNode apn: pns) {
             System.out.println(apn.toExplainPlanString());
         }
     }
 
     public void testCountA1() {
-        AbstractPlanNode pn = compile("SELECT count(A1) from T1");
-        System.out.println(pn.toJSONString());
+        pns = compileToFragments("SELECT count(A1) from T1");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
     }
 
     public void testCountStar()
     {
-        AbstractPlanNode pn = compile("SELECT count(*) from T1");
-        System.out.println(pn.toJSONString());
+        pns = compileToFragments("SELECT count(*) from T1");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
     }
 
-   public void testCountDistinctA1() {
-       AbstractPlanNode pn = compile("SELECT count(distinct A1) from T1");
-       System.out.println(pn.toJSONString());
-   }
+    public void testCountDistinctA1() {
+        pns = compileToFragments("SELECT count(distinct A1) from T1");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
+    }
 
     public void testDistinctA1() {
-        AbstractPlanNode pn = compile("SELECT DISTINCT A1 FROM T1");
-        System.out.println(pn.toJSONString());
+        pns = compileToFragments("SELECT DISTINCT A1 FROM T1");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
     }
 
-    */
-
+    // Make it to false when we fix ENG-4397
+    // ENG-4937 - As a developer, I want to ignore the "order by" clause on non-grouped aggregate queries.
     public void testEdgeComplexCase() {
         pns = compileToFragments("SELECT count(*)  FROM P1 order by PKEY");
-        // Make it to false when we fix ENG-4397
-        // ENG-4937 - As a developer, I want to ignore the "order by" clause on non-grouped aggregate queries.
         checkComplexAgg(pns, true);
     }
 
@@ -97,9 +99,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testReplicatedTableComplexAggregate() {
-          //pns = compileToFragments("select SUM(distinct(A1 * 2)), SUM(A1 * 2) from P1");
-          pns = compileToFragments("select A1, sum(B1), count(B1) + 5 from R1 group by A1");
-          checkComplexAgg(pns, true);
+          pns = compileToFragments("select PKEY+A1 from T1 Order by PKEY+A1");
+          checkComplexAgg(pns, false);
     }
 
     private void checkComplexAgg(List<AbstractPlanNode> pns, boolean hasProjectionNode) {
