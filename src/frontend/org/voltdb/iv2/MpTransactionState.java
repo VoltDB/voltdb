@@ -285,19 +285,19 @@ public class MpTransactionState extends TransactionState
                 if (msg == null) {
                     if (!snapShotRestoreProcName.equals(m_initiationMsg.getStoredProcedureName()) ) {
                         tmLog.warn("Possible multipartition transaction deadlock detected for: " + m_initiationMsg);
-                    }
-                    if (m_remoteWork == null) {
-                        tmLog.warn("Waiting on local BorrowTask response from site: " +
-                                CoreUtils.hsIdToString(m_buddyHSId));
-                    }
-                    else {
-                        tmLog.warn("Waiting on remote dependencies: ");
-                        for (Entry<Integer, Set<Long>> e : m_remoteDeps.entrySet()) {
-                            tmLog.warn("Dep ID: " + e.getKey() + " waiting on: " +
-                                    CoreUtils.hsIdCollectionToString(e.getValue()));
+                        if (m_remoteWork == null) {
+                            tmLog.warn("Waiting on local BorrowTask response from site: " +
+                                    CoreUtils.hsIdToString(m_buddyHSId));
                         }
+                        else {
+                            tmLog.warn("Waiting on remote dependencies: ");
+                            for (Entry<Integer, Set<Long>> e : m_remoteDeps.entrySet()) {
+                                tmLog.warn("Dep ID: " + e.getKey() + " waiting on: " +
+                                        CoreUtils.hsIdCollectionToString(e.getValue()));
+                            }
+                        }
+                        m_mbox.send(com.google.common.primitives.Longs.toArray(m_useHSIds), new DumpMessage());
                     }
-                    m_mbox.send(com.google.common.primitives.Longs.toArray(m_useHSIds), new DumpMessage());
                 }
             }
         }
