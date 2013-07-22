@@ -23,6 +23,8 @@
 #include "common/ids.h"
 #include "common/tabletuple.h"
 
+#include <string>
+
 namespace voltdb {
 class PersistentTable;
 class VoltDBEngine;
@@ -51,6 +53,7 @@ public:
      */
     ConstraintFailureException(PersistentTable *table, TableTuple tuple, std::string message);
 
+    virtual const std::string message() const;
     virtual ~ConstraintFailureException();
 protected:
     void p_serialize(ReferenceSerializeOutput *output) const;

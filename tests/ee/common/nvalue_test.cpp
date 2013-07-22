@@ -2103,44 +2103,123 @@ TEST_F(NValueTest, TestExtract)
     NValue result;
     NValue midSeptember = ValueFactory::getTimestampValue(1000000000000000);
 
-    const int EXPECTED_YEAR = 2001;
+    int EXPECTED_YEAR = 2001;
     result = midSeptember.callUnary<FUNC_EXTRACT_YEAR>();
     EXPECT_EQ(0, result.compare(ValueFactory::getIntegerValue(EXPECTED_YEAR)));
 
-    const int EXPECTED_MONTH = 9;
+    int8_t EXPECTED_MONTH = 9;
     result = midSeptember.callUnary<FUNC_EXTRACT_MONTH>();
     EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_MONTH)));
 
-    const int EXPECTED_DAY = 9;
+    int8_t EXPECTED_DAY = 9;
     result = midSeptember.callUnary<FUNC_EXTRACT_DAY>();
     EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_DAY)));
 
-    const int EXPECTED_DOW = 1;
+    int8_t EXPECTED_DOW = 1;
     result = midSeptember.callUnary<FUNC_EXTRACT_DAY_OF_WEEK>();
     EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_DOW)));
 
-    const int EXPECTED_DOY = 252;
+    int16_t EXPECTED_DOY = 252;
     result = midSeptember.callUnary<FUNC_EXTRACT_DAY_OF_YEAR>();
     EXPECT_EQ(0, result.compare(ValueFactory::getSmallIntValue(EXPECTED_DOY)));
 
-    const int EXPECTED_WOY = 36;
+    int8_t EXPECTED_WOY = 36;
     result = midSeptember.callUnary<FUNC_EXTRACT_WEEK_OF_YEAR>();
     EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_WOY)));
 
-    const int EXPECTED_QUARTER = 3;
+    int8_t EXPECTED_QUARTER = 3;
     result = midSeptember.callUnary<FUNC_EXTRACT_QUARTER>();
     EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_QUARTER)));
 
-    const int EXPECTED_HOUR = 1;
+    int8_t EXPECTED_HOUR = 1;
     result = midSeptember.callUnary<FUNC_EXTRACT_HOUR>();
     EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_HOUR)));
 
-    const int EXPECTED_MINUTE = 46;
+    int8_t EXPECTED_MINUTE = 46;
     result = midSeptember.callUnary<FUNC_EXTRACT_MINUTE>();
     EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_MINUTE)));
 
-    const std::string EXPECTED_SECONDS = "40";
+    std::string EXPECTED_SECONDS = "40";
     result = midSeptember.callUnary<FUNC_EXTRACT_SECOND>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getDecimalValueFromString(EXPECTED_SECONDS)));
+
+    // test time before epoch, Thu, 18 Nov 1948 16:32:03 GMT
+    NValue beforeEpoch = ValueFactory::getTimestampValue(-666430077000000);
+
+    EXPECTED_YEAR = 1948;
+    result = beforeEpoch.callUnary<FUNC_EXTRACT_YEAR>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getIntegerValue(EXPECTED_YEAR)));
+
+    EXPECTED_MONTH = 11;
+    result = beforeEpoch.callUnary<FUNC_EXTRACT_MONTH>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_MONTH)));
+
+    EXPECTED_DAY = 18;
+    result = beforeEpoch.callUnary<FUNC_EXTRACT_DAY>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_DAY)));
+
+    EXPECTED_DOW = 5;
+    result = beforeEpoch.callUnary<FUNC_EXTRACT_DAY_OF_WEEK>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_DOW)));
+
+    EXPECTED_DOY = 323;
+    result = beforeEpoch.callUnary<FUNC_EXTRACT_DAY_OF_YEAR>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getSmallIntValue(EXPECTED_DOY)));
+
+    EXPECTED_QUARTER = 4;
+    result = beforeEpoch.callUnary<FUNC_EXTRACT_QUARTER>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_QUARTER)));
+
+    EXPECTED_HOUR = 16;
+    result = beforeEpoch.callUnary<FUNC_EXTRACT_HOUR>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_HOUR)));
+
+    EXPECTED_MINUTE = 32;
+    result = beforeEpoch.callUnary<FUNC_EXTRACT_MINUTE>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_MINUTE)));
+
+    EXPECTED_SECONDS = "3";
+    result = beforeEpoch.callUnary<FUNC_EXTRACT_SECOND>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getDecimalValueFromString(EXPECTED_SECONDS)));
+
+
+    // test time before epoch, Human time (GMT): Fri, 05 Jul 1658 14:22:28 GMT
+    NValue longAgo = ValueFactory::getTimestampValue(-9829676252000000);
+
+    EXPECTED_YEAR = 1658;
+    result = longAgo.callUnary<FUNC_EXTRACT_YEAR>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getIntegerValue(EXPECTED_YEAR)));
+
+    EXPECTED_MONTH = 7;
+    result = longAgo.callUnary<FUNC_EXTRACT_MONTH>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_MONTH)));
+
+    EXPECTED_DAY = 5;
+    result = longAgo.callUnary<FUNC_EXTRACT_DAY>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_DAY)));
+
+    EXPECTED_DOW = 6;
+    result = longAgo.callUnary<FUNC_EXTRACT_DAY_OF_WEEK>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_DOW)));
+
+    EXPECTED_DOY = 186;
+    result = longAgo.callUnary<FUNC_EXTRACT_DAY_OF_YEAR>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getSmallIntValue(EXPECTED_DOY)));
+
+    EXPECTED_QUARTER = 3;
+    result = longAgo.callUnary<FUNC_EXTRACT_QUARTER>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_QUARTER)));
+
+    EXPECTED_HOUR = 14;
+    result = longAgo.callUnary<FUNC_EXTRACT_HOUR>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_HOUR)));
+
+    EXPECTED_MINUTE = 22;
+    result = longAgo.callUnary<FUNC_EXTRACT_MINUTE>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_MINUTE)));
+
+    EXPECTED_SECONDS = "28";
+    result = longAgo.callUnary<FUNC_EXTRACT_SECOND>();
     EXPECT_EQ(0, result.compare(ValueFactory::getDecimalValueFromString(EXPECTED_SECONDS)));
 
     delete poolHolder;

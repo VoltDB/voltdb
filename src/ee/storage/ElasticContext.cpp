@@ -18,6 +18,7 @@
 #include "storage/ElasticContext.h"
 #include "storage/persistenttable.h"
 #include "common/TupleOutputStreamProcessor.h"
+#include "common/FixUnusedAssertHack.h"
 
 namespace voltdb {
 
@@ -90,10 +91,7 @@ bool ElasticContext::notifyTupleDelete(TableTuple &tuple)
 {
     PersistentTable &table = getTable();
     if (m_index.has(table, tuple)) {
-#ifdef DEBUG
-        bool removed =
-#endif
-        m_index.remove(table, tuple);
+        bool removed = m_index.remove(table, tuple);
         assert(removed);
     }
     return true;
@@ -109,17 +107,11 @@ void ElasticContext::notifyTupleMovement(TBPtr sourceBlock,
 {
     PersistentTable &table = getTable();
     if (m_index.has(table, sourceTuple)) {
-#ifdef DEBUG
-        bool removed =
-#endif
-        m_index.remove(getTable(), sourceTuple);
+        bool removed = m_index.remove(getTable(), sourceTuple);
         assert(removed);
     }
     if (getPredicates()[0].eval(&targetTuple).isTrue()) {
-#ifdef DEBUG
-        bool added =
-#endif
-        m_index.add(getTable(), targetTuple);
+        bool added = m_index.add(getTable(), targetTuple);
         assert(added);
     }
 }

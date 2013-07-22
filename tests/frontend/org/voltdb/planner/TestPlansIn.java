@@ -31,6 +31,9 @@ public class TestPlansIn extends PlannerTestCase {
 
     public void testIn()
     {
+        compile("select * from new_order where no_w_id in ?;");
+        compile("select * from new_order where no_w_id in (5,7);");
+        compile("select * from new_order where no_w_id in (?);");
         compile("select * from new_order where no_w_id in (?,5,3,?);");
         compile("select * from new_order where no_w_id not in (?,5,3,?);");
         compile("select * from warehouse where w_name not in (?, 'foo');");
@@ -51,6 +54,8 @@ public class TestPlansIn extends PlannerTestCase {
         failToCompile("select * from new_order where no_w_id in ( ) and no_o_id > 1;",
                 " unexpected ");
 
+        failToCompile("select * from new_order where no_w_id in (select w_id from warehouse);",
+                "VoltDB does not support subqueries");
         failToCompile("select * from new_order where no_w_id <> (5, 7, 8);",
                 "row column count mismatch");
         failToCompile("select * from new_order where exists (select w_id from warehouse);",

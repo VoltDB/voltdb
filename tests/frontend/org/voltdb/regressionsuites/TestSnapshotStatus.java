@@ -43,15 +43,39 @@ public class TestSnapshotStatus extends SaveRestoreBase {
 
     public void testSnapshotStatus() throws Exception
     {
-       Client client = getClient();
-       VoltTable[] results = client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, 0).getResults();
-       System.out.println(results[0]);
-       // better be two rows, one for each node for table T, in the save results:
-       assertEquals(2, results[0].getRowCount());
-       results = client.callProcedure("@SnapshotStatus").getResults();
-       System.out.println(results[0]);
-       // better be two rows, one for each node, in the status results:
-       assertEquals(2, results[0].getRowCount());
+        Client client = getClient();
+        VoltTable[] results = client.callProcedure("@SnapshotSave", TMPDIR, TESTNONCE, 1).getResults();
+        System.out.println(results[0]);
+        // better be four rows, one for each execution site, in the blocking save results:
+        assertEquals(4, results[0].getRowCount());
+        results = client.callProcedure("@SnapshotStatus").getResults();
+        System.out.println(results[0]);
+        // better be four rows, one for each table at each node, in the status results:
+        assertEquals(4, results[0].getRowCount());
+        // better not be any zeros in the completion time
+        while (results[0].advanceRow()) {
+            long completed = results[0].getLong("END_TIME");
+            assertTrue("END_TIME was not filled", completed != 0);
+        }
+    }
+
+    // Regression test for ENG-4802
+    public void testCsvSnapshotStatus() throws Exception
+    {
+        Client client = getClient();
+        // Lazy man's JSON construction for snapshot opts
+        String json = "{uripath:\"file:///" + TMPDIR + "\", nonce:\"" + TESTNONCE + "\",block:true, format:\"csv\"}";
+        VoltTable[] results = client.callProcedure("@SnapshotSave", json).getResults();
+        System.out.println(results[0]);
+        results = client.callProcedure("@SnapshotStatus").getResults();
+        System.out.println(results[0]);
+        // better be three rows, one for the replicated table, and one for each partition of the partitioned table
+        assertEquals(3, results[0].getRowCount());
+        // better not be any zeros in the completion time
+        while (results[0].advanceRow()) {
+            long completed = results[0].getLong("END_TIME");
+            assertTrue("END_TIME was not filled", completed != 0);
+        }
     }
 
     //
@@ -65,7 +89,8 @@ public class TestSnapshotStatus extends SaveRestoreBase {
             new MultiConfigSuiteBuilder(TestSnapshotStatus.class);
 
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addLiteralSchema("CREATE TABLE T(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1));");
+        project.addLiteralSchema("CREATE TABLE T(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1));" +
+                "CREATE TABLE R(R1 INTEGER NOT NULL, R2 INTEGER);");
         project.addPartitionInfo("T", "A1");
         project.addStmtProcedure("InsertA", "INSERT INTO T VALUES(?,?);", "T.A1: 0");
 

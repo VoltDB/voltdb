@@ -1647,14 +1647,6 @@ public class Expression {
             exp.attributes.put("value", valueData.toString());
             return exp;
 
-        case OpTypes.DYNAMIC_PARAM:
-            // This eliminates a NullPointerException which MAY be a sign of insufficient type inference,
-            // but there MAY be cases where a parameter type can't legitimately be inferred, so let it go.
-            if (dataType != null) {
-                exp.attributes.put("valuetype", Types.getTypeName(dataType.typeCode));
-            }
-            return exp;
-
         case OpTypes.COLUMN:
         case OpTypes.COALESCE:
             ExpressionColumn ec = (ExpressionColumn)this;

@@ -119,7 +119,9 @@ bool TupleOutputStreamProcessor::writeRow(TupleSerializer &tupleSerializer,
         // Get approval from corresponding output stream predicate, if provided.
         bool accepted = true;
         if (!m_predicates->empty()) {
-            accepted = ipredicate->eval(&tuple).isTrue();
+            if (!boost::is_null(ipredicate)) {
+                accepted = ipredicate->eval(&tuple).isTrue();
+            }
             // Keep walking through predicates in lock-step with the streams.
             // As with first() we expect a predicate to be available for each and every stream.
             // It was already checked, so just assert here.

@@ -22,7 +22,10 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.types.TimestampType;
+import org.voltdb.utils.Encoder;
 
 /**
  *
@@ -208,24 +211,158 @@ public class ConstantValueExpression extends AbstractValueExpression {
     }
 
     @Override
-    public void refineValueType(VoltType columnType) {
-        if (m_valueType != VoltType.NUMERIC) {
+    public void refineValueType(VoltType neededType, int neededSize)
+    {
+        int size_unit = 1;
+        if (neededType == m_valueType) {
+
+            if (neededSize == m_valueSize) {
+                return;
+            }
+            // Variably sized types need to fit within the target width.
+            if (neededType == VoltType.VARBINARY) {
+                if ( ! Encoder.isHexEncodedString(getValue())) {
+                    throw new PlanningErrorException("Value (" + getValue() +
+                                                     ") has an invalid format for a constant " +
+                                                     neededType.toSQLString() + " value");
+                }
+                size_unit = 2;
+            }
+            else {
+                assert neededType == VoltType.STRING;
+            }
+
+            if (getValue().length() > size_unit*neededSize ) {
+                throw new PlanningErrorException("Value (" + getValue() +
+                                                 ") is too wide for a constant " +
+                                                 neededType.toSQLString() +
+                                                 " value of size " + neededSize);
+            }
+            setValueSize(neededSize);
             return;
         }
-        if ((columnType == VoltType.FLOAT) || (columnType == VoltType.DECIMAL)) {
-            m_valueType = columnType;
-            m_valueSize = columnType.getLengthInBytesForFixedTypes();
+
+        if (m_isNull) {
+            setValueType(neededType);
+            setValueSize(neededSize);
             return;
         }
-        if (columnType.isInteger()) {
-            Long.parseLong(getValue());
-            m_valueType = columnType;
-            m_valueSize = columnType.getLengthInBytesForFixedTypes();
+
+        // Constant's apparent type may not exactly match the target type needed.
+        if (neededType == VoltType.VARBINARY &&
+                (m_valueType == VoltType.STRING || m_valueType == null)) {
+            if ( ! Encoder.isHexEncodedString(getValue())) {
+                throw new PlanningErrorException("Value (" + getValue() +
+                                                 ") has an invalid format for a constant " +
+                                                 neededType.toSQLString() + " value");
+            }
+            size_unit = 2;
+            if (getValue().length() > size_unit*neededSize ) {
+                throw new PlanningErrorException("Value (" + getValue() +
+                                                 ") is too wide for a constant " +
+                                                 neededType.toSQLString() +
+                                                 " value of size " + neededSize);
+            }
+            setValueType(neededType);
+            setValueSize(neededSize);
+            return;
         }
-        else {
-            throw new NumberFormatException("NUMERIC constant value type must match a FLOAT, DECIMAL, or integral column, not " + columnType.toSQLString());
+
+        if (neededType == VoltType.STRING && m_valueType == null) {
+            if (getValue().length() > size_unit*neededSize ) {
+                throw new PlanningErrorException("Value (" + getValue() +
+                                                 ") is too wide for a constant " +
+                                                 neededType.toSQLString() +
+                                                 " value of size " + neededSize);
+            }
+            setValueType(neededType);
+            setValueSize(neededSize);
+            return;
+        }
+
+        if (neededType == VoltType.TIMESTAMP) {
+            if (m_valueType == VoltType.STRING) {
+                try {
+                    // Convert date value in whatever format is supported by TimeStampType
+                    // into VoltDB native microsecond count.
+                    TimestampType ts = new TimestampType(m_value);
+                    m_value = String.valueOf(ts.getTime());
+                }
+                // It couldn't be converted to timestamp.
+                catch (IllegalArgumentException e) {
+                    throw new PlanningErrorException("Value (" + getValue() +
+                                                     ") has an invalid format for a constant " +
+                                                     neededType.toSQLString() + " value");
+
+                }
+                setValueType(neededType);
+                setValueSize(neededSize);
+                return;
+            }
+        }
+
+        if ((neededType == VoltType.FLOAT) || (neededType == VoltType.DECIMAL)) {
+            if (m_valueType == null ||
+                    (m_valueType != VoltType.NUMERIC && ! m_valueType.isExactNumeric())) {
+                try {
+                    Double.parseDouble(getValue());
+                } catch (NumberFormatException nfe) {
+                    throw new PlanningErrorException("Value (" + getValue() +
+                                                     ") has an invalid format for a constant " +
+                                                     neededType.toSQLString() + " value");
+                }
+            }
+            setValueType(neededType);
+            setValueSize(neededSize);
+            return;
+        }
+
+        if (neededType.isInteger()) {
+            long value = 0;
+            try {
+                value = Long.parseLong(getValue());
+            } catch (NumberFormatException nfe) {
+                throw new PlanningErrorException("Value (" + getValue() +
+                                                 ") has an invalid format for a constant " +
+                                                 neededType.toSQLString() + " value");
+            }
+            checkIntegerValueRange(value, neededType);
+            m_valueType = neededType;
+            m_valueSize = neededType.getLengthInBytesForFixedTypes();
+            return;
+        }
+
+        // That's it for known type conversions.
+        throw new PlanningErrorException("Value (" + getValue() +
+                ") has an invalid format for a constant " +
+                neededType.toSQLString() + " value");
+    }
+
+    private static void checkIntegerValueRange(long value, VoltType integerType) {
+
+        // Note that while Long.MIN_VALUE is used to represent NULL in VoltDB, we have decided that
+        // pass in the literal for Long.MIN_VALUE makes very little sense when you have the option
+        // to use the literal NULL. Thus the NULL values for each of the 4 integer types are considered
+        // an underflow exception for the type.
+
+        if (integerType == VoltType.BIGINT || integerType == VoltType.TIMESTAMP) {
+            if (value == VoltType.NULL_BIGINT)
+                throw new PlanningErrorException("Constant value underflows BIGINT type.");
+        }
+        if (integerType == VoltType.INTEGER) {
+            if ((value > Integer.MAX_VALUE) || (value <= VoltType.NULL_INTEGER))
+                throw new PlanningErrorException("Constant value overflows/underflows INTEGER type.");
+        }
+        if (integerType == VoltType.SMALLINT) {
+            if ((value > Short.MAX_VALUE) || (value <= VoltType.NULL_SMALLINT))
+                throw new PlanningErrorException("Constant value overflows/underflows SMALLINT type.");
+        }
+        if (integerType == VoltType.TINYINT) {
+            if ((value > Byte.MAX_VALUE) || (value <= VoltType.NULL_TINYINT))
+                throw new PlanningErrorException("Constant value overflows/underflows TINYINT type.");
         }
     }
+
 
     @Override
     public void refineOperandType(VoltType columnType) {

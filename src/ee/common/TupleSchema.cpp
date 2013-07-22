@@ -158,6 +158,9 @@ void TupleSchema::setColumnMetaData(uint16_t index, ValueType type, const int32_
     columnInfo->length = length;
     if ((type == VALUE_TYPE_VARCHAR) || (type == VALUE_TYPE_VARBINARY)) {
         if (length < UNINLINEABLE_OBJECT_LENGTH && m_allowInlinedObjects) {
+            if (length == 0) {
+                throwFatalLogicErrorStreamed("Zero length for object type " << valueToString((ValueType)type));
+            }
             /*
              * Inline the string if it is less then UNINLINEABLE_OBJECT_LENGTH bytes.
              */

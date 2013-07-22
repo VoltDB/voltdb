@@ -45,11 +45,13 @@ CTX.CPPFLAGS += """-Wall -Wextra -Werror -Woverloaded-virtual
             -Winit-self -Wno-sign-compare -Wno-unused-parameter
             -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK
             -fno-omit-frame-pointer
-            -fvisibility=default -DBOOST_SP_DISABLE_THREADS"""
+            -fvisibility=default
+            -DBOOST_SP_DISABLE_THREADS -DBOOST_DISABLE_THREADS -DBOOST_ALL_NO_LIB"""
 
 # clang doesn't seem to want this
 if compiler_name == 'gcc':
     CTX.CPPFLAGS += " -pthread"
+    CTX.LDFLAGS += " -rdynamic"
 
 if (compiler_name != 'gcc') or (compiler_major == 4 and compiler_minor >= 3):
     CTX.CPPFLAGS += " -Wno-ignored-qualifiers -fno-strict-aliasing"
@@ -58,7 +60,7 @@ if CTX.PROFILE:
     CTX.CPPFLAGS += " -fvisibility=default -DPROFILE_ENABLED"
 
 # linker flags
-CTX.LDFLAGS += """ -g3 -rdynamic"""
+CTX.LDFLAGS += """ -g3"""
 CTX.LASTLDFLAGS = """ -ldl"""
 
 if CTX.COVERAGE:
@@ -68,19 +70,13 @@ if CTX.COVERAGE:
 # which you must have separately built and installed. Take some guesses
 # at the library location (/usr/local/lib).
 if CTX.PROFILE:
-    CTX.LDFLAGS = """  -L/usr/local/lib -g3 -rdynamic -lprofiler -lunwind"""
+    CTX.LDFLAGS = """  -L/usr/local/lib -g3 -lprofiler -lunwind"""
     # consider setting CTX.LASTLDFLAGS to " " rather than -ldl if that option really is unwanted.
 
 # this is where the build will look for header files
 # - the test source will also automatically look in the test root dir
 CTX.INCLUDE_DIRS = ['src/ee']
 CTX.SYSTEM_DIRS = ['third_party/cpp']
-
-# extra flags that will get added to building test source
-if CTX.LEVEL == "MEMCHECK":
-    CTX.TEST_EXTRAFLAGS = """ -g3 -DDEBUG -DMEMCHECK"""
-else:
-    CTX.TEST_EXTRAFLAGS = """ -g3 -DDEBUG """
 
 # don't worry about checking for changes in header files in the following
 #  directories
@@ -100,20 +96,20 @@ CTX.TEST_PREFIX = "tests/ee/"
 ###############################################################################
 
 if CTX.LEVEL == "MEMCHECK":
-    CTX.EXTRAFLAGS += " -g3 -rdynamic -DDEBUG -DMEMCHECK -DVOLT_LOG_LEVEL=500"
+    CTX.CPPFLAGS += " -g3 -DDEBUG -DMEMCHECK -DVOLT_LOG_LEVEL=500"
     CTX.OUTPUT_PREFIX = "obj/memcheck"
 
 if CTX.LEVEL == "DEBUG":
-    CTX.EXTRAFLAGS += " -g3 -rdynamic -DDEBUG -DVOLT_LOG_LEVEL=500"
+    CTX.CPPFLAGS += " -g3 -DDEBUG -DVOLT_LOG_LEVEL=500"
     CTX.OUTPUT_PREFIX = "obj/debug"
 
 if CTX.LEVEL == "RELEASE":
-    CTX.EXTRAFLAGS += " -g3 -O3 -mmmx -msse -msse2 -msse3 -DNDEBUG -DVOLT_LOG_LEVEL=500"
+    CTX.CPPFLAGS += " -g3 -O3 -mmmx -msse -msse2 -msse3 -DNDEBUG -DVOLT_LOG_LEVEL=500"
     CTX.OUTPUT_PREFIX = "obj/release"
 
 # build in parallel directory instead of subdir so that relative paths work
 if CTX.COVERAGE:
-    CTX.EXTRAFLAGS += " -ftest-coverage -fprofile-arcs"
+    CTX.CPPFLAGS += " -ftest-coverage -fprofile-arcs"
     CTX.OUTPUT_PREFIX += "-coverage"
 
 CTX.OUTPUT_PREFIX += "/"
@@ -331,12 +327,6 @@ CTX.INPUT['logging'] = """
 
 # specify the third party input
 
-CTX.THIRD_PARTY_INPUT['json_spirit'] = """
- json_spirit_reader.cpp
- json_spirit_value.cpp
- json_spirit_writer.cpp
-"""
-
 CTX.THIRD_PARTY_INPUT['jsoncpp'] = """
  jsoncpp.cpp
 """
@@ -409,8 +399,8 @@ if whichtests in ("${eetestsuite}", "indexes"):
 if whichtests in ("${eetestsuite}", "storage"):
     CTX.TESTS['storage'] = """
      CompactionTest
-     CopyOnWriteTest
      constraint_test
+     CopyOnWriteTest
      filter_test
      persistent_table_log_test
      PersistentTableMemStatsTest
