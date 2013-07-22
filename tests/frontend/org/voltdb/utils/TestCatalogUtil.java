@@ -242,7 +242,7 @@ public class TestCatalogUtil extends TestCase {
                             "<jsonapi enabled='true'/>" +
                             "</httpd>" +
                             "<export enabled='true' >" +
-                                "<onserver exportto='custom' exportpluginclass=\"com.foo.export.ExportClient\"  >" +
+                                "<onserver exportto='custom' exportconnectorclass=\"com.foo.export.ExportClient\"  >" +
                                 "</onserver>" +
                             "</export>" +
                             "<users> " +

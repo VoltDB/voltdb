@@ -234,7 +234,7 @@
       <xs:element name="configuration" type="ExportConfigurationType" minOccurs="0" maxOccurs="1"/>
     </xs:sequence>
     <xs:attribute name="exportto" type="ServerExportEnum" default="file"/>
-    <xs:attribute name="exportpluginclass" type="xs:string" default=""/>
+    <xs:attribute name="exportconnectorclass" type="xs:string" default=""/>
   </xs:complexType>
 
   <xs:complexType name="ExportConfigurationType">

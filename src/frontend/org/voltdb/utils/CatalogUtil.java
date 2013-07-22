@@ -1080,12 +1080,12 @@ public abstract class CatalogUtil {
             //Validate that we can load the class.
             case CUSTOM:
                 try {
-                    CatalogUtil.class.getClassLoader().loadClass(exportOnServer.getExportpluginclass());
-                    exportClientClassName = exportOnServer.getExportpluginclass();
+                    CatalogUtil.class.getClassLoader().loadClass(exportOnServer.getExportconnectorclass());
+                    exportClientClassName = exportOnServer.getExportconnectorclass();
                 } catch (ClassNotFoundException ex) {
                     hostLog.error(
                             "Custom Export failed to configure, failed to load " +
-                            " export plugin class: " + exportOnServer.getExportpluginclass() +
+                            " export plugin class: " + exportOnServer.getExportconnectorclass() +
                             " Disabling export.");
                     exportType.setEnabled(false);
                     return;
