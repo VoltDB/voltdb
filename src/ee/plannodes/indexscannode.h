@@ -63,12 +63,14 @@ class IndexScanPlanNode : public AbstractScanPlanNode {
             this->lookup_type = INDEX_LOOKUP_TYPE_EQ;
             this->sort_direction = SORT_DIRECTION_TYPE_INVALID;
             this->end_expression = NULL;
+            this->initial_expression = NULL;
         }
         IndexScanPlanNode() : AbstractScanPlanNode() {
             this->key_iterate = false;
             this->lookup_type = INDEX_LOOKUP_TYPE_EQ;
             this->sort_direction = SORT_DIRECTION_TYPE_INVALID;
             this->end_expression = NULL;
+            this->initial_expression = NULL;
         }
         ~IndexScanPlanNode();
         virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_INDEXSCAN); }
@@ -92,6 +94,9 @@ class IndexScanPlanNode : public AbstractScanPlanNode {
         std::vector<AbstractExpression*>& getSearchKeyExpressions();
         const std::vector<AbstractExpression*>& getSearchKeyExpressions() const;
 
+        void setInitialExpression(AbstractExpression* val);
+        AbstractExpression* getInitialExpression() const;
+
         std::string debugInfo(const std::string &spacer) const;
 
     protected:
@@ -108,6 +113,9 @@ class IndexScanPlanNode : public AbstractScanPlanNode {
         // TODO: Document
         //
         std::vector<AbstractExpression*> searchkey_expressions;
+
+        AbstractExpression* initial_expression;
+
         //
         // Enable Index Key Iteration
         //

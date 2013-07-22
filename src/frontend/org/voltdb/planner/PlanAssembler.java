@@ -926,13 +926,15 @@ public class PlanAssembler {
             return root;
         }
 
+        boolean canSkip = false;
+
         // Skip the explicit ORDER BY plan step if an IndexScan is already providing the equivalent ordering.
         // Note that even tree index scans that produce values in their own "key order" only report
         // their sort direction != SortDirectionType.INVALID
         // when they enforce an ordering equivalent to the one requested in the ORDER BY clause.
         if (root.getPlanNodeType() == PlanNodeType.INDEXSCAN) {
             if (((IndexScanPlanNode) root).getSortDirection() != SortDirectionType.INVALID) {
-                return root;
+                canSkip = true;
             }
         }
 
@@ -941,7 +943,18 @@ public class PlanAssembler {
             orderByNode.addSort(col.expression,
                                 col.ascending ? SortDirectionType.ASC
                                               : SortDirectionType.DESC);
+            if (canSkip) {
+                if (((IndexScanPlanNode) root).getSortDirection() !=
+                        (col.ascending ? SortDirectionType.ASC : SortDirectionType.DESC)) {
+                    canSkip = false;
+                }
+            }
         }
+
+        if (canSkip) {
+            return root;
+        }
+
         orderByNode.addAndLinkChild(root);
         orderByNode.generateOutputSchema(m_catalogDb);
 

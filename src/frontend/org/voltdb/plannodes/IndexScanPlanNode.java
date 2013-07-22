@@ -48,6 +48,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         TARGET_INDEX_NAME,
         END_EXPRESSION,
         SEARCHKEY_EXPRESSIONS,
+        INITIAL_EXPRESSION,
         KEY_ITERATE,
         LOOKUP_TYPE,
         DETERMINISM_ONLY,
@@ -72,6 +73,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // This list of expressions corresponds to the values that we will use
     // at runtime in the lookup on the index
     protected final List<AbstractExpression> m_searchkeyExpressions = new ArrayList<AbstractExpression>();
+
+    // for reverse scan LTE only. used to do forward scan to find the correct starting point
+    protected AbstractExpression m_initialExpression;
 
     // ???
     protected Boolean m_keyIterate = false;
@@ -254,6 +258,15 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         return Collections.unmodifiableList(m_searchkeyExpressions);
     }
 
+    public void setInitialExpression(AbstractExpression expr) {
+        if (expr != null) {
+            m_initialExpression = (AbstractExpression)expr.clone();
+        }
+    }
+
+    public AbstractExpression getInitialExpression() {
+        return m_initialExpression;
+    }
     @Override
     public void resolveColumnIndexes()
     {
@@ -394,6 +407,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         stringer.key(Members.END_EXPRESSION.name());
         stringer.value(m_endExpression);
 
+        stringer.key(Members.INITIAL_EXPRESSION.name()).value(m_initialExpression);
+
         stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array();
         for (AbstractExpression ae : m_searchkeyExpressions) {
             assert (ae instanceof JSONString);
@@ -417,6 +432,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         if( !jobj.isNull( Members.END_EXPRESSION.name() ) ) {
             tempjobj = jobj.getJSONObject( Members.END_EXPRESSION.name() );
             m_endExpression = AbstractExpression.fromJSONObject( tempjobj, db);
+        }
+        // load initial_expression
+        if ( !jobj.isNull(Members.INITIAL_EXPRESSION.name() ) ) {
+            tempjobj = jobj.getJSONObject( Members.INITIAL_EXPRESSION.name() );
+            m_initialExpression = AbstractExpression.fromJSONObject(tempjobj,  db);
         }
         //load searchkey_expressions
         if( !jobj.isNull( Members.SEARCHKEY_EXPRESSIONS.name() ) ) {
@@ -502,14 +522,18 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 }
             }
             else {
+                usageInfo = "\n" + indent;
+                if (m_lookupType == IndexLookupType.LT || m_lookupType == IndexLookupType.LTE) {
+                    usageInfo += "reverse";
+                }
                 // qualify whether the inequality matching covers all or only some index key components
                 // " " range-scan covering from (event_type = 1) AND (event_start > x.start_time)" vs
                 // " " range-scan on 1 of 2 cols from event_type = 1"
                 if (indexSize == keySize) {
-                    usageInfo = "\n" + indent + " range-scan covering from " + start;
+                    usageInfo += " range-scan covering from " + start;
                 }
                 else {
-                    usageInfo = String.format("\n%s range-scan on %d of %d cols from %s", indent, keySize, indexSize, start);
+                    usageInfo += String.format(" range-scan on %d of %d cols from %s", keySize, indexSize, start);
                 }
                 // Explain the criteria for continuinuing the scan such as
                 // "while (event_type = 1 AND event_start < x.start_time+30)"

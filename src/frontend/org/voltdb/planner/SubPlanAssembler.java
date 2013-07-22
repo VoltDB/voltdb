@@ -31,6 +31,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
@@ -501,19 +502,6 @@ public abstract class SubPlanAssembler {
             }
         }
 
-        // Upper and lower bounds get handled differently for scans that produce descending order.
-        if (retval.sortDirection == SortDirectionType.DESC) {
-            // Descending order is not supported if there are any kind of upper bounds.
-            // So, fall back to an order-indeterminate scan result which will get an explicit sort.
-            if ((endingBoundExpr != null) || ( ! retval.endExprs.isEmpty())) {
-                retval.sortDirection = SortDirectionType.INVALID;
-            } else {
-                // For a reverse scan, swap the start and end bounds.
-                endingBoundExpr = startingBoundExpr;
-                startingBoundExpr = null; // = the original endingBoundExpr, known to be null
-            }
-        }
-
         if (startingBoundExpr != null) {
             AbstractExpression comparator = startingBoundExpr.getFilter();
             retval.indexExprs.add(comparator);
@@ -529,15 +517,44 @@ public abstract class SubPlanAssembler {
 
         if (endingBoundExpr != null) {
             AbstractExpression comparator = endingBoundExpr.getFilter();
-            retval.endExprs.add(comparator);
-            retval.bindings.addAll(endingBoundExpr.getBindings());
             retval.use = IndexUseType.INDEX_SCAN;
-            if (retval.lookupType == IndexLookupType.EQ) {
-                // This does not need to be that accurate;
-                // anything OTHER than IndexLookupType.EQ is enough to enable a multi-key scan.
-                //TODO: work out whether there is any possible use for more precise settings of
-                // retval.lookupType, including for descending order cases ???
-                retval.lookupType = IndexLookupType.GTE;
+            retval.bindings.addAll(endingBoundExpr.getBindings());
+
+            if (startingBoundExpr != null) {
+                retval.endExprs.add(comparator);
+            } else {
+                // only do reverse scan optimization when no startingBoundExpr and lookup type is
+                // either < or <=
+                if (comparator.getExpressionType() == ExpressionType.COMPARE_LESSTHAN) {
+                    retval.lookupType = IndexLookupType.LT;
+                } else if (comparator.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO) {
+                    retval.lookupType = IndexLookupType.LTE;
+                }
+                if (retval.lookupType == IndexLookupType.EQ) {
+                    // This does not need to be that accurate;
+                    // anything OTHER than IndexLookupType.EQ is enough to enable a multi-key scan.
+                    //TODO: work out whether there is any possible use for more precise settings of
+                    // retval.lookupType, including for descending order cases ???
+                    retval.lookupType = IndexLookupType.GTE;
+                    retval.endExprs.add(comparator);
+                } else {
+                    // optimizable
+                    // add to indexExprs because it will be used as part of searchKey
+                    retval.indexExprs.add(comparator);
+                    // put it to post-filter as well
+                    retval.otherExprs.add(comparator);
+                    // construct a NOT NULL COMPARATOR for this comparison and add to poster-filter
+                    AbstractExpression newComparator = new OperatorExpression(ExpressionType.OPERATOR_NOT,
+                            new OperatorExpression(ExpressionType.OPERATOR_IS_NULL), null);
+                    newComparator.getLeft().setLeft(comparator.getLeft());
+                    newComparator.finalizeValueTypes();
+                    retval.otherExprs.add(newComparator);
+                    // initialExpr is used only for LTE
+                    if (comparator.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO) {
+                        retval.initialExpr.addAll(retval.indexExprs);
+                    }
+                    retval.sortDirection = SortDirectionType.DESC;
+                }
             }
         }
 
@@ -1201,6 +1218,7 @@ public abstract class SubPlanAssembler {
         scanNode.setSortDirection(path.sortDirection);
         scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
         scanNode.setPredicate(ExpressionUtil.combine(path.otherExprs));
+        scanNode.setInitialExpression(ExpressionUtil.combine(path.initialExpr));
 
         scanNode.setTargetTableName(table.getTypeName());
         //TODO: push scan column identification into "setTargetTableName"
