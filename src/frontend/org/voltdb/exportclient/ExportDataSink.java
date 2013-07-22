@@ -28,7 +28,7 @@ import jsr166y.ThreadLocalRandom;
 
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
-import org.voltdb.exportclient.ExportClientDecoderBase.RestartBlockException;
+import org.voltdb.exportclient.ExportDecoderBase.RestartBlockException;
 import org.voltcore.logging.VoltLogger;
 
 import com.google.common.base.Throwables;
@@ -45,7 +45,7 @@ public class ExportDataSink {
     final String m_tableSignature;
     final int partitionId;
     final String m_tableName;
-    final ExportClientDecoderBase m_decoder;
+    final ExportDecoderBase m_decoder;
     final long m_generation;
 
     // the preferred connection for a given partition/table combo
@@ -60,7 +60,7 @@ public class ExportDataSink {
     boolean m_started = false;
 
     public ExportDataSink(long generation, int partitionId, String tableSignature,
-            String tableName, ExportClientDecoderBase decoder) {
+            String tableName, ExportDecoderBase decoder) {
         m_generation = generation;
         m_tableSignature = tableSignature;
         this.partitionId = partitionId;

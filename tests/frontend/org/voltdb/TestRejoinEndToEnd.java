@@ -33,10 +33,10 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
-import org.voltdb.exportclient.ExportClientConnectorBase;
+import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportClientException;
 import org.voltdb.exportclient.ExportConnection;
-import org.voltdb.exportclient.ExportClientDecoderBase;
+import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
 
@@ -462,9 +462,9 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster.shutDown();
     }
 
-    class TrivialExportClient extends ExportClientConnectorBase {
+    class TrivialExportClient extends ExportClientBase {
 
-        public class TrivialDecoder extends ExportClientDecoderBase {
+        public class TrivialDecoder extends ExportDecoderBase {
 
             public TrivialDecoder(AdvertisedDataSource source) {
                 super(source);
@@ -488,7 +488,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         }
 
         @Override
-        public ExportClientDecoderBase constructExportDecoder(AdvertisedDataSource source) {
+        public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source) {
             return new TrivialDecoder(source);
         }
 

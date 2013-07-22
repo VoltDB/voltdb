@@ -32,12 +32,12 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltType;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
-import org.voltdb.exportclient.ExportClientConnectorBase;
+import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportClientException;
 import org.voltdb.exportclient.ExportConnection;
-import org.voltdb.exportclient.ExportClientDecoderBase;
+import org.voltdb.exportclient.ExportDecoderBase;
 
-public class ExportTestClient extends ExportClientConnectorBase
+public class ExportTestClient extends ExportClientBase
 {
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
     // hash table name + partition to verifier
@@ -52,7 +52,7 @@ public class ExportTestClient extends ExportClientConnectorBase
     }
 
     @Override
-    public ExportClientDecoderBase constructExportDecoder(AdvertisedDataSource source)
+    public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source)
     {
         m_generationsSeen.add(source.m_generation);
         String key = source.tableName + source.partitionId;

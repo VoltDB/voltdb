@@ -68,7 +68,7 @@ import com.google.common.base.Throwables;
  * added to each new rolling file}
  *
  */
-public class ExportToFileClient extends ExportClientConnectorBase {
+public class ExportToFileClient extends ExportClientBase {
     public static final int INTERNAL_FIELD_COUNT = 6;
 
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
@@ -445,7 +445,7 @@ public class ExportToFileClient extends ExportClientConnectorBase {
 
     // This class outputs exported rows converted to CSV or TSV values
     // for the table named in the constructor's AdvertisedDataSource
-    class ExportToFileDecoder extends ExportClientDecoderBase {
+    class ExportToFileDecoder extends ExportDecoderBase {
         private final long m_generation;
         private final String m_tableName;
         protected String m_schemaString = "ERROR SERIALIZING SCHEMA";

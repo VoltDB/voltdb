@@ -34,7 +34,7 @@ public class TestExportDataSink extends TestCase {
     static final String TABLE_SIGNATURE = "foo";
     static final int PARTITION_ID = 2;
 
-    class TestExportDecoder extends ExportClientDecoderBase
+    class TestExportDecoder extends ExportDecoderBase
     {
         public TestExportDecoder(AdvertisedDataSource source)
         {

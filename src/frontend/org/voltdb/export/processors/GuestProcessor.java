@@ -34,24 +34,24 @@ import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportDataSource;
 import org.voltdb.export.ExportGeneration;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
-import org.voltdb.exportclient.ExportClientDecoderBase;
-import org.voltdb.exportclient.ExportClientDecoderBase.RestartBlockException;
+import org.voltdb.exportclient.ExportDecoderBase;
+import org.voltdb.exportclient.ExportDecoderBase.RestartBlockException;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ListenableFuture;
-import org.voltdb.exportclient.ExportClientConnectorBase;
+import org.voltdb.exportclient.ExportClientBase;
 
 public class GuestProcessor implements ExportDataProcessor {
 
     public static final String EXPORT_TO_TYPE = "__EXPORT_TO_TYPE__";
 
     private ExportGeneration m_generation;
-    private ExportClientConnectorBase m_client;
+    private ExportClientBase m_client;
     private VoltLogger m_logger;
 
-    private final List<Pair<ExportClientDecoderBase, AdvertisedDataSource>> m_decoders =
-            new ArrayList<Pair<ExportClientDecoderBase, AdvertisedDataSource>>();
+    private final List<Pair<ExportDecoderBase, AdvertisedDataSource>> m_decoders =
+            new ArrayList<Pair<ExportDecoderBase, AdvertisedDataSource>>();
 
 
     // Instantiated at ExportManager
@@ -70,7 +70,7 @@ public class GuestProcessor implements ExportDataProcessor {
 
         try {
             final Class<?> clientClass = Class.forName(exportClientClass);
-            m_client = (ExportClientConnectorBase)clientClass.newInstance();
+            m_client = (ExportClientBase)clientClass.newInstance();
             m_client.configure(config);
         } catch( Throwable t) {
             Throwables.propagate(t);
@@ -110,7 +110,7 @@ public class GuestProcessor implements ExportDataProcessor {
                                         source.m_columnNames,
                                         types,
                                         new ArrayList<Integer>(source.m_columnLengths));
-                        ExportClientDecoderBase edb = m_client.constructExportDecoder(ads);
+                        ExportDecoderBase edb = m_client.constructExportDecoder(ads);
                         m_decoders.add(Pair.of(edb, ads));
                         final ListenableFuture<BBContainer> fut = source.poll();
                         constructListener( source, fut, edb, ads);
@@ -124,7 +124,7 @@ public class GuestProcessor implements ExportDataProcessor {
     private void constructListener(
             final ExportDataSource source,
             final ListenableFuture<BBContainer> fut,
-            final ExportClientDecoderBase edb,
+            final ExportDecoderBase edb,
             final AdvertisedDataSource ads) {
         /*
          * The listener runs in the thread specified by the EDB.
@@ -206,7 +206,7 @@ public class GuestProcessor implements ExportDataProcessor {
 
     @Override
     public void shutdown() {
-        for (final Pair<ExportClientDecoderBase, AdvertisedDataSource> p : m_decoders) {
+        for (final Pair<ExportDecoderBase, AdvertisedDataSource> p : m_decoders) {
             try {
                 p.getFirst().getExecutor().submit(new Runnable() {
                     @Override
