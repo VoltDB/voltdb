@@ -26,6 +26,7 @@
 #include "storage/TupleBlock.h"
 
 class DummyElasticTableStreamer;
+class CopyOnWriteTest;
 
 namespace voltdb {
 
@@ -35,8 +36,9 @@ class TupleOutputStreamProcessor;
 class ElasticContext : public TableStreamerContext
 {
 
-    friend bool TableStreamer::activateStream(PersistentTable&, PersistentTableSurgeon&, CatalogId);
+    friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TupleSerializer&, TableStreamType, std::vector<std::string>&);
     friend class ::DummyElasticTableStreamer;
+    friend class ::CopyOnWriteTest;
 
 public:
 

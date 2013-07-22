@@ -23,6 +23,7 @@
 
 namespace voltdb
 {
+    class TupleSerializer;
     class TupleOutputStreamProcessor;
     class PersistentTableSurgeon;
 
@@ -39,9 +40,10 @@ namespace voltdb
         /**
          * Activate streaming.
          */
-        virtual bool activateStream(PersistentTable &table,
-                                    PersistentTableSurgeon &surgeon,
-                                    CatalogId tableId) = 0;
+        virtual bool activateStream(PersistentTableSurgeon &surgeon,
+                                    TupleSerializer &serializer,
+                                    TableStreamType streamType,
+                                    std::vector<std::string> &predicateStrings) = 0;
 
         /**
          * Continue streaming.
@@ -55,21 +57,9 @@ namespace voltdb
         virtual bool canSafelyFreeTuple(TableTuple &tuple) const = 0;
 
         /**
-         * Return true if the stream has already been activated.
+         * Return the partition ID.
          */
-        virtual bool isAlreadyActive() const = 0;
-
-        /**
-         * Return the stream type, snapshot, recovery, etc..
-         * TODO: Refactor so the caller doesn't need to know the stream type, just the context.
-         */
-        virtual TableStreamType getStreamType() const = 0;
-
-        /**
-         * Return the current active stream type or TABLE_STREAM_NONE if nothing is active.
-         * TODO: Refactor so the caller doesn't need to know the stream type, just the context.
-         */
-        virtual TableStreamType getActiveStreamType() const = 0;
+        virtual int32_t getPartitionID() const = 0;
 
         /**
          * Tuple insert hook.
@@ -100,6 +90,15 @@ namespace voltdb
         virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
                                          TableTuple &sourceTuple, TableTuple &targetTuple) = 0;
 
+        /**
+         * Return stream type for active stream or TABLE_STREAM_NONE if nothing is active.
+         */
+        virtual TableStreamType getActiveStreamType() const = 0;
+
+        /**
+         * Return true if managing a stream of the specified type.
+         */
+        virtual bool hasStreamType(TableStreamType streamType) const = 0;
     };
 
 } // namespace voltdb

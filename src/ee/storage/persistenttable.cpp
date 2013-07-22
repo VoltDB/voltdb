@@ -919,27 +919,60 @@ bool PersistentTable::activateStream(
     int32_t partitionId,
     CatalogId tableId,
     ReferenceSerializeInput &serializeIn) {
-    return activateStreamInternal(
-        tableId,
-        boost::shared_ptr<TableStreamer>(
-            new TableStreamer(tupleSerializer, streamType, partitionId, serializeIn)));
+    /*
+     * Allow multiple stream types for the same partition by holding onto the
+     * TableStreamer object as long as the partitionId is the same. TableStreamer
+     * enforces which multiple stream type combinations are allowed.
+     */
+    if (m_tableStreamer == NULL || partitionId != m_tableStreamer->getPartitionID()) {
+        m_tableStreamer.reset(new TableStreamer(partitionId, *this, tableId));
+    }
+
+    std::vector<std::string> predicateStrings;
+    // Grab snapshot or elastic stream predicates.
+    if (streamType == TABLE_STREAM_SNAPSHOT || streamType == TABLE_STREAM_ELASTIC_INDEX) {
+        int npreds = serializeIn.readInt();
+        if (npreds > 0) {
+            predicateStrings.reserve(npreds);
+            for (int ipred = 0; ipred < npreds; ipred++) {
+                std::string spred = serializeIn.readTextString();
+                predicateStrings.push_back(spred);
+            }
+        }
+    }
+
+    return activateStreamInternal(tupleSerializer, streamType, tableId, predicateStrings);
 }
 
-/** Prepare table for streaming. */
-bool PersistentTable::activateStreamInternal(
-     CatalogId tableId,
-     boost::shared_ptr<TableStreamerInterface> tableStreamer) {
+/**
+ * Prepare table for streaming from serialized data (internal for tests).
+ * Use custom TableStreamer provided.
+ * Return true on success or false if it was already active.
+ */
+bool PersistentTable::activateWithCustomStreamer(
+    TupleSerializer &tupleSerializer,
+    TableStreamType streamType,
+    boost::shared_ptr<TableStreamerInterface> tableStreamer,
+    CatalogId tableId,
+    std::vector<std::string> &predicateStrings,
+    bool skipInternalActivation) {
 
     // Expect m_tableStreamer to be null. Only make it fatal in debug builds.
     assert(m_tableStreamer == NULL);
-    if (m_tableStreamer == NULL) {
-        m_tableStreamer = tableStreamer;
+    m_tableStreamer = tableStreamer;
+    bool success = !skipInternalActivation;
+    if (!skipInternalActivation) {
+        success = activateStreamInternal(tupleSerializer, streamType, tableId, predicateStrings);
     }
+    return success;
+}
 
-    // true => context is already active.
-    if (m_tableStreamer->isAlreadyActive()) {
-        return true;
-    }
+/** Prepare table for streaming. */
+bool PersistentTable::activateStreamInternal(TupleSerializer &tupleSerializer,
+                                             TableStreamType streamType,
+                                             CatalogId tableId,
+                                             std::vector<std::string> &predicateStrings) {
+    assert(m_tableStreamer != NULL);
 
     // false => no tuples.
     if (m_tupleCount == 0) {
@@ -948,7 +981,7 @@ bool PersistentTable::activateStreamInternal(
 
     //TODO: Move this special case snapshot code into the COW context.
     // Probably want to move all of the snapshot-related stuff there.
-    if (tableStreamTypeIsSnapshot(m_tableStreamer->getStreamType())) {
+    if (tableStreamTypeIsSnapshot(streamType)) {
         //All blocks are now pending snapshot
         m_blocksPendingSnapshot.swap(m_blocksNotPendingSnapshot);
         m_blocksPendingSnapshotLoad.swap(m_blocksNotPendingSnapshotLoad);
@@ -958,11 +991,10 @@ bool PersistentTable::activateStreamInternal(
         }
     }
 
-    if (m_tableStreamer->activateStream(*this, m_surgeon, tableId)) {
-        return false;
-    }
-
-    return true;
+    return m_tableStreamer->activateStream(m_surgeon,
+                                           tupleSerializer,
+                                           streamType,
+                                           predicateStrings);
 }
 
 /**
@@ -974,12 +1006,7 @@ int64_t PersistentTable::streamMore(TupleOutputStreamProcessor &outputStreams,
     if (m_tableStreamer.get() == NULL) {
         return -1;
     }
-    int64_t remaining = m_tableStreamer->streamMore(outputStreams, retPositions);
-    if (remaining <= 0) {
-        // clang needs the cast for some reason.
-        m_tableStreamer.reset((TableStreamer*)NULL);
-    }
-    return remaining;
+    return m_tableStreamer->streamMore(outputStreams, retPositions);
 }
 
 /**

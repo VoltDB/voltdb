@@ -238,7 +238,10 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     /** Add/drop/list materialized views to this table */
     void addMaterializedView(MaterializedViewMetadata *view);
 
-    /** Prepare table for streaming from serialized data. */
+    /**
+     * Prepare table for streaming from serialized data.
+     * Return true on success or false if it was already active.
+     */
     bool activateStream(TupleSerializer &tupleSerializer,
                                  TableStreamType streamType,
                                  int32_t partitionId,
@@ -305,7 +308,27 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
   private:
 
-    bool activateStreamInternal(CatalogId tableId, boost::shared_ptr<TableStreamerInterface> tableStreamer);
+    /**
+     * Prepare table for streaming from serialized data (internal for tests).
+     * Use custom TableStreamer provided.
+     * Return true on success or false if it was already active.
+     */
+    bool activateWithCustomStreamer(TupleSerializer &tupleSerializer,
+                                    TableStreamType streamType,
+                                    boost::shared_ptr<TableStreamerInterface> tableStreamer,
+                                    CatalogId tableId,
+                                    std::vector<std::string> &predicateStrings,
+                                    bool skipInternalActivation);
+
+    /**
+     * Prepare table for streaming from serialized data (internal).
+     * Assumes m_tableStreamer was previously initialized.
+     * Return true on success or false if it was already active.
+     */
+    bool activateStreamInternal(TupleSerializer &tupleSerializer,
+                                TableStreamType streamType,
+                                CatalogId tableId,
+                                std::vector<std::string> &predicateStrings);
 
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
         if (nextBlock != NULL) {

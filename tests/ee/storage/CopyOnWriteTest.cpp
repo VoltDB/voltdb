@@ -38,6 +38,7 @@
 #include "indexes/tableindex.h"
 #include "storage/tableiterator.h"
 #include "storage/CopyOnWriteIterator.h"
+#include "storage/TableStreamerContext.h"
 #include "storage/ElasticScanner.h"
 #include "storage/ElasticContext.h"
 #include "stx/btree_set.h"
@@ -60,7 +61,7 @@ using namespace voltdb;
 static int32_t m_primaryKeyIndex = 0;
 
 // Selects extra-small quantity for debugging.
-// Remember to comment out before checking in.
+//IMPORTANT: Comment out EXTRA_SMALL #define before checking in to reenable full testing!
 //#define EXTRA_SMALL
 
 #if defined(EXTRA_SMALL)
@@ -431,10 +432,18 @@ public:
         return m_table->m_blocksNotPendingSnapshotLoad;
     }
 
-    bool doActivateStream(boost::shared_ptr<TableStreamerInterface> streamer) {
+    bool doActivateStream(TableStreamType streamType,
+                          boost::shared_ptr<TableStreamerInterface> streamer,
+                          std::vector<std::string> &predicateStrings,
+                          bool skipInternalActivation) {
         m_outputStreams.reset(new TupleOutputStreamProcessor(m_serializationBuffer, sizeof(m_serializationBuffer)));
         m_outputStream = &m_outputStreams->at(0);
-        return m_table->activateStreamInternal(m_tableId, streamer);
+        return m_table->activateWithCustomStreamer(m_serializer,
+                                                   streamType,
+                                                   streamer,
+                                                   m_tableId,
+                                                   predicateStrings,
+                                                   skipInternalActivation);
     }
 
     int64_t doStreamMore() {
@@ -519,46 +528,54 @@ public:
     // Assume non-ridiculous copy semantics for Object.
     // Structured JSON-building for readibility, not efficiency.
 
-    static json_spirit::Object expr_value(const std::string& type, const json_spirit::Pair& valuePair) {
-        json_spirit::Object o;
-        o.push_back(json_spirit::Pair("TYPE", "VALUE_CONSTANT"));
-        o.push_back(json_spirit::Pair("VALUE_TYPE", type));
-        o.push_back(json_spirit::Pair("VALUE_SIZE", 0));
-        o.push_back(json_spirit::Pair("ISNULL", false));
-        o.push_back(valuePair);
-        return o;
+   static Json::Value expr_value_base(const std::string& type) {
+        Json::Value value;
+        value["TYPE"] = "VALUE_CONSTANT";
+        value["VALUE_TYPE"] = type;
+        value["VALUE_SIZE"] = 0;
+        value["ISNULL"] = false;
+        return value;
     }
 
-    static json_spirit::Object expr_value(const std::string& type, int ivalue) {
-        return expr_value(type, json_spirit::Pair("VALUE", ivalue));
+    static Json::Value expr_value(const std::string& type, std::string& key, int data) {
+        Json::Value value = expr_value_base(type);
+        value[key.c_str()] = data;
+        return value;
     }
 
-    static json_spirit::Object expr_value_tuple(const std::string& type,
-                                                const std::string& tblname,
-                                                int32_t colidx,
-                                                const std::string& colname) {
-        json_spirit::Object o;
-        o.push_back(json_spirit::Pair("TYPE", "VALUE_TUPLE"));
-        o.push_back(json_spirit::Pair("VALUE_TYPE", type));
-        o.push_back(json_spirit::Pair("VALUE_SIZE", 0));
-        o.push_back(json_spirit::Pair("TABLE_NAME", tblname));
-        o.push_back(json_spirit::Pair("COLUMN_IDX", colidx));
-        o.push_back(json_spirit::Pair("COLUMN_NAME", colname));
-        o.push_back(json_spirit::Pair("COLUMN_ALIAS", json_spirit::Value())); // null
-        return o;
+    static Json::Value expr_value(const std::string& type, int ivalue) {
+        std::string key = "VALUE";
+        return expr_value(type, key, ivalue);
     }
 
-    static json_spirit::Object expr_binary_op(const std::string& op,
-                                              const std::string& type,
-                                              const json_spirit::Object& left,
-                                              const json_spirit::Object& right) {
-        json_spirit::Object o;
-        o.push_back(json_spirit::Pair("TYPE", op));
-        o.push_back(json_spirit::Pair("VALUE_TYPE", type));
-        o.push_back(json_spirit::Pair("VALUE_SIZE", 0));
-        o.push_back(json_spirit::Pair("LEFT", left));
-        o.push_back(json_spirit::Pair("RIGHT", right));
-        return o;
+    static Json::Value expr_value_tuple(const std::string& type,
+                                        const std::string& tblname,
+                                        int32_t colidx,
+                                        const std::string& colname)
+    {
+        Json::Value value;
+        value["TYPE"] = "VALUE_TUPLE";
+        value["VALUE_TYPE"] = type;
+        value["VALUE_SIZE"] = 0;
+        value["TABLE_NAME"] = tblname;
+        value["COLUMN_IDX"] = colidx;
+        value["COLUMN_NAME"] = colname;
+        value["COLUMN_ALIAS"] = Json::nullValue; // null
+        return value;
+    }
+
+    static Json::Value expr_binary_op(const std::string& op,
+                                      const std::string& type,
+                                      const Json::Value& left,
+                                      const Json::Value& right)
+    {
+        Json::Value value;
+        value["TYPE"] = op;
+        value["VALUE_TYPE"] = type;
+        value["VALUE_SIZE"] = 0;
+        value["LEFT"] = left;
+        value["RIGHT"] = right;
+        return value;
     }
 
     void checkMultiCOW(T_ValueSet expected[], T_ValueSet actual[], bool doDelete, int ntotal, int nskipped) {
@@ -785,31 +802,6 @@ public:
         }
     }
 
-    std::string generateHashRangePredicate(T_HashRangeVector& ranges) {
-        int colidx = m_table->partitionColumn();
-        json_spirit::Object json;
-        std::string op = expressionToString(EXPRESSION_TYPE_HASH_RANGE);
-        json.push_back(json_spirit::Pair("TYPE", json_spirit::Value(op)));
-        json.push_back(json_spirit::Pair("VALUE_TYPE", json_spirit::Value(valueToString(VALUE_TYPE_BIGINT))));
-        json.push_back(json_spirit::Pair("VALUE_SIZE", json_spirit::Value(8)));
-        json.push_back(json_spirit::Pair("HASH_COLUMN", json_spirit::Value(colidx)));
-        json_spirit::Array array;
-        for (size_t i = 0; i < ranges.size(); i++) {
-            json_spirit::Object range;
-            range.push_back(json_spirit::Pair("RANGE_START", ranges[i].first));
-            range.push_back(json_spirit::Pair("RANGE_END", ranges[i].second));
-            array.push_back(range);
-        }
-        json.push_back(json_spirit::Pair("RANGES", array));
-        json_spirit::Object predicateStuff;
-        predicateStuff.push_back(json_spirit::Pair("triggersDelete", false));
-        predicateStuff.push_back(json_spirit::Pair("predicateExpression", json));
-        std::ostringstream os;
-        json_spirit::write(predicateStuff, os);
-        return os.str();
-    }
-
-
     // Work around unsupported modulus operator with other integer operators:
     //    Should be: result = (value % nparts) == ipart
     //  Work-around: result = (value - ((value / nparts) * nparts)) == ipart
@@ -817,8 +809,8 @@ public:
         std::string tblname = m_table->name();
         int colidx = m_table->partitionColumn();
         std::string colname = m_table->columnName(colidx);
-        json_spirit::Object jsonTuple = expr_value_tuple("INTEGER", tblname, colidx, colname);
-        json_spirit::Object json =
+        Json::Value jsonTuple = expr_value_tuple("INTEGER", tblname, colidx, colname);
+        Json::Value json =
         expr_binary_op("COMPARE_EQUAL", "INTEGER",
                        expr_binary_op("OPERATOR_MINUS", "INTEGER",
                                       jsonTuple,
@@ -832,13 +824,51 @@ public:
                        expr_value("INTEGER", (int)ipart)
                        );
 
-        std::ostringstream os;
+        Json::Value predicateStuff;
+        predicateStuff["triggersDelete"] = deleteForPredicate;
+        predicateStuff["predicateExpression"] = json;
 
-        json_spirit::Object predicateStuff;
-        predicateStuff.push_back(json_spirit::Pair("triggersDelete", deleteForPredicate));
-        predicateStuff.push_back(json_spirit::Pair("predicateExpression", json));
-        json_spirit::write(predicateStuff, os);
-        return os.str();
+        Json::FastWriter writer;
+        return writer.write(predicateStuff);
+    }
+
+    std::string generateHashRangePredicate(T_HashRangeVector& ranges) {
+        int colidx = m_table->partitionColumn();
+        Json::Value json;
+        std::string op = expressionToString(EXPRESSION_TYPE_HASH_RANGE);
+        json["TYPE"] = op;
+        json["VALUE_TYPE"] = valueToString(VALUE_TYPE_BIGINT);
+        json["VALUE_SIZE"] = 8;
+        json["HASH_COLUMN"] = colidx;
+        Json::Value array;
+        for (size_t i = 0; i < ranges.size(); i++) {
+            Json::Value range;
+            range["RANGE_START"] = static_cast<Json::Int64>(ranges[i].first);
+            range["RANGE_END"] = static_cast<Json::Int64>(ranges[i].second);
+            array.append(range);
+        }
+        json["RANGES"] = array;
+        Json::Value predicateStuff;
+        predicateStuff["triggersDelete"] = false;
+        predicateStuff["predicateExpression"] = json;
+
+        Json::FastWriter writer;
+        return writer.write(predicateStuff);
+    }
+
+    ElasticIndex *getElasticIndex() {
+        voltdb::TableStreamer *streamer = dynamic_cast<voltdb::TableStreamer*>(m_table->m_tableStreamer.get());
+        if (streamer != NULL) {
+            BOOST_FOREACH(voltdb::TableStreamer::Stream &stream, streamer->m_streams) {
+                if (stream.m_streamType == TABLE_STREAM_ELASTIC_INDEX) {
+                    voltdb::ElasticContext *context = dynamic_cast<ElasticContext*>(stream.m_context.get());
+                    if (context != NULL) {
+                        return &context->m_index;
+                    }
+                }
+            }
+        }
+        return NULL;
     }
 
     voltdb::VoltDBEngine *m_engine;
@@ -1203,11 +1233,11 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
         context("activate");
 
         ReferenceSerializeInput input(buffer, output.position());
-        bool alreadyActivated = m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
-        if (alreadyActivated) {
+        bool success = m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+        if (!success) {
             error("COW was previously activated");
         }
-        ASSERT_FALSE(alreadyActivated);
+        ASSERT_TRUE(success);
 
         int64_t remaining = tupleCount;
         while (remaining > 0) {
@@ -1317,22 +1347,27 @@ TEST_F(CopyOnWriteTest, BufferBoundaryCondition) {
  */
 class DummyTableStreamer : public TableStreamerInterface {
 public:
-    DummyTableStreamer(CopyOnWriteTest &test, TableStreamType type) :
-        m_test(test), m_type(type)
-    {}
+    DummyTableStreamer(CopyOnWriteTest &test, int32_t partitionId, TableStreamType type) :
+        m_test(test), m_partitionId(partitionId), m_type(type) {}
 
-    virtual bool activateStream(PersistentTable &table,
-                                PersistentTableSurgeon &surgeon,
-                                CatalogId tableId)
-    { return true; }
+    virtual bool activateStream(PersistentTableSurgeon &surgeon,
+                                TupleSerializer &tupleSerializer,
+                                TableStreamType streamType,
+                                std::vector<std::string> &predicateStrings) {
+        return false;
+    }
 
     virtual int64_t streamMore(TupleOutputStreamProcessor &outputStreams,
                                std::vector<int> &retPositions) { return 0; }
 
-    virtual bool canSafelyFreeTuple(TableTuple &tuple) const { return true; }
-
     // Saying it's already active forces activateStream() to return without doing anything.
     virtual bool isAlreadyActive() const { return true; }
+
+    virtual int32_t getPartitionID() const { return m_partitionId; }
+
+    virtual bool canSafelyFreeTuple(TableTuple &tuple) const { return true; }
+
+    virtual bool hasStreamType(TableStreamType streamType) const { return (m_type == streamType); }
 
     virtual TableStreamType getStreamType() const { return m_type; }
 
@@ -1352,6 +1387,7 @@ public:
     }
 
     CopyOnWriteTest &m_test;
+    int32_t m_partitionId;
     TableStreamType m_type;
 };
 
@@ -1442,10 +1478,11 @@ TEST_F(CopyOnWriteTest, ElasticScannerTest) {
 
     TableTuple tuple(m_table->schema());
 
-    DummyTableStreamer *dummyStreamer = new DummyTableStreamer(*this, TABLE_STREAM_ELASTIC_INDEX);
+    DummyTableStreamer *dummyStreamer = new DummyTableStreamer(*this, 0, TABLE_STREAM_ELASTIC_INDEX);
     boost::shared_ptr<TableStreamerInterface> dummyStreamerPtr(dummyStreamer);
     boost::shared_ptr<ElasticScanner>scanner = getElasticScanner();
-    doActivateStream(dummyStreamerPtr);
+    std::vector<std::string> predicateStrings;
+    doActivateStream(TABLE_STREAM_ELASTIC_INDEX, dummyStreamerPtr, predicateStrings, true);
 
     bool scanComplete = false;
 
@@ -1480,29 +1517,23 @@ class DummyElasticTableStreamer : public DummyTableStreamer {
 public:
     DummyElasticTableStreamer(CopyOnWriteTest &test,
                               int32_t partitionId,
-                              TableStreamType type,
-                              TupleSerializer &serializer,
                               const std::vector<std::string> &predicateStrings) :
-        DummyTableStreamer(test, type),
-        m_partitionId(partitionId),
-        m_serializer(serializer),
+        DummyTableStreamer(test, partitionId, TABLE_STREAM_ELASTIC_INDEX),
         m_predicateStrings(predicateStrings)
     {}
 
-    virtual bool activateStream(PersistentTable &table,
-                                PersistentTableSurgeon &surgeon,
-                                CatalogId tableId) {
-        m_context.reset(new ElasticContext(table, surgeon, m_partitionId, m_serializer, m_predicateStrings));
-        return true;
+    virtual bool activateStream(PersistentTableSurgeon &surgeon,
+                                TupleSerializer &tupleSerializer,
+                                TableStreamType streamType,
+                                std::vector<std::string> &predicateStrings) {
+        m_context.reset(new ElasticContext(*m_test.m_table, surgeon, m_partitionId,
+                                           tupleSerializer, m_predicateStrings));
+        return false;
     }
 
     virtual int64_t streamMore(TupleOutputStreamProcessor &outputStreams,
                                std::vector<int> &retPositions) {
         return m_context->handleStreamMore(outputStreams, retPositions);
-    }
-
-    virtual bool isAlreadyActive() const {
-        return (m_context != NULL);
     }
 
     virtual bool notifyTupleInsert(TableTuple &tuple) {
@@ -1539,7 +1570,6 @@ public:
     }
 
     int32_t m_partitionId;
-    TupleSerializer &m_serializer;
     const std::vector<std::string> &m_predicateStrings;
     boost::scoped_ptr<ElasticContext> m_context;
 };
@@ -1571,17 +1601,113 @@ TEST_F(CopyOnWriteTest, ElasticContextIndexTest) {
     std::ostringstream errmsg;
     ASSERT_TRUE(predicates.parseStrings(predicateStrings, errmsg, deleteFlags));
 
-    DummyElasticTableStreamer *streamerPtr =
-            new DummyElasticTableStreamer(*this, 0, TABLE_STREAM_ELASTIC_INDEX,
-                                          m_serializer, predicateStrings);
+    DummyElasticTableStreamer *streamerPtr = new DummyElasticTableStreamer(*this, 0, predicateStrings);
     boost::shared_ptr<TableStreamerInterface> streamer(streamerPtr);
-    doActivateStream(streamer);
+    doActivateStream(TABLE_STREAM_ELASTIC_INDEX, streamer, predicateStrings, false);
 
     for (size_t icycle = 0; icycle < NUM_CYCLES; icycle++) {
         tableScrambler.scramble();
     }
 
     checkIndex(streamerPtr->getIndex(), predicates);
+}
+
+/**
+ * Tests that a snapshot scan and an elastic index can coexist.
+ * The sequence is:
+ *  1) Populate tables.
+ *  2) Perform elastic index scan.
+ *  3) Perform snapshot scan.
+ *  4) Check the index.
+ */
+TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
+    const int NUM_PARTITIONS = 1;
+    const int TUPLES_PER_BLOCK = 50;
+    const int NUM_INITIAL = 300;
+    const int NUM_CYCLES = 300;
+    const int FREQ_INSERT = 1;
+    const int FREQ_DELETE = 10;
+    const int FREQ_UPDATE = 5;
+    const int FREQ_COMPACTION = 100;
+
+    ElasticTableScrambler tableScrambler(*this,
+                                         NUM_PARTITIONS, TUPLES_PER_BLOCK, NUM_INITIAL,
+                                         FREQ_INSERT, FREQ_DELETE,
+                                         FREQ_UPDATE, FREQ_COMPACTION);
+
+    tableScrambler.initialize();
+
+    T_HashRangeVector ranges;
+    ranges.push_back(T_HashRange(0x0000000000000000, 0x7fffffffffffffff));
+    std::vector<std::string> strings;
+    strings.push_back(generateHashRangePredicate(ranges));
+    StreamPredicateList predicates;
+    std::ostringstream errmsg;
+    std::vector<bool> deleteFlags;
+    ASSERT_TRUE(predicates.parseStrings(strings, errmsg, deleteFlags));
+    char buffer[1024 * 256];
+    ReferenceSerializeOutput output(buffer, 1024 * 256);
+    output.writeInt(1);
+    for (std::vector<std::string>::iterator i = strings.begin(); i != strings.end(); i++) {
+        output.writeTextString(*i);
+    }
+    ReferenceSerializeInput input(buffer, output.position());
+    m_table->activateStream(m_serializer, TABLE_STREAM_ELASTIC_INDEX, 0, m_tableId, input);
+
+    for (size_t icycle = 0; icycle < NUM_CYCLES; icycle++) {
+        tableScrambler.scramble();
+    }
+
+    // Mutate the table while a snapshot stream is slurping tuples.
+    T_ValueSet originalTuples;
+    getTableValueSet(originalTuples);
+
+    char config[4];
+    ::memset(config, 0, 4);
+    ::memset(config, 0, 4);
+    ReferenceSerializeInput inputSnapshot(config, 4);
+
+    m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, inputSnapshot);
+
+    T_ValueSet COWTuples;
+    char serializationBuffer[BUFFER_SIZE];
+    int totalInserted = 0;
+    while (true) {
+        TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
+        TupleOutputStream &outputStream = outputStreams.at(0);
+        std::vector<int> retPositions;
+        int64_t remaining = m_table->streamMore(outputStreams, retPositions);
+        if (remaining >= 0) {
+            ASSERT_EQ(outputStreams.size(), retPositions.size());
+        }
+        const int serialized = static_cast<int>(outputStream.position());
+        if (serialized == 0) {
+            break;
+        }
+        int ii = 12;//skip partition id and row count and first tuple length
+        while (ii < (serialized - 4)) {
+            int values[2];
+            values[0] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
+            values[1] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii + 4]));
+            const bool inserted =
+            COWTuples.insert(*reinterpret_cast<int64_t*>(values)).second;
+            if (!inserted) {
+                error("Failed: total inserted %d, with values %d and %d\n", totalInserted, values[0], values[1]);
+            }
+            ASSERT_TRUE(inserted);
+            totalInserted++;
+            ii += static_cast<int>(m_tupleWidth + sizeof(int32_t));
+        }
+        for (int jj = 0; jj < NUM_MUTATIONS; jj++) {
+            doRandomTableMutation(m_table);
+        }
+    }
+
+    checkTuples(NUM_INITIAL + (m_tuplesInserted - m_tuplesDeleted), originalTuples, COWTuples);
+
+    voltdb::ElasticIndex *index = getElasticIndex();
+    ASSERT_NE(NULL, index);
+    checkIndex(*index, predicates);
 }
 
 int main() {
