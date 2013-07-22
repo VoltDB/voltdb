@@ -153,7 +153,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         }
         project.addPartitionInfo("P1", "ID");
         boolean success;
-        project.addStmtProcedure("failedProcedure", "SELECT wage, SUM(wage) from R1 group by ID;");
+        //project.addStmtProcedure("failedProcedure", "SELECT wage, SUM(wage) from R1 group by ID;");
 
         config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
