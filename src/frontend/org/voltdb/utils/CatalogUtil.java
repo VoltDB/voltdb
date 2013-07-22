@@ -36,6 +36,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
@@ -73,7 +74,9 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.PlanFragment;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.ClusterConfig;
@@ -98,9 +101,14 @@ import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
+import org.voltdb.compilereport.IndexAnnotation;
+import org.voltdb.compilereport.ProcedureAnnotation;
+import org.voltdb.compilereport.StatementAnnotation;
+import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.export.processors.GuestProcessor;
 import org.voltdb.export.processors.RawProcessor;
 import org.voltdb.exportclient.ExportToFileClient;
+import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.xml.sax.SAXException;
@@ -1478,4 +1486,124 @@ public abstract class CatalogUtil {
         return new CatalogAndIds(catalogTxnId, catalogUniqueId, version, catalogHash, catalogBytes);
     }
 
+    /**
+     * Given plan graphs and a SQL stmt, compute a bi-directonal usage map between
+     * schema (indexes, table & views) and SQL/Procedures.
+     * Use "annotation" objects to store this extra information in the catalog
+     * during compilation and catalog report generation.
+     */
+    public static void updateUsageAnnotations(Database db,
+                                              Statement stmt,
+                                              AbstractPlanNode topPlan,
+                                              AbstractPlanNode bottomPlan)
+    {
+        SortedSet<String> tablesRead = new TreeSet<String>();
+        SortedSet<String> tablesUpdated = new TreeSet<String>();
+        SortedSet<String> indexes = new TreeSet<String>();
+        if (topPlan != null) {
+            topPlan.getTablesAndIndexes(tablesRead, tablesUpdated, indexes);
+        }
+        if (bottomPlan != null) {
+            bottomPlan.getTablesAndIndexes(tablesRead, tablesUpdated, indexes);
+        }
+
+        // make useage only in either read or updated, not both
+        tablesRead.removeAll(tablesUpdated);
+
+        for (Table table : db.getTables()) {
+            for (String indexName : indexes) {
+                Index index = table.getIndexes().get(indexName);
+                if (index != null) {
+                    updateIndexUsageAnnotation(index, stmt);
+                }
+            }
+            if (tablesRead.contains(table.getTypeName())) {
+                updateTableUsageAnnotation(table, stmt, true);
+                tablesRead.remove(table.getTypeName());
+            }
+            if (tablesUpdated.contains(table.getTypeName())) {
+                updateTableUsageAnnotation(table, stmt, false);
+                tablesUpdated.remove(table.getTypeName());
+            }
+        }
+
+        assert(tablesRead.size() == 0);
+        assert(tablesUpdated.size() == 0);
+    }
+
+    private static void updateIndexUsageAnnotation(Index index, Statement stmt) {
+        Procedure proc = (Procedure) stmt.getParent();
+        // skip CRUD generated procs
+        if (proc.getDefaultproc()) {
+            return;
+        }
+
+        IndexAnnotation ia = (IndexAnnotation) index.getAnnotation();
+        if (ia == null) {
+            ia = new IndexAnnotation();
+            index.setAnnotation(ia);
+        }
+        ia.statementsThatUseThis.add(stmt);
+        ia.proceduresThatUseThis.add(proc);
+
+        ProcedureAnnotation pa = (ProcedureAnnotation) proc.getAnnotation();
+        if (pa == null) {
+            pa = new ProcedureAnnotation();
+            proc.setAnnotation(pa);
+        }
+        pa.indexesUsed.add(index);
+
+        StatementAnnotation sa = (StatementAnnotation) stmt.getAnnotation();
+        if (sa == null) {
+            sa = new StatementAnnotation();
+            stmt.setAnnotation(sa);
+        }
+        sa.indexesUsed.add(index);
+    }
+
+    private static void updateTableUsageAnnotation(Table table, Statement stmt, boolean read) {
+        Procedure proc = (Procedure) stmt.getParent();
+        // skip CRUD generated procs
+        if (proc.getDefaultproc()) {
+            return;
+        }
+
+        TableAnnotation ta = (TableAnnotation) table.getAnnotation();
+        if (ta == null) {
+            ta = new TableAnnotation();
+            table.setAnnotation(ta);
+        }
+        if (read) {
+            ta.statementsThatReadThis.add(stmt);
+            ta.proceduresThatReadThis.add(proc);
+        }
+        else {
+            ta.statementsThatUpdateThis.add(stmt);
+            ta.proceduresThatUpdateThis.add(proc);
+        }
+
+        ProcedureAnnotation pa = (ProcedureAnnotation) proc.getAnnotation();
+        if (pa == null) {
+            pa = new ProcedureAnnotation();
+            proc.setAnnotation(pa);
+        }
+        if (read) {
+            pa.tablesRead.add(table);
+        }
+        else {
+            pa.tablesUpdated.add(table);
+        }
+
+        StatementAnnotation sa = (StatementAnnotation) stmt.getAnnotation();
+        if (sa == null) {
+            sa = new StatementAnnotation();
+            stmt.setAnnotation(sa);
+        }
+        if (read) {
+            sa.tablesRead.add(table);
+        }
+        else {
+            sa.tablesUpdated.add(table);
+        }
+    }
 }

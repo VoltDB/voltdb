@@ -158,7 +158,7 @@ public class TestReplicatedTableSaveFileState extends TestCase
             assertEquals(test_plan[i].parameters.toArray()[0], TABLE_NAME);
         }
         assertEquals(test_plan[number_of_sites].fragmentId,
-                     SysProcFragmentId.PF_restoreLoadReplicatedTableResults);
+                     SysProcFragmentId.PF_restoreReceiveResultTables);
         assertFalse(test_plan[number_of_sites].multipartition);
         checkPlanDependencies(test_plan);
         assertEquals(test_plan[number_of_sites].parameters.toArray()[0],
@@ -218,7 +218,7 @@ public class TestReplicatedTableSaveFileState extends TestCase
             assertEquals(test_plan[i].parameters.toArray()[0], TABLE_NAME);
         }
         assertEquals(test_plan[number_of_sites - 1].fragmentId,
-                     SysProcFragmentId.PF_restoreDistributeReplicatedTable);
+                     SysProcFragmentId.PF_restoreDistributeReplicatedTableAsReplicated);
         assertEquals(test_plan[number_of_sites - 1].siteId, 0);
         assertFalse(test_plan[number_of_sites - 1].multipartition);
         assertEquals(test_plan[number_of_sites - 1].parameters.toArray()[0],
@@ -226,7 +226,7 @@ public class TestReplicatedTableSaveFileState extends TestCase
         assertEquals(test_plan[number_of_sites - 1].parameters.toArray()[1],  CoreUtils.getHSIdFromHostAndSite( 3, 3));
 
         assertEquals(test_plan[number_of_sites].fragmentId,
-                     SysProcFragmentId.PF_restoreLoadReplicatedTableResults);
+                     SysProcFragmentId.PF_restoreReceiveResultTables);
         assertFalse(test_plan[number_of_sites].multipartition);
         checkPlanDependencies(test_plan);
         assertEquals(test_plan[number_of_sites].parameters.toArray()[0],
@@ -263,7 +263,7 @@ public class TestReplicatedTableSaveFileState extends TestCase
                 fragment_dep = (Integer) plan[i].parameters.toArray()[1];
             }
             else if (plan[i].fragmentId ==
-                SysProcFragmentId.PF_restoreDistributeReplicatedTable)
+                SysProcFragmentId.PF_restoreDistributeReplicatedTableAsReplicated)
             {
                 fragment_dep = (Integer) plan[i].parameters.toArray()[2];
             }

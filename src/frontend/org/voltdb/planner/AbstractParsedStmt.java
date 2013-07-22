@@ -47,9 +47,10 @@ public abstract class AbstractParsedStmt {
 
     public String sql;
 
-    public VoltType[] paramList = new VoltType[0];
+    // The initial value is a safety net for the case of parameter-less statements.
+    private ParameterValueExpression[] m_paramList = new ParameterValueExpression[0];
 
-    protected HashMap<Long, Integer> m_paramsById = new HashMap<Long, Integer>();
+    protected HashMap<Long, ParameterValueExpression> m_paramsById = new HashMap<Long, ParameterValueExpression>();
 
     public ArrayList<Table> tableList = new ArrayList<Table>();
 
@@ -157,7 +158,7 @@ public abstract class AbstractParsedStmt {
             VoltXMLElement subChild = child.children.get(0);
             AbstractExpression expr = parseExpressionTree(subChild);
             assert(expr != null);
-            expr.refineValueType(VoltType.get((byte)col.getType()));
+            expr.refineValueType(VoltType.get((byte)col.getType()), col.getSize());
             ExpressionUtil.finalizeValueTypes(expr);
             columns.put(col, expr);
         }
@@ -207,71 +208,37 @@ public abstract class AbstractParsedStmt {
      * @param root
      * @return configured AbstractExpression
      */
-    AbstractExpression parseExpressionTree(VoltXMLElement root) {
-        AbstractExpression exprTree = parseExpressionTree(m_paramsById, root);
-        exprTree.resolveForDB(m_db);
-
-        if (m_paramValues != null) {
-            List<AbstractExpression> params = exprTree.findAllSubexpressionsOfClass(ParameterValueExpression.class);
-            for (AbstractExpression ae : params) {
-                ParameterValueExpression pve = (ParameterValueExpression) ae;
-                ConstantValueExpression cve = pve.getOriginalValue();
-                if (cve != null) {
-                    cve.setValue(m_paramValues[pve.getParameterIndex()]);
-                }
-            }
-
-        }
-        return exprTree;
-    }
-
-    // TODO: This function and the functions (below) that it calls to deal with various Expression types
-    // are only marginally related to AbstractParsedStmt
     // -- the function is now also called by DDLCompiler with no AbstractParsedStmt in sight --
     // so, the methods COULD be relocated to class AbstractExpression or ExpressionUtil.
-    public AbstractExpression parseExpressionTree(HashMap<Long, Integer> paramsById, VoltXMLElement root) {
+    public AbstractExpression parseExpressionTree(VoltXMLElement root) {
         String elementName = root.name.toLowerCase();
         AbstractExpression retval = null;
 
         if (elementName.equals("value")) {
-            retval = parseValueExpression(paramsById, root);
+            retval = parseValueExpression(root);
         }
         else if (elementName.equals("vector")) {
-            retval = parseVectorExpression(paramsById, root);
+            retval = parseVectorExpression(root);
         }
         else if (elementName.equals("columnref")) {
             retval = parseColumnRefExpression(root);
         }
         else if (elementName.equals("operation")) {
-            retval = parseOperationExpression(paramsById, root);
+            retval = parseOperationExpression(root);
         }
         else if (elementName.equals("aggregation")) {
-            retval = parseAggregationExpression(paramsById, root);
+            retval = parseAggregationExpression(root);
             if (aggregationList != null) {
-                retval.resolveForDB(m_db);
-
-                // TODO(XIN): you need to understand why
-                if (m_paramValues != null) {
-                    List<AbstractExpression> params = retval.findAllSubexpressionsOfClass(ParameterValueExpression.class);
-                    for (AbstractExpression ae : params) {
-                        ParameterValueExpression pve = (ParameterValueExpression) ae;
-                        ConstantValueExpression cve = pve.getOriginalValue();
-                        if (cve != null) {
-                            cve.setValue(m_paramValues[pve.getParameterIndex()]);
-                        }
-                    }
-
-                }
                 ExpressionUtil.finalizeValueTypes(retval);
-                // Now I prepare the agg expr well
                 aggregationList.add(retval);
             }
         }
+        // After complex aggs are supported, this simplecolumn can be removed.
         else if (elementName.equals("simplecolumn")) {
             retval = parseSimpleColumnExpression(root);
         }
         else if (elementName.equals("function")) {
-            retval = parseFunctionExpression(paramsById, root);
+            retval = parseFunctionExpression(root);
         }
         else if (elementName.equals("asterisk")) {
             return null;
@@ -286,12 +253,12 @@ public abstract class AbstractParsedStmt {
     /**
      * Parse a Vector value for SQL-IN
      */
-    private AbstractExpression parseVectorExpression(HashMap<Long, Integer> paramsById, VoltXMLElement exprNode) {
+    private AbstractExpression parseVectorExpression(VoltXMLElement exprNode) {
         ArrayList<AbstractExpression> args = new ArrayList<AbstractExpression>();
         for (VoltXMLElement argNode : exprNode.children) {
             assert(argNode != null);
             // recursively parse each argument subtree (could be any kind of expression).
-            AbstractExpression argExpr = parseExpressionTree(paramsById, argNode);
+            AbstractExpression argExpr = parseExpressionTree(argNode);
             assert(argExpr != null);
             args.add(argExpr);
         }
@@ -307,19 +274,10 @@ public abstract class AbstractParsedStmt {
      * @param exprNode
      * @return
      */
-    private static AbstractExpression parseValueExpression(HashMap<Long, Integer> paramsById, VoltXMLElement exprNode) {
-        String type = exprNode.attributes.get("valuetype");
+    private AbstractExpression parseValueExpression(VoltXMLElement exprNode) {
         String isParam = exprNode.attributes.get("isparam");
         String isPlannerGenerated = exprNode.attributes.get("isplannergenerated");
 
-        VoltType vt = VoltType.typeFromString(type);
-        int size = VoltType.MAX_VALUE_LENGTH;
-        assert(vt != VoltType.VOLTTABLE);
-
-        if ((vt != VoltType.STRING) && (vt != VoltType.VARBINARY)) {
-            if (vt == VoltType.NULL) size = 0;
-            else size = vt.getLengthInBytesForFixedTypes();
-        }
         // A ParameterValueExpression is needed to represent any user-provided or planner-injected parameter.
         boolean needParameter = (isParam != null) && (isParam.equalsIgnoreCase("true"));
 
@@ -330,6 +288,15 @@ public abstract class AbstractParsedStmt {
             ((isPlannerGenerated != null) && (isPlannerGenerated.equalsIgnoreCase("true")));
 
         if (needConstant) {
+            String type = exprNode.attributes.get("valuetype");
+            VoltType vt = VoltType.typeFromString(type);
+            int size = VoltType.MAX_VALUE_LENGTH;
+            assert(vt != VoltType.VOLTTABLE);
+
+            if ((vt != VoltType.STRING) && (vt != VoltType.VARBINARY)) {
+                if (vt == VoltType.NULL) size = 0;
+                else size = vt.getLengthInBytesForFixedTypes();
+            }
             cve = new ConstantValueExpression();
             cve.setValueType(vt);
             cve.setValueSize(size);
@@ -338,16 +305,13 @@ public abstract class AbstractParsedStmt {
                 cve.setValue(valueStr);
             }
         }
-        if (needParameter) {
-            ParameterValueExpression expr = new ParameterValueExpression();
-            long id = Long.parseLong(exprNode.attributes.get("id"));
-            int paramIndex = paramIndexById(paramsById, id);
 
-            expr.setValueType(vt);
-            expr.setValueSize(size);
-            expr.setParameterIndex(paramIndex);
+        if (needParameter) {
+            long id = Long.parseLong(exprNode.attributes.get("id"));
+            ParameterValueExpression expr = m_paramsById.get(id);
             if (needConstant) {
                 expr.setOriginalValue(cve);
+                cve.setValue(m_paramValues[expr.getParameterIndex()]);
             }
             return expr;
         }
@@ -359,7 +323,7 @@ public abstract class AbstractParsedStmt {
      * @param exprNode
      * @return
      */
-    private static AbstractExpression parseColumnRefExpression(VoltXMLElement exprNode) {
+    private AbstractExpression parseColumnRefExpression(VoltXMLElement exprNode) {
         TupleValueExpression expr = new TupleValueExpression();
 
         String alias = exprNode.attributes.get("alias");
@@ -370,6 +334,7 @@ public abstract class AbstractParsedStmt {
         expr.setColumnName(columnName);
         expr.setTableName(tableName);
 
+        expr.resolveForDB(m_db);
         return expr;
     }
 
@@ -379,7 +344,8 @@ public abstract class AbstractParsedStmt {
      * @param exprNode
      * @return
      */
-    private AbstractExpression parseOperationExpression(HashMap<Long, Integer> paramsById, VoltXMLElement exprNode) {
+    private AbstractExpression parseOperationExpression(VoltXMLElement exprNode) {
+
         String optype = exprNode.attributes.get("optype");
         ExpressionType exprType = ExpressionType.get(optype);
         AbstractExpression expr = null;
@@ -401,7 +367,7 @@ public abstract class AbstractParsedStmt {
 
         // recursively parse the left subtree (could be another operator or
         // a constant/tuple/param value operand).
-        AbstractExpression leftExpr = parseExpressionTree(paramsById, leftExprNode);
+        AbstractExpression leftExpr = parseExpressionTree(leftExprNode);
         assert((leftExpr != null) || (exprType == ExpressionType.AGGREGATE_COUNT));
         expr.setLeft(leftExpr);
 
@@ -415,7 +381,7 @@ public abstract class AbstractParsedStmt {
             assert(rightExprNode != null);
 
             // recursively parse the right subtree
-            AbstractExpression rightExpr = parseExpressionTree(paramsById, rightExprNode);
+            AbstractExpression rightExpr = parseExpressionTree(rightExprNode);
             assert(rightExpr != null);
             expr.setRight(rightExpr);
         } else {
@@ -440,7 +406,7 @@ public abstract class AbstractParsedStmt {
      * @param exprNode
      * @return
      */
-    private static AbstractExpression parseSimpleColumnExpression(VoltXMLElement exprNode)
+    private AbstractExpression parseSimpleColumnExpression(VoltXMLElement exprNode)
     {
         // This object is a place holder that gets filled in later based on the display column it aliases.
         String alias = exprNode.attributes.get("alias");
@@ -456,7 +422,8 @@ public abstract class AbstractParsedStmt {
      * @param exprNode
      * @return
      */
-    private AbstractExpression parseAggregationExpression(HashMap<Long, Integer> paramsById, VoltXMLElement exprNode)
+
+    private AbstractExpression parseAggregationExpression(VoltXMLElement exprNode)
     {
         String type = exprNode.attributes.get("optype");
         ExpressionType exprType = ExpressionType.get(type);
@@ -477,7 +444,7 @@ public abstract class AbstractParsedStmt {
 
         // recursively parse the child subtree -- could (in theory) be an operator or
         // a constant, column, or param value operand or null in the specific case of "COUNT(*)".
-        AbstractExpression childExpr = parseExpressionTree(paramsById, childExprNode);
+        AbstractExpression childExpr = parseExpressionTree(childExprNode);
         if (childExpr == null) {
             assert(exprType == ExpressionType.AGGREGATE_COUNT);
             exprType = ExpressionType.AGGREGATE_COUNT_STAR;
@@ -500,7 +467,7 @@ public abstract class AbstractParsedStmt {
      * @param exprNode
      * @return a new Function Expression
      */
-    private AbstractExpression parseFunctionExpression(HashMap<Long, Integer> paramsById, VoltXMLElement exprNode) {
+    private AbstractExpression parseFunctionExpression(VoltXMLElement exprNode) {
         String name = exprNode.attributes.get("name").toLowerCase();
         String disabled = exprNode.attributes.get("disabled");
         if (disabled != null) {
@@ -525,7 +492,7 @@ public abstract class AbstractParsedStmt {
         for (VoltXMLElement argNode : exprNode.children) {
             assert(argNode != null);
             // recursively parse each argument subtree (could be any kind of expression).
-            AbstractExpression argExpr = parseExpressionTree(paramsById, argNode);
+            AbstractExpression argExpr = parseExpressionTree(argNode);
             assert(argExpr != null);
             args.add(argExpr);
         }
@@ -548,6 +515,7 @@ public abstract class AbstractParsedStmt {
             expr.setParameterArg(parameter_idx);
         }
 
+        expr.resolveForDB(m_db);
         return expr;
     }
 
@@ -672,16 +640,34 @@ public abstract class AbstractParsedStmt {
      * @param paramsNode
      */
     private void parseParameters(VoltXMLElement paramsNode) {
-        paramList = new VoltType[paramsNode.children.size()];
+        m_paramList = new ParameterValueExpression[paramsNode.children.size()];
 
         for (VoltXMLElement node : paramsNode.children) {
             if (node.name.equalsIgnoreCase("parameter")) {
                 long id = Long.parseLong(node.attributes.get("id"));
                 int index = Integer.parseInt(node.attributes.get("index"));
                 String typeName = node.attributes.get("valuetype");
+                String isVectorParam = node.attributes.get("isvector");
                 VoltType type = VoltType.typeFromString(typeName);
-                m_paramsById.put(id, index);
-                paramList[index] = type;
+                // HSQL has been known to jump to conclusions when it comes to typing
+                // parameters from context -- like assuming that only integers should be
+                // allowed in math with integers -- or is that a legit SQL thing?
+                // For now, assuming that HSQL is just wrong-ish.
+                if (type == VoltType.INTEGER) {
+                    // Assume that HSQL isn't totally wrong, just a little presumptive.
+                    // Re-ambiguate the type just slightly to give the planner a chance to determine differently.
+                    // Not sure whether this test should have been type.isInteger() --
+                    // does HSQL get other integral types wrong?
+                    type = VoltType.NUMERIC;
+                }
+                ParameterValueExpression pve = new ParameterValueExpression();
+                pve.setParameterIndex(index);
+                pve.setValueType(type);
+                if (isVectorParam != null && isVectorParam.equalsIgnoreCase("true")) {
+                    pve.setParamIsVector();
+                }
+                m_paramsById.put(id, pve);
+                m_paramList[index] = pve;
             }
         }
     }
@@ -1042,7 +1028,7 @@ public abstract class AbstractParsedStmt {
         String retval = "SQL:\n\t" + sql + "\n";
 
         retval += "PARAMETERS:\n\t";
-        for (VoltType param : paramList) {
+        for (ParameterValueExpression param : m_paramList) {
             retval += param.toString() + " ";
         }
 
@@ -1111,16 +1097,6 @@ public abstract class AbstractParsedStmt {
             retval += "\t(" + String.valueOf(i++) + ") " + expr.toString() + "\n";
 
         return retval;
-    }
-
-    // TODO: This method COULD also get migrated with the parse...Expression functions
-    // to class AbstractExpression or ExpressionUtil or possibly by itself to ParameterExpression
-    protected static int paramIndexById(HashMap<Long, Integer> paramsById, long paramId) {
-        if (paramId == -1) {
-            return -1;
-        }
-        assert(paramsById.containsKey(paramId));
-        return paramsById.get(paramId);
     }
 
     boolean isSimpleEquivalenceExpression(AbstractExpression expr) {
@@ -1206,6 +1182,10 @@ public abstract class AbstractParsedStmt {
     private AbstractExpression parseWhereCondition(VoltXMLElement tableScan)
     {
         return parseTableCondition(tableScan, "wherecond");
+    }
+
+    public ParameterValueExpression[] getParameters() {
+        return m_paramList;
     }
 
 }

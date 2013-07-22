@@ -46,6 +46,11 @@ public class CompiledInLists extends VoltProcedure {
         new SQLStmt("select * from R3 T where T.DESC IN (?, ?, ?, ?, ?)" +
                     " and T.NUM IN (100, 200, 300, 400, 500)");
 
+    public final SQLStmt P3withDESCs =
+            new SQLStmt("select * from P3 T where T.DESC IN ?" +
+                        " and T.NUM IN (100, 200, 300, 400, 500)");
+
+
     public final SQLStmt P3with5NUMs =
         new SQLStmt("select * from P3 T where T.DESC IN ('a', 'b', 'c', 'g', " +
                     "'this here is a longish string to force a permanent object allocation'" +
@@ -58,13 +63,35 @@ public class CompiledInLists extends VoltProcedure {
                     ")" +
                     " and T.NUM IN (?, ?, ?, ?, ?)");
 
+    public final SQLStmt P3withNUMs =
+            new SQLStmt("select * from P3 T where T.DESC IN ('a', 'b', 'c', 'g', " +
+                        "'this here is a longish string to force a permanent object allocation'" +
+                        ")" +
+                        " and T.NUM IN ?");
 
-    public VoltTable[] run(String[] fiveDESCs, int[] fiveNUMs)
+
+    public VoltTable[] run(String[] fiveDESCs, int[] fiveNUMs, int goEasyOnHSQL)
     {
         voltQueueSQL(P3with5DESCs, fiveDESCs[0], fiveDESCs[1], fiveDESCs[2], fiveDESCs[3], fiveDESCs[4]);
         voltQueueSQL(R3with5DESCs, fiveDESCs[0], fiveDESCs[1], fiveDESCs[2], fiveDESCs[3], fiveDESCs[4]);
+        // Without teaching the HSQL backend the "IN ?" trick, we need to simulate this part of the test
+        // using an effectively equivalent statement to get a consistent result.
+        if (goEasyOnHSQL != 0) {
+            voltQueueSQL(P3with5DESCs, fiveDESCs[0], fiveDESCs[1], fiveDESCs[2], fiveDESCs[3], fiveDESCs[4]);
+        }
+        else {
+            voltQueueSQL(P3withDESCs, (Object)fiveDESCs);
+        }
         voltQueueSQL(P3with5NUMs, fiveNUMs[0], fiveNUMs[1], fiveNUMs[2], fiveNUMs[3], fiveNUMs[4]);
         voltQueueSQL(R3with5NUMs, fiveNUMs[0], fiveNUMs[1], fiveNUMs[2], fiveNUMs[3], fiveNUMs[4]);
+        // Without teaching the HSQL backend the "IN ?" trick, we need to simulate this part of the test
+        // using an effectively equivalent statement to get a consistent result.
+        if (goEasyOnHSQL != 0) {
+            voltQueueSQL(P3with5NUMs, fiveNUMs[0], fiveNUMs[1], fiveNUMs[2], fiveNUMs[3], fiveNUMs[4]);
+        }
+        else {
+            voltQueueSQL(P3withNUMs, fiveNUMs);
+        }
         return voltExecuteSQL(true);
     }
 }

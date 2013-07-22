@@ -231,16 +231,21 @@ public class HSQLInterface {
         // see if the children are "row" and "table".
         int rowCount = 0;
         int tableCount = 0;
+        int valueCount = 0;
         for (VoltXMLElement child : expr.children) {
             if (child.name.equals("row")) {
                 rowCount++;
             }
-            if (child.name.equals("table")) {
+            else if (child.name.equals("table")) {
                 tableCount++;
+            }
+            else if (child.name.equals("value")) {
+                valueCount++;
             }
         }
         if ((tableCount + rowCount) > 0) {
-            assert((rowCount + tableCount) == 2);
+            assert rowCount == 1;
+            assert tableCount + valueCount == 1;
             return true;
         }
 
@@ -259,6 +264,7 @@ public class HSQLInterface {
 
         VoltXMLElement rowElem = null;
         VoltXMLElement tableElem = null;
+        VoltXMLElement valueElem = null;
         for (VoltXMLElement child : inElement.children) {
             if (child.name.equals("row")) {
                 rowElem = child;
@@ -266,15 +272,25 @@ public class HSQLInterface {
             else if (child.name.equals("table")) {
                 tableElem = child;
             }
+            else if (child.name.equals("value")) {
+                valueElem = child;
+            }
         }
         assert(rowElem.children.size() == 1);
 
-        // make the table expression an in-list
-        VoltXMLElement inlist = new VoltXMLElement("vector");
-        for (VoltXMLElement child : tableElem.children) {
-            assert(child.name.equals("row"));
-            assert(child.children.size() == 1);
-            inlist.children.addAll(child.children);
+        VoltXMLElement inlist;
+        if (tableElem != null) {
+            // make the table expression an in-list
+            inlist = new VoltXMLElement("vector");
+            for (VoltXMLElement child : tableElem.children) {
+                assert(child.name.equals("row"));
+                assert(child.children.size() == 1);
+                inlist.children.addAll(child.children);
+            }
+        }
+        else {
+            assert valueElem != null;
+            inlist = valueElem;
         }
 
         inElement.children.clear();

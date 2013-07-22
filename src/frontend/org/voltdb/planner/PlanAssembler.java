@@ -39,7 +39,6 @@ import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
-import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -112,12 +111,6 @@ public class PlanAssembler {
      * Counter for the number of plans generated to date for a single statement.
      */
     boolean m_insertPlanWasGenerated = false;
-
-    /**
-     * Whenever a parameter has its type changed during compilation, the new type is stored
-     * here, indexed by parameter index.
-     */
-    Map<Integer, VoltType> m_paramTypeOverrideMap = new HashMap<Integer, VoltType>();
 
     /**
      *
@@ -398,7 +391,7 @@ public class PlanAssembler {
         }
 
         assert (nextStmt != null);
-        addParameters(retval, nextStmt);
+        retval.parameters = nextStmt.getParameters();
         retval.fullWhereClause = nextStmt.getCombinedFilterExpression();
         retval.fullWinnerPlan = retval.rootPlanGraph;
         // Do a final generateOutputSchema pass.
@@ -493,20 +486,6 @@ public class PlanAssembler {
             }
         }
         plan.columns = output_schema;
-    }
-
-    private void addParameters(CompiledPlan plan, AbstractParsedStmt stmt) {
-        plan.parameters = new VoltType[stmt.paramList.length];
-
-        for (int i = 0; i < stmt.paramList.length; ++i) {
-            VoltType override = m_paramTypeOverrideMap.get(i);
-            if (override != null) {
-                plan.parameters[i] = override;
-            }
-            else {
-                plan.parameters[i] = stmt.paramList[i];
-            }
-        }
     }
 
     private AbstractPlanNode getNextSelectPlan() {
@@ -638,21 +617,10 @@ public class PlanAssembler {
         // updated.  We'll associate the actual values with VOLT_TEMP_TABLE
         // to avoid any false schema/column matches with the actual table.
         for (Entry<Column, AbstractExpression> col : m_parsedUpdate.columns.entrySet()) {
-
-            // make the literal type we're going to insert match the column type
-            AbstractExpression castedExpr = null;
-            try {
-                castedExpr = (AbstractExpression) col.getValue().clone();
-                ExpressionUtil.setOutputTypeForInsertExpression(
-                        castedExpr, VoltType.get((byte) col.getKey().getType()), col.getKey().getSize(), m_paramTypeOverrideMap);
-            } catch (Exception e) {
-                throw new PlanningErrorException(e.getMessage());
-            }
-
             proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
                                                    col.getKey().getTypeName(),
                                                    col.getKey().getTypeName(),
-                                                   castedExpr));
+                                                   col.getValue()));
 
             // check if this column is an indexed column
             if (affectedColumns.contains(col.getKey().getTypeName()))
@@ -740,25 +708,13 @@ public class PlanAssembler {
                 if (column.getDefaulttype() != 0)
                 {
                     const_expr.setValue(column.getDefaultvalue());
-                    const_expr.setValueType(VoltType.get((byte) column.getDefaulttype()));
+                    const_expr.refineValueType(VoltType.get((byte) column.getDefaulttype()), column.getSize());
                 }
                 else
                 {
                     const_expr.setValue(null);
+                    const_expr.refineValueType(VoltType.get((byte) column.getType()), column.getSize());
                 }
-            }
-
-            if (expr.getValueType() == VoltType.NULL) {
-                ConstantValueExpression const_expr =
-                    new ConstantValueExpression();
-                const_expr.setValue("NULL");
-            }
-
-            // set the expression type to match the corresponding Column.
-            try {
-                ExpressionUtil.setOutputTypeForInsertExpression(expr, VoltType.get((byte)column.getType()), column.getSize(), m_paramTypeOverrideMap);
-            } catch (Exception e) {
-                throw new PlanningErrorException(e.getMessage());
             }
 
             // Hint that this statement can be executed SP.
@@ -1049,7 +1005,8 @@ public class PlanAssembler {
      * @param root top of the original plan
      * @return new plan's root node
      */
-    AbstractPlanNode handleLimitOperator(AbstractPlanNode root) {
+    private AbstractPlanNode handleLimitOperator(AbstractPlanNode root)
+    {
         int limitParamIndex = m_parsedSelect.getLimitParameterIndex();
         int offsetParamIndex = m_parsedSelect.getOffsetParameterIndex();
 
@@ -1096,7 +1053,8 @@ public class PlanAssembler {
         if (canPushDown) {
             /*
              * For partitioned table, the pushed-down limit plan node has a limit based
-             * on the combined limit and offset, which may require an expression if either of these was not a hard-coded constant.
+             * on the combined limit and offset, which may require an expression if either of these
+             * was not a hard-coded constant and didn't get parameterized.
              * The top level limit plan node remains the same, with the original limit and offset values.
              */
             LimitPlanNode distLimit = new LimitPlanNode();
