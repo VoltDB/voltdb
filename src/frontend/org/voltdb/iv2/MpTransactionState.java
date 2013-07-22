@@ -279,10 +279,13 @@ public class MpTransactionState extends TransactionState
     {
         FragmentResponseMessage msg = null;
         try {
+            final String snapShotRestoreProcName = "@SnapshotRestore";
             while (msg == null) {
                 msg = m_newDeps.poll(60L * 5, TimeUnit.SECONDS);
                 if (msg == null) {
-                    tmLog.warn("Possible multipartition transaction deadlock detected for: " + m_initiationMsg);
+                    if (!snapShotRestoreProcName.equals(m_initiationMsg.getStoredProcedureName()) ) {
+                        tmLog.warn("Possible multipartition transaction deadlock detected for: " + m_initiationMsg);
+                    }
                     if (m_remoteWork == null) {
                         tmLog.warn("Waiting on local BorrowTask response from site: " +
                                 CoreUtils.hsIdToString(m_buddyHSId));
