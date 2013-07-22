@@ -145,6 +145,52 @@ public class TestDDLCompiler extends TestCase {
     }
 
     /**
+     * ENG-4865
+     * @throws HSQLParseException
+     */
+    public void testUniqueIndexGiveWarnings() throws HSQLParseException {
+        // ensure the test cleans up
+        File jarOut = new File("checkCompilerWarnings.jar");
+        jarOut.deleteOnExit();
+
+        String schema = "create table t0 (id bigint not null, name varchar(32),  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index ON t0 (name) ;";
+
+        // boilerplate for making a project
+        final String simpleProject =
+                "<?xml version=\"1.0\"?>\n" +
+                "<project><database><schemas>" +
+                "<schema path='%s' />" +
+                "</schemas></database></project>";
+
+        // RUN EXPECTING WARNINGS
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
+        String schemaPath = schemaFile.getPath();
+
+        File projectFile = VoltProjectBuilder.writeStringToTempFile(
+                String.format(simpleProject, schemaPath));
+        String projectPath = projectFile.getPath();
+
+        // compile successfully (but with a warning hopefully)
+        VoltCompiler compiler = new VoltCompiler();
+        boolean success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
+        assertTrue(success);
+
+        // verify the warnings exist
+        int foundPCWarnings = 0;
+        for (VoltCompiler.Feedback f : compiler.m_warnings) {
+            if (f.message.toLowerCase().contains("unique index")) {
+                foundPCWarnings++;
+            }
+        }
+        assertEquals(1, foundPCWarnings);
+
+        // cleanup after the test
+        jarOut.delete();
+    }
+
+    /**
      * ENG-2643: Ensure VoltDB can compile DDL with check and fk constrants,
      * but warn the user, rather than silently ignoring the stuff VoltDB
      * doesn't support.

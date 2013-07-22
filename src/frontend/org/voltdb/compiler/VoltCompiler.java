@@ -68,6 +68,7 @@ import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
+import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
@@ -391,8 +392,6 @@ public class VoltCompiler {
             compilerLog.error("Catalog compilation failed.");
             return false;
         }
-
-        HashMap<String, byte[]> explainPlans = getExplainPlans(catalog);
 
         // WRITE CATALOG TO JAR HERE
         final String catalogCommands = catalog.serialize();
@@ -797,6 +796,25 @@ public class VoltCompiler {
 
                 t.setPartitioncolumn(c);
                 t.setIsreplicated(false);
+
+                for (Index idx: t.getIndexes()) {
+                    boolean contain = false;
+                    for (ColumnRef col: idx.getColumns()) {
+                        if (col.getColumn().equals(c)) {
+                            contain = true;
+                            break;
+                        }
+                    }
+                    if (!contain) {
+                        // Add warning message
+                        String warnMsg = String.format("A unique index on the partitioned table %s does not include the partitioning column %s. " +
+                                "This does not guarantee uniqueness across the database and can cause constraint violations when repartitioning the data.",
+                                tableName, colName);
+                        addWarn(warnMsg);
+                    }
+                }
+
+
 
                 // Set the partitioning of destination tables of associated views.
                 // If a view's source table is replicated, then a full scan of the
