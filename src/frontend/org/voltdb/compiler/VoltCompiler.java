@@ -807,9 +807,16 @@ public class VoltCompiler {
                     }
                     if (!contain) {
                         // Add warning message
-                        String warnMsg = String.format("A unique index on the partitioned table %s does not include the partitioning column %s. " +
+                        String indexName = idx.getTypeName();
+                        if (indexName.startsWith("SYS_IDX_PK_") || indexName.startsWith("SYS_IDX_SYS_PK_") ||
+                                indexName.startsWith("MATVIEW_PK_INDEX") ) {
+                            indexName = "PRIMARY KEY index";
+                        } else {
+                            indexName = "unique index " + indexName;
+                        }
+                        String warnMsg = String.format("A %s on the partitioned table %s does not include the partitioning column %s. " +
                                 "This does not guarantee uniqueness across the database and can cause constraint violations when repartitioning the data.",
-                                tableName, colName);
+                                indexName, tableName, c.getName());
                         addWarn(warnMsg);
                     }
                 }

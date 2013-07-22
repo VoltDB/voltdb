@@ -153,9 +153,15 @@ public class TestDDLCompiler extends TestCase {
         File jarOut = new File("checkCompilerWarnings.jar");
         jarOut.deleteOnExit();
 
-        String schema = "create table t0 (id bigint not null, name varchar(32),  primary key (id));\n" +
+        // Normal unique index test
+        String schema1 = "create table t0 (id bigint not null, name varchar(32), age integer,  primary key (id));\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n" +
                 "CREATE UNIQUE INDEX user_index ON t0 (name) ;";
+
+        // Test primary key
+        String schema2 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN name;\n" +
+                "CREATE UNIQUE INDEX user_index ON t0 (age) ;";
 
         // boilerplate for making a project
         final String simpleProject =
@@ -165,7 +171,7 @@ public class TestDDLCompiler extends TestCase {
                 "</schemas></database></project>";
 
         // RUN EXPECTING WARNINGS
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema1);
         String schemaPath = schemaFile.getPath();
 
         File projectFile = VoltProjectBuilder.writeStringToTempFile(
@@ -180,12 +186,36 @@ public class TestDDLCompiler extends TestCase {
         // verify the warnings exist
         int foundPCWarnings = 0;
         for (VoltCompiler.Feedback f : compiler.m_warnings) {
-            if (f.message.toLowerCase().contains("unique index")) {
+            if (f.message.toLowerCase().contains("does not include the partitioning column")) {
                 foundPCWarnings++;
             }
         }
         assertEquals(1, foundPCWarnings);
+        // cleanup after the test
+        jarOut.delete();
 
+
+        // RUN EXPECTING WARNINGS
+        schemaFile = VoltProjectBuilder.writeStringToTempFile(schema2);
+        schemaPath = schemaFile.getPath();
+
+        projectFile = VoltProjectBuilder.writeStringToTempFile(
+                String.format(simpleProject, schemaPath));
+        projectPath = projectFile.getPath();
+
+        // compile successfully (but with a warning hopefully)
+        success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
+        assertTrue(success);
+
+        // verify the warnings exist
+        foundPCWarnings = 0;
+        for (VoltCompiler.Feedback f : compiler.m_warnings) {
+            if (f.message.toLowerCase().contains("does not include the partitioning column")) {
+                foundPCWarnings++;
+                System.out.println(f.message);
+            }
+        }
+        assertEquals(2, foundPCWarnings);
         // cleanup after the test
         jarOut.delete();
     }
