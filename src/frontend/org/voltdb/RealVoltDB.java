@@ -21,6 +21,7 @@ import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -777,14 +778,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             String pathToConfigInfo = pathToConfigInfoDir + File.separator + "config.json";
             File configInfo = new File(pathToConfigInfo);
 
-            String deploymentPath = null;
-            File deploymentFile = new File(m_config.m_pathToDeployment);
-            try {
-                deploymentPath = deploymentFile.getCanonicalPath();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
             byte jsonBytes[] = null;
             try {
                 JSONStringer stringer = new JSONStringer();
@@ -792,7 +785,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
                 stringer.key("workingDir").value(System.getProperty("user.dir"));
                 stringer.key("pid").value(CLibrary.getpid());
-                stringer.key("deployment").value(deploymentPath);
 
                 stringer.key("log4jDst").array();
                 Enumeration appenders = Logger.getRootLogger().getAllAppenders();
@@ -846,7 +838,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
         }
 
-        private void logCatalog() {
+        private void logCatalogAndDeployment() {
             File voltDbRoot = CatalogUtil.getVoltDbRoot(m_deployment.getPaths());
             String pathToConfigInfoDir = voltDbRoot.getPath() + File.separator + "config_log";
 
@@ -856,11 +848,24 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 hostLog.error("Failed to log catalog: " + e.getMessage());
                 e.printStackTrace();
             }
+
+            try {
+                File deploymentFile = new File(pathToConfigInfoDir, "deployment.xml");
+                if (deploymentFile.exists()) {
+                    deploymentFile.delete();
+                }
+                FileOutputStream fileOutputStream = new FileOutputStream(deploymentFile);
+                fileOutputStream.write(getHostMessenger().getZK().getData(VoltZK.deploymentBytes, false, null));
+                fileOutputStream.close();
+            } catch (Exception e) {
+                hostLog.error("Failed to log deployment file: " + e.getMessage());
+                e.printStackTrace();
+            }
         }
 
         public void run() {
             logConfigInfo();
-            logCatalog();
+            logCatalogAndDeployment();
         }
     }
 
@@ -1800,7 +1805,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_MPI.updateCatalog(diffCommands, m_catalogContext, csp);
             }
 
-            new ConfigLogging().logCatalog();
+            new ConfigLogging().logCatalogAndDeployment();
 
             return Pair.of(m_catalogContext, csp);
         }
