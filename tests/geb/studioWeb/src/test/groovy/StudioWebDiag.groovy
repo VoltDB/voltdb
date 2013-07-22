@@ -114,9 +114,9 @@ class StudioWebDiag extends GebReportingSpec {
         chkElements(procs, procFile)
     }
 
-    @Unroll //performs this method for each item in type
-    def '#testName test'(){
-        
+    //TEST SQL Queries
+    @Unroll //performs this method for each item in testName
+    def '#testName'(){
 
             setup: 'open new query'
             response = res
