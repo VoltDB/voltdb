@@ -18,14 +18,14 @@
 # type_not_null_float       FLOAT         NOT NULL
 # type_null_decimal         DECIMAL
 # type_not_null_decimal     DECIMAL       NOT NULL
-# type_null_varchar25       VARCHAR(32)
-# type_not_null_varchar25   VARCHAR(32)   NOT NULL
-# type_null_varchar128      VARCHAR(128)
-# type_not_null_varchar128  VARCHAR(128)  NOT NULL
-# type_null_varchar1024     VARCHAR(1024)
-# type_not_null_varchar1024 VARCHAR(1024) NOT NULL
+# type_null_varchar25       'VARCHAR'(32)
+# type_not_null_varchar25   'VARCHAR'(32)   NOT NULL
+# type_null_varchar128      'VARCHAR'(128)
+# type_not_null_varchar128  'VARCHAR'(128)  NOT NULL
+# type_null_varchar1024     'VARCHAR'(1024)
+# type_not_null_varchar1024 'VARCHAR'(1024) NOT NULL
 # PRIMARY KEY (rowid)
-# 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 A B C D E F
+# 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 a b c d e f
 #
 #
 #
@@ -35,15 +35,15 @@
 #///////////////
 #
 #
-{"testName":"InsertBigInt","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, A, B, C, D, E, F)","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
-{"testName":"InsertTinyInt","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, A, B, C, D, E, F)","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
-{"testName":"InsertSmallInt","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, A, B, C, D, E, F)","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
-{"testName":"InsertInteger","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, A, B, C, D, E, F)","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
-{"testName":"InsertFloat","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, A, B, C, D, E, F)","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
-{"testName":"InsertDecimal","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, A, B, C, D, E, F)","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
-{"testName":"InsertTimestamp","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, A, B, C, D, E, F)","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
-{"testName":"InsertVarchar","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, A, B, C, D, E, F)","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
-{"testName":"InsertNull","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, A, B, C, D, E, F)","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"InsertBigInt","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"InsertTinyInt","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"InsertSmallInt","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"InsertInteger","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"InsertFloat","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"InsertDecimal","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"InsertTimestamp","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"InsertVarchar","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
+{"testName":"InsertNull","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
 #
 #
 #//////////////////
@@ -51,14 +51,14 @@
 #//////////////////
 #
 #
-{"testName":"ExtraVarchar","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, ThisSentenceHasTooManyCharacters!, B, C, D, E, F)","response":{"result":"ERROR","status":"FAILURE"}}
-{"testName":"VarcharAsInt","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, VARCHAR, 8, 9, 10, 11, 12, 13, 14, 15, 16, A, B, C, D, E, F)","response":{"result":"ERROR","status":"FAILURE"}}
-{"testName":"VarcharAsBigInt","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, VARCHAR, 10, 11, 12, 13, 14, 15, 16, A, B, C, D, E, F)","response":{"result":"ERROR","status":"FAILURE"}}
-{"testName":"VarcharAsSmallInt","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, VARCHAR, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, A, B, C, D, E, F)","response":{"result":"ERROR","status":"FAILURE"}}
-{"testName":"VarcharAsTinyInt","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, VARCHAR, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, A, B, C, D, E, F)","response":{"result":"ERROR","status":"FAILURE"}}
-{"testName":"VarCharAsFloat","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, VARCHAR, 14, 15, 16, A, B, C, D, E, F)","response":{"result":"ERROR","status":"FAILURE"}}
-{"testName":"VarcharAsDecimal","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, VARCHAR, 16, A, B, C, D, E, F)","response":{"result":"ERROR","status":"FAILURE"}}
-{"testName":"VarcharAsTimestamp","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, VARCHAR, 12, 13, 14, 15, 16, A, B, C, D, E, F)","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"ExtraVarchar","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'ThisSentenceHasTooManyCharacters!', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"VarcharAsInt","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 'VARCHAR', 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"VarcharAsBigInt","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 'VARCHAR', 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"VarcharAsSmallInt","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 'VARCHAR', 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"VarcharAsTinyInt","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 'VARCHAR', 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"VarCharAsFloat","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 'VARCHAR', 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"VarcharAsDecimal","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 'VARCHAR', 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"VarcharAsTimestamp","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 'VARCHAR', 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f')","response":{"result":"ERROR","status":"FAILURE"}}
 {"testName":"BadParamCount","sqlCmd":"INSERT INTO partitioned_table VALUES(NotEnoughParameters)","response":{"result":"ERROR","status":"FAILURE"}}
 {"testName":"NullNotNull","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, null, 5, null, 7, null, 9, null, 11, null, 13, null, 15, null, A, null, C, null, E, null)","response":{"result":"ERROR","status":"FAILURE"}}
 #
@@ -68,7 +68,8 @@
 #/////////
 #
 #
-{"testName":"SELECT * FROM partitioned_table","sqlCmd":"select * from partitioned_table","response":{"result":{"rowid":["1"],"rowid_group":["1"],"type_null_tinyint":["1"],"type_not_null_tinyint":["1"],"type_null_smallint":["1"],"type_not_null_smallint":["1"],"type_null_integer":["1"],"type_not_null_integer":["1"],"type_null_bigint":["1"],"type_not_null_bigint":["1"],"type_null_timestamp":["1"],"type_not_null_timestamp":["1"],"type_null_float":["1"],"type_not_null_float":["1"],"type_null_decimal":["1.000000000000"],"type_not_null_decimal":["1.000000000000"],"type_null_varchar25":["1"],"type_not_null_varchar25":["1"],"type_null_varchar128":["1"],"type_not_null_varchar128":["1"],"type_null_varchar1024":["1"],"type_not_null_varchar1024":["1"]},"status":"SUCCESS"}}
+{"testName":"SelectAll","sqlCmd":"INSERT INTO partitioned_table VALUES(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 'a', 'b', 'c', 'd', 'e', 'f');SELECT * FROM partitioned_table","response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["11"],"type_not_null_timestamp":["12"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],"type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"]},"status":"SUCCESS"}}
+#
 #
 {"testName":"SelectColumns","sqlCmd":"SELECT FROM partitioned_table","response":{"result":{"rowid":["1"],"rowid_group":["1"],"type_null_tinyint":["1"],"type_not_null_tinyint":["1"],"type_null_smallint":["1"],"type_not_null_smallint":["1"],"type_null_integer":["1"],"type_not_null_integer":["1"],"type_null_bigint":["1"],"type_not_null_bigint":["1"],"type_null_timestamp":["1"],"type_not_null_timestamp":["1"],"type_null_float":["1"],"type_not_null_float":["1"],"type_null_decimal":["1.000000000000"],"type_not_null_decimal":["1.000000000000"],"type_null_varchar25":["1"],"type_not_null_varchar25":["1"],"type_null_varchar128":["1"],"type_not_null_varchar128":["1"],"type_null_varchar1024":["1"],"type_not_null_varchar1024":["1"]},"status":"SUCCESS"}}
 #
