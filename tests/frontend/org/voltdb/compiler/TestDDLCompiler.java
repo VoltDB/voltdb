@@ -164,50 +164,61 @@ public class TestDDLCompiler extends TestCase {
         String schema0 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
                 "CREATE UNIQUE INDEX user_index0 ON t0 (name) ;";
 
-        // A non-unique index on the non-partitioning key gets no warning.
-        String schema1 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+        // A unique index on the partitioning key ( no primary key) gets no warning.
+        String schema1 = "create table t0 (id bigint not null, name varchar(32) not null, age integer);\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n" +
-                "CREATE INDEX user_index1 ON t0 (name) ;";
+                "CREATE UNIQUE INDEX user_index1 ON t0 (id) ;";
 
-        // A unique compound index on the partitioning key and another column gets no warning.
+        // A unique index on the partitioning key ( also primary key) gets no warning.
         String schema2 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n" +
-                "CREATE UNIQUE INDEX user_index2 ON t0 (id, age) ;";
+                "CREATE UNIQUE INDEX user_index2 ON t0 (id) ;";
 
-        // A unique index on the partitioning key and an expression like abs(age) gets no warning.
+        // A unique compound index on the partitioning key and another column gets no warning.
         String schema3 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n" +
-                "CREATE UNIQUE INDEX user_index3 ON t0 (id, abs(age)) ;";
+                "CREATE UNIQUE INDEX user_index3 ON t0 (id, age) ;";
 
-        // A unique index on the partitioning key gets no warning.
+        // A unique index on the partitioning key and an expression like abs(age) gets no warning.
         String schema4 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n" +
-                "CREATE UNIQUE INDEX user_index4 ON t0 (id) ;";
+                "CREATE UNIQUE INDEX user_index4 ON t0 (id, abs(age)) ;";
 
-        // A unique index on the non-partitioning key gets one warning.
-        String schema6 = "create table t0 (id bigint not null, name varchar(32), age integer,  primary key (id));\n" +
-                "PARTITION TABLE t0 ON COLUMN id;\n" +
+
+        // A unique index on the partitioning key ( non-primary key) gets no warning.
+        String schema6 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN name;\n" +
                 "CREATE UNIQUE INDEX user_index6 ON t0 (name) ;";
 
-        // A unique index on an unrelated expression like abs(age) gets a warning.
-        String schema7 = "create table t0 (id bigint not null, name varchar(32), age integer,  primary key (id));\n" +
+        // A unique index on the partitioning key ( no primary key) gets one warning.
+        String schema7 = "create table t0 (id bigint not null, name varchar(32) not null, age integer);\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n" +
-                "CREATE UNIQUE INDEX user_index7 ON t0 (abs(age)) ;";
+                "CREATE UNIQUE INDEX user_index7 ON t0 (name) ;";
 
-        // A unique index on an expression of the partitioning key like substr(1, 2, name) gets a warning.
-        String schema8 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
-                "PARTITION TABLE t0 ON COLUMN name;\n" +
-                "CREATE UNIQUE INDEX user_index8 ON t0 (substr(name, 1, 2 )) ;";
+        // A unique index on the non-partitioning key gets one warning.
+        String schema8 = "create table t0 (id bigint not null, name varchar(32), age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index8 ON t0 (name) ;";
 
-        // A unique index on the non-partitioning key, non-partitioned column gets two warnings.
+        // A unique index on an unrelated expression like abs(age) gets a warning.
+        String schema9 = "create table t0 (id bigint not null, name varchar(32), age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index9 ON t0 (abs(age)) ;";
+
+
+        // A unique index on an expression of the partitioning key like substr(1, 2, name) gets two warnings.
         String schema10 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
                 "PARTITION TABLE t0 ON COLUMN name;\n" +
-                "CREATE UNIQUE INDEX user_index10 ON t0 (age) ;";
+                "CREATE UNIQUE INDEX user_index10 ON t0 (substr(name, 1, 2 )) ;";
+
+        // A unique index on the non-partitioning key, non-partitioned column gets two warnings.
+        String schema12 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN name;\n" +
+                "CREATE UNIQUE INDEX user_index12 ON t0 (age) ;";
 
 
-
-        String[] schemas = {schema0, schema1, schema2, schema3, schema4, schema6, schema7, schema8, schema10};
-        int[] expected =   {   0   ,    0   ,    0   ,    0   ,    0   ,    1   ,    1   ,    2   ,     2   };
+        String[] schemas = {schema0, schema1, schema2, schema3, schema4, schema6, schema7, schema8, schema9, schema10, schema12};
+        int[] expected =   {   0   ,    0   ,    0   ,    0   ,    0   ,    1   ,    1   ,    1   ,     1,      2   ,     2    };
 
         for (int i =0; i< schemas.length; i++) {
             String schema = schemas[i];
