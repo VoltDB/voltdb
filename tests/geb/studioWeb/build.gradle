@@ -23,21 +23,21 @@
 
 apply plugin: "groovy"
 
-
 // The drivers to use
 ext.drivers = ["firefox", "chrome"]
 
-repositories{
+repositories {
     mavenCentral() 
 }
 
-dependencies{
+dependencies {
     def gebVersion = "0.9.0"
     def seleniumVersion = "2.33.0"
+    def spockVersion = "0.7-groovy-2.0"
 
     //Geb & Spock
     testCompile "org.gebish:geb-spock:$gebVersion"
-    testCompile "org.spockframework:spock-core:0.7-groovy-2.0"
+    testCompile "org.spockframework:spock-core:$spockVersion"
 
     // Drivers
     drivers.each { driver ->
