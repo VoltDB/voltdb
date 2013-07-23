@@ -240,6 +240,3 @@ class StudioWebDiag extends GebReportingSpec {
         [fold1, fold2, fold3]*.click() //open each folder
     }
 }
-
-
-
