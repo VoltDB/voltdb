@@ -128,7 +128,7 @@ class StudioWebDiag extends GebReportingSpec {
     }
 
     //TEST SQL Queries
-    @Ignore //performs this method for each item in testName
+    @Unroll //performs this method for each item in testName
     def '#testName'(){
 
             setup: 'open new query'
