@@ -243,7 +243,12 @@ public class TestCatalogUtil extends TestCase {
                             "</httpd>" +
                             "<export enabled='true' >" +
                                 "<onserver exportto='custom' exportconnectorclass=\"com.foo.export.ExportClient\"  >" +
-                                "</onserver>" +
+                                    "<configuration>" +
+                                        "<property name=\"foo\">false</property>" +
+                                        "<property name=\"type\">CSV</property>" +
+                                        "<property name=\"with-schema\">false</property>" +
+                                    "</configuration>" +
+                                 "</onserver>" +
                             "</export>" +
                             "<users> " +
                             "<user name=\"joe\" password=\"aaa\" roles=\"lotre,lodue\"/>" +
