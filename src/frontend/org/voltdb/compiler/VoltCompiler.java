@@ -54,6 +54,7 @@ import javax.xml.validation.SchemaFactory;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.json_voltpatches.JSONException;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ProcInfoData;
@@ -68,6 +69,7 @@ import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
+import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
@@ -85,6 +87,8 @@ import org.voltdb.compiler.projectfile.ProjectType;
 import org.voltdb.compiler.projectfile.RolesType;
 import org.voltdb.compiler.projectfile.SchemasType;
 import org.voltdb.compilereport.ReportMaker;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -391,8 +395,6 @@ public class VoltCompiler {
             compilerLog.error("Catalog compilation failed.");
             return false;
         }
-
-        HashMap<String, byte[]> explainPlans = getExplainPlans(catalog);
 
         // WRITE CATALOG TO JAR HERE
         final String catalogCommands = catalog.serialize();
@@ -797,6 +799,60 @@ public class VoltCompiler {
 
                 t.setPartitioncolumn(c);
                 t.setIsreplicated(false);
+
+                for (Index index: t.getIndexes())
+                {
+                    // skip non-unique indexes
+                    if (!index.getUnique()) {
+                        continue;
+                    }
+                    boolean contain = false;
+                    String jsonExpr = index.getExpressionsjson();
+                    // if this is a pure-column index...
+                    if (jsonExpr.isEmpty()) {
+                        for (ColumnRef cref : index.getColumns()) {
+                            Column col = cref.getColumn();
+                            // unique index contains partitioned column
+                            if (col.equals(c)) {
+                                contain = true;
+                                break;
+                            }
+                        }
+                    }
+                    // if this is a fancy expression-based index...
+                    else {
+                        try {
+                            List<AbstractExpression> indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, null);
+                            for (AbstractExpression expr: indexExpressions) {
+                                if (expr instanceof TupleValueExpression &&
+                                        ((TupleValueExpression) expr).getColumnName().equals(c.getName()) ) {
+                                    contain = true;
+                                    break;
+                                }
+                            }
+                        } catch (JSONException e) {
+                            e.printStackTrace(); // danger will robinson
+                            assert(false);
+                        }
+                    }
+
+                    if (!contain) {
+                        // Add warning message
+                        String indexName = index.getTypeName();
+                        if (indexName.startsWith("SYS_IDX_PK_") || indexName.startsWith("SYS_IDX_SYS_PK_") ||
+                                indexName.startsWith("MATVIEW_PK_INDEX") ) {
+                            indexName = "PRIMARY KEY index";
+                        } else {
+                            indexName = "unique index " + indexName;
+                        }
+                        String warnMsg = String.format("A %s on the partitioned table %s does not include the partitioning column %s. " +
+                                "This does not guarantee uniqueness across the database and can cause constraint violations when repartitioning the data.",
+                                indexName, tableName, c.getName());
+                        addWarn(warnMsg);
+                    }
+                }
+
+
 
                 // Set the partitioning of destination tables of associated views.
                 // If a view's source table is replicated, then a full scan of the
