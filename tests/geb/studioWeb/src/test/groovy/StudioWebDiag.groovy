@@ -37,8 +37,6 @@ class StudioWebPage extends Page {
 
 class StudioWebDiag extends GebReportingSpec {
 
-    @Shared def testFile = new File('../../../../../Desktop/test.txt')
-
     //STATUS MESSAGES
     static String FAILURE = 'Query error'
     static String SUCCESS = 'Query Duration:'
@@ -57,7 +55,6 @@ class StudioWebDiag extends GebReportingSpec {
     @Shared def sqlList = []
     @Shared def correctElements = []
     @Shared def correctProcedures = []
-
 
     def setupSpec() {
         //Move file contents to memory
