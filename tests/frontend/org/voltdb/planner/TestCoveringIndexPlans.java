@@ -53,8 +53,8 @@ public class TestCoveringIndexPlans extends PlannerTestCase {
         assertTrue(pn instanceof IndexScanPlanNode);
         IndexScanPlanNode ispn = (IndexScanPlanNode)pn;
         assertEquals("COVER2_TREE", ispn.getTargetIndexName());
-        assertEquals(IndexLookupType.GTE, ispn.getLookupType());
-        assertEquals(1, ispn.getSearchKeyExpressions().size());
+        assertEquals(IndexLookupType.LT, ispn.getLookupType());
+        assertEquals(2, ispn.getSearchKeyExpressions().size());
     }
 
     public void testCover2ColumnsWithEquality()
@@ -81,36 +81,36 @@ public class TestCoveringIndexPlans extends PlannerTestCase {
         assertTrue(pn instanceof IndexScanPlanNode);
         IndexScanPlanNode ispn = (IndexScanPlanNode)pn;
         assertEquals("COVER3_TREE", ispn.getTargetIndexName());
-        assertEquals(IndexLookupType.GTE, ispn.getLookupType());
-        assertEquals(2, ispn.getSearchKeyExpressions().size());
+        assertEquals(IndexLookupType.LT, ispn.getLookupType());
+        assertEquals(3, ispn.getSearchKeyExpressions().size());
     }
 
     public void testCover3ColumnsWithLessThanAndOrderBy()
     {
         AbstractPlanNode pn = compile("select a, b from t where a = ? and c = ? and b < ? order by b;");
-        pn = pn.getChild(0);
+        pn = pn.getChild(0).getChild(0).getChild(0);
         if (pn != null) {
             System.out.println(pn.toJSONString());
         }
         assertTrue(pn instanceof IndexScanPlanNode);
         IndexScanPlanNode ispn = (IndexScanPlanNode)pn;
         assertEquals("COVER3_TREE", ispn.getTargetIndexName());
-        assertEquals(IndexLookupType.GTE, ispn.getLookupType());
-        assertEquals(2, ispn.getSearchKeyExpressions().size());
+        assertEquals(IndexLookupType.LT, ispn.getLookupType());
+        assertEquals(3, ispn.getSearchKeyExpressions().size());
     }
 
     public void testCover3ColumnsInOrderWithLessThanAndOrderBy()
     {
         AbstractPlanNode pn = compile("select a, b from t where a = ? and c = ? and b < ? order by b;");
-        pn = pn.getChild(0);
+        pn = pn.getChild(0).getChild(0).getChild(0);
         if (pn != null) {
             System.out.println(pn.toJSONString());
         }
         assertTrue(pn instanceof IndexScanPlanNode);
         IndexScanPlanNode ispn = (IndexScanPlanNode)pn;
         assertEquals("COVER3_TREE", ispn.getTargetIndexName());
-        assertEquals(IndexLookupType.GTE, ispn.getLookupType());
-        assertEquals(2, ispn.getSearchKeyExpressions().size());
+        assertEquals(IndexLookupType.LT, ispn.getLookupType());
+        assertEquals(3, ispn.getSearchKeyExpressions().size());
     }
 
     public void testCover3ColumnsOutOfOrderWithLessThan()
@@ -122,9 +122,9 @@ public class TestCoveringIndexPlans extends PlannerTestCase {
         }
         assertTrue(pn instanceof IndexScanPlanNode);
         IndexScanPlanNode ispn = (IndexScanPlanNode)pn;
-        assertEquals("COVER2_TREE", ispn.getTargetIndexName());
-        assertEquals(IndexLookupType.EQ, ispn.getLookupType());
-        assertEquals(2, ispn.getSearchKeyExpressions().size());
+        assertEquals("IDX_1", ispn.getTargetIndexName());
+        assertEquals(IndexLookupType.LT, ispn.getLookupType());
+        assertEquals(3, ispn.getSearchKeyExpressions().size());
     }
 
     public void testSingleColumnLessThan()

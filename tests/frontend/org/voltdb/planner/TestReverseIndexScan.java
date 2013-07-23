@@ -55,7 +55,7 @@ public class TestReverseIndexScan extends PlannerTestCase {
         assertEquals(IndexLookupType.LT, ispn.getLookupType());
         assertEquals(2, ispn.getSearchKeyExpressions().size());
         assertEquals(1, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
-        assertEquals(1, ExpressionUtil.uncombine(ispn.getPredicate()).size());
+        assertEquals(2, ExpressionUtil.uncombine(ispn.getPredicate()).size());
         assertEquals(SortDirectionType.DESC, ispn.getSortDirection());
     }
 
@@ -72,7 +72,7 @@ public class TestReverseIndexScan extends PlannerTestCase {
         assertEquals(IndexLookupType.LT, ispn.getLookupType());
         assertEquals(3, ispn.getSearchKeyExpressions().size());
         assertEquals(2, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
-        assertEquals(1, ExpressionUtil.uncombine(ispn.getPredicate()).size());
+        assertEquals(2, ExpressionUtil.uncombine(ispn.getPredicate()).size());
         assertEquals(SortDirectionType.DESC, ispn.getSortDirection());
     }
 
@@ -90,7 +90,7 @@ public class TestReverseIndexScan extends PlannerTestCase {
         assertEquals(IndexLookupType.LT, ispn.getLookupType());
         assertEquals(3, ispn.getSearchKeyExpressions().size());
         assertEquals(2, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
-        assertEquals(1, ExpressionUtil.uncombine(ispn.getPredicate()).size());
+        assertEquals(2, ExpressionUtil.uncombine(ispn.getPredicate()).size());
         assertEquals(SortDirectionType.DESC, ispn.getSortDirection());
     }
 
@@ -108,7 +108,7 @@ public class TestReverseIndexScan extends PlannerTestCase {
         assertEquals(IndexLookupType.LT, ispn.getLookupType());
         assertEquals(3, ispn.getSearchKeyExpressions().size());
         assertEquals(2, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
-        assertEquals(1, ExpressionUtil.uncombine(ispn.getPredicate()).size());
+        assertEquals(2, ExpressionUtil.uncombine(ispn.getPredicate()).size());
         assertEquals(SortDirectionType.DESC, ispn.getSortDirection());
     }
 
@@ -125,7 +125,7 @@ public class TestReverseIndexScan extends PlannerTestCase {
         assertEquals(IndexLookupType.LTE, ispn.getLookupType());
         assertEquals(2, ispn.getSearchKeyExpressions().size());
         assertEquals(1, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
-        assertEquals(1, ExpressionUtil.uncombine(ispn.getPredicate()).size());
+        assertEquals(2, ExpressionUtil.uncombine(ispn.getPredicate()).size());
         assertEquals(2, ExpressionUtil.uncombine(ispn.getInitialExpression()).size());
         assertEquals(SortDirectionType.DESC, ispn.getSortDirection());
     }
@@ -143,7 +143,7 @@ public class TestReverseIndexScan extends PlannerTestCase {
         assertEquals(IndexLookupType.LTE, ispn.getLookupType());
         assertEquals(3, ispn.getSearchKeyExpressions().size());
         assertEquals(2, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
-        assertEquals(1, ExpressionUtil.uncombine(ispn.getPredicate()).size());
+        assertEquals(2, ExpressionUtil.uncombine(ispn.getPredicate()).size());
         assertEquals(3, ExpressionUtil.uncombine(ispn.getInitialExpression()).size());
         assertEquals(SortDirectionType.DESC, ispn.getSortDirection());
     }
@@ -162,7 +162,7 @@ public class TestReverseIndexScan extends PlannerTestCase {
         assertEquals(IndexLookupType.LTE, ispn.getLookupType());
         assertEquals(3, ispn.getSearchKeyExpressions().size());
         assertEquals(2, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
-        assertEquals(1, ExpressionUtil.uncombine(ispn.getPredicate()).size());
+        assertEquals(2, ExpressionUtil.uncombine(ispn.getPredicate()).size());
         assertEquals(3, ExpressionUtil.uncombine(ispn.getInitialExpression()).size());
         assertEquals(SortDirectionType.DESC, ispn.getSortDirection());
     }
@@ -181,7 +181,7 @@ public class TestReverseIndexScan extends PlannerTestCase {
         assertEquals(IndexLookupType.LTE, ispn.getLookupType());
         assertEquals(3, ispn.getSearchKeyExpressions().size());
         assertEquals(2, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
-        assertEquals(1, ExpressionUtil.uncombine(ispn.getPredicate()).size());
+        assertEquals(2, ExpressionUtil.uncombine(ispn.getPredicate()).size());
         assertEquals(3, ExpressionUtil.uncombine(ispn.getInitialExpression()).size());
         assertEquals(SortDirectionType.DESC, ispn.getSortDirection());
     }

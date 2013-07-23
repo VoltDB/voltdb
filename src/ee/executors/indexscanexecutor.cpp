@@ -286,9 +286,12 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                         return true;
                     }
                     else {
-                        // VoltDB should only support LT or LTE with
-                        // empty search keys for order-by without lookup
-                        throw e;
+                        // for overflow on reverse scan, we need to
+                        // do a forward scan to find the correct start
+                        // point, which is exactly what LTE would do.
+                        // so, set the lookupType to LTE and the missing
+                        // searchkey will be handled by extra post filters
+                        localLookupType = INDEX_LOOKUP_TYPE_LTE;
                     }
                 }
                 if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
