@@ -136,19 +136,12 @@ public class TestIndexCountSuite extends RegressionSuite {
 
         VoltTable table;
 
-        Exception ex = null;
-        try {
-            table = client.callProcedure("@AdHoc","SELECT (COUNT(*) + 1) FROM TU1 WHERE POINTS < 2").getResults()[0];
-            // Comment the next three lines out when VoltDB can plan this kind of query
-//            assertTrue(table.getRowCount() == 1);
-//            assertTrue(table.advanceRow());
-//            assertEquals(2, table.getLong(0));
-        } catch (Exception e) {
-            assertTrue(e instanceof ProcCallException);
-            ex = e;
-        } finally {
-            assertNull(ex);
-        }
+        // We can plan this query now
+        table = client.callProcedure("@AdHoc","SELECT (COUNT(*) + 1) FROM TU1 WHERE POINTS < 2").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(2, table.getLong(0));
+
 
         table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS < -1").getResults()[0];
         assertTrue(table.getRowCount() == 1);

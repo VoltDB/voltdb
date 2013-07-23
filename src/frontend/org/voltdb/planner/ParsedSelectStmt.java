@@ -132,9 +132,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     */
     public ParsedSelectStmt(String[] paramValues, Database db) {
         super(paramValues, db);
-        if (aggregationList == null) {
-            aggregationList = new ArrayList<AbstractExpression>();
-        }
     }
 
     @Override
@@ -156,36 +153,47 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (limit != -1) assert limitParameterId == -1 : "Parsed value and param. limit.";
         if (offset != 0) assert offsetParameterId == -1 : "Parsed value and param. offset.";
 
-        // I want to extract groupby, orderby first before processing displayColumns
-        // Because I may have a fancy complex display
+        VoltXMLElement displayElement = null, orderbyElement = null, groupbyElement = null;
         for (VoltXMLElement child : stmtNode.children) {
-            if (child.name.equalsIgnoreCase("columns"))
-                parseDisplayColumns(child);
-            else if (child.name.equalsIgnoreCase("ordercolumns"))
-                parseOrderColumns(child);
-            else if (child.name.equalsIgnoreCase("groupcolumns"))
-                parseGroupByColumns(child);
+            if (child.name.equalsIgnoreCase("columns")) {
+                displayElement = child;
+            } else if (child.name.equalsIgnoreCase("ordercolumns")) {
+                orderbyElement = child;
+            } else if (child.name.equalsIgnoreCase("groupcolumns")) {
+                groupbyElement = child;
+            }
         }
+        if (aggregationList == null) {
+            aggregationList = new ArrayList<AbstractExpression>();
+        }
+        // I want to extract groupby, display first before processing orderBy
+        // Because I may have a fancy complex display
+        if (groupbyElement != null) {
+            parseGroupByColumns(groupbyElement);
+            insertToAggResultColumns(groupByColumns);
+        }
+
+        if (displayElement != null) {
+            parseDisplayColumns(displayElement);
+        }
+        if (orderbyElement != null) {
+            parseOrderColumns(orderbyElement);
+        }
+
         // We do not need aggregationList container in parseXMLtree
+        // Make it null to prevent others adding elements to it when parsing the tree
         aggregationList = null;
-        // Now AggResultsColumns contain All Aggregation info from DisplayColumn, GroupbyColumns and OrderbyColumns
-        // Besides, it contain all TVEs in OrderbyColumns. We want to add group-by Columns as pass-by columns also.
-        insertToAggResultColumns(groupByColumns);
 
         if (needComplexAggregation()) {
             fillUpAggResultColumns();
-            // Generate new output Schema, replace Aggs with TVEs for group by and order by
-            evaluateComplexColumns();
+            placeTVEsinColumns();
         } else {
             aggResultColumns = displayColumns;
-            // replace Aggs with TVEs for order by
-            replaceSimpleColumnsWithTVEsForOrderbyColumns();
+            replaceWithTVEsForOrderbyColumns();
         }
     }
 
     private boolean needComplexAggregation () {
-        // Hack for query like: Select COUNT(*) from T order by col
-        // Select P+A From T Order by P+A
         if (!hasAggregateExpression && !isGrouped()) {
             complexAggs = false;
             return false;
@@ -198,7 +206,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         for (int i = 0; i < displayColumns.size(); i++) {
             ParsedColInfo col = displayColumns.get(i);
-            if (isNewAggResultColumn(col)) {
+            if (isNewtoAggResultColumn(col)) {
                 // Now Only TVEs in displayColumns are left for AggResultColumns
                 if (col.expression instanceof TupleValueExpression) {
                     aggResultColumns.add(col);
@@ -214,6 +222,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             complexAggs = true;
             return true;
         }
+
         return false;
     }
     /**
@@ -222,7 +231,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      */
     private void fillUpAggResultColumns () {
         for (ParsedColInfo col: displayColumns) {
-            if (isNewAggResultColumn(col)) {
+            if (isNewtoAggResultColumn(col)) {
                 if (col.expression instanceof TupleValueExpression) {
                     aggResultColumns.add(col);
                 } else {
@@ -236,24 +245,23 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     /**
-     * TODO(xin): clean this function if possible
+     * Generate new output Schema and Place TVEs for display columns if needed.
+     * Place TVEs for order by columns always.
      */
-    private void evaluateComplexColumns () {
+    private void placeTVEsinColumns () {
         // Build the association between the table column with its index
         Map <AbstractExpression, Integer> aggTableIndexMap = new HashMap <AbstractExpression,Integer>();
         Map <AbstractExpression, String> exprToAliasMap = new HashMap <AbstractExpression,String>();
         int index = 0;
-        // TODO(XIN): pick up any hack string
-        String alias = "xin";
         for (ParsedColInfo col: aggResultColumns) {
             aggTableIndexMap.put(col.expression, index);
             if (col.alias == "") {
-                col.alias = alias + index;
+                // hack any unique string
+                col.alias = "$$_" + col.expression.getExpressionType().symbol() + "_$$_" + index;
             }
             exprToAliasMap.put(col.expression, col.alias);
             index++;
         }
-
         // Replace TVE for display columns
         newAggSchema = new NodeSchema();
         for (ParsedColInfo col : displayColumns) {
@@ -271,13 +279,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             newAggSchema.addColumn(schema_col);
         }
 
-        for (ParsedColInfo col : groupByColumns) {
-            if (col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
-                AbstractExpression expr = col.expression.replaceWithTVE(aggTableIndexMap, exprToAliasMap);
-                col.expression = expr;
-                // I think I already have tablename, alias, columnName setted up
-            }
-        }
         for (ParsedColInfo col : orderColumns) {
             if (col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
                 AbstractExpression expr = col.expression.replaceWithTVE(aggTableIndexMap, exprToAliasMap);
@@ -287,7 +288,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
-    private void replaceSimpleColumnsWithTVEsForOrderbyColumns () {
+    private void replaceWithTVEsForOrderbyColumns () {
         for (ParsedColInfo orderCol : orderColumns) {
             ParsedColInfo orig_col = null;
             for (ParsedColInfo col : displayColumns) {
@@ -314,7 +315,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
-    private boolean isNewAggResultColumn(ParsedColInfo col) {
+
+    private boolean isNewtoAggResultColumn(ParsedColInfo col) {
         boolean isNew = true;
         for (ParsedColInfo ic: aggResultColumns) {
             if (ic.simpleEquals(col)) {
@@ -325,14 +327,31 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return isNew;
     }
 
+    private boolean isNewtoAggResultColumn(AbstractExpression expr) {
+        boolean isNew = true;
+        for (ParsedColInfo ic: aggResultColumns) {
+            if (ic.expression.equals(expr)) {
+                isNew = false;
+                break;
+            }
+        }
+        return isNew;
+    }
+
     // Concat elements to the aggResultColumns
     private void insertToAggResultColumns (List<ParsedColInfo> colCollection) {
         for (ParsedColInfo col: colCollection) {
-            if (isNewAggResultColumn(col))
+            if (isNewtoAggResultColumn(col)) {
                 aggResultColumns.add(col);
+            }
         }
     }
 
+    /**
+     * ParseDisplayColumns and ParseOrderColumns will call this function to add Aggregation expressions to aggResultColumns
+     * @param colCollection
+     * @param cookedCol
+     */
     private void insertAggExpressionsToAggResultColumns (List<AbstractExpression> colCollection, ParsedColInfo cookedCol) {
         // Why IF ELSE, because AggResultColumn care about its alias,tableName
         if (colCollection.size() == 1 && cookedCol.expression.equals(colCollection.get(0))) {
@@ -341,9 +360,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             col.alias = cookedCol.alias;
             col.tableName = cookedCol.tableName;
             col.columnName = cookedCol.columnName;
-            if (isNewAggResultColumn(col))
+            if (isNewtoAggResultColumn(col)) {
                 aggResultColumns.add(col);
-        } else {
+            }
+        } else if (colCollection.size() != 0) {
+            // Try to check complexAggs earlier
+            complexAggs = true;
             for (AbstractExpression expr: colCollection) {
                 ParsedColInfo col = new ParsedColInfo();
                 col.expression = (AbstractExpression) expr.clone();
@@ -352,8 +374,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 col.alias = "";
                 col.tableName = "VOLT_TEMP_TABLE";
                 col.columnName = "";
-                if (isNewAggResultColumn(col))
+                if (isNewtoAggResultColumn(col)) {
                     aggResultColumns.add(col);
+                }
             }
         }
     }
@@ -366,8 +389,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             col.columnName = tve.getColumnName();
             col.tableName = tve.getTableName();
             col.expression = tve;
-            if (isNewAggResultColumn(col))
+            if (isNewtoAggResultColumn(col)) {
                 aggResultColumns.add(col);
+            }
         }
     }
 
@@ -377,10 +401,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      * @param tveList
      */
     private void findAllTVEs(AbstractExpression expr, List<TupleValueExpression> tveList) {
-        if (expr instanceof AggregateExpression)
+        if (!isNewtoAggResultColumn(expr))
             return;
         if (expr instanceof TupleValueExpression) {
-            // TODO(XIN): optimize it without clone if this TVE is already in AggResultColumns...
             tveList.add((TupleValueExpression) expr.clone());
             return;
         }
@@ -428,14 +451,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             col.index = displayColumns.size();
 
             insertAggExpressionsToAggResultColumns(aggregationList, col);
-            // Try to check complexAggs earlier, Assuming complex group by are not supported yet.
-            // TODO(XIN): double check when group by (AGG) is supported... ?
-            if ((aggregationList.size() == 1 && !aggregationList.get(0).equals(col.expression))
-                    || aggregationList.size() > 1)
-                complexAggs = true;
-            if (aggregationList.size() >= 1)
+            if (aggregationList.size() >= 1) {
                 hasAggregateExpression = true;
-
+            }
             displayColumns.add(col);
         }
     }
@@ -448,7 +466,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     private void parseGroupByColumn(VoltXMLElement groupByNode) {
         ParsedColInfo col = new ParsedColInfo();
-        aggregationList.clear();
         col.expression = parseExpressionTree(groupByNode);
         assert(col.expression != null);
 
@@ -470,8 +487,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         org.voltdb.catalog.Column catalogColumn =
                 getTableFromDB(col.tableName).getColumns().getIgnoreCase(col.columnName);
         col.index = catalogColumn.getIndex();
-
-        insertAggExpressionsToAggResultColumns(aggregationList, col);
         groupByColumns.add(col);
     }
 
@@ -529,7 +544,19 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             order_col.alias = alias;
             order_col.tableName = "VOLT_TEMP_TABLE";
             order_col.columnName = "";
-            // Replace its expression to TVE later
+
+            ParsedColInfo orig_col = null;
+            for (ParsedColInfo col : displayColumns) {
+                if (col.alias.equals(order_col.alias)) {
+                    orig_col = col;
+                    break;
+                }
+            }
+            if (orig_col != null && orig_col.tableName.equals("VOLT_TEMP_TABLE")) {
+                orig_col.orderBy = true;
+                orig_col.ascending = order_col.ascending;
+            }
+            // Replace its expression to TVE after we build the ExpressionIndexMap
         }
         else if ((child.name.equals("operation") == false) &&
                  (child.name.equals("aggregation") == false) &&
@@ -543,8 +570,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         order_col.expression = order_exp;
 
         insertAggExpressionsToAggResultColumns(aggregationList, order_col);
-
-        // Add TVEs in ORDER BY statement
+        if (aggregationList.size() >= 1) {
+            hasAggregateExpression = true;
+        }
+        // Add TVEs in ORDER BY statement if we have, stop recursive finding when we have it in AggResultColumns
         List<TupleValueExpression> tveList = new ArrayList<TupleValueExpression>();
         findAllTVEs(order_col.expression, tveList);
         insertTVEsToAggResultColumns(tveList);

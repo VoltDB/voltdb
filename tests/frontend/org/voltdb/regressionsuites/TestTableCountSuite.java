@@ -28,7 +28,6 @@ import junit.framework.Test;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
-import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
 public class TestTableCountSuite extends RegressionSuite {
@@ -54,19 +53,10 @@ public class TestTableCountSuite extends RegressionSuite {
         client.callProcedure("TU1.insert", 6, 6);
         client.callProcedure("TU1.insert", 8, 8);
 
-        Exception ex = null;
-        try {
-            VoltTable table = client.callProcedure("@AdHoc","SELECT (COUNT(*)+1) FROM TU1").getResults()[0];
-         // Comment the next three lines out when VoltDB can plan this kind of query
-//            assertTrue(table.getRowCount() == 1);
-//            assertTrue(table.advanceRow());
-//            assertEquals(6, table.getLong(0));
-        } catch (Exception e) {
-            assertTrue(e instanceof ProcCallException);
-            ex = e;
-        } finally {
-            assertNull(ex);
-        }
+        VoltTable table = client.callProcedure("@AdHoc","SELECT (COUNT(*)+1) FROM TU1").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(6, table.getLong(0));
     }
 
     public void testTableCounts() throws Exception {

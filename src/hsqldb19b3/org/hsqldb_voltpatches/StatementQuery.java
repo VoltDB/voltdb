@@ -425,13 +425,13 @@ public class StatementQuery extends StatementDMQL {
          *
          * Serialize the display columns in the exprColumn order.
          */
-        Set<Integer> nullColsIdx = new HashSet<Integer>();
+        Set<Integer> ignoredColsIndexes = new HashSet<Integer>();
         for (int jj=0; jj < displayCols.size(); ++jj) {
             Expression expr = displayCols.get(jj);
-            if (nullColsIdx.contains(jj)) {
+            if (ignoredColsIndexes.contains(jj)) {
                 continue;
             }
-            VoltXMLElement xml = expr.voltGetXML(session, displayCols, nullColsIdx, jj);
+            VoltXMLElement xml = expr.voltGetXML(session, displayCols, ignoredColsIndexes, jj);
             cols.children.add(xml);
             assert(xml != null);
         }
@@ -465,7 +465,7 @@ public class StatementQuery extends StatementDMQL {
 
             for (int jj=0; jj < groupByCols.size(); ++jj) {
                 Expression expr = groupByCols.get(jj);
-                VoltXMLElement xml = expr.voltGetXML(session, displayCols, nullColsIdx, jj);
+                VoltXMLElement xml = expr.voltGetXML(session, displayCols, ignoredColsIndexes, jj);
                 groupCols.children.add(xml);
             }
         }
@@ -476,7 +476,7 @@ public class StatementQuery extends StatementDMQL {
             query.children.add(orderCols);
             for (int jj=0; jj < orderByCols.size(); ++jj) {
                 Expression expr = orderByCols.get(jj);
-                VoltXMLElement xml = expr.voltGetXML(session, displayCols, nullColsIdx, jj);
+                VoltXMLElement xml = expr.voltGetXML(session, displayCols, ignoredColsIndexes, jj);
                 orderCols.children.add(xml);
             }
         }

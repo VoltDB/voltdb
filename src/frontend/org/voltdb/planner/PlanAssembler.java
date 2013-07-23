@@ -516,9 +516,7 @@ public class PlanAssembler {
         {
             root = handleLimitOperator(root);
         }
-
-        if ( (root.getPlanNodeType() == PlanNodeType.PROJECTION && m_parsedSelect.hasComplexAgg()) == false )
-            root.generateOutputSchema(m_catalogDb);
+        root.generateOutputSchema(m_catalogDb);
 
         return root;
     }
@@ -1143,7 +1141,6 @@ public class PlanAssembler {
             int outputColumnIndex = 0;
             NodeSchema agg_schema = new NodeSchema();
 
-            // TODO: Aggregates could theoretically ONLY appear in the ORDER BY clause but not the display columns, but we don't support that yet.
             for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.aggResultColumns) {
                 AbstractExpression rootExpr = col.expression;
                 AbstractExpression agg_input_expr = null;
@@ -1231,12 +1228,8 @@ public class PlanAssembler {
                 // If the rootExpr is not itself an AggregateExpression but simply contains one (or more)
                 // like "MAX(counter)+1" or "MAX(col)/MIN(col)" the assumptions about matching input and output
                 // columns break down.
-                // TODO: support expressions of aggregates by greater differentiation of display columns between the top-level
-                // aggregate (potentially containing aggregate functions and expressions of aggregate functions) and the pushed-down
-                // aggregate (potentially containing aggregate functions and aggregate functions of expressions).
                 else if (rootExpr.hasAnySubexpressionOfClass(AggregateExpression.class)) {
-                    // (XIN): we may never come to this case after using the aggResultColumns
-                    throw new PlanningErrorException("Unsupported operation on the result of an aggregate function in a column expression");
+                    assert(false);
                 }
                 else
                 {
@@ -1355,20 +1348,13 @@ public class PlanAssembler {
             accessPlanTemp.getChild(0).clearChildren();
             accessPlanTemp.getChild(0).addAndLinkChild(root);
             root = accessPlanTemp;
-
             // Add the top node
             coordNode.addAndLinkChild(root);
             coordNode.generateOutputSchema(m_catalogDb);
             root = coordNode;
-            if (needProjectionNode)
-                proj.addAndLinkChild(coordNode);
-
-        } else {
-            if (needProjectionNode)
-                proj.addAndLinkChild(root);
         }
-
         if (needProjectionNode) {
+            proj.addAndLinkChild(root);
             proj.setOutputSchema(newSchema);
             proj.generateOutputSchema(m_catalogDb);
             root = proj;

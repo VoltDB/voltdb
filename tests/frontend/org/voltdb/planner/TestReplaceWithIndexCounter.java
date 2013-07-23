@@ -206,9 +206,10 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T1 WHERE POINTS < 4 ORDER BY POINTS DESC");
         AbstractPlanNode p = pn.get(0).getChild(0);
 
-        // See testCountStar05()
         assertTrue(p instanceof ProjectionPlanNode);
         assertTrue(p.getChild(0) instanceof IndexCountPlanNode);
+        // Special case: un-comment it to replace the checking when we fix ticket
+        // ENG-4937 - As a developer, I want to ignore the "order by" clause on non-grouped aggregate queries.
         //assertTrue(p instanceof IndexCountPlanNode);
     }
 

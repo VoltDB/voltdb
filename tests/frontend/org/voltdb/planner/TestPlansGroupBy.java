@@ -118,9 +118,5 @@ public class TestPlansGroupBy extends PlannerTestCase {
             p = pns.get(1).getChild(0);
             assertFalse(p instanceof ProjectionPlanNode);
         }
-
-
     }
-
-
 }

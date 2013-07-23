@@ -94,6 +94,14 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             expected = new long[][] { {1, 57, 4} , {2, 88, 5}};
             System.out.println(vt.toString());
             compareTable(vt, expected);
+
+            // Test Complex Agg with functions
+            cr = client.callProcedure("@AdHoc", "SELECT dept, COUNT(*) as tag, sum(wage) - 1 from " + tb + " GROUP BY dept ORDER BY tag DESC");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {1, 3, 59} , {2, 2, 89}};
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
         }
 
 
