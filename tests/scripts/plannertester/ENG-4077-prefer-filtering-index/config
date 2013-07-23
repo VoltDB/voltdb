@@ -587,6 +587,7 @@ select * from P1 where not SUBSTRING( DESC FROM 2) >= '12';
 select * from P1 where DESC >= 'X2';
 select * from P1 where SUBSTRING(DESC FROM 2 FOR 1) >= '2';
 select * from P1 where not SUBSTRING( SUBSTRING (DESC FROM 2) FROM 1 FOR 1) < '2';
+select ID from IR3 ENG_4792 where NUM2 = 0 and RATIO <= 0.5 order by ID limit ?;
 
 Partition Columns:
 P1.ID,IP1.ID,IP2.ID,IP3.ID

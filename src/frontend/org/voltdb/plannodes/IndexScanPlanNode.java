@@ -441,12 +441,35 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     protected String explainPlanForNode(String indent) {
         assert(m_catalogIndex != null);
 
-        int indexSize = m_catalogIndex.getColumns().size();
-        int keySize = m_searchkeyExpressions.size();
+        int indexSize = 0;
+        List<AbstractExpression> indexExpressions = null;
+        // if this is a pure-column index...
+        String jsonExpr = m_catalogIndex.getExpressionsjson();
+        if (jsonExpr.isEmpty()) {
+            indexSize = m_catalogIndex.getColumns().size();
+        }
+        else {
+            try {
+                indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, null);
+                indexSize = indexExpressions.size();
+            } catch (JSONException e) {
+                // If something unexpected went wrong,
+                // give a bogus explanation as if this was a column index on the expressions' underlying columns.
+                // This is very unexpected, but you hate to bomb out on "explain" in production.
+                assert false; // Catching this during development with asserts enabled is another case entirely.
+                indexSize = m_catalogIndex.getColumns().size();
+            }
+        }
 
-        // When there is no start key, count a range scan key for each ANDed end condition.
-        if (keySize == 0 && m_endExpression != null) {
-            keySize = ExpressionUtil.uncombineAny(m_endExpression).size();
+        int startKeySize = m_searchkeyExpressions.size();
+        int keySize = startKeySize;
+        // When there is no start key or more end keys,
+        // count a range scan key for each ANDed end condition.
+        if (startKeySize < indexSize && m_endExpression != null) {
+            int endKeySize = ExpressionUtil.uncombineAny(m_endExpression).size();
+            if (keySize < endKeySize) {
+                keySize = endKeySize;
+            }
         }
 
         String usageInfo;
@@ -472,9 +495,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             for (int ii = 0; ii < keySize; ++ii) {
                 asIndexed[ii] = "(index key " + ii + ")";
             }
-            String jsonExpr = m_catalogIndex.getExpressionsjson();
-            // if this is a pure-column index...
-            if (jsonExpr.isEmpty()) {
+            if (indexExpressions == null) {
                 // grab the short names of the indexed columns in use.
                 for (ColumnRef cref : m_catalogIndex.getColumns()) {
                     Column col = cref.getColumn();
@@ -482,16 +503,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 }
             }
             else {
-                try {
-                    List<AbstractExpression> indexExpressions =
-                        AbstractExpression.fromJSONArrayString(jsonExpr, null);
-                    int ii = 0;
-                    for (AbstractExpression ae : indexExpressions) {
-                        asIndexed[ii++] = ae.explain(m_targetTableName);
-                    }
-                } catch (JSONException e) {
-                    // If something unexpected went wrong,
-                    // just fall back on the positional key labels.
+                int ii = 0;
+                for (AbstractExpression ae : indexExpressions) {
+                    asIndexed[ii++] = ae.explain(m_targetTableName);
                 }
             }
 
