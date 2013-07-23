@@ -645,7 +645,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             for (int i = 0; i < 1; i++) {
                 try {
                     InetAddress externalInterface = null;
-                    if (!m_config.m_externalInterface.equals("")) {
+                    if (!m_config.m_externalInterface.trim().equals("")) {
                         externalInterface = InetAddress.getByName(m_config.m_externalInterface);
                     }
                     ClientInterface ci =
@@ -1130,7 +1130,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     Enumeration<NetworkInterface> intfEnum = NetworkInterface.getNetworkInterfaces();
                     while (intfEnum.hasMoreElements()) {
                         NetworkInterface intf = intfEnum.nextElement();
-                        if (!intf.isUp()) {
+                        if (intf.isLoopback() || !intf.isUp()) {
                             continue;
                         }
                         interfaces.offer(intf);
