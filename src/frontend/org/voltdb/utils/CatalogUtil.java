@@ -752,8 +752,7 @@ public abstract class CatalogUtil {
                     sb.append( "EXPORTTO ").append(exportTo.name());
                 }
                 if (exportTo.name().equalsIgnoreCase("CUSTOM")) {
-                    String classz = onServer.getExportconnectorclass();
-                    sb.append(" EXPORTCONNECTORCLASS ").append(classz);
+                    sb.append(" EXPORTCONNECTORCLASS ").append(onServer.getExportconnectorclass());
                 }
                 ExportConfigurationType config = onServer.getConfiguration();
                 if (config != null) {
