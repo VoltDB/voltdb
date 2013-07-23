@@ -54,6 +54,7 @@ import javax.xml.validation.SchemaFactory;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.json_voltpatches.JSONException;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ProcInfoData;
@@ -86,6 +87,8 @@ import org.voltdb.compiler.projectfile.ProjectType;
 import org.voltdb.compiler.projectfile.RolesType;
 import org.voltdb.compiler.projectfile.SchemasType;
 import org.voltdb.compilereport.ReportMaker;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -797,17 +800,45 @@ public class VoltCompiler {
                 t.setPartitioncolumn(c);
                 t.setIsreplicated(false);
 
-                for (Index idx: t.getIndexes()) {
+                for (Index index: t.getIndexes())
+                {
+                    // skip non-unique indexes
+                    if (!index.getUnique()) {
+                        continue;
+                    }
                     boolean contain = false;
-                    for (ColumnRef col: idx.getColumns()) {
-                        if (col.getColumn().equals(c)) {
-                            contain = true;
-                            break;
+                    String jsonExpr = index.getExpressionsjson();
+                    // if this is a pure-column index...
+                    if (jsonExpr.isEmpty()) {
+                        for (ColumnRef cref : index.getColumns()) {
+                            Column col = cref.getColumn();
+                            // unique index contains partitioned column
+                            if (col.equals(c)) {
+                                contain = true;
+                                break;
+                            }
                         }
                     }
+                    // if this is a fancy expression-based index...
+                    else {
+                        try {
+                            List<AbstractExpression> indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, null);
+                            for (AbstractExpression expr: indexExpressions) {
+                                if (expr instanceof TupleValueExpression &&
+                                        ((TupleValueExpression) expr).getColumnName().equals(c.getName()) ) {
+                                    contain = true;
+                                    break;
+                                }
+                            }
+                        } catch (JSONException e) {
+                            e.printStackTrace(); // danger will robinson
+                            assert(false);
+                        }
+                    }
+
                     if (!contain) {
                         // Add warning message
-                        String indexName = idx.getTypeName();
+                        String indexName = index.getTypeName();
                         if (indexName.startsWith("SYS_IDX_PK_") || indexName.startsWith("SYS_IDX_SYS_PK_") ||
                                 indexName.startsWith("MATVIEW_PK_INDEX") ) {
                             indexName = "PRIMARY KEY index";

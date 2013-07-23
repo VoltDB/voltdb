@@ -153,16 +153,6 @@ public class TestDDLCompiler extends TestCase {
         File jarOut = new File("checkCompilerWarnings.jar");
         jarOut.deleteOnExit();
 
-        // Normal unique index test
-        String schema1 = "create table t0 (id bigint not null, name varchar(32), age integer,  primary key (id));\n" +
-                "PARTITION TABLE t0 ON COLUMN id;\n" +
-                "CREATE UNIQUE INDEX user_index ON t0 (name) ;";
-
-        // Test primary key
-        String schema2 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
-                "PARTITION TABLE t0 ON COLUMN name;\n" +
-                "CREATE UNIQUE INDEX user_index ON t0 (age) ;";
-
         // boilerplate for making a project
         final String simpleProject =
                 "<?xml version=\"1.0\"?>\n" +
@@ -170,54 +160,81 @@ public class TestDDLCompiler extends TestCase {
                 "<schema path='%s' />" +
                 "</schemas></database></project>";
 
-        // RUN EXPECTING WARNINGS
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema1);
-        String schemaPath = schemaFile.getPath();
+        // A unique index on the non-primary key for replicated table gets no warning.
+        String schema0 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "CREATE UNIQUE INDEX user_index0 ON t0 (name) ;";
 
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(
-                String.format(simpleProject, schemaPath));
-        String projectPath = projectFile.getPath();
+        // A non-unique index on the non-partitioning key gets no warning.
+        String schema1 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE INDEX user_index1 ON t0 (name) ;";
 
-        // compile successfully (but with a warning hopefully)
-        VoltCompiler compiler = new VoltCompiler();
-        boolean success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
-        assertTrue(success);
+        // A unique compound index on the partitioning key and another column gets no warning.
+        String schema2 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index2 ON t0 (id, age) ;";
 
-        // verify the warnings exist
-        int foundPCWarnings = 0;
-        for (VoltCompiler.Feedback f : compiler.m_warnings) {
-            if (f.message.toLowerCase().contains("does not include the partitioning column")) {
-                foundPCWarnings++;
+        // A unique index on the partitioning key and an expression like abs(age) gets no warning.
+        String schema3 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index3 ON t0 (id, abs(age)) ;";
+
+        // A unique index on the partitioning key gets no warning.
+        String schema4 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index4 ON t0 (id) ;";
+
+        // A unique index on the non-partitioning key gets one warning.
+        String schema6 = "create table t0 (id bigint not null, name varchar(32), age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index6 ON t0 (name) ;";
+
+        // A unique index on an unrelated expression like abs(age) gets a warning.
+        String schema7 = "create table t0 (id bigint not null, name varchar(32), age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "CREATE UNIQUE INDEX user_index7 ON t0 (abs(age)) ;";
+
+        // A unique index on an expression of the partitioning key like substr(1, 2, name) gets a warning.
+        String schema8 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN name;\n" +
+                "CREATE UNIQUE INDEX user_index8 ON t0 (substr(name, 1, 2 )) ;";
+
+        // A unique index on the non-partitioning key, non-partitioned column gets two warnings.
+        String schema10 = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
+                "PARTITION TABLE t0 ON COLUMN name;\n" +
+                "CREATE UNIQUE INDEX user_index10 ON t0 (age) ;";
+
+
+
+        String[] schemas = {schema0, schema1, schema2, schema3, schema4, schema6, schema7, schema8, schema10};
+        int[] expected =   {   0   ,    0   ,    0   ,    0   ,    0   ,    1   ,    1   ,    2   ,     2   };
+
+        for (int i =0; i< schemas.length; i++) {
+            String schema = schemas[i];
+            // RUN EXPECTING WARNINGS
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
+            String schemaPath = schemaFile.getPath();
+
+            File projectFile = VoltProjectBuilder.writeStringToTempFile(
+                    String.format(simpleProject, schemaPath));
+            String projectPath = projectFile.getPath();
+
+            // compile successfully (but with a warning hopefully)
+            VoltCompiler compiler = new VoltCompiler();
+            boolean success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
+            assertTrue(success);
+
+            // verify the warnings exist
+            int foundWarnings = 0;
+            for (VoltCompiler.Feedback f : compiler.m_warnings) {
+                if (f.message.toLowerCase().contains("does not include the partitioning column")) {
+                    foundWarnings++;
+                }
             }
+            assertEquals(expected[i], foundWarnings);
+            // cleanup after the test
+            jarOut.delete();
         }
-        assertEquals(1, foundPCWarnings);
-        // cleanup after the test
-        jarOut.delete();
-
-
-        // RUN EXPECTING WARNINGS
-        schemaFile = VoltProjectBuilder.writeStringToTempFile(schema2);
-        schemaPath = schemaFile.getPath();
-
-        projectFile = VoltProjectBuilder.writeStringToTempFile(
-                String.format(simpleProject, schemaPath));
-        projectPath = projectFile.getPath();
-
-        // compile successfully (but with a warning hopefully)
-        success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
-        assertTrue(success);
-
-        // verify the warnings exist
-        foundPCWarnings = 0;
-        for (VoltCompiler.Feedback f : compiler.m_warnings) {
-            if (f.message.toLowerCase().contains("does not include the partitioning column")) {
-                foundPCWarnings++;
-                System.out.println(f.message);
-            }
-        }
-        assertEquals(2, foundPCWarnings);
-        // cleanup after the test
-        jarOut.delete();
     }
 
     /**
