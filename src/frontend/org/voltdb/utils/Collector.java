@@ -19,14 +19,20 @@ package org.voltdb.utils;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.zip.GZIPOutputStream;
 
+import org.hsqldb_voltpatches.lib.tar.TarFileOutputStream;
 import org.hsqldb_voltpatches.lib.tar.TarGenerator;
 import org.hsqldb_voltpatches.lib.tar.TarMalformatException;
 import org.json_voltpatches.JSONArray;
@@ -35,32 +41,33 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.types.TimestampType;
 
+import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelSftp;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
+
 public class Collector {
     private static String m_voltDbRootPath = null;
     private static String m_configInfoPath = null;
     private static String m_catalogJarPath = null;
+    private static String m_deploymentPath = null;
     private static String m_outputTgzPath = null;
+
     private static String m_nonce = "";
+    private static boolean m_skipheapdump = false;
+    private static boolean m_upload = false;
 
     private static int m_pid = 0;
     private static String m_workingDir = null;
-    private static String m_deployment = null;
     private static ArrayList<String> m_logPaths = new ArrayList<String>();
 
     private static final VoltLogger m_log = new VoltLogger("CONSOLE");
 
-    static final String usage = "collector <voltdbroot-path> [<nonce>]";
-
     public static void main(String[] args) {
-        if (args.length == 1) {
-            m_voltDbRootPath = args[0];
-        } else if (args.length == 2) {
-            m_voltDbRootPath = args[0];
-            m_nonce = args[1];
-        } else {
-            System.err.printf("Usage: %s\n", usage);
-            System.exit(-1);
-        }
+        m_voltDbRootPath = args[0];
+        m_nonce = args[1];
+        m_skipheapdump = Boolean.parseBoolean(args[2]);
+        m_upload = Boolean.parseBoolean(args[3]);
 
         File voltDbRoot = new File(m_voltDbRootPath);
         if (!voltDbRoot.exists()) {
@@ -71,13 +78,14 @@ public class Collector {
         TimestampType ts = new TimestampType(new java.util.Date());
         m_configInfoPath = m_voltDbRootPath + File.separator + "config_log" + File.separator + "config.json";
         m_catalogJarPath = m_voltDbRootPath + File.separator + "config_log" + File.separator + "catalog.jar";
+        m_deploymentPath = m_voltDbRootPath + File.separator + "config_log" + File.separator + "deployment.xml";
         m_outputTgzPath = m_voltDbRootPath + File.separator + m_nonce + ts.toString().replace(' ', '-') + ".tgz";
 
         JSONObject jsonObject = parseJSONFile(m_configInfoPath);
 
         parseJSONObject(jsonObject);
 
-        generateTgzFile();
+        generateTgzFile(m_skipheapdump, m_upload);
     }
 
     private static JSONObject parseJSONFile(String configInfoPath) {
@@ -110,7 +118,6 @@ public class Collector {
         try {
             m_pid = jsonObject.getInt("pid");
             m_workingDir = jsonObject.getString("workingDir");
-            m_deployment = jsonObject.getString("deployment");
             JSONArray jsonArray = jsonObject.getJSONArray("log4jDst");
             for (int i = 0; i < jsonArray.length(); i++) {
                 String path = jsonArray.getJSONObject(i).getString("path");
@@ -121,11 +128,14 @@ public class Collector {
         }
     }
 
-    private static void generateTgzFile() {
+    private static void generateTgzFile(boolean skipheapdump, boolean upload) {
         try {
-            TarGenerator tarGenerator = new TarGenerator(new File(m_outputTgzPath), true, null);
+            ByteArrayOutputStream byteOutputStream = new ByteArrayOutputStream();
+            GZIPOutputStream outputStream = new GZIPOutputStream(byteOutputStream,
+                    TarFileOutputStream.Compression.DEFAULT_BLOCKS_PER_RECORD * 512);
+            TarGenerator tarGenerator = new TarGenerator(outputStream);
 
-            File deploymentXmlFile = new File(m_deployment);
+            File deploymentXmlFile = new File(m_deploymentPath);
             tarGenerator.queueEntry(deploymentXmlFile.getName(), deploymentXmlFile);
 
             File catalogJar = new File(m_catalogJarPath);
@@ -154,9 +164,11 @@ public class Collector {
                 }
             }
 
-            for (File file: new File("/tmp").listFiles()) {
-                if (file.getName().equals("java_pid" + m_pid + ".hprof")) {
-                    tarGenerator.queueEntry(file.getName(), file);
+            if (!skipheapdump) {
+                for (File file: new File("/tmp").listFiles()) {
+                    if (file.getName().equals("java_pid" + m_pid + ".hprof")) {
+                        tarGenerator.queueEntry(file.getName(), file);
+                    }
                 }
             }
 
@@ -175,11 +187,85 @@ public class Collector {
             writer.close();
             tarGenerator.queueEntry("sardata", tempSarFile);
 
-            tarGenerator.write();
+            tarGenerator.write(true);
+
+            if (!upload) {
+                boolean loop = true;
+                while (loop) {
+                    System.out.print("Upload collection to VoltDB server [y/n]? ");
+                    switch (System.console().readLine().charAt(0)) {
+                    case 'Y':
+                    case 'y':
+                        upload = true;
+                        loop = false;
+                        break;
+                    case 'N':
+                    case 'n':
+                        loop = false;
+                        break;
+                    default:
+                        break;
+                    }
+                }
+            }
+
+            if (upload) {
+                if (org.voltdb.utils.MiscUtils.isPro()) {
+                    InputStream inputStream = new ByteArrayInputStream(byteOutputStream.toByteArray());
+                    uploadToServer(inputStream);
+                    m_log.info("Uploaded " + new File(m_outputTgzPath).getName() + " to VoltDB server");
+                }
+                else {
+                    m_log.info("Uploading is only available in the Enterprise Edition");
+                    upload = false;
+                }
+            }
+            if (!upload){
+                FileOutputStream fileOutputStream = new FileOutputStream(m_outputTgzPath);
+                fileOutputStream.write(byteOutputStream.toByteArray());
+                fileOutputStream.close();
+                m_log.info("Created collection file at " + m_outputTgzPath);
+            }
         } catch (IOException e) {
             m_log.error(e.getMessage());
         } catch (TarMalformatException e) {
             m_log.error(e.getMessage());
         }
+    }
+
+    private static void uploadToServer(InputStream inputStream) {
+        System.out.print("username: ");
+        String username = System.console().readLine();
+        System.out.print("host: ");
+        String host = System.console().readLine();
+        System.out.print("password: ");
+        String password = new String(System.console().readPassword());
+
+        JSch jsch = null;
+        Session session = null;
+        Channel channel = null;
+        ChannelSftp channelSftp = null;
+        try {
+            jsch = new JSch();
+            session = jsch.getSession(username, host, 22);
+            session.setPassword(password);
+            JSch.setConfig("StrictHostKeyChecking", "no");
+            session.connect();
+
+            channel = session.openChannel("sftp");
+            channel.connect();
+            channelSftp = (ChannelSftp) channel;
+        } catch (Exception e) {
+            m_log.error(e.getMessage());
+        }
+
+        try {
+            channelSftp.put(inputStream, new File(m_outputTgzPath).getName());
+        } catch (Exception e) {
+            m_log.error(e.getMessage());
+        }
+
+        channelSftp.disconnect();
+        session.disconnect();
     }
 }
