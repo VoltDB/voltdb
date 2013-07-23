@@ -882,8 +882,7 @@ public class TestRollbackSuite extends RegressionSuite {
             fail();
         }
         catch (ProcCallException e) {
-//           e.printStackTrace();
-           e.getCause().printStackTrace();
+           System.out.println(e);
         }
         catch (IOException e) {
             e.printStackTrace();

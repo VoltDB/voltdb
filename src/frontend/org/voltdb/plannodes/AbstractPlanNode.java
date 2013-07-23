@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.SortedSet;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -219,6 +220,35 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             }
         }
     }
+
+    /**
+     * Recursively build sets of read and updated tables, as well as used indexes.
+     * {@see AbstractPlanNode#getThisNodesTablesAndIndexes(SortedSet, SortedSet, SortedSet)}
+     *
+     * @param tablesRead Set of tables read potentially added to at each recursive level.
+     * @param tablesUpdated Set of tables updated/inserted into/deleted potentially added to at each recursive level.
+     * @param indexes Set of indexes potentially added to at each recursive level.
+     */
+    public final void getTablesAndIndexes(SortedSet<String> tablesRead, SortedSet<String> tableUpdated, SortedSet<String> indexes) {
+        getThisNodesTablesAndIndexes(tablesRead, tableUpdated, indexes);
+        for (AbstractPlanNode node : m_inlineNodes.values()) {
+            node.getTablesAndIndexes(tablesRead, tableUpdated, indexes);
+        }
+        for (AbstractPlanNode node : m_children) {
+            node.getTablesAndIndexes(tablesRead, tableUpdated, indexes);
+        }
+    }
+
+    /**
+     * Add any tables read/updateded or indexes used to existing sets. This is used to build complete sets
+     * of read/modified tables and indexes. Currently this info is used for the catalog report.
+     * It is called recursively from {@see AbstractPlanNode#getTablesAndIndexes(SortedSet, SortedSet, SortedSet)}.
+     *
+     * @param tablesRead Set of tables read this method should add to.
+     * @param tablesUpdated Set of tables updated/inserted into/deleted from this method should add to.
+     * @param indexes Set of indexes this node should add its used index to.
+     */
+    protected void getThisNodesTablesAndIndexes(SortedSet<String> tablesRead, SortedSet<String> tablesUpdated, SortedSet<String> indexes) {}
 
     /**
      * Does the (sub)plan guarantee an identical result/effect when "replayed"
