@@ -1689,8 +1689,9 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
             int values[2];
             values[0] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
             values[1] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii + 4]));
-            const bool inserted =
-            COWTuples.insert(*reinterpret_cast<int64_t*>(values)).second;
+            void *valuesVoid = reinterpret_cast<void*>(values);
+            int64_t *values64 = reinterpret_cast<int64_t*>(valuesVoid);
+            const bool inserted = COWTuples.insert(*values64).second;
             if (!inserted) {
                 error("Failed: total inserted %d, with values %d and %d\n", totalInserted, values[0], values[1]);
             }
