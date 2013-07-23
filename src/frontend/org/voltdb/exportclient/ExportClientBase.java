@@ -48,12 +48,14 @@ public abstract class ExportClientBase {
     final ShutdownHook m_shutdownHook = new ShutdownHook();
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
     protected final List<InetSocketAddress> m_servers = new ArrayList<InetSocketAddress>();
-    protected final HashMap<InetSocketAddress, ExportConnection> m_exportConnections = new HashMap<InetSocketAddress, ExportConnection>();
+    protected final HashMap<InetSocketAddress, ExportConnection> m_exportConnections
+            = new HashMap<InetSocketAddress, ExportConnection>();
     protected final boolean m_useAdminPorts;
     protected final boolean m_autodiscoverTopolgy;
     protected boolean m_hasPrintedAutodiscoveryWarning = false;
     // First hash by table signature, second by partition
-    private final HashMap<Long, HashMap<String, HashMap<Integer, ExportDataSink>>> m_sinks = new HashMap<Long, HashMap<String, HashMap<Integer, ExportDataSink>>>();
+    private final HashMap<Long, HashMap<String, HashMap<Integer, ExportDataSink>>> m_sinks
+            = new HashMap<Long, HashMap<String, HashMap<Integer, ExportDataSink>>>();
     private final HashSet<AdvertisedDataSource> m_knownDataSources = new HashSet<AdvertisedDataSource>();
     final BandwidthMonitor m_bandwidthMonitor;
     // credentials
@@ -191,7 +193,8 @@ public abstract class ExportClientBase {
                 //sink = part_map.pu
             }
             sink = part_map.get(part_id);
-            m_logger.debug("Providing connection " + elConnection.name + " for table id " + source.signature + " to sink " + sink);
+            m_logger.debug("Providing connection " + elConnection.name + " for table id " +
+                    source.signature + " to sink " + sink);
             // and plug the ExportConnection into the ExportDataSink
             sink.addExportConnection(elConnection.name, source.systemStartTimestamp);
         }
@@ -290,7 +293,8 @@ public abstract class ExportClientBase {
         for (InetSocketAddress serverAddr : m_servers) {
             ExportConnection exportConnection = null;
             try {
-                exportConnection = new ExportConnection(m_username, m_password, serverAddr, m_sinks, m_bandwidthMonitor);
+                exportConnection = new ExportConnection(m_username, m_password,
+                        serverAddr, m_sinks, m_bandwidthMonitor);
                 exportConnection.openExportConnection();
 
                 // failed to connect
