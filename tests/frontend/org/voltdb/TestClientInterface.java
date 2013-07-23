@@ -139,7 +139,7 @@ public class TestClientInterface {
                 return null;
             }
         }).when(m_cxn).queueTask(any(Runnable.class));
-        m_ci = spy(new ClientInterface(VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT,
+        m_ci = spy(new ClientInterface(null, VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT,
                                        m_context, m_messenger, ReplicationRole.NONE,
                                        m_cartographer, m_allPartitions));
         m_ci.bindAdapter(m_cxn);
