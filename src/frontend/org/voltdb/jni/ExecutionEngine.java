@@ -309,13 +309,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
     }
 
-    public boolean updateStats(long stats) {
-        System.err.println(stats);
+    public boolean updateStats(int batchIndex, long tuplesFound) {
+        System.err.println(batchIndex);
+        System.err.println(tuplesFound);
         //Set timer and time out read only queries.
-        long currentTime = System.currentTimeMillis();
-        if(m_readOnly && currentTime - m_startTime > 50)
-            return true;
-        else
+//        long currentTime = System.currentTimeMillis();
+//        if(m_readOnly && currentTime - m_startTime > Long.MAX_VALUE)
+//            return true;
+//        else
             return false;
     }
 

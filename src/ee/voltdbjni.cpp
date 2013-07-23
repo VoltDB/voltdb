@@ -588,7 +588,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
             if (input_dep_ids) {
                 env->GetLongArrayRegion(input_dep_ids, i, 1, (jlong*) &input_dep_id);
             }
-
+            engine->setBatchIndex(i);
             // success is 0 and error is 1.
             if (engine->executeQuery(fragment_ids_buffer[i], 1, static_cast<int32_t>(input_dep_id),
                                      params, spHandle, lastCommittedSpHandle, uniqueId, i == 0,

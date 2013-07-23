@@ -140,6 +140,8 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
         m_abstractNode->getOutputSchema()[i]->getExpression()->substitute(params);
     }
 
+    //store the target table here maybe?
+
     // run the executor
     return p_execute(params);
 }

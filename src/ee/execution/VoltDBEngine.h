@@ -170,6 +170,13 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         inline int getUsedParamcnt() const { return m_usedParamcnt;}
         inline void setUsedParamcnt(int usedParamcnt) { m_usedParamcnt = usedParamcnt;}
 
+        // Some context information of the current executor
+        inline void setBatchIndex(int index) {m_currentBatchIndex = index;}
+        inline int getBatchIndex() {return m_currentBatchIndex;}
+        inline void setExecutor(char* executor) {m_executor = executor;}
+        inline char* getExecutor() {return m_executor;}
+        inline void setTargetTable(Table* table) {m_targetTable = table;}
+        inline Table* getTargetTable() {return m_targetTable;}
 
         // Created to transition existing unit tests to context abstraction.
         // If using this somewhere new, consider if you're being lazy.
@@ -527,6 +534,14 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         NValueArray m_staticParams;
         /** TODO : should be passed as execute() parameter..*/
         int m_usedParamcnt;
+
+        // ------------------------------------------------------------------
+        // Context: Context information of the current executor
+        // ------------------------------------------------------------------
+        /** index of the batch piece being executed */
+        int m_currentBatchIndex;
+        char* m_executor;
+        Table* m_targetTable;
 
         /** buffer object for result tables. set when the result table is sent out to localsite. */
         FallbackSerializeOutput m_resultOutput;
