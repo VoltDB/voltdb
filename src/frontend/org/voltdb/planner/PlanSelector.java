@@ -180,6 +180,11 @@ public class PlanSelector implements Cloneable {
                 // free the PlanColumns held by the previous best plan
                 m_bestPlan = plan;
                 m_bestFilename = filename;
+                // System.out.println("DEBUG: best cost " + plan.cost + " for plan\n" +
+                //                    planGraph.toExplainPlanString() + "DEBUG: for sql:" + plan.sql);
+            } else {
+                // System.out.println("DEBUG: more cost " + plan.cost + " for plan\n" +
+                //                    planGraph.toExplainPlanString() + "DEBUG: for sql:" + plan.sql);
             }
 
             outputPlan(plan, planGraph, filename);

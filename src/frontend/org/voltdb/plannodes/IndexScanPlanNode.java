@@ -312,11 +312,13 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         if (keyWidth > 0.0 && m_lookupType != IndexLookupType.EQ) {
             keyWidth -= 0.5;
         }
-        // When there is no start key, count an end-key as a single-column range scan key.
-        else if (keyWidth == 0.0 && m_endExpression != null) {
-            // TODO: ( (double) ExpressionUtil.uncombineAny(m_endExpression).size() ) - 0.5
-            // might give a result that is more in line with multi-component start-key-only scans.
-            keyWidth = 0.5;
+        // When there is no start key, count any prefix end-key as an equality filter and
+        // a terminal end-key as a single-column range scan key.
+        else if (keyWidth < (double)colCount && m_endExpression != null) {
+            double endKeyWidth = ( (double) ExpressionUtil.uncombineAny(m_endExpression).size() ) - 0.5;
+            if (keyWidth < endKeyWidth) {
+                keyWidth = endKeyWidth;
+            }
         }
 
 
@@ -341,15 +343,15 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             // Cost starts at 90% of a comparable seqscan AND
             // gets scaled down by an additional factor of 0.1 for each fully covered indexed column.
             // One intentional benchmark is for a single range-covered
-            // (i.e. half-covered, keyWidth == 0.5) column to have less than 1/3 the cost of a
+            // (i.e. half-covered, keyWidth == 0.5) column to have less than 1/4 the cost of a
             // "for ordering purposes only" index scan (keyWidth == 0).
-            // This is to completely compensate for the up to 3X final cost resulting from
-            // the "order by" and non-inlined "projection" nodes that must be added later to the
-            // inconveniently ordered scan result.
-            // Using a factor of 0.1 per FULLY covered (equality-filtered) column,
+            // This is to completely compensate for the up to 4X final cost resulting from
+            // the "order by" and non-inlined "projection" and "limit" nodes that must be
+            // added later to the inconveniently ordered scan result.
+            // Using a factor of 0.05 per FULLY covered (equality-filtered) column,
             // the effective scale factor for a single PARTIALLY covered (range-filtered) column
-            // comes to SQRT(0.1) which is just under 32% FTW!
-            tuplesToRead += (int) (tableEstimates.maxTuples * 0.90 * Math.pow(0.10, keyWidth));
+            // comes to SQRT(0.05) which is just under 23% FTW!
+            tuplesToRead += (int) (tableEstimates.maxTuples * 0.90 * Math.pow(0.05, keyWidth));
 
             // With all this discounting, make sure that any non-"covering unique" index scan costs more
             // than any "covering unique" one, no matter how many indexed column filters get piled on.
@@ -387,6 +389,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         if (m_catalogIndex.getUnique() && (colCount == keyWidth)) {
             m_estimatedOutputTupleCount = 1;
         }
+        // System.out.println("DEBUG: processing " + m_estimatedProcessedTupleCount + " tuples into " + m_estimatedOutputTupleCount + " for \n" + explainPlanForNode("DEBUG:") );
     }
 
     @Override
@@ -511,7 +514,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
             // Explain the search criteria that describe the start of the index scan, like
             // "(event_type = 1 AND event_start > x.start_time)"
-            String start = explainSearchKeys(asIndexed, keySize);
+            String start = explainSearchKeys(asIndexed, startKeySize);
             if (m_lookupType == IndexLookupType.EQ) {
                 // qualify whether the equality matching is for a unique value.
                 // " uniquely match (event_id = 1)" vs.
