@@ -24,7 +24,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -36,8 +35,8 @@ import org.voltdb.utils.BandwidthMonitor;
 import org.voltdb.utils.MiscUtils;
 
 /**
- * Provides an extensible base class for writing Export clients Manages a set of
- * connections to servers and a record of all of the partitions and tables that
+ * Provides an extensible base class for writing Export clients.
+ * Manages a set of connections to servers and a record of all of the partitions and tables that
  * are actively being exported.
  */
 public abstract class ExportClientBase {
