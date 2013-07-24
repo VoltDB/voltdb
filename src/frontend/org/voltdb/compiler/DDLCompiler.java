@@ -1213,7 +1213,7 @@ public class DDLCompiler {
                 int j = 0;
                 for (VoltXMLElement exprNode : subNode.children) {
                     AbstractParsedStmt dummy = new ParsedSelectStmt(null, db);
-                    exprs[j] = dummy.parseExpressionTree(exprNode);
+                    exprs[j] = dummy.parseExpressionTreeWithOutResolvingColumns(exprNode);
                     exprs[j].resolveForTable(table);
                     exprs[j].finalizeValueTypes();
                     ++j;
