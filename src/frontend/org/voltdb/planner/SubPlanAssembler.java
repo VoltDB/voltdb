@@ -1190,15 +1190,9 @@ public abstract class SubPlanAssembler {
         Index index = path.index;
         IndexScanPlanNode scanNode = new IndexScanPlanNode();
         AbstractPlanNode resultNode = scanNode;
-        // create the IndexScanNode with all its metadata
-        scanNode.setCatalogIndex(index);
-        scanNode.setKeyIterate(path.keyIterate);
-        scanNode.setLookupType(path.lookupType);
-        scanNode.setBindings(path.bindings);
+
+        // set sortDirection here becase it might be used for IN list
         scanNode.setSortDirection(path.sortDirection);
-        scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
-        scanNode.setPredicate(ExpressionUtil.combine(path.otherExprs));
-        scanNode.setInitialExpression(ExpressionUtil.combine(path.initialExpr));
         // Build the list of search-keys for the index in question
         // They are the rhs expressions of the normalized indexExpr comparisons.
         for (AbstractExpression expr : path.indexExprs) {
@@ -1218,6 +1212,14 @@ public abstract class SubPlanAssembler {
             }
             scanNode.addSearchKeyExpression(expr2);
         }
+        // create the IndexScanNode with all its metadata
+        scanNode.setCatalogIndex(index);
+        scanNode.setKeyIterate(path.keyIterate);
+        scanNode.setLookupType(path.lookupType);
+        scanNode.setBindings(path.bindings);
+        scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
+        scanNode.setPredicate(ExpressionUtil.combine(path.otherExprs));
+        scanNode.setInitialExpression(ExpressionUtil.combine(path.initialExpr));
         scanNode.setTargetTableName(table.getTypeName());
         //TODO: push scan column identification into "setTargetTableName"
         // (on the way to enabling it for DML plans).

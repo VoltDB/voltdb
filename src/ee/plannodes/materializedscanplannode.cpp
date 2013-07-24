@@ -43,7 +43,6 @@ namespace voltdb {
         assert(!m_tableRowsExpression);
         m_tableRowsExpression = AbstractExpression::buildExpressionTree(rowExpressionObj);
         std::string sortDirectionString = obj.valueForKey("SORT_DIRECTION").asStr();
-        printf("sortDirectionString: %s\n", sortDirectionString.c_str());
         m_sortDirection = stringToSortDirection(sortDirectionString);
     }
 

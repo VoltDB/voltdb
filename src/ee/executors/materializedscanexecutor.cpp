@@ -99,8 +99,6 @@ bool MaterializedScanExecutor::p_execute(const NValueArray &params) {
         }
     }
 
-    printf("materializedscan output: %s\n", output_table->debug().c_str());
-
     VOLT_TRACE("\n%s\n", output_table->debug().c_str());
     VOLT_DEBUG("Finished Materializing a Table");
 

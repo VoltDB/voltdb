@@ -265,6 +265,16 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         }
     }
 
+    public void addEndExpression(AbstractExpression newExpr)
+    {
+        if (newExpr != null)
+        {
+            List<AbstractExpression> newEndExpressions = ExpressionUtil.uncombine(m_endExpression);
+            newEndExpressions.add((AbstractExpression)newExpr.clone());
+            m_endExpression = ExpressionUtil.combine(newEndExpressions);
+        }
+    }
+
     public void clearSearchKeyExpression()
     {
         m_searchkeyExpressions.clear();
@@ -279,6 +289,23 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             // don't get bashed by other nodes or subsequent planner runs
             m_searchkeyExpressions.add((AbstractExpression) expr.clone());
         }
+    }
+
+    public void removeLastSearchKey()
+    {
+        int size = m_searchkeyExpressions.size();
+        if (size <= 1) {
+            clearSearchKeyExpression();
+        } else {
+            m_searchkeyExpressions.remove(size - 1);
+        }
+    }
+
+    // CAUTION: only used in MIN/MAX optimization of reverse scan
+    // we know this plan should be chosen, so we can change it safely
+    public void resetPredicate()
+    {
+        m_predicate = null;
     }
 
     /**
