@@ -225,7 +225,7 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
         assertTrue(pn.size() > 0);
 
         for ( AbstractPlanNode nd : pn) {
-            System.out.println("PlanNode Explan string:\n" + nd.toExplainPlanString());
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
         }
         AbstractPlanNode p = pn.get(0).getChild(0);
         if (isReplaceable)
