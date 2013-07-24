@@ -332,7 +332,6 @@ var IVoltDB = (function(){
                             ' (' + connection.Metadata['rawColumns'].data[i][5].toLowerCase() + ')';
                     }
                 }
-                
 
                  // User Procedures
                  for (var i = 0; i < connection.Metadata['procedures'].data.length; ++i)
@@ -359,14 +358,12 @@ var IVoltDB = (function(){
                     connection.Procedures[procName] = {};
                     connection.Procedures[procName]['' + connTypeParams.length] = connTypeParams;
                  }
-                 
 
                 var childConnectionQueue = connection.getQueue();
                 childConnectionQueue.Start(true);
                 childConnectionQueue.End(function(state) { connection.Ready = true; if (onconnectionready != null) onconnectionready(connection, state); }, null);
             }, null);
     }
-
 
     this.TestConnection = function(server, port, admin, user, password, isHashedPassword, onConnectionTested)
     {
