@@ -745,12 +745,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 if (message.getFragmentTaskType() != FragmentTaskMessage.SYS_PROC_PER_SITE) {
                     counter = new DuplicateCounter(
                             msg.getCoordinatorHSId(),
-                            msg.getTxnId(), m_replicaHSIds, msg.getInitiateTask().getStoredProcedureName());
+                            msg.getTxnId(), m_replicaHSIds,
+                            (msg.getInitiateTask() != null) ? msg.getInitiateTask().getStoredProcedureName() : null);
                 }
                 else {
                     counter = new SysProcDuplicateCounter(
                             msg.getCoordinatorHSId(),
-                            msg.getTxnId(), m_replicaHSIds, msg.getInitiateTask().getStoredProcedureName());
+                            msg.getTxnId(), m_replicaHSIds,
+                            (msg.getInitiateTask() != null) ? msg.getInitiateTask().getStoredProcedureName() : null);
                 }
                 m_duplicateCounters.put(new DuplicateCounterKey(msg.getTxnId(), newSpHandle), counter);
             }
