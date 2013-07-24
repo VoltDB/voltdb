@@ -549,10 +549,9 @@ public abstract class SubPlanAssembler {
                     newComparator.getLeft().setLeft(comparator.getLeft());
                     newComparator.finalizeValueTypes();
                     retval.otherExprs.add(newComparator);
-                    // initialExpr is used only for LTE
-                    if (comparator.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO) {
-                        retval.initialExpr.addAll(retval.indexExprs);
-                    }
+                    // initialExpr is set for both cases
+                    // but will be used for LTE and only when overflow case of LT
+                    retval.initialExpr.addAll(retval.indexExprs);
                     retval.sortDirection = SortDirectionType.DESC;
                 }
             }
@@ -1191,6 +1190,15 @@ public abstract class SubPlanAssembler {
         Index index = path.index;
         IndexScanPlanNode scanNode = new IndexScanPlanNode();
         AbstractPlanNode resultNode = scanNode;
+        // create the IndexScanNode with all its metadata
+        scanNode.setCatalogIndex(index);
+        scanNode.setKeyIterate(path.keyIterate);
+        scanNode.setLookupType(path.lookupType);
+        scanNode.setBindings(path.bindings);
+        scanNode.setSortDirection(path.sortDirection);
+        scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
+        scanNode.setPredicate(ExpressionUtil.combine(path.otherExprs));
+        scanNode.setInitialExpression(ExpressionUtil.combine(path.initialExpr));
         // Build the list of search-keys for the index in question
         // They are the rhs expressions of the normalized indexExpr comparisons.
         for (AbstractExpression expr : path.indexExprs) {
@@ -1210,16 +1218,6 @@ public abstract class SubPlanAssembler {
             }
             scanNode.addSearchKeyExpression(expr2);
         }
-        // create the IndexScanNode with all its metadata
-        scanNode.setCatalogIndex(index);
-        scanNode.setKeyIterate(path.keyIterate);
-        scanNode.setLookupType(path.lookupType);
-        scanNode.setBindings(path.bindings);
-        scanNode.setSortDirection(path.sortDirection);
-        scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
-        scanNode.setPredicate(ExpressionUtil.combine(path.otherExprs));
-        scanNode.setInitialExpression(ExpressionUtil.combine(path.initialExpr));
-
         scanNode.setTargetTableName(table.getTypeName());
         //TODO: push scan column identification into "setTargetTableName"
         // (on the way to enabling it for DML plans).
@@ -1239,6 +1237,7 @@ public abstract class SubPlanAssembler {
         MaterializedScanPlanNode matScan = new MaterializedScanPlanNode();
         assert(listElements instanceof VectorValueExpression || listElements instanceof ParameterValueExpression);
         matScan.setRowData(listElements);
+        matScan.setSortDirection(scanNode.getSortDirection());
 
         NestLoopIndexPlanNode nlijNode = new NestLoopIndexPlanNode();
         nlijNode.setJoinType(JoinType.INNER);

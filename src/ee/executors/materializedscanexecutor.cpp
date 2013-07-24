@@ -69,6 +69,8 @@ bool MaterializedScanExecutor::p_execute(const NValueArray &params) {
     // get array nvalue
     NValue arrayNValue = rowsExpression->eval();
 
+    SortDirectionType sort_direction = node->getSortDirection();
+
     // make a set to eliminate unique values in O(nlogn) time
     std::vector<NValue> sortedUniques;
 
@@ -77,14 +79,27 @@ bool MaterializedScanExecutor::p_execute(const NValueArray &params) {
     arrayNValue.castAndSortAndDedupArrayForInList(outputType, sortedUniques);
 
     // insert all items in the set in order
-    std::vector<NValue>::const_iterator iter;
-    for (iter = sortedUniques.begin(); iter != sortedUniques.end(); iter++) {
-        if ((*iter).isNull() && outputCantBeNull) {
-            continue;
+    if (sort_direction != SORT_DIRECTION_TYPE_DESC) {
+        std::vector<NValue>::const_iterator iter;
+        for (iter = sortedUniques.begin(); iter != sortedUniques.end(); iter++) {
+            if ((*iter).isNull() && outputCantBeNull) {
+                continue;
+            }
+            tmptup.setNValue(0, *iter);
+            output_table->insertTuple(tmptup);
         }
-        tmptup.setNValue(0, *iter);
-        output_table->insertTuple(tmptup);
+    } else {
+        std::vector<NValue>::reverse_iterator reverse_iter;
+        for (reverse_iter = sortedUniques.rbegin(); reverse_iter != sortedUniques.rend(); reverse_iter++) {
+            if ((*reverse_iter).isNull() && outputCantBeNull) {
+                continue;
+            }
+            tmptup.setNValue(0, *reverse_iter);
+            output_table->insertTuple(tmptup);
+        }
     }
+
+    printf("materializedscan output: %s\n", output_table->debug().c_str());
 
     VOLT_TRACE("\n%s\n", output_table->debug().c_str());
     VOLT_DEBUG("Finished Materializing a Table");
