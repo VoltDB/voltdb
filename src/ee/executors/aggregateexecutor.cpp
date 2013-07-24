@@ -443,6 +443,7 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
     m_groupByExpressions = node->getGroupByExpressions();
     node->collectOutputExpressions(m_outputColumnExpressions);
     m_aggregateOutputColumns = node->getAggregateOutputColumns();
+    m_predicate = node->getPredicate();
 
     std::vector<ValueType> groupByColumnTypes;
     std::vector<int32_t> groupByColumnSizes;
@@ -478,6 +479,9 @@ inline void AggregateExecutorBase::executeAggBase(const NValueArray& params)
     }
     BOOST_FOREACH(AbstractExpression* outputColumnExpression, m_outputColumnExpressions) {
         outputColumnExpression->substitute(params);
+    }
+    if (m_predicate != NULL && m_predicate->hasParameter()) {
+        m_predicate->substitute(params);
     }
 }
 
@@ -614,13 +618,17 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     Table* input_table = m_abstractNode->getInputTables()[0];
     assert(input_table);
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
+    if (m_predicate != NULL) {
+        assert(input_table->activeTupleCount() <= 1);
+    }
     TableIterator it = input_table->iterator();
     TableTuple nxtTuple(input_table->schema());
     PoolBackedTupleStorage nextGroupByKeyStorage(m_groupByKeySchema, &m_memoryPool);
     TableTuple& nextGroupByKeyTuple = nextGroupByKeyStorage;
     VOLT_TRACE("looping..");
     // Use the first input tuple to "prime" the system.
-    if (it.next(nxtTuple)) {
+    // ENG-1565: for this special case, can have only one input row, apply the predicate here
+    if (it.next(nxtTuple) && (m_predicate == NULL || m_predicate->eval(&nxtTuple, NULL).isTrue())) {
         initGroupByKeyTuple(nextGroupByKeyStorage, nxtTuple);
         // Start the aggregation calculation.
         initAggInstances(aggregateRow);
@@ -675,7 +683,6 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
         aggregateRow->m_passThroughTuple = nxtTuple;
         advanceAggs(aggregateRow);
     }
-
     VOLT_TRACE("finalizing..");
     // There's one last group (or table) row in progress that needs to be output.
     insertOutputTuple(aggregateRow);
