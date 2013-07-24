@@ -176,7 +176,7 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         PureJavaCrc32 crc = new PureJavaCrc32();
 
         for (Entry<String, byte[]> e : super.entrySet()) {
-            if (e.getKey().equals("buildinfo.txt")) {
+            if (e.getKey().equals("buildinfo.txt") || e.getKey().equals("catalog-report.html")) {
                 continue;
             }
             crc.update(e.getKey().getBytes("UTF-8"));
