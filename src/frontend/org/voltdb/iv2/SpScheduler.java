@@ -742,6 +742,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_mailbox.send(m_sendToHSIds,
                         replmsg);
                 DuplicateCounter counter;
+                /*
+                 * Non-determinism should be impossible to happen with MP fragments.
+                 * if you see "MP_DETERMINISM_ERROR" as procedure name in the crash logs
+                 * something has horribly gone wrong.
+                 */
                 if (message.getFragmentTaskType() != FragmentTaskMessage.SYS_PROC_PER_SITE) {
                     counter = new DuplicateCounter(
                             msg.getCoordinatorHSId(),
