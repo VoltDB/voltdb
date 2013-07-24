@@ -1204,6 +1204,8 @@ public class DDLCompiler {
 
         String name = node.attributes.get("name");
         boolean unique = Boolean.parseBoolean(node.attributes.get("unique"));
+        AbstractParsedStmt dummy = new ParsedSelectStmt(null, db);
+        dummy.setTable(table);
 
         // "parse" the expression trees for an expression-based index (vs. a simple column value index)
         AbstractExpression[] exprs = null;
@@ -1212,8 +1214,7 @@ public class DDLCompiler {
                 exprs = new AbstractExpression[subNode.children.size()];
                 int j = 0;
                 for (VoltXMLElement exprNode : subNode.children) {
-                    AbstractParsedStmt dummy = new ParsedSelectStmt(null, db);
-                    exprs[j] = dummy.parseExpressionTreeWithOutResolvingColumns(exprNode);
+                    exprs[j] = dummy.parseExpressionTree(exprNode);
                     exprs[j].resolveForTable(table);
                     exprs[j].finalizeValueTypes();
                     ++j;

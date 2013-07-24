@@ -1583,6 +1583,7 @@ public class Expression {
                     return otherCol.voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey);
                 }
             }
+            assert(false);
         }
 
         // Use the opType to find a pre-initialized prototype VoltXMLElement with the correct
