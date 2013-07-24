@@ -69,6 +69,9 @@ AggregatePlanNode::~AggregatePlanNode()
     {
         delete m_groupByExpressions[i];
     }
+    if (m_predicate != NULL) {
+        delete m_predicate;
+    }
 }
 
 string AggregatePlanNode::debugInfo(const string &spacer) const {
@@ -151,6 +154,10 @@ AggregatePlanNode::loadFromJSONObject(PlannerDomValue obj)
         for (int i = 0; i < groupByExpressionsArray.arrayLen(); i++) {
             m_groupByExpressions.push_back(AbstractExpression::buildExpressionTree(groupByExpressionsArray.valueAtIndex(i)));
         }
+    }
+
+    if (obj.hasNonNullKey("PREDICATE")) {
+        m_predicate = AbstractExpression::buildExpressionTree(obj.valueForKey("PREDICATE"));
     }
 }
 
