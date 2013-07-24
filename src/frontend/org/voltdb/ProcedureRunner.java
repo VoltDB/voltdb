@@ -113,6 +113,9 @@ public class ProcedureRunner {
     // current hash of sql and params
     protected final PureJavaCrc32C m_inputCRC = new PureJavaCrc32C();
 
+    // running procedure info
+    RunningProcedureContext m_rpc = new RunningProcedureContext();
+
     // Used to get around the "abstract" for StmtProcedures.
     // Path of least resistance?
     static class StmtProcedure extends VoltProcedure {
@@ -133,6 +136,7 @@ public class ProcedureRunner {
         else {
             m_procedureName = procedure.getClass().getSimpleName();
         }
+        m_rpc.m_procedureName = m_procedureName;
         m_procedure = procedure;
         m_isSysProc = procedure instanceof VoltSystemProcedure;
         m_catProc = catProc;
@@ -570,6 +574,7 @@ public class ProcedureRunner {
 
             // if batch is small (or reasonable size), do it in one go
             if (batchSize <= MAX_BATCH_SIZE) {
+                m_rpc.m_batch = m_batch;
                 return executeQueriesInABatch(m_batch, isFinalSQL);
             }
             // otherwise, break it into sub-batches
@@ -587,6 +592,7 @@ public class ProcedureRunner {
                     // decide if this sub-batch should be marked final
                     boolean finalSubBatch = isFinalSQL && (subSize == m_batch.size());
 
+                    m_rpc.m_batch = subBatch;
                     // run the sub-batch and copy the sub-results into the list of lists of results
                     // note: executeQueriesInABatch removes items from the batch as it runs.
                     //  this means subBatch will be empty after running and since subBatch is a
@@ -1213,6 +1219,7 @@ public class ProcedureRunner {
            params,
            m_txnState.spHandle,
            m_txnState.uniqueId,
-           m_catProc.getReadonly());
+           m_catProc.getReadonly(),
+           m_rpc);
     }
 }

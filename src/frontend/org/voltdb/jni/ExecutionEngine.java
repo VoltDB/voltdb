@@ -32,6 +32,7 @@ import org.voltdb.ExecutionSite;
 import org.voltdb.FragmentPlanSource;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
+import org.voltdb.RunningProcedureContext;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
@@ -84,6 +85,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     private int m_cacheMisses = 0;
     private int m_eeCacheSize = 0;
 
+    private RunningProcedureContext m_rpc;
     private boolean m_readOnly;
     private long m_startTime;
 
@@ -314,11 +316,16 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             String targetTableName,
             long targetTableSize,
             long tuplesFound) {
+        System.err.println(m_rpc.m_procedureName);
+        //if(m_rpc.m_batch!=null && !m_rpc.m_procedureName.contains(""));
+        //System.err.println(m_rpc.m_batch.get(batchIndex));
         System.err.println(batchIndex);
         System.err.println(planNodeName);
         System.err.println(targetTableName);
         System.err.println(targetTableSize);
         System.err.println(tuplesFound);
+        VoltLogger hostLog = new VoltLogger("HOST");
+
         //Set timer and time out read only queries.
 //        long currentTime = System.currentTimeMillis();
 //        if(m_readOnly && currentTime - m_startTime > Long.MAX_VALUE)
@@ -378,6 +385,37 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                             long undoQuantumToken) throws EEException
     {
         try {
+            //For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
+            m_readOnly = (undoQuantumToken == Long.MAX_VALUE) ? true : false;
+            //Consider put the following line in EEJNI.coreExecutePlanFrag... before where the native method is called?
+            m_startTime = System.currentTimeMillis();
+            VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
+                    parameterSets, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
+            m_plannerStats.updateEECacheStats(m_eeCacheSize, numFragmentIds - m_cacheMisses,
+                    m_cacheMisses, m_partitionId);
+            return results;
+        }
+        finally {
+            // don't count any cache misses when there's an exception. This is a lie and they
+            // will still be used to estimate the cache size, but it's hard to count cache hits
+            // during an exception, so we don't count cache misses either to get the right ratio.
+            m_cacheMisses = 0;
+        }
+    }
+
+    /** Run multiple plan fragments */
+    public VoltTable[] executePlanFragments(int numFragmentIds,
+                                            long[] planFragmentIds,
+                                            long[] inputDepIds,
+                                            Object[] parameterSets,
+                                            long spHandle,
+                                            long lastCommittedSpHandle,
+                                            long uniqueId,
+                                            long undoQuantumToken,
+                                            RunningProcedureContext rpc) throws EEException
+    {
+        try {
+            m_rpc = rpc;
             //For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
             m_readOnly = (undoQuantumToken == Long.MAX_VALUE) ? true : false;
             //Consider put the following line in EEJNI.coreExecutePlanFrag... before where the native method is called?

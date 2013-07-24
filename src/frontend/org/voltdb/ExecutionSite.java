@@ -1862,6 +1862,29 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     }
 
     @Override
+    public VoltTable[] executePlanFragments(
+            int numFragmentIds,
+            long[] planFragmentIds,
+            long[] inputDepIds,
+            Object[] parameterSets,
+            long txnId,//txnid is both sphandle and uniqueid pre-iv2
+            long txnIdAsUniqueId,
+            boolean readOnly,
+            RunningProcedureContext rpc) throws EEException
+    {
+        return ee.executePlanFragments(
+            numFragmentIds,
+            planFragmentIds,
+            inputDepIds,
+            parameterSets,
+            txnId,
+            lastCommittedTxnId,
+            txnIdAsUniqueId,
+            readOnly ? Long.MAX_VALUE : getNextUndoToken(),
+            rpc);
+    }
+
+    @Override
     public void simulateExecutePlanFragments(long txnId, boolean readOnly) {
         if (!readOnly) {
             // pretend real work was done
