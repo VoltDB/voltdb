@@ -974,9 +974,9 @@ bool PersistentTable::activateStreamInternal(TupleSerializer &tupleSerializer,
                                              std::vector<std::string> &predicateStrings) {
     assert(m_tableStreamer != NULL);
 
-    // false => no tuples.
+    // true => no tuples.
     if (m_tupleCount == 0) {
-        return false;
+        return true;
     }
 
     //TODO: Move this special case snapshot code into the COW context.
