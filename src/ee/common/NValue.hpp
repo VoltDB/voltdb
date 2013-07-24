@@ -311,7 +311,7 @@ class NValue {
 
     /* Evaluate the ordering relation against two NValues. Promotes
        exact types to allow disparate type comparison. See also the
-       op_ functions which return boolean NValues. 
+       op_ functions which return boolean NValues.
        IEEE754 mode respects IEEE754 rules, (NaN,Inf,+0,-0,etc).
      */
     int compare(const NValue rhs, bool ieee754) const;
