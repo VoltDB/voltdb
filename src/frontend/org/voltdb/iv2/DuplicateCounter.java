@@ -21,10 +21,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
-
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -47,20 +45,30 @@ public class DuplicateCounter
     protected VoltMessage m_lastResponse = null;
     final List<Long> m_expectedHSIds;
     final long m_txnId;
+    private String m_storedProcName = null;
 
     DuplicateCounter(
             long destinationHSId,
             long realTxnId,
-            List<Long> expectedHSIds)
-    {
+            List<Long> expectedHSIds, String procName)    {
         m_destinationId = destinationHSId;
         m_txnId = realTxnId;
         m_expectedHSIds = new ArrayList<Long>(expectedHSIds);
+        m_storedProcName = procName;
     }
 
     long getTxnId()
     {
         return m_txnId;
+    }
+
+    /**
+     * Return stored procedure name for the transaction.
+     *
+     * @return
+     */
+    public String getStoredProcedureName() {
+        return m_storedProcName;
     }
 
     int updateReplicas(List<Long> replicas) {
