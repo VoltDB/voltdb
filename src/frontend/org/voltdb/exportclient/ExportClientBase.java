@@ -62,8 +62,7 @@ public abstract class ExportClientBase {
     protected String m_username = "", m_password = "";
 
     /**
-     * Shutdown hook that waits until work is done and then kills the JVM BE
-     * AFRAID...
+     * Shutdown hook that waits until work is done and then kills the JVM BE AFRAID...
      */
     class ShutdownHook extends Thread {
 
