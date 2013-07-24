@@ -45,7 +45,7 @@ public class DuplicateCounter
     protected VoltMessage m_lastResponse = null;
     final List<Long> m_expectedHSIds;
     final long m_txnId;
-    private String m_storedProcName = null;
+    private final String m_storedProcName;
 
     DuplicateCounter(
             long destinationHSId,
@@ -89,9 +89,12 @@ public class DuplicateCounter
                 m_responseHash = Long.valueOf(hash);
             }
             else if (!m_responseHash.equals(hash)) {
-                String msg = String.format("HASH MISMATCH COMPARING: %d to %d\n" +
-                        "PREV MESSAGE: %s\n" +
-                        "CURR MESSAGE: %s\n",
+                tmLog.fatal("Stored procedure " + getStoredProcedureName()
+                        + " generated different SQL queries at different partitions."
+                        + " Shutting down to preserve data integrity.");
+                String msg = String.format("HASH MISMATCH COMPARING: %d to %d\n"
+                        + "PREV MESSAGE: %s\n"
+                        + "CURR MESSAGE: %s\n",
                         hash, m_responseHash,
                         m_lastResponse.toString(), message.toString());
                 tmLog.error(msg);

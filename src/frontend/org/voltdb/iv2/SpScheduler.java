@@ -652,9 +652,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_mailbox.send(counter.m_destinationId, counter.getLastResponse());
             }
             else if (result == DuplicateCounter.MISMATCH) {
-                hostLog.fatal("Stored procedure " + counter.getStoredProcedureName()
-                        + " generated different SQL queries at different partitions."
-                        + " Shutting down to preserve data integrity.");
                 VoltDB.crashLocalVoltDB("HASH MISMATCH: replicas produced different results.", true, null);
             }
         }
@@ -883,9 +880,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_mailbox.send(counter.m_destinationId, resp);
             }
             else if (result == DuplicateCounter.MISMATCH) {
-                hostLog.fatal("Stored procedure " + counter.getStoredProcedureName()
-                        + " generated different SQL queries at different partitions."
-                        + " Shutting down to preserve data integrity.");
                 VoltDB.crashLocalVoltDB("HASH MISMATCH running multi-part procedure.", true, null);
             }
             // doing duplicate suppresion: all done.

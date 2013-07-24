@@ -337,9 +337,6 @@ public class MpScheduler extends Scheduler
                 m_mailbox.send(counter.m_destinationId, message);
             }
             else if (result == DuplicateCounter.MISMATCH) {
-                hostLog.fatal("Stored procedure " + counter.getStoredProcedureName()
-                        + " generated different SQL queries at different partitions."
-                        + " Shutting down to preserve data integrity.");
                 VoltDB.crashLocalVoltDB("HASH MISMATCH running every-site system procedure.", true, null);
             }
             // doing duplicate suppresion: all done.
