@@ -600,7 +600,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         List<Long> expectedHSIds = new ArrayList<Long>(needsRepair);
         DuplicateCounter counter = new DuplicateCounter(
                 message.getCoordinatorHSId(), // Assume that the MPI's HSID hasn't changed
-                message.getTxnId(), expectedHSIds, message.getInitiateTask().getStoredProcedureName());
+                message.getTxnId(), expectedHSIds, "MP_DETERMINISM_ERROR");
         m_duplicateCounters.put(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()), counter);
 
         // is local repair necessary?
@@ -745,14 +745,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 if (message.getFragmentTaskType() != FragmentTaskMessage.SYS_PROC_PER_SITE) {
                     counter = new DuplicateCounter(
                             msg.getCoordinatorHSId(),
-                            msg.getTxnId(), m_replicaHSIds,
-                            (msg.getInitiateTask() != null) ? msg.getInitiateTask().getStoredProcedureName() : null);
+                            msg.getTxnId(), m_replicaHSIds, "MP_DETERMINISM_ERROR");
                 }
                 else {
                     counter = new SysProcDuplicateCounter(
                             msg.getCoordinatorHSId(),
-                            msg.getTxnId(), m_replicaHSIds,
-                            (msg.getInitiateTask() != null) ? msg.getInitiateTask().getStoredProcedureName() : null);
+                            msg.getTxnId(), m_replicaHSIds, "MP_DETERMINISM_ERROR");
                 }
                 m_duplicateCounters.put(new DuplicateCounterKey(msg.getTxnId(), newSpHandle), counter);
             }
