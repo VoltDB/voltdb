@@ -780,7 +780,7 @@ inline int TableTuple::compare(const TableTuple &other) const {
     for (int ii = 0; ii < columnCount; ii++) {
         const NValue lhs = getNValue(ii);
         const NValue rhs = other.getNValue(ii);
-        diff = lhs.compare(rhs, false);
+        diff = lhs.compare(rhs);
         if (diff) {
             return diff;
         }

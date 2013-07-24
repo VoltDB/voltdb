@@ -296,6 +296,9 @@ class NValue {
     /* Check if the value represents SQL NULL */
     bool isNull() const;
 
+    /* Check if the value represents IEEE 754 NaN */
+    bool isNaN() const;
+
     /* For boolean NValues, convert to bool */
     bool isTrue() const;
     bool isFalse() const;
@@ -312,11 +315,8 @@ class NValue {
     /* Evaluate the ordering relation against two NValues. Promotes
        exact types to allow disparate type comparison. See also the
        op_ functions which return boolean NValues.
-       IEEE754 mode respects IEEE754 rules, (NaN,Inf,+0,-0,etc).
      */
-    int compare(const NValue rhs, bool ieee754) const;
-    /* Default comparisons use IEEE754. Tuple comparisons for indexes don't. */
-    int compare(const NValue rhs) const { return compare(rhs, true); }
+    int compare(const NValue rhs) const;
 
     /* Return a boolean NValue with the comparison result */
     NValue op_equals(const NValue rhs) const;
@@ -1561,7 +1561,7 @@ class NValue {
         }
     }
 
-    int compareDoubleValue (const NValue rhs, bool ieee754) const {
+    int compareDoubleValue (const NValue rhs) const {
         const double lhsValue = getDouble();
         double rhsValue;
 
@@ -2223,14 +2223,14 @@ inline uint16_t NValue::getTupleStorageSize(const ValueType type) {
  * succeed if the values are incompatible.  Avoid use of
  * comparison in favor of op_*.
  */
-inline int NValue::compare(const NValue rhs, bool ieee754) const {
+inline int NValue::compare(const NValue rhs) const {
     switch (getValueType()) {
       case VALUE_TYPE_TINYINT:
       case VALUE_TYPE_SMALLINT:
       case VALUE_TYPE_INTEGER:
       case VALUE_TYPE_BIGINT:
         if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
-            return castAsDouble().compareDoubleValue(rhs, ieee754);
+            return castAsDouble().compareDoubleValue(rhs);
         } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
             return -1 * rhs.compareDecimalValue(*this);
         } else {
@@ -2238,12 +2238,12 @@ inline int NValue::compare(const NValue rhs, bool ieee754) const {
         }
       case VALUE_TYPE_TIMESTAMP:
         if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
-            return castAsDouble().compareDoubleValue(rhs, ieee754);
+            return castAsDouble().compareDoubleValue(rhs);
         } else {
             return compareAnyIntegerValue(rhs);
         }
       case VALUE_TYPE_DOUBLE:
-        return compareDoubleValue(rhs, ieee754);
+        return compareDoubleValue(rhs);
       case VALUE_TYPE_VARCHAR:
         return compareStringValue(rhs);
       case VALUE_TYPE_VARBINARY:
@@ -2845,6 +2845,13 @@ inline bool NValue::isNull() const {
           throwDynamicSQLException(
                   "NValue::isNull() called with unknown ValueType '%s'",
                   getValueTypeString().c_str());
+    }
+    return false;
+}
+
+inline bool NValue::isNaN() const {
+    if (getValueType() == VALUE_TYPE_DOUBLE) {
+        return std::isnan(getDouble());
     }
     return false;
 }
