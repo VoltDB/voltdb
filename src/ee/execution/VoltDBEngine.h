@@ -173,8 +173,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // Some context information of the current executor
         inline void setBatchIndex(int index) {m_currentBatchIndex = index;}
         inline int getBatchIndex() {return m_currentBatchIndex;}
-        inline void setExecutor(char* executor) {m_executor = executor;}
-        inline char* getExecutor() {return m_executor;}
+        inline void setPlanNodeName(std::string executor) {m_planNode = executor;}
+        inline std::string getPlanNodeName() {return m_planNode;}
         inline void setTargetTable(Table* table) {m_targetTable = table;}
         inline Table* getTargetTable() {return m_targetTable;}
 
@@ -540,7 +540,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // ------------------------------------------------------------------
         /** index of the batch piece being executed */
         int m_currentBatchIndex;
-        char* m_executor;
+        std::string m_planNode;
         Table* m_targetTable;
 
         /** buffer object for result tables. set when the result table is sent out to localsite. */

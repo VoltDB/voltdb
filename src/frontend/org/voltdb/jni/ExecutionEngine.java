@@ -309,8 +309,15 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
     }
 
-    public boolean updateStats(int batchIndex, long tuplesFound) {
+    public boolean updateStats(int batchIndex,
+            String planNodeName,
+            String targetTableName,
+            long targetTableSize,
+            long tuplesFound) {
         System.err.println(batchIndex);
+        System.err.println(planNodeName);
+        System.err.println(targetTableName);
+        System.err.println(targetTableSize);
         System.err.println(tuplesFound);
         //Set timer and time out read only queries.
 //        long currentTime = System.currentTimeMillis();

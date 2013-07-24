@@ -84,6 +84,7 @@ public:
         index = NULL;
         outer_table = NULL;
         m_lookupType = INDEX_LOOKUP_TYPE_INVALID;
+        m_engine = engine;
     }
 
     ~NestLoopIndexExecutor();
@@ -108,6 +109,9 @@ protected:
 
     //So valgrind doesn't report the data as lost.
     char *index_values_backing_store;
+
+    /** reference to the engine/context to log executing context*/
+    VoltDBEngine* m_engine;
 };
 
 }

@@ -66,7 +66,7 @@ namespace voltdb
                     TempTableLimits* limits);
         bool p_execute(const NValueArray& params);
         bool needsOutputTableClear();
-        /** reference to the engine/context to log the number of tuples scanned*/
+        /** reference to the engine/context to log executing context*/
         VoltDBEngine* m_engine;
     };
 }

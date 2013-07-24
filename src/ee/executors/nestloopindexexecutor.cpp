@@ -222,6 +222,7 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
 
     inner_table = dynamic_cast<PersistentTable*>(inline_node->getTargetTable());
     assert(inner_table);
+    m_engine->setTargetTable(inner_table);
 
     assert(node->getInputTables().size() == 1);
     outer_table = node->getInputTables()[0];

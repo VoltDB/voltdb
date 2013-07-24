@@ -29,12 +29,14 @@ namespace voltdb
     public:
         TableCountExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
             : AbstractExecutor(engine, abstract_node)
-        {}
+        {m_engine = engine;}
         ~TableCountExecutor();
     protected:
         bool p_init(AbstractPlanNode* abstract_node,
                     TempTableLimits* limits);
         bool p_execute(const NValueArray& params);
+        /** reference to the engine/context to log executing context*/
+        VoltDBEngine* m_engine;
     };
 }
 

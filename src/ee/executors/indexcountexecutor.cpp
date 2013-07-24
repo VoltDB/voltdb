@@ -154,6 +154,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     assert(m_outputTable == static_cast<TempTable*>(m_node->getOutputTable()));
     assert(m_targetTable);
     assert(m_targetTable == m_node->getTargetTable());
+    m_engine->setTargetTable(m_targetTable);
     VOLT_DEBUG("IndexCount: %s.%s\n", m_targetTable->name().c_str(),
                m_index->getName().c_str());
 

@@ -119,10 +119,6 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
                 oper_node->setTargetTable(target_table);
             }
         }
-        else{
-        	//Is this the right place?
-        	engine->setTargetTable(target_table);
-        }
     }
     needs_outputtable_clear_cached = needsOutputTableClear();
 

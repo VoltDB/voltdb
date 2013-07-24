@@ -43,6 +43,7 @@ public:
     IndexCountExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode)
         : AbstractExecutor(engine, abstractNode), m_searchKeyBackingStore(NULL), m_endKeyBackingStore(NULL)
     {
+    	m_engine = engine;
     }
     ~IndexCountExecutor();
 
@@ -88,6 +89,9 @@ protected:
     // So Valgrind doesn't complain:
     char* m_searchKeyBackingStore;
     char* m_endKeyBackingStore;
+
+    /** reference to the engine/context to log executing context*/
+    VoltDBEngine* m_engine;
 };
 
 }
