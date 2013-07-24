@@ -50,7 +50,14 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         int len = expected.length;
         assertTrue(vt.advanceRow());
         for (int i=0; i < len; i++) {
-            assertEquals(expected[i], vt.getLong(i));
+            long actual = -10000000;
+            // ENG-4295: hsql bug: HSQLBackend sometimes returns wrong column type.
+            try {
+                actual = vt.getLong(i);
+            } catch (IllegalArgumentException ex) {
+                actual = (int) vt.getDouble(i);
+            }
+            assertEquals(expected[i], actual);
         }
     }
 
@@ -70,7 +77,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
-    public void testStrangeCases() throws IOException, ProcCallException {
+    public void testStrangeCasesAndOrderby() throws IOException, ProcCallException {
         loadData();
 
         Client client = this.getClient();
@@ -95,9 +102,24 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             expected = new long[][] {{1,2,5,2}, {2,3,10,2}, {3,4,15,2}, {4,5,20,1}, {5,6,25,1} };
             System.out.println(vt.toString());
             compareTable(vt, expected);
+
+            // Test order by agg with tag
+            cr = client.callProcedure("@AdHoc", "SELECT dept, COUNT(*) as tag, sum(wage) - 1 from " + tb + " GROUP BY dept ORDER BY tag DESC");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {1, 3, 59} , {2, 2, 89}};
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            // Test order by agg expression with tag
+            cr = client.callProcedure("@AdHoc", "SELECT dept, ABS(COUNT(*)/2 * -1) as tag, sum(wage) - 1 from " + tb + " GROUP BY dept ORDER BY tag, dept DESC");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] {{2, 1, 89},{1, 1, 59}};
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
         }
     }
-
 
     public void testComplexAggs() throws IOException, ProcCallException {
         loadData();
@@ -133,25 +155,14 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             System.out.println(vt.toString());
             compareTable(vt, expected);
 
-            // Test Complex Agg with functions
-            cr = client.callProcedure("@AdHoc", "SELECT dept, COUNT(*) as tag, sum(wage) - 1 from " + tb + " GROUP BY dept ORDER BY tag DESC");
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            vt = cr.getResults()[0];
-            expected = new long[][] { {1, 3, 59} , {2, 2, 89}};
-            System.out.println(vt.toString());
-            compareTable(vt, expected);
-
             // Test sum()/count(), Addition
-            cr = client.callProcedure("@AdHoc", "SELECT dept, SUM(wage), COUNT(wage), AVG(wage), MAX(wage), MIN(wage), SUM(wage)/COUNT(wage),  MAX(wage)+MIN(wage)+1 from " + tb + " GROUP BY dept ORDER BY dept");
+            cr = client.callProcedure("@AdHoc", "SELECT dept, SUM(wage), COUNT(wage), AVG(wage), MAX(wage), MIN(wage), SUM(wage)/COUNT(wage),  " +
+            		"MAX(wage)+MIN(wage)+1 from " + tb + " GROUP BY dept ORDER BY dept");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] {{1, 60, 3, 20, 30, 10, 20, 41}, {2, 90, 2, 45, 50, 40, 45, 91}};
             compareTable(vt, expected);
         }
-
-    }
-
-    public void testOrderbyWithComplex() throws IOException, ProcCallException {
 
     }
 
@@ -204,10 +215,10 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         assertTrue(success);
         builder.addServerConfig(config);
 
-//        config = new LocalCluster("plansgroupby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-//        success = config.compile(project);
-//        assertTrue(success);
-//        builder.addServerConfig(config);
+        config = new LocalCluster("plansgroupby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        success = config.compile(project);
+        assertTrue(success);
+        builder.addServerConfig(config);
 
         // Cluster
         config = new LocalCluster("plansgroupby-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
