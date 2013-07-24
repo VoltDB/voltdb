@@ -23,7 +23,8 @@ package org.voltdb;
 public enum SnapshotFormat {
     NATIVE (true,  true),
     CSV    (true,  true),
-    STREAM (false, false);
+    STREAM (false, false),
+    INDEX  (false, false);
 
     private final boolean m_isFileBased;
     private final boolean m_isTableBased;
