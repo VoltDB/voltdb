@@ -239,10 +239,6 @@ public abstract class AbstractParsedStmt {
                 aggregationList.add(retval);
             }
         }
-        // After complex aggs are supported, this simplecolumn can be removed.
-        else if (elementName.equals("simplecolumn")) {
-            retval = parseSimpleColumnExpression(root);
-        }
         else if (elementName.equals("function")) {
             retval = parseFunctionExpression(root);
         }
@@ -411,22 +407,6 @@ public abstract class AbstractParsedStmt {
 
         return expr;
     }
-
-
-    /**
-     *
-     * @param exprNode
-     * @return
-     */
-    private AbstractExpression parseSimpleColumnExpression(VoltXMLElement exprNode)
-    {
-        // This object is a place holder that gets filled in later based on the display column it aliases.
-        String alias = exprNode.attributes.get("alias");
-        TupleValueExpression expr = new TupleValueExpression();
-        expr.setColumnAlias(alias);
-        return expr;
-    }
-
 
     /**
      *
