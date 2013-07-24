@@ -17,6 +17,10 @@
 voltdbpid=$(jps -l | grep -v "sun.tools.jps.Jps" | grep -v "org.apache.tools.ant.launch.Launcher" | grep -v "eclipse" | grep -v "slave.jar" | awk '{print $1}')
 for victim in ${voltdbpid}
 do
+    if [ -e "${victim}.jstack" ]; then
+        ls -1 ${victim}.jstack.[0-9]* 2>/dev/null | sort -t. -k3 -n -r | awk -F\. '{O=$0; $(NF)++; OFS="."; system("mv "O" "$0)}'
+        mv ${victim}.jstack ${victim}.jstack.1
+    fi
     jstack -l ${victim} > ${victim}.jstack
 #    jstack -l -m ${victim} > ${victim}.mixedjstack
 #    jstack -F -l -m ${victim} > ${victim}.forcedjstack

@@ -120,7 +120,7 @@ public class QueryPlanner {
         m_detMode = detMode;
         m_planSelector = new PlanSelector(m_cluster, m_db, m_estimates, m_stmtName,
                 m_procName, m_sql, m_costModel, m_paramHints, m_detMode,
-                suppressDebugOutput, System.getProperties().containsKey("compilerdebug"));
+                suppressDebugOutput);
     }
 
     /**
@@ -198,7 +198,7 @@ public class QueryPlanner {
                                                    m_paramzInfo.paramLiteralValues);
 
                 Pair<Integer, Object[]> info = buildParameterSetFromExtractedLiteralsAndReturnPartitionIndex(
-                        plan.parameters);
+                        plan.parameterTypes());
                 plan.partitioningKeyIndex = info.getFirst();
                 plan.extractedParamValues = ParameterSet.fromArrayNoCopy(info.getSecond());
 
@@ -215,10 +215,9 @@ public class QueryPlanner {
                 // fall through to re-planning without them
 
                 // note, real planning errors ignored here should be rethrown below
+                m_recentErrorMsg = null;
             }
         }
-
-        m_recentErrorMsg = null;
 
         // if parameterization isn't requested or if it failed, plan here
         CompiledPlan plan = compileFromXML(m_xmlSQL, null);

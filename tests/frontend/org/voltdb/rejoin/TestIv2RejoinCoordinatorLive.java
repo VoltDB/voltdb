@@ -43,6 +43,7 @@ import org.voltcore.messaging.VoltMessage;
 
 import org.voltcore.network.Connection;
 
+import org.voltdb.RealVoltDB;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.ClientInterface;
 import org.voltdb.ClientResponseImpl;
@@ -81,6 +82,7 @@ public class TestIv2RejoinCoordinatorLive {
     @BeforeClass
     public static void setUpOnce() throws IOException {
         m_volt = mock(VoltDBInterface.class);
+        doReturn(RealVoltDB.extractBuildInfo()[0]).when(m_volt).getVersionString();
         VoltDB.replaceVoltDBInstanceForTest(m_volt);
         VoltDB.ignoreCrash = true;
     }
@@ -172,7 +174,8 @@ public class TestIv2RejoinCoordinatorLive {
     public void testLiveBasic() throws Exception {
         createCoordinator(true);
         m_coordinator.startJoin(null, null, null);
-        RejoinMessage msg = new RejoinMessage(10000l, RejoinMessage.Type.INITIATION, "Rejoin_1");
+        RejoinMessage msg = new RejoinMessage(10000l, RejoinMessage.Type.INITIATION, "Rejoin_1",
+                                              1, null);
         List<Long> hsids = new ArrayList<Long>();
         hsids.add(1l);
         verifySent(hsids, msg);
@@ -192,7 +195,8 @@ public class TestIv2RejoinCoordinatorLive {
         reset(m_snapshotDaemon);
 
         // verify the second site is started
-        RejoinMessage expected = new RejoinMessage(10000l, RejoinMessage.Type.INITIATION, "Rejoin_2");
+        RejoinMessage expected = new RejoinMessage(10000l, RejoinMessage.Type.INITIATION, "Rejoin_2",
+                                                   1, null);
         hsids.clear();
         hsids.add(2l);
         verifySent(hsids, expected);

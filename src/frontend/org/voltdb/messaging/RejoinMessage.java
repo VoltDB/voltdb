@@ -19,12 +19,10 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.Set;
 
-import com.google.common.collect.ImmutableSet;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
+import org.voltdb.utils.FixedDBBPool;
 
 /**
  * Rejoin message used to drive the whole rejoin process. It is only sent between
@@ -50,9 +48,10 @@ public class RejoinMessage extends VoltMessage {
     private long m_snapshotTxnId = -1; // snapshot txnId
     private long m_masterHSId = -1;
     private String m_snapshotNonce = null;
-    // number of sinks to create on the site, default is 1, elastic join may use more
-    private int m_snapshotSinkCount = 1;
-    private Set<Long> m_snapshotSinkHSIds = null;
+    private FixedDBBPool m_bufferPool = null;
+    // number of sources sending to this site
+    private int m_snapshotSourceCount = 1;
+    private long m_snapshotSinkHSId = -1;
 
     /** Empty constructor for de-serialization */
     public RejoinMessage() {
@@ -72,23 +71,16 @@ public class RejoinMessage extends VoltMessage {
     }
 
     /**
-     * INITIATION, INITIATION_COMMUNITY and PARTITION_SNAPSHOT_INITIATION pass the
-     * nonce used by the coordinator to the site.
+     * INITIATION, INITIATION_COMMUNITY pass the nonce used by the coordinator to the site.
      */
-    public RejoinMessage(long sourceHSId, Type type, String snapshotNonce)
+    public RejoinMessage(long sourceHSId, Type type, String snapshotNonce,
+                         int sourceCount, FixedDBBPool bufferPool)
     {
         this(sourceHSId, type);
         assert(type == Type.INITIATION || type == Type.INITIATION_COMMUNITY);
         m_snapshotNonce = snapshotNonce;
-    }
-
-    /**
-     * For elastic join, the coordinator tells the producer how many snapshot sinks to create.
-     */
-    public RejoinMessage(long sourceHSId, Type type, String snapshotNonce, int sinkCount)
-    {
-        this(sourceHSId, type, snapshotNonce);
-        m_snapshotSinkCount = sinkCount;
+        m_snapshotSourceCount = sourceCount;
+        m_bufferPool = bufferPool;
     }
 
     /**
@@ -99,16 +91,7 @@ public class RejoinMessage extends VoltMessage {
     {
         this(sourceHSId, Type.INITIATION_RESPONSE);
         m_masterHSId = masterHSId;
-        m_snapshotSinkHSIds = ImmutableSet.copyOf(Arrays.asList(sinkHSId));
-    }
-
-    /**
-     * For elastic join, the producer may have multiple sinks.
-     */
-    public RejoinMessage(long sourceHSId, Set<Long> sinkHSIds)
-    {
-        this(sourceHSId, Type.INITIATION_RESPONSE);
-        m_snapshotSinkHSIds = ImmutableSet.copyOf(sinkHSIds);
+        m_snapshotSinkHSId = sinkHSId;
     }
 
     public Type getType() {
@@ -127,8 +110,14 @@ public class RejoinMessage extends VoltMessage {
         return m_masterHSId;
     }
 
-    public int getSnapshotSinkCount() {
-        return m_snapshotSinkCount;
+    public FixedDBBPool getSnapshotBufferPool()
+    {
+        return m_bufferPool;
+    }
+
+    public int getSnapshotSourceCount()
+    {
+        return m_snapshotSourceCount;
     }
 
     /**
@@ -138,12 +127,7 @@ public class RejoinMessage extends VoltMessage {
      * {@link #getSnapshotSinkHSIds()}.
      */
     public long getSnapshotSinkHSId() {
-        assert m_snapshotSinkHSIds.size() == 1;
-        return m_snapshotSinkHSIds.iterator().next();
-    }
-
-    public Set<Long> getSnapshotSinkHSIds() {
-        return m_snapshotSinkHSIds;
+        return m_snapshotSinkHSId;
     }
 
     @Override

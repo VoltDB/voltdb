@@ -20,6 +20,7 @@ package org.voltdb;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -140,7 +141,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * in order to avoid ensure that nothing misses the end of backpressure notification
      */
     private final ReentrantLock m_backpressureLock = new ReentrantLock();
-    private final ConcurrentHashMap<Connection, Object> m_connections = new ConcurrentHashMap<Connection, Object>();
+    private final ConcurrentHashMap<Connection, Object> m_connections =
+            new ConcurrentHashMap<Connection, Object>(10240, .75f, 128);
     private final SnapshotDaemon m_snapshotDaemon = new SnapshotDaemon();
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
 
@@ -163,7 +165,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * lookup.
      */
     private final ConcurrentHashMap<Long, ClientInterfaceHandleManager> m_cihm =
-              new ConcurrentHashMap<Long, ClientInterfaceHandleManager>();
+            new ConcurrentHashMap<Long, ClientInterfaceHandleManager>(10240, .75f, 128);
     private final Cartographer m_cartographer;
 
     /**
@@ -307,6 +309,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private volatile boolean m_running = true;
         private Thread m_thread = null;
         private final boolean m_isAdmin;
+        private final InetAddress m_interface;
 
         /**
          * Used a cached thread pool to accept new connections.
@@ -314,8 +317,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private final ExecutorService m_executor = CoreUtils.getBoundedThreadPoolExecutor(128, 10L, TimeUnit.SECONDS,
                         CoreUtils.getThreadFactory("Client authentication threads", "Client authenticator"));
 
-        ClientAcceptor(int port, VoltNetworkPool network, boolean isAdmin)
+        ClientAcceptor(InetAddress intf, int port, VoltNetworkPool network, boolean isAdmin)
         {
+            m_interface = intf;
             m_network = network;
             m_port = port;
             m_isAdmin = isAdmin;
@@ -342,7 +346,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
             if (!m_serverSocket.socket().isBound()) {
                 try {
-                    m_serverSocket.socket().bind(new InetSocketAddress(m_port));
+                    if (m_interface != null) {
+                        m_serverSocket.socket().bind(new InetSocketAddress(m_interface, m_port));
+                    } else {
+                        m_serverSocket.socket().bind(new InetSocketAddress(m_port));
+                    }
                 }
                 catch (IOException e) {
                     hostLog.fatal("Client interface failed to bind to port " + m_port);
@@ -446,7 +454,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                     if (!m_hasDTXNBackPressure) {
                                                         c.enableReadSelection();
                                                     }
-                                                    m_connections.put(c, "CONN");
+                                                    m_connections.put(c, "");
                                                 } finally {
                                                     m_backpressureLock.unlock();
                                                 }
@@ -781,7 +789,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 if (!m_acg.get().hasBackPressure()) {
                     c.enableReadSelection();
                 }
-                m_connections.put(c, "CONN");
+                m_connections.put(c, "");
             }
         }
 
@@ -1175,6 +1183,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             ReplicationRole replicationRole,
             Cartographer cartographer,
             int partitionCount,
+            InetAddress intf,
             int port,
             int adminPort,
             long timestampTestingSalt) throws Exception {
@@ -1192,12 +1201,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * Construct the runnables so they have access to the list of connections
          */
         final ClientInterface ci = new ClientInterface(
-           port, adminPort, context, messenger, replicationRole, cartographer, allPartitions);
+           intf, port, adminPort, context, messenger, replicationRole, cartographer, allPartitions);
 
         return ci;
     }
 
-    ClientInterface(int port, int adminPort, CatalogContext context, HostMessenger messenger,
+    ClientInterface(InetAddress intf, int port, int adminPort, CatalogContext context, HostMessenger messenger,
                     ReplicationRole replicationRole,
                     Cartographer cartographer, int[] allPartitions) throws Exception
     {
@@ -1206,9 +1215,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         // pre-allocate single partition array
         m_allPartitions = allPartitions;
-        m_acceptor = new ClientAcceptor(port, messenger.getNetwork(), false);
+        m_acceptor = new ClientAcceptor(intf, port, messenger.getNetwork(), false);
         m_adminAcceptor = null;
-        m_adminAcceptor = new ClientAcceptor(adminPort, messenger.getNetwork(), true);
+        m_adminAcceptor = new ClientAcceptor(intf, adminPort, messenger.getNetwork(), true);
         registerPolicies(replicationRole);
 
         m_mailbox = new LocalMailbox(messenger,  messenger.getHSIdForLocalSite(HostMessenger.CLIENT_INTERFACE_SITE_ID)) {
