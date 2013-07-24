@@ -312,11 +312,13 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         if (keyWidth > 0.0 && m_lookupType != IndexLookupType.EQ) {
             keyWidth -= 0.5;
         }
-        // When there is no start key, count an end-key as a single-column range scan key.
-        else if (keyWidth == 0.0 && m_endExpression != null) {
-            // TODO: ( (double) ExpressionUtil.uncombineAny(m_endExpression).size() ) - 0.5
-            // might give a result that is more in line with multi-component start-key-only scans.
-            keyWidth = 0.5;
+        // When there is no start key, count any prefix end-key as an equality filter and
+        // a terminal end-key as a single-column range scan key.
+        else if (keyWidth < (double)colCount && m_endExpression != null) {
+            double endKeyWidth = ( (double) ExpressionUtil.uncombineAny(m_endExpression).size() ) - 0.5;
+            if (keyWidth < endKeyWidth) {
+                keyWidth = endKeyWidth;
+            }
         }
 
 
@@ -341,15 +343,15 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             // Cost starts at 90% of a comparable seqscan AND
             // gets scaled down by an additional factor of 0.1 for each fully covered indexed column.
             // One intentional benchmark is for a single range-covered
-            // (i.e. half-covered, keyWidth == 0.5) column to have less than 1/3 the cost of a
+            // (i.e. half-covered, keyWidth == 0.5) column to have less than 1/4 the cost of a
             // "for ordering purposes only" index scan (keyWidth == 0).
-            // This is to completely compensate for the up to 3X final cost resulting from
-            // the "order by" and non-inlined "projection" nodes that must be added later to the
-            // inconveniently ordered scan result.
-            // Using a factor of 0.1 per FULLY covered (equality-filtered) column,
+            // This is to completely compensate for the up to 4X final cost resulting from
+            // the "order by" and non-inlined "projection" and "limit" nodes that must be
+            // added later to the inconveniently ordered scan result.
+            // Using a factor of 0.05 per FULLY covered (equality-filtered) column,
             // the effective scale factor for a single PARTIALLY covered (range-filtered) column
-            // comes to SQRT(0.1) which is just under 32% FTW!
-            tuplesToRead += (int) (tableEstimates.maxTuples * 0.90 * Math.pow(0.10, keyWidth));
+            // comes to SQRT(0.05) which is just under 23% FTW!
+            tuplesToRead += (int) (tableEstimates.maxTuples * 0.90 * Math.pow(0.05, keyWidth));
 
             // With all this discounting, make sure that any non-"covering unique" index scan costs more
             // than any "covering unique" one, no matter how many indexed column filters get piled on.
@@ -387,6 +389,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         if (m_catalogIndex.getUnique() && (colCount == keyWidth)) {
             m_estimatedOutputTupleCount = 1;
         }
+        // System.out.println("DEBUG: processing " + m_estimatedProcessedTupleCount + " tuples into " + m_estimatedOutputTupleCount + " for \n" + explainPlanForNode("DEBUG:") );
     }
 
     @Override
@@ -441,12 +444,35 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     protected String explainPlanForNode(String indent) {
         assert(m_catalogIndex != null);
 
-        int indexSize = m_catalogIndex.getColumns().size();
-        int keySize = m_searchkeyExpressions.size();
+        int indexSize = 0;
+        List<AbstractExpression> indexExpressions = null;
+        // if this is a pure-column index...
+        String jsonExpr = m_catalogIndex.getExpressionsjson();
+        if (jsonExpr.isEmpty()) {
+            indexSize = m_catalogIndex.getColumns().size();
+        }
+        else {
+            try {
+                indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, null);
+                indexSize = indexExpressions.size();
+            } catch (JSONException e) {
+                // If something unexpected went wrong,
+                // give a bogus explanation as if this was a column index on the expressions' underlying columns.
+                // This is very unexpected, but you hate to bomb out on "explain" in production.
+                assert false; // Catching this during development with asserts enabled is another case entirely.
+                indexSize = m_catalogIndex.getColumns().size();
+            }
+        }
 
-        // When there is no start key, count a range scan key for each ANDed end condition.
-        if (keySize == 0 && m_endExpression != null) {
-            keySize = ExpressionUtil.uncombineAny(m_endExpression).size();
+        int startKeySize = m_searchkeyExpressions.size();
+        int keySize = startKeySize;
+        // When there is no start key or more end keys,
+        // count a range scan key for each ANDed end condition.
+        if (startKeySize < indexSize && m_endExpression != null) {
+            int endKeySize = ExpressionUtil.uncombineAny(m_endExpression).size();
+            if (keySize < endKeySize) {
+                keySize = endKeySize;
+            }
         }
 
         String usageInfo;
@@ -472,9 +498,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             for (int ii = 0; ii < keySize; ++ii) {
                 asIndexed[ii] = "(index key " + ii + ")";
             }
-            String jsonExpr = m_catalogIndex.getExpressionsjson();
-            // if this is a pure-column index...
-            if (jsonExpr.isEmpty()) {
+            if (indexExpressions == null) {
                 // grab the short names of the indexed columns in use.
                 for (ColumnRef cref : m_catalogIndex.getColumns()) {
                     Column col = cref.getColumn();
@@ -482,22 +506,15 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 }
             }
             else {
-                try {
-                    List<AbstractExpression> indexExpressions =
-                        AbstractExpression.fromJSONArrayString(jsonExpr, null);
-                    int ii = 0;
-                    for (AbstractExpression ae : indexExpressions) {
-                        asIndexed[ii++] = ae.explain(m_targetTableName);
-                    }
-                } catch (JSONException e) {
-                    // If something unexpected went wrong,
-                    // just fall back on the positional key labels.
+                int ii = 0;
+                for (AbstractExpression ae : indexExpressions) {
+                    asIndexed[ii++] = ae.explain(m_targetTableName);
                 }
             }
 
             // Explain the search criteria that describe the start of the index scan, like
             // "(event_type = 1 AND event_start > x.start_time)"
-            String start = explainSearchKeys(asIndexed, keySize);
+            String start = explainSearchKeys(asIndexed, startKeySize);
             if (m_lookupType == IndexLookupType.EQ) {
                 // qualify whether the equality matching is for a unique value.
                 // " uniquely match (event_id = 1)" vs.
