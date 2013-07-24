@@ -41,10 +41,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Exchanger;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -61,6 +64,7 @@ import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotDaemon;
 import org.voltdb.SnapshotDaemon.ForwardClientException;
 import org.voltdb.SnapshotFormat;
@@ -1215,5 +1219,32 @@ public class SnapshotUtil {
         }
 
         return buf.array();
+    }
+
+    /**
+     * Watch for the completion of a snapshot
+     * @param nonce    The snapshot nonce to watch for
+     * @return A future that will return the SnapshotCompletionEvent
+     */
+    public static ListenableFuture<SnapshotCompletionInterest.SnapshotCompletionEvent>
+    watchSnapshot(final String nonce)
+    {
+        final SettableFuture<SnapshotCompletionInterest.SnapshotCompletionEvent> result =
+            SettableFuture.create();
+
+        SnapshotCompletionInterest interest = new SnapshotCompletionInterest() {
+            @Override
+            public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event)
+            {
+                if (event.nonce.equals(nonce)) {
+                    VoltDB.instance().getSnapshotCompletionMonitor().removeInterest(this);
+                    result.set(event);
+                }
+                return null;
+            }
+        };
+        VoltDB.instance().getSnapshotCompletionMonitor().addInterest(interest);
+
+        return result;
     }
 }
