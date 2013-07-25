@@ -90,18 +90,19 @@ public class FakeMesh extends Thread
 
     synchronized void failLink(long src, long dst)
     {
-        meshLog.info("Failing link between source: " + CoreUtils.hsIdToString(src) +
-                " and destination: " + CoreUtils.hsIdToString(dst));
-        internalFailLink(src, dst);
+        if (internalFailLink(src, dst)) {
+            meshLog.info("Failing link between source: " + CoreUtils.hsIdToString(src) +
+                    " and destination: " + CoreUtils.hsIdToString(dst));
+        }
     }
 
-    synchronized private void internalFailLink(long src,long dst) {
+    synchronized private boolean internalFailLink(long src,long dst) {
         Set<Long> dsts = m_failedLinks.get(src);
         if (dsts == null) {
             dsts = new HashSet<Long>();
             m_failedLinks.put(src, dsts);
         }
-        dsts.add(dst);
+        return dsts.add(dst);
     }
 
     synchronized void closeLink(long src, long dst) {

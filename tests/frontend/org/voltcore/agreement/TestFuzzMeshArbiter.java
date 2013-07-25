@@ -168,7 +168,6 @@ public class TestFuzzMeshArbiter extends TestCase
         state.setUpExpectations();
 
         state.expect();
-        assertEquals(state.m_expectations, state.getFailedCountMap());
 
         state.pruneDeadNodes();
 
@@ -176,7 +175,6 @@ public class TestFuzzMeshArbiter extends TestCase
         state.setUpExpectations();
 
         state.expect();
-        assertEquals(state.m_expectations, state.getFailedCountMap());
 
         state.pruneDeadNodes();
 
@@ -184,7 +182,18 @@ public class TestFuzzMeshArbiter extends TestCase
         state.setUpExpectations();
 
         state.expect();
-        assertEquals(state.m_expectations, state.getFailedCountMap());
+    }
+
+    public void testUnidirectionalLinkFailure() throws InterruptedException {
+        constructCluster(5);
+        while (!getNodesInState(NodeState.START).isEmpty()) {
+            Thread.sleep(50);
+        }
+        FuzzTestState state = new FuzzTestState(0L, m_nodes.keySet());
+        state.killUnidirectionalLink(0, 1);
+        state.setUpExpectations();
+
+        state.expect();
     }
 
     class FuzzTestState
@@ -260,6 +269,26 @@ public class TestFuzzMeshArbiter extends TestCase
 
             m_fakeMesh.failLink(getHSId(end1), getHSId(end2));
             m_fakeMesh.failLink(getHSId(end2), getHSId(end1));
+        }
+
+        void killUnidirectionalLink(int end1, int end2) {
+            if (end1 == end2) {
+                end1 = getRandomLiveNode();
+                end2 = getRandomLiveNode();
+            } else if (m_alreadyPicked.contains(end1)) {
+                end1 = getRandomLiveNode();
+                if (m_alreadyPicked.contains(end2)) {
+                    end2 = getRandomLiveNode();
+                }
+            }
+            int max = Math.max(end1, end2);
+
+            m_expectedLive.remove(getHSId(max));
+            m_killSet.add(getHSId(max));
+            m_alreadyPicked.add(end1);
+            m_alreadyPicked.add(end2);
+
+            m_fakeMesh.failLink(getHSId(end1), getHSId(end2));
         }
 
         void killRandomNode() throws InterruptedException
@@ -426,7 +455,7 @@ public class TestFuzzMeshArbiter extends TestCase
                     MiniNode node = e.getValue();
                     int connectedCount =
                             node.getNodeState() == NodeState.STOP ? 0 : node.getConnectedNodes().size();
-                    m_fuzzLog.info("Connection count for "
+                    m_fuzzLog.debug("Connection count for "
                             + CoreUtils.hsIdToString(e.getKey())
                             + " is " + connectedCount);
                     if (connectedCount == 0 || pruneSizes.contains(connectedCount)) {
@@ -591,8 +620,8 @@ public class TestFuzzMeshArbiter extends TestCase
 
     public void thereBeDragonsHeretestNastyFuzz() throws InterruptedException {
         long seed = System.currentTimeMillis();
-        final int clusterSize = 30;
-        final int killSize = 12;
+        final int clusterSize = 40;
+        final int killSize = 16;
         System.out.println("SEED: " + seed);
         constructCluster(clusterSize);
         while (!getNodesInState(NodeState.START).isEmpty()) {

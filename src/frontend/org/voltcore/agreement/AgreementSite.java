@@ -663,13 +663,6 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         m_mailbox.deliver(fm);
     }
 
-    public void reportFault(long reportingSite, long faultingSite, Set<Long> survivors) {
-        if (reportingSite == m_hsId) return;
-        FaultMessage fm = new FaultMessage(reportingSite, faultingSite, survivors);
-        fm.m_sourceHSId = m_hsId;
-        m_mailbox.deliver(fm);
-    }
-
     public void reportFault(FaultMessage fm) {
         fm.m_sourceHSId = m_hsId;
         m_mailbox.deliver(fm);

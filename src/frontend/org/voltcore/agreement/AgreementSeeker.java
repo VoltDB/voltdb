@@ -17,7 +17,6 @@
 
 package org.voltcore.agreement;
 
-import static com.google.common.base.Predicates.equalTo;
 import static com.google.common.base.Predicates.in;
 import static com.google.common.base.Predicates.not;
 
@@ -275,8 +274,13 @@ public class AgreementSeeker {
         if (   !m_hsids.contains(reportingHsid)
             || !sfm.m_survivors.contains(reportingHsid)) return;
 
+        Set<Long> survivors = sfm.m_survivors;
+        if (Sets.filter(sfm.getObservedFailedSites(), in(m_hsids)).isEmpty()) {
+            survivors = m_hsids;
+        }
+
         // dead = pre failure mesh - survivors
-        Set<Long> dead = Sets.difference(m_hsids, sfm.m_survivors);
+        Set<Long> dead = Sets.difference(m_hsids, survivors);
 
         removeValue(m_dead, reportingHsid);
 
@@ -291,7 +295,7 @@ public class AgreementSeeker {
         removeValue(m_alive, reportingHsid);
 
         // add alive graph nodes
-        for (long s: sfm.m_survivors) {
+        for (long s: survivors) {
             if (!m_hsids.contains(s)) continue;
             m_alive.put(s, reportingHsid);
         }
@@ -485,8 +489,8 @@ public class AgreementSeeker {
                             /*
                              * You only get here if and ONLY if yourself are the ONLY viable kill
                              */
-                            return ImmutableSet.copyOf(
-                                    Sets.filter(m_hsids, not(equalTo(m_selfHsid))));
+                            return ImmutableSet.of();/*ImmutableSet.copyOf(
+                                    Sets.filter(m_hsids, not(equalTo(m_selfHsid))));*/
                         }
 
                         // pick can no longer see anyone dead or alive

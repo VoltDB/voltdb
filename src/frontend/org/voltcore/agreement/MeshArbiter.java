@@ -18,7 +18,6 @@
 package org.voltcore.agreement;
 
 import static com.google.common.base.Predicates.equalTo;
-import static com.google.common.base.Predicates.in;
 import static com.google.common.base.Predicates.not;
 
 import java.util.ArrayList;
@@ -180,19 +179,6 @@ public class MeshArbiter {
                         + (fm.decided ? " decided: true" : ""));
             }
         },
-        StaleUnwitnessed {
-            @Override
-            void log(FaultMessage fm) {
-                m_recoveryLog.info("Agreement, Discarding " + name()
-                        + " stale: "
-                        + CoreUtils.hsIdToString(fm.failedSite)
-                        + ", repoter: "
-                        + CoreUtils.hsIdToString(fm.reportingSite)
-                        + ", survivors: ["
-                        + CoreUtils.hsIdCollectionToString(fm.survivors)
-                        + "]");
-            }
-        },
         OtherUnwitnessed {
             @Override
             void log(FaultMessage fm) {
@@ -204,6 +190,14 @@ public class MeshArbiter {
                         + ", survivors: ["
                         + CoreUtils.hsIdCollectionToString(fm.survivors)
                         + "]");
+            }
+        },
+        SoleSurvivor {
+            @Override
+            void log(FaultMessage fm) {
+                m_recoveryLog.info("Agreement, Discarding " + name()
+                        + " repoter: "
+                        + CoreUtils.hsIdToString(fm.reportingSite));
             }
         },
         DoNot {
@@ -228,6 +222,8 @@ public class MeshArbiter {
             return Discard.ReporterFailed;
         } else if (!hsIds.contains(fm.reportingSite)) {
             return Discard.ReporterUnknown;
+        } else if (fm.isSoleSurvivor()) {
+            return Discard.SoleSurvivor;
         } else if (Boolean.TRUE.equals(m_inTrouble.get(fm.reportingSite))) {
             return Discard.ReporterWitnessed;
         } else if (!fm.witnessed && fm.reportingSite == m_hsId) {
@@ -447,7 +443,7 @@ public class MeshArbiter {
 
                 if (  !m_seeker.getSurvivors().contains(m.m_sourceHSId)
                     || m_failedSites.contains(m.m_sourceHSId)
-                    || Sets.filter(sfm.getFailedSites(), in(hsIds)).isEmpty()) continue;
+                    || m_failedSites.containsAll(sfm.getFailedSites())) continue;
 
                 updateFailedSitesLedger(hsIds, sfm);
 
@@ -464,7 +460,8 @@ public class MeshArbiter {
 
                 if (   !hsIds.contains(fsfm.m_sourceHSId)
                     || m_seeker.getSurvivors().contains(fsfm.m_reportingHSId)
-                    || m_failedSites.contains(fsfm.m_reportingHSId)) continue;
+                    || m_failedSites.contains(fsfm.m_reportingHSId)
+                    || m_failedSites.containsAll(fsfm.getFailedSites())) continue;
 
                 m_seeker.add(fsfm);
 

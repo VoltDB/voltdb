@@ -82,6 +82,12 @@ public final class FaultMessage extends VoltMessage {
         return Subject.FAILURE.getId();
     }
 
+    public boolean isSoleSurvivor() {
+        return !witnessed
+            && survivors.size() == 1
+            && survivors.contains(reportingSite);
+    }
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();

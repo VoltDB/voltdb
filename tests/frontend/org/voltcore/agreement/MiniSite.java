@@ -82,7 +82,9 @@ class MiniSite extends Thread implements MeshAide
     }
 
     public void reportFault(long faultingSite) {
-        m_siteLog.debug("Reported fault: " + faultingSite + ", witnessed?: true" );
+        if (m_siteLog.isDebugEnabled()) {
+            m_siteLog.debug("Reported fault: " + faultingSite + ", witnessed?: true" );
+        }
         FaultMessage fm = new FaultMessage(m_mailbox.getHSId(), faultingSite);
         fm.m_sourceHSId = m_mailbox.getHSId();
         m_mailbox.deliver(fm);
@@ -90,7 +92,9 @@ class MiniSite extends Thread implements MeshAide
 
     public void reportFault(FaultMessage fm) {
         fm.m_sourceHSId = m_mailbox.getHSId();
-        m_siteLog.info("Reporting fault: " + fm);
+        if (m_siteLog.isDebugEnabled()) {
+            m_siteLog.debug("Reporting fault: " + fm);
+        }
         m_mailbox.deliver(fm);
     }
 
@@ -152,7 +156,10 @@ class MiniSite extends Thread implements MeshAide
     private void processMessage(VoltMessage msg)
     {
         if (!m_currentHSIds.contains(msg.m_sourceHSId)) {
-            m_siteLog.debug("Dropping message " + msg + " because it is not from a known up site");
+            if (m_siteLog.isDebugEnabled()) {
+                m_siteLog.debug("Dropping message " + msg + " because it is not from a known up site");
+            }
+            return;
         }
         // need heartbeat something in here?
         if (msg instanceof FaultMessage) {
@@ -163,8 +170,9 @@ class MiniSite extends Thread implements MeshAide
 
     private void discoverGlobalFaultData(FaultMessage faultMessage)
     {
-        m_siteLog.info("Saw fault: " + CoreUtils.hsIdToString(faultMessage.failedSite)
-                + ", witnessed?: " + faultMessage.witnessed);
+        if (m_siteLog.isDebugEnabled()) {
+            m_siteLog.debug("Saw fault: " + faultMessage);
+        }
         Map<Long, Long> results = m_arbiter.reconfigureOnFault(m_currentHSIds, faultMessage);
         if (results.isEmpty()) {
             return;
