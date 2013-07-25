@@ -70,7 +70,7 @@ class StudioWebDiag extends GebReportingSpec {
     def setupSpec() {
         //Move file contents to memory
         def primeList = {file,list -> if(file.size() != 0) {
-             file.eachLine {line -> if (line.trim().startsWith('#')){
+             file.eachLine {line -> if (!line.trim().startsWith('#')){
                 list.add(line)}}
             }
         }

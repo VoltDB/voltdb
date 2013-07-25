@@ -17,8 +17,8 @@ CREATE TABLE partitioned_table
 , type_not_null_float       FLOAT         NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
-, type_null_varchar32       VARCHAR(32)
-, type_not_null_varchar32   VARCHAR(32)   NOT NULL
+, type_null_varchar25       VARCHAR(32)
+, type_not_null_varchar25   VARCHAR(32)   NOT NULL
 , type_null_varchar128      VARCHAR(128)
 , type_not_null_varchar128  VARCHAR(128)  NOT NULL
 , type_null_varchar1024     VARCHAR(1024)
@@ -62,8 +62,8 @@ CREATE TABLE export_partitioned_table
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
 , type_not_null_float       FLOAT         NOT NULL
-, type_null_varchar32       VARCHAR(32)
-, type_not_null_varchar32   VARCHAR(32)   NOT NULL
+, type_null_varchar25       VARCHAR(32)
+, type_not_null_varchar25   VARCHAR(32)   NOT NULL
 , type_null_varchar128      VARCHAR(128)
 , type_not_null_varchar128  VARCHAR(128)  NOT NULL
 , type_null_varchar1024     VARCHAR(1024)
@@ -88,8 +88,8 @@ CREATE TABLE export_mirror_partitioned_table
 , type_not_null_decimal     DECIMAL       NOT NULL
 , type_null_float           FLOAT
 , type_not_null_float       FLOAT         NOT NULL
-, type_null_varchar32       VARCHAR(32)
-, type_not_null_varchar32   VARCHAR(32)   NOT NULL
+, type_null_varchar25       VARCHAR(32)
+, type_not_null_varchar25   VARCHAR(32)   NOT NULL
 , type_null_varchar128      VARCHAR(128)
 , type_not_null_varchar128  VARCHAR(128)  NOT NULL
 , type_null_varchar1024     VARCHAR(1024)
@@ -116,8 +116,8 @@ CREATE TABLE replicated_table
 , type_not_null_float       FLOAT         NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
-, type_null_varchar32       VARCHAR(32)
-, type_not_null_varchar32   VARCHAR(32)   NOT NULL
+, type_null_varchar25       VARCHAR(32)
+, type_not_null_varchar25   VARCHAR(32)   NOT NULL
 , type_null_varchar128      VARCHAR(128)
 , type_not_null_varchar128  VARCHAR(128)  NOT NULL
 , type_null_varchar1024     VARCHAR(1024)
@@ -161,8 +161,8 @@ CREATE TABLE export_replicated_table
 , type_not_null_float       FLOAT         NOT NULL
 , type_null_decimal         DECIMAL
 , type_not_null_decimal     DECIMAL       NOT NULL
-, type_null_varchar32       VARCHAR(32)
-, type_not_null_varchar32   VARCHAR(32)   NOT NULL
+, type_null_varchar25       VARCHAR(32)
+, type_not_null_varchar25   VARCHAR(32)   NOT NULL
 , type_null_varchar128      VARCHAR(128)
 , type_not_null_varchar128  VARCHAR(128)  NOT NULL
 , type_null_varchar1024     VARCHAR(1024)
