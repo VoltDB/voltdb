@@ -657,17 +657,6 @@ public abstract class AbstractParsedStmt {
                 String typeName = node.attributes.get("valuetype");
                 String isVectorParam = node.attributes.get("isvector");
                 VoltType type = VoltType.typeFromString(typeName);
-                // HSQL has been known to jump to conclusions when it comes to typing
-                // parameters from context -- like assuming that only integers should be
-                // allowed in math with integers -- or is that a legit SQL thing?
-                // For now, assuming that HSQL is just wrong-ish.
-                if (type == VoltType.INTEGER) {
-                    // Assume that HSQL isn't totally wrong, just a little presumptive.
-                    // Re-ambiguate the type just slightly to give the planner a chance to determine differently.
-                    // Not sure whether this test should have been type.isInteger() --
-                    // does HSQL get other integral types wrong?
-                    type = VoltType.NUMERIC;
-                }
                 ParameterValueExpression pve = new ParameterValueExpression();
                 pve.setParameterIndex(index);
                 pve.setValueType(type);

@@ -126,9 +126,6 @@ public class ParameterValueExpression extends AbstractValueExpression {
 
     @Override
     public void refineOperandType(VoltType columnType) {
-        if (m_valueType != null && m_valueType != VoltType.NUMERIC) {
-            return;
-        }
         if (columnType == null) {
             return;
         }
