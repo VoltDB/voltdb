@@ -1,36 +1,19 @@
--- BASIC SQL Coverage cases.  These represent more-or-less the
--- simplest possible templates for SQL statements that cover the SQL
--- keywords that we want to support for a version 1 release.
---
--- Required preprocessor template:
--- @columntype
--- @dmltable
--- @idcol
--- @insertvals
-
 -- DML, generate random data first.
 --INSERT
 -- test basic INSERT
-INSERT INTO @dmltable VALUES (@insertvals)
+INSERT INTO _table VALUES (@insertvals)
 
-SELECT * FROM _table LHS11 ,              _table RHS WHERE                                 LHS11._variable[@columntype] = RHS._variable[@comparabletype]
-SELECT * FROM _table LHS12 ,              _table RHS WHERE LHS12.@idcol = RHS.@idcol
-SELECT * FROM _table LHS13 ,              _table RHS WHERE LHS13.@idcol = RHS.@idcol AND     RHS._variable[numeric] = 2 
-SELECT * FROM _table LHS14 ,              _table RHS WHERE LHS14.@idcol = RHS.@idcol AND   LHS14._variable[numeric] = 2
-SELECT * FROM _table LHS15 ,              _table RHS WHERE LHS15.@idcol = RHS.@idcol AND   LHS15._variable[@columntype] < 45 AND LHS15._variable[@columntype] = RHS._variable[@comparabletype]
+SELECT * FROM P1 LHS23 LEFT  JOIN R1 RHS ON    LHS23.ID = RHS.ID AND     RHS.ID = 2
+SELECT * FROM R1 LHS24 RIGHT JOIN P1 RHS ON    LHS24.ID = RHS.ID AND     LHS24.ID = 2
+SELECT * FROM P1 LHS24 LEFT  JOIN R1 RHS ON    LHS24.ID = RHS.ID AND     LHS24.ID = 2
+SELECT * FROM R1 LHS23 RIGHT JOIN P1 RHS ON    LHS23.ID = RHS.ID AND     RHS.ID = 2
+SELECT * FROM P1 LHS23 RIGHT JOIN R1 RHS ON    LHS23.ID = RHS.ID AND     RHS.ID = 2
+SELECT * FROM R1 LHS24 LEFT  JOIN P1 RHS ON    LHS24.ID = RHS.ID AND     LHS24.ID = 2
+SELECT * FROM P1 LHS24 RIGHT JOIN R1 RHS ON    LHS24.ID = RHS.ID AND     LHS24.ID = 2
+SELECT * FROM R1 LHS23 LEFT  JOIN P1 RHS ON    LHS23.ID = RHS.ID AND     RHS.ID = 2
 
-SELECT * FROM _table LHS16 ,              _table RHS WHERE LHS16.@idcol = RHS.@idcol AND   LHS16.@numcol = RHS.@numcol AND   RHS.@idcol > 10 AND LHS16.@numcol < 30 AND LHS16.@numcol >= RHS.@idcol
 
-
-SELECT * FROM _table LHS21 @jointype JOIN _table RHS ON                                    LHS21._variable[@columntype] = RHS._variable[@comparabletype]
-SELECT * FROM _table LHS22 @jointype JOIN _table RHS ON    LHS22.@idcol = RHS.@idcol
-SELECT * FROM _table LHS23 @jointype JOIN _table RHS ON    LHS23.@idcol = RHS.@idcol AND     RHS._variable[numeric] = 2 
-SELECT * FROM _table LHS24 @jointype JOIN _table RHS ON    LHS24.@idcol = RHS.@idcol AND   LHS24._variable[numeric] = 2
-SELECT * FROM _table LHS25 @jointype JOIN _table RHS ON    LHS25.@idcol = RHS.@idcol WHERE LHS25._variable[@columntype] < 45 AND LHS25._variable[@columntype] = RHS._variable[@comparabletype]
-
-SELECT * FROM _table LHS26 @jointype JOIN _table RHS ON    LHS26.@idcol = RHS.@idcol AND   LHS26.@numcol = RHS.@numcol WHERE RHS.@idcol > 10 AND LHS26.@numcol < 30 AND LHS26.@numcol >= RHS.@idcol
-
---TODO: ENG-4929 Investigate why these get a planner NullPointerException for a timeout.
-SELECT * FROM _table LHS36 @jointype JOIN _table RHS USING(      @idcol,                         @numcol)          WHERE     @idcol > 10 AND       @numcol < 30 AND       @numcol >=     @idcol
--- it's not (just) the select * that fails:
-SELECT @idcol, @numcol FROM _table LHS36 @jointype JOIN _table RHS USING(      @idcol,       @numcol)          WHERE     @idcol > 10 AND       @numcol < 30 AND       @numcol >=     @idcol
+SELECT * FROM P1 LEFT  JOIN R1 USING(ID, NUM) WHERE ID > 10 AND NUM < 30 AND ID = NUM
+SELECT * FROM R1 RIGHT JOIN P1 USING(ID, NUM) WHERE ID > 10 AND NUM < 30 AND ID = NUM
+SELECT * FROM P1 RIGHT JOIN R1 USING(ID, NUM) WHERE ID > 10 AND NUM < 30 AND ID = NUM
+SELECT * FROM R1 LEFT  JOIN P1 USING(ID, NUM) WHERE ID > 10 AND NUM < 30 AND ID = NUM
