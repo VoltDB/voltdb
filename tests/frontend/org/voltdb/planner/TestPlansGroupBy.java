@@ -27,6 +27,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractScanPlanNode;
+import org.voltdb.plannodes.AggregatePlanNode;
+import org.voltdb.plannodes.LimitPlanNode;
+import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 
 public class TestPlansGroupBy extends PlannerTestCase {
@@ -82,11 +86,60 @@ public class TestPlansGroupBy extends PlannerTestCase {
     // Make it to false when we fix ENG-4397
     // ENG-4937 - As a developer, I want to ignore the "order by" clause on non-grouped aggregate queries.
     public void testEdgeComplexCase() {
+        pns = compileToFragments("select PKEY+A1 from T1 Order by PKEY+A1");
+        checkComplexAgg(pns, false);
+
         pns = compileToFragments("SELECT count(*)  FROM P1 order by PKEY");
         checkComplexAgg(pns, true);
     }
 
-    public void testSimpleComplexCase() {
+    public void testComplexAggwithLimit() {
+        pns = compileToFragments("SELECT A1, sum(A1), sum(A1)+11 FROM P1 GROUP BY A1 ORDER BY A1 LIMIT 2");
+        checkComplexAgg(pns, true);
+
+        // Test limit push down
+        AbstractPlanNode p = pns.get(1).getChild(0);
+        assertTrue(p instanceof LimitPlanNode);
+        assertTrue(p.getChild(0) instanceof OrderByPlanNode);
+        assertTrue(p.getChild(0).getChild(0) instanceof AggregatePlanNode);
+
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof ProjectionPlanNode);
+        assertTrue(p.getChild(0) instanceof LimitPlanNode);
+        assertTrue(p.getChild(0).getChild(0) instanceof OrderByPlanNode);
+        assertTrue(p.getChild(0).getChild(0).getChild(0) instanceof AggregatePlanNode);
+    }
+
+    public void testComplexAggwithDistinct() {
+        pns = compileToFragments("SELECT A1, sum(A1), sum(distinct A1)+11 FROM P1 GROUP BY A1 ORDER BY A1");
+        checkComplexAgg(pns, true);
+
+        // Test aggregation node not push down with distinct
+        AbstractPlanNode p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AbstractScanPlanNode);
+
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof ProjectionPlanNode);
+        assertTrue(p.getChild(0) instanceof OrderByPlanNode);
+        assertTrue(p.getChild(0).getChild(0) instanceof AggregatePlanNode);
+    }
+
+    public void testComplexAggwithLimitDistinct() {
+        pns = compileToFragments("SELECT A1, sum(A1), sum(distinct A1)+11 FROM P1 GROUP BY A1 ORDER BY A1 LIMIT 2");
+        checkComplexAgg(pns, true);
+
+        // Test limit push down
+        AbstractPlanNode p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AbstractScanPlanNode);
+
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof ProjectionPlanNode);
+        assertTrue(p.getChild(0) instanceof LimitPlanNode);
+        assertTrue(p.getChild(0).getChild(0) instanceof OrderByPlanNode);
+        assertTrue(p.getChild(0).getChild(0).getChild(0) instanceof AggregatePlanNode);
+    }
+
+    public void testComplexAggCase() {
         pns = compileToFragments("SELECT A1, sum(A1), sum(A1)+11 FROM P1 GROUP BY A1");
         checkComplexAgg(pns, true);
 
@@ -98,10 +151,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
     }
 
-    public void testReplicatedTableComplexAggregate() {
-          pns = compileToFragments("select PKEY+A1 from T1 Order by PKEY+A1");
-          checkComplexAgg(pns, false);
-    }
+//    public void testComplexGroupby() {
+//        pns = compileToFragments("SELECT ABS(A1), ABS(A1)+1, sum(B1) FROM P1 GROUP BY ABS(A1)");
+//    }
 
     private void checkComplexAgg(List<AbstractPlanNode> pns, boolean hasProjectionNode) {
         assertTrue(pns.size() > 0);

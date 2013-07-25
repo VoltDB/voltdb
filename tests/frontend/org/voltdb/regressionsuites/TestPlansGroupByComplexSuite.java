@@ -163,7 +163,50 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             expected = new long[][] {{1, 60, 3, 20, 30, 10, 20, 41}, {2, 90, 2, 45, 50, 40, 45, 91}};
             compareTable(vt, expected);
         }
+    }
 
+    public void testComplexAggsDistinctLimit() throws IOException, ProcCallException {
+        loadData();
+
+        Client client = this.getClient();
+        ClientResponse cr = null;
+        VoltTable vt;
+        long[][] expected;
+
+        // id, wage, dept, rate
+        String[] procs = {"R1.insert", "P1.insert"};
+        for (String tb: procs) {
+            cr = client.callProcedure(tb, 6,  10,  2 , 1.2);
+            cr = client.callProcedure(tb, 7,  40,  2 , 1.1);
+        }
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        String [] tbs = {"P1"};
+        for (String tb: tbs) {
+            // Test distinct with complex aggregations.
+            cr = client.callProcedure("@AdHoc", "SELECT dept, count(wage), sum(distinct wage), sum(wage), count(distinct wage)+5, sum(wage)/(count(wage)+1) from " + tb + " GROUP BY dept ORDER BY dept DESC;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] {{2, 4, 100, 140, 8, 28}, {1, 3, 60, 60, 8, 15} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            // Test limit with complex aggregation.
+            cr = client.callProcedure("@AdHoc", "SELECT wage, sum(id)+1, sum(id+1),  sum(dept+3)/count(dept) from " + tb + " GROUP BY wage ORDER BY wage ASC LIMIT 4 ;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] {{10, 8, 9, 4}, {20, 3, 3, 4}, {30, 4, 4, 4}, {40, 12, 13, 5}};
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            // Test distinct limit together with complex aggregation.
+            cr = client.callProcedure("@AdHoc", "SELECT wage, sum(id)+1, sum(id+1),  sum(dept+3)/count(distinct dept) from " + tb + " GROUP BY wage ORDER BY wage ASC LIMIT 4 ;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] {{10, 8, 9, 4}, {20, 3, 3, 4}, {30, 4, 4, 4}, {40, 12, 13, 10}};
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+        }
     }
 
     public void testComplexGroupby() throws IOException, ProcCallException {
@@ -215,16 +258,16 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         assertTrue(success);
         builder.addServerConfig(config);
 
-//        config = new LocalCluster("plansgroupby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-//        success = config.compile(project);
-//        assertTrue(success);
-//        builder.addServerConfig(config);
-//
-//        // Cluster
-//        config = new LocalCluster("plansgroupby-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-//        success = config.compile(project);
-//        assertTrue(success);
-//        builder.addServerConfig(config);
+        config = new LocalCluster("plansgroupby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        success = config.compile(project);
+        assertTrue(success);
+        builder.addServerConfig(config);
+
+        // Cluster
+        config = new LocalCluster("plansgroupby-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        success = config.compile(project);
+        assertTrue(success);
+        builder.addServerConfig(config);
 
         return builder;
     }

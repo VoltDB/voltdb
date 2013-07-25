@@ -503,7 +503,7 @@ public class PlanAssembler {
         root.generateOutputSchema(m_catalogDb);
         root = handleAggregationOperators(root);
 
-        root = handleOrderBy(root);
+        root = handleOrderBy(root, true);
 
         if ((root.getPlanNodeType() != PlanNodeType.AGGREGATE) &&
             (root.getPlanNodeType() != PlanNodeType.HASHAGGREGATE) &&
@@ -868,7 +868,7 @@ public class PlanAssembler {
      * @param root
      * @return new orderByNode (the new root) or the original root if no orderByNode was required.
      */
-    AbstractPlanNode handleOrderBy(AbstractPlanNode root) {
+    AbstractPlanNode handleOrderBy(AbstractPlanNode root, boolean expectedComplex) {
         assert (m_parsedSelect != null);
 
         // Only sort when the statement has an ORDER BY.
@@ -899,7 +899,7 @@ public class PlanAssembler {
         }
 
         AbstractPlanNode projectionNode = root;
-        if (m_parsedSelect.hasComplexAgg()) {
+        if (m_parsedSelect.hasComplexAgg() && expectedComplex) {
             AbstractPlanNode aggNode = root.getChild(0);
             projectionNode.clearChildren();
             aggNode.clearParents();
@@ -991,7 +991,7 @@ public class PlanAssembler {
             orderByNode.setOrderingByUniqueColumns();
         }
 
-        if (m_parsedSelect.hasComplexAgg()) {
+        if (m_parsedSelect.hasComplexAgg() && expectedComplex) {
             return projectionNode;
         }
 
@@ -1082,7 +1082,7 @@ public class PlanAssembler {
 
             // If the distributed limit must be performed on ordered input,
             // ensure the order of the data on each partition.
-            distributedPlan = handleOrderBy(distributedPlan);
+            distributedPlan = handleOrderBy(distributedPlan, false);
 
             // Apply the distributed limit.
             distLimit.addAndLinkChild(distributedPlan);
@@ -1091,9 +1091,22 @@ public class PlanAssembler {
             sendNode.addAndLinkChild(distLimit);
         }
 
-        topLimit.addAndLinkChild(root);
-        topLimit.generateOutputSchema(m_catalogDb);
-        return topLimit;
+        // Switch if has Complex aggregations
+        AbstractPlanNode projectionNode = root;
+        if (m_parsedSelect.hasComplexAgg()) {
+            AbstractPlanNode child = root.getChild(0);
+            projectionNode.clearChildren();
+            child.clearParents();
+
+            topLimit.addAndLinkChild(child);
+            topLimit.generateOutputSchema(m_catalogDb);
+            projectionNode.addAndLinkChild(topLimit);
+            return projectionNode;
+        } else {
+            topLimit.addAndLinkChild(root);
+            topLimit.generateOutputSchema(m_catalogDb);
+            return topLimit;
+        }
     }
 
     AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {

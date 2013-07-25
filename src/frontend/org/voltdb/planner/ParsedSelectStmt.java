@@ -255,7 +255,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         int index = 0;
         for (ParsedColInfo col: aggResultColumns) {
             aggTableIndexMap.put(col.expression, index);
-            if (col.alias == "") {
+            if ( col.alias == null) {
                 // hack any unique string
                 col.alias = "$$_" + col.expression.getExpressionType().symbol() + "_$$_" + index;
             }
@@ -359,7 +359,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 col.expression = (AbstractExpression) expr.clone();
                 ExpressionUtil.finalizeValueTypes(col.expression);
                 // Aggregation column use the the hacky stuff
-                col.alias = "";
                 col.tableName = "VOLT_TEMP_TABLE";
                 col.columnName = "";
                 if (isNewtoAggResultColumn(col)) {
