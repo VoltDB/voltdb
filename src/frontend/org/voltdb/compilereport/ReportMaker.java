@@ -660,7 +660,7 @@ public class ReportMaker {
 
         contents = contents.replace("##VERSION##", VoltDB.instance().getVersionString());
 
-        DateFormat df = SimpleDateFormat.getInstance();
+        DateFormat df = new SimpleDateFormat("d MMM yyyy HH:mm:ss z");
         contents = contents.replace("##TIMESTAMP##", df.format(m_timestamp));
 
         String msg = Encoder.hexEncode(VoltDB.instance().getVersionString() + "," + System.currentTimeMillis());

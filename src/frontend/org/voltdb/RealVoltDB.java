@@ -1492,7 +1492,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
             else {
                 while (m_isRunning) {
-                    Thread.sleep(3000);
+                    Thread.sleep(1);
                 }
             }
         }

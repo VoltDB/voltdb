@@ -19,7 +19,6 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
@@ -243,14 +242,14 @@ public class InitiateResponseMessage extends VoltMessage {
 
         sb.append("INITITATE_RESPONSE FOR TXN ");
         sb.append(m_txnId);
-        sb.append("\n SP HANDLE: " + m_spHandle);
-        sb.append("\n INITIATOR HSID: " + CoreUtils.hsIdToString(m_initiatorHSId));
-        sb.append("\n COORDINATOR HSID: " + CoreUtils.hsIdToString(m_coordinatorHSId));
-        sb.append("\n CLIENT INTERFACE HANDLE: " + m_clientInterfaceHandle);
-        sb.append("\n CLIENT CONNECTION ID: " + m_connectionId);
-        sb.append("\n READ-ONLY: " + m_readOnly);
-        sb.append("\n RECOVERYING: " + m_recovering);
-        sb.append("\n MISPARTITIONED: " + m_mispartitioned);
+        sb.append("\n SP HANDLE: ").append(m_spHandle);
+        sb.append("\n INITIATOR HSID: ").append(CoreUtils.hsIdToString(m_initiatorHSId));
+        sb.append("\n COORDINATOR HSID: ").append(CoreUtils.hsIdToString(m_coordinatorHSId));
+        sb.append("\n CLIENT INTERFACE HANDLE: ").append(m_clientInterfaceHandle);
+        sb.append("\n CLIENT CONNECTION ID: ").append(m_connectionId);
+        sb.append("\n READ-ONLY: ").append(m_readOnly);
+        sb.append("\n RECOVERING: ").append(m_recovering);
+        sb.append("\n MISPARTITIONED: ").append(m_mispartitioned);
         if (m_commit)
             sb.append("\n  COMMIT");
         else
