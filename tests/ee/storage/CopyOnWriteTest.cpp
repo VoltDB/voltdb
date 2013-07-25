@@ -856,19 +856,36 @@ public:
         return writer.write(predicateStuff);
     }
 
-    ElasticIndex *getElasticIndex() {
+    voltdb::ElasticContext *getElasticContext() {
         voltdb::TableStreamer *streamer = dynamic_cast<voltdb::TableStreamer*>(m_table->m_tableStreamer.get());
         if (streamer != NULL) {
             BOOST_FOREACH(voltdb::TableStreamer::StreamPtr &streamPtr, streamer->m_streams) {
                 if (streamPtr->m_streamType == TABLE_STREAM_ELASTIC_INDEX) {
                     voltdb::ElasticContext *context = dynamic_cast<ElasticContext*>(streamPtr->m_context.get());
                     if (context != NULL) {
-                        return &context->m_index;
+                        return context;
                     }
                 }
             }
         }
         return NULL;
+    }
+
+    voltdb::ElasticIndex *getElasticIndex() {
+        voltdb::ElasticContext *context = getElasticContext();
+        if (context != NULL) {
+            return &context->m_index;
+        }
+        return NULL;
+    }
+
+    bool setElasticIndexTuplesPerCall(size_t nTuplesPerCall) {
+        voltdb::ElasticContext *context = getElasticContext();
+        if (context != NULL) {
+            context->setTuplesPerCall(nTuplesPerCall);
+            return true;
+        }
+        return false;
     }
 
     voltdb::VoltDBEngine *m_engine;
@@ -1605,6 +1622,10 @@ TEST_F(CopyOnWriteTest, ElasticContextIndexTest) {
     boost::shared_ptr<TableStreamerInterface> streamer(streamerPtr);
     doActivateStream(TABLE_STREAM_ELASTIC_INDEX, streamer, predicateStrings, false);
 
+    while (doStreamMore() != 0) {
+        ;
+    }
+
     for (size_t icycle = 0; icycle < NUM_CYCLES; icycle++) {
         tableScrambler.scramble();
     }
@@ -1654,6 +1675,21 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
     ReferenceSerializeInput input(buffer, output.position());
     m_table->activateStream(m_serializer, TABLE_STREAM_ELASTIC_INDEX, 0, m_tableId, input);
 
+    // Force index streaming to need multiple streamMore() calls.
+    voltdb::ElasticContext *context = getElasticContext();
+    ASSERT_NE(NULL, context);
+    bool success = setElasticIndexTuplesPerCall(20);
+    ASSERT_TRUE(success);
+    char serializationBuffer[BUFFER_SIZE];
+    std::vector<int> retPositionsElastic;
+    TupleOutputStreamProcessor outputStreamsElastic(serializationBuffer, sizeof(serializationBuffer));
+    size_t nCalls = 0;
+    while (m_table->streamMore(outputStreamsElastic, retPositionsElastic) != 0) {
+        nCalls++;
+    }
+    // Make sure we forced more than one streamMore() call.
+    ASSERT_LE(2, nCalls);
+
     for (size_t icycle = 0; icycle < NUM_CYCLES; icycle++) {
         tableScrambler.scramble();
     }
@@ -1670,7 +1706,6 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
     m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, inputSnapshot);
 
     T_ValueSet COWTuples;
-    char serializationBuffer[BUFFER_SIZE];
     int totalInserted = 0;
     while (true) {
         TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));

@@ -26,22 +26,15 @@ ElasticContext::ElasticContext(PersistentTable &table,
                                PersistentTableSurgeon &surgeon,
                                int32_t partitionId,
                                TupleSerializer &serializer,
-                               const std::vector<std::string> &predicateStrings) :
+                               const std::vector<std::string> &predicateStrings,
+                               size_t nTuplesPerCall) :
     TableStreamerContext(table, surgeon, partitionId, serializer, predicateStrings),
     m_scanner(table, surgeon.getData()),
-    m_isIndexed(false)
+    m_isIndexed(false),
+    m_nTuplesPerCall(nTuplesPerCall)
 {
     if (predicateStrings.size() != 1) {
         throwFatalException("ElasticContext::ElasticContext() expects a single predicate.");
-    }
-
-    // Populate index with current tuples.
-    // Table changes are tracked through notifications.
-    TableTuple tuple(table.schema());
-    while (m_scanner.next(tuple)) {
-        if (getPredicates()[0].eval(&tuple).isTrue()) {
-            m_index.add(table, tuple);
-        }
     }
 }
 
@@ -59,9 +52,23 @@ int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStrea
         throwFatalException("ElasticContext::handleStreamMore() was called more than once.");
     }
 
+    // Populate index with current tuples.
+    // Table changes are tracked through notifications.
+    size_t i = 0;
+    TableTuple tuple(getTable().schema());
+    while (m_scanner.next(tuple)) {
+        if (getPredicates()[0].eval(&tuple).isTrue()) {
+            m_index.add(getTable(), tuple);
+        }
+        // Take a breather after every chunk of m_n
+        if (++i == m_nTuplesPerCall) {
+            break;
+        }
+    }
+
     // We're done with indexing.
-    m_isIndexed = true;
-    return 0;
+    m_isIndexed = m_scanner.isScanComplete();
+    return m_isIndexed ? 0 : 1;
 }
 
 /**
