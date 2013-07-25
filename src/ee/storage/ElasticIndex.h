@@ -138,6 +138,8 @@ class ElasticIndex : public stx::btree_set<ElasticIndexKey, ElasticIndexComparat
 
   public:
 
+    virtual ~ElasticIndex() {}
+
     /**
      * Return true if key is in the index.
      */

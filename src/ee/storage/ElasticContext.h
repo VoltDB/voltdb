@@ -26,6 +26,7 @@
 #include "storage/TupleBlock.h"
 
 class DummyElasticTableStreamer;
+class CopyOnWriteTest;
 
 namespace voltdb {
 
@@ -35,8 +36,9 @@ class TupleOutputStreamProcessor;
 class ElasticContext : public TableStreamerContext
 {
 
-    friend bool TableStreamer::activateStream(PersistentTable&, PersistentTableSurgeon&, CatalogId);
+    friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TupleSerializer&, TableStreamType, std::vector<std::string>&);
     friend class ::DummyElasticTableStreamer;
+    friend class ::CopyOnWriteTest;
 
 public:
 
@@ -81,7 +83,15 @@ private:
                    PersistentTableSurgeon &surgeon,
                    int32_t partitionId,
                    TupleSerializer &serializer,
-                   const std::vector<std::string> &predicateStrings);
+                   const std::vector<std::string> &predicateStrings,
+                   size_t nTuplesPerCall = DEFAULT_TUPLES_PER_CALL);
+
+    /**
+     * Allow overriding how often index creation is throttled.
+     */
+    void setTuplesPerCall(size_t nTuplesPerCall) {
+        m_nTuplesPerCall = nTuplesPerCall;
+    }
 
     /**
      * Scanner for retrieveing rows.
@@ -97,6 +107,14 @@ private:
      * Set to true after handleStreamMore() was called once after building the index.
      */
     bool m_isIndexed;
+
+    /**
+     * The maximum number of tuples to index per handleStreamMore() call.
+     * It's non-const to allow tests to manipulate (e.g. CopyOnWriteTest).
+     */
+    size_t m_nTuplesPerCall;
+
+    static const size_t DEFAULT_TUPLES_PER_CALL = 10000;
 };
 
 } // namespace voltdb
