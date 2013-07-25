@@ -463,18 +463,18 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             col.columnName = groupByNode.attributes.get("column");
             col.tableName = groupByNode.attributes.get("table");
             col.groupBy = true;
+
+            org.voltdb.catalog.Column catalogColumn =
+                    getTableFromDB(col.tableName).getColumns().getIgnoreCase(col.columnName);
+            col.index = catalogColumn.getIndex();
         }
         else
         {
-            throw new RuntimeException("GROUP BY with complex expressions not supported");
+            // XXX hacky, assume all non-column refs come from a temp table
+            col.tableName = "VOLT_TEMP_TABLE";
+            col.columnName = "";
+            col.groupBy = true;
         }
-
-        assert(col.alias.equalsIgnoreCase(col.columnName));
-        assert(getTableFromDB(col.tableName) != null);
-        assert(getTableFromDB(col.tableName).getColumns().getIgnoreCase(col.columnName) != null);
-        org.voltdb.catalog.Column catalogColumn =
-                getTableFromDB(col.tableName).getColumns().getIgnoreCase(col.columnName);
-        col.index = catalogColumn.getIndex();
         groupByColumns.add(col);
     }
 
