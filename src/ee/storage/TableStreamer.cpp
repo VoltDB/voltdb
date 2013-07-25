@@ -91,8 +91,14 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
     purgeStreams();
 
     if (alreadyPresent) {
-        VOLT_ERROR("TableStreamer already has stream type %d.", static_cast<int>(streamType));
-        return false;
+        if (streamType == TABLE_STREAM_ELASTIC_INDEX) {
+            // If starting a new elastic index stream get rid of the old one.
+            m_streams.clear();
+        }
+        else {
+            VOLT_ERROR("TableStreamer already has stream type %d.", static_cast<int>(streamType));
+            return false;
+        }
     }
 
     // Create an appropriate streaming context based on the stream type.
