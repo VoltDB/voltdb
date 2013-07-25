@@ -251,7 +251,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private void placeTVEsinColumns () {
         // Build the association between the table column with its index
         Map <AbstractExpression, Integer> aggTableIndexMap = new HashMap <AbstractExpression,Integer>();
-        Map <AbstractExpression, String> exprToAliasMap = new HashMap <AbstractExpression,String>();
+        Map <Integer, ParsedColInfo> indexToColumnMap = new HashMap <Integer, ParsedColInfo>();
         int index = 0;
         for (ParsedColInfo col: aggResultColumns) {
             aggTableIndexMap.put(col.expression, index);
@@ -259,32 +259,20 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 // hack any unique string
                 col.alias = "$$_" + col.expression.getExpressionType().symbol() + "_$$_" + index;
             }
-            exprToAliasMap.put(col.expression, col.alias);
+            indexToColumnMap.put(index, col);
             index++;
         }
         // Replace TVE for display columns
         newAggSchema = new NodeSchema();
         for (ParsedColInfo col : displayColumns) {
-            SchemaColumn schema_col = null;
-            if (col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
-                // Recursively mutate the expression tree with available TVE substitutes
-                AbstractExpression expr = col.expression.replaceWithTVE(aggTableIndexMap, exprToAliasMap);
-                schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "", col.alias, expr);
-            } else {
-                schema_col = new SchemaColumn(col.tableName,
-                        col.columnName,
-                        col.alias,
-                        col.expression);
-            }
+            AbstractExpression expr = col.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
+            SchemaColumn schema_col = new SchemaColumn(col.tableName, col.columnName, col.alias, expr);
             newAggSchema.addColumn(schema_col);
         }
-
+        // Replace TVE for order by columns
         for (ParsedColInfo col : orderColumns) {
-            if (col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
-                AbstractExpression expr = col.expression.replaceWithTVE(aggTableIndexMap, exprToAliasMap);
-                col.expression = expr;
-                // I think I already have tablename, alias, columnName setted up
-            }
+            AbstractExpression expr = col.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
+            col.expression = expr;
         }
     }
 

@@ -29,6 +29,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -541,12 +542,12 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     /**
      * This function recursively replace any Expression that in the aggTableIndexMap to a TVEs. Its column index and alias are also built up here.
      * @param aggTableIndexMap
-     * @param exprToAliasMap
+     * @param indexToColumnMap
      * @return
      */
     public AbstractExpression replaceWithTVE(
             Map <AbstractExpression, Integer> aggTableIndexMap,
-            Map <AbstractExpression, String> exprToAliasMap)
+            Map <Integer, ParsedColInfo> indexToColumnMap)
     {
         Integer ii = aggTableIndexMap.get(this);
         if (ii != null) {
@@ -554,9 +555,10 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             tve.setValueType(getValueType());
             tve.setValueSize(getValueSize());
             tve.setColumnIndex(ii);
-            tve.setColumnName("");
-            tve.setColumnAlias(exprToAliasMap.get(this));
-            tve.setTableName("VOLT_TEMP_TABLE");
+            ParsedColInfo col = indexToColumnMap.get(ii);
+            tve.setColumnName(col.columnName);
+            tve.setColumnAlias(col.alias);
+            tve.setTableName(col.tableName);
             // To prevent pushdown of LIMIT when ORDER BY references an agg. ENG-3487.
             if (hasAnySubexpressionOfClass(AggregateExpression.class))
                 tve.setHasAggregate(true);
@@ -567,17 +569,17 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         AbstractExpression lnode = null, rnode = null;
         ArrayList<AbstractExpression> newArgs = null;
         if (m_left != null) {
-            lnode = m_left.replaceWithTVE(aggTableIndexMap, exprToAliasMap);
+            lnode = m_left.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
         }
         if (m_right != null) {
-            rnode = m_right.replaceWithTVE(aggTableIndexMap, exprToAliasMap);
+            rnode = m_right.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
         }
 
         boolean changed = false;
         if (m_args != null) {
             newArgs = new ArrayList<AbstractExpression>();
             for (AbstractExpression expr: m_args) {
-                AbstractExpression ex = expr.replaceWithTVE(aggTableIndexMap, exprToAliasMap);
+                AbstractExpression ex = expr.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
                 newArgs.add(ex);
                 if (ex != expr) {
                     changed = true;
