@@ -21,7 +21,6 @@ import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -645,12 +644,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             int portOffset = 0;
             for (int i = 0; i < 1; i++) {
                 try {
+                    InetAddress externalInterface = null;
+                    if (!m_config.m_externalInterface.trim().equals("")) {
+                        externalInterface = InetAddress.getByName(m_config.m_externalInterface);
+                    }
                     ClientInterface ci =
                         ClientInterface.create(m_messenger,
                                 m_catalogContext,
                                 m_config.m_replicationRole,
                                 m_cartographer,
                                 clusterConfig.getPartitionCount(),
+                                externalInterface,
                                 config.m_port + portOffset,
                                 config.m_adminPort + portOffset,
                                 m_config.m_timestampTestingSalt);
@@ -863,6 +867,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
         }
 
+        @Override
         public void run() {
             logConfigInfo();
             logCatalogAndDeployment();
