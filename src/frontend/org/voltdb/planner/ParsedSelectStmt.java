@@ -290,6 +290,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 orig_col.ascending = orderCol.ascending;
 
                 TupleValueExpression tve = new TupleValueExpression();
+                tve.setColumnAlias(orig_col.alias);
                 tve.setColumnName("");
                 tve.setColumnIndex(-1);
                 tve.setTableName("VOLT_TEMP_TABLE");
