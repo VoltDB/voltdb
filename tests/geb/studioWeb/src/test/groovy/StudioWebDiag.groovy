@@ -237,10 +237,7 @@ class StudioWebDiag extends GebReportingSpec {
 
         //make table
         def colNum = 0
-        def makeCol = {index,rowset -> def list = []
-            rowset.each {row -> list.add(row.find('td',index).text())}
-            list
-        }
+        def makeCol = { index,rowset -> rowset.collect { row -> row.find('td',index).text() } }
         columns = columns.collect {it.toLowerCase()}
         columns.each {table.put(it,makeCol(colNum++, rows))}
 
