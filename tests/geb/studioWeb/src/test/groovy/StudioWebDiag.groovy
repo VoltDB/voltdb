@@ -52,18 +52,28 @@ class StudioWebDiag extends GebReportingSpec {
     //SHARED VARIABLES
     @Shared def slurper = new JsonSlurper()
     @Shared def response //stores expected response so that it may be accessed by all helper methods
+    
     @Shared def sqlList = []
     @Shared def correctElements = []
     @Shared def correctProcedures = []
+    @Shared def correctReadmeLines = []
+    @Shared def chkReadmeLines = []
+    
+    @Shared def fileListPairs = [
+        [elementFile, correctElements],
+        [procedureFile, correctProcedures],
+        [sqlFile, sqlList],
+        [correctReadme, correctReadmeLines],
+        [chkReadme, chkReadmeLines]]
 
     def setupSpec() {
         //Move file contents to memory
         def primeList = {file,list -> if(file.size() != 0) {
-            file.eachLine {line -> if (line[0] != '#') {
+            file.eachLine {line -> if (line.trim().startsWith('#')){
                 list.add(line)}}
             }
         }
-        [ [elementFile,correctElements],[procedureFile,correctProcedures],[sqlFile,sqlList] ].each{ primeList(*it) }
+        fileListPairs.each { primeList(*it) }
     }
 
     def 'To StudioWeb'() {
@@ -109,7 +119,7 @@ class StudioWebDiag extends GebReportingSpec {
 
     def 'Check readMe file'(){
         expect: 'them to be the same'
-        correctReadme.getText() == chkReadme.getText() & correctReadme.size() != 0
+        correctReadmeLines == chkReadmeLines & correctReadmeLines.size() != 0
     }
 
     def 'System Stored Procedures'(){
