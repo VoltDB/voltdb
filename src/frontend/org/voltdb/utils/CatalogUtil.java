@@ -17,6 +17,7 @@
 
 package org.voltdb.utils;
 
+import com.google.common.base.Charsets;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -39,14 +40,12 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
-
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
-
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -96,6 +95,7 @@ import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
+import static org.voltdb.compiler.deploymentfile.ServerExportEnum.JDBC;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
@@ -112,9 +112,6 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.xml.sax.SAXException;
-
-import com.google.common.base.Charsets;
-import static org.voltdb.compiler.deploymentfile.ServerExportEnum.JDBC;
 
 /**
  *
@@ -1098,7 +1095,7 @@ public abstract class CatalogUtil {
 
             // this is OK as the deployment file XML schema does not allow for
             // export configuration property names that begin with underscores
-            if (exportClientClassName != null && exportClientClassName.length() > 0) {
+            if (exportClientClassName != null && exportClientClassName.trim().length() > 0) {
                 ConnectorProperty prop = catconn.getConfig().add(GuestProcessor.EXPORT_TO_TYPE);
                 prop.setName(GuestProcessor.EXPORT_TO_TYPE);
                 prop.setValue(exportClientClassName);

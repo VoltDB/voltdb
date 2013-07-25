@@ -23,13 +23,16 @@
 
 package org.voltdb.utils;
 
+import com.google.common.base.Joiner;
 import java.io.File;
+import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
+import static junit.framework.Assert.assertEquals;
+import static junit.framework.Assert.assertFalse;
+import static junit.framework.Assert.assertTrue;
 import junit.framework.TestCase;
-
 import org.voltdb.VoltDB;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
@@ -43,12 +46,10 @@ import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.User;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.ExportOnServerType;
+import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.types.ConstraintType;
-
-import com.google.common.base.Joiner;
-import static junit.framework.Assert.assertEquals;
-import static junit.framework.Assert.assertFalse;
-import static junit.framework.Assert.assertTrue;
 
 public class TestCatalogUtil extends TestCase {
 
@@ -709,4 +710,33 @@ public class TestCatalogUtil extends TestCase {
         assertFalse(cluster.getNetworkpartition());
     }
 
+    public void testCustomExportClientSettings() throws Exception {
+        final String withCustomExport =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "       <export enabled='true' >"
+                + "       <onserver exportto='custom' exportconnectorclass=\"com.foo.export.ExportClient\"  >"
+                + "            <configuration>"
+                + "                <property name=\"foo\">false</property>"
+                + "                <property name=\"type\">CSV</property>"
+                + "                <property name=\"with-schema\">false</property>"
+                + "            </configuration>"
+                + "        </onserver>"
+                + "        </export>"
+                + "</deployment>";
+
+        final File tmpDisabled = VoltProjectBuilder.writeStringToTempFile(withCustomExport);
+        long crc = CatalogUtil.compileDeploymentAndGetCRC(catalog, tmpDisabled.getPath(), true);
+        assertTrue("Deployment file failed to parse", crc != -1);
+        DeploymentType deployment = CatalogUtil.getDeployment(new FileInputStream(tmpDisabled));
+        ExportType export = deployment.getExport();
+        assertTrue(export.isEnabled());
+        ExportOnServerType onserver = export.getOnserver();
+        assertEquals(onserver.getExportto(), onserver.getExportto().CUSTOM);
+
+        assertEquals(onserver.getExportconnectorclass(), "com.foo.export.ExportClient");
+        assertTrue(onserver.getConfiguration().getProperty().size() == 3);
+
+    }
 }
