@@ -25,6 +25,7 @@ import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ParameterSet;
+import org.voltdb.RunningProcedureContext;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -43,6 +44,7 @@ public class FragmentTask extends TransactionTask
     final Mailbox m_initiator;
     final FragmentTaskMessage m_fragmentMsg;
     final Map<Integer, List<VoltTable>> m_inputDeps;
+    public RunningProcedureContext m_procContext;
 
     // This constructor is used during live rejoin log replay.
     FragmentTask(Mailbox mailbox,
@@ -212,6 +214,10 @@ public class FragmentTask extends TransactionTask
                     fragmentId = siteConnection.getFragmentIdForPlanHash(planHash);
                 }
 
+                if(m_fragmentMsg.getProcNameInBytes() != null) {
+                    m_procContext = new RunningProcedureContext();
+                    m_procContext.m_procedureName = new String(m_fragmentMsg.getProcNameInBytes());
+                }
                 dependency = siteConnection.executePlanFragments(
                         1,
                         new long[] { fragmentId },
@@ -219,7 +225,8 @@ public class FragmentTask extends TransactionTask
                         new ParameterSet[] { params },
                         m_txnState.spHandle,
                         m_txnState.uniqueId,
-                        m_txnState.isReadOnly())[0];
+                        m_txnState.isReadOnly(),
+                        m_procContext)[0];
 
                 if (hostLog.isTraceEnabled()) {
                     hostLog.l7dlog(Level.TRACE,

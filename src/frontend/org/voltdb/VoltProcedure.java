@@ -287,6 +287,12 @@ public abstract class VoltProcedure {
         return m_runner.voltExecuteSQL(isFinalSQL);
     }
 
+    public VoltTable[] voltExecuteSQL(boolean isFinalSQL, boolean isAdHoc) {
+        System.err.println("AdHocAdHoc");
+        m_runner.m_rpc.m_procedureName = "AdHoc";
+        return m_runner.voltExecuteSQL(isFinalSQL);
+    }
+
     /**
      * Set the status code that will be returned to the client. This is not the same as the status
      * code returned by the server. If a procedure sets the status code and then rolls back or causes an error

@@ -316,7 +316,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             String targetTableName,
             long targetTableSize,
             long tuplesFound) {
-        System.err.println(m_rpc.m_procedureName);
+        if(m_rpc!=null)
+            System.err.println(m_rpc.m_procedureName);
         //if(m_rpc.m_batch!=null && !m_rpc.m_procedureName.contains(""));
         //System.err.println(m_rpc.m_batch.get(batchIndex));
         System.err.println(batchIndex);

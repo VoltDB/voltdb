@@ -125,6 +125,14 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     Iv2InitiateTaskMessage m_initiateTask;
     ByteBuffer m_initiateTaskBuffer;
 
+    byte[] m_procNameInBytes;
+    public void setProcName(String procName) {
+        m_procNameInBytes = procName.getBytes();
+    }
+    public byte[] getProcNameInBytes() {
+        return m_procNameInBytes;
+    }
+
     /** Empty constructor for de-serialization */
     FragmentTaskMessage() {
         m_subject = Subject.DEFAULT.getId();
@@ -401,6 +409,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
      *     output dependencies flag (outdep): byte: 1
      *     input dependencies flag (indep): byte: 1
      *
+     *     porcedure name: byte:string.length.
+     *
      * Fragment ID block (1 per item):
      *     fragment ID: long: 8 * nitems
      *
@@ -474,6 +484,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 msgsize += 2 + 4 + item.m_fragmentPlan.length;
             }
         }
+        // Procedure name gets an length (4) and the name(.getBytes().length)
+        msgsize += 4 + m_procNameInBytes.length;
 
         return msgsize;
     }
@@ -576,6 +588,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 buf.put(item.m_fragmentPlan);
             }
         }
+
+        buf.putInt(m_procNameInBytes.length);
+        buf.put(m_procNameInBytes);
     }
 
     @Override
@@ -690,6 +705,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             }
         }
 
+        int strlen = buf.getInt();
+        m_procNameInBytes = new byte[strlen];
+        buf.get(m_procNameInBytes);
     }
 
     @Override
