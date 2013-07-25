@@ -81,9 +81,7 @@ public:
         // If any stream handles the notification, it's "handled".
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
             assert(streamPtr != NULL);
-            if (streamPtr != NULL) {
-                handled |= streamPtr->m_context->notifyTupleInsert(tuple);
-            }
+            handled |= streamPtr->m_context->notifyTupleInsert(tuple);
         }
         return handled;
     }
@@ -97,9 +95,7 @@ public:
         // If any context handles the notification, it's "handled".
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
             assert(streamPtr != NULL);
-            if (streamPtr != NULL) {
-                handled |= streamPtr->m_context->notifyTupleUpdate(tuple);
-            }
+            handled |= streamPtr->m_context->notifyTupleUpdate(tuple);
         }
         return handled;
     }
@@ -113,9 +109,7 @@ public:
         // If any context handles the notification, it's "handled".
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
             assert(streamPtr != NULL);
-            if (streamPtr != NULL) {
-                handled |= streamPtr->m_context->notifyTupleDelete(tuple);
-            }
+            handled |= streamPtr->m_context->notifyTupleDelete(tuple);
         }
         return handled;
     }
@@ -126,9 +120,7 @@ public:
     virtual void notifyBlockWasCompactedAway(TBPtr block) {
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
             assert(streamPtr != NULL);
-            if (streamPtr != NULL) {
-                streamPtr->m_context->notifyBlockWasCompactedAway(block);
-            }
+            streamPtr->m_context->notifyBlockWasCompactedAway(block);
         }
     }
 
@@ -139,9 +131,7 @@ public:
                                      TableTuple &sourceTuple, TableTuple &targetTuple) {
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
             assert(streamPtr != NULL);
-            if (streamPtr != NULL) {
-                streamPtr->m_context->notifyTupleMovement(sourceBlock, targetBlock, sourceTuple, targetTuple);
-            }
+            streamPtr->m_context->notifyTupleMovement(sourceBlock, targetBlock, sourceTuple, targetTuple);
         }
     }
 
@@ -170,9 +160,6 @@ public:
         }
         StreamPtr streamPtr = m_streams.at(m_activeStreamIndex);
         assert(streamPtr != NULL);
-        if (streamPtr == NULL) {
-            return TABLE_STREAM_NONE;
-        }
         return streamPtr->m_streamType;
     }
 
@@ -182,7 +169,7 @@ public:
     virtual bool hasStreamType(TableStreamType streamType) const {
         BOOST_FOREACH(const StreamPtr &streamPtr, m_streams) {
             assert(streamPtr != NULL);
-            if (streamPtr != NULL && streamPtr->m_streamType == streamType) {
+            if (streamPtr->m_streamType == streamType) {
                 return true;
             }
         }
