@@ -747,9 +747,9 @@ public abstract class CatalogUtil {
                 ServerExportEnum exportTo = onServer.getExportto();
                 if (exportTo != null) {
                     sb.append( "EXPORTTO ").append(exportTo.name());
-                }
-                if (exportTo.name().equalsIgnoreCase("CUSTOM")) {
-                    sb.append(" EXPORTCONNECTORCLASS ").append(onServer.getExportconnectorclass());
+                    if (exportTo.name().equalsIgnoreCase("CUSTOM")) {
+                        sb.append(" EXPORTCONNECTORCLASS ").append(onServer.getExportconnectorclass());
+                    }
                 }
                 ExportConfigurationType config = onServer.getConfiguration();
                 if (config != null) {
