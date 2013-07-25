@@ -127,6 +127,11 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
                                      AtomicInteger numTables,
                                      SnapshotRegistry.Snapshot snapshotRecord)
     {
+        // no work on this node
+        if (pidToLocalHSIDs.isEmpty()) {
+            return;
+        }
+
         // create a null data target
         final DevNullSnapshotTarget dataTarget = new DevNullSnapshotTarget();
         final Runnable onClose = new TargetStatsClosure(dataTarget,
@@ -134,6 +139,7 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
                                                         numTables,
                                                         snapshotRecord);
         dataTarget.setOnCloseHandler(onClose);
+        m_targets.add(dataTarget);
 
         // go over all local sites, create a task for each source site
         for (IndexSnapshotRequestConfig.PartitionRanges partitionRange : partitionRanges) {
@@ -148,8 +154,6 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
                                           new SnapshotDataFilter[0],
                                           createPredicateForTable(table, partitionRange),
                                           false);
-
-                m_targets.add(dataTarget);
 
                 placeTask(task, Arrays.asList(localHSId));
             }
