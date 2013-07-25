@@ -22,7 +22,6 @@
 #include <vector>
 #include <list>
 #include <boost/shared_ptr.hpp>
-#include <boost/ptr_container/ptr_vector.hpp>
 #include <boost/foreach.hpp>
 #include "common/ids.h"
 #include "common/types.h"
@@ -80,8 +79,9 @@ public:
     virtual bool notifyTupleInsert(TableTuple &tuple) {
         bool handled = false;
         // If any stream handles the notification, it's "handled".
-        BOOST_FOREACH(Stream &stream, m_streams) {
-            handled |= stream.m_context->notifyTupleInsert(tuple);
+        BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+            assert(streamPtr != NULL);
+            handled |= streamPtr->m_context->notifyTupleInsert(tuple);
         }
         return handled;
     }
@@ -93,8 +93,9 @@ public:
     virtual bool notifyTupleUpdate(TableTuple &tuple) {
         bool handled = false;
         // If any context handles the notification, it's "handled".
-        BOOST_FOREACH(Stream &stream, m_streams) {
-            handled |= stream.m_context->notifyTupleUpdate(tuple);
+        BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+            assert(streamPtr != NULL);
+            handled |= streamPtr->m_context->notifyTupleUpdate(tuple);
         }
         return handled;
     }
@@ -106,8 +107,9 @@ public:
     virtual bool notifyTupleDelete(TableTuple &tuple) {
         bool handled = false;
         // If any context handles the notification, it's "handled".
-        BOOST_FOREACH(Stream &stream, m_streams) {
-            handled |= stream.m_context->notifyTupleDelete(tuple);
+        BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+            assert(streamPtr != NULL);
+            handled |= streamPtr->m_context->notifyTupleDelete(tuple);
         }
         return handled;
     }
@@ -116,8 +118,9 @@ public:
      * Block compaction hook.
      */
     virtual void notifyBlockWasCompactedAway(TBPtr block) {
-        BOOST_FOREACH(Stream &stream, m_streams) {
-            stream.m_context->notifyBlockWasCompactedAway(block);
+        BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+            assert(streamPtr != NULL);
+            streamPtr->m_context->notifyBlockWasCompactedAway(block);
         }
     }
 
@@ -126,8 +129,9 @@ public:
      */
     virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
                                      TableTuple &sourceTuple, TableTuple &targetTuple) {
-        BOOST_FOREACH(Stream &stream, m_streams) {
-            stream.m_context->notifyTupleMovement(sourceBlock, targetBlock, sourceTuple, targetTuple);
+        BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+            assert(streamPtr != NULL);
+            streamPtr->m_context->notifyTupleMovement(sourceBlock, targetBlock, sourceTuple, targetTuple);
         }
     }
 
@@ -154,15 +158,18 @@ public:
         if (m_activeStreamIndex < 0 || m_activeStreamIndex >= m_streams.size()) {
             return TABLE_STREAM_NONE;
         }
-        return m_streams.at(m_activeStreamIndex).m_streamType;
+        StreamPtr streamPtr = m_streams.at(m_activeStreamIndex);
+        assert(streamPtr != NULL);
+        return streamPtr->m_streamType;
     }
 
     /**
      * Return true if managing a stream of the specified type.
      */
     virtual bool hasStreamType(TableStreamType streamType) const {
-        BOOST_FOREACH(const Stream &stream, m_streams) {
-            if (stream.m_streamType == streamType) {
+        BOOST_FOREACH(const StreamPtr &streamPtr, m_streams) {
+            assert(streamPtr != NULL);
+            if (streamPtr->m_streamType == streamType) {
                 return true;
             }
         }
@@ -206,7 +213,9 @@ private:
      * scanning completes, like the elastic index. All streams are notified
      * of inserts, updates, deletes, and compactions.
      */
-    boost::ptr_vector<Stream> m_streams;
+    typedef boost::shared_ptr<Stream> StreamPtr;
+    typedef std::vector<StreamPtr> StreamList;
+    StreamList m_streams;
 
     /// The current active stream index. Not valid when m_streams is empty.
     int m_activeStreamIndex;

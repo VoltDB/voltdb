@@ -921,10 +921,11 @@ bool PersistentTable::activateStream(
     ReferenceSerializeInput &serializeIn) {
     /*
      * Allow multiple stream types for the same partition by holding onto the
-     * TableStreamer object as long as the partitionId is the same. TableStreamer
-     * enforces which multiple stream type combinations are allowed.
+     * TableStreamer object. TableStreamer enforces which multiple stream type
+     * combinations are allowed. Expect the partition ID not to change.
      */
-    if (m_tableStreamer == NULL || partitionId != m_tableStreamer->getPartitionID()) {
+    assert(m_tableStreamer == NULL || partitionId == m_tableStreamer->getPartitionID());
+    if (m_tableStreamer == NULL) {
         m_tableStreamer.reset(new TableStreamer(partitionId, *this, tableId));
     }
 
