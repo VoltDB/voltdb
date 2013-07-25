@@ -57,6 +57,8 @@ public class ForeignHost {
     private long m_deadHostTimeout;
     private final AtomicLong m_lastMessageMillis = new AtomicLong(Long.MAX_VALUE);
 
+    private long m_deadReportsCount = 0;
+
     /** ForeignHost's implementation of InputHandler */
     public class FHInputHandler extends VoltProtocolHandler {
 
@@ -230,12 +232,15 @@ public class ForeignHost {
         if ((!m_closing && m_isUp) &&
             (current_delta > m_deadHostTimeout))
         {
-            hostLog.error("DEAD HOST DETECTED, hostname: " + hostname());
-            hostLog.info("\tcurrent time: " + current_time);
-            hostLog.info("\tlast message: " + m_lastMessageMillis);
-            hostLog.info("\tdelta (millis): " + current_delta);
-            hostLog.info("\ttimeout value (millis): " + m_deadHostTimeout);
-            VoltDB.dropStackTrace("Timed out foreign host " + hostname() + " with delta " + current_delta);
+            if (m_deadReportsCount == 0) {
+                hostLog.error("DEAD HOST DETECTED, hostname: " + hostname());
+                hostLog.info("\tcurrent time: " + current_time);
+                hostLog.info("\tlast message: " + m_lastMessageMillis);
+                hostLog.info("\tdelta (millis): " + current_delta);
+                hostLog.info("\ttimeout value (millis): " + m_deadHostTimeout);
+                VoltDB.dropStackTrace("Timed out foreign host " + hostname() + " with delta " + current_delta);
+                m_deadReportsCount++;
+            }
             m_hostMessenger.reportForeignHostFailed(m_hostId);
         }
     }
