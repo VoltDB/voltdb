@@ -49,26 +49,31 @@ TableStreamer::TableStreamer(int32_t partitionId, PersistentTable &table, Catalo
 TableStreamer::~TableStreamer()
 {}
 
+/**
+ * Purge all inactive streams except for elastic.
+ * The elastic index needs to be available after scans complete.
+ */
 void TableStreamer::purgeStreams()
 {
-    // Purge everything but an elastic stream.
-    Stream *elasticStream = NULL;
-    size_t i = 0;
-    for (boost::ptr_vector<Stream>::iterator iter = m_streams.begin();
-         iter != m_streams.end(); ++iter) {
-        if (iter->m_streamType == TABLE_STREAM_ELASTIC_INDEX) {
-            // Rebuild the vector to only contain the elastic stream.
-            elasticStream = m_streams.release(iter).release();
-            break;
-        }
-        ++i;
-    }
-
+    // Rebuild stream list (m_streams) with active and elastic streams.
+    int iStream = 0;
+    int newActiveStreamIndex = -1;
+    StreamList savedStreams(m_streams);
     m_streams.clear();
-    if (elasticStream != NULL) {
-        m_streams.push_back(elasticStream);
+    BOOST_FOREACH(StreamPtr &streamPtr, savedStreams) {
+        assert(streamPtr != NULL);
+        if (streamPtr != NULL) {
+            if (iStream == m_activeStreamIndex) {
+                newActiveStreamIndex = static_cast<int>(m_streams.size());
+                m_streams.push_back(streamPtr);
+            }
+            else if (streamPtr->m_streamType == TABLE_STREAM_ELASTIC_INDEX) {
+                m_streams.push_back(streamPtr);
+            }
+        }
+        ++iStream;
     }
-    m_activeStreamIndex = -1;
+    m_activeStreamIndex = newActiveStreamIndex;
 }
 
 /**
@@ -83,33 +88,24 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                                    TableStreamType streamType,
                                    std::vector<std::string> &predicateStrings)
 {
-    // Reactivate an already-present stream? Also look for an elastic stream.
+    // Reactivate an already-present stream?
     m_activeStreamIndex = -1;
-    size_t i = 0;
-    for (boost::ptr_vector<Stream>::const_iterator iter = m_streams.begin();
-         iter != m_streams.end(); ++iter) {
-        if (m_activeStreamIndex == -1 && iter->m_streamType == streamType) {
-            m_activeStreamIndex = static_cast<int>(i);
+    int iStream = 0;
+    BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+        assert(streamPtr != NULL);
+        if (streamPtr != NULL) {
+            if (m_activeStreamIndex == -1 && streamPtr->m_streamType == streamType) {
+                m_activeStreamIndex = iStream;
+                break;
+            }
         }
-        ++i;
+        ++iStream;
     }
 
-    /*
-     * Conditions for purging non-elastic streams (OR):
-     *  - An elastic stream is active (because non-elastic streams don't serve
-     *    any purpose after streaming completes).
-     *  - No stream is active.
-     * purgeStreams() never gets rid of an elastic stream in case the index is
-     * needed. It also adjusts m_activeStreamIndex if an active elastic stream
-     * moves.
-     */
-    if (   (   m_activeStreamIndex != -1
-            && m_streams.at(m_activeStreamIndex).m_streamType == TABLE_STREAM_ELASTIC_INDEX)
-        || m_activeStreamIndex == -1 ) {
-        purgeStreams();
-    }
+    // Purge unneeded streams.
+    purgeStreams();
 
-    // Activate a new stream?
+    // Activate a new stream (not reactivating an existing one)?
     if (m_activeStreamIndex == -1) {
         /*
          * For now the semantics are that there can be two streams. One is the
@@ -128,7 +124,8 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
         }
         // At this point m_streams is either empty or with a single elastic stream.
         assert(   m_streams.empty()
-               || (m_streams.size() == 1 && m_streams.at(0).m_streamType == TABLE_STREAM_ELASTIC_INDEX));
+               || (   m_streams.size() == 1
+                   && m_streams.at(0)->m_streamType == TABLE_STREAM_ELASTIC_INDEX));
 
         // Create an appropriate streaming context based on the stream type.
         try {
@@ -156,13 +153,14 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                     assert(false);
             }
             m_activeStreamIndex = static_cast<int>(m_streams.size());
-            m_streams.push_back(new Stream(streamType, context));
+            m_streams.push_back(StreamPtr(new Stream(streamType, context)));
         }
         catch(SerializableEEException &e) {
             // The stream will not be added.
         }
     }
-    return (m_activeStreamIndex >= 0);
+
+    return (m_activeStreamIndex != -1);
 }
 
 int64_t TableStreamer::streamMore(TupleOutputStreamProcessor &outputStreams,
@@ -177,12 +175,16 @@ int64_t TableStreamer::streamMore(TupleOutputStreamProcessor &outputStreams,
         // Let the active stream handle it.
         assert(m_activeStreamIndex >= 0 && m_activeStreamIndex < m_streams.size());
         if (m_activeStreamIndex >= 0 && m_activeStreamIndex < m_streams.size()) {
-            Stream &stream = m_streams.at(m_activeStreamIndex);
-            remaining = stream.m_context->handleStreamMore(outputStreams, retPositions);
+            StreamPtr streamPtr = m_streams.at(m_activeStreamIndex);
+            assert(streamPtr != NULL);
+            if (streamPtr != NULL) {
+                remaining = streamPtr->m_context->handleStreamMore(outputStreams, retPositions);
+            }
         }
     }
     if (remaining <= 0) {
         // No longer streaming - purge all but elastic streams (to keep the index around).
+        m_activeStreamIndex = -1;
         purgeStreams();
     }
 
@@ -197,8 +199,11 @@ bool TableStreamer::canSafelyFreeTuple(TableTuple &tuple) const
     bool freeable = true;
     if (m_activeStreamIndex != -1) {
         assert(m_activeStreamIndex >= 0 && m_activeStreamIndex < m_streams.size());
-        const Stream &stream = m_streams.at(m_activeStreamIndex);
-        freeable = stream.m_context->canSafelyFreeTuple(tuple);
+        const StreamPtr streamPtr = m_streams.at(m_activeStreamIndex);
+        assert(streamPtr != NULL);
+        if (streamPtr != NULL) {
+            freeable = streamPtr->m_context->canSafelyFreeTuple(tuple);
+        }
     }
     return freeable;
 }

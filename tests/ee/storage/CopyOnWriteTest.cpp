@@ -859,9 +859,9 @@ public:
     ElasticIndex *getElasticIndex() {
         voltdb::TableStreamer *streamer = dynamic_cast<voltdb::TableStreamer*>(m_table->m_tableStreamer.get());
         if (streamer != NULL) {
-            BOOST_FOREACH(voltdb::TableStreamer::Stream &stream, streamer->m_streams) {
-                if (stream.m_streamType == TABLE_STREAM_ELASTIC_INDEX) {
-                    voltdb::ElasticContext *context = dynamic_cast<ElasticContext*>(stream.m_context.get());
+            BOOST_FOREACH(voltdb::TableStreamer::StreamPtr &streamPtr, streamer->m_streams) {
+                if (streamPtr->m_streamType == TABLE_STREAM_ELASTIC_INDEX) {
+                    voltdb::ElasticContext *context = dynamic_cast<ElasticContext*>(streamPtr->m_context.get());
                     if (context != NULL) {
                         return &context->m_index;
                     }
@@ -1702,6 +1702,11 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
         for (int jj = 0; jj < NUM_MUTATIONS; jj++) {
             doRandomTableMutation(m_table);
         }
+    }
+
+    // Do some extra mutations for good luck.
+    for (int jj = 0; jj < NUM_MUTATIONS; jj++) {
+        doRandomTableMutation(m_table);
     }
 
     checkTuples(NUM_INITIAL + (m_tuplesInserted - m_tuplesDeleted), originalTuples, COWTuples);
