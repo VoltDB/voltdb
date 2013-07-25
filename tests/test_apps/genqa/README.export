@@ -13,7 +13,7 @@ TO RUN remote Export Client Test:
     -- In 3, start the app client:
     ./run.sh async-export
     -- In 4, start the verifier:
-    ./run.sh exportverify
+    ./run.sh export-verify
 
 TO RUN onserver Export Client Test:
 - You'll need 4(four) terminals:
