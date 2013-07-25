@@ -46,9 +46,10 @@
 {_cmp |= ">="}
 {_cmp |= "!="} -- Apparently, an HSQL-supported alias for the standard <>
 
-{_jointype |= "INNER"}
-{_jointype |= "LEFT"}
-{_jointype |= "RIGHT"}
+{_jointype |= " "}
+{_jointype |= " INNER "}
+{_jointype |= " LEFT "}
+{_jointype |= " RIGHT "}
 
 {_setop |= " UNION "}
 {_setop |= " INTERSECT "}

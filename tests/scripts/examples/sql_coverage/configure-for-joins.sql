@@ -14,6 +14,7 @@
 -- reducing the random values to int16 until overflow detection works
 --{@insertvals = "_id, _value[string], _value[int32], _value[float]"}
 {@insertvals = "_id, _value[string], _value[int16], _value[float]"}
+{@numcol = "NUM"}
 {@optionalfn = "_numfun"}
 {@updatecolumn = "NUM"}
 {@updatevalue = "_value[int:0,100]"}

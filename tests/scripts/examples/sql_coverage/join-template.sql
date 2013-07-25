@@ -19,8 +19,7 @@ SELECT * FROM _table LHS13 ,              _table RHS WHERE LHS13.@idcol = RHS.@i
 SELECT * FROM _table LHS14 ,              _table RHS WHERE LHS14.@idcol = RHS.@idcol AND   LHS14._variable[numeric] = 2
 SELECT * FROM _table LHS15 ,              _table RHS WHERE LHS15.@idcol = RHS.@idcol AND   LHS15._variable[@columntype] < 45 AND LHS15._variable[@columntype] = RHS._variable[@comparabletype]
 
-SELECT * FROM _table LHS16 ,              _table RHS WHERE LHS16.@idcol = RHS.@idcol AND   LHS16._variable[#joined numeric] = RHS.__[#joined] AND   RHS.@idcol > 10 AND LHS16.__[#joined] < 30 AND LHS16.__[#joined] >= RHS.@idcol
-
+SELECT * FROM _table LHS16 ,              _table RHS WHERE LHS16.@idcol = RHS.@idcol AND   LHS16.@numcol = RHS.@numcol AND   RHS.@idcol > 10 AND LHS16.@numcol < 30 AND LHS16.@numcol >= RHS.@idcol
 
 SELECT * FROM _table LHS21 @jointype JOIN _table RHS ON                                    LHS21._variable[@columntype] = RHS._variable[@comparabletype]
 SELECT * FROM _table LHS22 @jointype JOIN _table RHS ON    LHS22.@idcol = RHS.@idcol
@@ -28,9 +27,9 @@ SELECT * FROM _table LHS23 @jointype JOIN _table RHS ON    LHS23.@idcol = RHS.@i
 SELECT * FROM _table LHS24 @jointype JOIN _table RHS ON    LHS24.@idcol = RHS.@idcol AND   LHS24._variable[numeric] = 2
 SELECT * FROM _table LHS25 @jointype JOIN _table RHS ON    LHS25.@idcol = RHS.@idcol WHERE LHS25._variable[@columntype] < 45 AND LHS25._variable[@columntype] = RHS._variable[@comparabletype]
 
-SELECT * FROM _table LHS26 @jointype JOIN _table RHS ON    LHS26.@idcol = RHS.@idcol AND   LHS26._variable[#joined numeric] = RHS.__[#joined] WHERE RHS.@idcol > 10 AND LHS26.__[#joined] < 30 AND LHS26.__[#joined] >= RHS.@idcol
+SELECT * FROM _table LHS26 @jointype JOIN _table RHS ON    LHS26.@idcol = RHS.@idcol AND   LHS26.@numcol = RHS.@numcol WHERE RHS.@idcol > 10 AND LHS26.@numcol < 30 AND LHS26.@numcol >= RHS.@idcol
 
 --TODO: ENG-4929 Investigate why these get a planner NullPointerException for a timeout.
---SELECT * FROM _table LHS36 @jointype JOIN _table RHS USING(      @idcol,                         _variable[#joined numeric])          WHERE     @idcol > 10 AND       __[#joined] < 30 AND       __[#joined] >=     @idcol
+--SELECT * FROM _table LHS36 @jointype JOIN _table RHS USING(      @idcol,                         @numcol)          WHERE     @idcol > 10 AND       @numcol < 30 AND       @numcol >=     @idcol
 -- it's not (just) the select * that fails:
---SELECT @idcol, __[#joined] FROM _table LHS36 @jointype JOIN _table RHS USING(      @idcol,       _variable[#joined numeric])          WHERE     @idcol > 10 AND       __[#joined] < 30 AND       __[#joined] >=     @idcol
+--SELECT @idcol, @numcol FROM _table LHS36 @jointype JOIN _table RHS USING(      @idcol,       @numcol)          WHERE     @idcol > 10 AND       @numcol < 30 AND       @numcol >=     @idcol

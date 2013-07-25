@@ -1,4 +1,13 @@
 <configure-for-joins.sql>
+
+-- Run the join-template against the default table in schema.py
+-- Run the template against DDL with a mix of types
+-- Keep the value scaled down here to prevent internal precision issues when dividing by constants > 20?
+
+{@idcol = "ID"}
+{@numcol = "NUM"}
+
+-- Repeat queries with forced data value overlaps between tables.
 <join-template.sql>
 
 -- Force some non-random values to get overlaps -- yes sadly this breaks the schema-independence of the test.
