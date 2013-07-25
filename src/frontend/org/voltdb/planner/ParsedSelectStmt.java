@@ -532,18 +532,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             order_col.alias = alias;
             order_col.tableName = "VOLT_TEMP_TABLE";
             order_col.columnName = "";
-
-            ParsedColInfo orig_col = null;
-            for (ParsedColInfo col : displayColumns) {
-                if (col.alias.equals(order_col.alias)) {
-                    orig_col = col;
-                    break;
-                }
-            }
-            if (orig_col != null && orig_col.tableName.equals("VOLT_TEMP_TABLE")) {
-                orig_col.orderBy = true;
-                orig_col.ascending = order_col.ascending;
-            }
             // Replace its expression to TVE after we build the ExpressionIndexMap
         }
         else if ((child.name.equals("operation") == false) &&
