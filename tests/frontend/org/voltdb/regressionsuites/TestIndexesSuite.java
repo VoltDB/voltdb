@@ -493,6 +493,36 @@ public class TestIndexesSuite extends RegressionSuite {
             assertEquals(4, results[0].getRowCount());
         }
 
+        // Confirm that filters get the expected number of rows before trying the DML that uses them.
+        results = client.callProcedure("@AdHoc", "select count(*) from R1 where DESC IN ('x', 'y', 'z', 'a')" +
+                                                 " and NUM IN (1010, 1020, 1030, -1040, 100)").getResults();
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
+        results[0].advanceRow();
+        assertEquals(1, results[0].getLong(0));
+
+        results = client.callProcedure("@AdHoc", "select count(*) from P1 where DESC IN ('x', 'y', 'z', 'b')" +
+                                                 " and NUM IN (1010, 1020, 1030, -1040, 100)").getResults();
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
+        results[0].advanceRow();
+        assertEquals(1, results[0].getLong(0));
+
+        // Test IN LIST DML interaction ENG-4909 -- this is a plan correctness test --
+        results = client.callProcedure("@AdHoc", "update R1 set NUM = (1000) where DESC IN ('x', 'y', 'z', 'a')" +
+                                                 " and NUM IN (1010, 1020, 1030, -1040, 100)").getResults();
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
+        results[0].advanceRow();
+        assertEquals(1, results[0].getLong(0));
+
+        results = client.callProcedure("@AdHoc", "delete from P1 where DESC IN ('x', 'y', 'z', 'b')" +
+                                                 " and NUM IN (1010, 1020, 1030, -1040, 100)").getResults();
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
+        results[0].advanceRow();
+        assertEquals(1, results[0].getLong(0));
+
     }
 
     public void testTicket195()
