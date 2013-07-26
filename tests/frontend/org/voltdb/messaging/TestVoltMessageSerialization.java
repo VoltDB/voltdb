@@ -49,6 +49,7 @@ public class TestVoltMessageSerialization extends TestCase {
         VoltDbMessageFactory vdbmf = new VoltDbMessageFactory();
 
         VoltMessage msg2 = vdbmf.createMessageFromBuffer(buf1, -1);
+        System.out.println(buf1.remaining());
         System.out.println(msg.getSerializedSize());
         System.out.println(msg2.getSerializedSize());
         ByteBuffer buf2 = ByteBuffer.allocate(msg2.getSerializedSize());
@@ -162,10 +163,10 @@ public class TestVoltMessageSerialization extends TestCase {
 
         FragmentTaskMessage ft2 = (FragmentTaskMessage) checkVoltMessage(ft);
 
-        System.out.println(ft.getInitiatorHSId());
-        System.out.println(new String(ft.getProcNameInBytes()));
-        System.out.println(ft2.getInitiatorHSId());
-        System.out.println(new String(ft2.getProcNameInBytes()));
+//        System.out.println(ft.getInitiatorHSId());
+//        System.out.println(new String(ft.getProcNameInBytes()));
+//        System.out.println(ft2.getInitiatorHSId());
+//        System.out.println(new String(ft2.getProcNameInBytes()));
 
         assertEquals(ft.getInitiatorHSId(), ft2.getInitiatorHSId());
         assertEquals(ft.getCoordinatorHSId(), ft2.getCoordinatorHSId());
@@ -256,9 +257,11 @@ public class TestVoltMessageSerialization extends TestCase {
         assertTrue(ft.m_initiateTaskBuffer != null);
         assertTrue(ft.m_initiateTaskBuffer.remaining() > 0);
 
-
+        System.out.println(new String(ft.getProcNameInBytes()));
         FragmentTaskMessage ft2 = (FragmentTaskMessage) checkVoltMessage(ft);
 
+        System.out.println("ft2 size: "+ft2.getSerializedSize());
+        System.out.println(new String(ft2.getProcNameInBytes()));
         assertTrue(ft2.getInitiateTask() != null);
         assertEquals(ft.getInitiatorHSId(), ft2.getInitiatorHSId());
         assertEquals(ft.getCoordinatorHSId(), ft2.getCoordinatorHSId());
