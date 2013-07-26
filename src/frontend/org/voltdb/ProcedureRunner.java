@@ -1165,6 +1165,7 @@ public class ProcedureRunner {
            state.m_localTask.addInputDepId(i, state.m_depsForLocalTask[i]);
        }
 
+       state.m_localTask.setProcName(m_procedureName);
        // note: non-transactional work only helps us if it's final work
        m_txnState.createLocalFragmentWork(state.m_localTask,
                                           state.m_localFragsAreNonTransactional && finalTask);

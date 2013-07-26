@@ -18,30 +18,26 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
-
-import java.util.concurrent.TimeUnit;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
-
 import org.voltcore.utils.CoreUtils;
-
-import org.voltdb.messaging.DumpMessage;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.BorrowTaskMessage;
+import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -168,6 +164,7 @@ public class MpTransactionState extends TransactionState
             }
             // send to all non-local sites
             if (non_local_hsids.length > 0) {
+                System.err.println("In createAllParticipatingFragmentWork: "+new String(m_remoteWork.getProcNameInBytes()));
                 m_mbox.send(non_local_hsids, m_remoteWork);
             }
         }

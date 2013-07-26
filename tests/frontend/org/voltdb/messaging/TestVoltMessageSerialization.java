@@ -49,6 +49,8 @@ public class TestVoltMessageSerialization extends TestCase {
         VoltDbMessageFactory vdbmf = new VoltDbMessageFactory();
 
         VoltMessage msg2 = vdbmf.createMessageFromBuffer(buf1, -1);
+        System.out.println(msg.getSerializedSize());
+        System.out.println(msg2.getSerializedSize());
         ByteBuffer buf2 = ByteBuffer.allocate(msg2.getSerializedSize());
         msg2.flattenToBuffer(buf2);
         buf1.rewind();
@@ -160,6 +162,11 @@ public class TestVoltMessageSerialization extends TestCase {
 
         FragmentTaskMessage ft2 = (FragmentTaskMessage) checkVoltMessage(ft);
 
+        System.out.println(ft.getInitiatorHSId());
+        System.out.println(new String(ft.getProcNameInBytes()));
+        System.out.println(ft2.getInitiatorHSId());
+        System.out.println(new String(ft2.getProcNameInBytes()));
+
         assertEquals(ft.getInitiatorHSId(), ft2.getInitiatorHSId());
         assertEquals(ft.getCoordinatorHSId(), ft2.getCoordinatorHSId());
         assertEquals(ft.getTxnId(), ft2.getTxnId());
@@ -171,7 +178,7 @@ public class TestVoltMessageSerialization extends TestCase {
 
         assertEquals(ft.isFinalTask(), ft2.isFinalTask());
         assertEquals(ft.isSysProcTask(), ft2.isSysProcTask());
-        assertEquals(ft.getProcNameInBytes(), ft2.getProcNameInBytes());
+        assertEquals(new String(ft.getProcNameInBytes()), new String(ft.getProcNameInBytes()));
     }
 
     public void testFragmentTaskWithTwoFrags() throws IOException {
