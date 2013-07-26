@@ -164,7 +164,6 @@ public class MpTransactionState extends TransactionState
             }
             // send to all non-local sites
             if (non_local_hsids.length > 0) {
-                System.err.println("In createAllParticipatingFragmentWork: "+new String(m_remoteWork.getProcNameInBytes()));
                 m_mbox.send(non_local_hsids, m_remoteWork);
             }
         }

@@ -121,6 +121,6 @@ public abstract class AdHocBase extends VoltSystemProcedure {
             voltQueueSQL(stmt, statement.extractedParamValues.toArray());
         }
 
-        return voltExecuteSQL(true,true);
+        return voltExecuteSQL(true);
     }
 }

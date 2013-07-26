@@ -214,7 +214,7 @@ public class FragmentTask extends TransactionTask
                     fragmentId = siteConnection.getFragmentIdForPlanHash(planHash);
                 }
 
-                if(m_fragmentMsg.getProcNameInBytes() != null) {
+                if(m_fragmentMsg.getProcNameInBytes().length != 0) {
                     m_procContext = new RunningProcedureContext();
                     m_procContext.m_procedureName = new String(m_fragmentMsg.getProcNameInBytes());
                 }

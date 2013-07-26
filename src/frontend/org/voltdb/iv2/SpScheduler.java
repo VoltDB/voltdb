@@ -17,7 +17,6 @@
 
 package org.voltdb.iv2;
 
-import com.google.common.primitives.Longs;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -30,6 +29,7 @@ import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
@@ -281,6 +281,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      * @return true if the message can be delivered directly to the scheduler,
      * false if the message is queued
      */
+    @Override
     public boolean sequenceForReplay(VoltMessage message)
     {
         boolean canDeliver = false;

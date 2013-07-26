@@ -1179,9 +1179,7 @@ public class ProcedureRunner {
                                           state.m_localFragsAreNonTransactional && finalTask);
 
        if (!state.m_distributedTask.isEmpty()) {
-           System.err.println("In executeSlowHomogeneousBatch: "+m_procedureName);
            state.m_distributedTask.setProcName(m_procedureName);
-           System.err.println(new String(state.m_distributedTask.getProcNameInBytes()));
            m_txnState.createAllParticipatingFragmentWork(state.m_distributedTask);
        }
 

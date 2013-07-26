@@ -159,6 +159,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         assert(selfCheck());
     }
 
+    // If you add a new field to the message and you don't want to lose information at all point,
+    // remember to add it to the constructor below, Because this constructor is used to copy a message at some place.
+    // for example, in SpScheduler.handleFragmentTaskMessage()
     // The parameter sets are .duplicate()'d in flattenToBuffer,
     // so we can make a shallow copy here and still be thread-safe
     // when we serialize the copy.
@@ -176,6 +179,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_items = ftask.m_items;
         m_initiateTask = ftask.m_initiateTask;
         m_emptyForRestart = ftask.m_emptyForRestart;
+        m_procNameInBytes = ftask.m_procNameInBytes;
         if (ftask.m_initiateTaskBuffer != null) {
             m_initiateTaskBuffer = ftask.m_initiateTaskBuffer.duplicate();
         }
