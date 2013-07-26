@@ -23,6 +23,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.Level;
@@ -57,7 +58,7 @@ public class ForeignHost {
     private long m_deadHostTimeout;
     private final AtomicLong m_lastMessageMillis = new AtomicLong(Long.MAX_VALUE);
 
-    private long m_deadReportsCount = 0;
+    private AtomicInteger m_deadReportsCount = new AtomicInteger(0);
 
     /** ForeignHost's implementation of InputHandler */
     public class FHInputHandler extends VoltProtocolHandler {
@@ -232,14 +233,13 @@ public class ForeignHost {
         if ((!m_closing && m_isUp) &&
             (current_delta > m_deadHostTimeout))
         {
-            if (m_deadReportsCount == 0) {
+            if (m_deadReportsCount.getAndIncrement() == 0) {
                 hostLog.error("DEAD HOST DETECTED, hostname: " + hostname());
                 hostLog.info("\tcurrent time: " + current_time);
                 hostLog.info("\tlast message: " + m_lastMessageMillis);
                 hostLog.info("\tdelta (millis): " + current_delta);
                 hostLog.info("\ttimeout value (millis): " + m_deadHostTimeout);
                 VoltDB.dropStackTrace("Timed out foreign host " + hostname() + " with delta " + current_delta);
-                m_deadReportsCount++;
             }
             m_hostMessenger.reportForeignHostFailed(m_hostId);
         }
