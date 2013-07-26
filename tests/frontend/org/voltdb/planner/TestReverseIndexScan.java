@@ -76,22 +76,21 @@ public class TestReverseIndexScan extends PlannerTestCase {
         assertEquals(SortDirectionType.DESC, ispn.getSortDirection());
     }
 
-    // has ORDER BY node
+    // ORDER BY: do not do reverse scan optimization
     public void test0031()
     {
         AbstractPlanNode pn = compile("select a, b from t where a = ? and c = ? and b < ? order by b;");
-        pn = pn.getChild(0).getChild(0).getChild(0);
+        pn = pn.getChild(0);
         if (pn != null) {
             System.out.println(pn.toJSONString());
         }
         assertTrue(pn instanceof IndexScanPlanNode);
         IndexScanPlanNode ispn = (IndexScanPlanNode)pn;
         assertEquals("COVER3_TREE", ispn.getTargetIndexName());
-        assertEquals(IndexLookupType.LT, ispn.getLookupType());
-        assertEquals(3, ispn.getSearchKeyExpressions().size());
-        assertEquals(2, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
-        assertEquals(2, ExpressionUtil.uncombine(ispn.getPredicate()).size());
-        assertEquals(SortDirectionType.DESC, ispn.getSortDirection());
+        assertEquals(IndexLookupType.GTE, ispn.getLookupType());
+        assertEquals(2, ispn.getSearchKeyExpressions().size());
+        assertEquals(3, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
+        assertEquals(SortDirectionType.ASC, ispn.getSortDirection());
     }
 
     // no ORDER BY node because order-by is handled by index scan inherent ordering
@@ -148,23 +147,21 @@ public class TestReverseIndexScan extends PlannerTestCase {
         assertEquals(SortDirectionType.DESC, ispn.getSortDirection());
     }
 
-    // has ORDER BY node
+    // ORDER BY: do not do reverse scan optimization
     public void test0061()
     {
         AbstractPlanNode pn = compile("select a, b from t where a = ? and c = ? and b <= ? order by b;");
-        pn = pn.getChild(0).getChild(0).getChild(0);
+        pn = pn.getChild(0);
         if (pn != null) {
             System.out.println(pn.toJSONString());
         }
         assertTrue(pn instanceof IndexScanPlanNode);
         IndexScanPlanNode ispn = (IndexScanPlanNode)pn;
         assertEquals("COVER3_TREE", ispn.getTargetIndexName());
-        assertEquals(IndexLookupType.LTE, ispn.getLookupType());
-        assertEquals(3, ispn.getSearchKeyExpressions().size());
-        assertEquals(2, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
-        assertEquals(2, ExpressionUtil.uncombine(ispn.getPredicate()).size());
-        assertEquals(3, ExpressionUtil.uncombine(ispn.getInitialExpression()).size());
-        assertEquals(SortDirectionType.DESC, ispn.getSortDirection());
+        assertEquals(IndexLookupType.GTE, ispn.getLookupType());
+        assertEquals(2, ispn.getSearchKeyExpressions().size());
+        assertEquals(3, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
+        assertEquals(SortDirectionType.ASC, ispn.getSortDirection());
     }
 
     // no ORDER BY node because order-by is handled by index scan inherent ordering

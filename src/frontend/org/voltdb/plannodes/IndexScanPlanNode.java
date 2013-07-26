@@ -38,10 +38,12 @@ import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
+import org.voltdb.utils.CatalogUtil;
 
 public class IndexScanPlanNode extends AbstractScanPlanNode {
 
@@ -591,16 +593,16 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             else {
                 usageInfo = "\n" + indent;
                 if (m_lookupType == IndexLookupType.LT || m_lookupType == IndexLookupType.LTE) {
-                    usageInfo += "reverse";
+                    usageInfo += "reverse ";
                 }
                 // qualify whether the inequality matching covers all or only some index key components
                 // " " range-scan covering from (event_type = 1) AND (event_start > x.start_time)" vs
                 // " " range-scan on 1 of 2 cols from event_type = 1"
                 if (indexSize == keySize) {
-                    usageInfo += " range-scan covering from " + start;
+                    usageInfo += "range-scan covering from " + start;
                 }
                 else {
-                    usageInfo += String.format(" range-scan on %d of %d cols from %s", keySize, indexSize, start);
+                    usageInfo += String.format("range-scan on %d of %d cols from %s", keySize, indexSize, start);
                 }
                 // Explain the criteria for continuinuing the scan such as
                 // "while (event_type = 1 AND event_start < x.start_time+30)"
@@ -680,5 +682,67 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     public void setForDeterminismOnly() {
         m_forDeterminismOnly = true;
+    }
+
+    // Called by ReplaceWithIndexLimit and ReplaceWithIndexCounter
+    // only apply those optimization if it has no (post-)predicates
+    // except those (post-)predicates are artifact predicates we
+    // added for reverse scan purpose only
+    public boolean isPredicatesOptimizableForAggregate() {
+
+        // for reverse scan, need to examine "added" predicates
+        List<AbstractExpression> predicates = ExpressionUtil.uncombine(m_predicate);
+        // if the size of predicates doesn't equal 2, can't be our added artifact predicates
+        // TODO: someday when index scans on non-nullable values are recognized, soften this
+        // test to make the NOT NULL predicate optional
+        if (predicates.size() != 2) {
+            return false;
+        }
+        // examin each possible "added" predicates
+        // the 1st predicate must matches the last searchKey and the 2nd is NOT NULL expr
+        AbstractExpression expr = predicates.get(0);
+        if (expr.getExpressionType() != ExpressionType.COMPARE_LESSTHAN &&
+                expr.getExpressionType() != ExpressionType.COMPARE_LESSTHANOREQUALTO) {
+            return false;
+        }
+        int searchKeyCount = m_searchkeyExpressions.size();
+        String exprsjson = m_catalogIndex.getExpressionsjson();
+        AbstractExpression left = expr.getLeft();
+        if (exprsjson.isEmpty()) {
+            if (left.getExpressionType() != ExpressionType.VALUE_TUPLE) {
+                return false;
+            }
+            if (((TupleValueExpression)left).getColumnIndex() !=
+                    CatalogUtil.getSortedCatalogItems(m_catalogIndex.getColumns(), "index").get(searchKeyCount - 1).getColumn().getIndex()) {
+                return false;
+            }
+        } else {
+            List<AbstractExpression> indexedExprs = null;
+            try {
+                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, null);
+            } catch (JSONException e) {
+                e.printStackTrace();
+                assert(false);
+                return false;
+            }
+            if (left.equals(indexedExprs.get(searchKeyCount - 1))) {
+                return false;
+            }
+        }
+        if (!expr.getRight().equals(m_searchkeyExpressions.get(searchKeyCount - 1))) {
+            return false;
+        }
+        expr = predicates.get(1);
+        if (expr.getExpressionType() != ExpressionType.OPERATOR_NOT) {
+            return false;
+        }
+        if (expr.getLeft().getExpressionType() != ExpressionType.OPERATOR_IS_NULL) {
+            return false;
+        }
+        if (!expr.getLeft().getLeft().equals(predicates.get(0).getLeft())) {
+            return false;
+        }
+
+        return true;
     }
 }

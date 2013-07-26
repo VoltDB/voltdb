@@ -42,7 +42,7 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
 
     private AbstractExpression m_tableData;
     private final TupleValueExpression m_outputExpression = new TupleValueExpression();
-    private SortDirectionType m_sortDirection = SortDirectionType.DESC;
+    private SortDirectionType m_sortDirection = SortDirectionType.INVALID;
 
     public enum Members {
         TABLE_DATA,
@@ -137,7 +137,9 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
         m_tableData.toJSONString(stringer);
         stringer.endObject();
 
-        stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirection.toString());
+        if (m_sortDirection == SortDirectionType.DESC) {
+            stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirection.toString());
+        }
     }
 
     @Override
@@ -148,8 +150,9 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
         JSONObject tableDataObj = obj.getJSONObject(Members.TABLE_DATA.name());
         m_tableData = AbstractExpression.fromJSONObject(tableDataObj, db);
 
-        assert(!obj.isNull(Members.SORT_DIRECTION.name()));
-        m_sortDirection = SortDirectionType.get(obj.getString( Members.SORT_DIRECTION.name()));
+        if (!obj.isNull(Members.SORT_DIRECTION.name())) {
+            m_sortDirection = SortDirectionType.get(obj.getString( Members.SORT_DIRECTION.name()));
+        }
     }
 
 }

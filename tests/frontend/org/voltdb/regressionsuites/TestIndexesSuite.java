@@ -621,22 +621,14 @@ public class TestIndexesSuite extends RegressionSuite {
         tableI++;
         rowI = 0;
         assertEquals( 3, results[tableI].getRowCount());
-        // following won't work anymore after adding reserve scan
-        // because jni and hsql produce difference order result
+        // after adding reserve scan, JNI and HSQL will report
+        // tuples in different order
         // so, add them to a set and ignore the order instead
         final VoltTableRow rowLTE0 = results[tableI].fetchRow(rowI++);
-//        assertEquals( -1, rowLTE0.getLong(0));
-//        assertEquals( 0, rowLTE0.getLong(1));
-//
         final VoltTableRow rowLTE1 = results[tableI].fetchRow(rowI++);
-//        assertEquals( 0, rowLTE1.getLong(0));
-//        assertEquals( 0, rowLTE1.getLong(1));
-//
         final VoltTableRow rowLTE2 = results[tableI].fetchRow(rowI++);
-//        assertEquals( 0, rowLTE2.getLong(0));
-//        assertEquals( 1, rowLTE2.getLong(1));
-
         HashSet<Long> TID = new HashSet<Long>();
+
         HashSet<Long> BID = new HashSet<Long>();
         HashSet<Long> expectedTID = new HashSet<Long>();
         HashSet<Long> expectedBID = new HashSet<Long>();

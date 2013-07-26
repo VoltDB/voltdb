@@ -520,11 +520,16 @@ public abstract class SubPlanAssembler {
             retval.use = IndexUseType.INDEX_SCAN;
             retval.bindings.addAll(endingBoundExpr.getBindings());
 
-            if (startingBoundExpr != null) {
+            // if we already have a lower bound, or the sorting direction is already determined
+            // do not do the reverse scan optimization
+            if (startingBoundExpr != null || retval.sortDirection == SortDirectionType.ASC) {
                 retval.endExprs.add(comparator);
+                if (retval.lookupType == IndexLookupType.EQ) {
+                    retval.lookupType = IndexLookupType.GTE;
+                }
             } else {
                 // only do reverse scan optimization when no startingBoundExpr and lookup type is
-                // either < or <=
+                // either < or <=, so do not optimize BETWEEN.
                 if (comparator.getExpressionType() == ExpressionType.COMPARE_LESSTHAN) {
                     retval.lookupType = IndexLookupType.LT;
                 } else if (comparator.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO) {
@@ -543,7 +548,11 @@ public abstract class SubPlanAssembler {
                     retval.indexExprs.add(comparator);
                     // put it to post-filter as well
                     retval.otherExprs.add(comparator);
-                    // construct a NOT NULL COMPARATOR for this comparison and add to poster-filter
+                    // Unlike a lower bound, an upper bound does not automatically filter out nulls
+                    // as required by the comparison filter, so construct a NOT NULL comparator and
+                    // add to post-filter
+                    // TODO: Implement an abstract isNullable() method on AbstractExpression and use
+                    // that here to optimize out the "NOT NULL" comparator for NOT NULL columns
                     AbstractExpression newComparator = new OperatorExpression(ExpressionType.OPERATOR_NOT,
                             new OperatorExpression(ExpressionType.OPERATOR_IS_NULL), null);
                     newComparator.getLeft().setLeft(comparator.getLeft());

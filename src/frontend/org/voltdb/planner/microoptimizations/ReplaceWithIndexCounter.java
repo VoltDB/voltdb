@@ -102,58 +102,10 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
 
         IndexScanPlanNode isp = (IndexScanPlanNode)child;
 
-        // An index count or table count can replace an index scan only if it has no (post-)predicates.
-        if (isp.getPredicate() != null) {
-            // for reverse scan, need to examine "added" predicates
-            List<AbstractExpression> predicates = ExpressionUtil.uncombine(isp.getPredicate());
-            // if the size of predicates doesn't equal 2, can't be our added artifact predicates
-            if (predicates.size() != 2) {
-                return plan;
-            }
-            // examin each possible "added" predicates
-            // the 1st predicate must matches the last searchKey and the 2nd is NOT NULL expr
-            AbstractExpression expr = predicates.get(0);
-            if (expr.getExpressionType() != ExpressionType.COMPARE_LESSTHAN &&
-                    expr.getExpressionType() != ExpressionType.COMPARE_LESSTHANOREQUALTO) {
-                return plan;
-            }
-            int searchKeyCount = isp.getSearchKeyExpressions().size();
-            String exprsjson = isp.getCatalogIndex().getExpressionsjson();
-            AbstractExpression left = expr.getLeft();
-            if (exprsjson.isEmpty()) {
-                if (left.getExpressionType() != ExpressionType.VALUE_TUPLE) {
-                    return plan;
-                }
-                if (((TupleValueExpression)left).getColumnIndex() !=
-                        CatalogUtil.getSortedCatalogItems(isp.getCatalogIndex().getColumns(), "index").get(searchKeyCount - 1).getColumn().getIndex()) {
-                    return plan;
-                }
-            } else {
-                List<AbstractExpression> indexedExprs = null;
-                try {
-                    indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, null);
-                } catch (JSONException e) {
-                    e.printStackTrace();
-                    assert(false);
-                    return plan;
-                }
-                if (left.equals(indexedExprs.get(searchKeyCount - 1))) {
-                    return plan;
-                }
-            }
-            if (!expr.getRight().equals(isp.getSearchKeyExpressions().get(searchKeyCount - 1))) {
-                return plan;
-            }
-            expr = predicates.get(1);
-            if (expr.getExpressionType() != ExpressionType.OPERATOR_NOT) {
-                return plan;
-            }
-            if (expr.getLeft().getExpressionType() != ExpressionType.OPERATOR_IS_NULL) {
-                return plan;
-            }
-            if (!expr.getLeft().getLeft().equals(predicates.get(0).getLeft())) {
-                return plan;
-            }
+        // An index count or table count can replace an index scan only if it has no (post-)predicates
+        // except those (post-)predicates are artifact predicates we added for reverse scan purpose only
+        if (isp.getPredicate() != null && !isp.isPredicatesOptimizableForAggregate()) {
+            return plan;
         }
 
         // With no start or end keys, there's not much a counting index can do.

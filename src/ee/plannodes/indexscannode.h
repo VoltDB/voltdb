@@ -94,7 +94,6 @@ class IndexScanPlanNode : public AbstractScanPlanNode {
         std::vector<AbstractExpression*>& getSearchKeyExpressions();
         const std::vector<AbstractExpression*>& getSearchKeyExpressions() const;
 
-        void setInitialExpression(AbstractExpression* val);
         AbstractExpression* getInitialExpression() const;
 
         std::string debugInfo(const std::string &spacer) const;

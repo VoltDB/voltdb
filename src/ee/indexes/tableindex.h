@@ -273,9 +273,9 @@ public:
         throwFatalException("Invoked TableIndex virtual method moveToLessThanKey which has no implementation");
     };
 
-    virtual void moveToStartEntry()
+    virtual void moveToBeforePriorEntry()
     {
-        throwFatalException("Invoked TableIndex virtual method moveToPrevEntry which has no implementation");
+        throwFatalException("Invoked TableIndex virtual method moveToBeforePriorEntry which has no implementation");
     }
 
     /**

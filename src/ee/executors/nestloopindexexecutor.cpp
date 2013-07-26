@@ -436,17 +436,16 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                                 break; // the outer while loop
                             }
                             else {
-                                // VoltDB should only support LT or LTE with
-                                // empty search keys for order-by without lookup
+                                // overflow of LT or LTE should be treated as LTE
+                                // to issue an "initial" forward scan
                                 localLookupType = INDEX_LOOKUP_TYPE_LTE;
                             }
                         }
                         if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
                             if ((localLookupType == INDEX_LOOKUP_TYPE_LT) ||
                                 (localLookupType == INDEX_LOOKUP_TYPE_LTE)) {
-
-                                // VoltDB should only support LT or LTE with
-                                // empty search keys for order-by without lookup
+                                // overflow of LT or LTE should be treated as LTE
+                                // to issue an "initial" forward scans
                                 localLookupType = INDEX_LOOKUP_TYPE_LTE;
                             }
                             else {
@@ -515,7 +514,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                             }
                         }
                         // just passed the first failed entry, so move 2 backward
-                        index->moveToStartEntry();
+                        index->moveToBeforePriorEntry();
                     }
                     else {
                         return false;

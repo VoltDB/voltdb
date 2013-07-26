@@ -42,8 +42,10 @@ namespace voltdb {
         PlannerDomValue rowExpressionObj = obj.valueForKey("TABLE_DATA");
         assert(!m_tableRowsExpression);
         m_tableRowsExpression = AbstractExpression::buildExpressionTree(rowExpressionObj);
-        std::string sortDirectionString = obj.valueForKey("SORT_DIRECTION").asStr();
-        m_sortDirection = stringToSortDirection(sortDirectionString);
+        if (obj.hasNonNullKey("SORT_DIRECTION")) {
+            std::string sortDirectionString = obj.valueForKey("SORT_DIRECTION").asStr();
+            m_sortDirection = stringToSortDirection(sortDirectionString);
+        }
     }
 
 }

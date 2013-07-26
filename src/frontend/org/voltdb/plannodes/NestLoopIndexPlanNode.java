@@ -76,9 +76,8 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         m_hasSignificantOutputSchema = true;
 
         if (m_children.get(0).getPlanNodeType() == PlanNodeType.MATERIALIZEDSCAN) {
-            if (((MaterializedScanPlanNode)m_children.get(0)).getSortDirection() == inlineScan.getSortDirection()) {
-                m_sortDirection = inlineScan.getSortDirection();
-            }
+            assert (((MaterializedScanPlanNode)m_children.get(0)).getSortDirection() == inlineScan.getSortDirection());
+            m_sortDirection = inlineScan.getSortDirection();
         }
     }
 

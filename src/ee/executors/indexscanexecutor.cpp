@@ -399,7 +399,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                 }
             }
             // just passed the first failed entry, so move 2 backward
-            m_index->moveToStartEntry();
+            m_index->moveToBeforePriorEntry();
         }
         else {
             return false;

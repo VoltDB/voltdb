@@ -883,7 +883,6 @@ public class PlanAssembler {
             return root;
         }
 
-        boolean canSkip = false;
         SortDirectionType sortDirection = SortDirectionType.INVALID;
 
         // Skip the explicit ORDER BY plan step if an IndexScan is already providing the equivalent ordering.
@@ -893,7 +892,7 @@ public class PlanAssembler {
         if (root.getPlanNodeType() == PlanNodeType.INDEXSCAN) {
             sortDirection = ((IndexScanPlanNode) root).getSortDirection();
             if (sortDirection != SortDirectionType.INVALID) {
-                canSkip = true;
+                return root;
             }
         }
         // Optimization for NestLoopIndex on IN list
@@ -901,7 +900,7 @@ public class PlanAssembler {
         if (root.getPlanNodeType() == PlanNodeType.NESTLOOPINDEX) {
             sortDirection = ((NestLoopIndexPlanNode)root).getSortDirection();
             if (sortDirection != SortDirectionType.INVALID) {
-                canSkip = true;
+                return root;
             }
         }
 
@@ -910,15 +909,6 @@ public class PlanAssembler {
             orderByNode.addSort(col.expression,
                                 col.ascending ? SortDirectionType.ASC
                                               : SortDirectionType.DESC);
-            if (canSkip) {
-                if (sortDirection != (col.ascending ? SortDirectionType.ASC : SortDirectionType.DESC)) {
-                    canSkip = false;
-                }
-            }
-        }
-
-        if (canSkip) {
-            return root;
         }
 
         orderByNode.addAndLinkChild(root);

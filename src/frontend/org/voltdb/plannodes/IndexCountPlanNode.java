@@ -132,7 +132,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     // @return the IndexCountPlanNode or null if one is not possible.
     public static IndexCountPlanNode createOrNull(IndexScanPlanNode isp, AggregatePlanNode apn)
     {
-        // add support for reserve scan
+        // add support for reverse scan
         // for ASC scan, check endExpression; for DESC scan, need to check searchkeys
         List<AbstractExpression> endKeys = new ArrayList<AbstractExpression>();
         // Initially assume that there will be an equality filter on all key components.

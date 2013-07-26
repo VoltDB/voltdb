@@ -118,15 +118,6 @@ const std::vector<AbstractExpression*>& IndexScanPlanNode::getSearchKeyExpressio
     return (this->searchkey_expressions);
 }
 
-void IndexScanPlanNode::setInitialExpression(AbstractExpression* val) {
-    // only expect this to be initialized once
-    if (initial_expression && initial_expression != val)
-    {
-        throwFatalException("initial_expression initialized twice in IndexScanPlanNode?");
-        delete initial_expression;
-    }
-    this->initial_expression = val;
-}
 AbstractExpression* IndexScanPlanNode::getInitialExpression() const {
     return (this->initial_expression);
 }
