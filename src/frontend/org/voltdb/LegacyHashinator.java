@@ -30,7 +30,7 @@ public class LegacyHashinator extends TheHashinator {
     private static final VoltLogger hostLogger = new VoltLogger("HOST");
 
     @Override
-    protected int pHashinateLong(long value) {
+    public int pHashinateLong(long value) {
         // special case this hard to hash value to 0 (in both c++ and java)
         if (value == Long.MIN_VALUE) return 0;
 
@@ -40,7 +40,7 @@ public class LegacyHashinator extends TheHashinator {
     }
 
     @Override
-    protected int pHashinateBytes(byte[] bytes) {
+    public int pHashinateBytes(byte[] bytes) {
         int hashCode = 0;
         int offset = 0;
         for (int ii = 0; ii < bytes.length; ii++) {
@@ -61,24 +61,24 @@ public class LegacyHashinator extends TheHashinator {
     }
 
     @Override
-    protected Pair<HashinatorType, byte[]> pGetCurrentConfig() {
+    public Pair<HashinatorType, byte[]> pGetCurrentConfig() {
         return Pair.of(HashinatorType.LEGACY, m_configBytes);
     }
 
     @Override
-    protected Map<Long, Integer> pPredecessors(int partition)
+    public Map<Long, Integer> pPredecessors(int partition)
     {
         throw new RuntimeException("Legacy hashinator doesn't support predecessors");
     }
 
     @Override
-    protected Pair<Long, Integer> pPredecessor(int partition, long token)
+    public Pair<Long, Integer> pPredecessor(int partition, long token)
     {
         throw new RuntimeException("Legacy hashinator doesn't support predecessors");
     }
 
     @Override
-    protected Map<Long, Long> pGetRanges(int partition)
+    public Map<Long, Long> pGetRanges(int partition)
     {
         throw new RuntimeException("Getting ranges is not supported in the legacy hashinator");
     }
