@@ -345,7 +345,9 @@ public abstract class AbstractParsedStmt {
         String tableName = exprNode.attributes.get("table");
         if (tableName == null && !exprNode.children.isEmpty()) {
             VoltXMLElement childExpr = exprNode.children.get(0);
-            return parseColumnRefExpression(childExpr);
+            if (childExpr.name.toLowerCase().equals("columnref")) {
+                    return parseColumnRefExpression(childExpr);
+            }
         }
         String columnName = exprNode.attributes.get("column");
 
