@@ -82,15 +82,19 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                                    TableStreamType streamType,
                                    std::vector<std::string> &predicateStrings)
 {
+    // It's an error if any stream is active. Let Java figure out how to recover,
+    // e.g. by finishing the serializeMore() call sequence.
+    TableStreamType activeStreamType = getActiveStreamType();
+    if (activeStreamType != TABLE_STREAM_NONE) {
+        VOLT_ERROR("An existing stream is still active (type %d).",
+                   static_cast<int>(activeStreamType));
+        return false;
+    }
+
     // It's an error (handled below) if the stream type is already present.
     // Everything should have been purged except for any elastic stream if
     // streamMore() had been called repeatedly until it returned 0.
-    bool alreadyPresent = hasStreamType(streamType);
-
-    // Purge unneeded streams, e.g. to handle streamMore() not being completely drained.
-    purgeStreams();
-
-    if (alreadyPresent) {
+    if (hasStreamType(streamType)) {
         if (streamType == TABLE_STREAM_ELASTIC_INDEX) {
             // If starting a new elastic index stream get rid of the old one.
             m_streams.clear();
@@ -100,6 +104,9 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
             return false;
         }
     }
+
+    // Purge unneeded streams, e.g. to handle streamMore() not being completely drained.
+    purgeStreams();
 
     // Create an appropriate streaming context based on the stream type.
     try {
