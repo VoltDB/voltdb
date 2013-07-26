@@ -177,7 +177,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         // except those (post-)predicates are artifact predicates
         // we added for reverse scan purpose only
         if (((IndexScanPlanNode)child).getPredicate() != null &&
-                ((IndexScanPlanNode)child).isPredicatesOptimizableForAggregate()) {
+                !((IndexScanPlanNode)child).isPredicatesOptimizableForAggregate()) {
             return plan;
         }
 
