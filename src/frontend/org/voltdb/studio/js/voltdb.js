@@ -225,7 +225,7 @@ var IVoltDB = (function(){
                           , '@Resume': { '0' : [] }
                           , '@Shutdown': { '0' : [] }
                           , '@SnapshotDelete': { '2' : ['varchar', 'varchar'] }
-                          , '@SnapshotRestore': { '2' : ['varchar', 'varchar'] }
+                          , '@SnapshotRestore': { '1' : ['varchar'],'2' : ['varchar', 'varchar'] }
                           , '@SnapshotSave': { '3' : ['varchar', 'varchar', 'bit'], '1' : ['varchar'] }
                           , '@SnapshotScan': { '1' : ['varchar'] }
                           , '@SnapshotStatus': { '0' : [] }
@@ -293,7 +293,7 @@ var IVoltDB = (function(){
                                                   , '@Resume': { '0' : ['Returns bit'] }
                                                   , '@Shutdown': { '0' : ['Returns bit'] }
                                                   , '@SnapshotDelete': { '2' : ['DirectoryPath (varchar)', 'UniqueId (varchar)', 'Returns Table[]'] }
-                                                  , '@SnapshotRestore': { '2' : ['DirectoryPath (varchar)', 'UniqueId (varchar)', 'Returns Table[]'] }
+                                                  , '@SnapshotRestore': { '2' : ['DirectoryPath (varchar)', 'UniqueId (varchar)', 'Returns Table[]'], '1' : ['JSON (varchar)', 'Returns Table[]'] }
                                                   , '@SnapshotSave': { '3' : ['DirectoryPath (varchar)', 'UniqueId (varchar)', 'Blocking (bit)', 'Returns Table[]'], '1' : ['JSON (varchar)', 'Returns Table[]']  }
                                                   , '@SnapshotScan': { '1' : ['DirectoryPath (varchar)', 'Returns Table[]'] }
                                                   , '@SnapshotStatus': { '0' : ['Returns Table[]'] }
@@ -366,7 +366,6 @@ var IVoltDB = (function(){
                 childConnectionQueue.End(function(state) { connection.Ready = true; if (onconnectionready != null) onconnectionready(connection, state); }, null);
             }, null);
     }
-
 
     this.TestConnection = function(server, port, admin, user, password, isHashedPassword, onConnectionTested)
     {
