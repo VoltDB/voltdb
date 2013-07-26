@@ -48,6 +48,26 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     Catalog m_catalog;
     int m_relativeIndex;
 
+    // Annotation where additional non-runtime info can be squirreled away
+    // Used by the compiler report generator for now
+    Object m_annotation = null;
+
+    /**
+     * Gets any annotation added to this instance.
+     * @return Annotation object or null.
+     */
+    public Object getAnnotation() {
+        return m_annotation;
+    }
+
+    /**
+     * Sets the annotation object for this instance.
+     * @param annotation Annotation object or null.
+     */
+    public void setAnnotation(Object annotation) {
+        m_annotation = annotation;
+    }
+
     /**
      * Get the parent of this CatalogType instance
      * @return The parent of this CatalogType instance

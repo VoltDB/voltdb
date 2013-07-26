@@ -21,14 +21,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import java.util.Map.Entry;
-
-import org.voltdb.messaging.FragmentResponseMessage;
-
-import org.voltdb.utils.MiscUtils;
-
 import org.voltdb.VoltTable;
+import org.voltdb.messaging.FragmentResponseMessage;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTableUtil;
 
 /**
@@ -45,9 +41,8 @@ public class SysProcDuplicateCounter extends DuplicateCounter
     SysProcDuplicateCounter(
             long destinationHSId,
             long realTxnId,
-            List<Long> expectedHSIds)
-    {
-        super(destinationHSId, realTxnId, expectedHSIds);
+            List<Long> expectedHSIds, String procName)    {
+        super(destinationHSId, realTxnId, expectedHSIds, procName);
     }
 
     /**

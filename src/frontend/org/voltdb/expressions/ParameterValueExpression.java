@@ -33,10 +33,12 @@ import org.voltdb.types.ExpressionType;
 public class ParameterValueExpression extends AbstractValueExpression {
 
     public enum Members {
-        PARAM_IDX;
+        PARAM_IDX,
+        PARAM_IS_VECTOR;
     }
 
-    protected int m_paramIndex = -1;
+    int m_paramIndex = -1;
+    private boolean m_paramIsVector = false;
     // Only parameters injected by the plan cache "parameterizer" have an associated constant
     // representing the original statement's constant value that the parameter replaces.
     // The constant value does not need to participate in parameter value identity (equality/hashing)
@@ -51,6 +53,7 @@ public class ParameterValueExpression extends AbstractValueExpression {
     public Object clone() {
         ParameterValueExpression clone = (ParameterValueExpression)super.clone();
         clone.m_paramIndex = m_paramIndex;
+        clone.m_paramIsVector = m_paramIsVector;
         clone.m_originalValue = m_originalValue;
         return clone;
     }
@@ -89,25 +92,36 @@ public class ParameterValueExpression extends AbstractValueExpression {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.key(Members.PARAM_IDX.name()).value(m_paramIndex);
+        if (m_paramIsVector) {
+            stringer.key(Members.PARAM_IS_VECTOR.name()).value(m_paramIsVector);
+        }
     }
 
     @Override
     public void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {
-        if (!obj.isNull(Members.PARAM_IDX.name())) {
-            m_paramIndex = obj.getInt(Members.PARAM_IDX.name());
+        assert ! obj.isNull(Members.PARAM_IDX.name());
+        m_paramIndex = obj.getInt(Members.PARAM_IDX.name());
+        if (!obj.isNull(Members.PARAM_IS_VECTOR.name())) {
+            m_paramIsVector = obj.getBoolean(Members.PARAM_IS_VECTOR.name());
         }
     }
 
     @Override
-    public void refineValueType(VoltType columnType) {
-        if (m_valueType != null && m_valueType != VoltType.NUMERIC) {
-            return;
+    public void refineValueType(VoltType neededType, int neededSize) {
+        if (m_originalValue != null) {
+            // Do not push down a target type that contradicts the original constant value
+            // of a generated parameter.
+            m_originalValue.refineValueType(neededType, neededSize);
+            VoltType fallbackType = m_originalValue.getValueType();
+            if (fallbackType != neededType) {
+                setValueType(fallbackType);
+                setValueSize(fallbackType.getLengthInBytesForFixedTypes());
+                return;
+            }
         }
-        if ((columnType == VoltType.FLOAT) || (columnType == VoltType.DECIMAL) || columnType.isInteger()) {
-            m_valueType = columnType;
-            m_valueSize = columnType.getLengthInBytesForFixedTypes();
-            return;
-        }
+        // Otherwise, target knows best?
+        setValueType(neededType);
+        setValueSize(neededSize);
     }
 
     @Override
@@ -129,12 +143,62 @@ public class ParameterValueExpression extends AbstractValueExpression {
 
     @Override
     public void finalizeValueTypes() {
-        // At this late stage, it's better to force a specific type than to leave one that will only
-        // cause problems in the ProcedureRunner (chokes on null or NUMERIC) or executor (chokes on NUMERIC).
+        // The setting of m_valueType on each ParameterValueExpression is especially significant
+        // because it drives the early argument type validation in voltQueueSQL or in
+        // ProcedureRunner's parameter-set processing for single-statement procedures.
+        // At this late stage of statement initialization,
+        // it's considered better to force a specific type than to leave one that
+        // will only cause problems in the ProcedureRunner (has been known to choke on null or NUMERIC)
+        // or executor (has been known to choke at least on NUMERIC).
+        // In many scenarios, the required type of the parameter has already been determined from its
+        // expression context. The HSQL parser takes a first (flawed?) pass at this and it gets later
+        // refined as VoltDB statement/expression initialization proceeds.
+        // Yet gaps (cases of null and NUMERIC m_valueType) remain, requiring this finalizaton step
+        // to fill them in.
+        // Algorithm: If the parameter is from a parameterized constant, and the constant was integral,
+        // take this as a sign that the parameter's value (and future values when the parameterized
+        // plan can get re-used) should be integral.
+        // Otherwise fall back to FLOAT. The rationale for that choice is that it seems to
+        // work out for the cases that have historically fallen through the cracks.
+        //
+        // TODO: consider leaving room for type ambiguity.
+        // It is possible that some of the problem being "solved" here is actually better solved by
+        // de-sensitizing the ProcedureRunner and/or EE.
+        // Rationale: It seems plausible for a plan to not do very much with a parameter
+        // that would indicate/restrict the type of the parameter.
+        // Such a plan might just work regardless of the type of the actual parameter value
+        // -- as long as the actual parameter had any valid concrete type.
+        // Similarly, a plan that applied some generic arithmetic to a parameter in a way that did not
+        // indicate or constrain the result type might just work regardless of the type of the actual
+        // parameter value -- EXCEPT for the requirement that it be some concrete NUMERIC sub-type.
+        // There are dozens of lines of NValue code in the EE that guard against abuses like applying
+        // arithmetic to strings or string operations to numeric types, but it seems better to catch
+        // the more obvious cases that involve constants at planning time -- as the HSQL parser tends
+        // to do -- and to catch the more obvious cases that involve parameters at statement invocation
+        // time in voltQueueSQL and ProcedureRunner.
+        // There are also dozens of lines of NValue code in the EE intending to provide flexibility
+        // in choice of exact numeric types to arithmetic operators, etc., so there is some reason to
+        // have confidence that at least SOME plans are capable of correct execution when invoked with
+        // variously typed parameters, especially if restricted to various numeric types.
+        // It is POSSIBLE that the EE's over-sensitivity to ambiguous types is
+        // isolated to something obscure like expression deserialization.
+        // That is, it may be gagging on input that it could otherwise easily stomach.
+        // ON THE OTHER HAND, it's not guaranteed that the planner itself is quite ready to
+        // operate and generate optimal plans when parameter types may be left ambiguous here.
+        // Worst case, is it possible that the determination of parameter types here is influencing
+        // the choice of the best applicable plan, so that plan choice would have to be
+        // conditional on the concrete type of the parameters passed in?
+        // There IS (or was?) at least one case of type-checking in the code that considers
+        // indexed access paths, but it might not be critical (i.e. might be obsolete).
         if (m_valueType != null && m_valueType != VoltType.NUMERIC) {
             return;
         }
-        m_valueType = VoltType.FLOAT;
+        VoltType fallbackType = VoltType.FLOAT;
+        if (m_originalValue != null) {
+            m_originalValue.refineOperandType(VoltType.BIGINT);
+            fallbackType = m_originalValue.getValueType(); // Typically BIGINT or FLOAT.
+        }
+        m_valueType = fallbackType;
         m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
     }
 
@@ -164,6 +228,16 @@ public class ParameterValueExpression extends AbstractValueExpression {
     @Override
     public String explain(String unused) {
         return "?" + m_paramIndex;
+    }
+
+    // Mark a parameter as vector-valued, so that it can properly drive argument type checking for
+    // cases like "col in ?", especially for single-statement procedures. This setting is irreversible.
+    public void setParamIsVector() {
+        m_paramIsVector = true;
+    }
+
+    public boolean getParamIsVector() {
+        return m_paramIsVector;
     }
 
 }

@@ -14,19 +14,22 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.voltdb.exportclient;
 
-import java.util.Properties;
+package org.voltdb.compilereport;
 
-public abstract class ExportClientBase2 extends ExportClientBase {
-    public ExportClientBase2(boolean useAdminPorts, int throughputDisplayPeriod, boolean autodiscoverTopology) {
-        super(useAdminPorts, throughputDisplayPeriod, autodiscoverTopology);
-    }
+import java.util.SortedSet;
+import java.util.TreeSet;
 
-    public ExportClientBase2(boolean useAdminPorts) {
-        super(useAdminPorts);
-    }
+import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Statement;
 
-    public abstract void configure( Properties config) throws Exception;
-    public abstract void shutdown( );
+/**
+ * Extra information generated during the compilation process, used by the ReportMaker.
+ * Gets attached to the m_annotation field in CatalogType.
+ * This one is for indexes.
+ *
+ */
+public class IndexAnnotation {
+    public SortedSet<Statement> statementsThatUseThis = new TreeSet<Statement>();
+    public SortedSet<Procedure> proceduresThatUseThis = new TreeSet<Procedure>();
 }

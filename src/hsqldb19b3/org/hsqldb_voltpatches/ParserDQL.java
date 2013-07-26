@@ -2941,6 +2941,18 @@ public class ParserDQL extends ParserBase {
         Expression e      = null;
 
         read();
+        // START of added VoltDB support for x IN ?
+        if (token.tokenType == Tokens.QUESTION &&
+            ! isCheckOrTriggerCondition) {
+            read();
+            e = new ExpressionColumn(OpTypes.DYNAMIC_PARAM);
+            compileContext.parameters.add(e);
+            e.nodeDataTypes = new Type[degree];
+            ExpressionLogical r = new ExpressionLogical(OpTypes.EQUAL, l, e);
+            r.exprSubType = OpTypes.ANY_QUANTIFIED;
+            return r;
+        }
+        // END of added VoltDB support for x IN ?
         readThis(Tokens.OPENBRACKET);
 
         int position = getPosition();

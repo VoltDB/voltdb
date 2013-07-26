@@ -1219,7 +1219,7 @@ public abstract class SubPlanAssembler {
                                                                    IndexScanPlanNode scanNode)
     {
         MaterializedScanPlanNode matScan = new MaterializedScanPlanNode();
-        assert(listElements instanceof VectorValueExpression);
+        assert(listElements instanceof VectorValueExpression || listElements instanceof ParameterValueExpression);
         matScan.setRowData(listElements);
 
         NestLoopIndexPlanNode nlijNode = new NestLoopIndexPlanNode();

@@ -123,15 +123,8 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
     needs_outputtable_clear_cached = needsOutputTableClear();
 
     // Call the p_init() method on our derived class
-    try {
-        if (!p_init(m_abstractNode, limits))
-            return false;
-    } catch (const exception& err) {
-        char message[128];
-        snprintf(message, 128, "The Executor failed to initialize PlanNode '%s'",
-                m_abstractNode->debug().c_str());
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      message);
+    if (!p_init(m_abstractNode, limits)) {
+        return false;
     }
     Table* tmp_output_table_base = m_abstractNode->getOutputTable();
     m_tmpOutputTable = dynamic_cast<TempTable*>(tmp_output_table_base);
