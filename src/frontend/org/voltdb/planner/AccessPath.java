@@ -32,6 +32,7 @@ public class AccessPath {
     boolean keyIterate = false;
     IndexLookupType lookupType = IndexLookupType.EQ;
     SortDirectionType sortDirection = SortDirectionType.INVALID;
+    final ArrayList<AbstractExpression> initialExpr = new ArrayList<AbstractExpression>();
     final ArrayList<AbstractExpression> indexExprs = new ArrayList<AbstractExpression>();
     final ArrayList<AbstractExpression> endExprs = new ArrayList<AbstractExpression>();
     final ArrayList<AbstractExpression> otherExprs = new ArrayList<AbstractExpression>();

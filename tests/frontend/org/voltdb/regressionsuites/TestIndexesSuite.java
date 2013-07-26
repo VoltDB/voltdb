@@ -24,6 +24,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.TreeSet;
 
 import org.voltdb.BackendTarget;
@@ -620,17 +621,43 @@ public class TestIndexesSuite extends RegressionSuite {
         tableI++;
         rowI = 0;
         assertEquals( 3, results[tableI].getRowCount());
+        // following won't work anymore after adding reserve scan
+        // because jni and hsql produce difference order result
+        // so, add them to a set and ignore the order instead
         final VoltTableRow rowLTE0 = results[tableI].fetchRow(rowI++);
-        assertEquals( -1, rowLTE0.getLong(0));
-        assertEquals( 0, rowLTE0.getLong(1));
-
+//        assertEquals( -1, rowLTE0.getLong(0));
+//        assertEquals( 0, rowLTE0.getLong(1));
+//
         final VoltTableRow rowLTE1 = results[tableI].fetchRow(rowI++);
-        assertEquals( 0, rowLTE1.getLong(0));
-        assertEquals( 0, rowLTE1.getLong(1));
-
+//        assertEquals( 0, rowLTE1.getLong(0));
+//        assertEquals( 0, rowLTE1.getLong(1));
+//
         final VoltTableRow rowLTE2 = results[tableI].fetchRow(rowI++);
-        assertEquals( 0, rowLTE2.getLong(0));
-        assertEquals( 1, rowLTE2.getLong(1));
+//        assertEquals( 0, rowLTE2.getLong(0));
+//        assertEquals( 1, rowLTE2.getLong(1));
+
+        HashSet<Long> TID = new HashSet<Long>();
+        HashSet<Long> BID = new HashSet<Long>();
+        HashSet<Long> expectedTID = new HashSet<Long>();
+        HashSet<Long> expectedBID = new HashSet<Long>();
+
+        expectedTID.add(-1L);
+        expectedTID.add(0L);
+        expectedTID.add(0L);
+
+        expectedBID.add(0L);
+        expectedBID.add(0L);
+        expectedBID.add(1L);
+
+        TID.add(rowLTE0.getLong(0));
+        TID.add(rowLTE1.getLong(0));
+        TID.add(rowLTE2.getLong(0));
+        BID.add(rowLTE0.getLong(1));
+        BID.add(rowLTE1.getLong(1));
+        BID.add(rowLTE2.getLong(1));
+
+        assertTrue(TID.equals(expectedTID));
+        assertTrue(BID.equals(expectedBID));
 
         // Test 10 -- LT first component of compound key
         tableI++;

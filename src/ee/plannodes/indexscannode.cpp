@@ -62,6 +62,7 @@ IndexScanPlanNode::~IndexScanPlanNode() {
         delete searchkey_expressions[ii];
     }
     delete end_expression;
+    delete initial_expression;
     delete getOutputTable();
     setOutputTable(NULL);
 }
@@ -117,6 +118,19 @@ const std::vector<AbstractExpression*>& IndexScanPlanNode::getSearchKeyExpressio
     return (this->searchkey_expressions);
 }
 
+void IndexScanPlanNode::setInitialExpression(AbstractExpression* val) {
+    // only expect this to be initialized once
+    if (initial_expression && initial_expression != val)
+    {
+        throwFatalException("initial_expression initialized twice in IndexScanPlanNode?");
+        delete initial_expression;
+    }
+    this->initial_expression = val;
+}
+AbstractExpression* IndexScanPlanNode::getInitialExpression() const {
+    return (this->initial_expression);
+}
+
 std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;
     buffer << this->AbstractScanPlanNode::debugInfo(spacer);
@@ -165,6 +179,13 @@ void IndexScanPlanNode::loadFromJSONObject(PlannerDomValue obj) {
     }
     else {
         end_expression = NULL;
+    }
+
+    if (obj.hasNonNullKey("INITIAL_EXPRESSION")) {
+        PlannerDomValue exprValue = obj.valueForKey("INITIAL_EXPRESSION");
+        initial_expression = AbstractExpression::buildExpressionTree(exprValue);
+    } else {
+        initial_expression = NULL;
     }
 
     PlannerDomValue searchKeyExprArray = obj.valueForKey("SEARCHKEY_EXPRESSIONS");

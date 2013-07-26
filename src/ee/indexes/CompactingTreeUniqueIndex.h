@@ -145,6 +145,36 @@ class CompactingTreeUniqueIndex : public TableIndex
         m_keyIter = m_entries.upperBound(KeyType(searchKey));
     }
 
+    void moveToLessThanKey(const TableTuple *searchKey)
+    {
+        // do moveToKeyOrGreater()
+        ++m_lookups;
+        m_begin = false;
+        m_keyIter = m_entries.lowerBound(KeyType(searchKey));
+        // find prev entry
+        if (m_keyIter.isEnd()) {
+            moveToEnd(m_begin);
+        } else {
+            m_keyIter.movePrev();
+        }
+    }
+
+    // only be called after moveToGreaterThanKey() for LTE case
+    void moveToStartEntry()
+    {
+        m_begin = false;
+        if (m_keyIter.isEnd()) {
+            m_keyIter = m_entries.rbegin();
+            return;
+        }
+        // go back 2 entries
+        // entries: [..., A, B, C, ...], currently m_keyIter = C (not NULL if reach here)
+        // B is the entry we just evaluated and didn't pass initial_expression test (can not be NULL)
+        // so A is the correct starting point (can be NULL)
+        m_keyIter.movePrev();
+        m_keyIter.movePrev();
+    }
+
     void moveToEnd(bool begin)
     {
         ++m_lookups;
@@ -153,6 +183,15 @@ class CompactingTreeUniqueIndex : public TableIndex
             m_keyIter = m_entries.begin();
         else
             m_keyIter = m_entries.rbegin();
+    }
+
+    TableTuple getValue()
+    {
+        TableTuple retval(getTupleSchema());
+        if (! m_keyIter.isEnd()) {
+            retval.move(const_cast<void*>(m_keyIter.value()));
+        }
+        return retval;
     }
 
     TableTuple nextValue()

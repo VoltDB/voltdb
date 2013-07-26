@@ -20,8 +20,12 @@ package org.voltdb.planner.microoptimizations;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.json_voltpatches.JSONException;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -30,7 +34,8 @@ import org.voltdb.plannodes.IndexCountPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.TableCountPlanNode;
-import org.voltdb.types.SortDirectionType;
+import org.voltdb.types.ExpressionType;
+import org.voltdb.utils.CatalogUtil;
 
 public class ReplaceWithIndexCounter extends MicroOptimization {
 
@@ -99,7 +104,56 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
 
         // An index count or table count can replace an index scan only if it has no (post-)predicates.
         if (isp.getPredicate() != null) {
-            return plan;
+            // for reverse scan, need to examine "added" predicates
+            List<AbstractExpression> predicates = ExpressionUtil.uncombine(isp.getPredicate());
+            // if the size of predicates doesn't equal 2, can't be our added artifact predicates
+            if (predicates.size() != 2) {
+                return plan;
+            }
+            // examin each possible "added" predicates
+            // the 1st predicate must matches the last searchKey and the 2nd is NOT NULL expr
+            AbstractExpression expr = predicates.get(0);
+            if (expr.getExpressionType() != ExpressionType.COMPARE_LESSTHAN &&
+                    expr.getExpressionType() != ExpressionType.COMPARE_LESSTHANOREQUALTO) {
+                return plan;
+            }
+            int searchKeyCount = isp.getSearchKeyExpressions().size();
+            String exprsjson = isp.getCatalogIndex().getExpressionsjson();
+            AbstractExpression left = expr.getLeft();
+            if (exprsjson.isEmpty()) {
+                if (left.getExpressionType() != ExpressionType.VALUE_TUPLE) {
+                    return plan;
+                }
+                if (((TupleValueExpression)left).getColumnIndex() !=
+                        CatalogUtil.getSortedCatalogItems(isp.getCatalogIndex().getColumns(), "index").get(searchKeyCount - 1).getColumn().getIndex()) {
+                    return plan;
+                }
+            } else {
+                List<AbstractExpression> indexedExprs = null;
+                try {
+                    indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, null);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                    assert(false);
+                    return plan;
+                }
+                if (left.equals(indexedExprs.get(searchKeyCount - 1))) {
+                    return plan;
+                }
+            }
+            if (!expr.getRight().equals(isp.getSearchKeyExpressions().get(searchKeyCount - 1))) {
+                return plan;
+            }
+            expr = predicates.get(1);
+            if (expr.getExpressionType() != ExpressionType.OPERATOR_NOT) {
+                return plan;
+            }
+            if (expr.getLeft().getExpressionType() != ExpressionType.OPERATOR_IS_NULL) {
+                return plan;
+            }
+            if (!expr.getLeft().getLeft().equals(predicates.get(0).getLeft())) {
+                return plan;
+            }
         }
 
         // With no start or end keys, there's not much a counting index can do.
@@ -109,14 +163,6 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
             // "select count(*) from table order by index_key;"
             // meets a naive planner that doesn't just cull the no-op ORDER BY. Who, us?
             return new TableCountPlanNode(isp, aggplan);
-        }
-
-        // Eliminate one last bizarre edge case - a reverse scan like
-        // "select count(*) from table where index_key > ? order by index_key DESC;".
-        // This time, hold out for the planner to develop the smarts to cull the ORDER BY
-        // -- the alternative would be the code clutter of trying to swap start and end keys.
-        if (isp.getSortDirection() == SortDirectionType.DESC) {
-            return plan;
         }
 
         // check for the index's support for counting
