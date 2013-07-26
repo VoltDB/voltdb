@@ -26,16 +26,21 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.utils.CatalogUtil;
 
 public class IndexCountPlanNode extends AbstractScanPlanNode {
 
@@ -121,6 +126,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     // @return the IndexCountPlanNode or null if one is not possible.
     public static IndexCountPlanNode createOrNull(IndexScanPlanNode isp, AggregatePlanNode apn)
     {
+        boolean needPadding = false;
         List<AbstractExpression> endKeys = new ArrayList<AbstractExpression>();
         // Initially assume that there will be an equality filter on all key components.
         IndexLookupType endType = IndexLookupType.EQ;
@@ -144,9 +150,41 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             endKeys.add((AbstractExpression)ae.getRight().clone());
         }
 
+        // decide whether to pad last endKey to solve
+        // SELECT COUNT(*) FROM T WHERE C1 = ? AND C2 > / >= ?
+        if (endType == IndexLookupType.EQ &&
+                endKeys.size() == isp.getCatalogIndex().getColumns().size() - 1 &&
+                isp.getSearchKeyExpressions().size() == isp.getCatalogIndex().getColumns().size()) {
+            Index index = isp.getCatalogIndex();
+            String jsonstring = index.getExpressionsjson();
+            VoltType missingKeyType = VoltType.INVALID;
+            if (jsonstring.isEmpty()) {
+                List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
+                missingKeyType = VoltType.get((byte)(indexedColRefs.get(indexedColRefs.size() - 1).getColumn().getType()));
+            } else {
+                List<AbstractExpression> exprs = null;
+                try {
+                    exprs = AbstractExpression.fromJSONArrayString(jsonstring, null);
+                } catch (JSONException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+                missingKeyType = exprs.get(exprs.size() - 1).getLeft().getValueType();
+            }
+            if (missingKeyType.isInteger()) {
+                ConstantValueExpression missingKey = new ConstantValueExpression();
+                missingKey.setValueType(missingKeyType);
+                missingKey.setValue(String.valueOf(VoltType.getMaxIntegralTypeValue(missingKeyType)));
+                endType = IndexLookupType.LTE;
+                endKeys.add(missingKey);
+                needPadding = true;
+            }
+        }
+
         // Avoid the cases that would cause undercounts for prefix matches.
         // A prefix-only key exists and does not use LT.
-        if ((endType != IndexLookupType.LT) &&
+        if (!needPadding &&
+            (endType != IndexLookupType.LT) &&
             (endKeys.size() > 0) &&
             (endKeys.size() < isp.getCatalogIndex().getColumns().size())) {
             return null;

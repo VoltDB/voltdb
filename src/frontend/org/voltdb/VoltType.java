@@ -518,6 +518,19 @@ public enum VoltType {
         }
     }
 
+    public static Object getMaxIntegralTypeValue(VoltType type) {
+        switch (type) {
+        case TINYINT: return new Byte(Byte.MAX_VALUE);
+        case SMALLINT: return new Short(Short.MAX_VALUE);
+        case INTEGER: return new Integer(Integer.MAX_VALUE);
+        case BIGINT:
+        case TIMESTAMP:
+            return new Long(Long.MAX_VALUE);
+        default:
+            return null;
+        }
+    }
+
     public boolean isNumber() {
         switch (this) {
             case TINYINT:

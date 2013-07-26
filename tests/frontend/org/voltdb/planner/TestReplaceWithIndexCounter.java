@@ -110,7 +110,7 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
 
     public void testCountStar10() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS > ?");
-        checkIndexCounter(pn, false);
+        checkIndexCounter(pn, true);
     }
 
     // Down below are cases that we can replace
@@ -199,6 +199,16 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T1 WHERE POINTS < 4 ORDER BY POINTS DESC");
         AbstractPlanNode p = pn.get(0).getChild(0);
         assertTrue(p instanceof IndexCountPlanNode);
+    }
+
+    public void testCountStar24() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T2 WHERE ID = 1 AND USERNAME > 'JOHN' ");
+        checkIndexCounter(pn, false);
+    }
+
+    public void testCountStar25() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS >= ?");
+        checkIndexCounter(pn, true);
     }
 
     /**

@@ -14,6 +14,7 @@ CREATE TABLE T2 (
 	PRIMARY KEY (ID)
 );
 create unique index idx_2_tree on T2 (USERNAME,POINTS);
+create index idx_t2_tree on T2 (ID, USERNAME);
 
 CREATE TABLE P1 (
   ID INTEGER DEFAULT '0' NOT NULL,
