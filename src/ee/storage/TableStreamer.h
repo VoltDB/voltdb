@@ -21,7 +21,8 @@
 #include <string>
 #include <vector>
 #include <list>
-#include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/foreach.hpp>
 #include "common/ids.h"
 #include "common/types.h"
 #include "common/TupleSerializer.h"
@@ -30,12 +31,11 @@
 #include "storage/ElasticScanner.h"
 #include "storage/TableStreamerContext.h"
 
+class CopyOnWriteTest;
+
 namespace voltdb
 {
 
-class CopyOnWriteContext;
-class RecoveryContext;
-class ElasticContext;
 class ReferenceSerializeInput;
 class PersistentTable;
 class PersistentTableSurgeon;
@@ -43,15 +43,14 @@ class TupleOutputStreamProcessor;
 
 class TableStreamer : public TableStreamerInterface
 {
+    friend class ::CopyOnWriteTest;
+
 public:
 
     /**
      * Constructor with data from serialized message.
      */
-    TableStreamer(TupleSerializer &tupleSerializer,
-                  TableStreamType streamType,
-                  int32_t partitionId,
-                  ReferenceSerializeInput &serializeIn);
+    TableStreamer(int32_t partitionId, PersistentTable &table, CatalogId tableId);
 
     /**
      * Destructor.
@@ -59,18 +58,13 @@ public:
     virtual ~TableStreamer();
 
     /**
-     * Return true if the stream has already been activated.
+     * Activate a stream.
+     * Return true if the stream was activated (by the call or previously).
      */
-    virtual bool isAlreadyActive() const {
-        return m_context != NULL;
-    }
-
-    /**
-     * Activate streaming.
-     */
-    virtual bool activateStream(PersistentTable &table,
-                                PersistentTableSurgeon &surgeon,
-                                CatalogId tableId);
+    virtual bool activateStream(PersistentTableSurgeon &surgeon,
+                                TupleSerializer &serializer,
+                                TableStreamType streamType,
+                                std::vector<std::string> &predicateStrings);
 
     /**
      * Continue streaming.
@@ -84,8 +78,10 @@ public:
      */
     virtual bool notifyTupleInsert(TableTuple &tuple) {
         bool handled = false;
-        if (m_context != NULL) {
-            handled = m_context->notifyTupleInsert(tuple);
+        // If any stream handles the notification, it's "handled".
+        BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+            assert(streamPtr != NULL);
+            handled |= streamPtr->m_context->notifyTupleInsert(tuple);
         }
         return handled;
     }
@@ -96,8 +92,10 @@ public:
      */
     virtual bool notifyTupleUpdate(TableTuple &tuple) {
         bool handled = false;
-        if (m_context != NULL) {
-            handled = m_context->notifyTupleUpdate(tuple);
+        // If any context handles the notification, it's "handled".
+        BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+            assert(streamPtr != NULL);
+            handled |= streamPtr->m_context->notifyTupleUpdate(tuple);
         }
         return handled;
     }
@@ -108,8 +106,10 @@ public:
      */
     virtual bool notifyTupleDelete(TableTuple &tuple) {
         bool handled = false;
-        if (m_context != NULL) {
-            handled = m_context->notifyTupleDelete(tuple);
+        // If any context handles the notification, it's "handled".
+        BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+            assert(streamPtr != NULL);
+            handled |= streamPtr->m_context->notifyTupleDelete(tuple);
         }
         return handled;
     }
@@ -118,8 +118,9 @@ public:
      * Block compaction hook.
      */
     virtual void notifyBlockWasCompactedAway(TBPtr block) {
-        if (m_context != NULL) {
-            m_context->notifyBlockWasCompactedAway(block);
+        BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+            assert(streamPtr != NULL);
+            streamPtr->m_context->notifyBlockWasCompactedAway(block);
         }
     }
 
@@ -128,25 +129,17 @@ public:
      */
     virtual void notifyTupleMovement(TBPtr sourceBlock, TBPtr targetBlock,
                                      TableTuple &sourceTuple, TableTuple &targetTuple) {
-        if (m_context != NULL) {
-            m_context->notifyTupleMovement(sourceBlock, targetBlock, sourceTuple, targetTuple);
+        BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+            assert(streamPtr != NULL);
+            streamPtr->m_context->notifyTupleMovement(sourceBlock, targetBlock, sourceTuple, targetTuple);
         }
     }
 
     /**
-     * Return the stream type, snapshot, recovery, etc..
-     * TODO: Refactor so the caller doesn't need to know the stream type, just the context.
+     * Return the partition ID.
      */
-    virtual TableStreamType getStreamType() const {
-        return m_streamType;
-    }
-
-    /**
-     * Return the current active stream type or TABLE_STREAM_NONE if nothing is active.
-     * TODO: Refactor so the caller doesn't need to know the stream type, just the context.
-     */
-    virtual TableStreamType getActiveStreamType() const {
-        return m_context.get() != NULL ? m_streamType : TABLE_STREAM_NONE;
+    virtual int32_t getPartitionID() const {
+        return m_partitionId;
     }
 
     /**
@@ -154,22 +147,78 @@ public:
      */
     virtual bool canSafelyFreeTuple(TableTuple &tuple) const;
 
+    /**
+     * Return stream type for active stream or TABLE_STREAM_NONE if nothing is active.
+     */
+    virtual TableStreamType getActiveStreamType() const {
+        if (m_activeStreamIndex == -1) {
+            return TABLE_STREAM_NONE;
+        }
+        assert(m_activeStreamIndex >= 0 && m_activeStreamIndex < m_streams.size());
+        if (m_activeStreamIndex < 0 || m_activeStreamIndex >= m_streams.size()) {
+            return TABLE_STREAM_NONE;
+        }
+        StreamPtr streamPtr = m_streams.at(m_activeStreamIndex);
+        assert(streamPtr != NULL);
+        return streamPtr->m_streamType;
+    }
+
+    /**
+     * Return true if managing a stream of the specified type.
+     */
+    virtual bool hasStreamType(TableStreamType streamType) const {
+        BOOST_FOREACH(const StreamPtr &streamPtr, m_streams) {
+            assert(streamPtr != NULL);
+            if (streamPtr->m_streamType == streamType) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 private:
 
-    /// Tuple serializer.
-    TupleSerializer &m_tupleSerializer;
+    class Stream
+    {
+        friend class TableStreamer;
+        friend class ::CopyOnWriteTest;
 
-    /// The type of scan.
-    const TableStreamType m_streamType;
+    public:
+
+        Stream(TableStreamType streamType,
+               boost::shared_ptr<TableStreamerContext> context);
+
+        /// The type of scan.
+        const TableStreamType m_streamType;
+
+        /// The stream context.
+        boost::shared_ptr<TableStreamerContext> m_context;
+    };
+
+    /// Purge all completed streams.
+    void purgeStreams();
 
     /// Current partition ID.
     int32_t m_partitionId;
 
-    /// Predicate strings.
-    std::vector<std::string> m_predicateStrings;
+    /// The table that we're streaming.
+    PersistentTable &m_table;
 
-    /// Context to keep track of snapshot scans.
-    boost::scoped_ptr<TableStreamerContext> m_context;
+    /// The ID of the table that we're streaming.
+    CatalogId m_tableId;
+
+    /**
+     * Snapshot streams. There can be more than one stream, but only one is
+     * active and streamable. The other(s) can provide results after
+     * scanning completes, like the elastic index. All streams are notified
+     * of inserts, updates, deletes, and compactions.
+     */
+    typedef boost::shared_ptr<Stream> StreamPtr;
+    typedef std::vector<StreamPtr> StreamList;
+    StreamList m_streams;
+
+    /// The current active stream index. Not valid when m_streams is empty.
+    int m_activeStreamIndex;
 };
 
 } // namespace voltdb
