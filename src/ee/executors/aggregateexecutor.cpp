@@ -42,6 +42,8 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+#undef VOLT_LOG_LEVEL
+#define VOLT_LOG_LEVEL 100
 
 #include "executors/aggregateexecutor.h"
 

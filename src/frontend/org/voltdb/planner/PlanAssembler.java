@@ -1153,11 +1153,13 @@ public class PlanAssembler {
 
             int outputColumnIndex = 0;
             NodeSchema agg_schema = new NodeSchema();
+            NodeSchema top_agg_schema = new NodeSchema();
 
             for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.aggResultColumns) {
                 AbstractExpression rootExpr = col.expression;
                 AbstractExpression agg_input_expr = null;
                 SchemaColumn schema_col = null;
+                SchemaColumn top_schema_col = null;
                 if (rootExpr instanceof AggregateExpression) {
                     ExpressionType agg_expression_type = rootExpr.getExpressionType();
                     agg_input_expr = rootExpr.getLeft();
@@ -1180,6 +1182,7 @@ public class PlanAssembler {
                     boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
                     aggNode.addAggregate(agg_expression_type, is_distinct, outputColumnIndex, agg_input_expr);
                     schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "", col.alias, tve);
+                    top_schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "", col.alias, tve);
 
                     /*
                      * Special case count(*), count(), sum(), min() and max() to
@@ -1252,13 +1255,18 @@ public class PlanAssembler {
                      * MUST already exist in the child node's output. Find them and
                      * add them to the aggregate's output.
                      */
-                    schema_col = new SchemaColumn(col.tableName,
-                                                  col.columnName,
-                                                  col.alias,
-                                                  col.expression);
+                    schema_col = new SchemaColumn(col.tableName, col.columnName, col.alias, col.expression);
+                    if (col.groupBy && col.tableName.equals("VOLT_TEMP_TABLE")) {
+                        top_schema_col = new SchemaColumn(col.tableName, col.columnName, col.alias,
+                                m_parsedSelect.topGroupByExpressions.get(col.alias));
+                    } else {
+                        top_schema_col = new SchemaColumn(col.tableName, col.columnName, col.alias, col.expression);
+                    }
+
                 }
 
                 agg_schema.addColumn(schema_col);
+                top_agg_schema.addColumn(top_schema_col);
                 outputColumnIndex++;
             }
 
@@ -1269,21 +1277,24 @@ public class PlanAssembler {
                                                      " Please specify " + col.alias +
                                                      " as a display column.");
                 }
-
                 aggNode.addGroupByExpression(col.expression);
 
                 if (topAggNode != null) {
-                    // This assumes that the group keys are simple columns in a fixed order as presented as input to aggNode,
-                    // as projected out of aggNode as input to topAggNode, and as projected out of topAggNode.
-                    // This is not likely to hold up in more general cases involving expressions.
-
-                    // FIXME(XIN):
-                    topAggNode.addGroupByExpression(col.expression);
+                    if (m_parsedSelect.hasComplexGroupby()) {
+                        topAggNode.addGroupByExpression(m_parsedSelect.topGroupByExpressions.get(col.alias));
+                    } else {
+                        topAggNode.addGroupByExpression(col.expression);
+                    }
                 }
             }
             aggNode.setOutputSchema(agg_schema);
             if (topAggNode != null) {
-                topAggNode.setOutputSchema(agg_schema);
+                if (m_parsedSelect.hasComplexGroupby()) {
+                    topAggNode.setOutputSchema(top_agg_schema);
+                } else {
+                    topAggNode.setOutputSchema(agg_schema);
+                }
+
             }
 
             NodeSchema newSchema = m_parsedSelect.getNewSchema();

@@ -115,6 +115,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     // It may has the consistent element order as the displayColumns
     public ArrayList<ParsedColInfo> aggResultColumns = new ArrayList<ParsedColInfo>();
+    public Map<String, AbstractExpression> topGroupByExpressions = null;
     private NodeSchema newAggSchema;
 
     public long limit = -1;
@@ -122,7 +123,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private long limitParameterId = -1;
     private long offsetParameterId = -1;
     public boolean distinct = false;
-    private boolean complexAggs = false;
+    private boolean hasComplexAggs = false;
+    private boolean hasComplexGroupby = false;
     private boolean hasAggregateExpression = false;
 
     /**
@@ -195,13 +197,13 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     private boolean needComplexAggregation () {
         if (!hasAggregateExpression && !isGrouped()) {
-            complexAggs = false;
+            hasComplexAggs = false;
             return false;
         }
-        if (complexAggs) return true;
+        if (hasComplexAgg()) return true;
 
         if (aggResultColumns.size() > displayColumns.size()) {
-            complexAggs = true;
+            hasComplexAggs = true;
             return true;
         }
         for (int i = 0; i < displayColumns.size(); i++) {
@@ -212,14 +214,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                     aggResultColumns.add(col);
                 } else {
                     // Col must be complex expression (like: TVE + 1, TVE + AGG)
-                    complexAggs = true;
+                    hasComplexAggs = true;
                     return true;
                 }
             }
         }
         if (aggResultColumns.size() < displayColumns.size()) {
             // Display Columns have duplicated Aggs or TVEs
-            complexAggs = true;
+            hasComplexAggs = true;
             return true;
         }
 
@@ -274,13 +276,25 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             AbstractExpression expr = col.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
             col.expression = expr;
         }
+
+        if (hasComplexGroupby()) {
+            topGroupByExpressions = new HashMap<String, AbstractExpression>();
+
+            for (ParsedColInfo col: groupByColumns) {
+                AbstractExpression expr = col.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
+                topGroupByExpressions.put(col.alias,expr);
+            }
+        }
     }
 
     private void replaceWithTVEsForOrderbyColumns () {
         for (ParsedColInfo orderCol : orderColumns) {
             ParsedColInfo orig_col = null;
             for (ParsedColInfo col : displayColumns) {
-                if (col.alias.equals(orderCol.alias)) {
+                if (col.alias.equals(orderCol.alias) || col.expression.equals(orderCol.expression)) {
+                    orderCol.alias = col.alias;
+                    orderCol.tableName = col.tableName;
+                    orderCol.columnName = col.columnName;
                     orig_col = col;
                     break;
                 }
@@ -291,15 +305,46 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
                 TupleValueExpression tve = new TupleValueExpression();
                 tve.setColumnAlias(orig_col.alias);
-                tve.setColumnName("");
-                tve.setColumnIndex(-1);
-                tve.setTableName("VOLT_TEMP_TABLE");
+                tve.setColumnName(orig_col.columnName);
+                tve.setTableName(orig_col.tableName);
                 tve.setValueSize(orig_col.expression.getValueSize());
                 tve.setValueType(orig_col.expression.getValueType());
                 if (orig_col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
                     tve.setHasAggregate(true);
                 }
                 orderCol.expression = tve;
+            }
+        }
+
+        // TODO(XIN): Optimize it when I can put this code into parseGroupByColumn()
+        if (hasComplexGroupby()) {
+            topGroupByExpressions = new HashMap<String, AbstractExpression>();
+
+            for (ParsedColInfo groupbyCol : groupByColumns) {
+                ParsedColInfo orig_col = null;
+                int columnIndex = -1;
+                for (int i = 0; i < displayColumns.size(); ++i) {
+                    ParsedColInfo col = displayColumns.get(i);
+                    if (col.expression.equals(groupbyCol.expression)) {
+                        groupbyCol.alias = col.alias;
+                        orig_col = col;
+                        columnIndex = i;
+                        break;
+                    }
+                }
+                if (orig_col != null && orig_col.tableName.equals("VOLT_TEMP_TABLE")) {
+                    orig_col.groupBy = true;
+
+                    TupleValueExpression tve = new TupleValueExpression();
+                    tve.setColumnAlias(orig_col.alias);
+                    tve.setColumnName(orig_col.columnName);
+                    tve.setTableName(orig_col.tableName);
+                    tve.setColumnIndex(columnIndex);
+                    tve.setValueSize(orig_col.expression.getValueSize());
+                    tve.setValueType(orig_col.expression.getValueType());
+                    topGroupByExpressions.put(orig_col.alias,tve);
+                }
+
             }
         }
     }
@@ -354,7 +399,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
         } else if (colCollection.size() != 0) {
             // Try to check complexAggs earlier
-            complexAggs = true;
+            hasComplexAggs = true;
             for (AbstractExpression expr: colCollection) {
                 ParsedColInfo col = new ParsedColInfo();
                 col.expression = (AbstractExpression) expr.clone();
@@ -464,16 +509,19 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             col.tableName = groupByNode.attributes.get("table");
             col.groupBy = true;
 
+            // This col.index set up is only useful for Materialized view.
             org.voltdb.catalog.Column catalogColumn =
                     getTableFromDB(col.tableName).getColumns().getIgnoreCase(col.columnName);
             col.index = catalogColumn.getIndex();
         }
         else
         {
+            // TODO(XIN): throw a error for Materialized view when possible.
             // XXX hacky, assume all non-column refs come from a temp table
             col.tableName = "VOLT_TEMP_TABLE";
             col.columnName = "";
             col.groupBy = true;
+            hasComplexGroupby = true;
         }
         groupByColumns.add(col);
     }
@@ -517,7 +565,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             order_col.alias = tve.getColumnAlias();
             ParsedColInfo orig_col = null;
             for (ParsedColInfo col : displayColumns) {
-                if (col.expression.equals(order_exp)) {
+                if (col.alias.equals(order_col.alias) || col.expression.equals(order_exp)) {
                     orig_col = col;
                     break;
                 }
@@ -526,19 +574,20 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 orig_col.orderBy = true;
                 orig_col.ascending = order_col.ascending;
             }
-        }
-        else if (order_exp.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+        } else {
             String alias = child.attributes.get("alias");
             order_col.alias = alias;
             order_col.tableName = "VOLT_TEMP_TABLE";
             order_col.columnName = "";
             // Replace its expression to TVE after we build the ExpressionIndexMap
+
+            if ((child.name.equals("operation") == false) &&
+                    (child.name.equals("aggregation") == false) &&
+                    (child.name.equals("function") == false)) {
+               throw new RuntimeException("ORDER BY parsed with strange child node type: " + child.name);
+           }
         }
-        else if ((child.name.equals("operation") == false) &&
-                 (child.name.equals("aggregation") == false) &&
-                 (child.name.equals("function") == false)) {
-            throw new RuntimeException("ORDER BY parsed with strange child node type: " + child.name);
-        }
+
         assert( ! (order_exp instanceof ConstantValueExpression));
         assert( ! (order_exp instanceof ParameterValueExpression));
 
@@ -594,8 +643,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return newAggSchema;
     }
 
+    public boolean hasComplexGroupby() {
+        return hasComplexGroupby;
+    }
+
     public boolean hasComplexAgg() {
-        return complexAggs;
+        return hasComplexAggs;
     }
 
     public boolean hasOrderByColumns() {
