@@ -154,7 +154,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
     private String makeSnapshotRequest(Multimap<Long, Long> sourceToDests)
     {
         StreamSnapshotRequestConfig.Stream stream =
-            new StreamSnapshotRequestConfig.Stream(sourceToDests, null, null);
+            new StreamSnapshotRequestConfig.Stream(sourceToDests, null);
         StreamSnapshotRequestConfig config =
             new StreamSnapshotRequestConfig(null, Arrays.asList(stream), false);
         return makeSnapshotRequest(config);

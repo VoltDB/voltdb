@@ -52,6 +52,7 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.TxnEgo;
 
 import org.voltdb.sysprocs.saverestore.CSVSnapshotWritePlan;
+import org.voltdb.sysprocs.saverestore.IndexSnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.NativeSnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.SnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.StreamSnapshotWritePlan;
@@ -565,6 +566,9 @@ public class SnapshotSaveAPI
         }
         else if (format == SnapshotFormat.STREAM) {
             plan = new StreamSnapshotWritePlan();
+        }
+        else if (format == SnapshotFormat.INDEX) {
+            plan = new IndexSnapshotWritePlan();
         }
         else {
             throw new RuntimeException("BAD BAD BAD");

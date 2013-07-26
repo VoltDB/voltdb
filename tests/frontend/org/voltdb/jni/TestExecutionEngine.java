@@ -185,8 +185,10 @@ public class TestExecutionEngine extends TestCase {
 
         loadTestTables( sourceEngine, m_catalog);
 
-        sourceEngine.activateTableStream( WAREHOUSE_TABLEID, TableStreamType.RECOVERY, new SnapshotPredicates());
-        sourceEngine.activateTableStream( STOCK_TABLEID, TableStreamType.RECOVERY, new SnapshotPredicates());
+        sourceEngine.activateTableStream( WAREHOUSE_TABLEID, TableStreamType.RECOVERY,
+                                          new SnapshotPredicates(null));
+        sourceEngine.activateTableStream( STOCK_TABLEID, TableStreamType.RECOVERY,
+                                          new SnapshotPredicates(null));
 
         BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
         try {
@@ -458,7 +460,7 @@ public class TestExecutionEngine extends TestCase {
 
         loadTestTables( sourceEngine, m_catalog);
 
-        SnapshotPredicates predicates = new SnapshotPredicates();
+        SnapshotPredicates predicates = new SnapshotPredicates(null);
         predicates.addPredicate(new HashRangeExpressionBuilder()
                                         .put(0x0000000000000000L, 0x7fffffffffffffffL)
                                         .build(0),

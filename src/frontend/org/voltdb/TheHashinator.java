@@ -91,12 +91,12 @@ public abstract class TheHashinator {
      *
      * Longs are converted to bytes in little endian order for elastic, modulus for legacy.
      */
-    abstract protected int pHashinateLong(long value);
-    abstract protected int pHashinateBytes(byte[] bytes);
-    abstract protected Pair<HashinatorType, byte[]> pGetCurrentConfig();
-    abstract protected Map<Long, Integer> pPredecessors(int partition);
-    abstract protected Pair<Long, Integer> pPredecessor(int partition, long token);
-    abstract protected Map<Long, Long> pGetRanges(int partition);
+    abstract public int pHashinateLong(long value);
+    abstract public int pHashinateBytes(byte[] bytes);
+    abstract public Pair<HashinatorType, byte[]> pGetCurrentConfig();
+    abstract public Map<Long, Integer> pPredecessors(int partition);
+    abstract public Pair<Long, Integer> pPredecessor(int partition, long token);
+    abstract public Map<Long, Long> pGetRanges(int partition);
 
     /**
      * Given a long value, pick a partition to store the data. It's only called for legacy
