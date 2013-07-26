@@ -17,6 +17,10 @@
 
 package org.voltdb;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListenableFutureTask;
+import com.google.common.util.concurrent.MoreExecutors;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -46,7 +50,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
-
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -107,11 +110,6 @@ import org.voltdb.sysprocs.SnapshotRestore;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
-
-import com.google.common.collect.ImmutableMap;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListenableFutureTask;
-import com.google.common.util.concurrent.MoreExecutors;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -353,10 +351,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
                 }
                 catch (IOException e) {
-                    hostLog.fatal("Client interface failed to bind to port " + m_port);
-                    hostLog.fatal("IOException message: \"" + e.getMessage() + "\"");
+                    String msg = "Client interface failed to bind to"
+                            + (m_isAdmin ? " Admin " : " ") + "port " + m_port;
                     MiscUtils.printPortsInUse(hostLog);
-                    VoltDB.crashLocalVoltDB("Client interface failed to bind to port " + m_port, false, e);
+                    VoltDB.crashLocalVoltDB(msg, false, e);
                 }
             }
             m_running = true;

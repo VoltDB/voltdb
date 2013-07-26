@@ -43,7 +43,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
-
 import org.apache.jute_voltpatches.BinaryInputArchive;
 import org.apache.jute_voltpatches.BinaryOutputArchive;
 import org.apache.jute_voltpatches.Record;
@@ -148,7 +147,7 @@ public class NIOServerCnxn implements Watcher, ServerCnxn {
                 ss.configureBlocking(false);
                 ss.register(selector, SelectionKey.OP_ACCEPT);
             } catch (IOException e) {
-                String msg = "ZooKeeper server failed to bind to client socket: " + addr.toString();
+                String msg = "ZooKeeper service unable to bind to port : " + addr.getPort();
                 VoltDB.crashLocalVoltDB(msg, false, e);
             }
         }
