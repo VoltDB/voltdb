@@ -254,13 +254,13 @@ public class TestTwoSitePlans extends TestCase implements FragmentPlanSource {
     @Override
     public byte[] planForFragmentId(long fragmentId) {
         if (fragmentId == CatalogUtil.getUniqueIdForFragment(selectBottomFrag)) {
-            return Encoder.base64Decode(selectBottomFrag.getPlannodetree());
+            return Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree());
         }
         else if (fragmentId == CatalogUtil.getUniqueIdForFragment(selectTopFrag)) {
-            return Encoder.base64Decode(selectTopFrag.getPlannodetree());
+            return Encoder.decodeBase64AndDecompressToBytes(selectTopFrag.getPlannodetree());
         }
         else if (fragmentId == CatalogUtil.getUniqueIdForFragment(insertFrag)) {
-            return Encoder.base64Decode(insertFrag.getPlannodetree());
+            return Encoder.decodeBase64AndDecompressToBytes(insertFrag.getPlannodetree());
         }
         else {
             fail();
