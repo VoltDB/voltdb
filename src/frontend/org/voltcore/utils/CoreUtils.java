@@ -64,7 +64,7 @@ import com.google.common.util.concurrent.MoreExecutors;
 public class CoreUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    public static final int SMALL_STACK_SIZE = 1024 * 128;
+    public static final int SMALL_STACK_SIZE = 1024 * 256;
 
     /**
      * Get a single thread executor that caches it's thread meaning that the thread will terminate
