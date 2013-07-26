@@ -542,7 +542,7 @@ public class SnapshotSiteProcessor {
              * thread so the EE can continue working.
              */
             if (tableTask.m_table.getIsreplicated() &&
-                tableTask.m_target.getFormat().isTableBased()) {
+                tableTask.m_target.getFormat().canCloseEarly()) {
                 final Thread terminatorThread =
                     new Thread("Replicated SnapshotDataTarget terminator ") {
                         @Override

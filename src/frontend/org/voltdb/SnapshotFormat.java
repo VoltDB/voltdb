@@ -27,10 +27,10 @@ public enum SnapshotFormat {
     INDEX  (false, false);
 
     private final boolean m_isFileBased;
-    private final boolean m_isTableBased;
-    private SnapshotFormat(boolean isFileBased, boolean isTableBased) {
+    private final boolean m_canCloseEarly;
+    private SnapshotFormat(boolean isFileBased, boolean canCloseEarly) {
         m_isFileBased = isFileBased;
-        m_isTableBased = isTableBased;
+        m_canCloseEarly = canCloseEarly;
     }
 
     /**
@@ -44,14 +44,12 @@ public enum SnapshotFormat {
     }
 
     /**
-     * Whether or not a per-table snapshot target should be created. If false, a
-     * single snapshot target instance will be used for all tables on a single
-     * partition replica.
-     *
-     * @return
+     * Whether or not the snapshot target can be closed early. If true,
+     * and the data target is associated with a replicated table, the SnapshotSiteProcessor may
+     * close it immediately after the replicated table finishes serialization.
      */
-    public boolean isTableBased() {
-        return m_isTableBased;
+    public boolean canCloseEarly() {
+        return m_canCloseEarly;
     }
 
     /**
