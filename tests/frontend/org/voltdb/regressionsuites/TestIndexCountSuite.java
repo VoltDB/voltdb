@@ -136,7 +136,6 @@ public class TestIndexCountSuite extends RegressionSuite {
 
         VoltTable table;
 
-        // We can plan this query now
         table = client.callProcedure("@AdHoc","SELECT (COUNT(*) + 1) FROM TU1 WHERE POINTS < 2").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
