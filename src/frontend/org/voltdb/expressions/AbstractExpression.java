@@ -19,6 +19,7 @@ package org.voltdb.expressions;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -28,6 +29,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -49,10 +51,6 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     protected AbstractExpression m_left = null;
     protected AbstractExpression m_right = null;
     protected List<AbstractExpression> m_args = null; // Never includes left and right "operator args".
-
-    public void setArgs(List<AbstractExpression> arguments) {
-        m_args = arguments;
-    }
 
     protected VoltType m_valueType = null;
     protected int m_valueSize = 0;
@@ -201,6 +199,21 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      */
     public void setRight(AbstractExpression right) {
         m_right = right;
+    }
+
+    /**
+     *
+     * @return the list of args
+     */
+    public List<AbstractExpression> getArgs () {
+        return m_args;
+    }
+
+    /**
+     * @param arguments to set
+     */
+    public void setArgs(List<AbstractExpression> arguments) {
+        m_args = arguments;
     }
 
     /**
@@ -524,6 +537,65 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             result.add(fromJSONObject(tempjobj, db));
         }
         return result;
+    }
+
+    /**
+     * This function recursively replace any Expression that in the aggTableIndexMap to a TVEs. Its column index and alias are also built up here.
+     * @param aggTableIndexMap
+     * @param indexToColumnMap
+     * @return
+     */
+    public AbstractExpression replaceWithTVE(
+            Map <AbstractExpression, Integer> aggTableIndexMap,
+            Map <Integer, ParsedColInfo> indexToColumnMap)
+    {
+        Integer ii = aggTableIndexMap.get(this);
+        if (ii != null) {
+            TupleValueExpression tve = new TupleValueExpression();
+            tve.setValueType(getValueType());
+            tve.setValueSize(getValueSize());
+            tve.setColumnIndex(ii);
+            ParsedColInfo col = indexToColumnMap.get(ii);
+            tve.setColumnName(col.columnName);
+            tve.setColumnAlias(col.alias);
+            tve.setTableName(col.tableName);
+            // To prevent pushdown of LIMIT when ORDER BY references an agg. ENG-3487.
+            if (hasAnySubexpressionOfClass(AggregateExpression.class))
+                tve.setHasAggregate(true);
+
+            return tve;
+        }
+
+        AbstractExpression lnode = null, rnode = null;
+        ArrayList<AbstractExpression> newArgs = null;
+        if (m_left != null) {
+            lnode = m_left.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
+        }
+        if (m_right != null) {
+            rnode = m_right.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
+        }
+
+        boolean changed = false;
+        if (m_args != null) {
+            newArgs = new ArrayList<AbstractExpression>();
+            for (AbstractExpression expr: m_args) {
+                AbstractExpression ex = expr.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
+                newArgs.add(ex);
+                if (ex != expr) {
+                    changed = true;
+                }
+            }
+        }
+
+        if (m_left != lnode || m_right != rnode || changed) {
+            AbstractExpression resExpr = (AbstractExpression) this.clone();
+            resExpr.setLeft(lnode);
+            resExpr.setRight(rnode);
+            resExpr.setArgs(newArgs);
+            return resExpr;
+        }
+
+        return this;
     }
 
     public ArrayList<AbstractExpression> findBaseTVEs() {

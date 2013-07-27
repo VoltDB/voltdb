@@ -522,9 +522,11 @@ inline void AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
     BOOST_FOREACH(int output_col_index, m_passThroughColumns) {
         tmptup.setNValue(output_col_index,
                          m_outputColumnExpressions[output_col_index]->eval(&(aggregateRow->m_passThroughTuple)));
+        VOLT_TRACE("Passthrough columns: %d", output_col_index);
     }
-
     output_table->insertTupleNonVirtual(tmptup);
+
+    VOLT_TRACE("output_table:\n%s", output_table->debug().c_str());
 }
 
 inline void AggregateExecutorBase::advanceAggs(AggregateRow* aggregateRow)
