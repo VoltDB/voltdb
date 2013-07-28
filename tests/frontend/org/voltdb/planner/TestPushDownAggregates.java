@@ -30,6 +30,7 @@ import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.DistinctPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
+import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
@@ -247,11 +248,10 @@ public class TestPushDownAggregates extends PlannerTestCase {
             ExpressionType[] aggTypes, ExpressionType[] pushDownTypes, boolean hasProjectionNode) {
         assertTrue(pn.size() > 0);
 
-        AbstractPlanNode p = null;
+        AbstractPlanNode p = pn.get(0).getChild(0);;
         if (hasProjectionNode) {
-            p = pn.get(0).getChild(0).getChild(0);
-        } else {
-            p = pn.get(0).getChild(0);
+            assertTrue(p instanceof ProjectionPlanNode);
+            p = p.getChild(0);
         }
 
         assertTrue(p instanceof AggregatePlanNode);

@@ -17,6 +17,7 @@
 
 package org.voltdb.utils;
 
+import com.google.common.base.Charsets;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -39,14 +40,12 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
-
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
-
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -96,6 +95,7 @@ import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
+import static org.voltdb.compiler.deploymentfile.ServerExportEnum.JDBC;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
@@ -112,8 +112,6 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.xml.sax.SAXException;
-
-import com.google.common.base.Charsets;
 
 /**
  *
@@ -749,6 +747,9 @@ public abstract class CatalogUtil {
                 ServerExportEnum exportTo = onServer.getExportto();
                 if (exportTo != null) {
                     sb.append( "EXPORTTO ").append(exportTo.name());
+                    if (exportTo.name().equalsIgnoreCase("CUSTOM")) {
+                        sb.append(" EXPORTCONNECTORCLASS ").append(onServer.getExportconnectorclass());
+                    }
                 }
                 ExportConfigurationType config = onServer.getConfiguration();
                 if (config != null) {
@@ -1071,13 +1072,33 @@ public abstract class CatalogUtil {
         ExportOnServerType exportOnServer = exportType.getOnserver();
         if (exportOnServer != null) {
 
+            String exportClientClassName = null;
+
+            switch( exportOnServer.getExportto()) {
+            case FILE: exportClientClassName = ExportToFileClient.class.getName(); break;
+            case JDBC: exportClientClassName = "org.voltdb.exportclient.JDBCExportClient"; break;
+            //Validate that we can load the class.
+            case CUSTOM:
+                try {
+                    CatalogUtil.class.getClassLoader().loadClass(exportOnServer.getExportconnectorclass());
+                    exportClientClassName = exportOnServer.getExportconnectorclass();
+                } catch (ClassNotFoundException ex) {
+                    hostLog.error(
+                            "Custom Export failed to configure, failed to load " +
+                            " export plugin class: " + exportOnServer.getExportconnectorclass() +
+                            " Disabling export.");
+                    exportType.setEnabled(false);
+                    return;
+                }
+                break;
+            }
+
             // this is OK as the deployment file XML schema does not allow for
             // export configuration property names that begin with underscores
-            ConnectorProperty prop = catconn.getConfig().add(GuestProcessor.EXPORT_TO_TYPE);
-            prop.setName(GuestProcessor.EXPORT_TO_TYPE);
-            switch( exportOnServer.getExportto()) {
-            case FILE: prop.setValue(ExportToFileClient.class.getName()); break;
-            case JDBC: prop.setValue("org.voltdb.exportclient.JDBCExportClient"); break;
+            if (exportClientClassName != null && exportClientClassName.trim().length() > 0) {
+                ConnectorProperty prop = catconn.getConfig().add(GuestProcessor.EXPORT_TO_TYPE);
+                prop.setName(GuestProcessor.EXPORT_TO_TYPE);
+                prop.setValue(exportClientClassName);
             }
 
             ExportConfigurationType exportConfiguration = exportOnServer.getConfiguration();
@@ -1087,7 +1108,7 @@ public abstract class CatalogUtil {
                 if (configProperties != null && ! configProperties.isEmpty()) {
 
                     for( PropertyType configProp: configProperties) {
-                        prop = catconn.getConfig().add(configProp.getName());
+                        ConnectorProperty prop = catconn.getConfig().add(configProp.getName());
                         prop.setName(configProp.getName());
                         prop.setValue(configProp.getValue());
                     }

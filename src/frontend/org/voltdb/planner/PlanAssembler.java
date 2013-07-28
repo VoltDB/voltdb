@@ -503,7 +503,15 @@ public class PlanAssembler {
         root.generateOutputSchema(m_catalogDb);
         root = handleAggregationOperators(root);
 
-        root = handleOrderBy(root, true);
+        if (m_parsedSelect.hasComplexAgg()) {
+            AbstractPlanNode aggNode = root.getChild(0);
+            root.clearChildren();
+            aggNode.clearParents();
+            aggNode = handleOrderBy(aggNode);
+            root.addAndLinkChild(aggNode);
+        } else {
+            root = handleOrderBy(root);
+        }
 
         if ((root.getPlanNodeType() != PlanNodeType.AGGREGATE) &&
             (root.getPlanNodeType() != PlanNodeType.HASHAGGREGATE) &&
@@ -868,7 +876,7 @@ public class PlanAssembler {
      * @param root
      * @return new orderByNode (the new root) or the original root if no orderByNode was required.
      */
-    AbstractPlanNode handleOrderBy(AbstractPlanNode root, boolean expectedComplex) {
+    AbstractPlanNode handleOrderBy(AbstractPlanNode root) {
         assert (m_parsedSelect != null);
 
         // Only sort when the statement has an ORDER BY.
@@ -898,20 +906,8 @@ public class PlanAssembler {
                                               : SortDirectionType.DESC);
         }
 
-        AbstractPlanNode projectionNode = root;
-        if (m_parsedSelect.hasComplexAgg() && expectedComplex) {
-            AbstractPlanNode aggNode = root.getChild(0);
-            projectionNode.clearChildren();
-            aggNode.clearParents();
-
-            orderByNode.addAndLinkChild(aggNode);
-            orderByNode.generateOutputSchema(m_catalogDb);
-            projectionNode.addAndLinkChild(orderByNode);
-
-        } else {
-            orderByNode.addAndLinkChild(root);
-            orderByNode.generateOutputSchema(m_catalogDb);
-        }
+        orderByNode.addAndLinkChild(root);
+        orderByNode.generateOutputSchema(m_catalogDb);
 
         // get all of the columns in the sort
         List<AbstractExpression> orderExpressions = orderByNode.getSortExpressions();
@@ -989,10 +985,6 @@ public class PlanAssembler {
 
         if (allScansAreDeterministic) {
             orderByNode.setOrderingByUniqueColumns();
-        }
-
-        if (m_parsedSelect.hasComplexAgg() && expectedComplex) {
-            return projectionNode;
         }
 
         return orderByNode;
@@ -1082,7 +1074,7 @@ public class PlanAssembler {
 
             // If the distributed limit must be performed on ordered input,
             // ensure the order of the data on each partition.
-            distributedPlan = handleOrderBy(distributedPlan, false);
+            distributedPlan = handleOrderBy(distributedPlan);
 
             // Apply the distributed limit.
             distLimit.addAndLinkChild(distributedPlan);
@@ -1366,7 +1358,6 @@ public class PlanAssembler {
         distNode.generateOutputSchema(m_catalogDb);
         root = distNode;
 
-        ProjectionPlanNode proj = new ProjectionPlanNode();
         // Put the send/receive pair back into place
         if (accessPlanTemp != null) {
             accessPlanTemp.getChild(0).clearChildren();
@@ -1378,6 +1369,7 @@ public class PlanAssembler {
             root = coordNode;
         }
         if (needProjectionNode) {
+            ProjectionPlanNode proj = new ProjectionPlanNode();
             proj.addAndLinkChild(root);
             proj.setOutputSchema(newSchema);
             proj.generateOutputSchema(m_catalogDb);

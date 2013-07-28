@@ -55,7 +55,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             try {
                 actual = vt.getLong(i);
             } catch (IllegalArgumentException ex) {
-                actual = (int) vt.getDouble(i);
+                actual = (long) vt.getDouble(i);
             }
             assertEquals(expected[i], actual);
         }
@@ -184,7 +184,8 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         String [] tbs = {"P1"};
         for (String tb: tbs) {
             // Test distinct with complex aggregations.
-            cr = client.callProcedure("@AdHoc", "SELECT dept, count(wage), sum(distinct wage), sum(wage), count(distinct wage)+5, sum(wage)/(count(wage)+1) from " + tb + " GROUP BY dept ORDER BY dept DESC;");
+            cr = client.callProcedure("@AdHoc", "SELECT dept, count(wage), sum(distinct wage), sum(wage), count(distinct wage)+5, " +
+                    "sum(wage)/(count(wage)+1) from " + tb + " GROUP BY dept ORDER BY dept DESC;");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] {{2, 4, 100, 140, 8, 28}, {1, 3, 60, 60, 8, 15} };
@@ -192,7 +193,8 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             compareTable(vt, expected);
 
             // Test limit with complex aggregation.
-            cr = client.callProcedure("@AdHoc", "SELECT wage, sum(id)+1, sum(id+1),  sum(dept+3)/count(dept) from " + tb + " GROUP BY wage ORDER BY wage ASC LIMIT 4 ;");
+            cr = client.callProcedure("@AdHoc", "SELECT wage, sum(id)+1, sum(id+1),  sum(dept+3)/count(dept) from " + tb +
+                    " GROUP BY wage ORDER BY wage ASC LIMIT 4 ;");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] {{10, 8, 9, 4}, {20, 3, 3, 4}, {30, 4, 4, 4}, {40, 12, 13, 5}};
@@ -200,7 +202,8 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             compareTable(vt, expected);
 
             // Test distinct limit together with complex aggregation.
-            cr = client.callProcedure("@AdHoc", "SELECT wage, sum(id)+1, sum(id+1),  sum(dept+3)/count(distinct dept) from " + tb + " GROUP BY wage ORDER BY wage ASC LIMIT 4 ;");
+            cr = client.callProcedure("@AdHoc", "SELECT wage, sum(id)+1, sum(id+1),  sum(dept+3)/count(distinct dept) from " + tb +
+                    " GROUP BY wage ORDER BY wage ASC LIMIT 4 ;");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] {{10, 8, 9, 4}, {20, 3, 3, 4}, {30, 4, 4, 4}, {40, 12, 13, 10}};
