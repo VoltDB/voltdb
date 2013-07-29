@@ -119,6 +119,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     //   - null
     //   - one filter expression per index key component (ANDed together) as "combined" for the IndexScan.
     //   - fewer filter expressions than index key components with one of them (the last) being a LT comparison.
+    //   - 1 fewer filter expressions than index key components, but all ANDed equality filters
     // The LT restriction comes because when index key prefixes are identical to the prefix-only end key,
     // the entire index key sorts greater than the prefix-only end-key, because it is always longer.
     // These prefix-equal cases would be missed in an EQ or LTE filter, causing undercounts.
@@ -126,7 +127,6 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     // @return the IndexCountPlanNode or null if one is not possible.
     public static IndexCountPlanNode createOrNull(IndexScanPlanNode isp, AggregatePlanNode apn)
     {
-        boolean needPadding = false;
         List<AbstractExpression> endKeys = new ArrayList<AbstractExpression>();
         // Initially assume that there will be an equality filter on all key components.
         IndexLookupType endType = IndexLookupType.EQ;
@@ -150,68 +150,75 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             endKeys.add((AbstractExpression)ae.getRight().clone());
         }
 
+        int indexSize = 0;
+        String jsonstring = isp.getCatalogIndex().getExpressionsjson();
+        List<ColumnRef> indexedColRefs = null;
+        List<AbstractExpression> indexedExprs = null;
+        if (jsonstring.isEmpty()) {
+            indexedColRefs = CatalogUtil.getSortedCatalogItems(isp.getCatalogIndex().getColumns(), "index");
+            indexSize = indexedColRefs.size();
+        } else {
+            try {
+                indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring, null);
+                indexSize = indexedExprs.size();
+            } catch (JSONException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
+
         // decide whether to pad last endKey to solve
         // SELECT COUNT(*) FROM T WHERE C1 = ? AND C2 > / >= ?
         if (endType == IndexLookupType.EQ &&
                 endKeys.size() > 0 &&
-                endKeys.size() == isp.getCatalogIndex().getColumns().size() - 1 &&
-                isp.getSearchKeyExpressions().size() == isp.getCatalogIndex().getColumns().size()) {
+                endKeys.size() == indexSize - 1 &&
+                isp.getSearchKeyExpressions().size() == indexSize) {
+
+            VoltType missingKeyType = VoltType.INVALID;
+            boolean canPadding = true;
+
             // need to check the filter we are missing is the last indexable expr
             // and find out the missing key
-            Index index = isp.getCatalogIndex();
-            String jsonstring = index.getExpressionsjson();
-            VoltType missingKeyType = VoltType.INVALID;
-            needPadding = true;
-
             if (jsonstring.isEmpty()) {
-                List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
-                int lastIndex = indexedColRefs.get(indexedColRefs.size() - 1).getColumn().getIndex();
+                int lastIndex = indexedColRefs.get(indexSize - 1).getColumn().getIndex();
                 for (AbstractExpression expr : endComparisons) {
                     if (((TupleValueExpression)(expr.getLeft())).getColumnIndex() == lastIndex) {
-                        needPadding = false;
+                        canPadding = false;
                         break;
                     }
                 }
-                if (needPadding) {
-                    missingKeyType = VoltType.get((byte)(indexedColRefs.get(indexedColRefs.size() - 1).getColumn().getType()));
+                if (canPadding) {
+                    missingKeyType = VoltType.get((byte)(indexedColRefs.get(indexSize - 1).getColumn().getType()));
                 }
             } else {
-                List<AbstractExpression> exprs = null;
-                try {
-                    exprs = AbstractExpression.fromJSONArrayString(jsonstring, null);
-                } catch (JSONException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
-                AbstractExpression lastIndexableExpr = exprs.get(exprs.size() - 1);
+                AbstractExpression lastIndexableExpr = indexedExprs.get(indexSize - 1);
                 for (AbstractExpression expr : endComparisons) {
                     if (expr.getLeft().bindingToIndexedExpression(lastIndexableExpr) != null) {
-                        needPadding = false;
+                        canPadding = false;
                         break;
                     }
                 }
-                if (needPadding) {
+                if (canPadding) {
                     missingKeyType = lastIndexableExpr.getValueType();
                 }
             }
-            if (needPadding && missingKeyType.isMaxValuePaddable()) {
+            if (canPadding && missingKeyType.isMaxValuePaddable()) {
                 ConstantValueExpression missingKey = new ConstantValueExpression();
                 missingKey.setValueType(missingKeyType);
                 missingKey.setValue(String.valueOf(VoltType.getPaddedMaxTypeValue(missingKeyType)));
                 endType = IndexLookupType.LTE;
                 endKeys.add(missingKey);
-                needPadding = true;
+                canPadding = true;
             } else {
-                needPadding = false;
+                return null;
             }
         }
 
         // Avoid the cases that would cause undercounts for prefix matches.
         // A prefix-only key exists and does not use LT.
-        if (!needPadding &&
-            (endType != IndexLookupType.LT) &&
+        if ((endType != IndexLookupType.LT) &&
             (endKeys.size() > 0) &&
-            (endKeys.size() < isp.getCatalogIndex().getColumns().size())) {
+            (endKeys.size() < indexSize)) {
             return null;
         }
         return new IndexCountPlanNode(isp, apn, endType, endKeys);
