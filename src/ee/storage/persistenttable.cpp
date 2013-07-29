@@ -1003,11 +1003,12 @@ bool PersistentTable::activateStreamInternal(TupleSerializer &tupleSerializer,
  * Return remaining tuple count, 0 if done, or -1 on error.
  */
 int64_t PersistentTable::streamMore(TupleOutputStreamProcessor &outputStreams,
+                                    TableStreamType streamType,
                                     std::vector<int> &retPositions) {
     if (m_tableStreamer.get() == NULL) {
         return -1;
     }
-    return m_tableStreamer->streamMore(outputStreams, retPositions);
+    return m_tableStreamer->streamMore(outputStreams, streamType, retPositions);
 }
 
 /**

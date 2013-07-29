@@ -351,6 +351,9 @@ enum TableStreamType {
     TABLE_STREAM_SNAPSHOT,
     TABLE_STREAM_ELASTIC_INDEX,
 
+    // Materialize previously-captured index.
+    TABLE_STREAM_ELASTIC_INDEX_READ,
+
     // Table stream types that don't use predicates.
     // Add new non-predicate types below TABLE_STREAM_RECOVERY so
     // that tableStreamTypeHasPredicates() doesn't have to change.
@@ -362,10 +365,9 @@ enum TableStreamType {
 
 /**
  * Return true if the table stream type uses predicates.
- * Assumes a specific order for the enum values to make the comparison easy.
  */
 inline bool tableStreamTypeHasPredicates(TableStreamType streamType) {
-    return streamType < TABLE_STREAM_RECOVERY;
+    return streamType == TABLE_STREAM_SNAPSHOT || streamType == TABLE_STREAM_ELASTIC_INDEX;
 }
 
 /**

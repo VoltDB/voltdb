@@ -20,13 +20,13 @@
 #include <iostream>
 #include <stx/btree.h>
 #include <boost/iterator/iterator_facade.hpp>
-#include "storage/persistenttable.h"
 #include "storage/TupleBlock.h"
 #include "common/tabletuple.h"
 
 namespace voltdb {
 
 class ElasticIndexIterator;
+class PersistentTable;
 
 /**
  * Elastic hash value container with some useful/convenient operations.
@@ -143,7 +143,7 @@ class ElasticIndex : public stx::btree_set<ElasticIndexKey, ElasticIndexComparat
     /**
      * Return true if key is in the index.
      */
-    bool has(const PersistentTable &table, const TableTuple &tuple);
+    bool has(const PersistentTable &table, const TableTuple &tuple) const;
 
     /**
      * Get the hash and tuple address if found.
@@ -170,17 +170,6 @@ class ElasticIndex : public stx::btree_set<ElasticIndexKey, ElasticIndexComparat
 inline ElasticHash::ElasticHash() :
     m_hashValue(0)
 {}
-
-/**
- * Full constructor
- */
-inline ElasticHash::ElasticHash(const PersistentTable &table, const TableTuple &tuple)
-{
-    int64_t hashValues[2];
-    tuple.getNValue(table.partitionColumn()).murmurHash3(hashValues);
-    // Only the least significant 8 bytes is used.
-    m_hashValue = hashValues[0];
-}
 
 /**
  * Copy constructor
@@ -284,7 +273,7 @@ inline bool ElasticIndexComparator::operator()(
 /**
  * Return true if key is in the index.
  */
-inline bool ElasticIndex::has(const PersistentTable &table, const TableTuple &tuple)
+inline bool ElasticIndex::has(const PersistentTable &table, const TableTuple &tuple) const
 {
     return exists(ElasticIndexKey(table, tuple));
 }

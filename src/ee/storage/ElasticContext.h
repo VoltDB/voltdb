@@ -19,7 +19,6 @@
 
 #include <vector>
 #include <string>
-#include "storage/ElasticIndex.h"
 #include "storage/ElasticScanner.h"
 #include "storage/TableStreamer.h"
 #include "storage/TableStreamerContext.h"
@@ -97,16 +96,6 @@ private:
      * Scanner for retrieveing rows.
      */
     ElasticScanner m_scanner;
-
-    /**
-     * Elastic index.
-     */
-    ElasticIndex m_index;
-
-    /**
-     * Set to true after handleStreamMore() was called once after building the index.
-     */
-    bool m_isIndexed;
 
     /**
      * The maximum number of tuples to index per handleStreamMore() call.

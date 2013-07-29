@@ -446,8 +446,8 @@ public:
                                                    skipInternalActivation);
     }
 
-    int64_t doStreamMore() {
-        return m_table->streamMore(*m_outputStreams, m_retPositions);
+    int64_t doStreamMore(TableStreamType streamType) {
+        return m_table->streamMore(*m_outputStreams, streamType, m_retPositions);
     }
 
     boost::shared_ptr<ElasticScanner> getElasticScanner() {
@@ -788,7 +788,7 @@ public:
             size_t nextra = extra.size();
             size_t nmoved = m_moved.size();
             error("Bad index - tuple statistics:");
-            error("     Tuples: %lu = %lu+%lu-%lu (%lu)", ntotal, ninitial, ninserted, ndeleted, nupdated);
+            error("     Tuples: %lu = %lu+%lu-%lu (%lu updated)", ntotal, ninitial, ninserted, ndeleted, nupdated);
             error("   Expected: %lu = %lu-%lu", nexpected, nactive, nrejected);
             error("      Found: %lu", nindexed);
             error("      Moved: %lu", nmoved);
@@ -871,12 +871,8 @@ public:
         return NULL;
     }
 
-    voltdb::ElasticIndex *getElasticIndex() {
-        voltdb::ElasticContext *context = getElasticContext();
-        if (context != NULL) {
-            return &context->m_index;
-        }
-        return NULL;
+    voltdb::ElasticIndex &getElasticIndex() {
+        return m_table->m_surgeon.m_index;
     }
 
     bool setElasticIndexTuplesPerCall(size_t nTuplesPerCall) {
@@ -1006,7 +1002,7 @@ TEST_F(CopyOnWriteTest, BigTest) {
             TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
             TupleOutputStream &outputStream = outputStreams.at(0);
             std::vector<int> retPositions;
-            int64_t remaining = m_table->streamMore(outputStreams, retPositions);
+            int64_t remaining = m_table->streamMore(outputStreams, TABLE_STREAM_SNAPSHOT, retPositions);
             if (remaining >= 0) {
                 ASSERT_EQ(outputStreams.size(), retPositions.size());
             }
@@ -1072,7 +1068,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
             TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
             TupleOutputStream &outputStream = outputStreams.at(0);
             std::vector<int> retPositions;
-            int64_t remaining = m_table->streamMore(outputStreams, retPositions);
+            int64_t remaining = m_table->streamMore(outputStreams, TABLE_STREAM_SNAPSHOT, retPositions);
             if (remaining >= 0) {
                 ASSERT_EQ(outputStreams.size(), retPositions.size());
             }
@@ -1139,7 +1135,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
             TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
             TupleOutputStream &outputStream = outputStreams.at(0);
             std::vector<int> retPositions;
-            int64_t remaining = m_table->streamMore(outputStreams, retPositions);
+            int64_t remaining = m_table->streamMore(outputStreams, TABLE_STREAM_SNAPSHOT, retPositions);
             if (remaining >= 0) {
                 ASSERT_EQ(outputStreams.size(), retPositions.size());
             }
@@ -1178,7 +1174,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
 /**
  * Exercise the multi-COW.
  */
-TEST_F(CopyOnWriteTest, MultiStreamTest) {
+TEST_F(CopyOnWriteTest, MultiStream) {
 
     // Constants
     const int32_t npartitions = 7;
@@ -1266,7 +1262,7 @@ TEST_F(CopyOnWriteTest, MultiStreamTest) {
             }
 
             std::vector<int> retPositions;
-            remaining = m_table->streamMore(outputStreams, retPositions);
+            remaining = m_table->streamMore(outputStreams, TABLE_STREAM_SNAPSHOT, retPositions);
             if (remaining >= 0) {
                 ASSERT_EQ(outputStreams.size(), retPositions.size());
             }
@@ -1348,7 +1344,7 @@ TEST_F(CopyOnWriteTest, BufferBoundaryCondition) {
     m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
     TupleOutputStreamProcessor outputStreams(serializationBuffer, bufferSize);
     std::vector<int> retPositions;
-    int64_t remaining = m_table->streamMore(outputStreams, retPositions);
+    int64_t remaining = m_table->streamMore(outputStreams, TABLE_STREAM_SNAPSHOT, retPositions);
     if (remaining >= 0) {
         ASSERT_EQ(outputStreams.size(), retPositions.size());
     }
@@ -1375,6 +1371,7 @@ public:
     }
 
     virtual int64_t streamMore(TupleOutputStreamProcessor &outputStreams,
+                               TableStreamType streamType,
                                std::vector<int> &retPositions) { return 0; }
 
     // Saying it's already active forces activateStream() to return without doing anything.
@@ -1475,7 +1472,7 @@ public:
 };
 
 // Test the elastic scanner.
-TEST_F(CopyOnWriteTest, ElasticScannerTest) {
+TEST_F(CopyOnWriteTest, ElasticScanner) {
 
     const int NUM_PARTITIONS = 1;
     const int TUPLES_PER_BLOCK = 50;
@@ -1549,6 +1546,7 @@ public:
     }
 
     virtual int64_t streamMore(TupleOutputStreamProcessor &outputStreams,
+                               TableStreamType streamType,
                                std::vector<int> &retPositions) {
         return m_context->handleStreamMore(outputStreams, retPositions);
     }
@@ -1577,22 +1575,13 @@ public:
         m_test.m_moved.insert(value);
     }
 
-    ElasticContext& getContext() {
-        return *m_context.get();
-    }
-
-    ElasticIndex& getIndex() {
-        // Abuse the friendship.
-        return getContext().m_index;
-    }
-
     int32_t m_partitionId;
     const std::vector<std::string> &m_predicateStrings;
     boost::scoped_ptr<ElasticContext> m_context;
 };
 
-// Test elastic context index creation.
-TEST_F(CopyOnWriteTest, ElasticContextIndexTest) {
+// Test elastic index creation.
+TEST_F(CopyOnWriteTest, ElasticIndex) {
     const int NUM_PARTITIONS = 1;
     const int TUPLES_PER_BLOCK = 50;
     const int NUM_INITIAL = 300;
@@ -1622,7 +1611,7 @@ TEST_F(CopyOnWriteTest, ElasticContextIndexTest) {
     boost::shared_ptr<TableStreamerInterface> streamer(streamerPtr);
     doActivateStream(TABLE_STREAM_ELASTIC_INDEX, streamer, predicateStrings, false);
 
-    while (doStreamMore() != 0) {
+    while (doStreamMore(TABLE_STREAM_ELASTIC_INDEX) != 0) {
         ;
     }
 
@@ -1630,7 +1619,7 @@ TEST_F(CopyOnWriteTest, ElasticContextIndexTest) {
         tableScrambler.scramble();
     }
 
-    checkIndex(streamerPtr->getIndex(), predicates);
+    checkIndex(getElasticIndex(), predicates);
 }
 
 /**
@@ -1684,7 +1673,7 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
     std::vector<int> retPositionsElastic;
     TupleOutputStreamProcessor outputStreamsElastic(serializationBuffer, sizeof(serializationBuffer));
     size_t nCalls = 0;
-    while (m_table->streamMore(outputStreamsElastic, retPositionsElastic) != 0) {
+    while (m_table->streamMore(outputStreamsElastic, TABLE_STREAM_ELASTIC_INDEX, retPositionsElastic) != 0) {
         nCalls++;
     }
     // Make sure we forced more than one streamMore() call.
@@ -1711,7 +1700,7 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
         TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
         TupleOutputStream &outputStream = outputStreams.at(0);
         std::vector<int> retPositions;
-        int64_t remaining = m_table->streamMore(outputStreams, retPositions);
+        int64_t remaining = m_table->streamMore(outputStreams, TABLE_STREAM_SNAPSHOT, retPositions);
         if (remaining >= 0) {
             ASSERT_EQ(outputStreams.size(), retPositions.size());
         }
@@ -1746,9 +1735,7 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
 
     checkTuples(NUM_INITIAL + (m_tuplesInserted - m_tuplesDeleted), originalTuples, COWTuples);
 
-    voltdb::ElasticIndex *index = getElasticIndex();
-    ASSERT_NE(NULL, index);
-    checkIndex(*index, predicates);
+    checkIndex(getElasticIndex(), predicates);
 }
 
 int main() {

@@ -104,7 +104,6 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
             return false;
         }
     }
-
     // Purge unneeded streams, e.g. to handle streamMore() not being completely drained.
     purgeStreams();
 
@@ -143,6 +142,7 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
 }
 
 int64_t TableStreamer::streamMore(TupleOutputStreamProcessor &outputStreams,
+                                  TableStreamType streamType,
                                   std::vector<int> &retPositions)
 {
     int64_t remaining = -2;

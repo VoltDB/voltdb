@@ -313,6 +313,7 @@ CTX.INPUT['storage'] = """
  RecoveryContext.cpp
  TupleBlock.cpp
  TableStreamerContext.cpp
+ ElasticIndex.cpp
 """
 
 CTX.INPUT['stats'] = """

@@ -59,6 +59,7 @@
 #include "storage/PersistentTableStats.h"
 #include "storage/TableStreamerInterface.h"
 #include "storage/RecoveryContext.h"
+#include "storage/ElasticIndex.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
 
@@ -86,11 +87,13 @@ class ReferenceSerializeInput;
 class PersistentTable;
 
 /**
- * Interface used by contexts, scanners, iterators, and undo actions
- * to access some normally-private stuff in PersistentTable.
+ * Interface used by contexts, scanners, iterators, and undo actions to access
+ * normally-private stuff in PersistentTable.
+ * Holds persistent state produced by contexts, e.g. the elastic index.
  */
 class PersistentTableSurgeon {
     friend class PersistentTable;
+    friend class ::CopyOnWriteTest;
 
 public:
 
@@ -104,16 +107,37 @@ public:
     void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock);
 
+    // Elastic index methods. Used by ElasticContext.
+    void clearIndex();
+    bool isIndexed() const;
+    void setIsIndexed(bool isIndexed);
+    bool indexHas(TableTuple &tuple) const;
+    bool indexAdd(TableTuple &tuple);
+    bool indexRemove(TableTuple &tuple);
 
 private:
 
-    PersistentTableSurgeon(PersistentTable &table) : m_table(table)
-    {}
+    /**
+     * Only PersistentTable can call the constructor.
+     */
+    PersistentTableSurgeon(PersistentTable &table);
 
-    virtual ~PersistentTableSurgeon()
-    {}
+    /**
+     * Only PersistentTable can call the destructor.
+     */
+    virtual ~PersistentTableSurgeon();
 
     PersistentTable &m_table;
+
+    /**
+     * Elastic index.
+     */
+    ElasticIndex m_index;
+
+    /**
+     * Set to true after handleStreamMore() was called once after building the index.
+     */
+    bool m_isIndexed;
 };
 
 /**
@@ -243,10 +267,10 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
      * Return true on success or false if it was already active.
      */
     bool activateStream(TupleSerializer &tupleSerializer,
-                                 TableStreamType streamType,
-                                 int32_t partitionId,
-                                 CatalogId tableId,
-                                 ReferenceSerializeInput &serializeIn);
+                        TableStreamType streamType,
+                        int32_t partitionId,
+                        CatalogId tableId,
+                        ReferenceSerializeInput &serializeIn);
 
     void dropMaterializedView(MaterializedViewMetadata *targetView);
     void segregateMaterializedViews(std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & start,
@@ -264,6 +288,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
      * Return remaining tuple count, 0 if done, or -1 on error.
      */
     int64_t streamMore(TupleOutputStreamProcessor &outputStreams,
+                       TableStreamType streamType,
                        std::vector<int> &retPositions);
 
     /**
@@ -444,6 +469,14 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     PersistentTableSurgeon m_surgeon;
 };
 
+inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :
+    m_table(table),
+    m_isIndexed(false)
+{}
+
+inline PersistentTableSurgeon::~PersistentTableSurgeon()
+{}
+
 inline TBMap &PersistentTableSurgeon::getData() {
     return m_table.m_data;
 }
@@ -474,6 +507,30 @@ inline void PersistentTableSurgeon::snapshotFinishedScanningBlock(TBPtr finished
     m_table.snapshotFinishedScanningBlock(finishedBlock, nextBlock);
 }
 
+inline bool PersistentTableSurgeon::isIndexed() const {
+    return m_isIndexed;
+}
+
+inline void PersistentTableSurgeon::setIsIndexed(bool isIndexed) {
+    m_isIndexed = isIndexed;
+}
+
+inline void PersistentTableSurgeon::clearIndex() {
+    m_index.clear();
+    m_isIndexed = false;
+}
+
+inline bool PersistentTableSurgeon::indexHas(TableTuple &tuple) const {
+    return m_index.has(m_table, tuple);
+}
+
+inline bool PersistentTableSurgeon::indexAdd(TableTuple &tuple) {
+    return m_index.add(m_table, tuple);
+}
+
+inline bool PersistentTableSurgeon::indexRemove(TableTuple &tuple) {
+    return m_index.remove(m_table, tuple);
+}
 
 inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {
     assert (m_tempTuple.m_data);

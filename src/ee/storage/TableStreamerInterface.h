@@ -49,6 +49,7 @@ namespace voltdb
          * Continue streaming.
          */
         virtual int64_t streamMore(TupleOutputStreamProcessor &outputStreams,
+                                   TableStreamType streamType,
                                    std::vector<int> &retPositions) = 0;
 
         /**
