@@ -44,6 +44,7 @@ import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
@@ -889,12 +890,23 @@ public class PlanAssembler {
             return root;
         }
 
+        SortDirectionType sortDirection = SortDirectionType.INVALID;
+
         // Skip the explicit ORDER BY plan step if an IndexScan is already providing the equivalent ordering.
         // Note that even tree index scans that produce values in their own "key order" only report
         // their sort direction != SortDirectionType.INVALID
         // when they enforce an ordering equivalent to the one requested in the ORDER BY clause.
         if (root.getPlanNodeType() == PlanNodeType.INDEXSCAN) {
-            if (((IndexScanPlanNode) root).getSortDirection() != SortDirectionType.INVALID) {
+            sortDirection = ((IndexScanPlanNode) root).getSortDirection();
+            if (sortDirection != SortDirectionType.INVALID) {
+                return root;
+            }
+        }
+        // Optimization for NestLoopIndex on IN list
+        // skip the explicit ORDER BY plan step if NestLoopIndex is providing the equivalent ordering
+        if (root.getPlanNodeType() == PlanNodeType.NESTLOOPINDEX) {
+            sortDirection = ((NestLoopIndexPlanNode)root).getSortDirection();
+            if (sortDirection != SortDirectionType.INVALID) {
                 return root;
             }
         }
