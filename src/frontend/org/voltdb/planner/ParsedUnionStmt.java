@@ -40,8 +40,6 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     public HashSet<String> m_uniqueTables = new HashSet<String>();
     public ArrayList<AbstractParsedStmt> m_children = new ArrayList<AbstractParsedStmt>();
     public UnionType m_unionType = UnionType.NOUNION;
-    /** Collection of filter expressions across all the the sub-selects */
-    public ArrayList<AbstractExpression> m_filterSelectionList = new ArrayList<AbstractExpression>();
 
     /**
     * Class constructor
@@ -123,17 +121,30 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
      * @param joinOrder
      */
     void postParse(String sql, String joinOrder) {
+        /** Collection of COMPARE_EQ filter expressions across all the the sub-selects */
+        ArrayList<AbstractExpression> equivalenceFilters = new ArrayList<AbstractExpression>();
 
         for (AbstractParsedStmt selectStmt : m_children) {
             selectStmt.postParse(sql, joinOrder);
             // Propagate parsing results to the parent union
             if (selectStmt.joinTree != null) {
-                m_filterSelectionList.addAll(selectStmt.joinTree.getAllExpressions());
+                equivalenceFilters.addAll(selectStmt.joinTree.getAllEquivalenceFilters());
             }
         }
         // Analyze children's where expressions together to identify possible identically
-        // partitioned tables
-        valueEquivalence.putAll(analyzeValueEquivalence(m_filterSelectionList));
+        // partitioned tables.
+        // TODO: There actually should be separate logic to determine the partitioning of each
+        // sub-statement and then decide if the resulting partitionings are compatible.
+        // The latter step should be based solely on the final partitioning expression
+        // that was determined separately for each statement.
+        // The current algorithm is a bit dodgy because it relies on the "union" of the
+        // sub-statements' equivalences determining the partitioning of the "union" of the
+        // sub-statements' tables.
+        // This may not be reliable if seemingly related (transitive) equivalence filters like
+        // "(A.X = B.Y) and (A.X = 1)" ever appear in different sub-statements.
+        // It works for now because a table can only be referenced once in a UNION statement
+        // -- no self-UNIONs, no UNIONs of joins that partially share tables.
+        valueEquivalence.putAll(analyzeValueEquivalence(equivalenceFilters));
 
         // these just shouldn't happen right?
         assert(multiTableSelectionList.size() == 0);

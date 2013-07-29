@@ -124,9 +124,50 @@ public class JoinNode implements Cloneable {
     }
 
     /**
+     * Collect all WHERE clause expressions of type COMPARE_EQUAL joined only by CONJUNCTION_AND nodes
+     * for the entire tree, so they can be used to determine query statement partitioning.
+     * This is tricky in the case of JOIN filters because "partition_column = constant"
+     * does not exclude joined result rows from occurring on all partitions.
+     * This generally still requires a multi-partition plan.
+     * But a join filter of the form "outer.partition_column = inner.partition_column" DOES allow
+     * a multi-partition join to be executed in parallel on each partition -- the inner table rows
+     * on other partitions from each outer table row have no effect on the results stemming from
+     * that outer table row. Likewise, the outer table rows on other partitions from each inner table
+     * row have no effect on the results stemming from that inner table row.
+     */
+    List<AbstractExpression> getAllEquivalenceFilters()
+    {
+        List<AbstractExpression> equivalences = new ArrayList<AbstractExpression>();
+        ArrayDeque<JoinNode> joinNodes = new ArrayDeque<JoinNode>();
+        // Iterate over the join nodes to collect their join and where equivalence filter expressions
+        joinNodes.add(this);
+        while (!joinNodes.isEmpty()) {
+            JoinNode joinNode = joinNodes.poll();
+            if (joinNode.m_joinExpr != null) {
+                Collection<AbstractExpression> joinFilters =
+                    ExpressionUtil.collectPartitioningJoinFilters(joinNode.m_joinExpr);
+                equivalences.addAll(joinFilters);
+            }
+            if (joinNode.m_whereExpr != null) {
+                Collection<AbstractExpression> whereFilters =
+                    ExpressionUtil.collectPartitioningWhereFilters(joinNode.m_whereExpr);
+                equivalences.addAll(whereFilters);
+            }
+            if (joinNode.m_leftNode != null) {
+                joinNodes.add(joinNode.m_leftNode);
+            }
+            if (joinNode.m_rightNode != null) {
+                joinNodes.add(joinNode.m_rightNode);
+            }
+        }
+        return equivalences;
+    }
+
+    /**
      * Collect all JOIN and WHERE expressions combined with AND for the entire tree.
      */
-    Collection<AbstractExpression> getAllExpressions() {
+    AbstractExpression getAllInnerJoinFilters() {
+        assert(m_joinType == JoinType.INNER);
         ArrayDeque<JoinNode> joinNodes = new ArrayDeque<JoinNode>();
         ArrayDeque<AbstractExpression> in = new ArrayDeque<AbstractExpression>();
         ArrayDeque<AbstractExpression> out = new ArrayDeque<AbstractExpression>();
@@ -160,18 +201,17 @@ public class JoinNode implements Cloneable {
                 out.add(inExpr);
             }
         }
-        return out;
+        return ExpressionUtil.combine(out);
     }
 
     /**
-     * Collect all JOIN and WHERE expressions for the entire statement and combine them into
-     * a single expression joined by AND.
+     * Get the WHERE expression for a single-table statement.
      */
-    AbstractExpression getCombinedExpression() {
-        // First, collect/decompose the original expressions into the subexpressions joined by AND
-        Collection<AbstractExpression> exprList = getAllExpressions();
-        // Eliminate dups
-        return ExpressionUtil.eliminateDuplicates(exprList);
+    AbstractExpression getSimpleFilterExpression()
+    {
+        assert(m_leftNode == null);
+        assert(m_rightNode == null);
+        return m_whereExpr;
     }
 
     /**

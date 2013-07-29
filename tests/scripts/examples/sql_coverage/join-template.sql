@@ -29,7 +29,5 @@ SELECT * FROM _table LHS25 @jointype JOIN _table RHS ON    LHS25.@idcol = RHS.@i
 
 SELECT * FROM _table LHS26 @jointype JOIN _table RHS ON    LHS26.@idcol = RHS.@idcol AND   LHS26.@numcol = RHS.@numcol WHERE RHS.@idcol > 10 AND LHS26.@numcol < 30 AND LHS26.@numcol >= RHS.@idcol
 
---TODO: ENG-4929 Investigate why these get a planner NullPointerException for a timeout.
---SELECT * FROM _table LHS36 @jointype JOIN _table RHS USING(      @idcol,                         @numcol)          WHERE     @idcol > 10 AND       @numcol < 30 AND       @numcol >=     @idcol
--- it's not (just) the select * that fails:
---SELECT @idcol, @numcol FROM _table LHS36 @jointype JOIN _table RHS USING(      @idcol,       @numcol)          WHERE     @idcol > 10 AND       @numcol < 30 AND       @numcol >=     @idcol
+SELECT * FROM _table LHS36 @jointype JOIN _table RHS USING(      @idcol,                         @numcol)              WHERE     @idcol > 10 AND       @numcol < 30 AND       @numcol >=     @idcol
+SELECT @idcol, @numcol FROM _table LHS36 @jointype JOIN _table RHS USING(     @idcol,            @numcol)              WHERE     @idcol > 10 AND       @numcol < 30 AND       @numcol >=     @idcol

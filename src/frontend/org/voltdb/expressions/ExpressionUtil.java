@@ -114,6 +114,48 @@ public abstract class ExpressionUtil {
         return leaf;
     }
 
+    public static boolean isSimpleEquivalenceExpression(AbstractExpression expr) {
+        // Ignore expressions that are not of COMPARE_EQUAL type
+        if (expr.getExpressionType() != ExpressionType.COMPARE_EQUAL) {
+            return false;
+        }
+        AbstractExpression leftExpr = expr.getLeft();
+        AbstractExpression rightExpr = expr.getRight();
+        // Can't use an expression based on a column value that is not just a simple column value.
+        if ( ( ! (leftExpr instanceof TupleValueExpression)) && leftExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
+            return false;
+        }
+        if ( ( ! (rightExpr instanceof TupleValueExpression)) && rightExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
+            return false;
+        }
+        return true;
+    }
+
+    static class FilterCondition
+    {
+        boolean qualifies(AbstractExpression anything) { return true; }
+        static FilterCondition allPass = new FilterCondition();
+
+        static FilterCondition filterSimpleEqualities = new FilterCondition()
+        {
+            boolean qualifies(AbstractExpression inExpr)
+            {
+                return isSimpleEquivalenceExpression(inExpr);
+            }
+        };
+
+        static FilterCondition filterTveToTveEqualities = new FilterCondition()
+        {
+            boolean qualifies(AbstractExpression inExpr)
+            {
+                return isSimpleEquivalenceExpression(inExpr) &&
+                        (inExpr.getLeft() instanceof TupleValueExpression) &&
+                        (inExpr.getRight() instanceof TupleValueExpression);
+            }
+        };
+
+    };
+
     /**
      * Convert one or more predicates, potentially in an arbitrarily nested conjunction tree
      * into a flattened collection. Similar to uncombine but for arbitrary tree shapes and with no
@@ -126,6 +168,41 @@ public abstract class ExpressionUtil {
      */
     public static Collection<AbstractExpression> uncombineAny(AbstractExpression expr)
     {
+        return collectSomeFilters(expr, FilterCondition.allPass);
+    }
+
+    /**
+     * Convert one or more predicates, potentially in an arbitrarily nested conjunction tree
+     * into a flattened collection and filter out any that do not qualify as potential
+     * partioning join filters, which is to say are not equality comparisons between
+     * tuple value expressions.
+     * Adds filtering to uncombineAny.
+     * @param expr
+     * @return a Collection containing the qualifying expr or if expr is a conjunction, its top-level
+     * non-conjunction child expressions that qualify.
+     */
+    public static Collection<AbstractExpression> collectPartitioningJoinFilters(AbstractExpression expr)
+    {
+        return collectSomeFilters(expr, FilterCondition.filterTveToTveEqualities);
+    }
+
+    /**
+     * Convert one or more predicates, potentially in an arbitrarily nested conjunction tree
+     * into a flattened collection and filter out any that do not qualify as potential
+     * partioning where filters, which is to say are not equality comparisons.
+     * Adds filtering to uncombineAny.
+     * @param expr
+     * @return a Collection containing the qualifying expr or if expr is a conjunction, its top-level
+     * non-conjunction child expressions that qualify.
+     */
+    public static Collection<AbstractExpression> collectPartitioningWhereFilters(AbstractExpression expr)
+    {
+        return collectSomeFilters(expr, FilterCondition.filterSimpleEqualities);
+    }
+
+    private static Collection<AbstractExpression> collectSomeFilters(AbstractExpression expr,
+                                                                     FilterCondition condition)
+    {
         ArrayDeque<AbstractExpression> out = new ArrayDeque<AbstractExpression>();
         if (expr != null) {
             ArrayDeque<AbstractExpression> in = new ArrayDeque<AbstractExpression>();
@@ -137,8 +214,9 @@ public abstract class ExpressionUtil {
                 if (inExpr.getExpressionType() == ExpressionType.CONJUNCTION_AND) {
                     in.add(inExpr.getLeft());
                     in.add(inExpr.getRight());
+                    continue;
                 }
-                else {
+                if (condition.qualifies(inExpr)) {
                     out.add(inExpr);
                 }
             }

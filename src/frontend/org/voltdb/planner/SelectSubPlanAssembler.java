@@ -189,8 +189,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 }
                 JoinNode joinOrderSubTree = reconstructJoinTreeFromTableNodes(joinOrderSubNodes);
                 //Collect all the join/where conditions to reassign them later
-                Collection<AbstractExpression> combinedExprs = subTree.getAllExpressions();
-                AbstractExpression combinedWhereExpr = ExpressionUtil.combine(combinedExprs);
+                AbstractExpression combinedWhereExpr = subTree.getAllInnerJoinFilters();
                 if (combinedWhereExpr != null) {
                     joinOrderSubTree.m_whereExpr = (AbstractExpression)combinedWhereExpr.clone();
                 }
@@ -357,8 +356,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                     newTrees.add(reconstructJoinTreeFromTableNodes(joinOrder));
                 }
                 //Collect all the join/where conditions to reassign them later
-                Collection<AbstractExpression> combinedExprs = subTree.getAllExpressions();
-                AbstractExpression combinedWhereExpr = ExpressionUtil.combine(combinedExprs);
+                AbstractExpression combinedWhereExpr = subTree.getAllInnerJoinFilters();
                 for (JoinNode newTree : newTrees) {
                     if (combinedWhereExpr != null) {
                         newTree.m_whereExpr = (AbstractExpression)combinedWhereExpr.clone();

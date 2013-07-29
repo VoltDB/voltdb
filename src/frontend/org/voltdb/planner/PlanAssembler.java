@@ -392,8 +392,6 @@ public class PlanAssembler {
 
         assert (nextStmt != null);
         retval.parameters = nextStmt.getParameters();
-        retval.fullWhereClause = nextStmt.getCombinedFilterExpression();
-        retval.fullWinnerPlan = retval.rootPlanGraph;
         // Do a final generateOutputSchema pass.
         retval.rootPlanGraph.generateOutputSchema(m_catalogDb);
         retval.setPartitioningKey(m_partitioning.effectivePartitioningValue());

@@ -534,10 +534,14 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
-     * Build a combined WHERE expressions for the entire statement.
+     * Build a WHERE expression for a single-table statement.
      */
-    public AbstractExpression getCombinedFilterExpression() {
-        return (joinTree != null) ? joinTree.getCombinedExpression() : null;
+    public AbstractExpression getSimpleFilterExpression() {
+        if (joinTree == null) { // Not possible.
+            assert(joinTree != null);
+            return null;
+        }
+        return joinTree.getSimpleFilterExpression();
     }
 
     /**
@@ -690,7 +694,7 @@ public abstract class AbstractParsedStmt {
             return;
         }
         // collect individual where/join expressions
-        Collection<AbstractExpression> exprList = joinTree.getAllExpressions();
+        Collection<AbstractExpression> exprList = joinTree.getAllEquivalenceFilters();
         valueEquivalence.putAll(analyzeValueEquivalence(exprList));
     }
 
@@ -880,7 +884,7 @@ public abstract class AbstractParsedStmt {
         HashMap<AbstractExpression, Set<AbstractExpression> > eqMap1 = analyzeValueEquivalence(singleTableExprs);
 
         for (AbstractExpression expr : twoTableExprs) {
-            if (! isSimpleEquivalenceExpression(expr)) {
+            if (! ExpressionUtil.isSimpleEquivalenceExpression(expr)) {
                 continue;
             }
             AbstractExpression leftExpr = expr.getLeft();
@@ -1045,25 +1049,8 @@ public abstract class AbstractParsedStmt {
         return retval;
     }
 
-    boolean isSimpleEquivalenceExpression(AbstractExpression expr) {
-        // Ignore expressions that are not of COMPARE_EQUAL type
-        if (expr.getExpressionType() != ExpressionType.COMPARE_EQUAL) {
-            return false;
-        }
-        AbstractExpression leftExpr = expr.getLeft();
-        AbstractExpression rightExpr = expr.getRight();
-        // Can't use an expression based on a column value that is not just a simple column value.
-        if ( ( ! (leftExpr instanceof TupleValueExpression)) && leftExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
-            return false;
-        }
-        if ( ( ! (rightExpr instanceof TupleValueExpression)) && rightExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
-            return false;
-        }
-        return true;
-    }
-
     private void addExprToEquivalenceSets(AbstractExpression expr, HashMap<AbstractExpression, Set<AbstractExpression> > equivalenceSet) {
-        if (! isSimpleEquivalenceExpression(expr)) {
+        if (! ExpressionUtil.isSimpleEquivalenceExpression(expr)) {
             return;
         }
 

@@ -1468,7 +1468,7 @@ public class DDLCompiler {
             Table srcTable = stmt.tableList.get(0);
             MaterializedViewInfo matviewinfo = srcTable.getViews().add(destTable.getTypeName());
             matviewinfo.setDest(destTable);
-            AbstractExpression where = stmt.getCombinedFilterExpression();
+            AbstractExpression where = stmt.getSimpleFilterExpression();
             if (where != null) {
                 String hex = Encoder.hexEncode(where.toJSONString());
                 matviewinfo.setPredicate(hex);
