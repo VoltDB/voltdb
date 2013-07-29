@@ -42,6 +42,7 @@ import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.types.SortDirectionType;
+import org.voltdb.utils.CatalogUtil;
 
 public class IndexCountPlanNode extends AbstractScanPlanNode {
 
@@ -182,7 +183,8 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
         // decide whether to pad last endKey to solve
         // SELECT COUNT(*) FROM T WHERE C1 = ? AND C2 > / >= ?
-        if (endType == IndexLookupType.EQ &&
+        if (isp.getSortDirection() != SortDirectionType.DESC &&
+                endType == IndexLookupType.EQ &&
                 endKeys.size() > 0 &&
                 endKeys.size() == indexSize - 1 &&
                 isp.getSearchKeyExpressions().size() == indexSize) {
@@ -355,7 +357,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     protected String explainPlanForNode(String indent) {
         assert(m_catalogIndex != null);
 
-        int indexSize = m_catalogIndex.getColumns().size();
+        int indexSize = CatalogUtil.getCatalogIndexSize(m_catalogIndex);
         int keySize = m_searchkeyExpressions.size();
 
         String scanType = "tree-counter";
