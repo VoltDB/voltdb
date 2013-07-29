@@ -217,21 +217,21 @@ public class ElasticHashinator extends TheHashinator {
     }
 
     @Override
-    protected int pHashinateLong(long value) {
+    public int pHashinateLong(long value) {
         if (value == Long.MIN_VALUE) return 0;
 
         return partitionForToken(MurmurHash3.hash3_x64_128(value));
     }
 
     @Override
-    protected int pHashinateBytes(byte[] bytes) {
+    public int pHashinateBytes(byte[] bytes) {
         ByteBuffer buf = ByteBuffer.wrap(bytes);
         final long token = MurmurHash3.hash3_x64_128(buf, 0, bytes.length, 0);
         return partitionForToken(token);
     }
 
     @Override
-    protected Pair<HashinatorType, byte[]> pGetCurrentConfig() {
+    public Pair<HashinatorType, byte[]> pGetCurrentConfig() {
         return Pair.of(HashinatorType.ELASTIC, m_configBytes);
     }
 
@@ -244,7 +244,7 @@ public class ElasticHashinator extends TheHashinator {
      * map will be empty.
      */
     @Override
-    protected Map<Long, Integer> pPredecessors(int partition) {
+    public Map<Long, Integer> pPredecessors(int partition) {
         Map<Long, Integer> predecessors = new TreeMap<Long, Integer>();
         UnmodifiableIterator<Map.Entry<Long,Integer>> iter = tokens.entrySet().iterator();
         Set<Long> pTokens = new HashSet<Long>();
@@ -281,7 +281,7 @@ public class ElasticHashinator extends TheHashinator {
      * @return The predecessor of the given token.
      */
     @Override
-    protected Pair<Long, Integer> pPredecessor(int partition, long token) {
+    public Pair<Long, Integer> pPredecessor(int partition, long token) {
         Integer partForToken = tokens.get(token);
         if (partForToken != null && partForToken == partition) {
             Map.Entry<Long, Integer> predecessor = tokens.headMap(token).lastEntry();
@@ -307,7 +307,7 @@ public class ElasticHashinator extends TheHashinator {
      * This runs in linear time with respect to the number of tokens on the ring.
      */
     @Override
-    protected Map<Long, Long> pGetRanges(int partition) {
+    public Map<Long, Long> pGetRanges(int partition) {
         Map<Long, Long> ranges = new TreeMap<Long, Long>();
         Long first = null; // start of the very first token on the ring
         Long start = null; // start of a range

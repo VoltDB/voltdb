@@ -405,7 +405,7 @@ public class SnapshotSiteProcessor {
         }
 
         // Table doesn't implement hashCode(), so use the table ID as key
-        Map<Integer, Pair<Table, SnapshotPredicates>> tablesAndPredicates =
+        Map<Integer, SnapshotPredicates> tablesAndPredicates =
             makeTablesAndPredicatesToSnapshot(tasks);
 
         activateTableStreams(ee, tablesAndPredicates);
@@ -467,10 +467,10 @@ public class SnapshotSiteProcessor {
         }
     }
 
-    private Map<Integer, Pair<Table, SnapshotPredicates>>
+    private Map<Integer, SnapshotPredicates>
     makeTablesAndPredicatesToSnapshot(Collection<SnapshotTableTask> tasks) {
-        Map<Integer, Pair<Table, SnapshotPredicates>> tablesAndPredicates =
-            new HashMap<Integer, Pair<Table, SnapshotPredicates>>();
+        Map<Integer, SnapshotPredicates> tablesAndPredicates =
+            new HashMap<Integer, SnapshotPredicates>();
 
         for (SnapshotTableTask task : tasks) {
             SNAP_LOG.debug("Examining SnapshotTableTask: " + task);
@@ -480,32 +480,27 @@ public class SnapshotSiteProcessor {
 
             // Make sure there is a predicate object for each table, the predicate could contain
             // empty expressions. So activateTableStream() doesn't have to do a null check.
-            Pair<Table, SnapshotPredicates> tableAndPredicate =
-                tablesAndPredicates.get(task.m_table.getRelativeIndex());
-            if (tableAndPredicate == null) {
-                tableAndPredicate =
-                    Pair.of(task.m_table, new SnapshotPredicates());
-                tablesAndPredicates.put(task.m_table.getRelativeIndex(), tableAndPredicate);
+            SnapshotPredicates predicates = tablesAndPredicates.get(task.m_table.getRelativeIndex());
+            if (predicates == null) {
+                predicates = new SnapshotPredicates(task.m_table);
+                tablesAndPredicates.put(task.m_table.getRelativeIndex(), predicates);
             }
 
-            tableAndPredicate.getSecond().addPredicate(task.m_predicate, task.m_deleteTuples);
+            predicates.addPredicate(task.m_predicate, task.m_deleteTuples);
         }
 
         return tablesAndPredicates;
     }
 
     private static void activateTableStreams(ExecutionEngine ee,
-                                             Map<Integer, Pair<Table, SnapshotPredicates>> tablesAndPredicates)
+                                             Map<Integer, SnapshotPredicates> tablesAndPredicates)
     {
-        for (Pair<Table, SnapshotPredicates> tableAndPredicate : tablesAndPredicates.values()) {
-            Table table = tableAndPredicate.getFirst();
-            SnapshotPredicates predicates = tableAndPredicate.getSecond();
-
-            if (!ee.activateTableStream(table.getRelativeIndex(),
+        for (SnapshotPredicates predicates : tablesAndPredicates.values()) {
+            if (!ee.activateTableStream(predicates.m_table.getRelativeIndex(),
                                         TableStreamType.SNAPSHOT,
                                         predicates)) {
                 VoltDB.crashLocalVoltDB("Attempted to activate copy on write mode for table "
-                                        + table.getTypeName() + " and failed", false, null);
+                                        + predicates.m_table.getTypeName() + " and failed", false, null);
             }
         }
     }
@@ -547,7 +542,7 @@ public class SnapshotSiteProcessor {
              * thread so the EE can continue working.
              */
             if (tableTask.m_table.getIsreplicated() &&
-                tableTask.m_target.getFormat().isTableBased()) {
+                tableTask.m_target.getFormat().canCloseEarly()) {
                 final Thread terminatorThread =
                     new Thread("Replicated SnapshotDataTarget terminator ") {
                         @Override
