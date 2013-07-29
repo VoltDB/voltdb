@@ -111,7 +111,14 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             System.out.println(vt.toString());
             compareTable(vt, expected);
 
-            // Test group by columns not in display columns
+            // Test order by expression column which is not in display columns
+            cr = client.callProcedure("@AdHoc", "SELECT COUNT(*) as tag, sum(wage) from " + tb + " GROUP BY dept ORDER BY abs(dept) DESC");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {2, 90}, {3, 60}};
+            compareTable(vt, expected);
+
+            // Test order by expression column which is not in display columns, with complex aggregations
             cr = client.callProcedure("@AdHoc", "SELECT dept, COUNT(*) as tag, sum(wage) - 1 from " + tb + " GROUP BY dept ORDER BY tag DESC");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];

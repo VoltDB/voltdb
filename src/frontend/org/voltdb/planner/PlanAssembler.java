@@ -44,7 +44,6 @@ import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
@@ -54,6 +53,7 @@ import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.MaterializePlanNode;
+import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
@@ -540,24 +540,6 @@ public class PlanAssembler {
         // TODO(XIN): Maybe we can remove this projection node for more cases
         // Need to figure it out
         // We may not need its type comparison with orderby as well.
-//        if (root.getPlanNodeType() == PlanNodeType.ORDERBY) {
-//            int orderOutputCols = root.getOutputSchema().getColumns().size();
-//            if (m_parsedSelect.displayColumns().size() != orderOutputCols) {
-//                return true;
-//            }
-//
-//            for (int i = 0; i < orderOutputCols; i++) {
-//                SchemaColumn orderCol = root.getOutputSchema().getColumns().get(i);
-//                ParsedColInfo displayCol = m_parsedSelect.displayColumns().get(i);
-//                if (!displayCol.tableName.equals(orderCol.getTableName()) ||
-//                        displayCol.columnName.equals(orderCol.getColumnName()) ||
-//                        displayCol.alias.equals(orderCol.getColumnAlias())) {
-//                    // Expression can be different if it has been replaced with TVEs already
-//                    return false;
-//                }
-//            }
-//        }
-
         if (m_parsedSelect.hasComplexGroupby() && root.getPlanNodeType() == PlanNodeType.ORDERBY) {
             return false;
         }
