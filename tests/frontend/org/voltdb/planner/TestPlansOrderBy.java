@@ -41,6 +41,7 @@ public class TestPlansOrderBy extends PlannerTestCase {
     private void validatePlan(String sql, boolean expectIndexScan, boolean expectSeqScan, boolean expectOrderBy, boolean expectHashAggregate)
     {
         AbstractPlanNode pn = compile(sql);
+        System.out.println(pn.getChild(0).toJSONString());
         assertEquals(expectIndexScan, pn.hasAnyNodeOfType(PlanNodeType.INDEXSCAN));
         assertEquals(expectSeqScan, pn.hasAnyNodeOfType(PlanNodeType.SEQSCAN));
         assertEquals(expectOrderBy, pn.hasAnyNodeOfType(PlanNodeType.ORDERBY));
@@ -166,6 +167,6 @@ public class TestPlansOrderBy extends PlannerTestCase {
     }
 
     public void testOrderDescWithEquality() {
-        validatePlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D1 DESC", true, false, true, false);
+        validatePlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D1 DESC", true, false, false, false);
     }
 }
