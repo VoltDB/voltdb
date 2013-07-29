@@ -801,8 +801,12 @@ public class TestPlansJoin extends PlannerTestCase {
         assertTrue(n instanceof IndexScanPlanNode);
         IndexScanPlanNode in = (IndexScanPlanNode) n;
         assertTrue(in.getPredicate() != null);
-        assertTrue(ExpressionType.COMPARE_GREATERTHAN == in.getPredicate().getExpressionType());
-        assertTrue(IndexLookupType.GTE == in.getLookupType());
+        assertTrue(ExpressionType.CONJUNCTION_AND == in.getPredicate().getExpressionType());
+        assertTrue(IndexLookupType.LT == in.getLookupType());
+        assertTrue(ExpressionType.CONJUNCTION_AND == in.getPredicate().getLeft().getExpressionType());
+        assertTrue(ExpressionType.COMPARE_GREATERTHAN == in.getPredicate().getLeft().getLeft().getExpressionType());
+        assertTrue(ExpressionType.OPERATOR_NOT == in.getPredicate().getLeft().getRight().getExpressionType());
+        assertTrue(ExpressionType.COMPARE_LESSTHAN == in.getPredicate().getRight().getExpressionType());
 
         // Distributed inner  and outer tables -NLIJ/inlined IndexScan
         lpn = compileToFragments("select *  FROM P2 RIGHT JOIN P3 ON P3.A = P2.A AND P2.A < 0 WHERE P2.A IS NULL");
