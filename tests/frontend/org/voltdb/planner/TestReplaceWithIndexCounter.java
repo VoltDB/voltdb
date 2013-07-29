@@ -223,6 +223,23 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
         checkIndexCounter(pn, true);
     }
 
+    // test with FLOAT type
+    public void testCountStar26() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from P1 WHERE NUM = 1 AND RATIO >= ?");
+        for ( AbstractPlanNode nd : pn)
+            System.out.println("PlanNode Explan string:\n" + nd.toExplainPlanString());
+        AbstractPlanNode p = pn.get(0).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        p = pn.get(1).getChild(0);
+        assertTrue(p instanceof IndexCountPlanNode);
+    }
+
+    // should not replace
+    public void testCountStar27() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT COUNT(*) FROM T2 WHERE USERNAME >= 'XIN' AND POINTS = ?");
+        checkIndexCounter(pn, false);
+    }
+
     /**
      * Check Whether or not the original plan is replaced with CountingIndexPlanNode.
      *

@@ -518,7 +518,21 @@ public enum VoltType {
         }
     }
 
-    public static Object getMaxIntegralTypeValue(VoltType type) {
+    public boolean isMaxValuePaddable() {
+        switch (this) {
+        case TINYINT:
+        case SMALLINT:
+        case INTEGER:
+        case BIGINT:
+        case TIMESTAMP:
+        case FLOAT:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    public static Object getPaddedMaxTypeValue(VoltType type) {
         switch (type) {
         case TINYINT: return new Byte(Byte.MAX_VALUE);
         case SMALLINT: return new Short(Short.MAX_VALUE);
@@ -526,6 +540,8 @@ public enum VoltType {
         case BIGINT:
         case TIMESTAMP:
             return new Long(Long.MAX_VALUE);
+        case FLOAT:
+            return new Float(Float.MAX_VALUE);
         default:
             return null;
         }

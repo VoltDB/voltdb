@@ -37,6 +37,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.ParameterValueExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.PlanNodeType;
@@ -153,14 +154,28 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         // decide whether to pad last endKey to solve
         // SELECT COUNT(*) FROM T WHERE C1 = ? AND C2 > / >= ?
         if (endType == IndexLookupType.EQ &&
+                endKeys.size() > 0 &&
                 endKeys.size() == isp.getCatalogIndex().getColumns().size() - 1 &&
                 isp.getSearchKeyExpressions().size() == isp.getCatalogIndex().getColumns().size()) {
+            // need to check the filter we are missing is the last indexable expr
+            // and find out the missing key
             Index index = isp.getCatalogIndex();
             String jsonstring = index.getExpressionsjson();
             VoltType missingKeyType = VoltType.INVALID;
+            needPadding = true;
+
             if (jsonstring.isEmpty()) {
                 List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
-                missingKeyType = VoltType.get((byte)(indexedColRefs.get(indexedColRefs.size() - 1).getColumn().getType()));
+                int lastIndex = indexedColRefs.get(indexedColRefs.size() - 1).getColumn().getIndex();
+                for (AbstractExpression expr : endComparisons) {
+                    if (((TupleValueExpression)(expr.getLeft())).getColumnIndex() == lastIndex) {
+                        needPadding = false;
+                        break;
+                    }
+                }
+                if (needPadding) {
+                    missingKeyType = VoltType.get((byte)(indexedColRefs.get(indexedColRefs.size() - 1).getColumn().getType()));
+                }
             } else {
                 List<AbstractExpression> exprs = null;
                 try {
@@ -169,15 +184,26 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
                 }
-                missingKeyType = exprs.get(exprs.size() - 1).getLeft().getValueType();
+                AbstractExpression lastIndexableExpr = exprs.get(exprs.size() - 1);
+                for (AbstractExpression expr : endComparisons) {
+                    if (expr.getLeft().bindingToIndexedExpression(lastIndexableExpr) != null) {
+                        needPadding = false;
+                        break;
+                    }
+                }
+                if (needPadding) {
+                    missingKeyType = lastIndexableExpr.getValueType();
+                }
             }
-            if (missingKeyType.isInteger()) {
+            if (needPadding && missingKeyType.isMaxValuePaddable()) {
                 ConstantValueExpression missingKey = new ConstantValueExpression();
                 missingKey.setValueType(missingKeyType);
-                missingKey.setValue(String.valueOf(VoltType.getMaxIntegralTypeValue(missingKeyType)));
+                missingKey.setValue(String.valueOf(VoltType.getPaddedMaxTypeValue(missingKeyType)));
                 endType = IndexLookupType.LTE;
                 endKeys.add(missingKey);
                 needPadding = true;
+            } else {
+                needPadding = false;
             }
         }
 
