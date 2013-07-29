@@ -202,6 +202,7 @@ public class TupleValueExpression extends AbstractValueExpression {
             // -- the assumption has to be that it is not being used in a general expression,
             // so the schema-dependent type implications don't matter
             // and its "target" value is getting properly validated, so we can shortcut checking here.
+            assert(false);
             return;
         }
         Table table = db.getTables().getIgnoreCase(m_tableName);
