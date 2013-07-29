@@ -68,7 +68,7 @@ import com.google.common.base.Throwables;
  * added to each new rolling file}
  *
  */
-public class ExportToFileClient extends ExportClientBase2 {
+public class ExportToFileClient extends ExportClientBase {
     public static final int INTERNAL_FIELD_COUNT = 6;
 
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");

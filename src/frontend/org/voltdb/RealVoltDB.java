@@ -644,12 +644,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             int portOffset = 0;
             for (int i = 0; i < 1; i++) {
                 try {
+                    InetAddress externalInterface = null;
+                    if (!m_config.m_externalInterface.trim().equals("")) {
+                        externalInterface = InetAddress.getByName(m_config.m_externalInterface);
+                    }
                     ClientInterface ci =
                         ClientInterface.create(m_messenger,
                                 m_catalogContext,
                                 m_config.m_replicationRole,
                                 m_cartographer,
                                 clusterConfig.getPartitionCount(),
+                                externalInterface,
                                 config.m_port + portOffset,
                                 config.m_adminPort + portOffset,
                                 m_config.m_timestampTestingSalt);
@@ -777,14 +782,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             String pathToConfigInfo = pathToConfigInfoDir + File.separator + "config.json";
             File configInfo = new File(pathToConfigInfo);
 
-            String deploymentPath = null;
-            File deploymentFile = new File(m_config.m_pathToDeployment);
-            try {
-                deploymentPath = deploymentFile.getCanonicalPath();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
             byte jsonBytes[] = null;
             try {
                 JSONStringer stringer = new JSONStringer();
@@ -792,7 +789,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
                 stringer.key("workingDir").value(System.getProperty("user.dir"));
                 stringer.key("pid").value(CLibrary.getpid());
-                stringer.key("deployment").value(deploymentPath);
 
                 stringer.key("log4jDst").array();
                 Enumeration appenders = Logger.getRootLogger().getAllAppenders();
@@ -846,7 +842,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
         }
 
-        private void logCatalog() {
+        private void logCatalogAndDeployment() {
             File voltDbRoot = CatalogUtil.getVoltDbRoot(m_deployment.getPaths());
             String pathToConfigInfoDir = voltDbRoot.getPath() + File.separator + "config_log";
 
@@ -856,11 +852,25 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 hostLog.error("Failed to log catalog: " + e.getMessage());
                 e.printStackTrace();
             }
+
+            try {
+                File deploymentFile = new File(pathToConfigInfoDir, "deployment.xml");
+                if (deploymentFile.exists()) {
+                    deploymentFile.delete();
+                }
+                FileOutputStream fileOutputStream = new FileOutputStream(deploymentFile);
+                fileOutputStream.write(getHostMessenger().getZK().getData(VoltZK.deploymentBytes, false, null));
+                fileOutputStream.close();
+            } catch (Exception e) {
+                hostLog.error("Failed to log deployment file: " + e.getMessage());
+                e.printStackTrace();
+            }
         }
 
+        @Override
         public void run() {
             logConfigInfo();
-            logCatalog();
+            logCatalogAndDeployment();
         }
     }
 
@@ -1482,7 +1492,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
             else {
                 while (m_isRunning) {
-                    Thread.sleep(3000);
+                    Thread.sleep(1);
                 }
             }
         }
@@ -1800,7 +1810,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_MPI.updateCatalog(diffCommands, m_catalogContext, csp);
             }
 
-            new ConfigLogging().logCatalog();
+            new ConfigLogging().logCatalogAndDeployment();
 
             return Pair.of(m_catalogContext, csp);
         }

@@ -137,23 +137,10 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
         }
 
         // make an index node from the scan node
-        IndexScanPlanNode indexScanNode = new IndexScanPlanNode();
-        indexScanNode.setTargetTableName(scanNode.getTargetTableName());
-        indexScanNode.setTargetTableAlias(scanNode.getTargetTableAlias());
-        indexScanNode.setEndExpression(null);
-        indexScanNode.setScanColumns(new ArrayList<SchemaColumn>());
-        indexScanNode.setCatalogIndex(indexToScan);
+        IndexScanPlanNode indexScanNode = new IndexScanPlanNode(scanNode, null, indexToScan, SortDirectionType.ASC);
         indexScanNode.setKeyIterate(true);
-        indexScanNode.setTargetIndexName(indexToScan.getTypeName());
-        indexScanNode.setLookupType(IndexLookupType.GTE);
-        indexScanNode.setSortDirection(SortDirectionType.ASC);
-        indexScanNode.setPredicate(scanNode.getPredicate());
         indexScanNode.setForDeterminismOnly();
-        for (AbstractPlanNode inlineNode : scanNode.getInlinePlanNodes().values()) {
-            indexScanNode.addInlinePlanNode(inlineNode);
-        }
         indexScanNode.generateOutputSchema(db);
-        indexScanNode.setBindings(new ArrayList<AbstractExpression>());
 
         return indexScanNode;
     }

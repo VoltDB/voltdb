@@ -53,12 +53,20 @@ public abstract class AbstractParsedStmt {
     protected HashMap<Long, ParameterValueExpression> m_paramsById = new HashMap<Long, ParameterValueExpression>();
 
     public ArrayList<Table> tableList = new ArrayList<Table>();
+    private Table m_DDLIndexedTable = null;
+
+    public void setTable(Table tbl) {
+        m_DDLIndexedTable = tbl;
+    }
+
 
     public HashMap<AbstractExpression, Set<AbstractExpression> > valueEquivalence = new HashMap<AbstractExpression, Set<AbstractExpression>>();
 
     public ArrayList<AbstractExpression> noTableSelectionList = new ArrayList<AbstractExpression>();
 
     public ArrayList<AbstractExpression> multiTableSelectionList = new ArrayList<AbstractExpression>();
+
+    protected ArrayList<AbstractExpression> aggregationList = null;
 
     // Hierarchical join representation
     public JoinNode joinTree = null;
@@ -206,52 +214,33 @@ public abstract class AbstractParsedStmt {
      * @param root
      * @return configured AbstractExpression
      */
-    AbstractExpression parseExpressionTree(VoltXMLElement root) {
-        AbstractExpression exprTree = parseExpressionTree(m_paramsById, root);
-        exprTree.resolveForDB(m_db);
-
-        if (m_paramValues != null) {
-            List<AbstractExpression> params = exprTree.findAllSubexpressionsOfClass(ParameterValueExpression.class);
-            for (AbstractExpression ae : params) {
-                ParameterValueExpression pve = (ParameterValueExpression) ae;
-                ConstantValueExpression cve = pve.getOriginalValue();
-                if (cve != null) {
-                    cve.setValue(m_paramValues[pve.getParameterIndex()]);
-                }
-            }
-
-        }
-        return exprTree;
-    }
-
-    // TODO: This static function and the functions (below) that it calls to deal with various Expression types
-    // are only marginally related to AbstractParsedStmt
     // -- the function is now also called by DDLCompiler with no AbstractParsedStmt in sight --
     // so, the methods COULD be relocated to class AbstractExpression or ExpressionUtil.
-    static public AbstractExpression parseExpressionTree(HashMap<Long, ParameterValueExpression> paramsById, VoltXMLElement root) {
+    public AbstractExpression parseExpressionTree(VoltXMLElement root) {
         String elementName = root.name.toLowerCase();
         AbstractExpression retval = null;
 
         if (elementName.equals("value")) {
-            retval = parseValueExpression(paramsById, root);
+            retval = parseValueExpression(root);
         }
         else if (elementName.equals("vector")) {
-            retval = parseVectorExpression(paramsById, root);
+            retval = parseVectorExpression(root);
         }
         else if (elementName.equals("columnref")) {
             retval = parseColumnRefExpression(root);
         }
         else if (elementName.equals("operation")) {
-            retval = parseOperationExpression(paramsById, root);
+            retval = parseOperationExpression(root);
         }
         else if (elementName.equals("aggregation")) {
-            retval = parseAggregationExpression(paramsById, root);
-        }
-        else if (elementName.equals("simplecolumn")) {
-            retval = parseSimpleColumnExpression(root);
+            retval = parseAggregationExpression(root);
+            if (aggregationList != null) {
+                ExpressionUtil.finalizeValueTypes(retval);
+                aggregationList.add(retval);
+            }
         }
         else if (elementName.equals("function")) {
-            retval = parseFunctionExpression(paramsById, root);
+            retval = parseFunctionExpression(root);
         }
         else if (elementName.equals("asterisk")) {
             return null;
@@ -266,12 +255,12 @@ public abstract class AbstractParsedStmt {
     /**
      * Parse a Vector value for SQL-IN
      */
-    private static AbstractExpression parseVectorExpression(HashMap<Long, ParameterValueExpression> paramsById, VoltXMLElement exprNode) {
+    private AbstractExpression parseVectorExpression(VoltXMLElement exprNode) {
         ArrayList<AbstractExpression> args = new ArrayList<AbstractExpression>();
         for (VoltXMLElement argNode : exprNode.children) {
             assert(argNode != null);
             // recursively parse each argument subtree (could be any kind of expression).
-            AbstractExpression argExpr = parseExpressionTree(paramsById, argNode);
+            AbstractExpression argExpr = parseExpressionTree(argNode);
             assert(argExpr != null);
             args.add(argExpr);
         }
@@ -287,7 +276,7 @@ public abstract class AbstractParsedStmt {
      * @param exprNode
      * @return
      */
-    private static AbstractExpression parseValueExpression(HashMap<Long, ParameterValueExpression> paramsById, VoltXMLElement exprNode) {
+    private AbstractExpression parseValueExpression(VoltXMLElement exprNode) {
         String isParam = exprNode.attributes.get("isparam");
         String isPlannerGenerated = exprNode.attributes.get("isplannergenerated");
 
@@ -321,9 +310,10 @@ public abstract class AbstractParsedStmt {
 
         if (needParameter) {
             long id = Long.parseLong(exprNode.attributes.get("id"));
-            ParameterValueExpression expr = paramsById.get(id);
+            ParameterValueExpression expr = m_paramsById.get(id);
             if (needConstant) {
                 expr.setOriginalValue(cve);
+                cve.setValue(m_paramValues[expr.getParameterIndex()]);
             }
             return expr;
         }
@@ -335,7 +325,7 @@ public abstract class AbstractParsedStmt {
      * @param exprNode
      * @return
      */
-    private static AbstractExpression parseColumnRefExpression(VoltXMLElement exprNode) {
+    private AbstractExpression parseColumnRefExpression(VoltXMLElement exprNode) {
         TupleValueExpression expr = new TupleValueExpression();
 
         String alias = exprNode.attributes.get("alias");
@@ -348,10 +338,17 @@ public abstract class AbstractParsedStmt {
         }
         String columnName = exprNode.attributes.get("column");
 
+        if (tableName == null) {
+            assert(m_DDLIndexedTable != null);
+            tableName = m_DDLIndexedTable.getTypeName();
+        }
+        assert(tableName != null);
+
         expr.setColumnAlias(alias);
         expr.setColumnName(columnName);
         expr.setTableName(tableName);
 
+        expr.resolveForDB(m_db);
         return expr;
     }
 
@@ -361,7 +358,8 @@ public abstract class AbstractParsedStmt {
      * @param exprNode
      * @return
      */
-    private static AbstractExpression parseOperationExpression(HashMap<Long, ParameterValueExpression> paramsById, VoltXMLElement exprNode) {
+    private AbstractExpression parseOperationExpression(VoltXMLElement exprNode) {
+
         String optype = exprNode.attributes.get("optype");
         ExpressionType exprType = ExpressionType.get(optype);
         AbstractExpression expr = null;
@@ -383,7 +381,7 @@ public abstract class AbstractParsedStmt {
 
         // recursively parse the left subtree (could be another operator or
         // a constant/tuple/param value operand).
-        AbstractExpression leftExpr = parseExpressionTree(paramsById, leftExprNode);
+        AbstractExpression leftExpr = parseExpressionTree(leftExprNode);
         assert((leftExpr != null) || (exprType == ExpressionType.AGGREGATE_COUNT));
         expr.setLeft(leftExpr);
 
@@ -397,7 +395,7 @@ public abstract class AbstractParsedStmt {
             assert(rightExprNode != null);
 
             // recursively parse the right subtree
-            AbstractExpression rightExpr = parseExpressionTree(paramsById, rightExprNode);
+            AbstractExpression rightExpr = parseExpressionTree(rightExprNode);
             assert(rightExpr != null);
             expr.setRight(rightExpr);
         } else {
@@ -416,29 +414,14 @@ public abstract class AbstractParsedStmt {
         return expr;
     }
 
-
-    /**
-     *
-     * @param exprNode
-     * @return
-     */
-    private static AbstractExpression parseSimpleColumnExpression(VoltXMLElement exprNode)
-    {
-        // This object is a place holder that gets filled in later based on the display column it aliases.
-        String alias = exprNode.attributes.get("alias");
-        TupleValueExpression expr = new TupleValueExpression();
-        expr.setColumnAlias(alias);
-        return expr;
-    }
-
-
     /**
      *
      * @param paramsById
      * @param exprNode
      * @return
      */
-    private static AbstractExpression parseAggregationExpression(HashMap<Long, ParameterValueExpression> paramsById, VoltXMLElement exprNode)
+
+    private AbstractExpression parseAggregationExpression(VoltXMLElement exprNode)
     {
         String type = exprNode.attributes.get("optype");
         ExpressionType exprType = ExpressionType.get(type);
@@ -459,7 +442,7 @@ public abstract class AbstractParsedStmt {
 
         // recursively parse the child subtree -- could (in theory) be an operator or
         // a constant, column, or param value operand or null in the specific case of "COUNT(*)".
-        AbstractExpression childExpr = parseExpressionTree(paramsById, childExprNode);
+        AbstractExpression childExpr = parseExpressionTree(childExprNode);
         if (childExpr == null) {
             assert(exprType == ExpressionType.AGGREGATE_COUNT);
             exprType = ExpressionType.AGGREGATE_COUNT_STAR;
@@ -482,7 +465,7 @@ public abstract class AbstractParsedStmt {
      * @param exprNode
      * @return a new Function Expression
      */
-    private static AbstractExpression parseFunctionExpression(HashMap<Long, ParameterValueExpression> paramsById, VoltXMLElement exprNode) {
+    private AbstractExpression parseFunctionExpression(VoltXMLElement exprNode) {
         String name = exprNode.attributes.get("name").toLowerCase();
         String disabled = exprNode.attributes.get("disabled");
         if (disabled != null) {
@@ -507,7 +490,7 @@ public abstract class AbstractParsedStmt {
         for (VoltXMLElement argNode : exprNode.children) {
             assert(argNode != null);
             // recursively parse each argument subtree (could be any kind of expression).
-            AbstractExpression argExpr = parseExpressionTree(paramsById, argNode);
+            AbstractExpression argExpr = parseExpressionTree(argNode);
             assert(argExpr != null);
             args.add(argExpr);
         }
@@ -530,6 +513,7 @@ public abstract class AbstractParsedStmt {
             expr.setParameterArg(parameter_idx);
         }
 
+        expr.resolveForDB(m_db);
         return expr;
     }
 

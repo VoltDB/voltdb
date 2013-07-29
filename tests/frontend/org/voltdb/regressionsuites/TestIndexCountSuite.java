@@ -136,19 +136,11 @@ public class TestIndexCountSuite extends RegressionSuite {
 
         VoltTable table;
 
-        Exception ex = null;
-        try {
-            table = client.callProcedure("@AdHoc","SELECT (COUNT(*) + 1) FROM TU1 WHERE POINTS < 2").getResults()[0];
-            // Comment the next three lines out when VoltDB can plan this kind of query
-//            assertTrue(table.getRowCount() == 1);
-//            assertTrue(table.advanceRow());
-//            assertEquals(2, table.getLong(0));
-        } catch (Exception e) {
-            assertTrue(e instanceof ProcCallException);
-            ex = e;
-        } finally {
-            assertNotNull(ex);
-        }
+        table = client.callProcedure("@AdHoc","SELECT (COUNT(*) + 1) FROM TU1 WHERE POINTS < 2").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(2, table.getLong(0));
+
 
         table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS < -1").getResults()[0];
         assertTrue(table.getRowCount() == 1);
@@ -354,215 +346,215 @@ public class TestIndexCountSuite extends RegressionSuite {
         client.callProcedure("TU2.insert", 3, 3, "xin");
         client.callProcedure("TU2.insert", 4, 6, "xin");
         client.callProcedure("TU2.insert", 5, 8, "xin");
-        client.callProcedure("TU2.insert", 6, 1, "jia");
-        client.callProcedure("TU2.insert", 7, 2, "jia");
-        client.callProcedure("TU2.insert", 8, 3, "jia");
-        client.callProcedure("TU2.insert", 9, 6, "jia");
-        client.callProcedure("TU2.insert", 10, 8, "jia");
+        client.callProcedure("TU2.insert", 6, 1, "jiao");
+        client.callProcedure("TU2.insert", 7, 2, "jiao");
+        client.callProcedure("TU2.insert", 8, 3, "jiao");
+        client.callProcedure("TU2.insert", 9, 6, "jiao");
+        client.callProcedure("TU2.insert", 10, 8, "jiao");
 
         VoltTable table;
         // test with 2,6
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS < 6").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS < 6").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(3, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS > 2 AND POINTS < 6").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS > 2 AND POINTS < 6").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(1, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS < -1").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS < -1").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(0, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS < 1").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS < 1").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(0, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS <= 1").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS <= 1").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(1, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS < 5").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS < 5").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(3, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS <= 5").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS <= 5").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(3, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS < 6").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS < 6").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(3, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS <= 6").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS <= 6").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(4, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS < 8").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS < 8").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(4, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS <= 8").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS <= 8").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(5, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS < 1000").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS < 1000").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(5, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS <= 1000").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS <= 1000").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(5, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS > -1").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS > -1").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(5, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS >= -1").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS >= -1").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(5, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS > 1").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS > 1").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(4, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS >= 1").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS >= 1").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(5, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS > 2").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS > 2").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(3, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS >= 2").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS >= 2").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(4, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS > 4").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS > 4").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(2, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS >= 4").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS >= 4").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(2, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS > 8").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS > 8").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(0, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS >= 8").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS >= 8").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(1, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS > 1000").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS > 1000").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(0, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS >= 1000").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS >= 1000").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(0, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS > -1 AND POINTS <= 6").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS > -1 AND POINTS <= 6").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(4, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS > -1 AND POINTS < 6").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS > -1 AND POINTS < 6").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(3, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS >= -1 AND POINTS <= 6").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS >= -1 AND POINTS <= 6").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(4, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS >= -1 AND POINTS < 6").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS >= -1 AND POINTS < 6").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(3, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS > 2 AND POINTS <= 6").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS > 2 AND POINTS <= 6").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(2, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS >= 2 AND POINTS <= 6").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS >= 2 AND POINTS <= 6").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(3, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS > 2 AND POINTS < 6").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS > 2 AND POINTS < 6").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(1, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS >= 2 AND POINTS < 6").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS >= 2 AND POINTS < 6").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(2, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS > 5 AND POINTS <= 8").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS > 5 AND POINTS <= 8").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(2, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS > 5 AND POINTS < 8").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS > 5 AND POINTS < 8").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(1, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS >= 5 AND POINTS <= 8").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS >= 5 AND POINTS <= 8").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(2, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS >= 5 AND POINTS < 8").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS >= 5 AND POINTS < 8").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(1, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS > 4 AND POINTS <= 9").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS > 4 AND POINTS <= 9").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(2, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS > 4 AND POINTS < 9").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS > 4 AND POINTS < 9").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(2, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS >= 4 AND POINTS <= 9").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS >= 4 AND POINTS <= 9").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(2, table.getLong(0));
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS >= 4 AND POINTS < 9").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jiao' AND POINTS >= 4 AND POINTS < 9").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(2, table.getLong(0));

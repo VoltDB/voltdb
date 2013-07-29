@@ -806,7 +806,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(0L,result.getLong(0));
     }
 
-    public void testFunctionSINCE_EPOCH() throws Exception {
+    public void testSINCE_EPOCH() throws Exception {
         System.out.println("STARTING SINCE_EPOCH");
         Client client = getClient();
         ClientResponse cr;
@@ -821,6 +821,9 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         cr = client.callProcedure("P2.insert", 3, new Timestamp(-1000L));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure("P2.insert", 4, new Timestamp(1371808830000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("P2.insert", 5, "2013-07-18 02:00:00.123457");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         // Test AdHoc
         cr = client.callProcedure("@AdHoc", "select SINCE_EPOCH (SECOND, TM), TM from P2 where id = 4");
@@ -830,6 +833,36 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(result.advanceRow());
         assertEquals(1371808830L, result.getLong(0));
         assertEquals(1371808830000000L, result.getTimestampAsLong(1));
+
+        // Test constants timestamp with string
+        cr = client.callProcedure("@AdHoc", "select TM, TO_TIMESTAMP(MICROS, SINCE_EPOCH (MICROS, '2013-07-18 02:00:00.123457') ) from P2 where id = 5");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(result.getTimestampAsLong(0), result.getTimestampAsLong(1));
+
+        // Test non-constant-value expression
+        cr = client.callProcedure("@AdHoc", "select TM, TM, TO_TIMESTAMP(MICROS, SINCE_EPOCH (MICROS, '2013-07-' || SUBSTRING('18', 0 , 2) || ' 02:00:00.123457') )  from P2 where id = 5;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(result.getTimestampAsLong(0), result.getTimestampAsLong(1));
+
+        // Test user error input, Only accept JDBC's timestamp format: YYYY-MM-DD-SS.sss.
+        try {
+            cr = client.callProcedure("@AdHoc", "select SINCE_EPOCH (MICROS, 'I am a timestamp')  from P2 where id = 5");
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("PlanningErrorException"));
+            assertTrue(ex.getMessage().contains("incompatible data type in conversion"));
+        }
+        try {
+            cr = client.callProcedure("@AdHoc", "select SINCE_EPOCH (MICROS, '2013-7-2 2:34:12')  from P2 where id = 5");
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("PlanningErrorException"));
+            assertTrue(ex.getMessage().contains("incompatible data type in conversion"));
+        }
 
         String[] procedures = {"SINCE_EPOCH_SECOND", "SINCE_EPOCH_MILLIS",
                 "SINCE_EPOCH_MILLISECOND", "SINCE_EPOCH_MICROS", "SINCE_EPOCH_MICROSECOND"};
@@ -912,7 +945,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
-    public void testToTimestamp() throws NoConnectionsException, IOException, ProcCallException {
+    public void testTO_TIMESTAMP() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING TO_TIMESTAMP");
         Client client = getClient();
         ClientResponse cr;
