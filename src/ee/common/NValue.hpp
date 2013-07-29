@@ -230,25 +230,6 @@ class NValue {
     /* Create an NValue with the null representation for valueType */
     static NValue getNullValue(ValueType);
 
-    static NValue getMaxNumericTypeValue(ValueType type) {
-        NValue retval (type);
-        switch (type) {
-        case VALUE_TYPE_TINYINT:
-            retval.getTinyInt() = static_cast<int8_t>(INT8_MAX); break;
-        case VALUE_TYPE_SMALLINT:
-            retval.getSmallInt() = static_cast<int16_t>(INT16_MAX); break;
-        case VALUE_TYPE_INTEGER:
-            retval.getInteger() = static_cast<int32_t>(INT32_MAX); break;
-        case VALUE_TYPE_BIGINT:
-            retval.getBigInt() = static_cast<int64_t>(INT64_MAX); break;
-        case VALUE_TYPE_TIMESTAMP:
-            retval.getTimestamp() = static_cast<int64_t>(INT64_MAX); break;
-        default:
-            throw SQLException(SQLException::dynamic_sql_error, "Can not generate non-numeric type max value.");
-        }
-        return retval;
-    }
-
     /* Create an NValue promoted/demoted to type */
     NValue castAs(ValueType type) const;
 
