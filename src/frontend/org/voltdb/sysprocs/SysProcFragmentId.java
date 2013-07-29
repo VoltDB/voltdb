@@ -158,10 +158,6 @@ public class SysProcFragmentId
         return (fragId == PF_updateCatalog || fragId == PF_updateCatalogAggregate);
     }
 
-    // @Update topology
-    public static final long PF_updateTopology = 230;
-    public static final long PF_updateTopologyAggregate = 231;
-
     public static final long PF_validatePartitioning = 240;
     public static final long PF_validatePartitioningResults = 241;
 }
