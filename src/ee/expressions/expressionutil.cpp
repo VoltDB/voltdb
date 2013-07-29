@@ -330,7 +330,7 @@ tupleValueFactory(PlannerDomValue obj, ExpressionType et,
     // verify input
     if (columnIndex < 0) {
         char message[100]; // enough to hold all numbers up to 64-bits
-        sprintf(message, "tupleValueFactory: invalid column_idx %d for table %s",
+        snprintf(message, 100, "tupleValueFactory: invalid column_idx %d for table %s",
                 columnIndex, tableName.c_str());
 
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
