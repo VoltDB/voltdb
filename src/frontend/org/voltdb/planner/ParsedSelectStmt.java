@@ -191,7 +191,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             placeTVEsinColumns();
         } else {
             aggResultColumns = displayColumns;
-            replaceWithTVEsForOrderbyColumns();
+            placeTVEsForOrderbyColumns();
         }
     }
 
@@ -287,32 +287,35 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
-    private void replaceWithTVEsForOrderbyColumns () {
+    private void placeTVEsForOrderbyColumns () {
         for (ParsedColInfo orderCol : orderColumns) {
-            ParsedColInfo orig_col = null;
-            for (ParsedColInfo col : displayColumns) {
-                if (col.alias.equals(orderCol.alias) || col.expression.equals(orderCol.expression)) {
-                    orderCol.alias = col.alias;
-                    orderCol.tableName = col.tableName;
-                    orderCol.columnName = col.columnName;
-                    orig_col = col;
-                    break;
+            if (orderCol.expression.hasAnySubexpressionOfClass(AggregateExpression.class) ||
+                    hasComplexGroupby) {
+                ParsedColInfo orig_col = null;
+                for (ParsedColInfo col : displayColumns) {
+                    if (col.alias.equals(orderCol.alias) || col.expression.equals(orderCol.expression)) {
+                        orderCol.alias = col.alias;
+                        orderCol.tableName = col.tableName;
+                        orderCol.columnName = col.columnName;
+                        orig_col = col;
+                        break;
+                    }
                 }
-            }
-            if (orig_col != null && orig_col.tableName.equals("VOLT_TEMP_TABLE")) {
-                orig_col.orderBy = true;
-                orig_col.ascending = orderCol.ascending;
+                if (orig_col.tableName.equals("VOLT_TEMP_TABLE")) {
+                    orig_col.orderBy = true;
+                    orig_col.ascending = orderCol.ascending;
 
-                TupleValueExpression tve = new TupleValueExpression();
-                tve.setColumnAlias(orig_col.alias);
-                tve.setColumnName(orig_col.columnName);
-                tve.setTableName(orig_col.tableName);
-                tve.setValueSize(orig_col.expression.getValueSize());
-                tve.setValueType(orig_col.expression.getValueType());
-                if (orig_col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
-                    tve.setHasAggregate(true);
+                    TupleValueExpression tve = new TupleValueExpression();
+                    tve.setColumnAlias(orig_col.alias);
+                    tve.setColumnName(orig_col.columnName);
+                    tve.setTableName(orig_col.tableName);
+                    tve.setValueSize(orig_col.expression.getValueSize());
+                    tve.setValueType(orig_col.expression.getValueType());
+                    if (orig_col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+                        tve.setHasAggregate(true);
+                    }
+                    orderCol.expression = tve;
                 }
-                orderCol.expression = tve;
             }
         }
 

@@ -513,10 +513,7 @@ public class PlanAssembler {
             root = handleOrderBy(root);
         }
 
-        if ((root.getPlanNodeType() != PlanNodeType.AGGREGATE) &&
-            (root.getPlanNodeType() != PlanNodeType.HASHAGGREGATE) &&
-            (root.getPlanNodeType() != PlanNodeType.DISTINCT) &&
-            (root.getPlanNodeType() != PlanNodeType.PROJECTION)) {
+        if (needProjectionNode(root)) {
             root = addProjection(root);
         }
 
@@ -527,6 +524,44 @@ public class PlanAssembler {
         root.generateOutputSchema(m_catalogDb);
 
         return root;
+    }
+
+    private boolean needProjectionNode (AbstractPlanNode root) {
+        if ((root.getPlanNodeType() == PlanNodeType.AGGREGATE) ||
+                (root.getPlanNodeType() == PlanNodeType.HASHAGGREGATE) ||
+                (root.getPlanNodeType() == PlanNodeType.DISTINCT) ||
+                (root.getPlanNodeType() == PlanNodeType.PROJECTION)) {
+            return false;
+        }
+
+        // Right now it rule out the comple Aggregation cases
+
+        // TODO(XIN): Maybe we can remove this projection node for more cases
+        // Need to figure it out
+        // We may not need its type comparison with orderby as well.
+//        if (root.getPlanNodeType() == PlanNodeType.ORDERBY) {
+//            int orderOutputCols = root.getOutputSchema().getColumns().size();
+//            if (m_parsedSelect.displayColumns().size() != orderOutputCols) {
+//                return true;
+//            }
+//
+//            for (int i = 0; i < orderOutputCols; i++) {
+//                SchemaColumn orderCol = root.getOutputSchema().getColumns().get(i);
+//                ParsedColInfo displayCol = m_parsedSelect.displayColumns().get(i);
+//                if (!displayCol.tableName.equals(orderCol.getTableName()) ||
+//                        displayCol.columnName.equals(orderCol.getColumnName()) ||
+//                        displayCol.alias.equals(orderCol.getColumnAlias())) {
+//                    // Expression can be different if it has been replaced with TVEs already
+//                    return false;
+//                }
+//            }
+//        }
+
+        if (m_parsedSelect.hasComplexGroupby() && root.getPlanNodeType() == PlanNodeType.ORDERBY) {
+            return false;
+        }
+
+        return true;
     }
 
     private AbstractPlanNode getNextDeletePlan() {

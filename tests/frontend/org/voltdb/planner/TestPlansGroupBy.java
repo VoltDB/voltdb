@@ -171,6 +171,11 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
     public void testComplexGroupby() {
         pns = compileToFragments("SELECT A1, ABS(A1), ABS(A1)+1, sum(B1) FROM P1 GROUP BY A1, ABS(A1)");
+        checkHasComplexAgg(pns);
+
+        // Check it can compile
+        pns = compileToFragments("SELECT ABS(A1), sum(B1) FROM P1 GROUP BY ABS(A1)");
+
     }
 
     private void checkHasComplexAgg(List<AbstractPlanNode> pns) {

@@ -77,6 +77,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
+
     public void testStrangeCasesAndOrderby() throws IOException, ProcCallException {
         loadData();
 
@@ -85,7 +86,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         VoltTable vt;
         long[][] expected;
 
-        String [] tbs = {"R1", "P1"};
+        String [] tbs = {"R1","P1"};
         for (String tb: tbs) {
             // Test duplicates, operator expression, group by primary key
             cr = client.callProcedure("@AdHoc", "SELECT id, id, dept, dept+5 from " + tb + " GROUP BY id ORDER BY id");
@@ -181,7 +182,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         }
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        String [] tbs = {"P1"};
+        String [] tbs = {"R1","P1"};
         for (String tb: tbs) {
             // Test distinct with complex aggregations.
             cr = client.callProcedure("@AdHoc", "SELECT dept, count(wage), sum(distinct wage), sum(wage), count(distinct wage)+5, " +
@@ -213,8 +214,50 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
     }
 
     public void testComplexGroupby() throws IOException, ProcCallException {
+        loadData();
 
+        Client client = this.getClient();
+        ClientResponse cr = null;
+        VoltTable vt;
+        long[][] expected;
+
+        // id, wage, dept, rate
+        String[] procs = {"R1.insert", "P1.insert"};
+        for (String tb: procs) {
+            cr = client.callProcedure(tb, 6,  10,  2 , 1.2);
+            cr = client.callProcedure(tb, 7,  40,  2 , 1.1);
+        }
+
+        String [] tbs = {"R1","P1"};
+        for (String tb: tbs) {
+            // Test complex groupby with without complex aggregation.
+            cr = client.callProcedure("@AdHoc", "SELECT abs(dept) as tag, count(wage) from " + tb + " GROUP BY abs(dept) ORDER BY tag ");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {1, 3}, {2, 4} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            // Test complex groupby with with complex aggregation.
+            cr = client.callProcedure("@AdHoc", "SELECT abs(dept-2) as tag, count(wage)+1 from " + tb + " GROUP BY abs(dept-2) ORDER BY tag;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {0, 5}, {1, 4} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            // More hard general test case with multi group by columns and complex aggs
+            cr = client.callProcedure("@AdHoc", "SELECT abs(dept-2) as tag, wage, wage/2, count(*)*2, sum(id)/count(id)+1 from " + tb +
+                    " GROUP BY abs(dept-2), wage ORDER BY tag, wage;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {0,10,5,2,7}, {0,40,20,4,6}, {0,50,25,2,6}, {1,10,5,2,2}, {1,20,10,2,3}, {1,30,15,2,4} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+        }
     }
+
+
 
     //
     // Suite builder boilerplate
@@ -255,6 +298,8 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         project.addPartitionInfo("P1", "ID");
         boolean success;
         //project.addStmtProcedure("failedProcedure", "SELECT wage, SUM(wage) from R1 group by ID;");
+        //project.addStmtProcedure("groupby", "SELECT abs(dept) as tag, count(wage)+1 from P1 GROUP BY abs(dept) ORDER BY abs(dept);");
+        //project.addStmtProcedure("orderby", "SELECT dept, COUNT(*) as tag, sum(wage) - 1 from P1 GROUP BY dept ORDER BY COUNT(*) DESC");
 
         config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
