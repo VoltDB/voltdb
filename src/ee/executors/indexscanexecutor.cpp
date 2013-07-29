@@ -216,6 +216,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     assert(m_targetTable);
     assert(m_targetTable == m_node->getTargetTable());
     m_engine->setTargetTable(m_targetTable);
+    m_engine->setIndex(m_index);
     VOLT_DEBUG("IndexScan: %s.%s\n", m_targetTable->name().c_str(),
                m_index->getName().c_str());
 

@@ -33,7 +33,8 @@ public:
     inline JNITopend* updateJNIEnv(JNIEnv *env) { m_jniEnv = env; return this; }
     int loadNextDependency(int32_t dependencyId, Pool *stringPool, Table* destination);
     bool updateStats(int32_t batchIndex, std::string planNodeName,
-    		std::string targetTableName, int64_t targetTableSize, int64_t tuplesFound);
+    		std::string targetTableName, int64_t targetTableSize, int64_t tuplesFound,
+    		std::string indexName);
     std::string planForFragmentId(int64_t fragmentId);
     void crashVoltDB(FatalException e);
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);

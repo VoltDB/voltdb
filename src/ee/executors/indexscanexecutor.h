@@ -72,7 +72,6 @@ public:
         : AbstractExecutor(engine, abstractNode), m_searchKeyBackingStore(NULL)
     {
         m_projectionExpressions = NULL;
-        m_engine = engine;
     }
     ~IndexScanExecutor();
 
@@ -123,8 +122,6 @@ private:
     // So Valgrind doesn't complain:
     char* m_searchKeyBackingStore;
 
-    /** reference to the engine/context to log executing context*/
-    VoltDBEngine* m_engine;
 };
 
 }

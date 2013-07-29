@@ -200,7 +200,8 @@ inline bool TableIterator::next(TableTuple &out, VoltDBEngine* engine) {
 				engine->getPlanNodeName(),
 				engine->getTargetTable()->name(),
 				engine->getTargetTable()->activeTupleCount(),
-				m_foundTuples)){
+				m_foundTuples,
+				engine->getIndex()->getName())){
 			VOLT_ERROR("Time out read only query.");
 			throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "Time out read only query.");
 		}

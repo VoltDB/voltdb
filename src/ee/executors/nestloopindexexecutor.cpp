@@ -309,6 +309,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     VOLT_TRACE("executing NestLoopIndex with outer table: %s, inner table: %s",
                outer_table->debug().c_str(), inner_table->debug().c_str());
 
+    m_engine->setIndex(index);
     //
     // Substitute parameter to SEARCH KEY Note that the expressions
     // will include TupleValueExpression even after this substitution

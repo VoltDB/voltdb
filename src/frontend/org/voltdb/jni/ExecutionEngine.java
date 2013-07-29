@@ -315,7 +315,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             String planNodeName,
             String targetTableName,
             long targetTableSize,
-            long tuplesFound) {
+            long tuplesFound,
+            String indexName) {
         //if(m_rProcContext.m_batch!=null && !m_rProcContext.m_procedureName.contains(""));
         //System.err.println(m_rProcContext.m_batch.get(batchIndex));
         VoltLogger log = new VoltLogger("CONSOLE");
@@ -326,6 +327,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         log.info("Most recent target table: "+targetTableName+"("+targetTableSize+")");
         log.info("Tuples processed: "+tuplesFound);
         log.info("Batch index: "+batchIndex);
+        log.info("Most recent index: "+indexName);
         //Set timer and time out read only queries.
 //        long currentTime = System.currentTimeMillis();
 //        if(m_readOnly && currentTime - m_startTime > Long.MAX_VALUE)
