@@ -1870,7 +1870,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             long txnId,//txnid is both sphandle and uniqueid pre-iv2
             long txnIdAsUniqueId,
             boolean readOnly,
-            RunningProcedureContext rpc) throws EEException
+            RunningProcedureContext rProcContext) throws EEException
     {
         return ee.executePlanFragments(
             numFragmentIds,
@@ -1881,7 +1881,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             lastCommittedTxnId,
             txnIdAsUniqueId,
             readOnly ? Long.MAX_VALUE : getNextUndoToken(),
-            rpc);
+            rProcContext);
     }
 
     @Override

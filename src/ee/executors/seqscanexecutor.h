@@ -60,14 +60,12 @@ namespace voltdb
     public:
         SeqScanExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
             : AbstractExecutor(engine, abstract_node)
-        {m_engine = engine;}
+        {}
     protected:
         bool p_init(AbstractPlanNode* abstract_node,
                     TempTableLimits* limits);
         bool p_execute(const NValueArray& params);
         bool needsOutputTableClear();
-        /** reference to the engine/context to log executing context*/
-        VoltDBEngine* m_engine;
     };
 }
 

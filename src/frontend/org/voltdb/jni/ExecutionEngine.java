@@ -85,7 +85,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     private int m_cacheMisses = 0;
     private int m_eeCacheSize = 0;
 
-    private RunningProcedureContext m_rpc;
+    private RunningProcedureContext m_rProcContext;
     private boolean m_readOnly;
     private long m_startTime;
 
@@ -316,17 +316,16 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             String targetTableName,
             long targetTableSize,
             long tuplesFound) {
-        if(m_rpc!=null)
-            System.err.println(m_rpc.m_procedureName);
-        //if(m_rpc.m_batch!=null && !m_rpc.m_procedureName.contains(""));
-        //System.err.println(m_rpc.m_batch.get(batchIndex));
-        System.err.println(batchIndex);
-        System.err.println(planNodeName);
-        System.err.println(targetTableName);
-        System.err.println(targetTableSize);
-        System.err.println(tuplesFound);
-        VoltLogger hostLog = new VoltLogger("HOST");
-
+        //if(m_rProcContext.m_batch!=null && !m_rProcContext.m_procedureName.contains(""));
+        //System.err.println(m_rProcContext.m_batch.get(batchIndex));
+        VoltLogger log = new VoltLogger("CONSOLE");
+        if(m_rProcContext!=null) {
+            log.info("Procedure: "+m_rProcContext.m_procedureName);
+        }
+        log.info("Executor: "+planNodeName);
+        log.info("Most recent target table: "+targetTableName+"("+targetTableSize+")");
+        log.info("Tuples processed: "+tuplesFound);
+        log.info("Batch index: "+batchIndex);
         //Set timer and time out read only queries.
 //        long currentTime = System.currentTimeMillis();
 //        if(m_readOnly && currentTime - m_startTime > Long.MAX_VALUE)
@@ -413,10 +412,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                             long lastCommittedSpHandle,
                                             long uniqueId,
                                             long undoQuantumToken,
-                                            RunningProcedureContext rpc) throws EEException
+                                            RunningProcedureContext rProcContext) throws EEException
     {
         try {
-            m_rpc = rpc;
+            m_rProcContext = rProcContext;
             //For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
             m_readOnly = (undoQuantumToken == Long.MAX_VALUE) ? true : false;
             //Consider put the following line in EEJNI.coreExecutePlanFrag... before where the native method is called?

@@ -974,7 +974,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public VoltTable[] executePlanFragments(int numFragmentIds,
             long[] planFragmentIds, long[] inputDepIds,
-            Object[] parameterSets, long spHandle, long uniqueId, boolean readOnly, RunningProcedureContext rpc)
+            Object[] parameterSets, long spHandle, long uniqueId, boolean readOnly, RunningProcedureContext rProcContext)
             throws EEException {
         return m_ee.executePlanFragments(
                 numFragmentIds,
@@ -985,7 +985,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 m_lastCommittedSpHandle,
                 uniqueId,
                 readOnly ? Long.MAX_VALUE : getNextUndoToken(),
-                rpc);
+                rProcContext);
     }
 
     @Override
