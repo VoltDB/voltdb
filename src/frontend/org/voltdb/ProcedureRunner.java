@@ -114,7 +114,7 @@ public class ProcedureRunner {
     protected final PureJavaCrc32C m_inputCRC = new PureJavaCrc32C();
 
     // running procedure info
-    RunningProcedureContext m_rpc = new RunningProcedureContext();
+    RunningProcedureContext m_rProcContext = new RunningProcedureContext();
 
     // Used to get around the "abstract" for StmtProcedures.
     // Path of least resistance?
@@ -136,7 +136,6 @@ public class ProcedureRunner {
         else {
             m_procedureName = procedure.getClass().getSimpleName();
         }
-        m_rpc.m_procedureName = m_procedureName;
         m_procedure = procedure;
         m_isSysProc = procedure instanceof VoltSystemProcedure;
         m_catProc = catProc;
@@ -572,9 +571,11 @@ public class ProcedureRunner {
             // memo-ize the original batch size here
             int batchSize = m_batch.size();
 
+            m_rProcContext.m_procedureName = this.m_procedureName;
+
             // if batch is small (or reasonable size), do it in one go
             if (batchSize <= MAX_BATCH_SIZE) {
-                m_rpc.m_batch = m_batch;
+                m_rProcContext.m_batch = m_batch;
                 return executeQueriesInABatch(m_batch, isFinalSQL);
             }
             // otherwise, break it into sub-batches
@@ -592,7 +593,7 @@ public class ProcedureRunner {
                     // decide if this sub-batch should be marked final
                     boolean finalSubBatch = isFinalSQL && (subSize == m_batch.size());
 
-                    m_rpc.m_batch = subBatch;
+                    m_rProcContext.m_batch = subBatch;
                     // run the sub-batch and copy the sub-results into the list of lists of results
                     // note: executeQueriesInABatch removes items from the batch as it runs.
                     //  this means subBatch will be empty after running and since subBatch is a
@@ -1173,7 +1174,6 @@ public class ProcedureRunner {
            state.m_localTask.addInputDepId(i, state.m_depsForLocalTask[i]);
        }
 
-       state.m_localTask.setProcName(m_procedureName);
        // note: non-transactional work only helps us if it's final work
        m_txnState.createLocalFragmentWork(state.m_localTask,
                                           state.m_localFragsAreNonTransactional && finalTask);
@@ -1229,6 +1229,6 @@ public class ProcedureRunner {
            m_txnState.spHandle,
            m_txnState.uniqueId,
            m_catProc.getReadonly(),
-           m_rpc);
+           m_rProcContext);
     }
 }
