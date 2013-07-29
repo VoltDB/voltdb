@@ -289,6 +289,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     private void placeTVEsForOrderbyColumns () {
         for (ParsedColInfo orderCol : orderColumns) {
+            // This if case checking is to rule out cases like: select PKEY + A_INT from O1 order by PKEY + A_INT,
+            // This case later needs a projection node on top of sort node to make it work
+
+            // If I have a complexGroupby at his point, it means that Display columns contain all the order by columns.
+            // In that way, this plan does not require another projection node on top of sort node.
             if (orderCol.expression.hasAnySubexpressionOfClass(AggregateExpression.class) ||
                     hasComplexGroupby) {
                 ParsedColInfo orig_col = null;
@@ -504,6 +509,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         ParsedColInfo col = new ParsedColInfo();
         col.expression = parseExpressionTree(groupByNode);
         assert(col.expression != null);
+        ExpressionUtil.finalizeValueTypes(col.expression);
 
         if (groupByNode.name.equals("columnref"))
         {

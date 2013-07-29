@@ -24,6 +24,9 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
@@ -55,7 +58,11 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             try {
                 actual = vt.getLong(i);
             } catch (IllegalArgumentException ex) {
-                actual = (long) vt.getDouble(i);
+                try {
+                    actual = (long) vt.getDouble(i);
+                } catch (IllegalArgumentException newEx) {
+                    actual = vt.getTimestampAsLong(i);
+                }
             }
             assertEquals(expected[i], actual);
         }
@@ -68,11 +75,11 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         // id, wage, dept, rate
         String[] procs = {"R1.insert", "P1.insert"};
         for (String tb: procs) {
-            cr = client.callProcedure(tb, 1,  10,  1 , 1.2);
-            cr = client.callProcedure(tb, 2,  20,  1 , 1.1);
-            cr = client.callProcedure(tb, 3,  30,  1 , 1.1);
-            cr = client.callProcedure(tb, 4,  40,  2 , 1.1);
-            cr = client.callProcedure(tb, 5,  50,  2 , 1.2);
+            cr = client.callProcedure(tb, 1,  10,  1 , "2013-06-18 02:00:00.123457");
+            cr = client.callProcedure(tb, 2,  20,  1 , "2013-07-18 02:00:00.123457");
+            cr = client.callProcedure(tb, 3,  30,  1 , "2013-07-18 10:40:01.123457");
+            cr = client.callProcedure(tb, 4,  40,  2 , "2013-08-18 02:00:00.123457");
+            cr = client.callProcedure(tb, 5,  50,  2 , "2013-09-18 02:00:00.123457");
         }
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
@@ -104,6 +111,39 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             System.out.println(vt.toString());
             compareTable(vt, expected);
 
+            // Test group by columns not in display columns
+            cr = client.callProcedure("@AdHoc", "SELECT dept, COUNT(*) as tag, sum(wage) - 1 from " + tb + " GROUP BY dept ORDER BY tag DESC");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {1, 3, 59} , {2, 2, 89}};
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+
+        }
+    }
+
+    public void testComplexAggsOrderbySuite() throws IOException, ProcCallException {
+        loadData();
+
+        Client client = this.getClient();
+        ClientResponse cr;
+        VoltTable vt;
+        long[][] expected;
+
+        String [] tbs = {"R1", "P1"};
+        for (String tb: tbs) {
+            // (1) Test Order by COUNT(*) without complex expression
+            // Test order by agg with tag
+            cr = client.callProcedure("@AdHoc", "SELECT dept, COUNT(*) as tag, sum(wage) from " + tb + " GROUP BY dept ORDER BY tag DESC");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {1, 3, 60} , {2, 2, 90}};
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+
+            // (2) Test Order by COUNT(*) with complex expression
             // Test order by agg with tag
             cr = client.callProcedure("@AdHoc", "SELECT dept, COUNT(*) as tag, sum(wage) - 1 from " + tb + " GROUP BY dept ORDER BY tag DESC");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -112,14 +152,34 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             System.out.println(vt.toString());
             compareTable(vt, expected);
 
-            // Test order by agg expression with tag
-            cr = client.callProcedure("@AdHoc", "SELECT dept, ABS(COUNT(*)/2 * -1) as tag, sum(wage) - 1 from " + tb + " GROUP BY dept ORDER BY tag, dept DESC");
+
+            // (3) Test Order by with FUNCTION expression, no group by column in display columns
+            // Test Order by without tag
+            cr = client.callProcedure("@AdHoc", "SELECT ABS(dept) as tag, SUM(ABS(wage) - 1) as tag, (count(*)+sum(dept*2))/2 from " + tb + " GROUP BY dept ORDER BY tag");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
-            expected = new long[][] {{2, 1, 89},{1, 1, 59}};
+            expected = new long[][] { {1, 57, 4} , {2, 88, 5}};
             System.out.println(vt.toString());
             compareTable(vt, expected);
+
+            // Test Order by without tag
+            cr = client.callProcedure("@AdHoc", "SELECT ABS(dept), SUM(ABS(wage) - 1) as tag, (count(*)+sum(dept*2))/2 from " + tb + " GROUP BY dept ORDER BY ABS(dept)");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {1, 57, 4} , {2, 88, 5}};
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            // Test Order by column not in Display columns
+            cr = client.callProcedure("@AdHoc", "SELECT SUM(ABS(wage) - 1) as tag, (count(*)+sum(dept*2))/2 from " + tb + " GROUP BY dept ORDER BY ABS(dept)");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {57, 4} , {88, 5}};
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
         }
+
     }
 
     public void testComplexAggs() throws IOException, ProcCallException {
@@ -177,8 +237,8 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         // id, wage, dept, rate
         String[] procs = {"R1.insert", "P1.insert"};
         for (String tb: procs) {
-            cr = client.callProcedure(tb, 6,  10,  2 , 1.2);
-            cr = client.callProcedure(tb, 7,  40,  2 , 1.1);
+            cr = client.callProcedure(tb, 6,  10,  2 , "2013-07-18 02:00:00.123457");
+            cr = client.callProcedure(tb, 7,  40,  2 , "2013-07-18 02:00:00.123457");
         }
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
@@ -213,7 +273,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         }
     }
 
-    public void testComplexGroupby() throws IOException, ProcCallException {
+    public void testComplexGroupby() throws IOException, ProcCallException, ParseException {
         loadData();
 
         Client client = this.getClient();
@@ -224,13 +284,14 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         // id, wage, dept, rate
         String[] procs = {"R1.insert", "P1.insert"};
         for (String tb: procs) {
-            cr = client.callProcedure(tb, 6,  10,  2 , 1.2);
-            cr = client.callProcedure(tb, 7,  40,  2 , 1.1);
+            cr = client.callProcedure(tb, 6,  10,  2 , "2013-07-18 02:00:00.123457");
+            cr = client.callProcedure(tb, 7,  40,  2 , "2013-09-18 02:00:00.123457");
         }
 
         String [] tbs = {"R1","P1"};
         for (String tb: tbs) {
-            // Test complex groupby with without complex aggregation.
+            // (1) Without extra aggregation expression
+            // Test complex group-by (Function expression) without complex aggregation.
             cr = client.callProcedure("@AdHoc", "SELECT abs(dept) as tag, count(wage) from " + tb + " GROUP BY abs(dept) ORDER BY tag ");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
@@ -238,7 +299,27 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             System.out.println(vt.toString());
             compareTable(vt, expected);
 
-            // Test complex groupby with with complex aggregation.
+            // Test complex group-by (normal expression) without complex aggregation.
+            // Actually this AdHoc query has an extra projection node because of the pass-by column dept in order by columns.
+            // ParameterValueExpression equal function return false. AggResultColumns contains: dept+1, count(wage) and dept.
+            // If it is a stored procedure, there is no extra projection node. AggResultColumns: dept+1 and count(wage).
+            cr = client.callProcedure("@AdHoc", "SELECT (dept+1) as tag, count(wage) from " + tb + " GROUP BY dept+1 ORDER BY tag ");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {2, 3}, {3, 4} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            // (2) With extra aggregation expression
+            // Test complex group-by with with complex aggregation.
+            cr = client.callProcedure("@AdHoc", "SELECT abs(dept) as tag, count(wage)+1 from " + tb + " GROUP BY abs(dept) ORDER BY tag DESC;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {2, 5}, {1, 4} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            // Test more complex group-by with with complex aggregation.
             cr = client.callProcedure("@AdHoc", "SELECT abs(dept-2) as tag, count(wage)+1 from " + tb + " GROUP BY abs(dept-2) ORDER BY tag;");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
@@ -254,10 +335,348 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             expected = new long[][] { {0,10,5,2,7}, {0,40,20,4,6}, {0,50,25,2,6}, {1,10,5,2,2}, {1,20,10,2,3}, {1,30,15,2,4} };
             System.out.println(vt.toString());
             compareTable(vt, expected);
+
+            if (!isHSQL()) {
+                // Timestamp function for complex group by
+                cr = client.callProcedure("@AdHoc", "SELECT truncate(day, tm) as tag, count(id)+1, sum(wage)/count(wage) from " + tb + " GROUP BY truncate(day, tm) ORDER BY tag;");
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+                vt = cr.getResults()[0];
+                SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+
+                Date time1 = dateFormat.parse("2013-06-18 00:00:00.000");
+                Date time2 = dateFormat.parse("2013-07-18 00:00:00.000");
+                Date time3 = dateFormat.parse("2013-08-18 00:00:00.000");
+                Date time4 = dateFormat.parse("2013-09-18 00:00:00.000");
+                expected = new long[][] { {time1.getTime()*1000, 2, 10}, {time2.getTime()*1000, 4, 20},
+                        {time3.getTime()*1000, 2, 40},{time4.getTime()*1000, 3, 45},};
+                System.out.println(vt.toString());
+                compareTable(vt, expected);
+            }
+        }
+    }
+
+    public void testComplexGroupbyDistinctLimit() throws IOException, ProcCallException, ParseException {
+        loadData();
+
+        Client client = this.getClient();
+        ClientResponse cr = null;
+        VoltTable vt;
+        long[][] expected;
+
+        // id, wage, dept, rate
+        String[] procs = {"R1.insert", "P1.insert"};
+        for (String tb: procs) {
+            cr = client.callProcedure(tb, 6,  10,  2 , "2013-07-18 02:00:00.123457");
+            cr = client.callProcedure(tb, 7,  40,  2 , "2013-09-18 02:00:00.123457");
+        }
+
+        String [] tbs = {"R1","P1"};
+        for (String tb: tbs) {
+            // (1) Without extra aggregation expression
+            // Test complex group-by (Function expression) without complex aggregation. (Depulicates: two 2s for dept)
+            // Test distinct
+            cr = client.callProcedure("@AdHoc", "SELECT abs(wage) as tag, count(distinct dept) from " + tb + " GROUP BY abs(wage) ORDER BY tag ");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {10, 2}, {20, 1}, {30, 1}, {40, 1}, {50, 1} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            // Test limit
+            cr = client.callProcedure("@AdHoc", "SELECT abs(wage) as tag, count(dept) from " + tb + " GROUP BY abs(wage) ORDER BY tag limit 4");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {10, 2}, {20, 1}, {30, 1}, {40, 2} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            // Test distinct and limit
+            cr = client.callProcedure("@AdHoc", "SELECT abs(wage) as tag, count(distinct dept) from " + tb + " GROUP BY abs(wage) ORDER BY tag limit 4");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {10, 2}, {20, 1}, {30, 1}, {40, 1} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+
+            // (2) With extra aggregation expression
+            // Test complex group-by with with complex aggregation. (Depulicates: two 2s for dept)
+            // Test distinct
+            cr = client.callProcedure("@AdHoc", "SELECT abs(wage) as tag, count(distinct dept)+1 from " + tb + " GROUP BY abs(wage) ORDER BY tag ");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {10, 3}, {20, 2}, {30, 2}, {40, 2}, {50, 2} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            // Test limit
+            cr = client.callProcedure("@AdHoc", "SELECT abs(wage) as tag, count(dept)+1 from " + tb + " GROUP BY abs(wage) ORDER BY tag limit 4");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {10, 3}, {20, 2}, {30, 2}, {40, 3}};
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            // Test distinct and limit
+            cr = client.callProcedure("@AdHoc", "SELECT abs(wage) as tag, count(distinct dept)+1 from " + tb + " GROUP BY abs(wage) ORDER BY tag limit 4 ");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {10, 3}, {20, 2}, {30, 2}, {40, 2} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+
+            // (3) More hard general test case with multi group by columns and complex aggs (Depulicates: two 40s for wage)
+            // Test distinct
+            cr = client.callProcedure("@AdHoc", "SELECT abs(dept-2) as tag, wage, wage/2, count(distinct wage)*2, sum(id)/count(id)+1 from " + tb +
+                    " GROUP BY abs(dept-2), wage ORDER BY tag, wage;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {0,10,5,2,7}, {0,40,20,2,6}, {0,50,25,2,6}, {1,10,5,2,2}, {1,20,10,2,3}, {1,30,15,2,4} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            // Test Limit
+            cr = client.callProcedure("@AdHoc", "SELECT abs(dept-2) as tag, wage, wage/2, count(wage)*2, sum(id)/count(id)+1 from " + tb +
+                    " GROUP BY abs(dept-2), wage ORDER BY tag, wage LIMIT 5;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {0,10,5,2,7}, {0,40,20,4,6}, {0,50,25,2,6}, {1,10,5,2,2}, {1,20,10,2,3} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            // Test distinct and limit
+            cr = client.callProcedure("@AdHoc", "SELECT abs(dept-2) as tag, wage, wage/2, count(distinct wage)*2, sum(id)/count(id)+1 from " + tb +
+                    " GROUP BY abs(dept-2), wage ORDER BY tag, wage LIMIT 5;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {0,10,5,2,7}, {0,40,20,2,6}, {0,50,25,2,6}, {1,10,5,2,2}, {1,20,10,2,3} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
         }
     }
 
 
+    public void testComplexGroupbyOrderbySuite() throws IOException, ProcCallException {
+        loadData();
+
+        Client client = this.getClient();
+        ClientResponse cr = null;
+        VoltTable vt;
+        long[][] expected;
+
+        // id, wage, dept, rate
+        String[] procs = {"R1.insert", "P1.insert"};
+        for (String tb: procs) {
+            cr = client.callProcedure(tb, 6,  10,  2 , "2013-07-18 02:00:00.123457");
+            cr = client.callProcedure(tb, 7,  40,  2 , "2013-09-18 02:00:00.123457");
+        }
+
+        String [] tbs = {"R1","P1"};
+        for (String tb: tbs) {
+            //(1) Test complex group-by with no extra aggregation expressions.
+            // Test order by with tag
+            cr = client.callProcedure("@AdHoc", "SELECT abs(dept) as tag, count(wage), sum(id), avg(wage)  from " + tb + " GROUP BY abs(dept) ORDER BY tag ");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {1, 3, 6, 20}, {2, 4, 22, 35} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            // Test order by without tag
+            cr = client.callProcedure("@AdHoc", "SELECT abs(dept) as tag, count(wage), sum(id), avg(wage) from " + tb + " GROUP BY abs(dept) ORDER BY abs(dept) ");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {1, 3, 6, 20}, {2, 4, 22, 35} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            // Test order by without tag and not in display columns
+            cr = client.callProcedure("@AdHoc", "SELECT count(wage), sum(id), avg(wage)  from " + tb + " GROUP BY abs(dept) ORDER BY abs(dept) ");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {3, 6, 20}, {4, 22, 35} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+
+            //(2) Test complex group-by with complex aggregation.
+            // Test order by with tag
+            cr = client.callProcedure("@AdHoc", "SELECT abs(dept-2) as tag, count(wage)+1, avg(wage)/2 from " + tb + " GROUP BY abs(dept-2) ORDER BY tag;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {0, 5, 17}, {1, 4, 10} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            // Test order by without tag
+            cr = client.callProcedure("@AdHoc", "SELECT abs(dept-2) as tag, count(wage)+1, avg(wage)/2 from " + tb + " GROUP BY abs(dept-2) ORDER BY abs(dept-2);");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {0, 5, 17}, {1, 4, 10} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            // Test order by without tag and not in display columns
+            cr = client.callProcedure("@AdHoc", "SELECT count(wage)+1, avg(wage)/2 from " + tb + " GROUP BY abs(dept-2) ORDER BY abs(dept-2);");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {5, 17}, {4, 10} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            //(3) More hard general test cases with multi group by columns and complex aggs
+            // Test order by with tag
+            cr = client.callProcedure("@AdHoc", "SELECT abs(dept-2) as tag, wage, wage/2, count(*)*2, sum(id)/count(id)+1 from " + tb +
+                    " GROUP BY abs(dept-2), wage ORDER BY tag, wage;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {0,10,5,2,7}, {0,40,20,4,6}, {0,50,25,2,6}, {1,10,5,2,2}, {1,20,10,2,3}, {1,30,15,2,4} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            // Test order by without tag
+            cr = client.callProcedure("@AdHoc", "SELECT abs(dept-2) as tag, wage, wage/2, count(*)*2, sum(id)/count(id)+1 from " + tb +
+                    " GROUP BY abs(dept-2), wage ORDER BY abs(dept-2), wage;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {0,10,5,2,7}, {0,40,20,4,6}, {0,50,25,2,6}, {1,10,5,2,2}, {1,20,10,2,3}, {1,30,15,2,4} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            // Test order by without tag and not in display columns
+            cr = client.callProcedure("@AdHoc", "SELECT wage, wage/2, count(*)*2, sum(id)/count(id)+1 from " + tb +
+                    " GROUP BY abs(dept-2), wage ORDER BY abs(dept-2), wage;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {10,5,2,7}, {40,20,4,6}, {50,25,2,6}, {10,5,2,2}, {20,10,2,3}, {30,15,2,4} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+            // Test order by without tag and not in display columns, and not equal to group by columns
+            // TODO(XIN): Try to write another test case
+        }
+    }
+
+    // TODO(XIN): make the following un-taged order by cases work, ENG-4958
+    public void testUnsupportedCases() throws IOException, ProcCallException {
+        loadData();
+
+        Client client = this.getClient();
+        ClientResponse cr = null;
+        VoltTable vt;
+        long[][] expected;
+
+        // id, wage, dept, rate
+        String[] procs = {"R1.insert", "P1.insert"};
+        for (String tb: procs) {
+            cr = client.callProcedure(tb, 6,  10,  2 , "2013-07-18 02:00:00.123457");
+            cr = client.callProcedure(tb, 7,  40,  2 , "2013-09-18 02:00:00.123457");
+        }
+        Exception ex = null;
+        String [] tbs = {"R1","P1"};
+        for (String tb: tbs) {
+            // Test order by agg without tag
+            ex = null;
+            try {
+                cr = client.callProcedure("@AdHoc", "SELECT dept, COUNT(*) as tag, sum(wage) from " + tb + " GROUP BY dept ORDER BY COUNT(*) DESC");
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+                vt = cr.getResults()[0];
+                expected = new long[][] { {1, 3, 60} , {2, 2, 90}};
+                compareTable(vt, expected);
+            } catch (ProcCallException e) {
+                ex = e;
+            } finally {
+                assertTrue(ex.getMessage().contains("invalid ORDER BY expression"));
+            }
+
+            ex = null;
+            try {
+                // Test order by agg not in display columns
+                cr = client.callProcedure("@AdHoc", "SELECT dept, avg(wage), sum(wage) from " + tb + " GROUP BY dept ORDER BY COUNT(*) DESC");
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+                vt = cr.getResults()[0];
+                expected = new long[][] { {1, 20, 60} , {2, 45, 90}};
+                compareTable(vt, expected);
+            } catch (ProcCallException e) {
+                ex = e;
+            } finally {
+                assertTrue(ex.getMessage().contains("invalid ORDER BY expression"));
+            }
+
+            ex = null;
+            try {
+                // Test group by column not in display columns
+                cr = client.callProcedure("@AdHoc", "SELECT avg(wage), sum(wage) from " + tb + " GROUP BY dept ORDER BY COUNT(*) DESC");
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+                vt = cr.getResults()[0];
+                expected = new long[][] { {20, 60} , {45, 90}};
+                compareTable(vt, expected);
+            } catch (ProcCallException e) {
+                ex = e;
+            } finally {
+                assertTrue(ex.getMessage().contains("invalid ORDER BY expression"));
+            }
+
+            ex = null;
+            try {
+                // Test order by agg without tag
+                cr = client.callProcedure("@AdHoc", "SELECT dept, COUNT(*) as tag, sum(wage) - 1 from " + tb + " GROUP BY dept ORDER BY COUNT(*) DESC");
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+                vt = cr.getResults()[0];
+                expected = new long[][] { {1, 3, 59} , {2, 2, 89}};
+                compareTable(vt, expected);
+            } catch (ProcCallException e) {
+                ex = e;
+            } finally {
+                assertTrue(ex.getMessage().contains("invalid ORDER BY expression"));
+            }
+
+            ex = null;
+            try {
+                // Test order by agg not in display columns
+                cr = client.callProcedure("@AdHoc", "SELECT dept, avg(wage), sum(wage) - 1 from " + tb + " GROUP BY dept ORDER BY COUNT(*) DESC");
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+                vt = cr.getResults()[0];
+                expected = new long[][] { {1, 20, 59} , {2, 45, 89}};
+                compareTable(vt, expected);
+            } catch (ProcCallException e) {
+                ex = e;
+            } finally {
+                assertTrue(ex.getMessage().contains("invalid ORDER BY expression"));
+            }
+
+
+            ex = null;
+            try {
+                // Test group by column not in display columns
+                cr = client.callProcedure("@AdHoc", "SELECT avg(wage), sum(wage) - 1 from " + tb + " GROUP BY dept ORDER BY COUNT(*) DESC");
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+                vt = cr.getResults()[0];
+                expected = new long[][] { {20, 59} , {45, 89}};
+                compareTable(vt, expected);
+            } catch (ProcCallException e) {
+                ex = e;
+            } finally {
+                assertTrue(ex.getMessage().contains("invalid ORDER BY expression"));
+            }
+
+            ex = null;
+            try {
+                // Test order by without tag and not in display columns, and not equal to group by columns
+                cr = client.callProcedure("@AdHoc", "SELECT count(wage), sum(id), avg(wage)  from " + tb + " GROUP BY abs(dept) ORDER BY count(*) ");
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+                vt = cr.getResults()[0];
+                expected = new long[][] { {3, 6, 20}, {4, 22, 35} };
+                compareTable(vt, expected);
+            } catch (ProcCallException e) {
+                ex = e;
+            } finally {
+                assertTrue(ex.getMessage().contains("invalid ORDER BY expression"));
+            }
+
+        }
+    }
 
     //
     // Suite builder boilerplate
@@ -282,13 +701,13 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
                 "WAGE INTEGER, " +
                 "DEPT INTEGER, " +
-                "RATE FLOAT, " +
+                "TM TIMESTAMP DEFAULT NULL, " +
                 "PRIMARY KEY (ID) );" +
                 "CREATE TABLE P1 ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
                 "WAGE INTEGER, " +
                 "DEPT INTEGER, " +
-                "RATE FLOAT, " +
+                "TM TIMESTAMP DEFAULT NULL, " +
                 "PRIMARY KEY (ID) );";
         try {
             project.addLiteralSchema(literalSchema);
@@ -298,8 +717,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         project.addPartitionInfo("P1", "ID");
         boolean success;
         //project.addStmtProcedure("failedProcedure", "SELECT wage, SUM(wage) from R1 group by ID;");
-        //project.addStmtProcedure("groupby", "SELECT abs(dept) as tag, count(wage)+1 from P1 GROUP BY abs(dept) ORDER BY abs(dept);");
-        //project.addStmtProcedure("orderby", "SELECT dept, COUNT(*) as tag, sum(wage) - 1 from P1 GROUP BY dept ORDER BY COUNT(*) DESC");
+        //project.addStmtProcedure("groupby", "SELECT (dept+1) as tag, count(wage) from R1 GROUP BY dept+1 ORDER BY tag");
 
         config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
