@@ -1023,7 +1023,7 @@ public class DDLCompiler {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
                     if (indexName.startsWith("SYS_IDX_SYS_") == false) {
-                        addIndexToCatalog(table, indexNode, indexReplacementMap);
+                        addIndexToCatalog(db, table, indexNode, indexReplacementMap);
                     }
                 }
 
@@ -1032,7 +1032,7 @@ public class DDLCompiler {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
                     if (indexName.startsWith("SYS_IDX_SYS_") == true) {
-                        addIndexToCatalog(table, indexNode, indexReplacementMap);
+                        addIndexToCatalog(db, table, indexNode, indexReplacementMap);
                     }
                 }
             }
@@ -1198,13 +1198,15 @@ public class DDLCompiler {
         return Arrays.equals(idx1baseTableOrder, idx2baseTableOrder);
     }
 
-    void addIndexToCatalog(Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
+    void addIndexToCatalog(Database db, Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
             throws VoltCompilerException
     {
         assert node.name.equals("index");
 
         String name = node.attributes.get("name");
         boolean unique = Boolean.parseBoolean(node.attributes.get("unique"));
+        AbstractParsedStmt dummy = new ParsedSelectStmt(null, db);
+        dummy.setTable(table);
 
         // "parse" the expression trees for an expression-based index (vs. a simple column value index)
         AbstractExpression[] exprs = null;
@@ -1213,7 +1215,7 @@ public class DDLCompiler {
                 exprs = new AbstractExpression[subNode.children.size()];
                 int j = 0;
                 for (VoltXMLElement exprNode : subNode.children) {
-                    exprs[j] = AbstractParsedStmt.parseExpressionTree(null, exprNode);
+                    exprs[j] = dummy.parseExpressionTree(exprNode);
                     exprs[j].resolveForTable(table);
                     exprs[j].finalizeValueTypes();
                     ++j;
