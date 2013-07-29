@@ -219,9 +219,9 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
                 ConstantValueExpression missingKey = new ConstantValueExpression();
                 missingKey.setValueType(missingKeyType);
                 missingKey.setValue(String.valueOf(VoltType.getPaddedMaxTypeValue(missingKeyType)));
+                missingKey.setValueSize(missingKeyType.getLengthInBytesForFixedTypes());
                 endType = IndexLookupType.LTE;
                 endKeys.add(missingKey);
-                canPadding = true;
             } else {
                 return null;
             }
@@ -240,7 +240,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
         // DESC case
         if ((isp.getSearchKeyExpressions().size() > 0) &&
-                (isp.getSearchKeyExpressions().size() < isp.getCatalogIndex().getColumns().size())) {
+                (isp.getSearchKeyExpressions().size() < indexSize)) {
             return null;
         }
         return new IndexCountPlanNode(isp, apn, endType, endKeys);
