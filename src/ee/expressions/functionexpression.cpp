@@ -316,6 +316,10 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_TRUNCATE_MICROSECOND:
             ret = new UnaryFunctionExpression<FUNC_TRUNCATE_MICROSECOND>((*arguments)[0]);
             break;
+        // Alias for function FUNC_TO_TIMESTAMP_SECOND
+        case FUNC_VOLT_FROM_UNIXTIME:
+            ret = new UnaryFunctionExpression<FUNC_TO_TIMESTAMP_SECOND>((*arguments)[0]);
+            break;
         case FUNC_FLOOR:
             ret = new UnaryFunctionExpression<FUNC_FLOOR>((*arguments)[0]);
             break;
