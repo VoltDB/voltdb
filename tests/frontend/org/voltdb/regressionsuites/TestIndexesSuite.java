@@ -390,6 +390,15 @@ public class TestIndexesSuite extends RegressionSuite {
                  " and T.NUM IN (10)", table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(0, results[0].getRowCount());
+
+            // try some DML -- but try not to actually update values except to themselves
+            // -- that just makes it harder to profile expected results down the line
+            query = String.format("delete from %s where DESC IN ('')" +
+                    " and NUM IN (111,112)", table);
+            System.out.println("Turning to @AdHoc: " + query);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            System.out.println("Returned from @AdHoc: " + query);
+            assertEquals(0, results[0].getRowCount());
         }
 
         // Flag whether CompiledInLists needs to tiptoe around lack of "col IN ?" support
@@ -981,6 +990,12 @@ public class TestIndexesSuite extends RegressionSuite {
                                  "'this here is a longish string to force a permanent object allocation'" +
                                  ")" +
                                  " and T.NUM IN ?");
+
+        //project.addStmtProcedure("InlinedUpdateInListP3with5NUMs",
+        //        "update P3 set NUM = 0 where DESC IN ('a', 'b', 'c', 'g', " +
+        //        "'this here is a longish string to force a permanent object allocation'" +
+        //        ")" +
+        //        " and NUM IN (111,222,333,444,555)");
 
         boolean success;
 
