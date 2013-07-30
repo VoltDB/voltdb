@@ -100,6 +100,7 @@ private:
     bool* m_needsSubstituteSearchKey; // needs_substitute_search_key_ptr[]
     bool m_needsSubstitutePostExpression;
     bool m_needsSubstituteEndExpression;
+    bool m_needsSubstituteInitialExpression;
 
     IndexLookupType m_lookupType;
     SortDirectionType m_sortDirection;

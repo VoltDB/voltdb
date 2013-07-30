@@ -170,13 +170,16 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
             return plan;
         }
 
-        // no non-indexable (post-)predicates allowed
-        if (((IndexScanPlanNode)child).getPredicate() != null) {
-            return plan;
-        }
-
         // already have the IndexScanPlanNode
         IndexScanPlanNode ispn = (IndexScanPlanNode)child;
+
+        // can do optimization only if it has no (post-)predicates
+        // except those (post-)predicates are artifact predicates
+        // we added for reverse scan purpose only
+        if (((IndexScanPlanNode)child).getPredicate() != null &&
+                !((IndexScanPlanNode)child).isPredicatesOptimizableForAggregate()) {
+            return plan;
+        }
 
         // 1. Handle ALL equality filters case.
         // In the IndexScanPlanNode:
@@ -192,9 +195,17 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         }
 
         // exprs will be used as filterExprs to check the index
-        // the initial value is endExprs and might be changed in different values in variant cases
-        List<AbstractExpression> exprs = ExpressionUtil.uncombine(ispn.getEndExpression());
-        int numberOfEndExprs = exprs.size();
+        // For forward scan, the initial value is endExprs and might be changed in different values in variant cases
+        // For reverse scan, the initial value is initialExprs which is the "old" endExprs
+        List<AbstractExpression> exprs;
+        int numOfSearchKeys = ispn.getSearchKeyExpressions().size();
+        if (ispn.getLookupType() == IndexLookupType.LT || ispn.getLookupType() == IndexLookupType.LTE) {
+            exprs = ExpressionUtil.uncombine(ispn.getInitialExpression());
+            numOfSearchKeys -= 1;
+        } else {
+            exprs = ExpressionUtil.uncombine(ispn.getEndExpression());
+        }
+        int numberOfExprs = exprs.size();
 
         // If there is only 1 difference between searchkeyExprs and endExprs,
         // 1. trivial filters can be discarded, 2 possibilities:
@@ -202,43 +213,29 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         //         <=> SELECT MIN(X) FROM T WHERE [other prefix filters] && the X < / <= ? filter
         //      b. SELECT MAX(X) FROM T WHERE X > / >= ?
         //         <=> SELECT MAX(X) FROM T with post-filter
-        // 2. filter should act as equality filter, only 1 possibility
+        // 2. filter should act as equality filter, 2 possibilities
         //      SELECT MIN(X) FROM T WHERE [other prefix filters] X > / >= ?
+        //      SELECT MAX(X) FROM T WHERE [other prefix filters] X < / <= ?
 
         // check if there is other filters for SELECT MAX(X) FROM T WHERE [other prefix filter AND ] X > / >= ?
         // but we should allow SELECT MAX(X) FROM T WHERE X = ?
         if (sortDirection == SortDirectionType.DESC && ispn.getSortDirection() == SortDirectionType.INVALID) {
-            if (numberOfEndExprs > 1 ||
-                    (numberOfEndExprs == 1 && aggExpr.bindingToIndexedExpression(exprs.get(0).getLeft()) == null)) {
+            if (numberOfExprs > 1 ||
+                    (numberOfExprs == 1 && aggExpr.bindingToIndexedExpression(exprs.get(0).getLeft()) == null)) {
                 return plan;
             }
         }
 
         // have an upper bound: # of endingExpr is more than # of searchExpr
-        if (numberOfEndExprs > ispn.getSearchKeyExpressions().size()) {
-            // do not support max() with upper bound
-            if (sortDirection == SortDirectionType.DESC) {
-                return plan;
-            }
+        if (numberOfExprs > numOfSearchKeys) {
             // check last ending condition, see whether it is
             //      SELECT MIN(X) FROM T WHERE [other prefix filters] X < / <= ? or
             // other filters will be checked later
-            AbstractExpression lastEndExpr = exprs.get(numberOfEndExprs - 1);
+            AbstractExpression lastEndExpr = exprs.get(numberOfExprs - 1);
             if ((lastEndExpr.getExpressionType() == ExpressionType.COMPARE_LESSTHAN ||
                  lastEndExpr.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO)
                     && lastEndExpr.getLeft().equals(aggExpr)) {
                 exprs.remove(lastEndExpr);
-            }
-        }
-
-        // have a lower bound: # of searchExpr is more than # of endingExpr
-        if (ispn.getSearchKeyExpressions().size() > numberOfEndExprs) {
-            // need to check last expression of searchkey (but not from searchkey!), see whether it is
-            //      SELECT MIN(X) FROM T WHERE [other prefix filters] X > / >= ? or
-            //      SELECT MAX(X) FROM T WHERE X > / >= ?
-            // but we can do this later in checkIndex()
-            if (ispn.getLookupType() != IndexLookupType.GT && ispn.getLookupType() != IndexLookupType.GTE) {
-                return plan;
             }
         }
 
@@ -250,6 +247,15 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         } else {
             // we know which end we want to fetch, set the sort direction
             ispn.setSortDirection(sortDirection);
+            // for SELECT MIN(X) FROM T WHERE [...] X < / <= ?
+            // reset the IndexLookupType, remove "added" searchKey, add back to endExpression, and clear "added" predicate
+            if (sortDirection == SortDirectionType.ASC &&
+                    (ispn.getLookupType() == IndexLookupType.LT || ispn.getLookupType() == IndexLookupType.LTE)){
+                ispn.setLookupType(IndexLookupType.GTE);
+                ispn.removeLastSearchKey();
+                ispn.addEndExpression(ExpressionUtil.uncombine(ispn.getInitialExpression()).get(numberOfExprs - 1));
+                ispn.resetPredicate();
+            }
             // add an inline LIMIT plan node to this index scan plan node
             LimitPlanNode lpn = new LimitPlanNode();
             lpn.setLimit(1);
@@ -267,7 +273,10 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
             //  |__ IndexScanPlanNode       =>      |__IndexScanPlanNode with no filter
             //                                              |__LimitPlanNode
             // For now, we take the second approach.
-            if (sortDirection == SortDirectionType.DESC && !ispn.getSearchKeyExpressions().isEmpty() && exprs.isEmpty()) {
+            if (sortDirection == SortDirectionType.DESC &&
+                    !ispn.getSearchKeyExpressions().isEmpty() &&
+                    exprs.isEmpty() &&
+                    ExpressionUtil.uncombine(ispn.getInitialExpression()).isEmpty()) {
                 AbstractExpression newPredicate = new ComparisonExpression();
                 if (ispn.getLookupType() == IndexLookupType.GT)
                     newPredicate.setExpressionType(ExpressionType.COMPARE_GREATERTHAN);

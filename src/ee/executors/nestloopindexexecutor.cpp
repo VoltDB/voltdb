@@ -352,6 +352,11 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
         where_expression->substitute(params);
         VOLT_TRACE("Post Expression:\n%s", where_expression->debug(true).c_str());
     }
+    AbstractExpression* initial_expression = inline_node->getInitialExpression();
+    if (initial_expression != NULL) {
+        initial_expression->substitute(params);
+        VOLT_TRACE("Initial Expression:\n%s", initial_expression->debug(true).c_str());
+    }
     //
     // OUTER TABLE ITERATION
     //
@@ -433,18 +438,17 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                                 break; // the outer while loop
                             }
                             else {
-                                // VoltDB should only support LT or LTE with
-                                // empty search keys for order-by without lookup
-                                throw e;
+                                // overflow of LT or LTE should be treated as LTE
+                                // to issue an "initial" forward scan
+                                localLookupType = INDEX_LOOKUP_TYPE_LTE;
                             }
                         }
                         if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
                             if ((localLookupType == INDEX_LOOKUP_TYPE_LT) ||
                                 (localLookupType == INDEX_LOOKUP_TYPE_LTE)) {
-
-                                // VoltDB should only support LT or LTE with
-                                // empty search keys for order-by without lookup
-                                throw e;
+                                // overflow of LT or LTE should be treated as LTE
+                                // to issue an "initial" forward scans
+                                localLookupType = INDEX_LOOKUP_TYPE_LTE;
                             }
                             else {
                                 // don't allow GTE because it breaks null handling
@@ -468,7 +472,6 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                 }
             }
             VOLT_TRACE("Searching %s", index_values.debug("").c_str());
-
 
             // if a search value didn't fit into the targeted index key, skip this key
             if (!keyException) {
@@ -500,6 +503,21 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                     else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
                         index->moveToKeyOrGreater(&index_values);
                     }
+                    else if (localLookupType == INDEX_LOOKUP_TYPE_LT) {
+                        index->moveToLessThanKey(&index_values);
+                    } else if (localLookupType == INDEX_LOOKUP_TYPE_LTE) {
+                        // find the entry whose key is greater than search key,
+                        // do a forward scan using initialExpr to find the correct
+                        // start point to do reverse scan
+                        index->moveToGreaterThanKey(&index_values);
+                        while (!(inner_tuple = index->nextValue()).isNullTuple()) {
+                            if (initial_expression != NULL && initial_expression->eval(&inner_tuple, NULL).isFalse()) {
+                                break;
+                            }
+                        }
+                        // just passed the first failed entry, so move 2 backward
+                        index->moveToBeforePriorEntry();
+                    }
                     else {
                         return false;
                     }
@@ -515,7 +533,6 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                 {
                     VOLT_TRACE("inner_tuple:%s",
                                inner_tuple.debug(inner_table->name()).c_str());
-
                     //
                     // First check whether the end_expression is now false
                     //
