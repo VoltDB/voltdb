@@ -1567,6 +1567,17 @@ public class DDLCompiler {
             throw m_compiler.new VoltCompilerException(msg);
         }
 
+        if (stmt.hasComplexGroupby()) {
+            msg += "has GROUP BY with complex expressions not supported";
+            throw m_compiler.new VoltCompilerException(msg);
+        }
+
+        if (stmt.hasComplexAgg()) {
+            msg += "has complex aggregation expressions not supported";
+            throw m_compiler.new VoltCompilerException(msg);
+        }
+
+
         int i;
         for (i = 0; i < groupColCount; i++) {
             ParsedSelectStmt.ParsedColInfo gbcol = stmt.groupByColumns.get(i);
