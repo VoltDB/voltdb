@@ -476,7 +476,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         stringer.key(Members.END_EXPRESSION.name());
         stringer.value(m_endExpression);
 
-        stringer.key(Members.INITIAL_EXPRESSION.name()).value(m_initialExpression);
+        if (m_initialExpression != null) {
+            stringer.key(Members.INITIAL_EXPRESSION.name()).value(m_initialExpression);
+        }
 
         stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array();
         for (AbstractExpression ae : m_searchkeyExpressions) {
