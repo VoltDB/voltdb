@@ -37,6 +37,7 @@ import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
+import org.voltdb.utils.CatalogUtil;
 
 public class IndexCountPlanNode extends AbstractScanPlanNode {
 
@@ -157,6 +158,8 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             endKeys.add((AbstractExpression)ae.getRight().clone());
         }
 
+        int indexSize = CatalogUtil.getCatalogIndexSize(isp.getCatalogIndex());
+
         // check endkey for ASC or searchkey for DESC case separately
 
         // Avoid the cases that would cause undercounts for prefix matches.
@@ -164,13 +167,13 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         if (isp.getSortDirection() != SortDirectionType.DESC &&
             (endType != IndexLookupType.LT) &&
             (endKeys.size() > 0) &&
-            (endKeys.size() < isp.getCatalogIndex().getColumns().size())) {
+            (endKeys.size() < indexSize)) {
             return null;
         }
 
         // DESC case
         if ((isp.getSearchKeyExpressions().size() > 0) &&
-                (isp.getSearchKeyExpressions().size() < isp.getCatalogIndex().getColumns().size())) {
+                (isp.getSearchKeyExpressions().size() < indexSize)) {
             return null;
         }
         return new IndexCountPlanNode(isp, apn, endType, endKeys);
@@ -285,7 +288,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     protected String explainPlanForNode(String indent) {
         assert(m_catalogIndex != null);
 
-        int indexSize = m_catalogIndex.getColumns().size();
+        int indexSize = CatalogUtil.getCatalogIndexSize(m_catalogIndex);
         int keySize = m_searchkeyExpressions.size();
 
         String scanType = "tree-counter";
