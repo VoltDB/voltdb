@@ -33,6 +33,15 @@ public class PortGeneratorForTest extends PortGenerator {
         public int nClient = -1;
         public int nAdmin = -1;
         public int nZkport = -1;
+        public int nReplicationPort = -1;
+
+        public int nextReplicationPort() {
+            return nReplicationPort;
+        }
+
+        public void setReplicationPort(int nc) {
+            nReplicationPort = nc;
+        }
 
         public int nextZkPort() {
             return nZkport;
@@ -88,6 +97,16 @@ public class PortGeneratorForTest extends PortGenerator {
     public int nextZkPort() {
         if (pprovider != null) {
             int rport = pprovider.nextZkPort();
+            if (rport != -1) {
+                return rport;
+            }
+        }
+        return super.next();
+    }
+
+    public int nextReplicationPort() {
+        if (pprovider != null) {
+            int rport = pprovider.nextReplicationPort();
             if (rport != -1) {
                 return rport;
             }

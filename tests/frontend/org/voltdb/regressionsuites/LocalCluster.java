@@ -346,9 +346,9 @@ public class LocalCluster implements VoltServerConfig {
         cmdln.adminPort(portGenerator.nextAdmin());
         cmdln.zkport(portGenerator.nextZkPort());
         // replication port and its two automatic followers.
-        cmdln.drAgentStartPort(portGenerator.next());
-        portGenerator.next();
-        portGenerator.next();
+        cmdln.drAgentStartPort(portGenerator.nextReplicationPort());
+        portGenerator.nextReplicationPort();
+        portGenerator.nextReplicationPort();
         if (m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
             for (EEProcess proc : m_eeProcs.get(0)) {
                 assert(proc != null);
@@ -567,7 +567,7 @@ public class LocalCluster implements VoltServerConfig {
             cmdln.internalPort(portGenerator.next());
             // set the dragent port. it uses the start value and
             // the next two sequential port numbers - so burn those two.
-            cmdln.drAgentStartPort(portGenerator.next());
+            cmdln.drAgentStartPort(portGenerator.nextReplicationPort());
             portGenerator.next();
             portGenerator.next();
 
