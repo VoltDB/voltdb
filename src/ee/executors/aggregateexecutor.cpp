@@ -631,7 +631,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     VOLT_TRACE("looping..");
     // Use the first input tuple to "prime" the system.
     // ENG-1565: for this special case, can have only one input row, apply the predicate here
-    if (it.next(nxtTuple, m_engine) && (m_predicate == NULL || m_predicate->eval(&nxtTuple, NULL).isTrue())) {
+    if (it.next(nxtTuple) && (m_predicate == NULL || m_predicate->eval(&nxtTuple, NULL).isTrue())) {
     	initGroupByKeyTuple(nextGroupByKeyStorage, nxtTuple);
         // Start the aggregation calculation.
         initAggInstances(aggregateRow);

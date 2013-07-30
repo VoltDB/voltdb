@@ -376,12 +376,12 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
                 dynamic_cast<Table*>(executor->getPlanNode()->getOutputTable());
 
         try {
-            // Now call the execute method to actually perform whatever action
-            // it is that the node is supposed to do...
-        	// Set the plannode that generated the executor to be executed
+        	// Reset isLongOp
         	if(m_isLongOp) {
         		setLongOp(false);
         	}
+            // Now call the execute method to actually perform whatever action
+            // it is that the node is supposed to do...
             if (!executor->execute(params)) {
                 VOLT_TRACE("The Executor's execution at position '%d'"
                            " failed for PlanFragment '%jd'",

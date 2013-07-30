@@ -91,10 +91,7 @@ public:
 private:
     // Get an iterator via table->iterator()
     TableIterator(Table *, TBMapI);
-    TableIterator(Table *, TBMapI, VoltDBEngine* engine);
     TableIterator(Table *, std::vector<TBPtr>::iterator);
-    TableIterator(Table *, std::vector<TBPtr>::iterator, VoltDBEngine* engine);
-
 
     bool persistentNext(TableTuple &out);
     bool tempNext(TableTuple &out);
@@ -193,21 +190,23 @@ inline bool TableIterator::next(TableTuple &out) {
 }
 
 inline bool TableIterator::next(TableTuple &out, VoltDBEngine* engine) {
-	const int threshold = 1000;
-	if(m_foundTuples > threshold-3 && !engine->isLongOp()) {
-		engine->setLongOp(true);
-	}
-	if(m_foundTuples > threshold-1 && m_foundTuples % threshold == 0) {
-		//Update stats in java and let java determine if we should cancel this query.
-		if(engine->getTopend()->updateStats(engine->getBatchIndex(),
-				engine->getPlanNodeName(),
-				engine->getTargetTable() ? engine->getTargetTable()->name() : "None",
-				engine->getTargetTable() ? engine->getTargetTable()->activeTupleCount() : 0,
-				m_foundTuples,
-				engine->getIndex() ? engine->getIndex()->getName() : "None")){
-			VOLT_ERROR("Time out read only query.");
-			throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "Time out read only query.");
+	const int threshold = 100000000;
+	if(m_foundTuples > threshold-3 ) {
+		if(!engine->isLongOp()) {
+			engine->setLongOp(true);
 		}
+		if(m_foundTuples > threshold-1 && m_foundTuples % threshold == 0) {
+				//Update stats in java and let java determine if we should cancel this query.
+				if(engine->getTopend()->updateStats(engine->getBatchIndex(),
+						engine->getPlanNodeName(),
+						engine->getTargetTable() ? engine->getTargetTable()->name() : "None",
+						engine->getTargetTable() ? engine->getTargetTable()->activeTupleCount() : 0,
+						m_foundTuples,
+						engine->getIndex() ? engine->getIndex()->getName() : "None")){
+					VOLT_ERROR("Time out read only query.");
+					throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "Time out read only query.");
+				}
+			}
 	}
     if (!m_tempTableIterator) {
         return persistentNext(out);

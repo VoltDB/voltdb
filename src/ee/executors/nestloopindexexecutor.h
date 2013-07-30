@@ -116,7 +116,6 @@ protected:
 
     //So valgrind doesn't report the data as lost.
     char *index_values_backing_store;
-
 };
 
 }

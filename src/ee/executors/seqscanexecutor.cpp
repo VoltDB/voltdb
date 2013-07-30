@@ -110,7 +110,6 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     assert(output_table);
     Table* target_table = dynamic_cast<Table*>(node->getTargetTable());
     assert(target_table);
-
     //cout << "SeqScanExecutor: node id" << node->getPlanNodeId() << endl;
     VOLT_TRACE("Sequential Scanning table :\n %s",
                target_table->debug().c_str());

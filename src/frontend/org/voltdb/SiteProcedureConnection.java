@@ -106,7 +106,7 @@ public interface SiteProcedureConnection {
             long spHandle,
             long uniqueId,
             boolean readOnly,
-            RunningProcedureContext rpc) throws EEException;
+            RunningProcedureContext rProcContext) throws EEException;
 
     /**
      * For test cases that need to mimic a plan fragment being invoked

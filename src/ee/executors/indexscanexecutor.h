@@ -122,7 +122,6 @@ private:
         m_searchKeyBeforeSubstituteArrayPtr;
     // So Valgrind doesn't complain:
     char* m_searchKeyBackingStore;
-
 };
 
 }

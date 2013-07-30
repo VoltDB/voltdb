@@ -55,7 +55,6 @@ bool TableCountExecutor::p_execute(const NValueArray &params) {
 
     Table* target_table = dynamic_cast<Table*>(node->getTargetTable());
     assert(target_table);
-    //m_engine->setTargetTable(target_table);
     VOLT_TRACE("Table Count table :\n %s",
                target_table->debug().c_str());
     VOLT_DEBUG("Table Count table : %s which has %d active, %d"

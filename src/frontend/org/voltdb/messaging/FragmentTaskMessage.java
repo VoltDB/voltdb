@@ -413,10 +413,10 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
      *     output dependencies flag (outdep): byte: 1
      *     input dependencies flag (indep): byte: 1
      *
-     *     porcedure name: byte:string.length.
-     *
      * Fragment ID block (1 per item):
      *     fragment ID: long: 8 * nitems
+     *
+     * Porcedure name: byte: length of the name string.
      *
      * Parameter set block (1 per item):
      *     parameter buffer size: int: 4 * nitems
@@ -450,7 +450,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // Fragment ID block (20 bytes per sha1-hash)
         msgsize += 20 * m_items.size();
 
-        // Procedure name gets an length (4) and the name(.getBytes().length)
+        // Procedure name gets an length (4) and the name (.length)
         msgsize += 4;
         if(m_procNameInBytes.length != 0)
             msgsize += m_procNameInBytes.length;

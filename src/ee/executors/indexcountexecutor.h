@@ -88,7 +88,6 @@ protected:
     // So Valgrind doesn't complain:
     char* m_searchKeyBackingStore;
     char* m_endKeyBackingStore;
-
 };
 
 }
