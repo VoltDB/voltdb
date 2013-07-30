@@ -177,6 +177,7 @@ void AbstractExecutor::setDMLCountOutputTable(TempTableLimits* limits) {
 inline void AbstractExecutor::setStatsForLongOp() {
 	if(m_engine->isLongOp()) {
 		m_engine->setPlanNodeName(planNodeToString(m_abstractNode->getPlanNodeType()));
+		std::cout<<planNodeToString(m_abstractNode->getPlanNodeType());
 		m_engine->setTargetTable(NULL);
 		m_engine->setIndex(NULL);
 	}

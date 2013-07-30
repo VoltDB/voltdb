@@ -321,13 +321,24 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         //System.err.println(m_rProcContext.m_batch.get(batchIndex));
         VoltLogger log = new VoltLogger("CONSOLE");
         if(m_rProcContext!=null) {
-            log.info("Procedure: "+m_rProcContext.m_procedureName);
+            log.info("Long running operation");
+            log.info("[Proc:"+m_rProcContext.m_procedureName+"]"
+                    +"["+"Executor:"+planNodeName+"]"
+                    +"["+"Target table(size):"+targetTableName+"("+targetTableSize+")"+"]"
+                    +"["+"Tuples processed:"+tuplesFound+"]"
+                    +"["+"Index:"+indexName+"]"
+                    +"["+"Batch index:"+batchIndex+"]"
+                    );
         }
-        log.info("Executor: "+planNodeName);
-        log.info("Most recent target table: "+targetTableName+"("+targetTableSize+")");
-        log.info("Tuples processed: "+tuplesFound);
-        log.info("Batch index: "+batchIndex);
-        log.info("Most recent index: "+indexName);
+        else {//Sys proc is not implemented I think
+            log.info("Long running operation");
+            log.info("["+"Executor:"+planNodeName+"]"
+                    +"["+"Target table(size):"+targetTableName+"("+targetTableSize+")"+"]"
+                    +"["+"Tuples processed:"+tuplesFound+"]"
+                    +"["+"Index:"+indexName+"]"
+                    +"["+"Batch index:"+batchIndex+"]"
+                    );
+        }
         //Set timer and time out read only queries.
 //        long currentTime = System.currentTimeMillis();
 //        if(m_readOnly && currentTime - m_startTime > Long.MAX_VALUE)
