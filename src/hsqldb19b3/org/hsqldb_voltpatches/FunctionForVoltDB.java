@@ -115,6 +115,8 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_TRUNCATE_MILLISECOND   = 20021;
         static final int FUNC_VOLT_TRUNCATE_MICROSECOND   = 20022;
 
+        static final int FUNC_VOLT_FROM_UNIXTIME          = 20023;
+
         private static final FunctionId[] instances = {
 
             new FunctionId("sql_error", null, FUNC_VOLT_SQL_ERROR, 0,
@@ -165,6 +167,10 @@ public class FunctionForVoltDB extends FunctionSQL {
                     Tokens.MINUTE, Tokens.SECOND, Tokens.MILLIS, Tokens.MILLISECOND,
                     Tokens.MICROS, Tokens.MICROSECOND,
                     Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("from_unixtime", Type.SQL_TIMESTAMP, FUNC_VOLT_FROM_UNIXTIME, -1,
+                    new Type[] { Type.SQL_BIGINT },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();
