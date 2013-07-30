@@ -17,11 +17,8 @@
 
 package org.voltdb.iv2;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.exceptions.TransactionRestartException;
@@ -29,22 +26,13 @@ import org.voltdb.exceptions.TransactionRestartException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 
-public class TransactionTaskQueue
+public class MpTransactionTaskQueue extends TransactionTaskQueue
 {
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    final protected SiteTaskerQueue m_taskQueue;
-
-    /*
-     * Multi-part transactions create a backlog of tasks behind them. A queue is
-     * created for each multi-part task to maintain the backlog until the next
-     * multi-part task.
-     */
-    protected Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
-
-    TransactionTaskQueue(SiteTaskerQueue queue)
+    MpTransactionTaskQueue(SiteTaskerQueue queue)
     {
-        m_taskQueue = queue;
+        super(queue);
     }
 
     /**
@@ -94,7 +82,7 @@ public class TransactionTaskQueue
     // SiteTaskerQueue.  Before it does this, it unblocks the MP transaction
     // that may be running in the Site thread and causes it to rollback by
     // faking an unsuccessful FragmentResponseMessage.
-    synchronized void repair(SiteTasker task, List<Long> masters, Map<Integer, Long> partitionMasters)
+    synchronized void repair(SiteTasker task, List<Long> masters)
     {
         // At the MPI's TransactionTaskQueue, we know that there can only be
         // one transaction in the SiteTaskerQueue at a time, because the
@@ -106,7 +94,7 @@ public class TransactionTaskQueue
         Iterator<TransactionTask> iter = m_backlog.iterator();
         if (iter.hasNext()) {
             MpProcedureTask next = (MpProcedureTask)iter.next();
-            next.doRestart(masters, partitionMasters);
+            next.doRestart(masters);
             // get head
             // Only the MPI's TransactionTaskQueue is ever called in this way, so we know
             // that the TransactionTasks we pull out of it have to be MP transactions, so this
@@ -128,7 +116,7 @@ public class TransactionTaskQueue
             while (iter.hasNext())
             {
                 next = (MpProcedureTask)iter.next();
-                next.updateMasters(masters, partitionMasters);
+                next.updateMasters(masters);
             }
         }
     }
@@ -217,7 +205,7 @@ public class TransactionTaskQueue
     public String toString()
     {
         StringBuilder sb = new StringBuilder();
-        sb.append("TransactionTaskQueue:").append("\n");
+        sb.append("MpTransactionTaskQueue:").append("\n");
         sb.append("\tSIZE: ").append(size());
         if (!m_backlog.isEmpty()) {
             sb.append("\tHEAD: ").append(m_backlog.getFirst());

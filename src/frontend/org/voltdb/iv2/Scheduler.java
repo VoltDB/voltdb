@@ -75,7 +75,6 @@ abstract public class Scheduler implements InitiatorMessageHandler
     // IZZY: We should refactor this to be inviolable in the future.
     final protected SiteTaskerQueue m_tasks;
     protected Mailbox m_mailbox;
-    final protected TransactionTaskQueue m_pendingTasks;
     protected boolean m_isLeader = false;
     private TxnEgo m_txnEgo;
     final protected int m_partitionId;
@@ -106,7 +105,6 @@ abstract public class Scheduler implements InitiatorMessageHandler
     Scheduler(int partitionId, SiteTaskerQueue taskQueue)
     {
         m_tasks = taskQueue;
-        m_pendingTasks = new TransactionTaskQueue(m_tasks);
         m_partitionId = partitionId;
         m_txnEgo = TxnEgo.makeZero(partitionId);
     }

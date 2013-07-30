@@ -58,6 +58,7 @@ public class MpScheduler extends Scheduler
     private final long m_buddyHSId;
     //Generator of pre-IV2ish timestamp based unique IDs
     private final UniqueIdGenerator m_uniqueIdGenerator;
+    final private MpTransactionTaskQueue m_pendingTasks;
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
@@ -69,6 +70,7 @@ public class MpScheduler extends Scheduler
     MpScheduler(int partitionId, long buddyHSId, SiteTaskerQueue taskQueue)
     {
         super(partitionId, taskQueue);
+        m_pendingTasks = new MpTransactionTaskQueue(m_tasks);
         m_buddyHSId = buddyHSId;
         m_iv2Masters = new ArrayList<Long>();
         m_partitionMasters = Maps.newHashMap();
