@@ -370,7 +370,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
 
     VOLT_TRACE("<num_of_outer_cols>: %d\n", num_of_outer_cols);
     while (outer_iterator.next(outer_tuple, m_engine)) {
-    	setStatsForLongOp(inner_table, index);
+        setStatsForLongOp(inner_table, index);
         VOLT_TRACE("outer_tuple:%s",
                    outer_tuple.debug(outer_table->name()).c_str());
         // Set the outer tuple columns. Must be outside the inner loop

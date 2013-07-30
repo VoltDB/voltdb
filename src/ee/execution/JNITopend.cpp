@@ -99,9 +99,9 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
 
     m_updateStatsMID = m_jniEnv->GetMethodID(jniClass, "updateStats", "(ILjava/lang/String;Ljava/lang/String;JJLjava/lang/String;)Z");
     if (m_updateStatsMID == NULL) {
-    	m_jniEnv->ExceptionDescribe();
-    	assert(m_updateStatsMID != 0);
-    	throw std::exception();
+        m_jniEnv->ExceptionDescribe();
+        assert(m_updateStatsMID != 0);
+        throw std::exception();
     }
 
     m_planForFragmentIdMID = m_jniEnv->GetMethodID(jniClass, "planForFragmentId", "(J)[B");
@@ -222,35 +222,35 @@ int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
 }
 
 bool JNITopend::updateStats(int32_t batchIndex,
-		std::string planNodeName,
-		std::string targetTableName,
-		int64_t targetTableSize,
-		int64_t tuplesFound,
-		std::string indexName) {
-	JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, 10);
-	if (jni_frame.checkResult() < 0) {
-		VOLT_ERROR("Unable to load dependency: jni frame error.");
-		throw std::exception();
-	}
+                std::string planNodeName,
+                std::string targetTableName,
+                int64_t targetTableSize,
+                int64_t tuplesFound,
+                std::string indexName) {
+        JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, 10);
+        if (jni_frame.checkResult() < 0) {
+                VOLT_ERROR("Unable to load dependency: jni frame error.");
+                throw std::exception();
+        }
 
-	jstring jPlanNodeName = m_jniEnv->NewStringUTF(planNodeName.c_str());
-	if (m_jniEnv->ExceptionCheck()) {
-		m_jniEnv->ExceptionDescribe();
-		throw std::exception();
-	}
-	jstring jTargetTableName = m_jniEnv->NewStringUTF(targetTableName.c_str());
-	if (m_jniEnv->ExceptionCheck()) {
-		m_jniEnv->ExceptionDescribe();
-		throw std::exception();
-	}
-	jstring jIndexName = m_jniEnv->NewStringUTF(indexName.c_str());
-	if (m_jniEnv->ExceptionCheck()) {
-		m_jniEnv->ExceptionDescribe();
-		throw std::exception();
-	}
+        jstring jPlanNodeName = m_jniEnv->NewStringUTF(planNodeName.c_str());
+        if (m_jniEnv->ExceptionCheck()) {
+                m_jniEnv->ExceptionDescribe();
+                throw std::exception();
+        }
+        jstring jTargetTableName = m_jniEnv->NewStringUTF(targetTableName.c_str());
+        if (m_jniEnv->ExceptionCheck()) {
+                m_jniEnv->ExceptionDescribe();
+                throw std::exception();
+        }
+        jstring jIndexName = m_jniEnv->NewStringUTF(indexName.c_str());
+        if (m_jniEnv->ExceptionCheck()) {
+                m_jniEnv->ExceptionDescribe();
+                throw std::exception();
+        }
 
     jboolean isInterrupt = m_jniEnv->CallBooleanMethod(m_javaExecutionEngine,m_updateStatsMID,
-    		batchIndex, jPlanNodeName, jTargetTableName, targetTableSize, tuplesFound, jIndexName);
+                batchIndex, jPlanNodeName, jTargetTableName, targetTableSize, tuplesFound, jIndexName);
     return (bool)(isInterrupt == JNI_TRUE);
 }
 

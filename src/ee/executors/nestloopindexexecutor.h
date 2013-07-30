@@ -94,11 +94,11 @@ protected:
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
     inline void setStatsForLongOp(Table* targetTable, TableIndex* index) {
-    	if(m_engine->isLongOp()) {
-    		m_engine->setPlanNodeName(planNodeToString(m_abstractNode->getPlanNodeType()));
-    		m_engine->setTargetTable(targetTable);
-    		m_engine->setIndex(index);
-    	}
+        if(m_engine->isLongOp()) {
+                m_engine->setPlanNodeName(planNodeToString(m_abstractNode->getPlanNodeType()));
+                m_engine->setTargetTable(targetTable);
+                m_engine->setIndex(index);
+        }
     };
 
     NestLoopIndexPlanNode* node;

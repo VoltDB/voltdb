@@ -36,8 +36,8 @@ class Topend {
     virtual int loadNextDependency(
         int32_t dependencyId, voltdb::Pool *pool, Table* destination) = 0;
     virtual bool updateStats(int32_t batchIndex, std::string planNodeName,
-    		std::string targetTableName, int64_t targetTableSize, int64_t tuplesFound,
-    		std::string indexName) = 0;
+                std::string targetTableName, int64_t targetTableSize, int64_t tuplesFound,
+                std::string indexName) = 0;
     virtual std::string planForFragmentId(int64_t fragmentId) = 0;
 
     virtual void crashVoltDB(voltdb::FatalException e) = 0;
