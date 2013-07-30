@@ -198,7 +198,6 @@ inline bool TableIterator::next(TableTuple &out, VoltDBEngine* engine) {
 		engine->setLongOp(true);
 	}
 	if(m_foundTuples > threshold-1 && m_foundTuples % threshold == 0) {
-		std::cout<<"In UpdateStats";
 		//Update stats in java and let java determine if we should cancel this query.
 		if(engine->getTopend()->updateStats(engine->getBatchIndex(),
 				engine->getPlanNodeName(),

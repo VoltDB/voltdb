@@ -116,6 +116,9 @@ class AbstractExecutor {
      */
     void setDMLCountOutputTable(TempTableLimits* limits);
 
+    /**
+     * Set up statistics for long running operations thru m_engine
+     */
     void setStatsForLongOp();
 
     // execution engine owns the plannode allocation.
