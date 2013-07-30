@@ -2142,9 +2142,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     private void prepareReplication() {
-        if (m_nodeDRGateway != null) {
-            m_nodeDRGateway.start();
-            m_nodeDRGateway.bindPorts();
+        try {
+            if (m_nodeDRGateway != null) {
+                m_nodeDRGateway.start();
+                m_nodeDRGateway.bindPorts();
+            }
+        } catch (Exception ex) {
+            if (this.m_deployment.getReplication() != null) {
+                //TODO: Should we crash? or is this OK.
+                hostLog.error("Replication Service failed to start: " + ex);
+            }
         }
     }
 

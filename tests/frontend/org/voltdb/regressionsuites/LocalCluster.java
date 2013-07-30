@@ -27,13 +27,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.PortGenerator;
 import org.voltdb.BackendTarget;
 import org.voltdb.ReplicationRole;
-import org.voltdb.StartAction;
 import org.voltdb.ServerThread;
+import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CommandLine;
@@ -45,6 +43,20 @@ import org.voltdb.utils.VoltFile;
  * mind if building memory or load intensive tests.)
  */
 public class LocalCluster implements VoltServerConfig {
+
+    /**
+     * @return the expectedToCrash
+     */
+    public boolean isExpectedToCrash() {
+        return expectedToCrash;
+    }
+
+    /**
+     * @param expectedToCrash the expectedToCrash to set
+     */
+    public void setExpectedToCrash(boolean expectedToCrash) {
+        this.expectedToCrash = expectedToCrash;
+    }
 
     public enum FailureState {
         ALL_RUNNING,
@@ -86,6 +98,7 @@ public class LocalCluster implements VoltServerConfig {
     ArrayList<Process> m_cluster = new ArrayList<Process>();
     int perLocalClusterExtProcessIndex = 0;
     VoltProjectBuilder m_builder;
+    private boolean expectedToCrash = false;
 
     // Dedicated paths in the filesystem to be used as a root for each process
     ArrayList<File> m_subRoots = new ArrayList<File>();
@@ -105,7 +118,7 @@ public class LocalCluster implements VoltServerConfig {
     private final ArrayList<ArrayList<EEProcess>> m_eeProcs = new ArrayList<ArrayList<EEProcess>>();
 
     // Produce a (presumably) available IP port number.
-    public final PortGenerator portGenerator = new PortGenerator();
+    public final PortGeneratorForTest portGenerator = new PortGeneratorForTest();
 
     // The base command line - each process copies and customizes this.
     // Each local cluster process has a CommandLine instance configured
@@ -486,9 +499,11 @@ public class LocalCluster implements VoltServerConfig {
 
             if (downProcesses > 0) {
                 int expectedProcesses = m_hostCount - (m_hasLocalServer ? 1 : 0);
-                throw new RuntimeException(
-                        String.format("%d/%d external processes failed to start",
-                                downProcesses, expectedProcesses));
+                if (!expectedToCrash) {
+                    throw new RuntimeException(
+                            String.format("%d/%d external processes failed to start",
+                            downProcesses, expectedProcesses));
+                }
             }
             // this error case should only be from a timeout
             if (!allReady) {
@@ -540,7 +555,7 @@ public class LocalCluster implements VoltServerConfig {
         }
         // exit code 143 is the forcible shutdown code from .destroy()
         if (retval != 0 && retval != 143) {
-            log.info("External VoltDB process terminated abnormally with return: " + retval);
+            log.info("killOne: External VoltDB process terminated abnormally with return: " + retval);
         }
     }
 
@@ -608,24 +623,18 @@ public class LocalCluster implements VoltServerConfig {
             log.info(cmdLineFull);
             m_procBuilder.command().addAll(cmdlnList);
 
-            // for debug, dump the command line to a file.
-            //cmdln.dumpToFile("/tmp/izzy/cmd_" + Integer.toString(portGenerator.next()));
-            Process proc = m_procBuilder.start();
-            m_cluster.add(proc);
-
             // write output to obj/release/testoutput/<test name>-n.txt
             // this may need to be more unique? Also very useful to just
             // set this to a hardcoded path and use "tail -f" to debug.
             String testoutputdir = cmdln.buildDir() + File.separator + "testoutput";
-
+            System.out.println("Process output will be redirected to directory: " + testoutputdir);
             // make sure the directory exists
             File dir = new File(testoutputdir);
             if (dir.exists()) {
-                assert(dir.isDirectory());
-            }
-            else {
+                assert (dir.isDirectory());
+            } else {
                 boolean status = dir.mkdirs();
-                assert(status);
+                assert (status);
             }
 
             File dirFile = new VoltFile(testoutputdir);
@@ -637,14 +646,20 @@ public class LocalCluster implements VoltServerConfig {
                 }
             }
 
+            // for debug, dump the command line to a file.
+            //cmdln.dumpToFile("/tmp/izzy/cmd_" + Integer.toString(portGenerator.next()));
+            Process proc = m_procBuilder.start();
+            m_cluster.add(proc);
+            String fileName = testoutputdir
+                    + File.separator
+                    + "LC-"
+                    + getFileName() + "-"
+                    + hostId + "-"
+                    + "idx" + String.valueOf(perLocalClusterExtProcessIndex++)
+                    + ".txt";
+            System.out.println("Process output can be found in: " + fileName);
             ptf = new PipeToFile(
-                    testoutputdir +
-                    File.separator +
-                    "LC-" +
-                    getFileName() + "-" +
-                    hostId + "-" +
-                    "idx" + String.valueOf(perLocalClusterExtProcessIndex++) +
-                    ".txt",
+                    fileName,
                     proc.getInputStream(),
                     startAction == StartAction.JOIN ? PipeToFile.m_rejoinToken : PipeToFile.m_initToken,
                     false,
@@ -941,14 +956,14 @@ public class LocalCluster implements VoltServerConfig {
                     retval = proc.waitFor();
                 }
                 catch (InterruptedException e) {
-                    System.out.println("Unable to wait for Localcluster process to die: " + proc.toString());
-                    log.error("Unable to wait for Localcluster process to die: " + proc.toString(), e);
+                    System.out.println("shutDownExternal Unable to wait for Localcluster process to die: " + proc.toString());
+                    log.error("shutDownExternal Unable to wait for Localcluster process to die: " + proc.toString(), e);
                 }
                 // exit code 143 is the forcible shutdown code from .destroy()
                 if (retval != 0 && retval != 143)
                 {
-                    System.out.println("External VoltDB process terminated abnormally with return: " + retval);
-                    log.error("External VoltDB process terminated abnormally with return: " + retval);
+                    System.out.println("shutDownExternal: External VoltDB process terminated abnormally with return: " + retval);
+                    log.error("shutDownExternal: External VoltDB process terminated abnormally with return: " + retval);
                 }
             }
         }
