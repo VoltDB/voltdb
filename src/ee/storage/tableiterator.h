@@ -193,8 +193,10 @@ inline bool TableIterator::next(TableTuple &out) {
 }
 
 inline bool TableIterator::next(TableTuple &out, VoltDBEngine* engine) {
-	if(m_foundTuples > 0) {
-			//&& m_foundTuples % 100000 == 0) {
+	if(m_foundTuples > 10000000-3) {
+		engine->setLongOp(true);
+	}
+	if(m_foundTuples > 10000000 && m_foundTuples % 10000000 == 0) {
 		//Update stats in java and let java determine if we should cancel this query.
 		if(engine->getTopend()->updateStats(engine->getBatchIndex(),
 				engine->getPlanNodeName(),
