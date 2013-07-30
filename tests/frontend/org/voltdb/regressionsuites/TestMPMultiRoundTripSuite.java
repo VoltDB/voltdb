@@ -129,7 +129,7 @@ public class TestMPMultiRoundTripSuite extends RegressionSuite {
         final Client client = this.getClient();
         boolean caught = false;
         try {
-            ClientResponse resp = client.callProcedure("MultiRoundMixReadsAndWrites", 10, 6);
+            client.callProcedure("MultiRoundMixReadsAndWrites", 10, 6);
             assertFalse("Failed to produce constraint violation", true);
         }
         catch (ProcCallException e) {
@@ -149,7 +149,7 @@ public class TestMPMultiRoundTripSuite extends RegressionSuite {
         final Client client = this.getClient();
         boolean caught = false;
         try {
-            ClientResponse resp = client.callProcedure("MultiRoundMixReplicatedReadsAndWrites", 10, 6);
+            client.callProcedure("MultiRoundMixReplicatedReadsAndWrites", 10, 6);
             assertFalse("Failed to produce constraint violation", true);
         }
         catch (ProcCallException e) {

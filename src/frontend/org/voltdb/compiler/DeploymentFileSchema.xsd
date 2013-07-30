@@ -234,6 +234,7 @@
       <xs:element name="configuration" type="ExportConfigurationType" minOccurs="0" maxOccurs="1"/>
     </xs:sequence>
     <xs:attribute name="exportto" type="ServerExportEnum" default="file"/>
+    <xs:attribute name="exportconnectorclass" type="xs:string" default=""/>
   </xs:complexType>
 
   <xs:complexType name="ExportConfigurationType">
@@ -262,6 +263,7 @@
     <xs:restriction base="xs:token">
       <xs:enumeration value="file"/>
       <xs:enumeration value="jdbc"/>
+      <xs:enumeration value="custom"/>
     </xs:restriction>
   </xs:simpleType>
 

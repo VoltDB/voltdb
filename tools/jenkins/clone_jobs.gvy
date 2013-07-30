@@ -78,15 +78,17 @@ for(item in alljobs)
 
     // option to remove cron triggers and trigger everthing from the kit build
     if (true) {
-        t = job.getTrigger(triggers.TimerTrigger.class)
-        //println t.getSpec() // crontab specification as string ie. "0 22 * * *"
-        // to create a new trigger use addTrigger(new Trigger("0 22 * * *"))
-        if (t != null)
-          job.removeTrigger(t.getDescriptor())
-        if (project != kit) {
-          // make a list of all jobs for a BuildTrigger for the kit build job
-          downstream = downstream + "," + project.getName() // make a list of downstream projects
-        }
+        try {
+            t = job.getTrigger(triggers.TimerTrigger)
+            //println t.getSpec() // crontab specification as string ie. "0 22 * * *"
+            // to create a new trigger use addTrigger(new Trigger("0 22 * * *"))
+            if (t != null)
+              job.removeTrigger(t.getDescriptor())
+            if (project != kit) {
+              // make a list of all jobs for a BuildTrigger for the kit build job
+              downstream = downstream + "," + project.getName() // make a list of downstream projects
+            }
+        catch(e) { println "no Timer Trigger found" }
     }
 
     // option to modify build timeout
