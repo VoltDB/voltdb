@@ -156,7 +156,7 @@ AbstractPlanNode::getInlinePlanNode(PlanNodeType type) const
     else
     {
         VOLT_TRACE("No internal PlanNode with type '%s' is available for '%s'",
-                   plannodeutil::getTypeName(type).c_str(),
+                   planNodeToString(type).c_str(),
                    this->debug().c_str());
     }
     return ret;

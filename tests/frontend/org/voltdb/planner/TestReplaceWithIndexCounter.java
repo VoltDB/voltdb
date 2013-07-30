@@ -29,6 +29,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.IndexCountPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.TableCountPlanNode;
 
 public class TestReplaceWithIndexCounter extends PlannerTestCase {
@@ -90,7 +91,13 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
 
     public void testCountStar05() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T1 WHERE POINTS < ? ORDER BY ID DESC");
-        checkIndexCounter(pn, true);
+        // Special case: un-comment it to replace the checking when we fix ticket
+        // ENG-4937 - As a developer, I want to ignore the "order by" clause on non-grouped aggregate queries.
+        //checkIndexCounter(pn, true);
+
+        AbstractPlanNode p = pn.get(0).getChild(0);
+        assertTrue(p instanceof ProjectionPlanNode);
+        assertTrue(p.getChild(0) instanceof IndexCountPlanNode);
     }
 
     public void testCountStar06() {
@@ -198,7 +205,12 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
     public void testCountStar23() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T1 WHERE POINTS < 4 ORDER BY POINTS DESC");
         AbstractPlanNode p = pn.get(0).getChild(0);
-        assertTrue(p instanceof IndexCountPlanNode);
+
+        assertTrue(p instanceof ProjectionPlanNode);
+        assertTrue(p.getChild(0) instanceof IndexCountPlanNode);
+        // Special case: un-comment it to replace the checking when we fix ticket
+        // ENG-4937 - As a developer, I want to ignore the "order by" clause on non-grouped aggregate queries.
+        //assertTrue(p instanceof IndexCountPlanNode);
     }
 
     /**
@@ -213,7 +225,7 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
         assertTrue(pn.size() > 0);
 
         for ( AbstractPlanNode nd : pn) {
-            System.out.println("PlanNode Explan string:\n" + nd.toExplainPlanString());
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
         }
         AbstractPlanNode p = pn.get(0).getChild(0);
         if (isReplaceable)

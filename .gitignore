@@ -23,6 +23,8 @@ groovyout/
 /examples/*/*.jar
 /.DS_Store
 debugoutput/
+statement-plans/
+catalog-report.html
 voltdbroot/
 log/
 voltipc.xcodeproj/

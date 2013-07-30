@@ -134,7 +134,8 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
     // determine which indices are updated by this executor
     // iterate through all target table indices and see if they contain
     //  tables mutated by this executor
-    BOOST_FOREACH(TableIndex *index, m_targetTable->allIndexes()) {
+    std::vector<TableIndex*> allIndexes = m_targetTable->allIndexes();
+    BOOST_FOREACH(TableIndex *index, allIndexes) {
         bool indexKeyUpdated = false;
         BOOST_FOREACH(int colIndex, index->getColumnIndices()) {
             std::pair<int, int> updateColInfo; // needs to be here because of macro failure

@@ -31,6 +31,7 @@
 
 package org.hsqldb_voltpatches;
 
+import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -103,6 +104,19 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_TO_TIMESTAMP_MILLISECOND  = 20011;
         static final int FUNC_VOLT_TO_TIMESTAMP_MICROSECOND  = 20012;
 
+        static final int FUNC_VOLT_TRUNCATE_TIMESTAMP     = 20013;
+        static final int FUNC_VOLT_TRUNCATE_YEAR          = 20014;
+        static final int FUNC_VOLT_TRUNCATE_QUARTER       = 20015;
+        static final int FUNC_VOLT_TRUNCATE_MONTH         = 20016;
+        static final int FUNC_VOLT_TRUNCATE_DAY           = 20017;
+        static final int FUNC_VOLT_TRUNCATE_HOUR          = 20018;
+        static final int FUNC_VOLT_TRUNCATE_MINUTE        = 20019;
+        static final int FUNC_VOLT_TRUNCATE_SECOND        = 20020;
+        static final int FUNC_VOLT_TRUNCATE_MILLISECOND   = 20021;
+        static final int FUNC_VOLT_TRUNCATE_MICROSECOND   = 20022;
+
+        static final int FUNC_VOLT_FROM_UNIXTIME          = 20023;
+
         private static final FunctionId[] instances = {
 
             new FunctionId("sql_error", null, FUNC_VOLT_SQL_ERROR, 0,
@@ -145,6 +159,18 @@ public class FunctionForVoltDB extends FunctionSQL {
                     Tokens.SECOND, Tokens.MILLIS, Tokens.MICROS,
                     Tokens.MILLISECOND, Tokens.MICROSECOND,
                     Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("truncate", Type.SQL_TIMESTAMP, FUNC_VOLT_TRUNCATE_TIMESTAMP, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_TIMESTAMP },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.X_KEYSET, 11,
+                    Tokens.YEAR, Tokens.QUARTER, Tokens.MONTH, Tokens.DAY, Tokens.HOUR,
+                    Tokens.MINUTE, Tokens.SECOND, Tokens.MILLIS, Tokens.MILLISECOND,
+                    Tokens.MICROS, Tokens.MICROSECOND,
+                    Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("from_unixtime", Type.SQL_TIMESTAMP, FUNC_VOLT_FROM_UNIXTIME, -1,
+                    new Type[] { Type.SQL_BIGINT },
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();
@@ -341,6 +367,19 @@ public class FunctionForVoltDB extends FunctionSQL {
                     continue;
                 }
                 else if (paramTypes[i].canConvertFrom(nodes[i].dataType)) {
+                    if (paramTypes[i].isDateTimeType() && nodes[i].dataType.isCharacterType()) {
+                        String datetimestring = (String) nodes[i].valueData;
+                        if (datetimestring != null) {
+                            datetimestring = datetimestring.trim();
+                            try {
+                                Timestamp.valueOf(datetimestring);
+                            }
+                            catch (Exception e) {
+                                throw Error.error(ErrorCode.X_42561);
+                            }
+                            nodes[i].dataType = paramTypes[i];
+                        }
+                    }
                     continue; // accept compatible argument types
                 }
                 throw Error.error(ErrorCode.X_42565); // incompatible data type

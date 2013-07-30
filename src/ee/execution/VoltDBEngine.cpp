@@ -167,6 +167,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
 {
     // Be explicit about running in the standard C locale for now.
     locale::global(locale("C"));
+    setenv("TZ", "UTC", 0); // set timezone as "UTC" in EE level
     m_clusterIndex = clusterIndex;
     m_siteId = siteId;
     m_partitionId = partitionId;

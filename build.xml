@@ -147,7 +147,7 @@ PRIMARY ENTRY POINTS
 -->
 
 <target name="default"
-    depends="compile, ee, voltdb.jar"
+    depends="compile, ee, voltdb.jar, voltdbclient.jar"
     description="Compile Java classes and C++ JNI library."
 />
 <target name="check"
@@ -895,7 +895,7 @@ JAVA COMPILATION
         <fileset dir="${src.hsqldb.dir}" includes="**/*.properties" />
         <fileset dir="${src.gpl.dir}" includes="**/*.properties"/>
         <fileset dir="${src.gpl.dir}" includes="**/*.xml" />
-        <fileset dir="${src.gpl.dir}" includes="**/admintemplate.html" />
+        <fileset dir="${src.gpl.dir}" includes="**/*template.html" />
     </copy>
 
     <copy todir='${build.prod.dir}/org/hsqldb_voltpatches/resources'>

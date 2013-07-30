@@ -20,6 +20,7 @@ package org.voltdb;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -33,12 +34,14 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -46,8 +49,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
-import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashSet;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -141,7 +142,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * in order to avoid ensure that nothing misses the end of backpressure notification
      */
     private final ReentrantLock m_backpressureLock = new ReentrantLock();
-    private final NonBlockingHashSet<Connection> m_connections = new NonBlockingHashSet<Connection>();
+    private final ConcurrentHashMap<Connection, Object> m_connections =
+            new ConcurrentHashMap<Connection, Object>(10240, .75f, 128);
     private final SnapshotDaemon m_snapshotDaemon = new SnapshotDaemon();
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
 
@@ -163,8 +165,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * serviced by the associated network thread. They are paired so as to only do a single
      * lookup.
      */
-    private final NonBlockingHashMap<Long, ClientInterfaceHandleManager> m_cihm =
-            new NonBlockingHashMap<Long, ClientInterfaceHandleManager>();
+    private final ConcurrentHashMap<Long, ClientInterfaceHandleManager> m_cihm =
+            new ConcurrentHashMap<Long, ClientInterfaceHandleManager>(10240, .75f, 128);
     private final Cartographer m_cartographer;
 
     /**
@@ -239,7 +241,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
 
                     m_hasGlobalClientBackPressure = true;
-                    for (Connection c : m_connections) {
+                    for (Connection c : m_connections.keySet()) {
                         c.disableReadSelection();
                     }
                 } else {
@@ -248,7 +250,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
 
                     if (m_hasGlobalClientBackPressure && !m_hasDTXNBackPressure) {
-                        for (Connection c : m_connections) {
+                        for (Connection c : m_connections.keySet()) {
                             if (!c.writeStream().hadBackPressure()) {
                                 /*
                                  * Also synchronize on the individual connection
@@ -308,6 +310,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private volatile boolean m_running = true;
         private Thread m_thread = null;
         private final boolean m_isAdmin;
+        private final InetAddress m_interface;
 
         /**
          * Used a cached thread pool to accept new connections.
@@ -315,8 +318,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private final ExecutorService m_executor = CoreUtils.getBoundedThreadPoolExecutor(128, 10L, TimeUnit.SECONDS,
                         CoreUtils.getThreadFactory("Client authentication threads", "Client authenticator"));
 
-        ClientAcceptor(int port, VoltNetworkPool network, boolean isAdmin)
+        ClientAcceptor(InetAddress intf, int port, VoltNetworkPool network, boolean isAdmin)
         {
+            m_interface = intf;
             m_network = network;
             m_port = port;
             m_isAdmin = isAdmin;
@@ -343,7 +347,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
             if (!m_serverSocket.socket().isBound()) {
                 try {
-                    m_serverSocket.socket().bind(new InetSocketAddress(m_port));
+                    if (m_interface != null) {
+                        m_serverSocket.socket().bind(new InetSocketAddress(m_interface, m_port));
+                    } else {
+                        m_serverSocket.socket().bind(new InetSocketAddress(m_port));
+                    }
                 }
                 catch (IOException e) {
                     hostLog.fatal("Client interface failed to bind to port " + m_port);
@@ -421,13 +429,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                      */
                     m_numConnections.incrementAndGet();
 
-                    m_executor.execute(new Runnable() {
+                    final Runnable authRunnable = new Runnable() {
                         @Override
                         public void run() {
                             if (socket != null) {
                                 boolean success = false;
+                                //Populated on timeout
+                                AtomicReference<String> timeoutRef = new AtomicReference<String>();
                                 try {
-                                    final InputHandler handler = authenticate(socket);
+                                    final InputHandler handler = authenticate(socket, timeoutRef);
                                     if (handler != null) {
                                         socket.configureBlocking(false);
                                         if (handler instanceof ClientInputHandler) {
@@ -447,7 +457,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                     if (!m_hasDTXNBackPressure) {
                                                         c.enableReadSelection();
                                                     }
-                                                    m_connections.add(c);
+                                                    m_connections.put(c, "");
                                                 } finally {
                                                     m_backpressureLock.unlock();
                                                 }
@@ -464,7 +474,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                         //Don't care connection is already lost anyways
                                     }
                                     if (m_running) {
-                                        hostLog.warn("Exception authenticating and registering user in ClientAcceptor", e);
+                                        if (timeoutRef.get() != null) {
+                                            hostLog.warn(timeoutRef.get());
+                                        } else {
+                                            hostLog.warn("Exception authenticating and " +
+                                                         "registering user in ClientAcceptor", e);
+                                        }
                                     }
                                 } finally {
                                     if (!success) {
@@ -473,9 +488,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                 }
                             }
                         }
-                    });
+                    };
+                    while (true) {
+                        try {
+                            m_executor.execute(authRunnable);
+                            break;
+                        } catch (RejectedExecutionException e) {
+                            Thread.sleep(1);
+                        }
+                    }
                 } while (m_running);
-            }  catch (IOException e) {
+            }  catch (Exception e) {
                 if (m_running) {
                     hostLog.fatal("Exception in ClientAcceptor. The acceptor has died", e);
                 }
@@ -501,11 +524,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         /**
          * Attempt to authenticate the user associated with this socket connection
          * @param socket
+         * @param timeoutRef Populated with error on timeout
          * @return AuthUser a set of user permissions or null if authentication fails
          * @throws IOException
          */
         private InputHandler
-        authenticate(final SocketChannel socket) throws IOException
+        authenticate(final SocketChannel socket, final AtomicReference<String> timeoutRef) throws IOException
         {
             ByteBuffer responseBuffer = ByteBuffer.allocate(6);
             byte version = (byte)0;
@@ -524,16 +548,25 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              * Schedule a timeout to close the socket in case there is no response for the timeout
              * period. This will wake up the current thread that is blocked on reading the login message
              */
-            ScheduledFuture<?> timeoutFuture = VoltDB.instance().schedulePriorityWork(new Runnable() {
-                                                    @Override
-                                                    public void run() {
-                                                        try {
-                                                            socket.close();
-                                                        } catch (IOException e) {
-                                                            //Don't care
-                                                        }
-                                                    }
-                                                }, 1600, 0, TimeUnit.MILLISECONDS);
+            final long start = System.currentTimeMillis();
+            ScheduledFuture<?> timeoutFuture =
+                    VoltDB.instance().schedulePriorityWork(new Runnable() {
+                        @Override
+                        public void run() {
+                            long delta = System.currentTimeMillis() - start;
+                            double seconds = delta / 1000.0;
+                            StringBuilder sb = new StringBuilder();
+                            sb.append("Timed out authenticating client from ");
+                            sb.append(socket.socket().getRemoteSocketAddress().toString());
+                            sb.append(String.format(" after %.2f seconds (timeout target is 1.6 seconds)", seconds));
+                            timeoutRef.set(sb.toString());
+                            try {
+                                socket.close();
+                            } catch (IOException e) {
+                                //Don't care
+                            }
+                        }
+                    }, 1600, 0, TimeUnit.MILLISECONDS);
 
             try {
                 while (lengthBuffer.hasRemaining()) {
@@ -782,7 +815,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 if (!m_acg.get().hasBackPressure()) {
                     c.enableReadSelection();
                 }
-                m_connections.add(c);
+                m_connections.put(c, "");
             }
         }
 
@@ -1022,7 +1055,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_backpressureLock.lock();
         try {
             m_hasDTXNBackPressure = true;
-            for (final Connection c : m_connections) {
+            for (final Connection c : m_connections.keySet()) {
                 c.disableReadSelection();
             }
         } finally {
@@ -1042,7 +1075,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (m_hasGlobalClientBackPressure) {
                 return;
             }
-            for (final Connection c : m_connections) {
+            for (final Connection c : m_connections.keySet()) {
                 if (!c.writeStream().hadBackPressure()) {
                     /*
                      * Also synchronize on the individual connection
@@ -1176,6 +1209,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             ReplicationRole replicationRole,
             Cartographer cartographer,
             int partitionCount,
+            InetAddress intf,
             int port,
             int adminPort,
             long timestampTestingSalt) throws Exception {
@@ -1193,12 +1227,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * Construct the runnables so they have access to the list of connections
          */
         final ClientInterface ci = new ClientInterface(
-           port, adminPort, context, messenger, replicationRole, cartographer, allPartitions);
+           intf, port, adminPort, context, messenger, replicationRole, cartographer, allPartitions);
 
         return ci;
     }
 
-    ClientInterface(int port, int adminPort, CatalogContext context, HostMessenger messenger,
+    ClientInterface(InetAddress intf, int port, int adminPort, CatalogContext context, HostMessenger messenger,
                     ReplicationRole replicationRole,
                     Cartographer cartographer, int[] allPartitions) throws Exception
     {
@@ -1207,9 +1241,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         // pre-allocate single partition array
         m_allPartitions = allPartitions;
-        m_acceptor = new ClientAcceptor(port, messenger.getNetwork(), false);
+        m_acceptor = new ClientAcceptor(intf, port, messenger.getNetwork(), false);
         m_adminAcceptor = null;
-        m_adminAcceptor = new ClientAcceptor(adminPort, messenger.getNetwork(), true);
+        m_adminAcceptor = new ClientAcceptor(intf, adminPort, messenger.getNetwork(), true);
         registerPolicies(replicationRole);
 
         m_mailbox = new LocalMailbox(messenger,  messenger.getHSIdForLocalSite(HostMessenger.CLIENT_INTERFACE_SITE_ID)) {
@@ -1269,7 +1303,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             JSONObject jsObj = new JSONObject(new String(message.m_payload, "UTF-8"));
             final int partitionId = jsObj.getInt(Cartographer.JSON_PARTITION_ID);
             final long initiatorHSId = jsObj.getLong(Cartographer.JSON_INITIATOR_HSID);
-            for (final Connection c : m_connections) {
+            for (final Connection c : m_connections.keySet()) {
                 c.queueTask(new Runnable() {
                     @Override
                     public void run() {
@@ -2302,7 +2336,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     private final void checkForDeadConnections(final long now) {
         final ArrayList<Connection> connectionsToRemove = new ArrayList<Connection>();
-        for (final Connection c : m_connections) {
+        for (final Connection c : m_connections.keySet()) {
             final int delta = c.writeStream().calculatePendingWriteDelta(now);
             if (delta > 4000) {
                 connectionsToRemove.add(c);

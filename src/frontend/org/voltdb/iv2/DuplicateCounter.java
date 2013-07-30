@@ -21,10 +21,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
-
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -47,20 +45,30 @@ public class DuplicateCounter
     protected VoltMessage m_lastResponse = null;
     final List<Long> m_expectedHSIds;
     final long m_txnId;
+    private final String m_storedProcName;
 
     DuplicateCounter(
             long destinationHSId,
             long realTxnId,
-            List<Long> expectedHSIds)
-    {
+            List<Long> expectedHSIds, String procName)    {
         m_destinationId = destinationHSId;
         m_txnId = realTxnId;
         m_expectedHSIds = new ArrayList<Long>(expectedHSIds);
+        m_storedProcName = procName;
     }
 
     long getTxnId()
     {
         return m_txnId;
+    }
+
+    /**
+     * Return stored procedure name for the transaction.
+     *
+     * @return
+     */
+    public String getStoredProcedureName() {
+        return m_storedProcName;
     }
 
     int updateReplicas(List<Long> replicas) {
@@ -81,9 +89,12 @@ public class DuplicateCounter
                 m_responseHash = Long.valueOf(hash);
             }
             else if (!m_responseHash.equals(hash)) {
-                String msg = String.format("HASH MISMATCH COMPARING: %d to %d\n" +
-                        "PREV MESSAGE: %s\n" +
-                        "CURR MESSAGE: %s\n",
+                tmLog.fatal("Stored procedure " + getStoredProcedureName()
+                        + " generated different SQL queries at different partitions."
+                        + " Shutting down to preserve data integrity.");
+                String msg = String.format("HASH MISMATCH COMPARING: %d to %d\n"
+                        + "PREV MESSAGE: %s\n"
+                        + "CURR MESSAGE: %s\n",
                         hash, m_responseHash,
                         m_lastResponse.toString(), message.toString());
                 tmLog.error(msg);
