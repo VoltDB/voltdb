@@ -66,6 +66,13 @@ namespace voltdb
                     TempTableLimits* limits);
         bool p_execute(const NValueArray& params);
         bool needsOutputTableClear();
+        void setStatsForLongOp(Table* targetTable) {
+        	if(m_engine->isLongOp()) {
+        		m_engine->setPlanNodeName(planNodeToString(m_abstractNode->getPlanNodeType()));
+        		m_engine->setTargetTable(targetTable);
+        		m_engine->setIndex(NULL);
+        	}
+        };
     };
 }
 

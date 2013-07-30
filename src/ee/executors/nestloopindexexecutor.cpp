@@ -222,7 +222,6 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
 
     inner_table = dynamic_cast<PersistentTable*>(inline_node->getTargetTable());
     assert(inner_table);
-    m_engine->setTargetTable(inner_table);
 
     assert(node->getInputTables().size() == 1);
     outer_table = node->getInputTables()[0];
@@ -309,7 +308,6 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     VOLT_TRACE("executing NestLoopIndex with outer table: %s, inner table: %s",
                outer_table->debug().c_str(), inner_table->debug().c_str());
 
-    m_engine->setIndex(index);
     //
     // Substitute parameter to SEARCH KEY Note that the expressions
     // will include TupleValueExpression even after this substitution
@@ -372,6 +370,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
 
     VOLT_TRACE("<num_of_outer_cols>: %d\n", num_of_outer_cols);
     while (outer_iterator.next(outer_tuple, m_engine)) {
+    	setStatsForLongOp(inner_table, index);
         VOLT_TRACE("outer_tuple:%s",
                    outer_tuple.debug(outer_table->name()).c_str());
         // Set the outer tuple columns. Must be outside the inner loop

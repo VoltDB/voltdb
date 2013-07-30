@@ -193,17 +193,19 @@ inline bool TableIterator::next(TableTuple &out) {
 }
 
 inline bool TableIterator::next(TableTuple &out, VoltDBEngine* engine) {
-	if(m_foundTuples > 10000000-3) {
+	const int threshold = 1000;
+	if(m_foundTuples > threshold-3 && !engine->isLongOp()) {
 		engine->setLongOp(true);
 	}
-	if(m_foundTuples > 10000000 && m_foundTuples % 10000000 == 0) {
+	if(m_foundTuples > threshold-1 && m_foundTuples % threshold == 0) {
+		std::cout<<"In UpdateStats";
 		//Update stats in java and let java determine if we should cancel this query.
 		if(engine->getTopend()->updateStats(engine->getBatchIndex(),
 				engine->getPlanNodeName(),
-				engine->getTargetTable()->name(),
-				engine->getTargetTable()->activeTupleCount(),
+				engine->getTargetTable() ? engine->getTargetTable()->name() : "None",
+				engine->getTargetTable() ? engine->getTargetTable()->activeTupleCount() : 0,
 				m_foundTuples,
-				engine->getIndex()->getName())){
+				engine->getIndex() ? engine->getIndex()->getName() : "None")){
 			VOLT_ERROR("Time out read only query.");
 			throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "Time out read only query.");
 		}

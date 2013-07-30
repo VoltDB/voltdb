@@ -571,6 +571,7 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
     PoolBackedTupleStorage nextGroupByKeyStorage(m_groupByKeySchema, &m_memoryPool);
     TableTuple& nextGroupByKeyTuple = nextGroupByKeyStorage;
     while (it.next(nxtTuple, m_engine)) {
+    	setStatsForLongOp();
         initGroupByKeyTuple(nextGroupByKeyStorage, nxtTuple);
         AggregateRow *aggregateRow;
         // Search for the matching group.
@@ -631,7 +632,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     // Use the first input tuple to "prime" the system.
     // ENG-1565: for this special case, can have only one input row, apply the predicate here
     if (it.next(nxtTuple, m_engine) && (m_predicate == NULL || m_predicate->eval(&nxtTuple, NULL).isTrue())) {
-        initGroupByKeyTuple(nextGroupByKeyStorage, nxtTuple);
+    	initGroupByKeyTuple(nextGroupByKeyStorage, nxtTuple);
         // Start the aggregation calculation.
         initAggInstances(aggregateRow);
         aggregateRow->m_passThroughTuple = nxtTuple;
@@ -652,6 +653,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
 
     TableTuple inProgressGroupByKeyTuple(m_groupByKeySchema);
     while (it.next(nxtTuple, m_engine)) {
+    	setStatsForLongOp();
         // The nextGroupByKeyTuple now stores the key(s) of the current group in progress.
         // Swap its storage with that of the inProgressGroupByKeyTuple.
         // The inProgressGroupByKeyTuple will be null initially, until the first call to initGroupByKeyTuple below
