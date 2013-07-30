@@ -344,7 +344,7 @@ public class LocalCluster implements VoltServerConfig {
         cmdln.internalPort(portGenerator.next());
         cmdln.port(portGenerator.nextClient());
         cmdln.adminPort(portGenerator.nextAdmin());
-        cmdln.zkport(portGenerator.next());
+        cmdln.zkport(portGenerator.nextZkPort());
         // replication port and its two automatic followers.
         cmdln.drAgentStartPort(portGenerator.next());
         portGenerator.next();
@@ -594,7 +594,7 @@ public class LocalCluster implements VoltServerConfig {
                 cmdln.debugPort(portGenerator.next());
             }
 
-            cmdln.zkport(portGenerator.next());
+            cmdln.zkport(portGenerator.nextZkPort());
 
             if (startAction == StartAction.JOIN) {
                 cmdln.startCommand(startAction);

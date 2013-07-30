@@ -43,6 +43,18 @@ public class NCProcess {
         }
     }
 
+    public NCProcess(int port, boolean loopback) {
+        try {
+            m4_process = new ProcessBuilder("nc", "-l", "-4", "127.0.0.1", String.valueOf(port)).start();
+            m6_process = new ProcessBuilder("nc", "-l", "-6", "127.0.0.1", String.valueOf(port)).start();
+            Thread.sleep(2000);
+        } catch (IOException ex) {
+            Logger.getLogger(NCProcess.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (InterruptedException ex) {
+            Logger.getLogger(NCProcess.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
     public int close() {
         int eval = 2;
         if (m4_process != null) {

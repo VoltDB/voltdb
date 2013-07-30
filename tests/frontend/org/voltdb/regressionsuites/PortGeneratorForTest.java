@@ -30,8 +30,17 @@ public class PortGeneratorForTest extends PortGenerator {
 
     class PortProvider {
 
-        public int nClient;
-        public int nAdmin;
+        public int nClient = -1;
+        public int nAdmin = -1;
+        public int nZkport = -1;
+
+        public int nextZkPort() {
+            return nZkport;
+        }
+
+        public void setZkPort(int nc) {
+            nZkport = nc;
+        }
 
         public int nextClient() {
             return nClient;
@@ -57,7 +66,10 @@ public class PortGeneratorForTest extends PortGenerator {
     @Override
     public int nextClient() {
         if (pprovider != null) {
-            return pprovider.nextClient();
+            int rport = pprovider.nextClient();
+            if (rport != -1) {
+                return rport;
+            }
         }
         return super.nextClient();
     }
@@ -65,8 +77,21 @@ public class PortGeneratorForTest extends PortGenerator {
     @Override
     public int nextAdmin() {
         if (pprovider != null) {
-            return pprovider.nextAdmin();
+            int rport = pprovider.nextAdmin();
+            if (rport != -1) {
+                return rport;
+            }
         }
         return super.nextAdmin();
+    }
+
+    public int nextZkPort() {
+        if (pprovider != null) {
+            int rport = pprovider.nextZkPort();
+            if (rport != -1) {
+                return rport;
+            }
+        }
+        return super.next();
     }
 }
