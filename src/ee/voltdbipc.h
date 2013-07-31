@@ -65,6 +65,10 @@ public:
      */
     char *retrieveDependency(int32_t dependencyId, size_t *dependencySz);
 
+    bool updateStats(int32_t batchIndex, std::string planNodeName,
+            std::string targetTableName, int64_t targetTableSize, int64_t tuplesFound,
+            std::string indexName);
+
     /**
      * Retrieve a plan from Java via the IPC connection for a fragment id.
      * Plan is JSON. Returns the empty string on failure, but failure is
