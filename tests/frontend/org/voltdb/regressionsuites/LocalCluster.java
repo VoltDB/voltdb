@@ -26,6 +26,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
@@ -56,6 +57,20 @@ public class LocalCluster implements VoltServerConfig {
      */
     public void setExpectedToCrash(boolean expectedToCrash) {
         this.expectedToCrash = expectedToCrash;
+    }
+
+    /**
+     * @return the additionalProcessEnv
+     */
+    public Map<String, String> getAdditionalProcessEnv() {
+        return additionalProcessEnv;
+    }
+
+    /**
+     * @param additionalProcessEnv the additionalProcessEnv to set
+     */
+    public void setAdditionalProcessEnv(Map<String, String> additionalProcessEnv) {
+        this.additionalProcessEnv = additionalProcessEnv;
     }
 
     public enum FailureState {
@@ -116,7 +131,9 @@ public class LocalCluster implements VoltServerConfig {
     ServerThread m_localServer = null;
     ProcessBuilder m_procBuilder;
     private final ArrayList<ArrayList<EEProcess>> m_eeProcs = new ArrayList<ArrayList<EEProcess>>();
-
+    //This is additional process invironment variables that can be passed.
+    // This is used to pass JMX port. Any additional use cases can use this too.
+    private Map<String, String> additionalProcessEnv = null;
     // Produce a (presumably) available IP port number.
     public final PortGeneratorForTest portGenerator = new PortGeneratorForTest();
 
@@ -222,6 +239,12 @@ public class LocalCluster implements VoltServerConfig {
 
         m_enableIv2 = enableIv2 || VoltDB.checkTestEnvForIv2();
         m_procBuilder = new ProcessBuilder();
+        if (additionalProcessEnv != null) {
+            Map<String, String> env = m_procBuilder.environment();
+            for (String name : additionalProcessEnv.keySet()) {
+                env.put(name, additionalProcessEnv.get(name));
+            }
+        }
 
         // set the working directory to obj/release/prod
         //m_procBuilder.directory(new File(m_buildDir + File.separator + "prod"));
