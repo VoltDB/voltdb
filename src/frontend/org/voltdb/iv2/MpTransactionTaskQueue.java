@@ -48,20 +48,8 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         Iv2Trace.logTransactionTaskQueueOffer(task);
         boolean retval = false;
         if (!m_backlog.isEmpty()) {
-            /*
-             * This branch happens during regular execution when a multi-part is in progress.
-             * The first task for the multi-part is the head of the queue, and all the single parts
-             * are being queued behind it. The txnid check catches tasks that are part of the multi-part
-             * and immediately queues them for execution.
-             */
-            if (task.getTxnId() != m_backlog.getFirst().getTxnId())
-            {
-                m_backlog.addLast(task);
-                retval = true;
-            }
-            else {
-                taskQueueOffer(task);
-            }
+            m_backlog.addLast(task);
+            retval = true;
         }
         else {
             /*
