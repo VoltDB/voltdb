@@ -81,7 +81,6 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
 
         config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project0);
-
         assertFalse(success);
         captured = capturer.toString("UTF-8");
         lines = captured.split("\n");
@@ -115,7 +114,6 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
 
         config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project1);
-
         assertFalse(success);
         captured = capturer.toString("UTF-8");
         lines = captured.split("\n");
@@ -147,7 +145,6 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         }
         config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project2);
-
         assertFalse(success);
         captured = capturer.toString("UTF-8");
         lines = captured.split("\n");
