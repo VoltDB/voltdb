@@ -46,7 +46,6 @@ public class TestPlansJoin extends PlannerTestCase {
         AbstractPlanNode pn = compile("select * FROM R1 JOIN R2 ON R1.C = R2.C");
         AbstractPlanNode n = pn.getChild(0).getChild(0);
         assertTrue(n instanceof NestLoopPlanNode);
-        NestLoopPlanNode nlj = (NestLoopPlanNode) n;
         //assertEquals(JoinType.INNER, nlj.getJoinType());
         for (int ii = 0; ii < 2; ii++) {
             assertTrue(n.getChild(ii) instanceof SeqScanPlanNode);
@@ -387,7 +386,6 @@ public class TestPlansJoin extends PlannerTestCase {
         assertTrue(n instanceof NestLoopPlanNode);
         p = ((NestLoopPlanNode) n).getJoinPredicate();
         assertEquals(ExpressionType.COMPARE_EQUAL, p.getExpressionType());
-        ExpressionType t = p.getLeft().getExpressionType();
         assertEquals(ExpressionType.VALUE_TUPLE, p.getLeft().getExpressionType());
         assertEquals(ExpressionType.VALUE_TUPLE, p.getRight().getExpressionType());
         seqScan = n.getChild(1);

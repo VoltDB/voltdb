@@ -19,6 +19,7 @@ package org.voltdb.planner;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
@@ -37,9 +38,9 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         EXCEPT
     };
     /** Hash Set to enforce table uniqueness across all the sub-selects */
-    public HashSet<String> m_uniqueTables = new HashSet<String>();
-    public ArrayList<AbstractParsedStmt> m_children = new ArrayList<AbstractParsedStmt>();
-    public UnionType m_unionType = UnionType.NOUNION;
+    private HashSet<String> m_uniqueTables = new HashSet<String>();
+    ArrayList<AbstractParsedStmt> m_children = new ArrayList<AbstractParsedStmt>();
+    UnionType m_unionType = UnionType.NOUNION;
 
     /**
     * Class constructor
@@ -69,6 +70,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
      * @param root
      * @param db
      */
+    @Override
     void parseTablesAndParams(VoltXMLElement stmtNode) {
 
         assert(stmtNode.children.size() > 1);
@@ -120,6 +122,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
      * @param db
      * @param joinOrder
      */
+    @Override
     void postParse(String sql, String joinOrder) {
         /** Collection of COMPARE_EQ filter expressions across all the the sub-selects */
         ArrayList<AbstractExpression> equivalenceFilters = new ArrayList<AbstractExpression>();
