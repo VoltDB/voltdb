@@ -535,14 +535,17 @@ public class PlanAssembler {
             return false;
         }
 
-        // Right now it rule out the comple Aggregation cases
+        // Assuming the restrictions: Order by columns are (1) columns from table
+        // (2) tag from display columns (3) actual expressions from display columns
+        // Currently, we do not allow order by complex expressions that are not in display columns
 
-        // TODO(XIN): Maybe we can remove this projection node for more cases
-        // Need to figure it out
-        // We may not need its type comparison with orderby as well.
-        if (m_parsedSelect.hasComplexGroupby() && root.getPlanNodeType() == PlanNodeType.ORDERBY) {
+        // If there is a complexGroupby at his point, it means that Display columns contain all the order by columns.
+        // In that way, this plan does not require another projection node on top of sort node.
+        if (m_parsedSelect.hasComplexGroupby()) {
             return false;
         }
+        // TODO(XIN): Maybe we can remove this projection node for more cases
+        // as optimization in the future.
 
         return true;
     }
@@ -1277,13 +1280,13 @@ public class PlanAssembler {
                      * add them to the aggregate's output.
                      */
                     schema_col = new SchemaColumn(col.tableName, col.columnName, col.alias, col.expression);
-                    if (col.groupBy && col.tableName.equals("VOLT_TEMP_TABLE")) {
-                        top_schema_col = new SchemaColumn(col.tableName, col.columnName, col.alias,
-                                m_parsedSelect.topGroupByExpressions.get(col.alias));
+                    AbstractExpression topExpr = null;
+                    if (col.groupBy) {
+                        topExpr = m_parsedSelect.groupByExpressions.get(col.alias);
                     } else {
-                        top_schema_col = new SchemaColumn(col.tableName, col.columnName, col.alias, col.expression);
+                        topExpr = col.expression;
                     }
-
+                    top_schema_col = new SchemaColumn(col.tableName, col.columnName, col.alias, topExpr);
                 }
 
                 agg_schema.addColumn(schema_col);
@@ -1301,11 +1304,7 @@ public class PlanAssembler {
                 aggNode.addGroupByExpression(col.expression);
 
                 if (topAggNode != null) {
-                    if (m_parsedSelect.hasComplexGroupby()) {
-                        topAggNode.addGroupByExpression(m_parsedSelect.topGroupByExpressions.get(col.alias));
-                    } else {
-                        topAggNode.addGroupByExpression(col.expression);
-                    }
+                    topAggNode.addGroupByExpression(m_parsedSelect.groupByExpressions.get(col.alias));
                 }
             }
             aggNode.setOutputSchema(agg_schema);
