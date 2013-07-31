@@ -1567,6 +1567,19 @@ public class DDLCompiler {
             throw m_compiler.new VoltCompilerException(msg);
         }
 
+        if (stmt.hasComplexGroupby()) {
+            msg += "contains an expression involving a group by. " +
+                    "Expressions with group by are not currently supported in views.";
+            throw m_compiler.new VoltCompilerException(msg);
+        }
+
+        if (stmt.hasComplexAgg()) {
+            msg += "contains an expression involving an aggregate function. " +
+                    "Expressions with aggregate functions are not currently supported in views.";
+            throw m_compiler.new VoltCompilerException(msg);
+        }
+
+
         int i;
         for (i = 0; i < groupColCount; i++) {
             ParsedSelectStmt.ParsedColInfo gbcol = stmt.groupByColumns.get(i);
