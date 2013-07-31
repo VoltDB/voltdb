@@ -842,14 +842,6 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(result.advanceRow());
         assertEquals(result.getTimestampAsLong(0), result.getTimestampAsLong(1));
 
-        // Test non-constant-value expression
-        cr = client.callProcedure("@AdHoc", "select TM, TM, TO_TIMESTAMP(MICROS, SINCE_EPOCH (MICROS, '2013-07-' || SUBSTRING('18', 0 , 2) || ' 02:00:00.123457') )  from P2 where id = 5;");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(result.getTimestampAsLong(0), result.getTimestampAsLong(1));
-
         // Test user error input, Only accept JDBC's timestamp format: YYYY-MM-DD-SS.sss.
         try {
             cr = client.callProcedure("@AdHoc", "select SINCE_EPOCH (MICROS, 'I am a timestamp')  from P2 where id = 5");
