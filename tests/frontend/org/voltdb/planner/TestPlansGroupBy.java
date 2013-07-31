@@ -175,6 +175,13 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         // Check it can compile
         pns = compileToFragments("SELECT ABS(A1), sum(B1) FROM P1 GROUP BY ABS(A1)");
+        AbstractPlanNode p = pns.get(0).getChild(0);
+        //
+        assertTrue(p instanceof AggregatePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
 
     }
 
