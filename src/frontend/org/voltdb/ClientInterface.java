@@ -45,6 +45,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -426,13 +427,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                      */
                     m_numConnections.incrementAndGet();
 
-                    m_executor.execute(new Runnable() {
+                    final Runnable authRunnable = new Runnable() {
                         @Override
                         public void run() {
                             if (socket != null) {
                                 boolean success = false;
+                                //Populated on timeout
+                                AtomicReference<String> timeoutRef = new AtomicReference<String>();
                                 try {
-                                    final InputHandler handler = authenticate(socket);
+                                    final InputHandler handler = authenticate(socket, timeoutRef);
                                     if (handler != null) {
                                         socket.configureBlocking(false);
                                         if (handler instanceof ClientInputHandler) {
@@ -469,7 +472,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                         //Don't care connection is already lost anyways
                                     }
                                     if (m_running) {
-                                        hostLog.warn("Exception authenticating and registering user in ClientAcceptor", e);
+                                        if (timeoutRef.get() != null) {
+                                            hostLog.warn(timeoutRef.get());
+                                        } else {
+                                            hostLog.warn("Exception authenticating and " +
+                                                         "registering user in ClientAcceptor", e);
+                                        }
                                     }
                                 } finally {
                                     if (!success) {
@@ -478,9 +486,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                 }
                             }
                         }
-                    });
+                    };
+                    while (true) {
+                        try {
+                            m_executor.execute(authRunnable);
+                            break;
+                        } catch (RejectedExecutionException e) {
+                            Thread.sleep(1);
+                        }
+                    }
                 } while (m_running);
-            }  catch (IOException e) {
+            }  catch (Exception e) {
                 if (m_running) {
                     hostLog.fatal("Exception in ClientAcceptor. The acceptor has died", e);
                 }
@@ -506,11 +522,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         /**
          * Attempt to authenticate the user associated with this socket connection
          * @param socket
+         * @param timeoutRef Populated with error on timeout
          * @return AuthUser a set of user permissions or null if authentication fails
          * @throws IOException
          */
         private InputHandler
-        authenticate(final SocketChannel socket) throws IOException
+        authenticate(final SocketChannel socket, final AtomicReference<String> timeoutRef) throws IOException
         {
             ByteBuffer responseBuffer = ByteBuffer.allocate(6);
             byte version = (byte)0;
@@ -529,16 +546,25 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              * Schedule a timeout to close the socket in case there is no response for the timeout
              * period. This will wake up the current thread that is blocked on reading the login message
              */
-            ScheduledFuture<?> timeoutFuture = VoltDB.instance().schedulePriorityWork(new Runnable() {
-                                                    @Override
-                                                    public void run() {
-                                                        try {
-                                                            socket.close();
-                                                        } catch (IOException e) {
-                                                            //Don't care
-                                                        }
-                                                    }
-                                                }, 1600, 0, TimeUnit.MILLISECONDS);
+            final long start = System.currentTimeMillis();
+            ScheduledFuture<?> timeoutFuture =
+                    VoltDB.instance().schedulePriorityWork(new Runnable() {
+                        @Override
+                        public void run() {
+                            long delta = System.currentTimeMillis() - start;
+                            double seconds = delta / 1000.0;
+                            StringBuilder sb = new StringBuilder();
+                            sb.append("Timed out authenticating client from ");
+                            sb.append(socket.socket().getRemoteSocketAddress().toString());
+                            sb.append(String.format(" after %.2f seconds (timeout target is 1.6 seconds)", seconds));
+                            timeoutRef.set(sb.toString());
+                            try {
+                                socket.close();
+                            } catch (IOException e) {
+                                //Don't care
+                            }
+                        }
+                    }, 1600, 0, TimeUnit.MILLISECONDS);
 
             try {
                 while (lengthBuffer.hasRemaining()) {

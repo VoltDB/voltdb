@@ -1534,6 +1534,17 @@ public class Expression {
     }
 
     /**
+     * DONE(Xin): add a new function to do operator overloading
+     * @param session
+     * @return
+     * @throws HSQLParseException
+     */
+    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
+    {
+        return voltGetXML(session, null, null, -1);
+    }
+
+    /**
      * VoltDB added method to get a non-catalog-dependent
      * representation of this HSQLDB object.
      * @param session The current Session object may be needed to resolve
@@ -1541,7 +1552,7 @@ public class Expression {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
+    VoltXMLElement voltGetXML(Session session, List<Expression> displayCols, java.util.Set<Integer> ignoredDisplayColIndexes, int startKey) throws HSQLParseException
     {
         // The voltXML representations of expressions tends to be driven much more by the expression's opType
         // than its Expression class.
@@ -1557,9 +1568,22 @@ public class Expression {
         // The prototypes dictionary is set up to handle a SIMPLE_COLUMN of any class EXCEPT ExpressionColumn.
         // A SIMPLE_COLUMN ExpressionColumn can be treated as a normal "COLUMN" ExpressionColumn.
         // That case gets explicitly enabled here by fudging the opType from SIMPLE_COLUMN to COLUMN.
-        if ((exprOp == OpTypes.SIMPLE_COLUMN) && (this instanceof ExpressionColumn)) {
-            // Completely override the OpType value to handle it as a normal COLUMN.
-            exprOp = OpTypes.COLUMN;
+        if (exprOp == OpTypes.SIMPLE_COLUMN) {
+            // find the substitue from displayCols list
+            for (int ii=startKey+1; ii < displayCols.size(); ++ii)
+            {
+                Expression otherCol = displayCols.get(ii);
+                if (otherCol != null && (otherCol.opType != OpTypes.SIMPLE_COLUMN) &&
+                         (otherCol.columnIndex == this.columnIndex))
+                {
+                    ignoredDisplayColIndexes.add(ii);
+                    // serialize the column this simple column stands-in for.
+                    // Prepare to skip displayCols that are the referent of a SIMPLE_COLUMN."
+                    // quit seeking simple_column's replacement.
+                    return otherCol.voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey);
+                }
+            }
+            assert(false);
         }
 
         // Use the opType to find a pre-initialized prototype VoltXMLElement with the correct
@@ -1581,7 +1605,7 @@ public class Expression {
 
         for (Expression expr : nodes) {
             if (expr != null) {
-                VoltXMLElement vxmle = expr.voltGetXML(session);
+                VoltXMLElement vxmle = expr.voltGetXML(session, displayCols, ignoredDisplayColIndexes, startKey);
                 exp.children.add(vxmle);
                 assert(vxmle != null);
             }
@@ -1680,7 +1704,6 @@ public class Expression {
         default:
             return exp;
         }
-
     }
 
     private static final int caseDiff = ('a' - 'A');

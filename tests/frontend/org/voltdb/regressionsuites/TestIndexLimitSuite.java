@@ -251,6 +251,7 @@ public class TestIndexLimitSuite extends RegressionSuite {
         callWithExpectedResult(client, -3, "@AdHoc", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS < 1");
         callWithExpectedResult(client, true, "@Explain", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS < 1");
 
+
         callWithExpectedResult(client, -3, "@AdHoc", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS <= 2");
         callWithExpectedResult(client, true, "@Explain", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS <= 2");
 
@@ -260,13 +261,15 @@ public class TestIndexLimitSuite extends RegressionSuite {
         callWithExpectedResult(client, 2, "@AdHoc", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS >= 2");
         callWithExpectedResult(client, true, "@Explain", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS >= 2");
 
+        // NEW: optimizable after adding reserve scan
         // MAX() with upper bound is not optimized
         callWithExpectedResult(client, 1, "@AdHoc", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS < 2");
-        callWithExpectedResult(client, false, "@Explain", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS < 2");
+        callWithExpectedResult(client, true, "@Explain", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS < 2");
 
+        // NEW: optimizable after adding reserve scan
         // MAX() with upper bound is not optimized
         callWithExpectedResult(client, 2, "@AdHoc", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS <= 2");
-        callWithExpectedResult(client, false, "@Explain", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS <= 2");
+        callWithExpectedResult(client, true, "@Explain", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS <= 2");
 
         callWithExpectedResult(client, -1, "@AdHoc", "SELECT MIN(POINTS) FROM TU2 WHERE UNAME = 'jim' AND POINTS < 5");
         callWithExpectedResult(client, true, "@Explain", "SELECT MIN(POINTS) FROM TU2 WHERE UNAME = 'jim' AND POINTS < 5");

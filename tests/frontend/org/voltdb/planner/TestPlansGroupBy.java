@@ -23,7 +23,16 @@
 
 package org.voltdb.planner;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractScanPlanNode;
+import org.voltdb.plannodes.AggregatePlanNode;
+import org.voltdb.plannodes.LimitPlanNode;
+import org.voltdb.plannodes.OrderByPlanNode;
+import org.voltdb.plannodes.ProjectionPlanNode;
+import org.voltdb.plannodes.ReceivePlanNode;
 
 public class TestPlansGroupBy extends PlannerTestCase {
     @Override
@@ -37,31 +46,151 @@ public class TestPlansGroupBy extends PlannerTestCase {
         super.tearDown();
     }
 
+    List<AbstractPlanNode> pns = new ArrayList<AbstractPlanNode>();
 
     public void testGroupByA1() {
-        AbstractPlanNode pn = compile("SELECT A1 from T1 group by A1");
-        System.out.println(pn.toJSONString());
+        pns = compileToFragments("SELECT A1 from T1 group by A1");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
     }
 
     public void testCountA1() {
-        AbstractPlanNode pn = compile("SELECT count(A1) from T1");
-        System.out.println(pn.toJSONString());
+        pns = compileToFragments("SELECT count(A1) from T1");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
     }
 
     public void testCountStar()
     {
-        AbstractPlanNode pn = compile("SELECT count(*) from T1");
-        System.out.println(pn.toJSONString());
+        pns = compileToFragments("SELECT count(*) from T1");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
     }
 
-   public void testCountDistinctA1() {
-       AbstractPlanNode pn = compile("SELECT count(distinct A1) from T1");
-       System.out.println(pn.toJSONString());
-   }
+    public void testCountDistinctA1() {
+        pns = compileToFragments("SELECT count(distinct A1) from T1");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
+    }
 
     public void testDistinctA1() {
-        AbstractPlanNode pn = compile("SELECT DISTINCT A1 FROM T1");
-        System.out.println(pn.toJSONString());
+        pns = compileToFragments("SELECT DISTINCT A1 FROM T1");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
     }
 
+    public void testEdgeComplexRelatedCases() {
+        // Make sure that this query will compile correctly
+        pns = compileToFragments("select PKEY+A1 from T1 Order by PKEY+A1");
+        AbstractPlanNode p = pns.get(0).getChild(0);
+        assertTrue(p instanceof ProjectionPlanNode);
+        assertTrue(p.getChild(0) instanceof OrderByPlanNode);
+        assertTrue(p.getChild(0).getChild(0) instanceof ReceivePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AbstractScanPlanNode);
+
+        // Make it to false when we fix ENG-4397
+        // ENG-4937 - As a developer, I want to ignore the "order by" clause on non-grouped aggregate queries.
+        pns = compileToFragments("SELECT count(*)  FROM P1 order by PKEY");
+        checkHasComplexAgg(pns);
+
+        // Make sure it compile correctly
+        pns = compileToFragments("SELECT A1, count(*) as tag FROM P1 group by A1 order by tag, A1 limit 1");
+        p = pns.get(0).getChild(0);
+
+        assertTrue(p instanceof LimitPlanNode);
+        assertTrue(p.getChild(0) instanceof ProjectionPlanNode);
+        assertTrue(p.getChild(0).getChild(0) instanceof OrderByPlanNode);
+        assertTrue(p.getChild(0).getChild(0).getChild(0) instanceof AggregatePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+    }
+
+    public void testComplexAggwithLimit() {
+        pns = compileToFragments("SELECT A1, sum(A1), sum(A1)+11 FROM P1 GROUP BY A1 ORDER BY A1 LIMIT 2");
+        checkHasComplexAgg(pns);
+
+        // Test limit push down
+        AbstractPlanNode p = pns.get(0).getChild(0);
+        assertTrue(p instanceof ProjectionPlanNode);
+        assertTrue(p.getChild(0) instanceof LimitPlanNode);
+        assertTrue(p.getChild(0).getChild(0) instanceof OrderByPlanNode);
+        assertTrue(p.getChild(0).getChild(0).getChild(0) instanceof AggregatePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof LimitPlanNode);
+        assertTrue(p.getChild(0) instanceof OrderByPlanNode);
+        assertTrue(p.getChild(0).getChild(0) instanceof AggregatePlanNode);
+    }
+
+    public void testComplexAggwithDistinct() {
+        pns = compileToFragments("SELECT A1, sum(A1), sum(distinct A1)+11 FROM P1 GROUP BY A1 ORDER BY A1");
+        checkHasComplexAgg(pns);
+
+        // Test aggregation node not push down with distinct
+        AbstractPlanNode p = pns.get(0).getChild(0);
+        assertTrue(p instanceof ProjectionPlanNode);
+        assertTrue(p.getChild(0) instanceof OrderByPlanNode);
+        assertTrue(p.getChild(0).getChild(0) instanceof AggregatePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AbstractScanPlanNode);
+    }
+
+    public void testComplexAggwithLimitDistinct() {
+        pns = compileToFragments("SELECT A1, sum(A1), sum(distinct A1)+11 FROM P1 GROUP BY A1 ORDER BY A1 LIMIT 2");
+        checkHasComplexAgg(pns);
+
+        // Test no limit push down
+        AbstractPlanNode p = pns.get(0).getChild(0);
+        assertTrue(p instanceof ProjectionPlanNode);
+        assertTrue(p.getChild(0) instanceof LimitPlanNode);
+        assertTrue(p.getChild(0).getChild(0) instanceof OrderByPlanNode);
+        assertTrue(p.getChild(0).getChild(0).getChild(0) instanceof AggregatePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AbstractScanPlanNode);
+    }
+
+    public void testComplexAggCase() {
+        pns = compileToFragments("SELECT A1, sum(A1), sum(A1)+11 FROM P1 GROUP BY A1");
+        checkHasComplexAgg(pns);
+
+        pns = compileToFragments("SELECT A1, SUM(PKEY) as A2, (SUM(PKEY) / 888) as A3, (SUM(PKEY) + 1) as A4 FROM P1 GROUP BY A1");
+        checkHasComplexAgg(pns);
+
+    }
+
+//    public void testComplexGroupby() {
+//        pns = compileToFragments("SELECT ABS(A1), ABS(A1)+1, sum(B1) FROM P1 GROUP BY ABS(A1)");
+//    }
+
+    private void checkHasComplexAgg(List<AbstractPlanNode> pns) {
+        assertTrue(pns.size() > 0);
+        boolean isDistributed = pns.size() > 1 ? true: false;
+
+        for ( AbstractPlanNode nd : pns) {
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+        }
+
+        AbstractPlanNode p = pns.get(0).getChild(0);
+        assertTrue(p instanceof ProjectionPlanNode);
+        while ( p.getChildCount() > 0) {
+            p = p.getChild(0);
+            assertFalse(p instanceof ProjectionPlanNode);
+        }
+
+        if (isDistributed) {
+            p = pns.get(1).getChild(0);
+            assertFalse(p instanceof ProjectionPlanNode);
+        }
+    }
 }
