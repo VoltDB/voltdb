@@ -85,6 +85,7 @@ class AbstractExecutor {
     AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode) {
         m_abstractNode = abstractNode;
         m_tmpOutputTable = NULL;
+        m_engine = engine;
     }
 
     /** Concrete executor classes implement initialization in p_init() */
@@ -115,12 +116,20 @@ class AbstractExecutor {
      */
     void setDMLCountOutputTable(TempTableLimits* limits);
 
+    /**
+     * Set up statistics for long running operations thru m_engine
+     */
+    void setStatsForLongOp();
+
     // execution engine owns the plannode allocation.
     AbstractPlanNode* m_abstractNode;
     TempTable* m_tmpOutputTable;
 
     // cache to avoid runtime virtual function call
     bool needs_outputtable_clear_cached;
+
+    /** reference to the engine/context to log executing context*/
+    VoltDBEngine* m_engine;
 };
 
 inline bool AbstractExecutor::execute(const NValueArray& params)
@@ -142,6 +151,17 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
 
     // run the executor
     return p_execute(params);
+}
+
+/**
+ * Set up statistics for long running operations thru m_engine
+ */
+inline void AbstractExecutor::setStatsForLongOp() {
+        if(m_engine->isLongOp()) {
+                m_engine->setPlanNodeName(planNodeToString(m_abstractNode->getPlanNodeType()));
+                m_engine->setTargetTable(NULL);
+                m_engine->setIndex(NULL);
+        }
 }
 
 }

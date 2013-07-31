@@ -51,6 +51,8 @@
 #include "common/tabletuple.h"
 #include "table.h"
 #include "storage/TupleIterator.h"
+#include "execution/VoltDBEngine.h"
+#include "common/TimeOutException.h"
 
 namespace voltdb {
 
@@ -81,14 +83,15 @@ public:
      * @return true if succeeded. false if no more active tuple is there.
     */
     bool next(TableTuple &out);
+    bool next(TableTuple &out, VoltDBEngine* engine);
     bool hasNext();
     int getLocation() const;
+    int getTuplesFound();
 
 private:
     // Get an iterator via table->iterator()
     TableIterator(Table *, TBMapI);
     TableIterator(Table *, std::vector<TBPtr>::iterator);
-
 
     bool persistentNext(TableTuple &out);
     bool tempNext(TableTuple &out);
@@ -135,7 +138,6 @@ inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator 
     {
     }
 
-
 inline TableIterator::TableIterator(Table *parent, TBMapI start)
     :
       m_table(parent),
@@ -179,6 +181,33 @@ inline bool TableIterator::hasNext() {
 }
 
 inline bool TableIterator::next(TableTuple &out) {
+    if (!m_tempTableIterator) {
+        return persistentNext(out);
+    }
+    else {
+        return tempNext(out);
+    }
+}
+
+inline bool TableIterator::next(TableTuple &out, VoltDBEngine* engine) {
+        const int threshold = 100000000;
+        if(m_foundTuples > threshold-3 ) {
+                if(!engine->isLongOp()) {
+                        engine->setLongOp(true);
+                }
+                if(m_foundTuples > threshold-1 && m_foundTuples % threshold == 0) {
+                                //Update stats in java and let java determine if we should cancel this query.
+                                if(engine->getTopend()->updateStats(engine->getBatchIndex(),
+                                                engine->getPlanNodeName(),
+                                                engine->getTargetTable() ? engine->getTargetTable()->name() : "None",
+                                                engine->getTargetTable() ? engine->getTargetTable()->activeTupleCount() : 0,
+                                                m_foundTuples,
+                                                engine->getIndex() ? engine->getIndex()->getName() : "None")){
+                                        VOLT_ERROR("Time out read only query.");
+                                        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "Time out read only query.");
+                                }
+                        }
+        }
     if (!m_tempTableIterator) {
         return persistentNext(out);
     }
@@ -263,6 +292,8 @@ inline int TableIterator::getLocation() const {
     return m_location;
 }
 
+inline int TableIterator::getTuplesFound() {
+        return m_foundTuples;
 }
-
+}
 #endif

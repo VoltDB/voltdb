@@ -376,6 +376,10 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
                 dynamic_cast<Table*>(executor->getPlanNode()->getOutputTable());
 
         try {
+                // Reset isLongOp
+                if(m_isLongOp) {
+                        setLongOp(false);
+                }
             // Now call the execute method to actually perform whatever action
             // it is that the node is supposed to do...
             if (!executor->execute(params)) {

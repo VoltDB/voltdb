@@ -178,8 +178,9 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
         int tuple_ctr = 0;
         int tuple_skipped = 0;
-        while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
+        while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple, m_engine))
         {
+                setStatsForLongOp(target_table);
             VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
                        tuple.debug(target_table->name()).c_str(), tuple_ctr,
                        (int)target_table->activeTupleCount());

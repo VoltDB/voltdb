@@ -94,6 +94,21 @@ public interface SiteProcedureConnection {
             boolean readOnly) throws EEException;
 
     /**
+     * Execute a set of plan fragments.
+     * Note: it's ok to pass null for inputDepIds if the fragments
+     * have no dependencies.
+     */
+    public VoltTable[] executePlanFragments(
+            int numFragmentIds,
+            long[] planFragmentIds,
+            long[] inputDepIds,
+            Object[] parameterSets,
+            long spHandle,
+            long uniqueId,
+            boolean readOnly,
+            RunningProcedureContext rProcContext) throws EEException;
+
+    /**
      * For test cases that need to mimic a plan fragment being invoked
      */
     public void simulateExecutePlanFragments(long txnId, boolean readOnly);
