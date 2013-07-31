@@ -88,6 +88,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     private RunningProcedureContext m_rProcContext;
     private boolean m_readOnly;
     private long m_startTime;
+    private long m_logDuration;
 
     protected FragmentPlanSource m_planSource;
 
@@ -317,22 +318,25 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long targetTableSize,
             long tuplesFound,
             String indexName) {
-        VoltLogger log = new VoltLogger("CONSOLE");
-        log.info("Long running operation");
-        log.info("[Proc:"+m_rProcContext.m_procedureName+"]"
-                +"["+"Executor:"+planNodeName+"]"
-                +"["+"Target table(size):"+targetTableName+"("+targetTableSize+")"+"]"
-                +"["+"Tuples processed:"+tuplesFound+"]"
-                +"["+"Index:"+indexName+"]"
-                +"["+"Batch index:"+batchIndex+"]"
-                );
-
+        long currentTime = System.currentTimeMillis();
+        long duration = currentTime - m_startTime;
+        if(duration > m_logDuration) {
+            VoltLogger log = new VoltLogger("CONSOLE");
+            log.info("Long running operation");
+            log.info("[Proc:"+m_rProcContext.m_procedureName+"]"
+                    +"["+"Executor:"+planNodeName+"]"
+                    +"["+"Target table(size):"+targetTableName+"("+targetTableSize+")"+"]"
+                    +"["+"Tuples processed:"+tuplesFound+"]"
+                    +"["+"Index:"+indexName+"]"
+                    +"["+"Batch index:"+batchIndex+"]"
+                    );
+            m_logDuration = (m_logDuration < 30000) ? 2*m_logDuration : 30000;
+        }
         //Set timer and time out read only queries.
-//        long currentTime = System.currentTimeMillis();
-//        if(m_readOnly && currentTime - m_startTime > Long.MAX_VALUE)
-//            return true;
-//        else
-            return false;
+        //        if(m_readOnly && currentTime - m_startTime > Long.MAX_VALUE)
+        //            return true;
+        //        else
+        return false;
     }
 
     /**
@@ -389,6 +393,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             //For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
             m_readOnly = (undoQuantumToken == Long.MAX_VALUE) ? true : false;
             //Consider put the following line in EEJNI.coreExecutePlanFrag... before where the native method is called?
+            m_logDuration = 1000;
             m_startTime = System.currentTimeMillis();
             VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
                     parameterSets, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
@@ -420,6 +425,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             //For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
             m_readOnly = (undoQuantumToken == Long.MAX_VALUE) ? true : false;
             //Consider put the following line in EEJNI.coreExecutePlanFrag... before where the native method is called?
+            m_logDuration = 1000;
             m_startTime = System.currentTimeMillis();
             VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
                     parameterSets, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
