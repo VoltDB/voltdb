@@ -370,7 +370,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
         // get the width of the index and number of columns used
         // need doubles for math
-        double colCount = m_catalogIndex.getColumns().size();
+        double colCount = CatalogUtil.getCatalogIndexSize(m_catalogIndex);
         double keyWidth = m_searchkeyExpressions.size();
         assert(keyWidth <= colCount);
 
@@ -522,7 +522,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     protected String explainPlanForNode(String indent) {
         assert(m_catalogIndex != null);
 
-        int indexSize = m_catalogIndex.getColumns().size();
+        int indexSize = CatalogUtil.getCatalogIndexSize(m_catalogIndex);
         int keySize = m_searchkeyExpressions.size();
 
         // When there is no start key, count a range scan key for each ANDed end condition.

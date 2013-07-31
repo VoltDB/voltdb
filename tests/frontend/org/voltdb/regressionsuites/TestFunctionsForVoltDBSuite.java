@@ -950,7 +950,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        String[] procedures = {"TO_TIMESTAMP_SECOND", "TO_TIMESTAMP_MILLIS",
+        String[] procedures = {"FROM_UNIXTIME", "TO_TIMESTAMP_SECOND", "TO_TIMESTAMP_MILLIS",
                 "TO_TIMESTAMP_MILLISECOND", "TO_TIMESTAMP_MICROS", "TO_TIMESTAMP_MICROSECOND"};
 
         for (int i=0; i< procedures.length; i++) {
@@ -961,7 +961,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             result = cr.getResults()[0];
             assertEquals(1, result.getRowCount());
             assertTrue(result.advanceRow());
-            if (proc == "TO_TIMESTAMP_SECOND") {
+            if (proc == "TO_TIMESTAMP_SECOND" || proc == "FROM_UNIXTIME") {
                 assertEquals(0L, result.getTimestampAsLong(0));
             } else if (proc == "TO_TIMESTAMP_MILLIS" || proc == "TO_TIMESTAMP_MILLISECOND") {
                 assertEquals(0L, result.getTimestampAsLong(0));
@@ -976,7 +976,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             result = cr.getResults()[0];
             assertEquals(1, result.getRowCount());
             assertTrue(result.advanceRow());
-            if (proc == "TO_TIMESTAMP_SECOND") {
+            if (proc == "TO_TIMESTAMP_SECOND" || proc == "FROM_UNIXTIME") {
                 assertEquals(1000000L, result.getTimestampAsLong(0));
             } else if (proc == "TO_TIMESTAMP_MILLIS" || proc == "TO_TIMESTAMP_MILLISECOND") {
                 assertEquals(1000L, result.getTimestampAsLong(0));
@@ -991,7 +991,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             result = cr.getResults()[0];
             assertEquals(1, result.getRowCount());
             assertTrue(result.advanceRow());
-            if (proc == "TO_TIMESTAMP_SECOND") {
+            if (proc == "TO_TIMESTAMP_SECOND" || proc == "FROM_UNIXTIME") {
                 assertEquals(1000000000L, result.getTimestampAsLong(0));
             } else if (proc == "TO_TIMESTAMP_MILLIS" || proc == "TO_TIMESTAMP_MILLISECOND") {
                 assertEquals(1000000L, result.getTimestampAsLong(0));
@@ -1006,7 +1006,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             result = cr.getResults()[0];
             assertEquals(1, result.getRowCount());
             assertTrue(result.advanceRow());
-            if (proc == "TO_TIMESTAMP_SECOND") {
+            if (proc == "TO_TIMESTAMP_SECOND" || proc == "FROM_UNIXTIME") {
                 assertEquals(-1000000000L, result.getTimestampAsLong(0));
             } else if (proc == "TO_TIMESTAMP_MILLIS" || proc == "TO_TIMESTAMP_MILLISECOND") {
                 assertEquals(-1000000L, result.getTimestampAsLong(0));
@@ -1021,7 +1021,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             result = cr.getResults()[0];
             assertEquals(1, result.getRowCount());
             assertTrue(result.advanceRow());
-            if (proc == "TO_TIMESTAMP_SECOND") {
+            if (proc == "TO_TIMESTAMP_SECOND" || proc == "FROM_UNIXTIME") {
                 assertEquals(1371808830000000000L, result.getTimestampAsLong(0));
             } else if (proc == "TO_TIMESTAMP_MILLIS" || proc == "TO_TIMESTAMP_MILLISECOND") {
                 assertEquals(1371808830000000L, result.getTimestampAsLong(0));
@@ -1400,6 +1400,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         project.addStmtProcedure("TRUNCATE", "select TRUNCATE(YEAR, TM), TRUNCATE(QUARTER, TM), TRUNCATE(MONTH, TM), " +
                 "TRUNCATE(DAY, TM), TRUNCATE(HOUR, TM),TRUNCATE(MINUTE, TM),TRUNCATE(SECOND, TM), TRUNCATE(MILLIS, TM), " +
                 "TRUNCATE(MILLISECOND, TM), TRUNCATE(MICROS, TM), TRUNCATE(MICROSECOND, TM) from P2 where id = ?");
+
+        project.addStmtProcedure("FROM_UNIXTIME", "select FROM_UNIXTIME (?) from P2 where id = ?");
 
         // CONFIG #1: Local Site/Partition running on JNI backend
         config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
