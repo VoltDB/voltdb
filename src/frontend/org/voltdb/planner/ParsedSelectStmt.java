@@ -202,10 +202,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         if (hasComplexAgg()) return true;
 
-        if (aggResultColumns.size() > displayColumns.size()) {
+        int numDisplayCols = displayColumns.size();
+        if (aggResultColumns.size() > numDisplayCols) {
             hasComplexAgg = true;
             return true;
         }
+
         for (ParsedColInfo col : displayColumns) {
             if (isNewtoAggResultColumn(col)) {
                 // Now Only TVEs in displayColumns are left for AggResultColumns
@@ -218,8 +220,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 }
             }
         }
-        if (aggResultColumns.size() < displayColumns.size()) {
-            // Display Columns have duplicated Aggs or TVEs
+        if (aggResultColumns.size() != numDisplayCols) {
+            // Display columns have duplicated Aggs or TVEs (less than case)
+            // Display columns have several pass-through columns if group by primary key (larger than case)
             hasComplexAgg = true;
             return true;
         }

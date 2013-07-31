@@ -93,8 +93,17 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         VoltTable vt;
         long[][] expected;
 
-        String [] tbs = {"R1","P1"};
+        String [] tbs = {"R1", "P1"};
         for (String tb: tbs) {
+            // Test pass-through columns, group by primary key
+            cr = client.callProcedure("@AdHoc", "SELECT dept, count(wage) from " + tb +
+                    " GROUP BY id ORDER BY dept");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] {{2,1}, {2,1}, {1,1}, {1,1}, {1,1} };
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
             // Test duplicates, operator expression, group by primary key
             cr = client.callProcedure("@AdHoc", "SELECT id, id, dept, dept+5 from " + tb +
                     " GROUP BY id ORDER BY id");
