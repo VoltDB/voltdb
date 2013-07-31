@@ -343,6 +343,12 @@ public abstract class AbstractParsedStmt {
 
         String alias = exprNode.attributes.get("alias");
         String tableName = exprNode.attributes.get("table");
+        if (tableName == null && !exprNode.children.isEmpty()) {
+            VoltXMLElement childExpr = exprNode.children.get(0);
+            if (childExpr.name.toLowerCase().equals("columnref")) {
+                    return parseColumnRefExpression(childExpr);
+            }
+        }
         String columnName = exprNode.attributes.get("column");
 
         expr.setColumnAlias(alias);
