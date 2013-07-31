@@ -22,14 +22,14 @@ namespace voltdb
 {
 
 /**
- * Full constructor
+ * Generate hash value for key.
  */
-ElasticHash::ElasticHash(const PersistentTable &table, const TableTuple &tuple)
+ElasticHash ElasticIndex::generateHash(const PersistentTable &table, const TableTuple &tuple)
 {
     int64_t hashValues[2];
     tuple.getNValue(table.partitionColumn()).murmurHash3(hashValues);
     // Only the least significant 8 bytes is used.
-    m_hashValue = hashValues[0];
+    return hashValues[0];
 }
 
 } // namespace voltdb

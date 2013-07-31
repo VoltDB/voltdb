@@ -114,6 +114,10 @@ public:
     bool indexHas(TableTuple &tuple) const;
     bool indexAdd(TableTuple &tuple);
     bool indexRemove(TableTuple &tuple);
+    ElasticIndex::iterator indexIterator(int64_t lowerBound = 0);
+    ElasticIndex::const_iterator indexIterator(int64_t lowerBound = 0) const;
+    ElasticIndex::iterator indexEnd();
+    ElasticIndex::const_iterator indexEnd() const;
 
 private:
 
@@ -530,6 +534,22 @@ inline bool PersistentTableSurgeon::indexAdd(TableTuple &tuple) {
 
 inline bool PersistentTableSurgeon::indexRemove(TableTuple &tuple) {
     return m_index.remove(m_table, tuple);
+}
+
+inline ElasticIndex::iterator PersistentTableSurgeon::indexIterator(int64_t lowerBound) {
+    return m_index.createIterator(lowerBound);
+}
+
+inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIterator(int64_t lowerBound) const {
+    return m_index.createIterator(lowerBound);
+}
+
+inline ElasticIndex::iterator PersistentTableSurgeon::indexEnd() {
+    return m_index.end();
+}
+
+inline ElasticIndex::const_iterator PersistentTableSurgeon::indexEnd() const {
+    return m_index.end();
 }
 
 inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {

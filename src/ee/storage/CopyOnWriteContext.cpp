@@ -219,7 +219,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
     // care about the active tuple count. Return max int as if there are always
     // tuples remaining (until the counter is forced to zero when done).
     if (m_tuplesRemaining < 0) {
-        retValue = std::numeric_limits<int32_t>::max();
+        retValue = std::numeric_limits<int64_t>::max();
     }
 
     // Done when the table scan is finished and iteration is complete.

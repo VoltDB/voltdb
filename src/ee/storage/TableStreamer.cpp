@@ -102,6 +102,11 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                                                      serializer, predicateStrings));
                     break;
 
+                case TABLE_STREAM_ELASTIC_INDEX_READ:
+                    context.reset(new ElasticContext(m_table, surgeon, m_partitionId,
+                                                     serializer, predicateStrings));
+                    break;
+
                 default:
                     assert(false);
             }
