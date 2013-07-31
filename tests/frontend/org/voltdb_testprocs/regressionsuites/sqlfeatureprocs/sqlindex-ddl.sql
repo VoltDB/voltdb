@@ -43,6 +43,11 @@ CREATE TABLE TU4 (
 );
 create unique index idx_U4_TREE on TU4 (UNAME,SEX,POINTS);
 
+CREATE TABLE TU5 (
+        ID INTEGER NOT NULL,
+        POINTS FLOAT NOT NULL
+);
+create index idx_tu5_TREE on TU5 (ID, POINTS);
 
 CREATE TABLE TM1 (
        ID INTEGER NOT NULL,

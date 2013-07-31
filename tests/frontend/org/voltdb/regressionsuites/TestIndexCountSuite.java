@@ -136,19 +136,11 @@ public class TestIndexCountSuite extends RegressionSuite {
 
         VoltTable table;
 
-        Exception ex = null;
-        try {
-            table = client.callProcedure("@AdHoc","SELECT (COUNT(*) + 1) FROM TU1 WHERE POINTS < 2").getResults()[0];
-            // Comment the next three lines out when VoltDB can plan this kind of query
-//            assertTrue(table.getRowCount() == 1);
-//            assertTrue(table.advanceRow());
-//            assertEquals(2, table.getLong(0));
-        } catch (Exception e) {
-            assertTrue(e instanceof ProcCallException);
-            ex = e;
-        } finally {
-            assertNotNull(ex);
-        }
+        table = client.callProcedure("@AdHoc","SELECT (COUNT(*) + 1) FROM TU1 WHERE POINTS < 2").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(2, table.getLong(0));
+
 
         table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS < -1").getResults()[0];
         assertTrue(table.getRowCount() == 1);
@@ -890,6 +882,47 @@ public class TestIndexCountSuite extends RegressionSuite {
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(1, table.getLong(0));
+
+    }
+
+    void testENG4959Float() throws Exception {
+        Client client = getClient();
+
+        client.callProcedure("TU5.insert", 1, 0.1);
+        client.callProcedure("TU5.insert", 1, 0.2);
+        client.callProcedure("TU5.insert", 1, 0.3);
+        client.callProcedure("TU5.insert", 1, 0.4);
+        client.callProcedure("TU5.insert", 1, 0.5);
+        client.callProcedure("TU5.insert", 2, 0.1);
+        client.callProcedure("TU5.insert", 2, 0.2);
+        client.callProcedure("TU5.insert", 2, 0.3);
+        client.callProcedure("TU5.insert", 2, 0.4);
+        client.callProcedure("TU5.insert", 2, 0.5);
+
+        VoltTable table = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM TU5 WHERE ID = 1 AND POINTS > 0.2").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(3, table.getLong(0));
+
+        table = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM TU5 WHERE ID = 1 AND POINTS > 0.5").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(0, table.getLong(0));
+
+        table = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM TU5 WHERE ID = 2 AND POINTS > 0.3").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(2, table.getLong(0));
+
+        table = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM TU5 WHERE ID = 2 AND POINTS > 0.5").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(0, table.getLong(0));
+
+        table = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM TU5 WHERE ID = 1 AND POINTS >= 0.1").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(5, table.getLong(0));
 
     }
 

@@ -8,11 +8,11 @@ INFO Master throughput
 JOIN: Sending fault data .* lastKnownGloballyCommitedMultiPartTxnId \d*
 HOST: Received failure message from initiator.*commit point.*safe txn id .*
 HOST: Received failure message from .* safe txn id
-INFO.*HOST:
 
 #Clientlog exceptions
 Connection to database host .* was lost before a response
-ERROR: Non success in ProcCallback
+Transaction dropped due to change in mastership
+Non success in ProcCallback for
 WARN: ClientThread threw after
 
 #The damn ps output in apprunner.log
