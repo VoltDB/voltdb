@@ -51,6 +51,23 @@ public:
                                      std::vector<int> &retPositions) = 0;
 
     /**
+     * Optional reactivation handler.
+     *  Called during activation when the stream already exists.
+     *  Return true if reactivation is allowed. (default=false)
+     */
+    virtual bool handleReactivation(TableStreamType streamType) {
+        VOLT_ERROR("Not allowed to reactivate stream type %d", static_cast<int>(streamType));
+        return false;
+    }
+
+    /**
+     * Optional deactivation handler.
+     *  Called when the stream is shutting down.
+     *  Return true to keep it around and listening to updates. (default=false)
+     */
+    virtual bool handleDeactivation() {return false;}
+
+    /**
      * Optional tuple insert handler.
      */
     virtual bool notifyTupleInsert(TableTuple &tuple) {return false;}
@@ -181,9 +198,9 @@ private:
      * Partition ID
      */
     const int32_t m_partitionId;
-
-
 };
+
+typedef boost::shared_ptr<TableStreamerContext> TableStreamerContextPtr;
 
 } // namespace voltdb
 

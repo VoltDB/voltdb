@@ -47,6 +47,16 @@ public:
     virtual ~ElasticContext();
 
     /**
+     * Reactivation handler.
+     */
+    virtual bool handleReactivation(TableStreamType streamType);
+
+    /**
+     * Deactivation handler.
+     */
+    virtual bool handleDeactivation();
+
+    /**
      * Mandatory streamMore() handler.
      */
     virtual int64_t handleStreamMore(TupleOutputStreamProcessor &outputStreams,

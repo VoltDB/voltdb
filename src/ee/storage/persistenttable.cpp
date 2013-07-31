@@ -1008,6 +1008,11 @@ int64_t PersistentTable::streamMore(TupleOutputStreamProcessor &outputStreams,
     if (m_tableStreamer.get() == NULL) {
         return -1;
     }
+    // Balance the zero tuple count short circuiting done in activateStream().
+    //TODO: Improve or eliminate this special logic in both places.
+    if (m_tupleCount == 0) {
+        return 0;
+    }
     return m_tableStreamer->streamMore(outputStreams, streamType, retPositions);
 }
 
@@ -1216,8 +1221,7 @@ void PersistentTable::doIdleCompaction() {
 }
 
 void PersistentTable::doForcedCompaction() {
-    if (   m_tableStreamer.get() != NULL
-        && tableStreamTypeIsRecovery(m_tableStreamer->getActiveStreamType())) {
+    if (m_tableStreamer.get() != NULL && m_tableStreamer->hasStreamType(TABLE_STREAM_RECOVERY)) {
         LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO,
             "Deferring compaction until recovery is complete.");
         return;

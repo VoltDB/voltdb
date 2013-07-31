@@ -42,103 +42,78 @@ TableStreamer::Stream::Stream(TableStreamType streamType,
 TableStreamer::TableStreamer(int32_t partitionId, PersistentTable &table, CatalogId tableId) :
     m_partitionId(partitionId),
     m_table(table),
-    m_tableId(tableId),
-    m_activeStreamIndex(-1)
+    m_tableId(tableId)
 {}
 
 TableStreamer::~TableStreamer()
 {}
 
 /**
- * Purge all inactive streams except for elastic.
- * The elastic index needs to be available after scans complete.
- */
-void TableStreamer::purgeStreams()
-{
-    // Clear and rebuild the stream list (m_streams) with only the streams that
-    // can be accessed for data later (only elastic for now).
-    StreamList savedStreams(m_streams);
-    m_streams.clear();
-    BOOST_FOREACH(StreamPtr &streamPtr, savedStreams) {
-        assert(streamPtr != NULL);
-        if (streamPtr->m_streamType == TABLE_STREAM_ELASTIC_INDEX) {
-            m_streams.push_back(streamPtr);
-            break;
-        }
-    }
-    // Nothing is active after purging.
-    m_activeStreamIndex = -1;
-}
-
-/**
- * activateStream() encapsulates all the stream type-specific knowledge.
- * It knows how to create streams, with or without predicates, and validate
- * that multiple stream types can coexist.
- * The only permitted context combinations are an elastic context paired with
- * any other context type. Of course any individual context is fine too.
+ * activateStream() knows how to create streams based on type.
+ * Context classes determine whether or not reactivation is allowed.
  */
 bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                                    TupleSerializer &serializer,
                                    TableStreamType streamType,
                                    std::vector<std::string> &predicateStrings)
 {
-    // It's an error if any stream is active. Let Java figure out how to recover,
-    // e.g. by finishing the serializeMore() call sequence.
-    TableStreamType activeStreamType = getActiveStreamType();
-    if (activeStreamType != TABLE_STREAM_NONE) {
-        VOLT_ERROR("An existing stream is still active (type %d).",
-                   static_cast<int>(activeStreamType));
-        return false;
-    }
+    bool failed = false;
 
-    // It's an error (handled below) if the stream type is already present.
-    // Everything should have been purged except for any elastic stream if
-    // streamMore() had been called repeatedly until it returned 0.
-    if (hasStreamType(streamType)) {
-        if (streamType == TABLE_STREAM_ELASTIC_INDEX) {
-            // If starting a new elastic index stream get rid of the old one.
-            m_streams.clear();
+    // Rebuild the stream list with just the streams that deserve to persist.
+    StreamList savedStreams(m_streams);
+    m_streams.clear();
+    bool found = false;
+    BOOST_FOREACH(StreamPtr &streamPtr, savedStreams) {
+        assert(streamPtr != NULL);
+        found = streamPtr->m_streamType == streamType;
+        if (found) {
+            if (streamPtr->m_context->handleReactivation(streamType)) {
+                m_streams.push_back(streamPtr);
+            }
+            else {
+                failed = true;
+            }
+            break;
         }
         else {
-            VOLT_ERROR("TableStreamer already has stream type %d.", static_cast<int>(streamType));
-            return false;
+            m_streams.push_back(streamPtr);
         }
     }
-    // Purge unneeded streams, e.g. to handle streamMore() not being completely drained.
-    purgeStreams();
 
     // Create an appropriate streaming context based on the stream type.
-    try {
-        boost::shared_ptr<TableStreamerContext> context;
-        switch (streamType) {
-            case TABLE_STREAM_SNAPSHOT:
-                // Constructor can throw exception when it parses the predicates.
-                context.reset(
-                    new CopyOnWriteContext(m_table, surgeon, serializer, m_partitionId,
-                                           predicateStrings, m_table.activeTupleCount()));
-                break;
+    if (!found && !failed) {
+        try {
+            boost::shared_ptr<TableStreamerContext> context;
+            switch (streamType) {
+                case TABLE_STREAM_SNAPSHOT:
+                    // Constructor can throw exception when it parses the predicates.
+                    context.reset(
+                        new CopyOnWriteContext(m_table, surgeon, serializer, m_partitionId,
+                                               predicateStrings, m_table.activeTupleCount()));
+                    break;
 
-            case TABLE_STREAM_RECOVERY:
-                context.reset(new RecoveryContext(m_table, surgeon, m_partitionId,
-                                                  serializer, m_tableId));
-                break;
+                case TABLE_STREAM_RECOVERY:
+                    context.reset(new RecoveryContext(m_table, surgeon, m_partitionId,
+                                                      serializer, m_tableId));
+                    break;
 
-            case TABLE_STREAM_ELASTIC_INDEX:
-                context.reset(new ElasticContext(m_table, surgeon, m_partitionId,
-                                                 serializer, predicateStrings));
-                break;
+                case TABLE_STREAM_ELASTIC_INDEX:
+                    context.reset(new ElasticContext(m_table, surgeon, m_partitionId,
+                                                     serializer, predicateStrings));
+                    break;
 
-            default:
-                assert(false);
+                default:
+                    assert(false);
+            }
+            m_streams.push_back(StreamPtr(new Stream(streamType, context)));
         }
-        m_activeStreamIndex = static_cast<int>(m_streams.size());
-        m_streams.push_back(StreamPtr(new Stream(streamType, context)));
-    }
-    catch(SerializableEEException &e) {
-        // The stream will not be added.
+        catch(SerializableEEException &e) {
+            // The stream will not be added.
+            failed = true;
+        }
     }
 
-    return (m_activeStreamIndex != -1);
+    return !failed;
 }
 
 int64_t TableStreamer::streamMore(TupleOutputStreamProcessor &outputStreams,
@@ -146,22 +121,32 @@ int64_t TableStreamer::streamMore(TupleOutputStreamProcessor &outputStreams,
                                   std::vector<int> &retPositions)
 {
     int64_t remaining = -2;
-    if (m_activeStreamIndex == -1) {
-        // No active stream.
-        remaining = -1;
-    }
-    else {
-        // Let the active stream handle it.
-        assert(m_activeStreamIndex >= 0 && m_activeStreamIndex < m_streams.size());
-        if (m_activeStreamIndex >= 0 && m_activeStreamIndex < m_streams.size()) {
-            StreamPtr streamPtr = m_streams.at(m_activeStreamIndex);
-            assert(streamPtr != NULL);
+
+    // Rebuild the stream list as dictated by context semantics.
+    StreamList savedStreams(m_streams);
+    m_streams.clear();
+    for (StreamList::iterator iter = savedStreams.begin(); iter != savedStreams.end(); ++iter) {
+        StreamPtr streamPtr = *iter;
+        assert(streamPtr->m_context != NULL);
+        if (streamPtr->m_streamType == streamType) {
+            // Assert that we didn't find the stream type twice.
+            assert(remaining == -2);
             remaining = streamPtr->m_context->handleStreamMore(outputStreams, retPositions);
+            if (remaining <= 0) {
+                // Drop the stream if it doesn't need to hang around (e.g. elastic).
+                if (streamPtr->m_context->handleDeactivation()) {
+                    m_streams.push_back(streamPtr);
+                }
+            }
+            else {
+                // Keep the stream because tuples remain.
+                m_streams.push_back(streamPtr);
+            }
         }
-    }
-    if (remaining <= 0) {
-        // No longer streaming - purge all but elastic streams (to keep the index around).
-        purgeStreams();
+        else {
+            // Keep other existing streams.
+            m_streams.push_back(streamPtr);
+        }
     }
 
     return remaining;
@@ -173,12 +158,15 @@ int64_t TableStreamer::streamMore(TupleOutputStreamProcessor &outputStreams,
 bool TableStreamer::canSafelyFreeTuple(TableTuple &tuple) const
 {
     bool freeable = true;
-    if (m_activeStreamIndex != -1) {
-        assert(m_activeStreamIndex >= 0 && m_activeStreamIndex < m_streams.size());
-        const StreamPtr streamPtr = m_streams.at(m_activeStreamIndex);
-        assert(streamPtr != NULL);
+
+    // Any active stream can reject freeing the tuple.
+    BOOST_FOREACH(StreamPtr streamPtr, m_streams) {
         freeable = streamPtr->m_context->canSafelyFreeTuple(tuple);
+        if (!freeable) {
+            break;
+        }
     }
+
     return freeable;
 }
 

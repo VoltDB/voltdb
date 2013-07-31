@@ -41,6 +41,25 @@ ElasticContext::ElasticContext(PersistentTable &table,
 ElasticContext::~ElasticContext()
 {}
 
+/**
+ * Reactivation handler.
+ */
+bool ElasticContext::handleReactivation(TableStreamType streamType)
+{
+    m_surgeon.clearIndex();
+    // Okay to reuse this context.
+    return true;
+}
+
+/**
+ * Deactivation handler.
+ */
+bool ElasticContext::handleDeactivation()
+{
+    // Keep this context around to maintain the index.
+    return true;
+}
+
 /*
  * Serialize to multiple output streams.
  * Return remaining tuple count, 0 if done, or -1 on error.

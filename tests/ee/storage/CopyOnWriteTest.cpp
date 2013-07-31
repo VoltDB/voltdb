@@ -771,6 +771,7 @@ public:
                         }
                     }
                     if (!accountedFor) {
+std::cerr << "WTF! " << value << std::endl;
                         wtf++;
                     }
                 }
@@ -1374,18 +1375,11 @@ public:
                                TableStreamType streamType,
                                std::vector<int> &retPositions) { return 0; }
 
-    // Saying it's already active forces activateStream() to return without doing anything.
-    virtual bool isAlreadyActive() const { return true; }
-
     virtual int32_t getPartitionID() const { return m_partitionId; }
 
     virtual bool canSafelyFreeTuple(TableTuple &tuple) const { return true; }
 
-    virtual bool hasStreamType(TableStreamType streamType) const { return (m_type == streamType); }
-
-    virtual TableStreamType getStreamType() const { return m_type; }
-
-    virtual TableStreamType getActiveStreamType() const { return m_type; }
+    virtual TableStreamerContextPtr findStreamContext(TableStreamType streamType) { return TableStreamerContextPtr(); }
 
     virtual bool notifyTupleInsert(TableTuple &tuple) { return false; }
 

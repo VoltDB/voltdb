@@ -149,32 +149,18 @@ public:
     virtual bool canSafelyFreeTuple(TableTuple &tuple) const;
 
     /**
-     * Return stream type for active stream or TABLE_STREAM_NONE if nothing is active.
+     * Return context or null for specified type.
      */
-    virtual TableStreamType getActiveStreamType() const {
-        if (m_activeStreamIndex == -1) {
-            return TABLE_STREAM_NONE;
-        }
-        assert(m_activeStreamIndex >= 0 && m_activeStreamIndex < m_streams.size());
-        if (m_activeStreamIndex < 0 || m_activeStreamIndex >= m_streams.size()) {
-            return TABLE_STREAM_NONE;
-        }
-        StreamPtr streamPtr = m_streams.at(m_activeStreamIndex);
-        assert(streamPtr != NULL);
-        return streamPtr->m_streamType;
-    }
-
-    /**
-     * Return true if managing a stream of the specified type.
-     */
-    virtual bool hasStreamType(TableStreamType streamType) const {
-        BOOST_FOREACH(const StreamPtr &streamPtr, m_streams) {
+    virtual TableStreamerContextPtr findStreamContext(TableStreamType streamType) {
+        boost::shared_ptr<TableStreamerContext> context;
+        BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
             assert(streamPtr != NULL);
             if (streamPtr->m_streamType == streamType) {
-                return true;
+                context = streamPtr->m_context;
+                break;
             }
         }
-        return false;
+        return context;
     }
 
 private:
@@ -196,9 +182,6 @@ private:
         boost::shared_ptr<TableStreamerContext> m_context;
     };
 
-    /// Purge all completed streams.
-    void purgeStreams();
-
     /// Current partition ID.
     int32_t m_partitionId;
 
@@ -209,17 +192,12 @@ private:
     CatalogId m_tableId;
 
     /**
-     * Snapshot streams. There can be more than one stream, but only one is
-     * active and streamable. The other(s) can provide results after
-     * scanning completes, like the elastic index. All streams are notified
-     * of inserts, updates, deletes, and compactions.
+     * Snapshot streams.
+     * All streams are notified of inserts, updates, deletes, and compactions.
      */
     typedef boost::shared_ptr<Stream> StreamPtr;
     typedef std::vector<StreamPtr> StreamList;
     StreamList m_streams;
-
-    /// The current active stream index. Not valid when m_streams is empty.
-    int m_activeStreamIndex;
 };
 
 } // namespace voltdb
