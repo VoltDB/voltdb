@@ -369,7 +369,8 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     int num_of_inner_cols = (join_type == JOIN_TYPE_LEFT)? null_tuple.sizeInValues() : 0;
 
     VOLT_TRACE("<num_of_outer_cols>: %d\n", num_of_outer_cols);
-    while (outer_iterator.next(outer_tuple, m_engine)) {
+    outer_iterator.setEngine(m_engine);
+    while (outer_iterator.next(outer_tuple)) {
         setStatsForLongOp(inner_table, index);
         VOLT_TRACE("outer_tuple:%s",
                    outer_tuple.debug(outer_table->name()).c_str());

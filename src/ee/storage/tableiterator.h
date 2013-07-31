@@ -84,6 +84,7 @@ public:
     */
     bool next(TableTuple &out);
     bool next(TableTuple &out, VoltDBEngine* engine);
+    void setEngine(VoltDBEngine* engine);
     bool hasNext();
     int getLocation() const;
     int getTuplesFound();
@@ -123,6 +124,7 @@ private:
     TBPtr m_currentBlock;
     std::vector<TBPtr>::iterator m_tempBlockIterator;
     bool m_tempTableIterator;
+    VoltDBEngine* m_engine;
 };
 
 inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator start)
@@ -134,7 +136,8 @@ inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator 
       m_foundTuples(0), m_tupleLength(parent->m_tupleLength),
       m_tuplesPerBlock(parent->m_tuplesPerBlock), m_currentBlock(NULL),
       m_tempBlockIterator(start),
-      m_tempTableIterator(true)
+      m_tempTableIterator(true),
+      m_engine(NULL)
     {
     }
 
@@ -148,7 +151,8 @@ inline TableIterator::TableIterator(Table *parent, TBMapI start)
       m_activeTuples((int) m_table->m_tupleCount),
       m_foundTuples(0), m_tupleLength(parent->m_tupleLength),
       m_tuplesPerBlock(parent->m_tuplesPerBlock), m_currentBlock(NULL),
-      m_tempTableIterator(false)
+      m_tempTableIterator(false),
+      m_engine(NULL)
     {
     }
 
@@ -162,6 +166,7 @@ inline void TableIterator::reset(std::vector<TBPtr>::iterator start) {
     m_tupleLength = m_table->m_tupleLength;
     m_tuplesPerBlock = m_table->m_tuplesPerBlock;
     m_currentBlock = NULL;
+    m_engine = NULL;
 }
 
 inline void TableIterator::reset(TBMapI start) {
@@ -174,40 +179,35 @@ inline void TableIterator::reset(TBMapI start) {
     m_tupleLength = m_table->m_tupleLength;
     m_tuplesPerBlock = m_table->m_tuplesPerBlock;
     m_currentBlock = NULL;
+    m_engine = NULL;
 }
 
 inline bool TableIterator::hasNext() {
     return m_foundTuples < m_activeTuples;
 }
 
-inline bool TableIterator::next(TableTuple &out) {
-    if (!m_tempTableIterator) {
-        return persistentNext(out);
-    }
-    else {
-        return tempNext(out);
-    }
+inline void TableIterator::setEngine(VoltDBEngine* engine) {
+    m_engine = engine;
 }
 
-inline bool TableIterator::next(TableTuple &out, VoltDBEngine* engine) {
-        const int threshold = 100000000;
-        if(m_foundTuples > threshold-3 ) {
-                if(!engine->isLongOp()) {
-                        engine->setLongOp(true);
-                }
-                if(m_foundTuples > threshold-1 && m_foundTuples % threshold == 0) {
-                                //Update stats in java and let java determine if we should cancel this query.
-                                if(engine->getTopend()->updateStats(engine->getBatchIndex(),
-                                                engine->getPlanNodeName(),
-                                                engine->getTargetTable() ? engine->getTargetTable()->name() : "None",
-                                                engine->getTargetTable() ? engine->getTargetTable()->activeTupleCount() : 0,
-                                                m_foundTuples,
-                                                engine->getIndex() ? engine->getIndex()->getName() : "None")){
-                                        VOLT_ERROR("Time out read only query.");
-                                        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "Time out read only query.");
-                                }
-                        }
+inline bool TableIterator::next(TableTuple &out) {
+    if( m_foundTuples > LONG_OP_THRESHOLD-3 && m_engine ) {
+        if(!m_engine->isLongOp()) {
+            m_engine->setLongOp(true);
         }
+        if(m_foundTuples > LONG_OP_THRESHOLD-1 && m_foundTuples % LONG_OP_THRESHOLD == 0) {
+            //Update stats in java and let java determine if we should cancel this query.
+            if(m_engine->getTopend()->updateStats(m_engine->getBatchIndex(),
+                    m_engine->getPlanNodeName(),
+                    m_engine->getTargetTable() ? m_engine->getTargetTable()->name() : "None",
+                            m_engine->getTargetTable() ? m_engine->getTargetTable()->activeTupleCount() : 0,
+                                    m_foundTuples,
+                                    m_engine->getIndex() ? m_engine->getIndex()->getName() : "None")){
+                VOLT_ERROR("Time out read only query.");
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "Time out read only query.");
+            }
+        }
+    }
     if (!m_tempTableIterator) {
         return persistentNext(out);
     }
