@@ -115,6 +115,29 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         assertTrue(foundLineMatching(lines, ".*V2.*GROUP BY with complex expressions not supported.*"));
 
 
+        VoltProjectBuilder project3 = new VoltProjectBuilder();
+        literalSchema =
+                "CREATE TABLE R1 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "WAGE INTEGER, " +
+                "DEPT INTEGER, " +
+                "TM TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) );" +
+                "CREATE TABLE P1 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "WAGE INTEGER, " +
+                "DEPT INTEGER, " +
+                "TM TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) );";
+        try {
+            project3.addLiteralSchema(literalSchema);
+        } catch (IOException e) {
+            assertFalse(true);
+        }
+
+        config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        success = config.compile(project3);
+        assertTrue(success);
         builder.addServerConfig(config);
 
 //        config = new LocalCluster("plansgroupby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
