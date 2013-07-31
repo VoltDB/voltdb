@@ -1568,7 +1568,7 @@ public class DDLCompiler {
         }
 
         if (stmt.hasComplexGroupby()) {
-            msg += "contains an expression involving an group by. " +
+            msg += "contains an expression involving a group by. " +
                     "Expressions with group by are not currently supported in views.";
             throw m_compiler.new VoltCompilerException(msg);
         }

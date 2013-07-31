@@ -51,10 +51,48 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 TestPlansGroupByComplexMaterializedViewSuite.class);
         ByteArrayOutputStream capturer = new ByteArrayOutputStream();
         PrintStream capturing = new PrintStream(capturer);
+        String literalSchema = null;
+        boolean success = true;
+        String captured = null;
+        String[] lines = null;
+
+        VoltProjectBuilder project0 = new VoltProjectBuilder();
+        project0.setCompilerDebugPrintStream(capturing);
+        literalSchema =
+                "CREATE TABLE F ( " +
+                "F_PKEY INTEGER NOT NULL, " +
+                "F_D1   INTEGER NOT NULL, " +
+                "F_D2   INTEGER NOT NULL, " +
+                "F_D3   INTEGER NOT NULL, " +
+                "F_VAL1 INTEGER NOT NULL, " +
+                "F_VAL2 INTEGER NOT NULL, " +
+                "F_VAL3 INTEGER NOT NULL, " +
+                "PRIMARY KEY (F_PKEY) ); " +
+
+                "CREATE VIEW V0 (V_D1_PKEY, V_D2_PKEY, V_D3_PKEY, V_F_PKEY, CNT, SUM_V1, SUM_V2, SUM_V3) " +
+                "AS SELECT F_D1, F_D2, F_D3, F_PKEY, COUNT(*), SUM(F_VAL1)+1, SUM(F_VAL2), SUM(F_VAL3) " +
+                "FROM F  GROUP BY F_D1, F_D2, F_D3, F_PKEY;"
+                ;
+        try {
+            project0.addLiteralSchema(literalSchema);
+        } catch (IOException e) {
+            assertFalse(true);
+        }
+
+        config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        success = config.compile(project0);
+
+        assertFalse(success);
+        captured = capturer.toString("UTF-8");
+        lines = captured.split("\n");
+
+        assertTrue(foundLineMatching(lines,
+                ".*V0.*Expressions with aggregate functions are not currently supported in views.*"));
+
 
         VoltProjectBuilder project1 = new VoltProjectBuilder();
         project1.setCompilerDebugPrintStream(capturing);
-        String literalSchema =
+        literalSchema =
                 "CREATE TABLE F ( " +
                 "F_PKEY INTEGER NOT NULL, " +
                 "F_D1   INTEGER NOT NULL, " +
@@ -76,11 +114,11 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         }
 
         config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        boolean success = config.compile(project1);
+        success = config.compile(project1);
 
         assertFalse(success);
-        String captured = capturer.toString("UTF-8");
-        String[] lines = captured.split("\n");
+        captured = capturer.toString("UTF-8");
+        lines = captured.split("\n");
 
         assertTrue(foundLineMatching(lines,
                 ".*V1.*Expressions with aggregate functions are not currently supported in views.*"));
