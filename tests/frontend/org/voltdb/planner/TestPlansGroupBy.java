@@ -169,9 +169,21 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
     }
 
-//    public void testComplexGroupby() {
-//        pns = compileToFragments("SELECT ABS(A1), ABS(A1)+1, sum(B1) FROM P1 GROUP BY ABS(A1)");
-//    }
+    public void testComplexGroupby() {
+        pns = compileToFragments("SELECT A1, ABS(A1), ABS(A1)+1, sum(B1) FROM P1 GROUP BY A1, ABS(A1)");
+        checkHasComplexAgg(pns);
+
+        // Check it can compile
+        pns = compileToFragments("SELECT ABS(A1), sum(B1) FROM P1 GROUP BY ABS(A1)");
+        AbstractPlanNode p = pns.get(0).getChild(0);
+        //
+        assertTrue(p instanceof AggregatePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+
+    }
 
     private void checkHasComplexAgg(List<AbstractPlanNode> pns) {
         assertTrue(pns.size() > 0);
