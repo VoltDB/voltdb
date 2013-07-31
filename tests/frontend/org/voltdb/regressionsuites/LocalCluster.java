@@ -59,20 +59,6 @@ public class LocalCluster implements VoltServerConfig {
         this.expectedToCrash = expectedToCrash;
     }
 
-    /**
-     * @return the additionalProcessEnv
-     */
-    public Map<String, String> getAdditionalProcessEnv() {
-        return additionalProcessEnv;
-    }
-
-    /**
-     * @param additionalProcessEnv the additionalProcessEnv to set
-     */
-    public void setAdditionalProcessEnv(Map<String, String> additionalProcessEnv) {
-        this.additionalProcessEnv = additionalProcessEnv;
-    }
-
     public enum FailureState {
         ALL_RUNNING,
         ONE_FAILURE,
@@ -133,7 +119,7 @@ public class LocalCluster implements VoltServerConfig {
     private final ArrayList<ArrayList<EEProcess>> m_eeProcs = new ArrayList<ArrayList<EEProcess>>();
     //This is additional process invironment variables that can be passed.
     // This is used to pass JMX port. Any additional use cases can use this too.
-    private Map<String, String> additionalProcessEnv = null;
+    private Map<String, String> m_additionalProcessEnv = null;
     // Produce a (presumably) available IP port number.
     public final PortGeneratorForTest portGenerator = new PortGeneratorForTest();
 
@@ -144,10 +130,18 @@ public class LocalCluster implements VoltServerConfig {
     private final CommandLine templateCmdLine = new CommandLine(StartAction.CREATE);
 
     public LocalCluster(String jarFileName, int siteCount,
+            int hostCount, int kfactor, BackendTarget target, Map<String, String> env) {
+        this(jarFileName, siteCount,
+                hostCount, kfactor, target,
+                FailureState.ALL_RUNNING, false, false, false, env);
+
+    }
+
+    public LocalCluster(String jarFileName, int siteCount,
             int hostCount, int kfactor, BackendTarget target) {
         this(jarFileName, siteCount,
              hostCount, kfactor, target,
-             FailureState.ALL_RUNNING, false, false, false);
+                FailureState.ALL_RUNNING, false, false, false, null);
     }
 
     public LocalCluster(String jarFileName, int siteCount,
@@ -155,7 +149,7 @@ public class LocalCluster implements VoltServerConfig {
                         boolean isRejoinTest, boolean enableIv2) {
         this(jarFileName, siteCount,
              hostCount, kfactor, target,
-             FailureState.ALL_RUNNING, false, isRejoinTest, enableIv2);
+                FailureState.ALL_RUNNING, false, isRejoinTest, enableIv2, null);
     }
 
     public LocalCluster(String jarFileName, int siteCount,
@@ -163,18 +157,18 @@ public class LocalCluster implements VoltServerConfig {
                         FailureState failureState,
                         boolean debug) {
         this(jarFileName, siteCount, hostCount, kfactor, target,
-             failureState, debug, false, false);
+                failureState, debug, false, false, null);
     }
 
     public LocalCluster(String jarFileName, int siteCount,
                         int hostCount, int kfactor, BackendTarget target,
                         FailureState failureState,
-                        boolean debug, boolean isRejoinTest, boolean enableIv2)
-    {
+            boolean debug, boolean isRejoinTest, boolean enableIv2, Map<String, String> env)    {
         assert (jarFileName != null);
         assert (siteCount > 0);
         assert (hostCount > 0);
 
+        m_additionalProcessEnv = env;
         // get the name of the calling class
         StackTraceElement[] traces = Thread.currentThread().getStackTrace();
         m_callingClassName = "UnknownClass";
@@ -239,12 +233,6 @@ public class LocalCluster implements VoltServerConfig {
 
         m_enableIv2 = enableIv2 || VoltDB.checkTestEnvForIv2();
         m_procBuilder = new ProcessBuilder();
-        if (additionalProcessEnv != null) {
-            Map<String, String> env = m_procBuilder.environment();
-            for (String name : additionalProcessEnv.keySet()) {
-                env.put(name, additionalProcessEnv.get(name));
-            }
-        }
 
         // set the working directory to obj/release/prod
         //m_procBuilder.directory(new File(m_buildDir + File.separator + "prod"));
@@ -362,6 +350,12 @@ public class LocalCluster implements VoltServerConfig {
 
         // Make the local Configuration object...
         CommandLine cmdln = (templateCmdLine.makeCopy());
+        if (this.m_additionalProcessEnv != null) {
+            for (String name : this.m_additionalProcessEnv.keySet()) {
+                cmdln.setJavaProperty(name, this.m_additionalProcessEnv.get(name));
+            }
+        }
+
         cmdln.internalPort(portGenerator.next());
         cmdln.voltFilePrefix(subroot.getPath());
         cmdln.internalPort(portGenerator.next());
@@ -586,6 +580,11 @@ public class LocalCluster implements VoltServerConfig {
     {
         PipeToFile ptf = null;
         CommandLine cmdln = (templateCmdLine.makeCopy());
+        if (this.m_additionalProcessEnv != null) {
+            for (String name : this.m_additionalProcessEnv.keySet()) {
+                cmdln.setJavaProperty(name, this.m_additionalProcessEnv.get(name));
+            }
+        }
         try {
             cmdln.internalPort(portGenerator.next());
             // set the dragent port. it uses the start value and

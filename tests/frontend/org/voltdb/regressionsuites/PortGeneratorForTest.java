@@ -34,6 +34,15 @@ public class PortGeneratorForTest extends PortGenerator {
         public int nAdmin = -1;
         public int nZkport = -1;
         public int nReplicationPort = -1;
+        public int nJMXPort = -1;
+
+        public int nextJMXPort() {
+            return nJMXPort;
+        }
+
+        public void setJMXPort(int nc) {
+            nJMXPort = nc;
+        }
 
         public int nextReplicationPort() {
             return nReplicationPort;
