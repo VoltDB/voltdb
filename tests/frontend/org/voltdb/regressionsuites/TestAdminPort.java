@@ -35,7 +35,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestAdminPort extends TestCase {
 
-    NCProcess ncprocess;
+    PortListener ncprocess;
     PipeToFile pf;
     int rport;
 
@@ -51,7 +51,7 @@ public class TestAdminPort extends TestCase {
     public void setUp() throws Exception {
         rport = SecureRandom.getInstance("SHA1PRNG").nextInt(2000) + 22000;
         System.out.println("Random Admin port is: " + rport);
-        ncprocess = new NCProcess(rport);
+        ncprocess = new PortListener(rport);
         try {
             //Build the catalog
             VoltProjectBuilder builder = new VoltProjectBuilder();
