@@ -28,6 +28,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.security.SecureRandom;
+import static junit.framework.Assert.assertTrue;
 import junit.framework.TestCase;
 import org.voltdb.BackendTarget;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -42,12 +43,6 @@ public class TestHttpPort extends TestCase {
         super(name);
     }
 
-    static VoltProjectBuilder getBuilderForTest() throws IOException {
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("");
-        return builder;
-    }
-
     /**
      * JUnit special method called to setup the test. This instance will start
      * the VoltDB server using the VoltServerConfig instance provided.
@@ -58,23 +53,26 @@ public class TestHttpPort extends TestCase {
         System.out.println("Random HTTP port is: " + rport);
         ncprocess = new NCProcess(rport);
         try {
+            //Build the catalog
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addLiteralSchema("");
+            String catalogJar = "dummy.jar";
+            builder.setHTTPDPort(rport);
 
-            // build up a project builder for the workload
-            VoltProjectBuilder project = getBuilderForTest();
-            boolean success;
-            LocalCluster config = new LocalCluster("decimal-default.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            project.setHTTPDPort(rport);
+            LocalCluster config = new LocalCluster(catalogJar, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
-            success = config.compile(project);
+            config.portGenerator.enablePortProvider();
+            config.portGenerator.pprovider.setAdmin(rport);
             config.setHasLocalServer(false);
-            assertTrue(success);
+            //We expect it to crash
             config.setExpectedToCrash(true);
+
+            boolean success = config.compile(builder);
+            assertTrue(success);
 
             config.startUp();
             pf = config.m_pipes.get(0);
-            Process p = config.m_cluster.get(0);
             Thread.currentThread().sleep(10000);
-            p.destroy();
         } catch (IOException ex) {
             fail(ex.getMessage());
         } finally {
