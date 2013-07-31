@@ -82,7 +82,8 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         String captured = capturer.toString("UTF-8");
         String[] lines = captured.split("\n");
 
-        assertTrue(foundLineMatching(lines, ".*V1.*complex aggregation expressions not supported.*"));
+        assertTrue(foundLineMatching(lines,
+                ".*V1.*Expressions with aggregate functions are not currently supported in views.*"));
 
         //
         VoltProjectBuilder project2 = new VoltProjectBuilder();
@@ -112,7 +113,8 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         assertFalse(success);
         captured = capturer.toString("UTF-8");
         lines = captured.split("\n");
-        assertTrue(foundLineMatching(lines, ".*V2.*GROUP BY with complex expressions not supported.*"));
+        assertTrue(foundLineMatching(lines,
+                ".*V2.*Expressions with group by are not currently supported in views.*"));
 
 
         VoltProjectBuilder project3 = new VoltProjectBuilder();
@@ -153,10 +155,12 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         return builder;
     }
     static private boolean foundLineMatching(String[] lines, String pattern) {
+        String contents = "";
         for (String string : lines) {
-            if (string.matches(pattern)) {
-                return true;
-            }
+            contents += string;
+        }
+        if (contents.matches(pattern)) {
+            return true;
         }
         return false;
     }

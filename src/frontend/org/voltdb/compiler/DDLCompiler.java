@@ -1568,12 +1568,14 @@ public class DDLCompiler {
         }
 
         if (stmt.hasComplexGroupby()) {
-            msg += "has GROUP BY with complex expressions not supported";
+            msg += "contains an expression involving an group by. " +
+                    "Expressions with group by are not currently supported in views.";
             throw m_compiler.new VoltCompilerException(msg);
         }
 
         if (stmt.hasComplexAgg()) {
-            msg += "has complex aggregation expressions not supported";
+            msg += "contains an expression involving an aggregate function. " +
+                    "Expressions with aggregate functions are not currently supported in views.";
             throw m_compiler.new VoltCompilerException(msg);
         }
 

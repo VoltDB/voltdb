@@ -97,7 +97,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         for (String tb: tbs) {
             // Test pass-through columns, group by primary key
             cr = client.callProcedure("@AdHoc", "SELECT dept, count(wage) from " + tb +
-                    " GROUP BY id ORDER BY dept");
+                    " GROUP BY id ORDER BY dept DESC");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] {{2,1}, {2,1}, {1,1}, {1,1}, {1,1} };
