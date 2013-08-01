@@ -387,7 +387,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     abstract public byte[] loadTable(
         int tableId, VoltTable table, long spHandle,
-        long lastCommittedSpHandle, boolean returnUniqueViolations) throws EEException;
+        long lastCommittedSpHandle, boolean returnUniqueViolations,
+        long undoToken) throws EEException;
 
     /**
      * Set the log levels to be used when logging in this engine
@@ -582,9 +583,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param Length of the serialized table
      * @param undoToken token for undo quantum where changes should be logged.
      * @param returnUniqueViolations If true unique violations won't cause a fatal error and will be returned instead
+     * @param undoToken The undo token to release
      */
     protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table,
-            long spHandle, long lastCommittedSpHandle, boolean returnUniqueViolations);
+            long spHandle, long lastCommittedSpHandle, boolean returnUniqueViolations, long undoToken);
 
     /**
      * Executes multiple plan fragments with the given parameter sets and gets the results.

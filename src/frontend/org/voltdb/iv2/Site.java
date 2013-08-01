@@ -682,7 +682,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     @Override
     public byte[] loadTable(long txnId, String clusterName, String databaseName,
-            String tableName, VoltTable data, boolean returnUniqueViolations) throws VoltAbortException
+            String tableName, VoltTable data,
+            boolean returnUniqueViolations, long undoToken) throws VoltAbortException
     {
         Cluster cluster = m_context.cluster;
         if (cluster == null) {
@@ -697,15 +698,18 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
         }
 
-        return loadTable(txnId, table.getRelativeIndex(), data, returnUniqueViolations);
+        return loadTable(txnId, table.getRelativeIndex(), data, returnUniqueViolations, undoToken);
     }
 
     @Override
-    public byte[] loadTable(long spHandle, int tableId, VoltTable data, boolean returnUniqueViolations)
+    public byte[] loadTable(long spHandle, int tableId,
+            VoltTable data, boolean returnUniqueViolations,
+            long undoToken)
     {
+        // Long.MAX_VALUE is a no-op don't track undo token
         return m_ee.loadTable(tableId, data,
                 spHandle,
-                m_lastCommittedSpHandle, returnUniqueViolations);
+                m_lastCommittedSpHandle, returnUniqueViolations, undoToken);
     }
 
     @Override

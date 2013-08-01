@@ -343,7 +343,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public byte[] loadTable(final int tableId, final VoltTable table,
-        final long txnId, final long lastCommittedTxnId, boolean returnUniqueViolations) throws EEException
+        final long txnId, final long lastCommittedTxnId, boolean returnUniqueViolations,
+        long undoToken) throws EEException
     {
         if (LOG.isTraceEnabled()) {
             LOG.trace("loading table id=" + tableId + "...");
@@ -354,7 +355,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
 
         final int errorCode = nativeLoadTable(pointer, tableId, serialized_table,
-                                              txnId, lastCommittedTxnId, returnUniqueViolations);
+                                              txnId, lastCommittedTxnId, returnUniqueViolations, undoToken);
         checkErrorCode(errorCode);
 
         deserializer.clear();

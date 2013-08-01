@@ -105,10 +105,11 @@ public class TestExecutionEngine extends TestCase {
         }
 
         System.out.println(warehousedata.toString());
-        engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, false);
+        // Long.MAX_VALUE is a no-op don't track undo token
+        engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, false, Long.MAX_VALUE);
 
         //Check that we can detect and handle the dups when loading the data twice
-        byte results[] = engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, true);
+        byte results[] = engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, true, Long.MAX_VALUE);
         System.out.println("Printing dups");
         System.out.println(PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(results), true));
 
@@ -137,7 +138,8 @@ public class TestExecutionEngine extends TestCase {
                              "sdist4", "sdist5", "sdist6", "sdist7", "sdist8",
                              "sdist9", "sdist10", 0, 0, 0, "sdata");
         }
-        engine.loadTable(STOCK_TABLEID, stockdata, 0, 0, false);
+        // Long.MAX_VALUE is a no-op don't track undo token
+        engine.loadTable(STOCK_TABLEID, stockdata, 0, 0, false, Long.MAX_VALUE);
     }
 
     public void testLoadTable() throws Exception {

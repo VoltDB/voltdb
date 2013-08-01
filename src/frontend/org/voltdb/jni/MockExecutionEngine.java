@@ -139,7 +139,7 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public byte[] loadTable(final int tableId, final VoltTable table, final long txnId,
-        final long lastCommittedTxnId, boolean returnUniqueViolations)
+        final long lastCommittedTxnId, boolean returnUniqueViolations, long undoToken)
     throws EEException
     {
         return null;

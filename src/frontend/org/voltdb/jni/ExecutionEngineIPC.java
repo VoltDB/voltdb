@@ -836,7 +836,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public byte[] loadTable(final int tableId, final VoltTable table, final long spHandle,
-            final long lastCommittedSpHandle, boolean returnUniqueViolations)
+            final long lastCommittedSpHandle, boolean returnUniqueViolations, long undoToken)
     throws EEException
     {
         if (returnUniqueViolations) {
@@ -847,6 +847,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putInt(tableId);
         m_data.putLong(spHandle);
         m_data.putLong(lastCommittedSpHandle);
+        m_data.putLong(undoToken);
         m_data.putInt(returnUniqueViolations ? 1 : 0);
 
         final ByteBuffer tableBytes = table.getTableDataReference();

@@ -71,13 +71,19 @@ public interface SiteProcedureConnection {
             String databaseName,
             String tableName,
             VoltTable data,
-            boolean returnUniqueViolations)
+            boolean returnUniqueViolations,
+            long undoToken)
     throws VoltAbortException;
 
     /**
      * loadTable method used internally by ExecutionSite/Site clients
      */
-    public byte[] loadTable(long txnId, int tableId, VoltTable data, boolean returnUniqueViolations);
+    public byte[] loadTable(
+            long txnId,
+            int tableId,
+            VoltTable data,
+            boolean returnUniqueViolations,
+            long undoToken);
 
     /**
      * Execute a set of plan fragments.
