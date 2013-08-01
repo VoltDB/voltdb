@@ -74,6 +74,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
+
 import org.voltdb.ClientInterfaceHandleManager.Iv2InFlight;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
@@ -354,7 +355,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
                 catch (IOException e) {
                     String msg = "Client interface failed to bind to"
-                            + (m_isAdmin ? " Admin " : " ") + "port " + m_port;
+                            + (m_isAdmin ? " Admin " : " ") + "port: " + m_port;
                     MiscUtils.printPortsInUse(hostLog);
                     VoltDB.crashLocalVoltDB(msg, false, e);
                 }

@@ -87,8 +87,8 @@ public class LocalCluster implements VoltServerConfig {
     ArrayList<Process> m_cluster = new ArrayList<Process>();
     int perLocalClusterExtProcessIndex = 0;
     VoltProjectBuilder m_builder;
-    private boolean expectedToCrash = false;
-    private boolean expectedToInitialize = true;
+    private boolean m_expectedToCrash = false;
+    private boolean m_expectedToInitialize = true;
 
     // Dedicated paths in the filesystem to be used as a root for each process
     ArrayList<File> m_subRoots = new ArrayList<File>();
@@ -379,7 +379,7 @@ public class LocalCluster implements VoltServerConfig {
     }
 
     boolean waitForAllReady() {
-        if (!expectedToInitialize) {
+        if (!m_expectedToInitialize) {
             return true;
         }
         long startOfPipeWait = System.currentTimeMillis();
@@ -508,7 +508,7 @@ public class LocalCluster implements VoltServerConfig {
 
             if (downProcesses > 0) {
                 int expectedProcesses = m_hostCount - (m_hasLocalServer ? 1 : 0);
-                if (!expectedToCrash) {
+                if (!m_expectedToCrash) {
                     throw new RuntimeException(
                             String.format("%d/%d external processes failed to start",
                             downProcesses, expectedProcesses));
@@ -660,8 +660,6 @@ public class LocalCluster implements VoltServerConfig {
                 }
             }
 
-            // for debug, dump the command line to a file.
-            //cmdln.dumpToFile("/tmp/izzy/cmd_" + Integer.toString(portGenerator.next()));
             Process proc = m_procBuilder.start();
             m_cluster.add(proc);
             String fileName = testoutputdir
@@ -1232,30 +1230,30 @@ public class LocalCluster implements VoltServerConfig {
     }
 
     /**
-     * @return the expectedToCrash
+     * @return the m_expectedToCrash
      */
     public boolean isExpectedToCrash() {
-        return expectedToCrash;
+        return m_expectedToCrash;
     }
 
     /**
-     * @param expectedToCrash the expectedToCrash to set
+     * @param m_expectedToCrash the m_expectedToCrash to set
      */
     public void setExpectedToCrash(boolean expectedToCrash) {
-        this.expectedToCrash = expectedToCrash;
+        this.m_expectedToCrash = expectedToCrash;
     }
 
     /**
-     * @return the expectedToInitialize
+     * @return the m_expectedToInitialize
      */
     public boolean isExpectedToInitialize() {
-        return expectedToInitialize;
+        return m_expectedToInitialize;
     }
 
     /**
-     * @param expectedToInitialize the expectedToInitialize to set
+     * @param m_expectedToInitialize the m_expectedToInitialize to set
      */
     public void setExpectedToInitialize(boolean expectedToInitialize) {
-        this.expectedToInitialize = expectedToInitialize;
+        this.m_expectedToInitialize = expectedToInitialize;
     }
 }
