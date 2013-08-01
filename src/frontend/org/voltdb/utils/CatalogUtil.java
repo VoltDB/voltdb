@@ -1606,4 +1606,24 @@ public abstract class CatalogUtil {
             sa.tablesUpdated.add(table);
         }
     }
+
+    /**
+     * Get all normal tables from the catalog. A normal table is one that's NOT a materialized
+     * view, nor an export table. For the lack of a better name, I call it normal.
+     * @param catalog         Catalog database
+     * @param isReplicated    true to return only replicated tables,
+     *                        false to return all partitioned tables
+     * @return A list of tables
+     */
+    public static List<Table> getNormalTables(Database catalog, boolean isReplicated) {
+        List<Table> tables = new ArrayList<Table>();
+        for (Table table : catalog.getTables()) {
+            if ((table.getIsreplicated() == isReplicated) &&
+                table.getMaterializer() == null &&
+                !CatalogUtil.isTableExportOnly(catalog, table)) {
+                tables.add(table);
+            }
+        }
+        return tables;
+    }
 }
