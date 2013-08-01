@@ -112,6 +112,11 @@ if [ "$1" = "mask" ]; then
     exec $VOLTDB_HOME/tools/volt "$@"
 fi
 
+# log collection is handled by tools/volt
+if [ "$1" = "collect" ]; then
+    exec $VOLTDB_HOME/tools/volt "$@"
+fi
+
 # detect and adjust for Linux package installation vs. VoltDB distribution
 if [ -d "$VOLTDB_HOME/../../lib/voltdb" ]; then
     # Linux package installation puts all libraries in /usr/lib/voltdb
