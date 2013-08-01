@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.SettableFuture;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
@@ -315,6 +316,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
         public SnapshotSender(Mailbox mb)
         {
+            Preconditions.checkArgument(mb != null);
             m_mb = mb;
             m_workQueue = new LinkedBlockingQueue<SendWork>();
             m_expectedEOFs = new AtomicInteger();

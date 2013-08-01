@@ -17,6 +17,7 @@
 
 package org.voltdb.rejoin;
 
+import com.google.common.base.Preconditions;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
@@ -43,6 +44,7 @@ public class StreamSnapshotAckReceiver implements Runnable {
     volatile Exception m_lastException = null;
 
     public StreamSnapshotAckReceiver(Mailbox mb) {
+        Preconditions.checkArgument(mb != null);
         m_mb = mb;
         m_callbacks = Collections.synchronizedMap(new HashMap<Long, AckCallback>());
         m_expectedEOFs = new AtomicInteger();
