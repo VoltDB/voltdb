@@ -17,7 +17,6 @@
 
 package org.voltdb.planner;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -40,7 +39,6 @@ import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
-import org.voltdb.expressions.InComparisonExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -557,28 +555,8 @@ public class PlanAssembler {
         if (root != null && root.getPlanNodeType() == PlanNodeType.NESTLOOPINDEX) {
             assert(parsedStmt != null);
             if (parsedStmt.joinTree.m_root != null ) {
-                ArrayDeque<JoinTree.JoinNode> joinNodes = new ArrayDeque<JoinTree.JoinNode>();
-                joinNodes.add(parsedStmt.joinTree.m_root);
-
-                while (!joinNodes.isEmpty()) {
-                    JoinTree.JoinNode joinNode = joinNodes.poll();
-                    if (joinNode == null) {
-                        continue;
-                    }
-                    if (joinNode.m_leftNode != null) {
-                        joinNodes.add(joinNode.m_leftNode);
-                    }
-                    if (joinNode.m_rightNode != null) {
-                        joinNodes.add(joinNode.m_rightNode);
-                    }
-                    if (joinNode.m_table != null) {
-                        if (joinNode.m_joinExpr != null && joinNode.m_joinExpr instanceof InComparisonExpression) {
-                            return true;
-                        }
-                    }
-                }
+                return true;
             }
-
         }
         return false;
     }
