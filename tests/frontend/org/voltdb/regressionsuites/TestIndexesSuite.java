@@ -390,6 +390,74 @@ public class TestIndexesSuite extends RegressionSuite {
                  " and T.NUM IN (10)", table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(0, results[0].getRowCount());
+
+//            Current table is P3, results:
+//                header size: 46
+//                status code: -128 column count: 5
+//                cols (ID:INTEGER), (DESC:STRING), (NUM:INTEGER), (NUM2:INTEGER), (RATIO:FLOAT),
+//                rows -
+//                 3,c,200,3,16.5
+//                 6,f,200,6,17.5
+//                 1,a,100,1,14.5
+//                 7,g,300,7,18.5
+//                 2,b,100,2,15.5
+//                 8,h,300,8,19.5
+
+            // try some DML -- but try not to actually update values except to themselves
+            // -- that just makes it harder to profile expected results down the line
+            query = String.format("delete from %s where DESC IN ('')" +
+                    " and NUM IN (111,112)", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            System.out.println("Delete results:" + results[0]);
+            assertEquals(1, results[0].getRowCount());
+            results[0].advanceRow();
+            assertEquals(0, results[0].getLong(0));
+
+            query = String.format("select * from %s T ", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(6, results[0].getRowCount());
+
+            // Try delete with in
+            query = String.format("delete from %s where DESC IN ('x','y', 'b','z')" +
+                    " and NUM IN (119,100)", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(1, results[0].getRowCount());
+            results[0].advanceRow();
+            assertEquals(1, results[0].getLong(0));
+
+            query = String.format("select * from %s T ", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(5, results[0].getRowCount());
+
+            results = client.callProcedure("Insert", table, 2, "b", 100, 2, 15.5).getResults();
+            assertEquals(1, results[0].getRowCount());
+            results[0].advanceRow();
+            assertEquals(1, results[0].getLong(0));
+
+            // Test update with IN
+            query = String.format("update %s set num2 = 10 where DESC IN ('x', 'y', 'z', 'c')", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(1, results[0].getRowCount());
+            results[0].advanceRow();
+            assertEquals(1, results[0].getLong(0));
+
+            query = String.format("select id, desc from %s where num2 = 10 ", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(1, results[0].getRowCount());
+            results[0].advanceRow();
+            assertEquals(3, results[0].getLong(0));
+            assertEquals("c", results[0].getString(1));
+
+            query = String.format("update %s set num2 = 3 where DESC = 'c'", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(1, results[0].getRowCount());
+            results[0].advanceRow();
+            assertEquals(1, results[0].getLong(0));
+
+            query = String.format("select * from %s T ", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            assertEquals(6, results[0].getRowCount());
+
         }
 
         // Flag whether CompiledInLists needs to tiptoe around lack of "col IN ?" support
@@ -493,6 +561,36 @@ public class TestIndexesSuite extends RegressionSuite {
             assertEquals(1, results.length);
             assertEquals(4, results[0].getRowCount());
         }
+
+        // Confirm that filters get the expected number of rows before trying the DML that uses them.
+        results = client.callProcedure("@AdHoc", "select count(*) from R3 where DESC IN ('x', 'y', 'z', 'a')" +
+                                                 " and NUM IN (1010, 1020, 1030, -1040, 100)").getResults();
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
+        results[0].advanceRow();
+        assertEquals(1, results[0].getLong(0));
+
+        results = client.callProcedure("@AdHoc", "select count(*) from P3 where DESC IN ('x', 'y', 'z', 'b')" +
+                                                 " and NUM IN (1010, 1020, 1030, -1040, 100)").getResults();
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
+        results[0].advanceRow();
+        assertEquals(1, results[0].getLong(0));
+
+        // Test IN LIST DML interaction ENG-4909 -- this is a plan correctness test --
+        results = client.callProcedure("@AdHoc", "update R3 set NUM = (1000) where DESC IN ('x', 'y', 'z', 'a')" +
+                                                 " and NUM IN (1010, 1020, 1030, -1040, 100)").getResults();
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
+        results[0].advanceRow();
+        assertEquals(1, results[0].getLong(0));
+
+        results = client.callProcedure("@AdHoc", "delete from P3 where DESC IN ('x', 'y', 'z', 'b')" +
+                                                 " and NUM IN (1010, 1020, 1030, -1040, 100)").getResults();
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
+        results[0].advanceRow();
+        assertEquals(1, results[0].getLong(0));
 
     }
 
@@ -951,6 +1049,12 @@ public class TestIndexesSuite extends RegressionSuite {
                                  "'this here is a longish string to force a permanent object allocation'" +
                                  ")" +
                                  " and T.NUM IN ?");
+
+        //project.addStmtProcedure("InlinedUpdateInListP3with5NUMs",
+        //        "update P3 set NUM = 0 where DESC IN ('a', 'b', 'c', 'g', " +
+        //        "'this here is a longish string to force a permanent object allocation'" +
+        //        ")" +
+        //        " and NUM IN (111,222,333,444,555)");
 
         boolean success;
 
