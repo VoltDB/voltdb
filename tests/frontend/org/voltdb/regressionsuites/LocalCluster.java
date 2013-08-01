@@ -47,20 +47,6 @@ import org.voltdb.utils.VoltFile;
  */
 public class LocalCluster implements VoltServerConfig {
 
-    /**
-     * @return the expectedToCrash
-     */
-    public boolean isExpectedToCrash() {
-        return expectedToCrash;
-    }
-
-    /**
-     * @param expectedToCrash the expectedToCrash to set
-     */
-    public void setExpectedToCrash(boolean expectedToCrash) {
-        this.expectedToCrash = expectedToCrash;
-    }
-
     public enum FailureState {
         ALL_RUNNING,
         ONE_FAILURE,
@@ -102,6 +88,7 @@ public class LocalCluster implements VoltServerConfig {
     int perLocalClusterExtProcessIndex = 0;
     VoltProjectBuilder m_builder;
     private boolean expectedToCrash = false;
+    private boolean expectedToInitialize = true;
 
     // Dedicated paths in the filesystem to be used as a root for each process
     ArrayList<File> m_subRoots = new ArrayList<File>();
@@ -358,9 +345,9 @@ public class LocalCluster implements VoltServerConfig {
             }
         }
 
-        cmdln.internalPort(portGenerator.next());
+        cmdln.internalPort(portGenerator.nextInternalPort());
         cmdln.voltFilePrefix(subroot.getPath());
-        cmdln.internalPort(portGenerator.next());
+        cmdln.internalPort(portGenerator.nextInternalPort());
         cmdln.port(portGenerator.nextClient());
         cmdln.adminPort(portGenerator.nextAdmin());
         cmdln.zkport(portGenerator.nextZkPort());
@@ -392,6 +379,9 @@ public class LocalCluster implements VoltServerConfig {
     }
 
     boolean waitForAllReady() {
+        if (!expectedToInitialize) {
+            return true;
+        }
         long startOfPipeWait = System.currentTimeMillis();
         boolean allReady = false;
         do {
@@ -467,7 +457,7 @@ public class LocalCluster implements VoltServerConfig {
         // reset the port generator. RegressionSuite always expects
         // to find ClientInterface and Admin mode on known ports.
         portGenerator.reset();
-        templateCmdLine.leaderPort(portGenerator.next());
+        templateCmdLine.leaderPort(portGenerator.nextInternalPort());
 
         m_eeProcs.clear();
         for (int ii = 0; ii < m_hostCount; ii++) {
@@ -588,7 +578,7 @@ public class LocalCluster implements VoltServerConfig {
             }
         }
         try {
-            cmdln.internalPort(portGenerator.next());
+            cmdln.internalPort(portGenerator.nextInternalPort());
             // set the dragent port. it uses the start value and
             // the next two sequential port numbers - so burn those two.
             cmdln.drAgentStartPort(portGenerator.nextReplicationPort());
@@ -651,7 +641,7 @@ public class LocalCluster implements VoltServerConfig {
             // this may need to be more unique? Also very useful to just
             // set this to a hardcoded path and use "tail -f" to debug.
             String testoutputdir = cmdln.buildDir() + File.separator + "testoutput";
-            System.out.println("Process output will be redirected to directory: " + testoutputdir);
+            System.out.println("Process output will be redirected to: " + testoutputdir);
             // make sure the directory exists
             File dir = new File(testoutputdir);
             if (dir.exists()) {
@@ -795,7 +785,7 @@ public class LocalCluster implements VoltServerConfig {
             rejoinCmdLn.m_port = portGenerator.nextClient();
             rejoinCmdLn.m_adminPort = portGenerator.nextAdmin();
             rejoinCmdLn.m_zkInterface = "127.0.0.1:" + portGenerator.next();
-            rejoinCmdLn.m_internalPort = portGenerator.next();
+            rejoinCmdLn.m_internalPort = portGenerator.nextInternalPort();
             setPortsFromConfig(hostId, rejoinCmdLn);
 
             List<String> rejoinCmdLnStr = rejoinCmdLn.createCommandLine();
@@ -980,14 +970,12 @@ public class LocalCluster implements VoltServerConfig {
                     retval = proc.waitFor();
                 }
                 catch (InterruptedException e) {
-                    System.out.println("shutDownExternal Unable to wait for Localcluster process to die: " + proc.toString());
-                    log.error("shutDownExternal Unable to wait for Localcluster process to die: " + proc.toString(), e);
+                    log.error("Unable to wait for Localcluster process to die: " + proc.toString(), e);
                 }
                 // exit code 143 is the forcible shutdown code from .destroy()
                 if (retval != 0 && retval != 143)
                 {
-                    System.out.println("shutDownExternal: External VoltDB process terminated abnormally with return: " + retval);
-                    log.error("shutDownExternal: External VoltDB process terminated abnormally with return: " + retval);
+                    log.error("External VoltDB process terminated abnormally with return: " + retval);
                 }
             }
         }
@@ -1241,5 +1229,33 @@ public class LocalCluster implements VoltServerConfig {
             retval[ii] = new File(m_subRoots.get(ii), path.getPath());
         }
         return retval;
+    }
+
+    /**
+     * @return the expectedToCrash
+     */
+    public boolean isExpectedToCrash() {
+        return expectedToCrash;
+    }
+
+    /**
+     * @param expectedToCrash the expectedToCrash to set
+     */
+    public void setExpectedToCrash(boolean expectedToCrash) {
+        this.expectedToCrash = expectedToCrash;
+    }
+
+    /**
+     * @return the expectedToInitialize
+     */
+    public boolean isExpectedToInitialize() {
+        return expectedToInitialize;
+    }
+
+    /**
+     * @param expectedToInitialize the expectedToInitialize to set
+     */
+    public void setExpectedToInitialize(boolean expectedToInitialize) {
+        this.expectedToInitialize = expectedToInitialize;
     }
 }

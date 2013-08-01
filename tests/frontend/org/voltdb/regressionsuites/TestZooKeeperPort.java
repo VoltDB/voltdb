@@ -87,7 +87,6 @@ public class TestZooKeeperPort extends TestCase {
     @Override
     public void tearDown() throws Exception {
         if (ncprocess != null) {
-            System.out.println("Killing NC processes.");
             ncprocess.close();
         }
     }

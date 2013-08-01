@@ -35,6 +35,15 @@ public class PortGeneratorForTest extends PortGenerator {
         public int nZkport = -1;
         public int nReplicationPort = -1;
         public int nJMXPort = -1;
+        public int nInternalPort = -1;
+
+        public int nextInternalPort() {
+            return nInternalPort;
+        }
+
+        public void setInternalPort(int nc) {
+            nInternalPort = nc;
+        }
 
         public int nextJMXPort() {
             return nJMXPort;
@@ -116,6 +125,16 @@ public class PortGeneratorForTest extends PortGenerator {
     public int nextReplicationPort() {
         if (pprovider != null) {
             int rport = pprovider.nextReplicationPort();
+            if (rport != -1) {
+                return rport;
+            }
+        }
+        return super.next();
+    }
+
+    public int nextInternalPort() {
+        if (pprovider != null) {
+            int rport = pprovider.nextInternalPort();
             if (rport != -1) {
                 return rport;
             }

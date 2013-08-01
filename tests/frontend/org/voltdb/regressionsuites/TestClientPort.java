@@ -29,6 +29,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.security.SecureRandom;
 
+import static junit.framework.Assert.assertNotNull;
 import static junit.framework.Assert.assertTrue;
 import junit.framework.TestCase;
 
@@ -73,6 +74,8 @@ public class TestClientPort extends TestCase {
 
             config.startUp();
             pf = config.m_pipes.get(0);
+            assertNotNull(pf);
+
             Thread.currentThread().sleep(10000);
         } catch (IOException ex) {
             fail(ex.getMessage());
@@ -87,7 +90,6 @@ public class TestClientPort extends TestCase {
     @Override
     public void tearDown() throws Exception {
         if (ncprocess != null) {
-            System.out.println("Killing NC processes.");
             ncprocess.close();
         }
     }

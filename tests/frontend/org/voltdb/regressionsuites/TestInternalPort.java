@@ -29,19 +29,19 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.security.SecureRandom;
 
-import static junit.framework.Assert.assertTrue;
+import static junit.framework.Assert.fail;
 import junit.framework.TestCase;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.compiler.VoltProjectBuilder;
 
-public class TestHttpPort extends TestCase {
+public class TestInternalPort extends TestCase {
 
     PortListener ncprocess;
     PipeToFile pf;
     int rport;
 
-    public TestHttpPort(String name) {
+    public TestInternalPort(String name) {
         super(name);
     }
 
@@ -52,22 +52,21 @@ public class TestHttpPort extends TestCase {
     @Override
     public void setUp() throws Exception {
         rport = SecureRandom.getInstance("SHA1PRNG").nextInt(2000) + 22000;
-        System.out.println("Random HTTP port is: " + rport);
+        System.out.println("Random Internal port is: " + rport);
         ncprocess = new PortListener(rport);
         try {
             //Build the catalog
             VoltProjectBuilder builder = new VoltProjectBuilder();
             builder.addLiteralSchema("");
             String catalogJar = "dummy.jar";
-            builder.setHTTPDPort(rport);
 
             LocalCluster config = new LocalCluster(catalogJar, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
             config.portGenerator.enablePortProvider();
-            config.portGenerator.pprovider.setAdmin(rport);
+            config.portGenerator.pprovider.setInternalPort(rport);
+            //We dont expect the process to initialize as its goint to wait for leader.
+            config.setExpectedToInitialize(false);
             config.setHasLocalServer(false);
-            //We expect it to crash
-            config.setExpectedToCrash(true);
 
             boolean success = config.compile(builder);
             assertTrue(success);
@@ -95,11 +94,11 @@ public class TestHttpPort extends TestCase {
     /*
      *
      */
-    public void testHttpPort() throws Exception {
+    public void testInternalPort() throws Exception {
         BufferedReader bi = new BufferedReader(new FileReader(new File(pf.m_filename)));
         String line;
         boolean failed = true;
-        final CharSequence cs = "HTTP service unable to bind to port";
+        final CharSequence cs = "Connecting to the VoltDB cluster leader";
         while ((line = bi.readLine()) != null) {
             System.out.println(line);
             if (line.contains(cs)) {
