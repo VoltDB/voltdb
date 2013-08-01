@@ -17,7 +17,6 @@
 
 package org.voltdb;
 
-import com.google.common.collect.ImmutableSet;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -35,6 +34,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.PriorityBlockingQueue;
+
+import com.google.common.collect.ImmutableSet;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -44,6 +45,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
+
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.export.ExportManager;

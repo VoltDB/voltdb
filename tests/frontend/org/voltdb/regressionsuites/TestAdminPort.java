@@ -28,8 +28,10 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.security.SecureRandom;
+
 import static junit.framework.Assert.fail;
 import junit.framework.TestCase;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.compiler.VoltProjectBuilder;
 

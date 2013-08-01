@@ -22,9 +22,11 @@
  */
 package org.voltdb.export;
 
-import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.util.Properties;
+
+import com.google.common.collect.ImmutableMap;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.LegacyHashinator;
 import org.voltdb.TheHashinator;
