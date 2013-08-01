@@ -33,6 +33,8 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.FailureSiteForwardMessage;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.SiteFailureMessage;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.fsfmMsg;
+import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmFailed;
+import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmFailures;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmSafe;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmSafeTxns;
 import static org.voltcore.agreement.maker.SiteFailureMessageMaker.sfmSource;
@@ -67,7 +69,8 @@ public class TestAgreementSeeker {
     public void testOneNodeDown() throws Exception {
         Maker<SiteFailureMessage> s2fail = a(SiteFailureMessage,
                 with(sfmSurvivors,Longs.asList(1,3,4)),
-                with(sfmSafeTxns,sfmSafe(2,22)));
+                with(sfmSafeTxns,sfmSafe(2,22)),
+                with(sfmFailures,sfmFailed(2)));
 
         s1.startSeekingFor(hsids, ImmutableMap.of(2L,true));
         s3.startSeekingFor(hsids, ImmutableMap.of(2L,true));
@@ -102,7 +105,8 @@ public class TestAgreementSeeker {
     public void testTwoNodesDown() throws Exception {
         Maker<SiteFailureMessage> s23fail = a(SiteFailureMessage,
                 with(sfmSurvivors,Longs.asList(1,4)),
-                with(sfmSafeTxns,sfmSafe(2,22,3,33)));
+                with(sfmSafeTxns,sfmSafe(2,22,3,33)),
+                with(sfmFailures,sfmFailed(2,3)));
 
         s1.startSeekingFor(hsids, ImmutableMap.of(2L,true,3L,true));
         s4.startSeekingFor(hsids, ImmutableMap.of(2L,true,3L,true));
@@ -129,7 +133,8 @@ public class TestAgreementSeeker {
     public void testOneLinkDownBetweenTwoNodes() throws Exception {
         Maker<SiteFailureMessage> msg = a(SiteFailureMessage,
                 with(sfmSurvivors,Longs.asList(1,2,3,4)),
-                with(sfmSafeTxns,sfmSafe(3,33,4,44)));
+                with(sfmSafeTxns,sfmSafe(3,33,4,44)),
+                with(sfmFailures,sfmFailed(3,4)));
 
 
         s1.startSeekingFor(hsids, ImmutableMap.of(3L,false,4L,false));
