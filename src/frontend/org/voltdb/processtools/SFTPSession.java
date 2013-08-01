@@ -80,6 +80,7 @@ public class SFTPSession {
      * @param user SFTP connection user name
      * @param key SFTP connection private key
      * @param host SFTP remote host name
+     * @param password SFTP connection password
      * @param port SFTP port
      * @param log logger
      *
@@ -87,7 +88,7 @@ public class SFTPSession {
      *   session
      */
     public SFTPSession(
-            final String user, final String key, final String host,
+            final String user, final String key, final String host, final String password,
             int port, final VoltLogger log) {
         Preconditions.checkArgument(
                 user != null && !user.trim().isEmpty(),
@@ -122,6 +123,10 @@ public class SFTPSession {
             session.setTimeout(15000);
             session.setConfig("StrictHostKeyChecking", "no");
             session.setDaemonThread(true);
+
+            if (password != null && !password.trim().isEmpty()) {
+                session.setPassword(password);
+            }
         } catch (JSchException jsex) {
             throw new SFTPException("create a JSch session", jsex);
         }
@@ -145,6 +150,21 @@ public class SFTPSession {
             throw new SFTPException("open an SFTP channel", jsex);
         }
         m_channel = channel;
+    }
+
+    public SFTPSession( final String user, final String key, final String host, final String password) {
+        this(user, key, host, password, 22, null);
+    }
+
+    public SFTPSession( final String user, final String key,
+            final String host, final String password, final VoltLogger log) {
+        this(user, key, host, password, 22, log);
+    }
+
+    public SFTPSession(
+            final String user, final String key, final String host,
+            int port, final VoltLogger log) {
+        this(user, key, host, null, 22, null);
     }
 
     public SFTPSession( final String user, final String key, final String host) {
