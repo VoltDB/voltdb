@@ -548,6 +548,18 @@ public class PlanAssembler {
         return true;
     }
 
+    // ENG-4909 Bug: currently disable NESTLOOPINDEX plan for IN
+    private boolean disableNestedLoopIndexJoinForInComparison (AbstractPlanNode root, AbstractParsedStmt parsedStmt) {
+        if (root != null && root.getPlanNodeType() == PlanNodeType.NESTLOOPINDEX) {
+            assert(parsedStmt != null);
+            if (parsedStmt.joinTree.m_root != null ) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+
     private AbstractPlanNode getNextDeletePlan() {
         assert (subAssembler != null);
 
@@ -556,6 +568,12 @@ public class PlanAssembler {
         Table targetTable = m_parsedDelete.tableList.get(0);
 
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
+
+        // ENG-4909 Bug: currently disable NESTLOOPINDEX plan for IN
+        if (disableNestedLoopIndexJoinForInComparison(subSelectRoot, m_parsedDelete)) {
+            subSelectRoot = subAssembler.nextPlan();
+        }
+
         if (subSelectRoot == null)
             return null;
 
@@ -613,6 +631,10 @@ public class PlanAssembler {
         assert (subAssembler != null);
 
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
+        if (disableNestedLoopIndexJoinForInComparison(subSelectRoot, m_parsedUpdate)) {
+            subSelectRoot = subAssembler.nextPlan();
+        }
+
         if (subSelectRoot == null)
             return null;
 
