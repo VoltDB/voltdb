@@ -17,6 +17,7 @@
 
 package org.voltdb.planner;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -39,6 +40,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
+import org.voltdb.expressions.InComparisonExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -550,6 +552,38 @@ public class PlanAssembler {
         return true;
     }
 
+    // ENG-4909 Bug: currently disable NESTLOOPINDEX plan for IN
+    private boolean disableNestedLoopIndexJoinForInComparison (AbstractPlanNode root, AbstractParsedStmt parsedStmt) {
+        if (root != null && root.getPlanNodeType() == PlanNodeType.NESTLOOPINDEX) {
+            assert(parsedStmt != null);
+            if (parsedStmt.joinTree.m_root != null ) {
+                ArrayDeque<JoinTree.JoinNode> joinNodes = new ArrayDeque<JoinTree.JoinNode>();
+                joinNodes.add(parsedStmt.joinTree.m_root);
+
+                while (!joinNodes.isEmpty()) {
+                    JoinTree.JoinNode joinNode = joinNodes.poll();
+                    if (joinNode == null) {
+                        continue;
+                    }
+                    if (joinNode.m_leftNode != null) {
+                        joinNodes.add(joinNode.m_leftNode);
+                    }
+                    if (joinNode.m_rightNode != null) {
+                        joinNodes.add(joinNode.m_rightNode);
+                    }
+                    if (joinNode.m_table != null) {
+                        if (joinNode.m_joinExpr != null && joinNode.m_joinExpr instanceof InComparisonExpression) {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+        }
+        return false;
+    }
+
+
     private AbstractPlanNode getNextDeletePlan() {
         assert (subAssembler != null);
 
@@ -558,6 +592,12 @@ public class PlanAssembler {
         Table targetTable = m_parsedDelete.tableList.get(0);
 
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
+
+        // ENG-4909 Bug: currently disable NESTLOOPINDEX plan for IN
+        if (disableNestedLoopIndexJoinForInComparison(subSelectRoot, m_parsedDelete)) {
+            subSelectRoot = subAssembler.nextPlan();
+        }
+
         if (subSelectRoot == null)
             return null;
 
@@ -615,6 +655,10 @@ public class PlanAssembler {
         assert (subAssembler != null);
 
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
+        if (disableNestedLoopIndexJoinForInComparison(subSelectRoot, m_parsedUpdate)) {
+            subSelectRoot = subAssembler.nextPlan();
+        }
+
         if (subSelectRoot == null)
             return null;
 
