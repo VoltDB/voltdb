@@ -390,6 +390,15 @@ public class TestIndexesSuite extends RegressionSuite {
                  " and T.NUM IN (10)", table);
             results = client.callProcedure("@AdHoc", query).getResults();
             assertEquals(0, results[0].getRowCount());
+
+            // try some DML -- but try not to actually update values except to themselves
+            // -- that just makes it harder to profile expected results down the line
+            query = String.format("delete from %s where DESC IN ('')" +
+                    " and NUM IN (111,112)", table);
+            System.out.println("Turning to @AdHoc: " + query);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            System.out.println("Returned from @AdHoc: " + query);
+            assertEquals(0, results[0].getRowCount());
         }
 
         // Flag whether CompiledInLists needs to tiptoe around lack of "col IN ?" support
@@ -493,6 +502,36 @@ public class TestIndexesSuite extends RegressionSuite {
             assertEquals(1, results.length);
             assertEquals(4, results[0].getRowCount());
         }
+
+        // Confirm that filters get the expected number of rows before trying the DML that uses them.
+        results = client.callProcedure("@AdHoc", "select count(*) from R1 where DESC IN ('x', 'y', 'z', 'a')" +
+                                                 " and NUM IN (1010, 1020, 1030, -1040, 100)").getResults();
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
+        results[0].advanceRow();
+        assertEquals(1, results[0].getLong(0));
+
+        results = client.callProcedure("@AdHoc", "select count(*) from P1 where DESC IN ('x', 'y', 'z', 'b')" +
+                                                 " and NUM IN (1010, 1020, 1030, -1040, 100)").getResults();
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
+        results[0].advanceRow();
+        assertEquals(1, results[0].getLong(0));
+
+        // Test IN LIST DML interaction ENG-4909 -- this is a plan correctness test --
+        results = client.callProcedure("@AdHoc", "update R1 set NUM = (1000) where DESC IN ('x', 'y', 'z', 'a')" +
+                                                 " and NUM IN (1010, 1020, 1030, -1040, 100)").getResults();
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
+        results[0].advanceRow();
+        assertEquals(1, results[0].getLong(0));
+
+        results = client.callProcedure("@AdHoc", "delete from P1 where DESC IN ('x', 'y', 'z', 'b')" +
+                                                 " and NUM IN (1010, 1020, 1030, -1040, 100)").getResults();
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
+        results[0].advanceRow();
+        assertEquals(1, results[0].getLong(0));
 
     }
 
@@ -951,6 +990,12 @@ public class TestIndexesSuite extends RegressionSuite {
                                  "'this here is a longish string to force a permanent object allocation'" +
                                  ")" +
                                  " and T.NUM IN ?");
+
+        //project.addStmtProcedure("InlinedUpdateInListP3with5NUMs",
+        //        "update P3 set NUM = 0 where DESC IN ('a', 'b', 'c', 'g', " +
+        //        "'this here is a longish string to force a permanent object allocation'" +
+        //        ")" +
+        //        " and NUM IN (111,222,333,444,555)");
 
         boolean success;
 
