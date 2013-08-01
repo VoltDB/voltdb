@@ -48,6 +48,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListenableFutureTask;
+import com.google.common.util.concurrent.MoreExecutors;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -70,6 +74,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
+
 import org.voltdb.ClientInterfaceHandleManager.Iv2InFlight;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
@@ -108,11 +113,6 @@ import org.voltdb.sysprocs.SnapshotRestore;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
-
-import com.google.common.collect.ImmutableMap;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListenableFutureTask;
-import com.google.common.util.concurrent.MoreExecutors;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -354,10 +354,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
                 }
                 catch (IOException e) {
-                    hostLog.fatal("Client interface failed to bind to port " + m_port);
-                    hostLog.fatal("IOException message: \"" + e.getMessage() + "\"");
+                    String msg = "Client interface failed to bind to"
+                            + (m_isAdmin ? " Admin " : " ") + "port: " + m_port;
                     MiscUtils.printPortsInUse(hostLog);
-                    VoltDB.crashLocalVoltDB("Client interface failed to bind to port " + m_port, false, e);
+                    VoltDB.crashLocalVoltDB(msg, false, e);
                 }
             }
             m_running = true;
