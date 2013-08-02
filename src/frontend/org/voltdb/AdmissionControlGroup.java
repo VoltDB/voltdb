@@ -64,6 +64,7 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
      * don't want it to fail silently either.
      */
     private boolean m_haveLoggedACGNegativeFailure = false;
+    private boolean m_haveLoggedACGMismatchFailure = false;
 
     /*
      * The ACG is accessed lock free from the network thread that owns the group.
@@ -196,6 +197,14 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
              * once all requests associated with the ACG have left the system and the correct values are indeed 0.
              */
             m_pendingTxnCount = 0;
+            m_pendingTxnBytes = 0;
+        } else if (m_pendingTxnCount == 0 && m_pendingTxnBytes != 0) {
+            if (!m_haveLoggedACGMismatchFailure) {
+                m_haveLoggedACGMismatchFailure = true;
+                networkLog.error("Admission control error, 0 outstanding transaction count, " +
+                                 "but outstanding transaction bytes are " + m_pendingTxnBytes);
+            }
+
             m_pendingTxnBytes = 0;
         }
     }
