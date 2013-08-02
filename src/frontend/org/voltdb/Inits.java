@@ -35,6 +35,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.PriorityBlockingQueue;
 
+import com.google.common.collect.ImmutableSet;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -44,6 +45,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
+
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.export.ExportManager;
@@ -55,8 +57,6 @@ import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
-
-import com.google.common.collect.ImmutableSet;
 
 /**
  * This breaks up VoltDB initialization tasks into discrete units.
@@ -467,15 +467,16 @@ public class Inits {
                     } catch (Exception e1) {}
                 }
                 if (httpPort == 8081)
-                    m_rvdb.m_httpPortExtraLogMessage = "HTTP admin console unable to bind to port 8080";
+                    m_rvdb.m_httpPortExtraLogMessage = "HTTP service unable to bind to port 8080";
                 else if (httpPort > 8081)
-                    m_rvdb.m_httpPortExtraLogMessage = "HTTP admin console unable to bind to ports 8080 through " + String.valueOf(httpPort - 1);
+                    m_rvdb.m_httpPortExtraLogMessage = "HTTP service unable to bind to ports 8080 through "
+                            + String.valueOf(httpPort - 1);
             }
             else if (httpPort != -1) {
                 try {
                     m_rvdb.m_adminListener = new HTTPAdminListener(m_rvdb.m_jsonEnabled, httpPort);
                 } catch (Exception e1) {
-                    hostLog.fatal("HTTP admin console unable to bind to port " + httpPort + ". Exiting.");
+                    hostLog.fatal("HTTP service unable to bind to port " + httpPort + ". Exiting.");
                     System.exit(-1);
                 }
             }
