@@ -350,7 +350,7 @@ public class TestFuzzMeshArbiter extends TestCase
             Iterator<Long> kitr = m_killSet.iterator();
             while (kitr.hasNext()) {
                 MiniNode knode = m_nodes.get(kitr.next());
-                if (knode.getNodeState() == NodeState.STOP) {
+                if (knode == null || knode.getNodeState() == NodeState.STOP) {
                     kitr.remove();
                 }
             }
