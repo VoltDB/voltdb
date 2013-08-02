@@ -554,9 +554,7 @@ public class PlanAssembler {
     private boolean disableNestedLoopIndexJoinForInComparison (AbstractPlanNode root, AbstractParsedStmt parsedStmt) {
         if (root != null && root.getPlanNodeType() == PlanNodeType.NESTLOOPINDEX) {
             assert(parsedStmt != null);
-            if (parsedStmt.joinTree.m_root != null ) {
-                return true;
-            }
+            return true;
         }
         return false;
     }
