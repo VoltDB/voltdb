@@ -528,34 +528,6 @@ class NValue {
     // The array size is predetermined in allocateANewNValueList.
     void setArrayElements(std::vector<NValue> &args) const;
 
-  private:
-    /*
-     * Private methods are private for a reason. Don't expose the raw
-     * data so that it can be operated on directly.
-     */
-
-    // Function declarations for NValue.cpp definitions.
-    void createDecimalFromString(const std::string &txt);
-    std::string createStringFromDecimal() const;
-    NValue opDivideDecimals(const NValue lhs, const NValue rhs) const;
-    NValue opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const;
-
-    // Helpers for inList.
-    // These are purposely not inlines to avoid exposure of NValueList details.
-    void deserializeIntoANewNValueList(SerializeInput &input, Pool *dataPool);
-    void allocateANewNValueList(size_t elementCount, ValueType elementType);
-
-    // Promotion Rules. Initialized in NValue.cpp
-    static ValueType s_intPromotionTable[];
-    static ValueType s_decimalPromotionTable[];
-    static ValueType s_doublePromotionTable[];
-    static TTInt s_maxDecimalValue;
-    static TTInt s_minDecimalValue;
-    // These initializers give the unique double values that are
-    // closest but not equal to +/-1E26 within the accuracy of a double.
-    static const double s_gtMaxDecimalAsDouble;
-    static const double s_ltMinDecimalAsDouble;
-
     static ValueType promoteForOp(ValueType vta, ValueType vtb) {
         ValueType rt;
         switch (vta) {
@@ -592,6 +564,34 @@ class NValue {
         // assert(rt != VALUE_TYPE_INVALID);
         return rt;
     }
+
+  private:
+    /*
+     * Private methods are private for a reason. Don't expose the raw
+     * data so that it can be operated on directly.
+     */
+
+    // Function declarations for NValue.cpp definitions.
+    void createDecimalFromString(const std::string &txt);
+    std::string createStringFromDecimal() const;
+    NValue opDivideDecimals(const NValue lhs, const NValue rhs) const;
+    NValue opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const;
+
+    // Helpers for inList.
+    // These are purposely not inlines to avoid exposure of NValueList details.
+    void deserializeIntoANewNValueList(SerializeInput &input, Pool *dataPool);
+    void allocateANewNValueList(size_t elementCount, ValueType elementType);
+
+    // Promotion Rules. Initialized in NValue.cpp
+    static ValueType s_intPromotionTable[];
+    static ValueType s_decimalPromotionTable[];
+    static ValueType s_doublePromotionTable[];
+    static TTInt s_maxDecimalValue;
+    static TTInt s_minDecimalValue;
+    // These initializers give the unique double values that are
+    // closest but not equal to +/-1E26 within the accuracy of a double.
+    static const double s_gtMaxDecimalAsDouble;
+    static const double s_ltMinDecimalAsDouble;
 
     /**
      * 16 bytes of storage for NValue data.

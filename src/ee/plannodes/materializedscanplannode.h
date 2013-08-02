@@ -33,9 +33,11 @@ namespace voltdb {
     public:
         MaterializedScanPlanNode(CatalogId id) : AbstractPlanNode(id) {
             m_tableRowsExpression = NULL;
+            m_sortDirection = SORT_DIRECTION_TYPE_INVALID;
         }
         MaterializedScanPlanNode() : AbstractPlanNode() {
             m_tableRowsExpression = NULL;
+            m_sortDirection = SORT_DIRECTION_TYPE_INVALID;
         }
 
         ~MaterializedScanPlanNode();
@@ -44,6 +46,9 @@ namespace voltdb {
 
         AbstractExpression* getTableRowsExpression() const
         { return m_tableRowsExpression; }
+
+        SortDirectionType getSortDirection() const
+        { return m_sortDirection; }
 
         std::string debugInfo(const std::string &spacer) const;
 
@@ -54,6 +59,7 @@ namespace voltdb {
         // so long as eval() returns an NValue array as opposed
         // to the usual scalar NValues.
         AbstractExpression* m_tableRowsExpression;
+        SortDirectionType m_sortDirection;
     };
 
 }

@@ -62,7 +62,7 @@ template<> inline NValue NValue::callUnary<FUNC_CHAR_LENGTH>() const {
         return getNullValue();
 
     char *valueChars = reinterpret_cast<char*>(getObjectValue());
-    return getIntegerValue(getCharLength(valueChars, getObjectLength()));
+    return getBigIntValue(static_cast<int64_t>(getCharLength(valueChars, getObjectLength())));
 }
 
 /** implement the 1-argument SQL SPACE function */

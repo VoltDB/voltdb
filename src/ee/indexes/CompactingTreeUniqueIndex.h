@@ -121,7 +121,7 @@ class CompactingTreeUniqueIndex : public TableIndex
     bool moveToKey(const TableTuple *searchKey)
     {
         ++m_lookups;
-        m_begin = true;
+        m_forward = true;
         m_keyIter = findKey(searchKey);
         if (m_keyIter.isEnd()) {
             m_match.move(NULL);
@@ -134,21 +134,52 @@ class CompactingTreeUniqueIndex : public TableIndex
     void moveToKeyOrGreater(const TableTuple *searchKey)
     {
         ++m_lookups;
-        m_begin = true;
+        m_forward = true;
         m_keyIter = m_entries.lowerBound(KeyType(searchKey));
     }
 
     void moveToGreaterThanKey(const TableTuple *searchKey)
     {
         ++m_lookups;
-        m_begin = true;
+        m_forward = true;
         m_keyIter = m_entries.upperBound(KeyType(searchKey));
+    }
+
+    void moveToLessThanKey(const TableTuple *searchKey)
+    {
+        // do moveToKeyOrGreater()
+        ++m_lookups;
+        m_keyIter = m_entries.lowerBound(KeyType(searchKey));
+        // find prev entry
+        if (m_keyIter.isEnd()) {
+            moveToEnd(false);
+        } else {
+            m_forward = false;
+            m_keyIter.movePrev();
+        }
+    }
+
+    // only be called after moveToGreaterThanKey() for LTE case
+    void moveToBeforePriorEntry()
+    {
+        assert(m_forward);
+        m_forward = false;
+        if (m_keyIter.isEnd()) {
+            m_keyIter = m_entries.rbegin();
+            return;
+        }
+        // go back 2 entries
+        // entries: [..., A, B, C, ...], currently m_keyIter = C (not NULL if reach here)
+        // B is the entry we just evaluated and didn't pass initial_expression test (can not be NULL)
+        // so A is the correct starting point (can be NULL)
+        m_keyIter.movePrev();
+        m_keyIter.movePrev();
     }
 
     void moveToEnd(bool begin)
     {
         ++m_lookups;
-        m_begin = begin;
+        m_forward = begin;
         if (begin)
             m_keyIter = m_entries.begin();
         else
@@ -161,7 +192,7 @@ class CompactingTreeUniqueIndex : public TableIndex
 
         if (! m_keyIter.isEnd()) {
             retval.move(const_cast<void*>(m_keyIter.value()));
-            if (m_begin) {
+            if (m_forward) {
                 m_keyIter.moveNext();
             } else {
                 m_keyIter.movePrev();
@@ -180,7 +211,7 @@ class CompactingTreeUniqueIndex : public TableIndex
 
     bool advanceToNextKey()
     {
-        if (m_begin) {
+        if (m_forward) {
             m_keyIter.moveNext();
         } else {
             m_keyIter.movePrev();
@@ -295,7 +326,7 @@ class CompactingTreeUniqueIndex : public TableIndex
     MapType m_entries;
 
     // iteration stuff
-    bool m_begin;
+    bool m_forward;
     typename MapType::iterator m_keyIter;
     TableTuple m_match;
 
@@ -306,7 +337,7 @@ public:
     CompactingTreeUniqueIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme) :
         TableIndex(keySchema, scheme),
         m_entries(true, KeyComparator(keySchema)),
-        m_begin(true),
+        m_forward(true),
         m_match(getTupleSchema()),
         m_cmp(keySchema)
     {}
