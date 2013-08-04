@@ -712,7 +712,7 @@ public:
 
     }
 
-    void checkIndex(ElasticIndex &index, StreamPredicateList &predicates, bool directKey) {
+    void checkIndex(const std::string &tag, ElasticIndex &index, StreamPredicateList &predicates, bool directKey) {
         voltdb::TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         T_ValueSet accepted;
@@ -782,7 +782,6 @@ public:
                         }
                     }
                     if (!accountedFor) {
-std::cerr << "WTF! " << value << std::endl;
                         wtf++;
                     }
                 }
@@ -799,7 +798,7 @@ std::cerr << "WTF! " << value << std::endl;
             size_t nmissing = missing.size();
             size_t nextra = extra.size();
             size_t nmoved = m_moved.size();
-            error("Bad index - tuple statistics:");
+            error("Bad index (%s) - tuple statistics:", tag.c_str());
             error("     Tuples: %lu = %lu+%lu-%lu (%lu updated)", ntotal, ninitial, ninserted, ndeleted, nupdated);
             error("   Expected: %lu = %lu-%lu", nexpected, nactive, nrejected);
             error("      Found: %lu", nindexed);
@@ -842,6 +841,13 @@ std::cerr << "WTF! " << value << std::endl;
 
         Json::FastWriter writer;
         return writer.write(predicateStuff);
+    }
+
+    std::string generateHashRangePredicate(T_HashRange& range) {
+        T_HashRangeVector ranges;
+        ranges.push_back(range);
+        std::vector<std::string> predicateStrings;
+        return generateHashRangePredicate(ranges);
     }
 
     std::string generateHashRangePredicate(T_HashRangeVector& ranges) {
@@ -1624,7 +1630,7 @@ TEST_F(CopyOnWriteTest, ElasticIndex) {
         tableScrambler.scramble();
     }
 
-    checkIndex(getElasticIndex(), predicates, false);
+    checkIndex("ElasticIndex", getElasticIndex(), predicates, false);
 }
 
 /**
@@ -1645,143 +1651,166 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
     const int FREQ_UPDATE = 5;
     const int FREQ_COMPACTION = 100;
 
-    ElasticTableScrambler tableScrambler(*this,
-                                         NUM_PARTITIONS, TUPLES_PER_BLOCK, NUM_INITIAL,
-                                         FREQ_INSERT, FREQ_DELETE,
-                                         FREQ_UPDATE, FREQ_COMPACTION);
+    // These ranges test edge conditions and also that hash range expressions
+    // and elastic index predicates filter the same way.
+    T_HashRangeVector testRanges;
+    const int64_t maxint = std::numeric_limits<int64_t>::max();
+    const int64_t minint = std::numeric_limits<int64_t>::min();
+    testRanges.push_back(T_HashRange(0, maxint));
+    testRanges.push_back(T_HashRange(maxint, 0));
+    testRanges.push_back(T_HashRange(minint, 0));
+    testRanges.push_back(T_HashRange(0, minint));
+    testRanges.push_back(T_HashRange(minint, maxint));
+    testRanges.push_back(T_HashRange(maxint, minint));
+    testRanges.push_back(T_HashRange(-maxint/2, +maxint/2));
+    testRanges.push_back(T_HashRange(+maxint/2, -maxint/2));
+    testRanges.push_back(T_HashRange(0, 0));
+    testRanges.push_back(T_HashRange(maxint, maxint));
 
-    tableScrambler.initialize();
+    BOOST_FOREACH(T_HashRange &testRange, testRanges) {
+        m_tuplesInserted = m_tuplesDeleted = 0;
 
-    T_HashRangeVector ranges;
-    ranges.push_back(T_HashRange(0x0000000000000000, 0x7fffffffffffffff));
-    std::vector<std::string> predicateStrings;
-    predicateStrings.push_back(generateHashRangePredicate(ranges));
-    StreamPredicateList predicates;
-    std::ostringstream errmsg;
-    std::vector<bool> deleteFlags;
-    ASSERT_TRUE(predicates.parseStrings(predicateStrings, errmsg, deleteFlags));
-    char predicateBuffer[1024 * 256];
-    ReferenceSerializeOutput predicateOutput(predicateBuffer, 1024 * 256);
-    predicateOutput.writeInt(1);
-    for (std::vector<std::string>::iterator i = predicateStrings.begin();
-         i != predicateStrings.end(); i++) {
-        predicateOutput.writeTextString(*i);
-    }
-    ReferenceSerializeInput predicateInput(predicateBuffer, predicateOutput.position());
-    m_table->activateStream(m_serializer, TABLE_STREAM_ELASTIC_INDEX, 0, m_tableId, predicateInput);
+        ElasticTableScrambler tableScrambler(*this,
+                                             NUM_PARTITIONS, TUPLES_PER_BLOCK, NUM_INITIAL,
+                                             FREQ_INSERT, FREQ_DELETE,
+                                             FREQ_UPDATE, FREQ_COMPACTION);
 
-    // Force index streaming to need multiple streamMore() calls.
-    voltdb::ElasticContext *context = getElasticContext();
-    ASSERT_NE(NULL, context);
-    bool success = setElasticIndexTuplesPerCall(20);
-    ASSERT_TRUE(success);
-    char serializationBuffer[BUFFER_SIZE];
-    std::vector<int> retPositionsElastic;
-    TupleOutputStreamProcessor outputStreamsElastic(serializationBuffer, sizeof(serializationBuffer));
-    size_t nCalls = 0;
-    while (m_table->streamMore(outputStreamsElastic, TABLE_STREAM_ELASTIC_INDEX, retPositionsElastic) != 0) {
-        nCalls++;
-    }
-    // Make sure we forced more than one streamMore() call.
-    ASSERT_LE(2, nCalls);
+        tableScrambler.initialize();
 
-    for (size_t icycle = 0; icycle < NUM_CYCLES; icycle++) {
-        tableScrambler.scramble();
-    }
-
-    // Mutate the table while a snapshot stream is slurping tuples.
-    T_ValueSet originalTuples;
-    getTableValueSet(originalTuples);
-
-    char config[4];
-    ::memset(config, 0, 4);
-    ::memset(config, 0, 4);
-    ReferenceSerializeInput inputSnapshot(config, 4);
-
-    m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, inputSnapshot);
-
-    T_ValueSet COWTuples;
-    int totalInserted = 0;
-    while (true) {
-        TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
-        TupleOutputStream &outputStream = outputStreams.at(0);
-        std::vector<int> retPositions;
-        int64_t remaining = m_table->streamMore(outputStreams, TABLE_STREAM_SNAPSHOT, retPositions);
-        if (remaining >= 0) {
-            ASSERT_EQ(outputStreams.size(), retPositions.size());
+        std::vector<std::string> predicateStrings;
+        predicateStrings.push_back(generateHashRangePredicate(testRange));
+        StreamPredicateList predicates;
+        std::ostringstream errmsg;
+        std::vector<bool> deleteFlags;
+        ASSERT_TRUE(predicates.parseStrings(predicateStrings, errmsg, deleteFlags));
+        char predicateBuffer[1024 * 256];
+        ReferenceSerializeOutput predicateOutput(predicateBuffer, 1024 * 256);
+        predicateOutput.writeInt(1);
+        for (std::vector<std::string>::iterator i = predicateStrings.begin();
+             i != predicateStrings.end(); i++) {
+            predicateOutput.writeTextString(*i);
         }
-        const int serialized = static_cast<int>(outputStream.position());
-        if (serialized == 0) {
-            break;
+        ReferenceSerializeInput predicateInput(predicateBuffer, predicateOutput.position());
+        m_table->activateStream(m_serializer, TABLE_STREAM_ELASTIC_INDEX, 0, m_tableId, predicateInput);
+
+        // Force index streaming to need multiple streamMore() calls.
+        voltdb::ElasticContext *context = getElasticContext();
+        ASSERT_NE(NULL, context);
+        bool success = setElasticIndexTuplesPerCall(20);
+        ASSERT_TRUE(success);
+        char serializationBuffer[BUFFER_SIZE];
+        std::vector<int> retPositionsElastic;
+        TupleOutputStreamProcessor outputStreamsElastic(serializationBuffer, sizeof(serializationBuffer));
+        size_t nCalls = 0;
+        while (m_table->streamMore(outputStreamsElastic, TABLE_STREAM_ELASTIC_INDEX, retPositionsElastic) != 0) {
+            nCalls++;
         }
-        int ii = 12;//skip partition id and row count and first tuple length
-        while (ii < (serialized - 4)) {
-            int values[2];
-            values[0] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
-            values[1] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii + 4]));
-            void *valuesVoid = reinterpret_cast<void*>(values);
-            int64_t *values64 = reinterpret_cast<int64_t*>(valuesVoid);
-            const bool inserted = COWTuples.insert(*values64).second;
-            if (!inserted) {
-                error("Failed: total inserted %d, with values %d and %d\n", totalInserted, values[0], values[1]);
+        // Make sure we forced more than one streamMore() call.
+        ASSERT_LE(2, nCalls);
+
+        for (size_t icycle = 0; icycle < NUM_CYCLES; icycle++) {
+            tableScrambler.scramble();
+        }
+
+        // Mutate the table while a snapshot stream is slurping tuples.
+        T_ValueSet originalTuples;
+        getTableValueSet(originalTuples);
+
+        char config[4];
+        ::memset(config, 0, 4);
+        ::memset(config, 0, 4);
+        ReferenceSerializeInput inputSnapshot(config, 4);
+
+        m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, inputSnapshot);
+
+        T_ValueSet COWTuples;
+        int totalInserted = 0;
+        while (true) {
+            TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
+            TupleOutputStream &outputStream = outputStreams.at(0);
+            std::vector<int> retPositions;
+            int64_t remaining = m_table->streamMore(outputStreams, TABLE_STREAM_SNAPSHOT, retPositions);
+            if (remaining >= 0) {
+                ASSERT_EQ(outputStreams.size(), retPositions.size());
             }
-            ASSERT_TRUE(inserted);
-            totalInserted++;
-            ii += static_cast<int>(m_tupleWidth + sizeof(int32_t));
+            const int serialized = static_cast<int>(outputStream.position());
+            if (serialized == 0) {
+                break;
+            }
+            int ii = 12;//skip partition id and row count and first tuple length
+            while (ii < (serialized - 4)) {
+                int values[2];
+                values[0] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
+                values[1] = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii + 4]));
+                void *valuesVoid = reinterpret_cast<void*>(values);
+                int64_t *values64 = reinterpret_cast<int64_t*>(valuesVoid);
+                const bool inserted = COWTuples.insert(*values64).second;
+                if (!inserted) {
+                    error("Failed: total inserted %d, with values %d and %d\n", totalInserted, values[0], values[1]);
+                }
+                ASSERT_TRUE(inserted);
+                totalInserted++;
+                ii += static_cast<int>(m_tupleWidth + sizeof(int32_t));
+            }
+            for (int jj = 0; jj < NUM_MUTATIONS; jj++) {
+                doRandomTableMutation(m_table);
+            }
         }
+
+        // Do some extra mutations for good luck.
         for (int jj = 0; jj < NUM_MUTATIONS; jj++) {
             doRandomTableMutation(m_table);
         }
-    }
 
-    // Do some extra mutations for good luck.
-    for (int jj = 0; jj < NUM_MUTATIONS; jj++) {
-        doRandomTableMutation(m_table);
-    }
+        checkTuples(NUM_INITIAL + (m_tuplesInserted - m_tuplesDeleted), originalTuples, COWTuples);
 
-    checkTuples(NUM_INITIAL + (m_tuplesInserted - m_tuplesDeleted), originalTuples, COWTuples);
+        std::ostringstream os1;
+        os1 << "direct " << testRange.first << ':' << testRange.second;
+        checkIndex(os1.str(), getElasticIndex(), predicates, false);
 
-    checkIndex(getElasticIndex(), predicates, false);
+        //=== Materialize the index for comparison
 
-    //=== Materialize the index for comparison
+        char predicateBuffer2[1024 * 256];
+        ReferenceSerializeOutput predicateOutput2(predicateBuffer2, 1024 * 256);
+        std::ostringstream predicateString2;
+        predicateString2 << testRange.first << ':' << testRange.second;
+        predicateOutput2.writeInt(1);
+        predicateOutput2.writeTextString(predicateString2.str());
+        ReferenceSerializeInput predicateInput2(predicateBuffer2, predicateOutput2.position());
 
-    char predicateBuffer2[1024 * 256];
-    ReferenceSerializeOutput predicateOutput2(predicateBuffer2, 1024 * 256);
-    std::string predicateString2 = "0:9223372036854775807";
-    predicateOutput2.writeInt(1);
-    predicateOutput2.writeTextString(predicateString2);
-    ReferenceSerializeInput predicateInput2(predicateBuffer2, predicateOutput2.position());
+        m_table->activateStream(m_serializer, TABLE_STREAM_ELASTIC_INDEX_READ, 0, m_tableId, predicateInput2);
 
-    m_table->activateStream(m_serializer, TABLE_STREAM_ELASTIC_INDEX_READ, 0, m_tableId, predicateInput2);
-
-    ElasticIndex index;
-    totalInserted = 0;
-    while (true) {
-        memset(serializationBuffer, 0, sizeof(serializationBuffer));
-        TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
-        TupleOutputStream &outputStream = outputStreams.at(0);
-        std::vector<int> retPositions;
-        int64_t remaining = m_table->streamMore(outputStreams, TABLE_STREAM_ELASTIC_INDEX_READ, retPositions);
-        if (remaining >= 0) {
-            ASSERT_EQ(outputStreams.size(), retPositions.size());
+        ElasticIndex index;
+        totalInserted = 0;
+        while (true) {
+            memset(serializationBuffer, 0, sizeof(serializationBuffer));
+            TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
+            TupleOutputStream &outputStream = outputStreams.at(0);
+            std::vector<int> retPositions;
+            int64_t remaining = m_table->streamMore(outputStreams, TABLE_STREAM_ELASTIC_INDEX_READ, retPositions);
+            if (remaining >= 0) {
+                ASSERT_EQ(outputStreams.size(), retPositions.size());
+            }
+            const int serialized = static_cast<int>(outputStream.position());
+            if (serialized == 0) {
+                break;
+            }
+            int ii = 12; // skip partition id, row count, and first tuple size
+            while (ii < (serialized - 4)) {
+                int value = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
+                int64_t hash[2];
+                MurmurHash3_x64_128(&value, sizeof(value), 0, hash);
+                ElasticIndexKey key(hash[0], NULL);
+                index.add(key);
+                totalInserted++;
+                ii += static_cast<int>(m_tupleWidth + sizeof(int32_t));
+            }
         }
-        const int serialized = static_cast<int>(outputStream.position());
-        if (serialized == 0) {
-            break;
-        }
-        int ii = 12; // skip partition id, row count, and first tuple size
-        while (ii < (serialized - 4)) {
-            int value = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
-            int64_t hash[2];
-            MurmurHash3_x64_128(&value, sizeof(value), 0, hash);
-            ElasticIndexKey key(hash[0], NULL);
-            index.add(key);
-            totalInserted++;
-            ii += static_cast<int>(m_tupleWidth + sizeof(int32_t));
-        }
-    }
 
-    checkIndex(index, predicates, true);
+        std::ostringstream os2;
+        os2 << "serialized " << testRange.first << ':' << testRange.second;
+        checkIndex(os2.str(), index, predicates, true);
+    }
 }
 
 int main() {

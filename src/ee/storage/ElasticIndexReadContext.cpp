@@ -51,6 +51,12 @@ ElasticIndexReadContext::ElasticIndexReadContext(
     m_wrapsAround = (m_range.m_from >= m_range.m_to);
     // Initialize the iterator to start from the range lower bounds or higher.
     m_iter = m_surgeon.indexIterator(m_range.m_from);
+    if (m_iter == m_surgeon.indexEnd()) {
+        if (m_wrapsAround) {
+            m_iter = m_surgeon.indexIterator(std::numeric_limits<int64_t>::min());
+            m_wrappedAround = true;
+        }
+    }
 }
 
 /**
@@ -68,62 +74,67 @@ int64_t ElasticIndexReadContext::handleStreamMore(
         TupleOutputStreamProcessor &outputStreams,
         std::vector<int> &retPositions)
 {
+    int64_t remaining = std::numeric_limits<int64_t>::max();
+
+    // End of iteration or wrap around?
     if (m_iter == m_surgeon.indexEnd()) {
-        return 0;
+        remaining = 0;
     }
 
     // Need to initialize the output stream list.
     if (outputStreams.size() != 1) {
         throwFatalException("serializeMore() expects exactly one output stream.");
     }
-    outputStreams.open(getTable(),
-                       getMaxTupleLength(),
-                       getPartitionId(),
-                       getPredicates(),
-                       getPredicateDeleteFlags());
 
-    const TupleSchema *schema = getTable().schema();
-    assert(schema != NULL);
+    if (remaining != 0) {
+        outputStreams.open(getTable(),
+                           getMaxTupleLength(),
+                           getPartitionId(),
+                           getPredicates(),
+                           getPredicateDeleteFlags());
 
-    // Set to true to break out of the loop after the tuples dry up
-    // or the byte count threshold is hit.
-    int64_t remaining = std::numeric_limits<int64_t>::max();
-    bool yield = false;
-    while (!yield) {
-        // Write the tuple.
-        // The delete flag should not be set.
-        TableTuple tuple(m_iter->getTupleAddress(), schema);
-        bool deleteTuple = false;
-        yield = outputStreams.writeRow(getSerializer(), tuple, deleteTuple);
-        assert(deleteTuple == false);
-        if (++m_iter == m_surgeon.indexEnd()) {
-            // Wrap around zero?
-            if (m_wrapsAround && !m_wrappedAround) {
-                m_iter = m_surgeon.indexIterator(0);
-                m_wrappedAround = true;
-            }
-            else {
-                yield = true;
-                remaining = 0;
-            }
-        }
-        // See if we've hit the end of the range.
-        if (!yield) {
-            if (m_wrapsAround) {
-                if (m_wrappedAround && m_iter->getHash() >= m_range.m_to) {
+        const TupleSchema *schema = getTable().schema();
+        assert(schema != NULL);
+
+        // Set to true to break out of the loop after the tuples dry up
+        // or the byte count threshold is hit.
+        bool yield = false;
+        while (!yield) {
+            // Write the tuple.
+            // The delete flag should not be set.
+            TableTuple tuple(m_iter->getTupleAddress(), schema);
+            bool deleteTuple = false;
+            yield = outputStreams.writeRow(getSerializer(), tuple, deleteTuple);
+            assert(deleteTuple == false);
+            if (++m_iter == m_surgeon.indexEnd()) {
+                if (m_wrapsAround && !m_wrappedAround) {
+                    m_iter = m_surgeon.indexIterator(std::numeric_limits<int64_t>::min());
+                    if (m_iter == m_surgeon.indexEnd()) {
+                        yield = true;
+                        remaining = 0;
+                    }
+                    else {
+                        m_wrappedAround = true;
+                    }
+                }
+                else {
                     yield = true;
                     remaining = 0;
                 }
             }
-            else if (m_iter->getHash() >= m_range.m_to) {
-                yield = true;
-                remaining = 0;
+            else {
+                // End of range (if already wrapped around or didn't need to)?
+                if ((!m_wrapsAround || m_wrappedAround) && m_iter->getHash() >= m_range.m_to) {
+                    yield = true;
+                    remaining = 0;
+                }
             }
         }
+
+        // Need to close the output streams and insert row counts.
+        outputStreams.close();
     }
 
-    // Need to close the output streams and insert row counts.
-    outputStreams.close();
     // If more was streamed copy current positions for return.
     // Can this copy be avoided?
     for (size_t i = 0; i < outputStreams.size(); i++) {
