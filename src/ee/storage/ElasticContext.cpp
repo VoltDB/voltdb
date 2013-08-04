@@ -61,7 +61,7 @@ bool ElasticContext::handleDeactivation()
 }
 
 /*
- * Serialize to multiple output streams.
+ * Serialize to output stream.
  * Return remaining tuple count, 0 if done, or -1 on error.
  */
 int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStreams,

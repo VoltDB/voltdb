@@ -99,9 +99,14 @@ class ElasticIndex : public stx::btree_set<ElasticIndexKey, ElasticIndexComparat
     virtual ~ElasticIndex() {}
 
     /**
-     * Return true if key is in the index.
+     * Return true if key is in the index (indirect from tuple).
      */
     bool has(const PersistentTable &table, const TableTuple &tuple) const;
+
+    /**
+     * Return true if key is in the index (direct).
+     */
+    bool has(const ElasticIndexKey &key) const;
 
     /**
      * Get the hash and tuple address if found.
@@ -110,10 +115,16 @@ class ElasticIndex : public stx::btree_set<ElasticIndexKey, ElasticIndexComparat
     bool get(const PersistentTable &table, const TableTuple &tuple, ElasticIndexKey &key);
 
     /**
-     * Add key to index.
+     * Add key to index (indirect from tuple).
      * Return true if it wasn't present and got added.
      */
     bool add(const PersistentTable &table, const TableTuple &tuple);
+
+    /**
+     * Add key to index (direct).
+     * Return true if it wasn't present and got added.
+     */
+    bool add(const ElasticIndexKey &key);
 
     /**
      * Remove key from index.
@@ -206,11 +217,19 @@ inline ElasticIndexKey ElasticIndex::generateKey(const PersistentTable &table, c
 }
 
 /**
- * Return true if key is in the index.
+ * Return true if key is in the index (indirect from tuple).
  */
 inline bool ElasticIndex::has(const PersistentTable &table, const TableTuple &tuple) const
 {
-    return exists(generateKey(table, tuple));
+    return has(generateKey(table, tuple));
+}
+
+/**
+ * Return true if key is in the index (direct).
+ */
+inline bool ElasticIndex::has(const ElasticIndexKey &key) const
+{
+    return exists(key);
 }
 
 /**
@@ -229,13 +248,21 @@ inline bool ElasticIndex::get(const PersistentTable &table, const TableTuple &tu
 }
 
 /**
- * Add key to index.
+ * Add key to index (indirect from tuple).
  * Return true if it wasn't present and needed to be added.
  */
 inline bool ElasticIndex::add(const PersistentTable &table, const TableTuple &tuple)
 {
+    return add(generateKey(table, tuple));
+}
+
+/**
+ * Add key to index (direct).
+ * Return true if it wasn't present and needed to be added.
+ */
+inline bool ElasticIndex::add(const ElasticIndexKey &key)
+{
     bool inserted = false;
-    ElasticIndexKey key = generateKey(table, tuple);
     if (!exists(key)) {
         inserted = insert(key).second;
         assert(inserted);

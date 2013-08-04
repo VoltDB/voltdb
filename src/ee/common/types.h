@@ -367,7 +367,9 @@ enum TableStreamType {
  * Return true if the table stream type uses predicates.
  */
 inline bool tableStreamTypeHasPredicates(TableStreamType streamType) {
-    return streamType == TABLE_STREAM_SNAPSHOT || streamType == TABLE_STREAM_ELASTIC_INDEX;
+    return streamType == TABLE_STREAM_SNAPSHOT
+        || streamType == TABLE_STREAM_ELASTIC_INDEX
+        || streamType == TABLE_STREAM_ELASTIC_INDEX_READ;
 }
 
 /**

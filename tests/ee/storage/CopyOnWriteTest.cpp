@@ -52,6 +52,7 @@
 #include <boost/foreach.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
+#include <murmur3/MurmurHash3.h>
 
 using namespace voltdb;
 
@@ -711,7 +712,7 @@ public:
 
     }
 
-    void checkIndex(ElasticIndex &index, StreamPredicateList &predicates) {
+    void checkIndex(ElasticIndex &index, StreamPredicateList &predicates, bool directKey) {
         voltdb::TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         T_ValueSet accepted;
@@ -728,7 +729,17 @@ public:
                 }
             }
             T_Value value = *reinterpret_cast<T_Value*>(tuple.address() + 1);
-            bool isIndexed = index.has(*m_table, tuple);
+            bool isIndexed;
+            if (directKey) {
+                // Direct key tests synthesize keys with NULL tuple addresses.
+                int64_t hash[2];
+                MurmurHash3_x64_128(tuple.address()+1, sizeof(int32_t), 0, hash);
+                ElasticIndexKey key(hash[0], NULL);
+                isIndexed = index.has(key);
+            }
+            else {
+                isIndexed = index.has(*m_table, tuple);
+            }
             if (isAccepted) {
                 accepted.insert(value);
                 if (!isIndexed) {
@@ -1613,7 +1624,7 @@ TEST_F(CopyOnWriteTest, ElasticIndex) {
         tableScrambler.scramble();
     }
 
-    checkIndex(getElasticIndex(), predicates);
+    checkIndex(getElasticIndex(), predicates, false);
 }
 
 /**
@@ -1643,20 +1654,21 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
 
     T_HashRangeVector ranges;
     ranges.push_back(T_HashRange(0x0000000000000000, 0x7fffffffffffffff));
-    std::vector<std::string> strings;
-    strings.push_back(generateHashRangePredicate(ranges));
+    std::vector<std::string> predicateStrings;
+    predicateStrings.push_back(generateHashRangePredicate(ranges));
     StreamPredicateList predicates;
     std::ostringstream errmsg;
     std::vector<bool> deleteFlags;
-    ASSERT_TRUE(predicates.parseStrings(strings, errmsg, deleteFlags));
-    char buffer[1024 * 256];
-    ReferenceSerializeOutput output(buffer, 1024 * 256);
-    output.writeInt(1);
-    for (std::vector<std::string>::iterator i = strings.begin(); i != strings.end(); i++) {
-        output.writeTextString(*i);
+    ASSERT_TRUE(predicates.parseStrings(predicateStrings, errmsg, deleteFlags));
+    char predicateBuffer[1024 * 256];
+    ReferenceSerializeOutput predicateOutput(predicateBuffer, 1024 * 256);
+    predicateOutput.writeInt(1);
+    for (std::vector<std::string>::iterator i = predicateStrings.begin();
+         i != predicateStrings.end(); i++) {
+        predicateOutput.writeTextString(*i);
     }
-    ReferenceSerializeInput input(buffer, output.position());
-    m_table->activateStream(m_serializer, TABLE_STREAM_ELASTIC_INDEX, 0, m_tableId, input);
+    ReferenceSerializeInput predicateInput(predicateBuffer, predicateOutput.position());
+    m_table->activateStream(m_serializer, TABLE_STREAM_ELASTIC_INDEX, 0, m_tableId, predicateInput);
 
     // Force index streaming to need multiple streamMore() calls.
     voltdb::ElasticContext *context = getElasticContext();
@@ -1729,7 +1741,47 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
 
     checkTuples(NUM_INITIAL + (m_tuplesInserted - m_tuplesDeleted), originalTuples, COWTuples);
 
-    checkIndex(getElasticIndex(), predicates);
+    checkIndex(getElasticIndex(), predicates, false);
+
+    //=== Materialize the index for comparison
+
+    char predicateBuffer2[1024 * 256];
+    ReferenceSerializeOutput predicateOutput2(predicateBuffer2, 1024 * 256);
+    std::string predicateString2 = "0:9223372036854775807";
+    predicateOutput2.writeInt(1);
+    predicateOutput2.writeTextString(predicateString2);
+    ReferenceSerializeInput predicateInput2(predicateBuffer2, predicateOutput2.position());
+
+    m_table->activateStream(m_serializer, TABLE_STREAM_ELASTIC_INDEX_READ, 0, m_tableId, predicateInput2);
+
+    ElasticIndex index;
+    totalInserted = 0;
+    while (true) {
+        memset(serializationBuffer, 0, sizeof(serializationBuffer));
+        TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
+        TupleOutputStream &outputStream = outputStreams.at(0);
+        std::vector<int> retPositions;
+        int64_t remaining = m_table->streamMore(outputStreams, TABLE_STREAM_ELASTIC_INDEX_READ, retPositions);
+        if (remaining >= 0) {
+            ASSERT_EQ(outputStreams.size(), retPositions.size());
+        }
+        const int serialized = static_cast<int>(outputStream.position());
+        if (serialized == 0) {
+            break;
+        }
+        int ii = 12; // skip partition id, row count, and first tuple size
+        while (ii < (serialized - 4)) {
+            int value = ntohl(*reinterpret_cast<int32_t*>(&serializationBuffer[ii]));
+            int64_t hash[2];
+            MurmurHash3_x64_128(&value, sizeof(value), 0, hash);
+            ElasticIndexKey key(hash[0], NULL);
+            index.add(key);
+            totalInserted++;
+            ii += static_cast<int>(m_tupleWidth + sizeof(int32_t));
+        }
+    }
+
+    checkIndex(index, predicates, true);
 }
 
 int main() {

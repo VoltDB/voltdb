@@ -22,6 +22,7 @@
 #include "storage/persistenttable.h"
 #include "storage/CopyOnWriteContext.h"
 #include "storage/ElasticContext.h"
+#include "storage/ElasticIndexReadContext.h"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
 
@@ -103,8 +104,8 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                     break;
 
                 case TABLE_STREAM_ELASTIC_INDEX_READ:
-                    context.reset(new ElasticContext(m_table, surgeon, m_partitionId,
-                                                     serializer, predicateStrings));
+                    context.reset(new ElasticIndexReadContext(m_table, surgeon, m_partitionId,
+                                                              serializer, predicateStrings));
                     break;
 
                 default:

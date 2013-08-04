@@ -931,7 +931,7 @@ bool PersistentTable::activateStream(
 
     std::vector<std::string> predicateStrings;
     // Grab snapshot or elastic stream predicates.
-    if (streamType == TABLE_STREAM_SNAPSHOT || streamType == TABLE_STREAM_ELASTIC_INDEX) {
+    if (tableStreamTypeHasPredicates(streamType)) {
         int npreds = serializeIn.readInt();
         if (npreds > 0) {
             predicateStrings.reserve(npreds);
