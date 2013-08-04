@@ -36,7 +36,9 @@ ElasticIndexReadContext::ElasticIndexReadContext(
         TupleSerializer &serializer,
         const std::vector<std::string> &predicateStrings) :
     TableStreamerContext(table, surgeon, partitionId, serializer),
-    m_range() // Parsed below
+    m_range(), // Parsed below
+    m_wrapsAround(false),
+    m_wrappedAround(false)
 {
     if (predicateStrings.size() != 1) {
         throwFatalException("Too many ElasticIndexReadContext predicates (>1): %ld",
@@ -46,6 +48,7 @@ ElasticIndexReadContext::ElasticIndexReadContext(
         throwFatalException("Unable to parse ElasticIndexReadContext predicate \"%s\".",
                             predicateStrings.at(0).c_str())
     }
+    m_wrapsAround = (m_range.m_from >= m_range.m_to);
     // Initialize the iterator to start from the range lower bounds or higher.
     m_iter = m_surgeon.indexIterator(m_range.m_from);
 }
@@ -94,8 +97,28 @@ int64_t ElasticIndexReadContext::handleStreamMore(
         yield = outputStreams.writeRow(getSerializer(), tuple, deleteTuple);
         assert(deleteTuple == false);
         if (++m_iter == m_surgeon.indexEnd()) {
-            yield = true;
-            remaining = 0;
+            // Wrap around zero?
+            if (m_wrapsAround && !m_wrappedAround) {
+                m_iter = m_surgeon.indexIterator(0);
+                m_wrappedAround = true;
+            }
+            else {
+                yield = true;
+                remaining = 0;
+            }
+        }
+        // See if we've hit the end of the range.
+        if (!yield) {
+            if (m_wrapsAround) {
+                if (m_wrappedAround && m_iter->getHash() >= m_range.m_to) {
+                    yield = true;
+                    remaining = 0;
+                }
+            }
+            else if (m_iter->getHash() >= m_range.m_to) {
+                yield = true;
+                remaining = 0;
+            }
         }
     }
 

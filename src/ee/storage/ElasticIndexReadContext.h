@@ -93,6 +93,12 @@ private:
 
     /// Elastic index iterator
     ElasticIndex::const_iterator m_iter;
+
+    /// Set to true if the range crosses zero.
+    bool m_wrapsAround;
+
+    /// Set to true when iteration continues after wrapping around.
+    bool m_wrappedAround;
 };
 
 }

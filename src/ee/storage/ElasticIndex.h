@@ -67,6 +67,11 @@ class ElasticIndexKey
     bool operator==(const ElasticIndexKey &other) const;
 
     /**
+     * Hash accessor.
+     */
+    ElasticHash getHash() const;
+
+    /**
      * Tuple address accessor.
      */
     char *getTupleAddress() const;
@@ -189,6 +194,14 @@ inline const ElasticIndexKey &ElasticIndexKey::operator=(const ElasticIndexKey &
 inline bool ElasticIndexKey::operator==(const ElasticIndexKey &other) const
 {
     return m_hash == other.m_hash && m_ptr == other.m_ptr;
+}
+
+/**
+ * Hash accessor.
+ */
+inline ElasticHash ElasticIndexKey::getHash() const
+{
+    return m_hash;
 }
 
 /**
