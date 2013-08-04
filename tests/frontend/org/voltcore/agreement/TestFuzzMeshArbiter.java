@@ -168,20 +168,6 @@ public class TestFuzzMeshArbiter extends TestCase
         state.setUpExpectations();
 
         state.expect();
-
-        state.pruneDeadNodes();
-
-        state.killLink(2, 3);
-        state.setUpExpectations();
-
-        state.expect();
-
-        state.pruneDeadNodes();
-
-        state.killLink(0, 2);
-        state.setUpExpectations();
-
-        state.expect();
     }
 
     public void testUnidirectionalLinkFailure() throws InterruptedException {
