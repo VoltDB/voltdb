@@ -121,9 +121,12 @@ public:
         NValue rnv = m_right->eval(tuple1, tuple2);
 
         // comparisons with null or NaN are always false
-        if (lnv.isNull() || lnv.isNaN() || rnv.isNull() || rnv.isNaN()) {
+        // [This code is commented out because doing the right thing breaks voltdb atm.
+        // We need to re-enable after we can verify that all plans in all configs give the
+        // same answer.]
+        /*if (lnv.isNull() || lnv.isNaN() || rnv.isNull() || rnv.isNaN()) {
             return NValue::getFalse();
-        }
+        }*/
 
         return compare.cmp(lnv, rnv);
     }
@@ -159,10 +162,13 @@ public:
         NValue lnv = m_left->eval(tuple1, tuple2);
         NValue rnv = m_right->eval(tuple1, tuple2);
 
-        // comparisons with null or NaN are always false
-        if (lnv.isNull() || lnv.isNaN() || rnv.isNull() || rnv.isNaN()) {
+        // Comparisons with null or NaN are always false
+        // [This code is commented out because doing the right thing breaks voltdb atm.
+        // We need to re-enable after we can verify that all plans in all configs give the
+        // same answer.]
+        /*if (lnv.isNull() || lnv.isNaN() || rnv.isNull() || rnv.isNaN()) {
             return NValue::getFalse();
-        }
+        }*/
 
         return compare.cmp(lnv, rnv);
     }
