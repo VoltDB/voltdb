@@ -17,21 +17,8 @@
 
 package org.voltcore.messaging;
 
-public enum Subject {
-    DEFAULT,                 // All original message types are in the default subject
-    SITE_FAILURE_UPDATE,     // Execution site data exchange when processing post-failure
-    FAILURE,                 // Notification of node failures
-    SITE_FAILURE_FORWARD;    // Agreement site forwards for failures detected on other sites
+import java.util.Set;
 
-    private final byte m_id;
-
-    private Subject() {
-        final int ordinal = ordinal();
-        assert(ordinal < Byte.MAX_VALUE);
-        m_id = (byte)ordinal;
-    }
-
-    public byte getId() {
-        return m_id;
-    }
+public interface DisconnectFailedHostsCallback {
+    public void disconnect(Set<Integer> failedHostIds);
 }
