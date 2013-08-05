@@ -131,29 +131,10 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         }
         m_backlog.removeFirst();
         Iterator<TransactionTask> iter = m_backlog.iterator();
-        while (iter.hasNext()) {
+        if (iter.hasNext()) {
             TransactionTask task = iter.next();
-            long lastQueuedTxnId = task.getTxnId();
             taskQueueOffer(task);
             ++offered;
-            if (task.getTransactionState().isSinglePartition()) {
-                // single part can be immediately removed and offered
-                iter.remove();
-                continue;
-            }
-            else {
-                // leave the mp fragment at the head of the backlog but
-                // iterate and take care of the kooky case explained above.
-                while (iter.hasNext()) {
-                    task = iter.next();
-                    if (task.getTxnId() == lastQueuedTxnId) {
-                        iter.remove();
-                        taskQueueOffer(task);
-                        ++offered;
-                    }
-                }
-                break;
-            }
         }
         return offered;
     }
