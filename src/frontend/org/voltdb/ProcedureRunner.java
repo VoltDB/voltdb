@@ -827,16 +827,6 @@ public class ProcedureRunner {
             // this is where, in the case of java procedures, m_method is set
             m_paramTypes = m_language.accept(parametersTypeRetriever, this);
 
-            int tempParamTypesLength = m_paramTypes.length;
-            m_paramTypeIsPrimitive = new boolean[tempParamTypesLength];
-            m_paramTypeIsArray = new boolean[tempParamTypesLength];
-            m_paramTypeComponentType = new Class<?>[tempParamTypesLength];
-
-            for (int ii = 0; ii < tempParamTypesLength; ii++) {
-                m_paramTypeIsPrimitive[ii] = m_paramTypes[ii].isPrimitive();
-                m_paramTypeIsArray[ii] = m_paramTypes[ii].isArray();
-                m_paramTypeComponentType[ii] = m_paramTypes[ii].getComponentType();
-            }
             if (m_procMethod == null && m_language == Language.JAVA) {
                 throw new RuntimeException("No \"run\" method found in: " + m_procedure.getClass().getName());
             }

@@ -479,16 +479,10 @@ public class DDLCompiler {
 
         DDLStatement stmt = getNextStatement(reader, m_compiler);
         while (stmt != null) {
-            // We sometimes choke at parsing statements with newlines, so
-            // make a version without newlines for most of the processing,
-            // but leave the original around because the formatting has
-            // value in the catalog report and perhaps elsewhere in the future.
-            String oneLinerStmt = stmt.statement.replace("\n", " ");
-
             // Some statements are processed by VoltDB and the rest are handled by HSQL.
             boolean processed = false;
             try {
-                processed = processVoltDBStatement(oneLinerStmt, db);
+                processed = processVoltDBStatement(stmt.statement, db);
             } catch (VoltCompilerException e) {
                 // Reformat the message thrown by VoltDB DDL processing to have a line number.
                 String msg = "VoltDB DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
@@ -497,7 +491,7 @@ public class DDLCompiler {
             if (!processed) {
                 try {
                     // check for CREATE TABLE or CREATE VIEW
-                    Matcher tableMatcher = createTablePattern.matcher(oneLinerStmt);
+                    Matcher tableMatcher = createTablePattern.matcher(stmt.statement);
                     if (tableMatcher.find()) {
                         String tableName = tableMatcher.group(2);
                         m_tableNameToDDL.put(tableName.toUpperCase(), stmt.statement);
@@ -506,8 +500,8 @@ public class DDLCompiler {
                     // kind of ugly.  We hex-encode each statement so we can
                     // avoid embedded newlines so we can delimit statements
                     // with newline.
-                    m_fullDDL += Encoder.hexEncode(oneLinerStmt) + "\n";
-                    m_hsql.runDDLCommand(oneLinerStmt);
+                    m_fullDDL += Encoder.hexEncode(stmt.statement) + "\n";
+                    m_hsql.runDDLCommand(stmt.statement);
                 } catch (HSQLParseException e) {
                     String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
                     throw m_compiler.new VoltCompilerException(msg, stmt.lineNo);
