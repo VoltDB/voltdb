@@ -130,9 +130,8 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             return offered;
         }
         m_backlog.removeFirst();
-        Iterator<TransactionTask> iter = m_backlog.iterator();
-        if (iter.hasNext()) {
-            TransactionTask task = iter.next();
+        if (!m_backlog.isEmpty()) {
+            TransactionTask task = m_backlog.getFirst();
             taskQueueOffer(task);
             ++offered;
         }
