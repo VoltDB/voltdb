@@ -57,6 +57,7 @@ public class EveryPartitionTask extends TransactionTask
     {
         hostLog.debug("STARTING: " + this);
         m_mailbox.send(m_initiatorHSIds, m_initiationMsg);
+        m_txnState.setDone();
         m_queue.flush();
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
         hostLog.debug("COMPLETE: " + this);
