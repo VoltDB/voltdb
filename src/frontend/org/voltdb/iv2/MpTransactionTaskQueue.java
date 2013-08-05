@@ -46,25 +46,12 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     synchronized boolean offer(TransactionTask task)
     {
         Iv2Trace.logTransactionTaskQueueOffer(task);
-        boolean retval = false;
-        if (!m_backlog.isEmpty()) {
-            m_backlog.addLast(task);
-            retval = true;
-        }
-        else {
-            /*
-             * Base case nothing queued nothing in progress
-             * If the task is a multipart then put an entry in the backlog which
-             * will act as a barrier for single parts, queuing them for execution after the
-             * multipart
-             */
-            if (!task.getTransactionState().isSinglePartition()) {
-                m_backlog.addLast(task);
-                retval = true;
-            }
+        boolean empty = m_backlog.isEmpty();
+        m_backlog.addLast(task);
+        if (empty) {
             taskQueueOffer(task);
         }
-        return retval;
+        return true;
     }
 
     // repair is used by MPI repair to inject a repair task into the
