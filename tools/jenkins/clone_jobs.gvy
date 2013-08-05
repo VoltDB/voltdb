@@ -44,9 +44,8 @@ for(item in alljobs)
       newName = item.getName().replace(str_nextrelease, str_branch)
 
       // delete existing job with new name
-      nj = Hudson.instance.getJob(newName)
-      if (nj)
-            nj.delete()
+      if (Hudson.instance.getJob(newName))
+            Hudson.instance.getJob(newName).delete()
 
       // copy the job, disable and save it
       def job = Hudson.instance.copy(item, newName)
