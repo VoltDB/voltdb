@@ -56,9 +56,11 @@ public class VoltXMLElement {
             sb.append(indent).append(" ").append(e.getKey());
             sb.append(" = ").append(e.getValue()).append("\n");
         }
-        sb.append(indent).append("[").append("\n");
-        for (VoltXMLElement e : children) {
-            e.append(sb, indent + "   ");
+        if ( ! children.isEmpty()) {
+            sb.append(indent).append("[").append("\n");
+            for (VoltXMLElement e : children) {
+                e.append(sb, indent + "   ");
+            }
         }
     }
 

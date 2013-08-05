@@ -482,7 +482,7 @@ public class TestPlansJoin extends PlannerTestCase {
 
        // Two Distributed tables join on non-partitioned column
        failToCompile("select * FROM P1 JOIN P2 ON P1.C = P2.E",
-                     "Join or union of multiple partitioned tables has insufficient join criteria.");
+                     "Join of multiple partitioned tables has insufficient join criteria.");
    }
 
     public void testBasicOuterJoin() {
@@ -665,7 +665,7 @@ public class TestPlansJoin extends PlannerTestCase {
 
         // Distributed Inner and Outer table joined on the non-partition column
         failToCompile("select * FROM P1 LEFT JOIN P4 ON P1.A = P4.E",
-                "Join or union of multiple partitioned tables has insufficient join criteria");
+                "Join of multiple partitioned tables has insufficient join criteria");
     }
 
     public void testBasicIndexOuterJoin() {

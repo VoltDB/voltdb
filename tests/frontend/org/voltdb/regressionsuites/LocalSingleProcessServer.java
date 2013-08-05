@@ -182,19 +182,22 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
     }
 
     @Override
-    public void startUp(boolean clearLocalDataDirectories) {
-        if (clearLocalDataDirectories) {
-            File exportOverflow = new File( m_pathToVoltRoot, "export_overflow");
-            if (exportOverflow.exists()) {
-                assert(exportOverflow.isDirectory());
-                for (File f : exportOverflow.listFiles()) {
-                    if (f.isFile() && f.getName().endsWith(".pbd") || f.getName().endsWith(".ad")) {
-                        f.delete();
-                    }
+    public void startUp() {
+        File exportOverflow = new File( m_pathToVoltRoot, "export_overflow");
+        if (exportOverflow.exists()) {
+            assert(exportOverflow.isDirectory());
+            for (File f : exportOverflow.listFiles()) {
+                if (f.isFile() && f.getName().endsWith(".pbd") || f.getName().endsWith(".ad")) {
+                    f.delete();
                 }
             }
         }
+        restartUp();
+    }
 
+    @Override
+    public void restartUp()
+    {
         Configuration config = new Configuration();
         config.m_backend = m_target;
         config.m_noLoadLibVOLTDB = (m_target == BackendTarget.HSQLDB_BACKEND);
@@ -225,10 +228,6 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
     @Override
     public boolean isValgrind() {
         return m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC;
-    }
-    @Override
-    public void startUp() {
-        startUp(true);
     }
     @Override
     public void createDirectory(File path) throws IOException {

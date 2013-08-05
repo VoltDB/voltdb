@@ -87,7 +87,7 @@ public class TestExportSnapshotPreservesSequenceNumber extends TestExportBase {
         client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte)1);
 
         m_config.shutDown();
-        m_config.startUp(false);
+        m_config.restartUp();
 
         client = getClient();
 

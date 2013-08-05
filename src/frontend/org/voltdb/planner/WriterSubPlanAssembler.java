@@ -21,7 +21,6 @@ import java.util.ArrayDeque;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
-import org.voltdb.planner.JoinNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 
 /**
@@ -67,6 +66,9 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
         if (!m_generatedPlans) {
             // Analyze join conditions
             m_parsedStmt.analyzeJoinExpressions(m_parsedStmt.joinTree);
+            // these just shouldn't happen right?
+            assert(m_parsedStmt.multiTableSelectionList.size() == 0);
+            assert(m_parsedStmt.noTableSelectionList.size() == 0);
 
             m_generatedPlans = true;
             assert (m_parsedStmt.joinTree != null);
@@ -85,15 +87,6 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
                 tableNode.m_currentAccessPath = path;
 
                 AbstractPlanNode plan = getAccessPlanForTable(tableNode.m_table, tableNode.m_currentAccessPath);
-
-                /*
-                 * If the access plan for the table in the join order was for a
-                 * distributed table scan there will be a send/receive pair at the top.
-                 */
-                if (m_partitioning.getCountOfPartitionedTables() > 1 && m_partitioning.requiresTwoFragments()) {
-                    plan = addSendReceivePair(plan);
-                }
-
                 m_plans.add(plan);
             }
 
