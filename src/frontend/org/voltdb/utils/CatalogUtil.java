@@ -17,7 +17,6 @@
 
 package org.voltdb.utils;
 
-import com.google.common.base.Charsets;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -40,12 +39,14 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
+
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
+
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -114,6 +115,8 @@ import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.xml.sax.SAXException;
 
+import com.google.common.base.Charsets;
+
 /**
  *
  */
@@ -122,7 +125,7 @@ public abstract class CatalogUtil {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     // The minimum version of catalog that's compatible with this version of Volt
-    public static final int[] minCompatibleVersion = {3, 2};
+    public static final int[] minCompatibleVersion = {3, 5};
 
     public static final String CATALOG_FILENAME = "catalog.txt";
     public static final String CATALOG_BUILDINFO_FILENAME = "buildinfo.txt";
