@@ -32,6 +32,7 @@ public class MicroOptimizationRunner {
         optimizations.add(new PushdownLimitsIntoScans());
         optimizations.add(new ReplaceWithIndexCounter());
         optimizations.add(new SeqScansToUniqueTreeScans());
+        optimizations.add(new ReplaceWithIndexLimit());
         // optimizations.add(new PushdownReceiveDominators());
     }
 

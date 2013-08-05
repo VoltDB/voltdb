@@ -17,6 +17,7 @@
 
 package org.voltdb.utils;
 
+import com.google.common.base.Charsets;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -39,19 +40,18 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
-
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
-
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.json_voltpatches.JSONException;
 import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -108,12 +108,11 @@ import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.export.processors.GuestProcessor;
 import org.voltdb.export.processors.RawProcessor;
 import org.voltdb.exportclient.ExportToFileClient;
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.xml.sax.SAXException;
-
-import com.google.common.base.Charsets;
 
 /**
  *
@@ -449,9 +448,26 @@ public abstract class CatalogUtil {
             ret += "CREATE INDEX " + catalog_idx.getTypeName() +
                    " ON " + catalog_tbl.getTypeName() + " (";
             add = "";
-            for (ColumnRef catalog_colref : CatalogUtil.getSortedCatalogItems(catalog_idx.getColumns(), "index")) {
-                ret += add + catalog_colref.getColumn().getTypeName();
-                add = ", ";
+
+            String jsonstring = catalog_idx.getExpressionsjson();
+
+            if (jsonstring.isEmpty()) {
+                for (ColumnRef catalog_colref : CatalogUtil.getSortedCatalogItems(catalog_idx.getColumns(), "index")) {
+                    ret += add + catalog_colref.getColumn().getTypeName();
+                    add = ", ";
+                }
+            } else {
+                List<AbstractExpression> indexedExprs = null;
+                try {
+                    indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring, null);
+                } catch (JSONException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+                for (AbstractExpression expr : indexedExprs) {
+                    ret += add + expr.explain(catalog_tbl.getTypeName());
+                    add = ", ";
+                }
             }
             ret += ");\n";
         }
@@ -749,6 +765,9 @@ public abstract class CatalogUtil {
                 ServerExportEnum exportTo = onServer.getExportto();
                 if (exportTo != null) {
                     sb.append( "EXPORTTO ").append(exportTo.name());
+                    if (exportTo.name().equalsIgnoreCase("CUSTOM")) {
+                        sb.append(" EXPORTCONNECTORCLASS ").append(onServer.getExportconnectorclass());
+                    }
                 }
                 ExportConfigurationType config = onServer.getConfiguration();
                 if (config != null) {
@@ -1071,13 +1090,33 @@ public abstract class CatalogUtil {
         ExportOnServerType exportOnServer = exportType.getOnserver();
         if (exportOnServer != null) {
 
+            String exportClientClassName = null;
+
+            switch( exportOnServer.getExportto()) {
+            case FILE: exportClientClassName = ExportToFileClient.class.getName(); break;
+            case JDBC: exportClientClassName = "org.voltdb.exportclient.JDBCExportClient"; break;
+            //Validate that we can load the class.
+            case CUSTOM:
+                try {
+                    CatalogUtil.class.getClassLoader().loadClass(exportOnServer.getExportconnectorclass());
+                    exportClientClassName = exportOnServer.getExportconnectorclass();
+                } catch (ClassNotFoundException ex) {
+                    hostLog.error(
+                            "Custom Export failed to configure, failed to load " +
+                            " export plugin class: " + exportOnServer.getExportconnectorclass() +
+                            " Disabling export.");
+                    exportType.setEnabled(false);
+                    return;
+                }
+                break;
+            }
+
             // this is OK as the deployment file XML schema does not allow for
             // export configuration property names that begin with underscores
-            ConnectorProperty prop = catconn.getConfig().add(GuestProcessor.EXPORT_TO_TYPE);
-            prop.setName(GuestProcessor.EXPORT_TO_TYPE);
-            switch( exportOnServer.getExportto()) {
-            case FILE: prop.setValue(ExportToFileClient.class.getName()); break;
-            case JDBC: prop.setValue("org.voltdb.exportclient.JDBCExportClient"); break;
+            if (exportClientClassName != null && exportClientClassName.trim().length() > 0) {
+                ConnectorProperty prop = catconn.getConfig().add(GuestProcessor.EXPORT_TO_TYPE);
+                prop.setName(GuestProcessor.EXPORT_TO_TYPE);
+                prop.setValue(exportClientClassName);
             }
 
             ExportConfigurationType exportConfiguration = exportOnServer.getConfiguration();
@@ -1087,7 +1126,7 @@ public abstract class CatalogUtil {
                 if (configProperties != null && ! configProperties.isEmpty()) {
 
                     for( PropertyType configProp: configProperties) {
-                        prop = catconn.getConfig().add(configProp.getName());
+                        ConnectorProperty prop = catconn.getConfig().add(configProp.getName());
                         prop.setName(configProp.getName());
                         prop.setValue(configProp.getValue());
                     }
@@ -1605,5 +1644,27 @@ public abstract class CatalogUtil {
         else {
             sa.tablesUpdated.add(table);
         }
+    }
+
+    // Calculate the width of an index:
+    // -- if the index is a pure-column index, return number of columns in the index
+    // -- if the index is an expression index, return number of expressions used to create the index
+    public static int getCatalogIndexSize(Index index) {
+        int indexSize = 0;
+        String jsonstring = index.getExpressionsjson();
+
+        if (jsonstring.isEmpty()) {
+            indexSize = getSortedCatalogItems(index.getColumns(), "index").size();
+        } else {
+            try {
+                indexSize = AbstractExpression.fromJSONArrayString(jsonstring, null).size();
+            } catch (JSONException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
+
+        return indexSize;
+
     }
 }

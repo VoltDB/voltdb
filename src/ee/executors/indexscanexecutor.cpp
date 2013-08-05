@@ -192,6 +192,11 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
         m_needsSubstitutePostExpression =
             m_node->getPredicate()->hasParameter();
     }
+    if (m_node->getInitialExpression() != NULL)
+    {
+        m_needsSubstituteInitialExpression =
+            m_node->getInitialExpression()->hasParameter();
+    }
 
     //
     // Miscellanous Information
@@ -281,9 +286,12 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                         return true;
                     }
                     else {
-                        // VoltDB should only support LT or LTE with
-                        // empty search keys for order-by without lookup
-                        throw e;
+                        // for overflow on reverse scan, we need to
+                        // do a forward scan to find the correct start
+                        // point, which is exactly what LTE would do.
+                        // so, set the lookupType to LTE and the missing
+                        // searchkey will be handled by extra post filters
+                        localLookupType = INDEX_LOOKUP_TYPE_LTE;
                     }
                 }
                 if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
@@ -343,6 +351,16 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     assert (m_index);
     assert (m_index == m_targetTable->index(m_node->getTargetIndexName()));
 
+    // INITIAL EXPRESSION
+    AbstractExpression* initial_expression = m_node->getInitialExpression();
+    if (initial_expression != NULL)
+    {
+        if (m_needsSubstituteInitialExpression) {
+            initial_expression->substitute(params);
+        }
+        VOLT_DEBUG("Initial Expression:\n%s", initial_expression->debug(true).c_str());
+    }
+
     //
     // An index scan has three parts:
     //  (1) Lookup tuples using the search key
@@ -368,6 +386,20 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
             m_index->moveToKeyOrGreater(&m_searchKey);
+        } else if (localLookupType == INDEX_LOOKUP_TYPE_LT) {
+            m_index->moveToLessThanKey(&m_searchKey);
+        } else if (localLookupType == INDEX_LOOKUP_TYPE_LTE) {
+            // find the entry whose key is greater than search key,
+            // do a forward scan using initialExpr to find the correct
+            // start point to do reverse scan
+            m_index->moveToGreaterThanKey(&m_searchKey);
+            while (!(m_tuple = m_index->nextValue()).isNullTuple()) {
+                if (initial_expression != NULL && initial_expression->eval(&m_tuple, NULL).isFalse()) {
+                    break;
+                }
+            }
+            // just passed the first failed entry, so move 2 backward
+            m_index->moveToBeforePriorEntry();
         }
         else {
             return false;
@@ -394,6 +426,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
            ((localLookupType != INDEX_LOOKUP_TYPE_EQ || activeNumOfSearchKeys == 0) &&
             !(m_tuple = m_index->nextValue()).isNullTuple()))) {
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", m_tuple.debug("tablename").c_str());
+
         //
         // First check whether the end_expression is now false
         //

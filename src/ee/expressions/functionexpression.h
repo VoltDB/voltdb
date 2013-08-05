@@ -226,6 +226,8 @@ static const int FUNC_TRUNCATE_MINUTE                  = 20019;
 static const int FUNC_TRUNCATE_SECOND                  = 20020;
 static const int FUNC_TRUNCATE_MILLISECOND             = 20021;
 static const int FUNC_TRUNCATE_MICROSECOND             = 20022;
+
+static const int FUNC_VOLT_FROM_UNIXTIME               = 20023;
 }
 
 // All of these "...functions.h" files need to be included AFTER the above definitions

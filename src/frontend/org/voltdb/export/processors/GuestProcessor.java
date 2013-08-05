@@ -16,15 +16,16 @@
  */
 package org.voltdb.export.processors;
 
+import com.google.common.base.Preconditions;
+import com.google.common.base.Throwables;
+import com.google.common.util.concurrent.ListenableFuture;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.RejectedExecutionException;
-
 import jsr166y.ThreadLocalRandom;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.InputHandler;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -34,20 +35,16 @@ import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportDataSource;
 import org.voltdb.export.ExportGeneration;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
-import org.voltdb.exportclient.ExportClientBase2;
+import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.exportclient.ExportDecoderBase.RestartBlockException;
-
-import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
-import com.google.common.util.concurrent.ListenableFuture;
 
 public class GuestProcessor implements ExportDataProcessor {
 
     public static final String EXPORT_TO_TYPE = "__EXPORT_TO_TYPE__";
 
     private ExportGeneration m_generation;
-    private ExportClientBase2 m_client;
+    private ExportClientBase m_client;
     private VoltLogger m_logger;
 
     private final List<Pair<ExportDecoderBase, AdvertisedDataSource>> m_decoders =
@@ -66,11 +63,11 @@ public class GuestProcessor implements ExportDataProcessor {
     @Override
     public void setProcessorConfig( Properties config) {
         String exportClientClass = config.getProperty(EXPORT_TO_TYPE);
-        Preconditions.checkNotNull(exportClientClass, "export to type is undefined");
+        Preconditions.checkNotNull(exportClientClass, "export to type is undefined or custom export plugin class missing.");
 
         try {
             final Class<?> clientClass = Class.forName(exportClientClass);
-            m_client = (ExportClientBase2)clientClass.newInstance();
+            m_client = (ExportClientBase)clientClass.newInstance();
             m_client.configure(config);
         } catch( Throwable t) {
             Throwables.propagate(t);

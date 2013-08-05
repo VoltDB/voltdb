@@ -53,6 +53,7 @@ import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.MaterializePlanNode;
+import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
@@ -503,12 +504,17 @@ public class PlanAssembler {
         root.generateOutputSchema(m_catalogDb);
         root = handleAggregationOperators(root);
 
-        root = handleOrderBy(root);
+        if (m_parsedSelect.hasComplexAgg()) {
+            AbstractPlanNode aggNode = root.getChild(0);
+            root.clearChildren();
+            aggNode.clearParents();
+            aggNode = handleOrderBy(aggNode);
+            root.addAndLinkChild(aggNode);
+        } else {
+            root = handleOrderBy(root);
+        }
 
-        if ((root.getPlanNodeType() != PlanNodeType.AGGREGATE) &&
-            (root.getPlanNodeType() != PlanNodeType.HASHAGGREGATE) &&
-            (root.getPlanNodeType() != PlanNodeType.DISTINCT) &&
-            (root.getPlanNodeType() != PlanNodeType.PROJECTION)) {
+        if (needProjectionNode(root)) {
             root = addProjection(root);
         }
 
@@ -516,11 +522,45 @@ public class PlanAssembler {
         {
             root = handleLimitOperator(root);
         }
-
         root.generateOutputSchema(m_catalogDb);
 
         return root;
     }
+
+    private boolean needProjectionNode (AbstractPlanNode root) {
+        if ((root.getPlanNodeType() == PlanNodeType.AGGREGATE) ||
+                (root.getPlanNodeType() == PlanNodeType.HASHAGGREGATE) ||
+                (root.getPlanNodeType() == PlanNodeType.DISTINCT) ||
+                (root.getPlanNodeType() == PlanNodeType.PROJECTION)) {
+            return false;
+        }
+
+        // Assuming the restrictions: Order by columns are (1) columns from table
+        // (2) tag from display columns (3) actual expressions from display columns
+        // Currently, we do not allow order by complex expressions that are not in display columns
+
+        // If there is a complexGroupby at his point, it means that Display columns contain all the order by columns.
+        // In that way, this plan does not require another projection node on top of sort node.
+        if (m_parsedSelect.hasComplexGroupby()) {
+            return false;
+        }
+        // TODO(XIN): Maybe we can remove this projection node for more cases
+        // as optimization in the future.
+
+        return true;
+    }
+
+    // ENG-4909 Bug: currently disable NESTLOOPINDEX plan for IN
+    private boolean disableNestedLoopIndexJoinForInComparison (AbstractPlanNode root, AbstractParsedStmt parsedStmt) {
+        if (root != null && root.getPlanNodeType() == PlanNodeType.NESTLOOPINDEX) {
+            assert(parsedStmt != null);
+            if (parsedStmt.joinTree.m_root != null ) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 
     private AbstractPlanNode getNextDeletePlan() {
         assert (subAssembler != null);
@@ -530,6 +570,12 @@ public class PlanAssembler {
         Table targetTable = m_parsedDelete.tableList.get(0);
 
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
+
+        // ENG-4909 Bug: currently disable NESTLOOPINDEX plan for IN
+        if (disableNestedLoopIndexJoinForInComparison(subSelectRoot, m_parsedDelete)) {
+            subSelectRoot = subAssembler.nextPlan();
+        }
+
         if (subSelectRoot == null)
             return null;
 
@@ -587,6 +633,10 @@ public class PlanAssembler {
         assert (subAssembler != null);
 
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
+        if (disableNestedLoopIndexJoinForInComparison(subSelectRoot, m_parsedUpdate)) {
+            subSelectRoot = subAssembler.nextPlan();
+        }
+
         if (subSelectRoot == null)
             return null;
 
@@ -882,12 +932,23 @@ public class PlanAssembler {
             return root;
         }
 
+        SortDirectionType sortDirection = SortDirectionType.INVALID;
+
         // Skip the explicit ORDER BY plan step if an IndexScan is already providing the equivalent ordering.
         // Note that even tree index scans that produce values in their own "key order" only report
         // their sort direction != SortDirectionType.INVALID
         // when they enforce an ordering equivalent to the one requested in the ORDER BY clause.
         if (root.getPlanNodeType() == PlanNodeType.INDEXSCAN) {
-            if (((IndexScanPlanNode) root).getSortDirection() != SortDirectionType.INVALID) {
+            sortDirection = ((IndexScanPlanNode) root).getSortDirection();
+            if (sortDirection != SortDirectionType.INVALID) {
+                return root;
+            }
+        }
+        // Optimization for NestLoopIndex on IN list
+        // skip the explicit ORDER BY plan step if NestLoopIndex is providing the equivalent ordering
+        if (root.getPlanNodeType() == PlanNodeType.NESTLOOPINDEX) {
+            sortDirection = ((NestLoopIndexPlanNode)root).getSortDirection();
+            if (sortDirection != SortDirectionType.INVALID) {
                 return root;
             }
         }
@@ -898,6 +959,7 @@ public class PlanAssembler {
                                 col.ascending ? SortDirectionType.ASC
                                               : SortDirectionType.DESC);
         }
+
         orderByNode.addAndLinkChild(root);
         orderByNode.generateOutputSchema(m_catalogDb);
 
@@ -978,6 +1040,7 @@ public class PlanAssembler {
         if (allScansAreDeterministic) {
             orderByNode.setOrderingByUniqueColumns();
         }
+
         return orderByNode;
     }
 
@@ -1074,22 +1137,29 @@ public class PlanAssembler {
             sendNode.addAndLinkChild(distLimit);
         }
 
-        topLimit.addAndLinkChild(root);
-        topLimit.generateOutputSchema(m_catalogDb);
-        return topLimit;
+        // Switch if has Complex aggregations
+        AbstractPlanNode projectionNode = root;
+        if (m_parsedSelect.hasComplexAgg()) {
+            AbstractPlanNode child = root.getChild(0);
+            projectionNode.clearChildren();
+            child.clearParents();
+
+            topLimit.addAndLinkChild(child);
+            topLimit.generateOutputSchema(m_catalogDb);
+            projectionNode.addAndLinkChild(topLimit);
+            return projectionNode;
+        } else {
+            topLimit.addAndLinkChild(root);
+            topLimit.generateOutputSchema(m_catalogDb);
+            return topLimit;
+        }
     }
 
     AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
-        boolean containsAggregateExpression = false;
         AggregatePlanNode aggNode = null;
 
         /* Check if any aggregate expressions are present */
-        for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns) {
-            if (col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
-                containsAggregateExpression = true;
-                break;
-            }
-        }
+        boolean containsAggregateExpression = m_parsedSelect.hasAggregateExpression();
 
         /*
          * "Select A from T group by A" is grouped but has no aggregate operator
@@ -1129,11 +1199,13 @@ public class PlanAssembler {
 
             int outputColumnIndex = 0;
             NodeSchema agg_schema = new NodeSchema();
-            // TODO: Aggregates could theoretically ONLY appear in the ORDER BY clause but not the display columns, but we don't support that yet.
-            for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns) {
+            NodeSchema top_agg_schema = new NodeSchema();
+
+            for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.aggResultColumns) {
                 AbstractExpression rootExpr = col.expression;
                 AbstractExpression agg_input_expr = null;
                 SchemaColumn schema_col = null;
+                SchemaColumn top_schema_col = null;
                 if (rootExpr instanceof AggregateExpression) {
                     ExpressionType agg_expression_type = rootExpr.getExpressionType();
                     agg_input_expr = rootExpr.getLeft();
@@ -1156,6 +1228,7 @@ public class PlanAssembler {
                     boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
                     aggNode.addAggregate(agg_expression_type, is_distinct, outputColumnIndex, agg_input_expr);
                     schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "", col.alias, tve);
+                    top_schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "", col.alias, tve);
 
                     /*
                      * Special case count(*), count(), sum(), min() and max() to
@@ -1217,11 +1290,8 @@ public class PlanAssembler {
                 // If the rootExpr is not itself an AggregateExpression but simply contains one (or more)
                 // like "MAX(counter)+1" or "MAX(col)/MIN(col)" the assumptions about matching input and output
                 // columns break down.
-                // TODO: support expressions of aggregates by greater differentiation of display columns between the top-level
-                // aggregate (potentially containing aggregate functions and expressions of aggregate functions) and the pushed-down
-                // aggregate (potentially containing aggregate functions and aggregate functions of expressions).
                 else if (rootExpr.hasAnySubexpressionOfClass(AggregateExpression.class)) {
-                    throw new PlanningErrorException("Unsupported operation on the result of an aggregate function in a column expression");
+                    assert(false);
                 }
                 else
                 {
@@ -1231,13 +1301,18 @@ public class PlanAssembler {
                      * MUST already exist in the child node's output. Find them and
                      * add them to the aggregate's output.
                      */
-                    schema_col = new SchemaColumn(col.tableName,
-                                                  col.columnName,
-                                                  col.alias,
-                                                  col.expression);
+                    schema_col = new SchemaColumn(col.tableName, col.columnName, col.alias, col.expression);
+                    AbstractExpression topExpr = null;
+                    if (col.groupBy) {
+                        topExpr = m_parsedSelect.groupByExpressions.get(col.alias);
+                    } else {
+                        topExpr = col.expression;
+                    }
+                    top_schema_col = new SchemaColumn(col.tableName, col.columnName, col.alias, topExpr);
                 }
 
                 agg_schema.addColumn(schema_col);
+                top_agg_schema.addColumn(top_schema_col);
                 outputColumnIndex++;
             }
 
@@ -1248,24 +1323,24 @@ public class PlanAssembler {
                                                      " Please specify " + col.alias +
                                                      " as a display column.");
                 }
-
                 aggNode.addGroupByExpression(col.expression);
+
                 if (topAggNode != null) {
-                    // This assumes that the group keys are simple columns in a fixed order as presented as input to aggNode,
-                    // as projected out of aggNode as input to topAggNode, and as projected out of topAggNode.
-                    // This is not likely to hold up in more general cases involving expressions.
-                    topAggNode.addGroupByExpression(col.expression);
+                    topAggNode.addGroupByExpression(m_parsedSelect.groupByExpressions.get(col.alias));
                 }
             }
-
             aggNode.setOutputSchema(agg_schema);
-            /*
-             * Is there a necessary coordinator-aggregate node...
-             */
             if (topAggNode != null) {
-                topAggNode.setOutputSchema(agg_schema);
+                if (m_parsedSelect.hasComplexGroupby()) {
+                    topAggNode.setOutputSchema(top_agg_schema);
+                } else {
+                    topAggNode.setOutputSchema(agg_schema);
+                }
+
             }
-            root = pushDownAggregate(root, aggNode, topAggNode);
+
+            NodeSchema newSchema = m_parsedSelect.getNewSchema();
+            root = pushDownAggregate(root, aggNode, topAggNode, m_parsedSelect.hasComplexAgg(), newSchema);
         }
 
         if (m_parsedSelect.isGrouped()) {
@@ -1305,7 +1380,8 @@ public class PlanAssembler {
      */
     AbstractPlanNode pushDownAggregate(AbstractPlanNode root,
                                        AggregatePlanNode distNode,
-                                       AggregatePlanNode coordNode) {
+                                       AggregatePlanNode coordNode,
+                                       boolean needProjectionNode, NodeSchema newSchema) {
 
         // remember that coordinating aggregation has a pushed-down
         // counterpart deeper in the plan. this allows other operators
@@ -1337,11 +1413,17 @@ public class PlanAssembler {
             accessPlanTemp.getChild(0).clearChildren();
             accessPlanTemp.getChild(0).addAndLinkChild(root);
             root = accessPlanTemp;
-
             // Add the top node
             coordNode.addAndLinkChild(root);
             coordNode.generateOutputSchema(m_catalogDb);
             root = coordNode;
+        }
+        if (needProjectionNode) {
+            ProjectionPlanNode proj = new ProjectionPlanNode();
+            proj.addAndLinkChild(root);
+            proj.setOutputSchema(newSchema);
+            proj.generateOutputSchema(m_catalogDb);
+            root = proj;
         }
         return root;
     }

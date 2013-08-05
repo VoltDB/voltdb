@@ -55,6 +55,11 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google.common.base.Charsets;
+import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.SettableFuture;
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.log4j.Appender;
@@ -76,6 +81,7 @@ import org.voltcore.utils.COWMap;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
+
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
@@ -114,12 +120,6 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.VoltSampler;
-
-import com.google.common.base.Charsets;
-import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.SettableFuture;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -672,25 +672,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 final Class<?> statsManagerClass =
                         MiscUtils.loadProClass("org.voltdb.management.JMXStatsManager", "JMX", true);
                 if (statsManagerClass != null) {
-                    ArrayList<Long> localHSIds;
-                    Long MPHSId;
-                    if (isIV2Enabled()) {
-                        localHSIds = new ArrayList<Long>();
-                        for (Initiator iv2Initiator : m_iv2Initiators) {
-                            localHSIds.add(iv2Initiator.getInitiatorHSId());
-                        }
-                        MPHSId = m_MPI.getInitiatorHSId();
-                    } else {
-                        localHSIds = new ArrayList<Long>(m_localSites.keySet());
-                        MPHSId = null;
-                    }
                     m_statsManager = (StatsManager)statsManagerClass.newInstance();
                     m_statsManager.initialize();
                 }
             } catch (Exception e) {
-                hostLog.error("Failed to instantiate the JMX stats manager: " + e.getMessage() +
-                              ". Disabling JMX.");
-                e.printStackTrace();
+                //JMXStatsManager will log and we continue.
             }
 
             try {
@@ -1492,7 +1478,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
             else {
                 while (m_isRunning) {
-                    Thread.sleep(3000);
+                    Thread.sleep(1);
                 }
             }
         }
@@ -2158,9 +2144,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     private void prepareReplication() {
-        if (m_nodeDRGateway != null) {
-            m_nodeDRGateway.start();
-            m_nodeDRGateway.bindPorts();
+        try {
+            if (m_nodeDRGateway != null) {
+                m_nodeDRGateway.start();
+                m_nodeDRGateway.bindPorts();
+            }
+        } catch (Exception ex) {
+            hostLog.warn("Replication Service failed to bind to port: " + ex);
         }
     }
 
