@@ -31,6 +31,8 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
 {
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
+    private TransactionTask m_currentTask = null;
+
     MpTransactionTaskQueue(SiteTaskerQueue queue)
     {
         super(queue);
@@ -46,11 +48,8 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     synchronized boolean offer(TransactionTask task)
     {
         Iv2Trace.logTransactionTaskQueueOffer(task);
-        boolean empty = m_backlog.isEmpty();
         m_backlog.addLast(task);
-        if (empty) {
-            taskQueueOffer(task);
-        }
+        taskQueueOffer();
         return true;
     }
 
@@ -97,12 +96,19 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         }
     }
 
-    // Add a local method to offer to the SiteTaskerQueue so we have
-    // a single point we can log through.
-    private void taskQueueOffer(TransactionTask task)
+    private boolean taskQueueOffer()
     {
-        Iv2Trace.logSiteTaskerQueueOffer(task);
-        m_taskQueue.offer(task);
+        boolean retval = false;
+        if (m_currentTask == null) {
+            if (!m_backlog.isEmpty()) {
+                TransactionTask task = m_backlog.getFirst();
+                m_currentTask = task;
+                Iv2Trace.logSiteTaskerQueueOffer(task);
+                m_taskQueue.offer(task);
+                retval = true;
+            }
+        }
+        return retval;
     }
 
     /**
@@ -112,27 +118,12 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     synchronized int flush()
     {
         int offered = 0;
-        // If the first entry of the backlog is a completed transaction, clear it so it no longer
-        // blocks the backlog then iterate the backlog for more work.
-        //
-        // Note the kooky corner case where a multi-part transaction can actually have multiple outstanding
-        // tasks. At first glance you would think that because the relationship is request response there
-        // can be only one outstanding task for a given multi-part transaction.
-        //
-        // That isn't true.
-        //
-        // A rollback can cause there to be a fragment task as well as a rollback
-        // task. The rollback is generated asynchronously by another partition.
-        // If we don't flush all the associated tasks now then flush won't be called again because it is waiting
-        // for the complete transaction task that is languishing in the queue to do the flush post multi-part.
-        // It can't be called eagerly because that would destructively flush single parts as well.
         if (m_backlog.isEmpty() || !m_backlog.getFirst().getTransactionState().isDone()) {
             return offered;
         }
         m_backlog.removeFirst();
-        if (!m_backlog.isEmpty()) {
-            TransactionTask task = m_backlog.getFirst();
-            taskQueueOffer(task);
+        m_currentTask = null;
+        if (taskQueueOffer()) {
             ++offered;
         }
         return offered;
@@ -145,7 +136,8 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
      */
     synchronized void restart()
     {
-        taskQueueOffer(m_backlog.getFirst());
+        m_currentTask = null;
+        taskQueueOffer();
     }
 
     /**
