@@ -15,23 +15,26 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltcore.messaging;
+package org.voltcore.agreement;
 
-public enum Subject {
-    DEFAULT,                 // All original message types are in the default subject
-    SITE_FAILURE_UPDATE,     // Execution site data exchange when processing post-failure
-    FAILURE,                 // Notification of node failures
-    SITE_FAILURE_FORWARD;    // Agreement site forwards for failures detected on other sites
+public enum ArbitrationStrategy {
+    NO_QUARTER {
+        @Override
+        public <R, P> R accept(Visitor<R, P> vtor, P param) {
+            return vtor.visitNoQuarter(param);
+        }
+    },
+    MATCHING_CARDINALITY {
+        @Override
+        public <R, P> R accept(Visitor<R, P> vtor, P param) {
+            return vtor.visitMatchingCardinality(param);
+        }
+    };
 
-    private final byte m_id;
-
-    private Subject() {
-        final int ordinal = ordinal();
-        assert(ordinal < Byte.MAX_VALUE);
-        m_id = (byte)ordinal;
+    public interface Visitor<R,P> {
+        R visitNoQuarter(P param);
+        R visitMatchingCardinality(P param);
     }
 
-    public byte getId() {
-        return m_id;
-    }
+    public abstract <R,P> R accept(Visitor<R,P> vtor, P param);
 }
