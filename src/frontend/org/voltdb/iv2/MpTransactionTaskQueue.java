@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.exceptions.TransactionRestartException;
@@ -30,7 +31,7 @@ import org.voltdb.messaging.FragmentTaskMessage;
 
 public class MpTransactionTaskQueue extends TransactionTaskQueue
 {
-    protected static final VoltLogger hostLog = new VoltLogger("HOST");
+    protected static final VoltLogger tmLog = new VoltLogger("TM");
 
     private final Map<Long, TransactionTask> m_currentWrites = new HashMap<Long, TransactionTask>();
     private final Map<Long, TransactionTask> m_currentReads = new HashMap<Long, TransactionTask>();
@@ -68,32 +69,55 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         // know it will be the next thing to run once we poison the current
         // TXN.
         m_taskQueue.offer(task);
+        // First, poison all the stuff that is currently running
+        Map<Long, TransactionTask> currentSet;
+        if (!m_currentReads.isEmpty()) {
+            assert(m_currentWrites.isEmpty());
+            tmLog.debug("MpTTQ: repairing reads");
+            currentSet = m_currentReads;
+        }
+        else {
+            tmLog.debug("MpTTQ: repairing writes");
+            currentSet = m_currentWrites;
+        }
+        for (Entry<Long, TransactionTask> e : currentSet.entrySet()) {
+            if (e.getValue() instanceof MpProcedureTask) {
+                MpProcedureTask next = (MpProcedureTask)e.getValue();
+                tmLog.debug("MpTTQ: poisoning task: " + next);
+                next.doRestart(masters, partitionMasters);
+                // get head
+                // Only the MPI's TransactionTaskQueue is ever called in this way, so we know
+                // that the TransactionTasks we pull out of it have to be MP transactions, so this
+                // cast is safe
+                MpTransactionState txn = (MpTransactionState)next.getTransactionState();
+                // inject poison pill
+                FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false);
+                FragmentResponseMessage poison =
+                    new FragmentResponseMessage(dummy, 0L); // Don't care about source HSID here
+                // Provide a TransactionRestartException which will be converted
+                // into a ClientResponse.RESTART, so that the MpProcedureTask can
+                // detect the restart and take the appropriate actions.
+                TransactionRestartException restart = new TransactionRestartException(
+                        "Transaction being restarted due to fault recovery or shutdown.", next.getTxnId());
+                poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
+                txn.offerReceivedFragmentResponse(poison);
+            }
+            else {
+                assert(false);
+            }
+        }
+        // Now, iterate through the backlog and update the partition masters
+        // for all MpProcedureTasks not at the head of the TransactionTaskQueue
         Iterator<TransactionTask> iter = m_backlog.iterator();
-        if (iter.hasNext()) {
-            MpProcedureTask next = (MpProcedureTask)iter.next();
-            next.doRestart(masters, partitionMasters);
-            // get head
-            // Only the MPI's TransactionTaskQueue is ever called in this way, so we know
-            // that the TransactionTasks we pull out of it have to be MP transactions, so this
-            // cast is safe
-            MpTransactionState txn = (MpTransactionState)next.getTransactionState();
-            // inject poison pill
-            FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false);
-            FragmentResponseMessage poison =
-                new FragmentResponseMessage(dummy, 0L); // Don't care about source HSID here
-            // Provide a TransactionRestartException which will be converted
-            // into a ClientResponse.RESTART, so that the MpProcedureTask can
-            // detect the restart and take the appropriate actions.
-            TransactionRestartException restart = new TransactionRestartException(
-                    "Transaction being restarted due to fault recovery or shutdown.", next.getTxnId());
-            poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
-            txn.offerReceivedFragmentResponse(poison);
-            // Now, iterate through the rest of the data structure and update the partition masters
-            // for all MpProcedureTasks not at the head of the TransactionTaskQueue
-            while (iter.hasNext())
-            {
-                next = (MpProcedureTask)iter.next();
+        while (iter.hasNext()) {
+            // EveryPartition work is just going to cross its fingers here.
+            TransactionTask tt = iter.next();
+            if (task instanceof MpProcedureTask) {
+                MpProcedureTask next = (MpProcedureTask)tt;
                 next.updateMasters(masters, partitionMasters);
+            }
+            else {
+                assert(false);
             }
         }
     }
@@ -109,7 +133,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         boolean retval = false;
         if (m_currentReads.isEmpty() && m_currentWrites.isEmpty()) {
             if (!m_backlog.isEmpty()) {
-                TransactionTask task = m_backlog.getFirst();
+                TransactionTask task = m_backlog.pollFirst();
                 if (task.getTransactionState().isReadOnly()) {
                     m_currentReads.put(task.getTxnId(), task);
                 }
@@ -131,10 +155,6 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     synchronized int flush(long txnId)
     {
         int offered = 0;
-        if (m_backlog.isEmpty() || !m_backlog.getFirst().getTransactionState().isDone()) {
-            return offered;
-        }
-        m_backlog.removeFirst();
         if (m_currentReads.containsKey(txnId)) {
             m_currentReads.remove(txnId);
         }
