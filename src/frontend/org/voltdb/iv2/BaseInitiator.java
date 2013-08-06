@@ -149,7 +149,6 @@ public abstract class BaseInitiator implements Initiator
                                        m_initiatorMailbox.getHSId(),
                                        backend, catalogContext,
                                        serializedCatalog,
-                                       catalogContext.m_transactionId,
                                        m_partitionId,
                                        numberOfPartitions,
                                        startAction,

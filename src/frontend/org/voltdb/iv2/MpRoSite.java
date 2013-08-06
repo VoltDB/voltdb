@@ -23,6 +23,7 @@ import java.util.concurrent.Future;
 
 //import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
@@ -36,6 +37,7 @@ import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
 import org.voltdb.StatsSelector;
 import org.voltdb.SystemProcedureExecutionContext;
+import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -44,10 +46,9 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.jni.ExecutionEngine;
-
-import com.google.common.collect.ImmutableMap;
 
 public class MpRoSite implements Runnable, SiteProcedureConnection
 {
@@ -143,12 +144,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public ImmutableMap<String, ProcedureRunner> getProcedures() {
-            throw new RuntimeException("Not implemented in iv2");
-            // return m_loadedProcedures.procs;
-        }
-
-        @Override
         public long getSiteId() {
             return m_siteId;
         }
@@ -189,11 +184,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         @Override
         public int getCatalogVersion() {
             return m_context.catalogVersion;
-        }
-
-        @Override
-        public SiteTracker getSiteTracker() {
-            throw new RuntimeException("Not implemented in iv2");
         }
 
         @Override
@@ -240,6 +230,20 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         {
             throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
+
+        @Override
+        public boolean activateTableStream(int tableId, TableStreamType type, long undoToken, byte[] predicates)
+        {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
+        @Override
+        public Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
+                List<DBBPool.BBContainer> outputBuffers)
+        {
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+        }
+
     };
 
     /** Create a new RO MP execution site */
@@ -388,7 +392,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public void truncateUndoLog(boolean rollback, long beginUndoToken, long txnId, long spHandle)
+    public void truncateUndoLog(boolean rollback, long beginUndoToken, long txnId, long spHandle,
+            List<UndoAction> undoActions)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }

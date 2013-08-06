@@ -135,7 +135,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             TransactionTask tt = iter.next();
             if (task instanceof MpProcedureTask) {
                 MpProcedureTask next = (MpProcedureTask)tt;
-                next.updateMasters(masters);
+                next.updateMasters(masters, partitionMasters);
             }
             else {
                 assert(false);
