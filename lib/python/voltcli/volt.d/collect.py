@@ -26,17 +26,29 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 @VOLT.Command(
-    description = 'Collect artifacts for problem analysis.',
+    description = 'Collect logs for problem analysis.',
     options = (
-        VOLT.StringOption (None, '--nonce', 'nonce',
-                           'the unique collection file identifier',
+        VOLT.StringOption (None, '--prefix', 'uniqueid',
+                           'file name prefix for uniquely identifying collection',
+                           default = 'voltdb_logs'),
+        VOLT.StringOption (None, '--upload', 'host',
+                           'upload resulting collection to HOST via SFTP',
                            default = ''),
-        VOLT.BooleanOption(None, '--skipheapdump', 'skipheapdump',
+        VOLT.StringOption (None, '--username', 'username',
+                           'user name for SFTP upload',
+                           default = ''),
+        VOLT.StringOption (None, '--password', 'password',
+                           'password for SFTP upload',
+                           default = ''),
+        VOLT.BooleanOption(None, '--no-prompt', 'noprompt',
+                           'automatically upload collection (without user prompt)',
+                           default = False),
+        VOLT.BooleanOption(None, '--dry-run', 'dryrun',
+                           'list the log files without collecting them',
+                           default = False),
+        VOLT.BooleanOption(None, '--skip-heap-dump', 'skipheapdump',
                            'exclude heap dump file from collection',
                            default = False),
-        VOLT.BooleanOption(None, '--upload', 'upload',
-                           'automatically upload collected files to server (skip confirmation)',
-                           default = False)
     ),
     arguments = (
         VOLT.PathArgument('voltdbroot', 'the voltdbroot path', absolute = True)
@@ -44,5 +56,5 @@
 )
 
 def collect(runner):
-    runner.args.extend([runner.opts.voltdbroot, runner.opts.nonce, runner.opts.skipheapdump, runner.opts.upload])
+    runner.args.extend([runner.opts.voltdbroot, runner.opts.uniqueid, runner.opts.host, runner.opts.username, runner.opts.password, runner.opts.noprompt, runner.opts.dryrun, runner.opts.skipheapdump])
     runner.java.execute('org.voltdb.utils.Collector', None, *runner.args)
