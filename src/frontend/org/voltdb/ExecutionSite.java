@@ -1450,14 +1450,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             readOnly ? Long.MAX_VALUE : getNextUndoToken());
     }
 
-    @Override
-    public void simulateExecutePlanFragments(long txnId, boolean readOnly) {
-        if (!readOnly) {
-            // pretend real work was done
-            getNextUndoToken();
-        }
-    }
-
     /**
      * Continue doing runnable work for the current transaction.
      * If doWork() returns true, the transaction is over.

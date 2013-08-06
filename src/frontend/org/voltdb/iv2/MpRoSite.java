@@ -357,12 +357,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public void simulateExecutePlanFragments(long txnId, boolean readOnly)
-    {
-        throw new RuntimeException("Not supported in IV2.");
-    }
-
-    @Override
     public Map<Integer, List<VoltTable>> recursableRun(
             TransactionState currentTxnState)
     {
