@@ -119,8 +119,8 @@ public class TestIndexesSuite extends RegressionSuite {
             client.callProcedure("Insert", table, 8, "h", 300, 8, 19.5);
             client.callProcedure("Insert", table, 9, "h", 300, 8, 19.5);
 
-            String sql = String.format("select %s.ID, MIN(%s.ID) from %s group by %s.ID order by %s.ID limit 4",
-                    table, table, table, table, table);
+            String sql = String.format("select T.ID, MIN(T.ID) from %s T group by T.ID order by T.ID limit 4",
+                    table);
             VoltTable results = client.callProcedure("@AdHoc", sql).getResults()[0];
             System.out.println(results);
         }
@@ -132,7 +132,8 @@ public class TestIndexesSuite extends RegressionSuite {
 
         Client client = getClient();
 
-        for (int i = 0; i < 200; i++) {
+        int i = 0;
+        for (int j = 0; j < 20; j++) {
             client.callProcedure("R1IX.insert", i++, "a", 100 * i, 0.0 / 0.0);
             client.callProcedure("R1IX.insert", i++, "b", 100 * i, 16.5);
             client.callProcedure("R1IX.insert", i++, "c", 100 * i, 119.5);
