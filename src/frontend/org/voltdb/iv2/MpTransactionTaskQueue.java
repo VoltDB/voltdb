@@ -120,7 +120,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
      * Try to offer as many runnable Tasks to the SiteTaskerQueue as possible.
      * @return the number of TransactionTasks queued to the SiteTaskerQueue
      */
-    synchronized int flush()
+    synchronized int flush(long txnId)
     {
         int offered = 0;
         if (m_backlog.isEmpty() || !m_backlog.getFirst().getTransactionState().isDone()) {

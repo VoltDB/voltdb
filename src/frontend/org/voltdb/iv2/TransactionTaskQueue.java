@@ -94,9 +94,10 @@ public class TransactionTaskQueue
 
     /**
      * Try to offer as many runnable Tasks to the SiteTaskerQueue as possible.
+     * @param txnId The transaction ID of the TransactionTask which is completing and causing the flush
      * @return the number of TransactionTasks queued to the SiteTaskerQueue
      */
-    synchronized int flush()
+    synchronized int flush(long txnId)
     {
         int offered = 0;
         // If the first entry of the backlog is a completed transaction, clear it so it no longer

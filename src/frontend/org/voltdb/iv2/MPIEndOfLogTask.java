@@ -47,7 +47,7 @@ public class MPIEndOfLogTask extends TransactionTask
         hostLog.debug("STARTING: " + this);
         m_mailbox.send(m_initiatorHSIds, m_txnState.getNotice());
         m_txnState.setDone();
-        m_queue.flush();
+        m_queue.flush(getTxnId());
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
         hostLog.debug("COMPLETE: " + this);
     }

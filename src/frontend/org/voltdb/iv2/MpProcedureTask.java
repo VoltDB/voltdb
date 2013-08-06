@@ -207,7 +207,7 @@ public class MpProcedureTask extends ProcedureTask
         complete.setOriginalTxnId(m_msg.getOriginalTxnId());
         m_initiator.send(com.google.common.primitives.Longs.toArray(m_initiatorHSIds), complete);
         m_txnState.setDone();
-        m_queue.flush();
+        m_queue.flush(getTxnId());
     }
 
     private void restartTransaction()
