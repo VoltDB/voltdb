@@ -681,7 +681,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 handler =
                     new ClientInputHandler(
                             username,
-                            socket.socket().getInetAddress().getHostName(),
+                            socket.socket().getInetAddress().getHostAddress(),
                             m_isAdmin);
             }
             else {
