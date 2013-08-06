@@ -98,20 +98,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     // Current topology
     int m_partitionId;
 
-    // Need temporary access to some startup parameters in order to
-    // initialize EEs in the right thread.
-    private static class StartupConfig
-    {
-        final String m_serializedCatalog;
-        final long m_timestamp;
-        StartupConfig(final String serCatalog, final long timestamp)
-        {
-            m_serializedCatalog = serCatalog;
-            m_timestamp = timestamp;
-        }
-    }
-    private StartupConfig m_startupConfig = null;
-
     // Undo token state for the corresponding EE.
     public final static long kInvalidUndoToken = -1L;
     long latestUndoToken = 0L;
@@ -252,7 +238,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public void updateBackendLogLevels() {
-             MpRoSite.this.updateBackendLogLevels();
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
 
         @Override
@@ -265,7 +251,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         @Override
         public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config)
         {
-             MpRoSite.this.updateHashinator(config);
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
     };
 
@@ -289,8 +275,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         m_numberOfPartitions = numPartitions;
         m_scheduler = scheduler;
         m_backend = backend;
-        // need this later when running in the final thread.
-        m_startupConfig = new StartupConfig(serializedCatalog, context.m_uniqueId);
         m_lastCommittedTxnId = TxnEgo.makeZero(partitionId).getTxnId();
         m_lastCommittedSpHandle = TxnEgo.makeZero(partitionId).getTxnId();
         m_currentTxnId = Long.MIN_VALUE;
@@ -321,7 +305,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     /** Thread specific initialization */
-    void initialize(String serializedCatalog, long timestamp)
+    void initialize()
     {
         if (m_backend == BackendTarget.HSQLDB_BACKEND) {
             m_hsql = HsqlBackend.initializeHSQLBackend(m_siteId,
@@ -342,8 +326,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public void run()
     {
         Thread.currentThread().setName("Iv2ExecutionSite: " + CoreUtils.hsIdToString(m_siteId));
-        initialize(m_startupConfig.m_serializedCatalog, m_startupConfig.m_timestamp);
-        m_startupConfig = null; // release the serializedCatalog bytes.
+        initialize();
 
         try {
             while (m_shouldContinue) {
@@ -579,11 +562,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public void setNumberOfPartitions(int partitionCount)
     {
         m_numberOfPartitions = partitionCount;
-    }
-
-    private void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config)
-    {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
     /**
