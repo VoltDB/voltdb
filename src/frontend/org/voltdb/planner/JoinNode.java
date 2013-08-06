@@ -211,6 +211,9 @@ public class JoinNode implements Cloneable {
                 if (joinNode.m_whereExpr != null) {
                     ExpressionUtil.collectPartitioningFilters(joinNode.m_whereExpr, equivalenceSet);
                 }
+                if (joinNode.m_joinExpr != null) {
+                    ExpressionUtil.collectPartitioningFilters(joinNode.m_joinExpr, equivalenceSet);
+                }
                 assert joinNode.m_leftNode == null && joinNode.m_rightNode == null;
                 continue;
             }
