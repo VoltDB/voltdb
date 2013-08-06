@@ -15,23 +15,12 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltcore.messaging;
 
-public enum Subject {
-    DEFAULT,                 // All original message types are in the default subject
-    SITE_FAILURE_UPDATE,     // Execution site data exchange when processing post-failure
-    FAILURE,                 // Notification of node failures
-    SITE_FAILURE_FORWARD;    // Agreement site forwards for failures detected on other sites
+package org.voltcore.agreement;
 
-    private final byte m_id;
+import java.util.Set;
 
-    private Subject() {
-        final int ordinal = ordinal();
-        assert(ordinal < Byte.MAX_VALUE);
-        m_id = (byte)ordinal;
-    }
-
-    public byte getId() {
-        return m_id;
-    }
+public interface MeshAide {
+    public Long getNewestSafeTransactionForInitiator(Long initiatorId);
+    public void sendHeartbeats(Set<Long> hsIds);
 }
