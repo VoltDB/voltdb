@@ -920,7 +920,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         }
 
         AbstractJoinPlanNode ajNode = null;
-        AbstractPlanNode retval = null;
         if (canHaveNLJ) {
             NestLoopPlanNode nljNode = new NestLoopPlanNode();
             // get all the clauses that join the applicable two tables
@@ -955,7 +954,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             // now generate the output schema for this join
             nljNode.generateOutputSchema(m_db);
             ajNode = nljNode;
-            retval = ajNode;
         }
         else if (canHaveNLIJ) {
             NestLoopIndexPlanNode nlijNode = new NestLoopIndexPlanNode();
@@ -979,7 +977,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         ajNode.setPreJoinPredicate(ExpressionUtil.combine(joinNode.m_joinOuterList));
         ajNode.setWherePredicate(ExpressionUtil.combine(whereClauses));
         ajNode.generateOutputSchema(m_db);
-        return retval;
+        return ajNode;
     }
 
     private boolean hasReplicatedResult(AbstractPlanNode plan)
