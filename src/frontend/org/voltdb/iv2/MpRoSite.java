@@ -60,9 +60,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     // HSId of this site's initiator.
     final long m_siteId;
 
-    // Partition count is important for some reason.
-    int m_numberOfPartitions;
-
     // What type of EE is controlled
     final BackendTarget m_backend;
 
@@ -89,20 +86,16 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     // Current topology
     int m_partitionId;
 
-    // Undo token state for the corresponding EE.
-    public final static long kInvalidUndoToken = -1L;
-    long latestUndoToken = 0L;
-
     @Override
     public long getNextUndoToken()
     {
-        return ++latestUndoToken;
+        throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
     }
 
     @Override
     public long getLatestUndoToken()
     {
-        return latestUndoToken;
+        throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
     }
 
     // Advanced in complete transaction.
@@ -116,16 +109,19 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     /**
      * SystemProcedures are "friends" with ExecutionSites and granted
      * access to internal state via m_systemProcedureContext.
+     *
+     * The only sysproc which should run on the RO MP Site is Adhoc.  Everything
+     * else will yell at you.
      */
     SystemProcedureExecutionContext m_sysprocContext = new SystemProcedureExecutionContext() {
         @Override
         public Database getDatabase() {
-            return m_context.database;
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
 
         @Override
         public Cluster getCluster() {
-            return m_context.cluster;
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
 
         @Override
@@ -133,6 +129,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
 
+        // Needed for adhoc queries
         @Override
         public long getCurrentTxnId() {
             return m_currentTxnId;
@@ -145,42 +142,31 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public long getSiteId() {
-            return m_siteId;
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
 
-        /*
-         * Expensive to compute, memoize it
-         */
-        private Boolean m_isLowestSiteId = null;
         @Override
         public boolean isLowestSiteId()
         {
-            if (m_isLowestSiteId != null) {
-                return m_isLowestSiteId;
-            } else {
-                // FUTURE: should pass this status in at construction.
-                long lowestSiteId = VoltDB.instance().getSiteTrackerForSnapshot().getLowestSiteForHost(getHostId());
-                m_isLowestSiteId = m_siteId == lowestSiteId;
-                return m_isLowestSiteId;
-            }
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
-
 
         @Override
         public int getHostId() {
-            return CoreUtils.getHostIdFromHSId(m_siteId);
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
 
         @Override
         public int getPartitionId() {
-            return m_partitionId;
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
 
         @Override
         public long getCatalogCRC() {
-            return m_context.getCatalogCRC();
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
 
+        // Needed for Adhoc queries
         @Override
         public int getCatalogVersion() {
             return m_context.catalogVersion;
@@ -188,23 +174,23 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public SiteTracker getSiteTrackerForSnapshot() {
-            return VoltDB.instance().getSiteTrackerForSnapshot();
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
 
         @Override
         public int getNumberOfPartitions() {
-            return m_numberOfPartitions;
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
 
         @Override
         public void setNumberOfPartitions(int partitionCount) {
-            MpRoSite.this.setNumberOfPartitions(partitionCount);
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
 
         @Override
         public SiteProcedureConnection getSiteProcedureConnection()
         {
-            return MpRoSite.this;
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
 
         @Override
@@ -222,7 +208,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         public boolean updateCatalog(String diffCmds, CatalogContext context,
                 CatalogSpecificPlanner csp, boolean requiresSnapshotIsolation)
         {
-            return MpRoSite.this.updateCatalog(diffCmds, context, csp, requiresSnapshotIsolation, false);
+            throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
         }
 
         @Override
@@ -253,13 +239,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             BackendTarget backend,
             CatalogContext context,
             int partitionId,
-            int numPartitions,
             InitiatorMailbox initiatorMailbox)
     {
         m_siteId = siteId;
         m_context = context;
         m_partitionId = partitionId;
-        m_numberOfPartitions = numPartitions;
         m_scheduler = scheduler;
         m_backend = backend;
         m_currentTxnId = Long.MIN_VALUE;
@@ -282,12 +266,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         else {
             m_hsql = null;
         }
-    }
-
-    /** Create a native VoltDB execution engine */
-    ExecutionEngine initializeEE(String serializedCatalog, final long timestamp)
-    {
-        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
@@ -525,11 +503,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         if (!foundMultipartTxnId) {
             VoltDB.crashLocalVoltDB("Didn't find a multipart txnid on restore", false, null);
         }
-    }
-
-    public void setNumberOfPartitions(int partitionCount)
-    {
-        m_numberOfPartitions = partitionCount;
     }
 
     /**
