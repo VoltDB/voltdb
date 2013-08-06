@@ -45,6 +45,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# list of commands handled by tools/volt
+declare -a VOLT_KEYWORDS=(compile mask collect)
+
 # JVM detection taken from Apache Cassandra
 # Determine the sort of JVM we'll be running on.
 
@@ -102,15 +105,12 @@ fi
 
 #echo $VOLTDB_HOME
 
-# compilation is handled by tools/volt
-if [ "$1" = "compile" ]; then
-    exec $VOLTDB_HOME/tools/volt "$@"
-fi
-
-# deployment masking is handled by tools/volt
-if [ "$1" = "mask" ]; then
-    exec $VOLTDB_HOME/tools/volt "$@"
-fi
+# if command is in VOLT_KEYWORDS list, route to tools/volt
+for (( i = 0; i < ${#VOLT_KEYWORDS[@]}; i++ )); do
+    if [ "$1" = "${VOLT_KEYWORDS[$i]}" ]; then
+        exec $VOLTDB_HOME/tools/volt "$@"
+    fi
+done
 
 # detect and adjust for Linux package installation vs. VoltDB distribution
 if [ -d "$VOLTDB_HOME/../../lib/voltdb" ]; then
