@@ -17,6 +17,7 @@
 
 package org.voltdb.iv2;
 
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +32,8 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
 {
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    private TransactionTask m_currentTask = null;
+    private final Map<Long, TransactionTask> m_currentWrites = new HashMap<Long, TransactionTask>();
+    private final Map<Long, TransactionTask> m_currentReads = new HashMap<Long, TransactionTask>();
 
     MpTransactionTaskQueue(SiteTaskerQueue queue)
     {
@@ -105,10 +107,16 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     private boolean taskQueueOffer()
     {
         boolean retval = false;
-        if (m_currentTask == null) {
+        if (m_currentReads.isEmpty() && m_currentWrites.isEmpty()) {
             if (!m_backlog.isEmpty()) {
                 TransactionTask task = m_backlog.getFirst();
-                m_currentTask = task;
+                if (task.getTransactionState().isReadOnly()) {
+                    m_currentReads.put(task.getTxnId(), task);
+                }
+                else {
+                    assert(m_currentWrites.isEmpty());
+                    m_currentWrites.put(task.getTxnId(), task);
+                }
                 taskQueueOffer(task);
                 retval = true;
             }
@@ -127,7 +135,14 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             return offered;
         }
         m_backlog.removeFirst();
-        m_currentTask = null;
+        if (m_currentReads.containsKey(txnId)) {
+            m_currentReads.remove(txnId);
+        }
+        else {
+            assert(m_currentWrites.containsKey(txnId));
+            m_currentWrites.remove(txnId);
+            assert(m_currentWrites.isEmpty());
+        }
         if (taskQueueOffer()) {
             ++offered;
         }
@@ -141,7 +156,15 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
      */
     synchronized void restart()
     {
-        taskQueueOffer(m_currentTask);
+        TransactionTask task;
+        if (!m_currentReads.isEmpty()) {
+            task = m_currentReads.entrySet().iterator().next().getValue();
+        }
+        else {
+            assert(!m_currentWrites.isEmpty());
+            task = m_currentWrites.entrySet().iterator().next().getValue();
+        }
+        taskQueueOffer(task);
     }
 
     /**
