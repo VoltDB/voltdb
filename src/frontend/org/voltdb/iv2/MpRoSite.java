@@ -17,7 +17,6 @@
 
 package org.voltdb.iv2;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,7 +25,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
@@ -39,12 +37,10 @@ import org.voltdb.IndexStats;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.MemoryStats;
 import org.voltdb.ParameterSet;
-import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
 import org.voltdb.SnapshotSiteProcessor;
-import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.SystemProcedureExecutionContext;
@@ -55,7 +51,6 @@ import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
@@ -63,13 +58,7 @@ import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.jni.Sha1Wrapper;
-import org.voltdb.messaging.CompleteTransactionMessage;
-import org.voltdb.messaging.FragmentTaskMessage;
-import org.voltdb.messaging.Iv2InitiateTaskMessage;
-import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.LogKeys;
-
-import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 import com.google.common.collect.ImmutableMap;
 
@@ -90,14 +79,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
     // What type of EE is controlled
     final BackendTarget m_backend;
-
-    // Is the site in a rejoining mode.
-    private final static int kStateRunning = 0;
-    private final static int kStateRejoining = 1;
-    private final static int kStateReplayingRejoin = 2;
-    private int m_rejoinState;
-    private final TaskLog m_rejoinTaskLog;
-    private JoinProducerBase.JoinCompletionAction m_replayCompletionAction;
 
     // Enumerate execution sites by host.
     private static final AtomicInteger siteIndexCounter = new AtomicInteger(0);
@@ -131,14 +112,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     // Currently available procedure
     volatile LoadedProcedureSet m_loadedProcedures;
 
-    // Cache the DR gateway here so that we can pass it to tasks as they are reconstructed from
-    // the task log
-    private final PartitionDRGateway m_drGateway;
-
     // Current topology
     int m_partitionId;
-
-    private final String m_coreBindIds;
 
     // Need temporary access to some startup parameters in order to
     // initialize EEs in the right thread.
@@ -323,14 +298,10 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             long txnId,
             int partitionId,
             int numPartitions,
-            StartAction startAction,
             int snapshotPriority,
             InitiatorMailbox initiatorMailbox,
             StatsAgent agent,
-            MemoryStats memStats,
-            String coreBindIds,
-            TaskLog rejoinTaskLog,
-            PartitionDRGateway drGateway)
+            MemoryStats memStats)
     {
         m_siteId = siteId;
         m_context = context;
@@ -338,9 +309,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         m_numberOfPartitions = numPartitions;
         m_scheduler = scheduler;
         m_backend = backend;
-        m_rejoinState = VoltDB.createForRejoin(startAction) || startAction == StartAction
-                .JOIN ? kStateRejoining :
-                kStateRunning;
         m_snapshotPriority = snapshotPriority;
         // need this later when running in the final thread.
         m_startupConfig = new StartupConfig(serializedCatalog, context.m_uniqueId);
@@ -348,9 +316,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         m_lastCommittedSpHandle = TxnEgo.makeZero(partitionId).getTxnId();
         m_currentTxnId = Long.MIN_VALUE;
         m_initiatorMailbox = initiatorMailbox;
-        m_coreBindIds = coreBindIds;
-        m_rejoinTaskLog = rejoinTaskLog;
-        m_drGateway = drGateway;
 
         if (agent != null) {
             m_tableStats = new TableStats(m_siteId);
@@ -449,32 +414,18 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public void run()
     {
         Thread.currentThread().setName("Iv2ExecutionSite: " + CoreUtils.hsIdToString(m_siteId));
-        if (m_coreBindIds != null) {
-            PosixJNAAffinity.INSTANCE.setAffinity(m_coreBindIds);
-        }
         initialize(m_startupConfig.m_serializedCatalog, m_startupConfig.m_timestamp);
         m_startupConfig = null; // release the serializedCatalog bytes.
 
         try {
             while (m_shouldContinue) {
-                if (m_rejoinState == kStateRunning) {
-                    // Normal operation blocks the site thread on the sitetasker queue.
-                    SiteTasker task = m_scheduler.take();
-                    if (task instanceof TransactionTask) {
-                        m_currentTxnId = ((TransactionTask)task).getTxnId();
-                        m_lastTxnTime = EstTime.currentTimeMillis();
-                    }
-                    task.run(getSiteProcedureConnection());
+                // Normal operation blocks the site thread on the sitetasker queue.
+                SiteTasker task = m_scheduler.take();
+                if (task instanceof TransactionTask) {
+                    m_currentTxnId = ((TransactionTask)task).getTxnId();
+                    m_lastTxnTime = EstTime.currentTimeMillis();
                 }
-                else {
-                    // Rejoin operation poll and try to do some catchup work. Tasks
-                    // are responsible for logging any rejoin work they might have.
-                    SiteTasker task = m_scheduler.poll();
-                    if (task != null) {
-                        task.runForRejoin(getSiteProcedureConnection(), m_rejoinTaskLog);
-                    }
-                    replayFromTaskLog();
-                }
+                task.run(getSiteProcedureConnection());
             }
         }
         catch (OutOfMemoryError e)
@@ -493,102 +444,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             VoltDB.crashLocalVoltDB(errmsg, true, t);
         }
         shutdown();
-    }
-
-    ParticipantTransactionState global_replay_mpTxn = null;
-    void replayFromTaskLog() throws IOException
-    {
-        // not yet time to catch-up.
-        if (m_rejoinState != kStateReplayingRejoin) {
-            return;
-        }
-
-        // replay 10:1 in favor of replay
-        for (int i=0; i < 10; ++i) {
-            if (m_rejoinTaskLog.isEmpty()) {
-                break;
-            }
-
-            TransactionInfoBaseMessage tibm = m_rejoinTaskLog.getNextMessage();
-            if (tibm == null) {
-                break;
-            }
-
-            if (tibm instanceof Iv2InitiateTaskMessage) {
-                Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)tibm;
-                SpProcedureTask t = new SpProcedureTask(
-                        m_initiatorMailbox, m.getStoredProcedureName(),
-                        null, m, m_drGateway);
-                if (!filter(tibm)) {
-                    t.runFromTaskLog(this);
-                }
-            }
-            else if (tibm instanceof FragmentTaskMessage) {
-                FragmentTaskMessage m = (FragmentTaskMessage)tibm;
-                if (global_replay_mpTxn == null) {
-                    global_replay_mpTxn = new ParticipantTransactionState(m.getTxnId(), m);
-                }
-                else if (global_replay_mpTxn.txnId != m.getTxnId()) {
-                    VoltDB.crashLocalVoltDB("Started a MP transaction during replay before completing " +
-                            " open transaction.", false, null);
-                }
-                FragmentTask t = new FragmentTask(m_initiatorMailbox, m, global_replay_mpTxn);
-                if (!filter(tibm)) {
-                    t.runFromTaskLog(this);
-                }
-            }
-            else if (tibm instanceof CompleteTransactionMessage) {
-                // Needs improvement: completes for sysprocs aren't filterable as sysprocs.
-                // Only complete transactions that are open...
-                if (global_replay_mpTxn != null) {
-                    CompleteTransactionMessage m = (CompleteTransactionMessage)tibm;
-                    CompleteTransactionTask t = new CompleteTransactionTask(global_replay_mpTxn,
-                            null, m, m_drGateway);
-                    if (!m.isRestart()) {
-                        global_replay_mpTxn = null;
-                    }
-                    if (!filter(tibm)) {
-                        t.runFromTaskLog(this);
-                    }
-                }
-            }
-            else {
-                VoltDB.crashLocalVoltDB("Can not replay message type " +
-                        tibm + " during live rejoin. Unexpected error.",
-                        false, null);
-            }
-        }
-
-        // exit replay being careful not to exit in the middle of a multi-partititon
-        // transaction. The SPScheduler doesn't have a valid transaction state for a
-        // partially replayed MP txn and in case of rollback the scheduler's undo token
-        // is wrong. Run MP txns fully kStateRejoining or fully kStateRunning.
-        if (m_rejoinTaskLog.isEmpty() && global_replay_mpTxn == null) {
-            setReplayRejoinComplete();
-        }
-    }
-
-    private boolean filter(TransactionInfoBaseMessage tibm)
-    {
-        // don't log sysproc fragments or iv2 intiiate task messages.
-        // this is all jealously; should be refactored to ask tibm
-        // if it wants to be filtered for rejoin and eliminate this
-        // horrible introspection. This implementation mimics the
-        // original live rejoin code for ExecutionSite...
-        if (tibm instanceof FragmentTaskMessage && ((FragmentTaskMessage)tibm).isSysProcTask()) {
-            return true;
-        }
-        else if (tibm instanceof Iv2InitiateTaskMessage) {
-            Iv2InitiateTaskMessage itm = (Iv2InitiateTaskMessage)tibm;
-            if ((itm.getStoredProcedureName().startsWith("@") == false) ||
-                (itm.getStoredProcedureName().startsWith("@AdHoc") == true)) {
-                return false;
-            }
-            else {
-                return true;
-            }
-        }
-        return false;
     }
 
     public void startShutdown()
@@ -636,20 +491,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             String tableName, VoltTable data, boolean returnUniqueViolations,
             long undoToken) throws VoltAbortException
     {
-        Cluster cluster = m_context.cluster;
-        if (cluster == null) {
-            throw new VoltAbortException("cluster '" + clusterName + "' does not exist");
-        }
-        Database db = cluster.getDatabases().get(databaseName);
-        if (db == null) {
-            throw new VoltAbortException("database '" + databaseName + "' does not exist in cluster " + clusterName);
-        }
-        Table table = db.getTables().getIgnoreCase(tableName);
-        if (table == null) {
-            throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
-        }
-
-        return loadTable(txnId, table.getRelativeIndex(), data, returnUniqueViolations, undoToken);
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
@@ -755,53 +597,9 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     @Override
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction replayComplete,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
-        // transition from kStateRejoining to live rejoin replay.
-        // pass through this transition in all cases; if not doing
-        // live rejoin, will transfer to kStateRunning as usual
-        // as the rejoin task log will be empty.
-        assert(m_rejoinState == kStateRejoining);
-
-        if (replayComplete == null) {
-            throw new RuntimeException("Null Replay Complete Action.");
-        }
-
-        for (Map.Entry<String, Map<Integer, Pair<Long,Long>>> tableEntry : exportSequenceNumbers.entrySet()) {
-            final Table catalogTable = m_context.tables.get(tableEntry.getKey());
-            if (catalogTable == null) {
-                VoltDB.crashLocalVoltDB(
-                        "Unable to find catalog entry for table named " + tableEntry.getKey(),
-                        true,
-                        null);
-            }
-            Pair<Long,Long> sequenceNumbers = tableEntry.getValue().get(m_partitionId);
-            if (sequenceNumbers == null) {
-                VoltDB.crashLocalVoltDB(
-                        "Could not find export sequence numbers for partition " +
-                                m_partitionId + " table " +
-                                tableEntry.getKey() + " have " + exportSequenceNumbers, false, null);
-            }
-            exportAction(
-                    true,
-                    sequenceNumbers.getFirst().longValue(),
-                    sequenceNumbers.getSecond(),
-                    m_partitionId,
-                    catalogTable.getSignature());
-        }
-
-        m_rejoinState = kStateReplayingRejoin;
-        m_replayCompletionAction = replayComplete;
-        if (m_rejoinTaskLog != null) {
-            m_rejoinTaskLog.setEarliestTxnId(
-                    m_replayCompletionAction.getSnapshotTxnId());
-        }
-    }
-
-    private void setReplayRejoinComplete() {
-        // transition out of rejoin replay to normal running state.
-        assert(m_rejoinState == kStateReplayingRejoin);
-        m_replayCompletionAction.run();
-        m_rejoinState = kStateRunning;
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers)
+    {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
