@@ -898,13 +898,16 @@ class PersistentConfig(object):
         to permanent config file, and path to local config file.
         """
         self.permanent_path = permanent_path
-        self.local_path     = local_path
+        self.local_path = local_path
         if format.lower() == 'ini':
             self.config_manager = INIConfigManager()
         else:
             abort('Unsupported configuration format "%s".' % format)
         self.permanent = self.config_manager.load(self.permanent_path)
-        self.local     = self.config_manager.load(self.local_path)
+        if self.local_path:
+            self.local = self.config_manager.load(self.local_path)
+        else:
+            self.local = {}
 
     def save_permanent(self):
         """
@@ -916,7 +919,11 @@ class PersistentConfig(object):
         """
         Save the local configuration (overrides and additions to permanent).
         """
-        self.config_manager.save(self.local_path, self.local)
+        if self.local:
+            self.config_manager.save(self.local_path, self.local)
+        else:
+            error('No local configuration was specified. (%s)' % tag,
+                  'For reference, the permanent configuration is "%s".' % self.permanent_path)
 
     def get(self, key):
         """
@@ -938,7 +945,8 @@ class PersistentConfig(object):
         Set a key/value pair in the local configuration.
         """
         self.local[key] = value
-        self.save_local()
+        if self.local:
+            self.save_local()
 
     def query(self, filter = None):
         """
@@ -1100,7 +1108,7 @@ class CodeFormatter(object):
             self._line(True, ')')
         self.block_start_index.pop()
     def code(self, *lines):
-        self._line(self.level > 0, *lines)
+        self._line(True, *lines)
     def comment(self, *lines):
         for line in lines:
             self._line(False, '-- %s' % line)
@@ -1115,6 +1123,6 @@ class CodeFormatter(object):
             self._block_line('--%s %s' % (self.vcomment_prefix, line))
     def blank(self, n=1):
         for line in range(n):
-            self.lines.append('')
+            self._line(False, '')
     def __str__(self):
         return '\n'.join(self.lines)

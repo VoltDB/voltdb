@@ -58,8 +58,8 @@ MESSAGES = utility.MessageDict(
     BINARY = 'BINARY type was replaced by VARBINARY.',
     BLOB = 'BLOB type was replaced by VARBINARY.',
     UNSUPPORTED = 'Unsupported MySQL type.',
+    PARSE_ERROR = 'Unable to parse.',
 )
-
 
 # Perform the delayed MySQL module imports.
 def initialize():
@@ -85,14 +85,19 @@ def initialize():
 
 
 @VOLT.Command(
-    description='Access MySQL database schema.',
+    description='VoltDB quick start from a live MySQL database.',
+    description2='Run from a project directory where new files can be generated.',
+    options=(
+        VOLT.StringOption('-p', '--partition-table', 'partition_table',
+                          'primary partitioning table.'),
+    ),
     arguments=(
-        VOLT.StringArgument('uri', help='Database URI.')
-    )
+        VOLT.StringArgument('uri', help='Database URI, e.g. mysql://user@host/database.'),
+    ),
 )
-def mysql_schema(runner):
+def mysql(runner):
     initialize()
-    schema_generator = MySQLSchemaGenerator(runner.opts.uri)
+    schema_generator = MySQLSchemaGenerator(runner.opts.uri, runner.opts.partition_table)
     schema_generator.write_schema(sys.stdout)
 
 
@@ -118,8 +123,9 @@ class PartitionedTable(object):
 
 class MySQLSchemaGenerator(object):
 
-    def __init__(self, uri):
+    def __init__(self, uri, partition_table):
         self.uri = uri
+        self.partition_table_name = partition_table
         self.formatter = utility.CodeFormatter(vcomment_prefix=G.vcomment_prefix)
         # Initialized in initialize()
         self.schema = None
@@ -265,27 +271,41 @@ class MySQLSchemaGenerator(object):
         self._determine_partitioning()
 
     def _determine_partitioning(self):
-        # Partition the biggest table.
-        max_row_count = 0
-        biggest_table = None
-        for table in self.iter_tables():
-            if table.row_count > max_row_count:
-                max_row_count = table.row_count
-                biggest_table = table
-        if not biggest_table:
-            utility.abort('No table has rows. The database must be populated')
-        pkey_column_name = biggest_table.primary_key_columns[0].name
-        reason_chosen = ('%s has the largest row count of %d.'
-                            % (biggest_table.name, max_row_count))
-        biggest_ptable = PartitionedTable(biggest_table, pkey_column_name, reason_chosen)
-        self.partitioned_tables[biggest_table.name] = biggest_ptable
+        # Partition around either a user-specified table or the largest row count.
+        partition_table = None
+        if self.partition_table_name:
+            # Find the user-specified table schema.
+            for table in self.iter_tables():
+                if table.name == self.partition_table_name:
+                    partition_table = table
+                    reason_chosen = ('%s was explicitly specified for partitioning.' % table.name)
+                    break
+            else:
+                utility.abort('Partitioning table "%s" is not in the schema.'
+                                    % self.partition_table_name)
+        else:
+            # Find the largest row count.
+            max_row_count = 0
+            for table in self.iter_tables():
+                if table.row_count > max_row_count:
+                    max_row_count = table.row_count
+                    partition_table = table
+                    reason_chosen = ('%s has the largest row count of %d.'
+                                            % (table.name, max_row_count))
+        if not partition_table:
+            utility.abort('Unable to generate partitioning without one of the following:', (
+                          '- A database populated with representative data.',
+                          '- A partitioning table specified on the command line.'))
+        pkey_column_name = partition_table.primary_key_columns[0].name
+        biggest_ptable = PartitionedTable(partition_table, pkey_column_name, reason_chosen)
+        self.partitioned_tables[partition_table.name] = biggest_ptable
         # Partition other tables having a foreign key referencing the biggest table.
         for table in self.iter_tables():
-            if table.name == biggest_table.name:
+            if table.name == partition_table.name:
                 continue
             for fk_name in table.schema.foreign_keys:
                 fk = table.schema.foreign_keys[fk_name]
-                if fk.referenced_table_name != biggest_table.name:
+                if fk.referenced_table_name != partition_table.name:
                     continue
                 # It's a winner if one of the FK reference columns is the
                 # referenced table's partition key.
@@ -311,7 +331,7 @@ def convert_type(mysql_type):
     """
     m = G.re_type.match(mysql_type)
     if not m:
-        return 'VARCHAR(50)', 'Unable to parse'
+        return 'VARCHAR(50)', MESSAGES.PARSE_ERROR
     # Normalize compound names with arbitrary spacing,
     # e.g. "DOUBLE   PRECISION".
     name = ''.join(m.group(1).upper().split())
