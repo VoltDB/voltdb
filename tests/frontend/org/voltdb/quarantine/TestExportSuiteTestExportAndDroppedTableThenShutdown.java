@@ -192,7 +192,7 @@ public class TestExportSuiteTestExportAndDroppedTableThenShutdown extends Regres
 
         quiesce(client);
         m_config.shutDown();
-        m_config.startUp(false);
+        m_config.restartUp();
 
         client = getClient();
 

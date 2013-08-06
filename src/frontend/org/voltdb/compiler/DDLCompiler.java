@@ -404,16 +404,10 @@ public class DDLCompiler {
 
         DDLStatement stmt = getNextStatement(reader, m_compiler);
         while (stmt != null) {
-            // We sometimes choke at parsing statements with newlines, so
-            // make a version without newlines for most of the processing,
-            // but leave the original around because the formatting has
-            // value in the catalog report and perhaps elsewhere in the future.
-            String oneLinerStmt = stmt.statement.replace("\n", " ");
-
             // Some statements are processed by VoltDB and the rest are handled by HSQL.
             boolean processed = false;
             try {
-                processed = processVoltDBStatement(oneLinerStmt, db);
+                processed = processVoltDBStatement(stmt.statement, db);
             } catch (VoltCompilerException e) {
                 // Reformat the message thrown by VoltDB DDL processing to have a line number.
                 String msg = "VoltDB DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
@@ -421,7 +415,10 @@ public class DDLCompiler {
             }
             if (!processed) {
                 try {
-                    // check for CREATE TABLE or CREATE VIEW
+                    // Check for CREATE TABLE or CREATE VIEW.
+                    // We sometimes choke at parsing statements with newlines, so
+                    // check against a newline free version of the stmt.
+                    String oneLinerStmt = stmt.statement.replace("\n", " ");
                     Matcher tableMatcher = createTablePattern.matcher(oneLinerStmt);
                     if (tableMatcher.find()) {
                         String tableName = tableMatcher.group(2);
@@ -431,8 +428,8 @@ public class DDLCompiler {
                     // kind of ugly.  We hex-encode each statement so we can
                     // avoid embedded newlines so we can delimit statements
                     // with newline.
-                    m_fullDDL += Encoder.hexEncode(oneLinerStmt) + "\n";
-                    m_hsql.runDDLCommand(oneLinerStmt);
+                    m_fullDDL += Encoder.hexEncode(stmt.statement) + "\n";
+                    m_hsql.runDDLCommand(stmt.statement);
                 } catch (HSQLParseException e) {
                     String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
                     throw m_compiler.new VoltCompilerException(msg, stmt.lineNo);
@@ -778,7 +775,7 @@ public class DDLCompiler {
         else if (nchar[0] == '\n') {
             // normalize newlines to spaces
             m_currLineNo += 1;
-            retval.statement += "\n";
+            retval.statement += " ";
         }
         else if (nchar[0] == '\r') {
             // ignore carriage returns
@@ -1470,7 +1467,7 @@ public class DDLCompiler {
             Table srcTable = stmt.tableList.get(0);
             MaterializedViewInfo matviewinfo = srcTable.getViews().add(destTable.getTypeName());
             matviewinfo.setDest(destTable);
-            AbstractExpression where = stmt.getCombinedFilterExpression();
+            AbstractExpression where = stmt.getSingleTableFilterExpression();
             if (where != null) {
                 String hex = Encoder.hexEncode(where.toJSONString());
                 matviewinfo.setPredicate(hex);

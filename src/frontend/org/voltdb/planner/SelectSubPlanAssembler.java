@@ -24,19 +24,20 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.JoinNode;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.types.JoinType;
+import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.PermutationGenerator;
 
 /**
@@ -188,8 +189,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 }
                 JoinNode joinOrderSubTree = reconstructJoinTreeFromTableNodes(joinOrderSubNodes);
                 //Collect all the join/where conditions to reassign them later
-                Collection<AbstractExpression> combinedExprs = subTree.getAllExpressions();
-                AbstractExpression combinedWhereExpr = ExpressionUtil.combine(combinedExprs);
+                AbstractExpression combinedWhereExpr = subTree.getAllInnerJoinFilters();
                 if (combinedWhereExpr != null) {
                     joinOrderSubTree.m_whereExpr = (AbstractExpression)combinedWhereExpr.clone();
                 }
@@ -356,8 +356,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                     newTrees.add(reconstructJoinTreeFromTableNodes(joinOrder));
                 }
                 //Collect all the join/where conditions to reassign them later
-                Collection<AbstractExpression> combinedExprs = subTree.getAllExpressions();
-                AbstractExpression combinedWhereExpr = ExpressionUtil.combine(combinedExprs);
+                AbstractExpression combinedWhereExpr = subTree.getAllInnerJoinFilters();
                 for (JoinNode newTree : newTrees) {
                     if (combinedWhereExpr != null) {
                         newTree.m_whereExpr = (AbstractExpression)combinedWhereExpr.clone();
@@ -546,8 +545,45 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
             // Analyze join and filter conditions
             m_parsedStmt.analyzeJoinExpressions(joinTree);
+            // a query that is a little too quirky or complicated.
+            assert(m_parsedStmt.multiTableSelectionList.size() == 0);
+            assert(m_parsedStmt.noTableSelectionList.size() == 0);
 
-            // generate more plans
+            if ( ! m_partitioning.wasSpecifiedAsSingle()) {
+                // Now that analyzeJoinExpressions has done its job of properly categorizing
+                // and placing the various filters that the HSQL parser tends to leave in the strangest
+                // configuration, this is the first opportunity to analyze WHERE and JOIN filters'
+                // effects on statement partitioning.
+                // But this causes the analysis to be run based on a particular join order.
+                // Which join orders does this analysis actually need to be run on?
+                // Can it be run on the first join order and be assumed to hold for all join orders?
+                // If there is a join order that fails to generate a single viable plan, is its
+                // determination of partitioning (or partitioning failure) always valid for other
+                // join orders, or should the analysis be repeated on a viable join order
+                // in that case?
+                // For now, analyze each join order independently and when an invalid partitioning is
+                // detected, skip the plan generation for that particular ordering.
+                // If this causes all plans to be skipped, commonly the case, the PlanAssembler
+                // should propagate an error message identifying partitioning as the problem.
+                HashMap<AbstractExpression, Set<AbstractExpression>>
+                    valueEquivalence = joinTree.getAllEquivalenceFilters();
+                int countOfIndependentlyPartitionedTables =
+                        m_partitioning.analyzeForMultiPartitionAccess(m_parsedStmt.tableList,
+                                                                      valueEquivalence);
+                if (countOfIndependentlyPartitionedTables > 1) {
+                    // The case of more than one independent partitioned table
+                    // would result in an illegal plan with more than two fragments.
+                    // Don't throw a planning error here, in case the problem is just with this
+                    // particular join order, but do leave a hint to the PlanAssembler in case
+                    // the failure is unanimous -- a common case.
+                    m_recentErrorMsg =
+                        "Join of multiple partitioned tables has insufficient join criteria.";
+                    //System.out.println("DEBUG: bad partitioning for: " + joinTree);
+                    // This join order, at least, is not worth trying to plan.
+                    continue;
+                }
+            }
+
             generateMorePlansForJoinTree(joinTree);
         }
         return m_plans.poll();
@@ -567,7 +603,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         generateAccessPaths(joinTree);
 
         List<JoinNode> nodes = joinTree.generateAllNodesJoinOrder();
-        generateSubPlanForJoinNodeRecursively(joinTree, nodes);
+        generateSubPlanForJoinNodeRecursively(joinTree, 0, nodes);
     }
 
     /**
@@ -662,26 +698,64 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
         // The inner table can have multiple index access paths based on
         // inner and inner-outer join expressions plus the naive one.
-        // If the join is INNER or the inner table is replicated or the send/receive pair can be deferred,
-        // the join node can be NLIJ, otherwise it will be NLJ even for an index access path.
-        if (parentNode.m_joinType == JoinType.INNER || innerChildNode.m_table.getIsreplicated() ||
-                canDeferSendReceivePairForNode()) {
-            // This case can support either NLIJ -- assuming joinNode.m_joinInnerOuterList
-            // is non-empty AND at least ONE of its clauses can be leveraged in the IndexScan
-            // -- or NLJ, otherwise.
-            innerChildNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(innerChildNode.m_table,
-                    parentNode.m_joinInnerOuterList,
-                    parentNode.m_joinInnerList,
-                    null));
-        } else {
-            // Only NLJ is supported in this case.
-            // If the join is NLJ, the inner node won't be inlined
-            // which means that it can't use inner-outer join expressions
-            // -- they must be set aside to be processed within the NLJ.
-            innerChildNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(innerChildNode.m_table,
-                    null,
-                    parentNode.m_joinInnerList,
-                    parentNode.m_joinInnerOuterList));
+        innerChildNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(innerChildNode.m_table,
+                parentNode.m_joinInnerOuterList,
+                parentNode.m_joinInnerList,
+                null));
+
+        // If there are inner expressions AND inner-outer expressions, it could be that there
+        // are indexed access paths that use elements of both in the indexing expressions,
+        // especially in the case of a compound index.
+        // These access paths can not be considered for use with an NLJ because they rely on
+        // inner-outer expressions.
+        // If there is a possibility that NLIJ will not be an option due to the
+        // "special case" processing that puts a send/receive plan between the join node
+        // and its inner child node, other access paths need to be considered that use the
+        // same indexes as those identified so far but in a simpler, less effective way
+        // that does not rely on inner-outer expressions.
+        // The following simplistic method of finding these access paths is to force
+        // inner-outer expressions to be handled as NLJ-compatible post-filters and repeat
+        // the search for access paths.
+        // This will typically generate some duplicate access paths, including the naive
+        // sequential scan path and any indexed paths that happened to use only the inner
+        // expressions.
+        // For now, we deal with this redundancy by dropping (and re-generating) all
+        // access paths EXCPT those that reference the inner-outer expressions.
+        // TODO: implementing access path hash and equality and possibly using a "Set"
+        // would allow deduping as new access paths are added OR
+        // the simplified access path search process could be based on
+        // the existing indexed access paths -- for each access path that "hasInnerOuterIndexExpression"
+        // try to generate and add a simpler access path using the same index,
+        // this time with the inner-outer expressions used only as non-indexable post-filters.
+
+        // Don't bother generating these redundant or inferior access paths unless there is
+        // an inner-outer expression and a chance that NLIJ will be taken out of the running.
+        boolean mayNeedInnerSendReceive = ( ! m_partitioning.wasSpecifiedAsSingle()) &&
+                (m_partitioning.getCountOfPartitionedTables() > 0) &&
+                (parentNode.m_joinType != JoinType.INNER) &&
+                ! innerChildNode.m_table.getIsreplicated();
+// too expensive/complicated to test here? (parentNode.m_leftNode has a replicated result?) &&
+
+
+        if (mayNeedInnerSendReceive && ! parentNode.m_joinInnerOuterList.isEmpty()) {
+            List<AccessPath> innerOuterAccessPaths = new ArrayList<AccessPath>();
+            for (AccessPath innerAccessPath : innerChildNode.m_accessPaths) {
+                if ((innerAccessPath.index != null) &&
+                    hasInnerOuterIndexExpression(innerChildNode.m_table,
+                                                 innerAccessPath.indexExprs,
+                                                 innerAccessPath.initialExpr,
+                                                 innerAccessPath.endExprs)) {
+                    innerOuterAccessPaths.add(innerAccessPath);
+                }
+            }
+            Collection<AccessPath> nljAccessPaths =
+                    getRelevantAccessPathsForTable(innerChildNode.m_table,
+                                                   null,
+                                                   parentNode.m_joinInnerList,
+                                                   parentNode.m_joinInnerOuterList);
+            innerChildNode.m_accessPaths.clear();
+            innerChildNode.m_accessPaths.addAll(nljAccessPaths);
+            innerChildNode.m_accessPaths.addAll(innerOuterAccessPaths);
         }
 
         assert(innerChildNode.m_accessPaths.size() > 0);
@@ -693,28 +767,26 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @param rootNode The root node for the whole join tree.
      * @param nodes The node list to iterate over.
      */
-    private void generateSubPlanForJoinNodeRecursively(JoinNode rootNode, List<JoinNode> nodes) {
-        assert(nodes.size() > 0);
-        JoinNode joinNode = nodes.get(0);
-        if (nodes.size() == 1) {
+    private void generateSubPlanForJoinNodeRecursively(JoinNode rootNode,
+                                                       int nextNode, List<JoinNode> nodes)
+    {
+        assert(nodes.size() > nextNode);
+        JoinNode joinNode = nodes.get(nextNode);
+        if (nodes.size() == nextNode + 1) {
             for (AccessPath path : joinNode.m_accessPaths) {
                 joinNode.m_currentAccessPath = path;
-                AbstractPlanNode plan = getSelectSubPlanForJoinNode(rootNode, false);
-                /*
-                 * If the access plan for the table in the join order was for a
-                 * distributed table scan there will be a send/receive pair at the top.
-                 */
-                if (m_partitioning.getCountOfPartitionedTables() > 1 && m_partitioning.requiresTwoFragments()) {
-                    plan = addSendReceivePair(plan);
+                AbstractPlanNode plan = getSelectSubPlanForJoinNode(rootNode);
+                if (plan == null) {
+                    continue;
                 }
-
                 m_plans.add(plan);
             }
-        } else {
-            for (AccessPath path : joinNode.m_accessPaths) {
-                joinNode.m_currentAccessPath = path;
-                generateSubPlanForJoinNodeRecursively(rootNode, nodes.subList(1, nodes.size()));
-            }
+            return;
+        }
+
+        for (AccessPath path : joinNode.m_accessPaths) {
+            joinNode.m_currentAccessPath = path;
+            generateSubPlanForJoinNodeRecursively(rootNode, nextNode+1, nodes);
         }
     }
 
@@ -727,32 +799,28 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @return A completed plan-sub-graph that should match the correct tuples from the
      * correct tables.
      */
-    private AbstractPlanNode getSelectSubPlanForJoinNode(JoinNode joinNode, boolean isInnerNode) {
+    private AbstractPlanNode getSelectSubPlanForJoinNode(JoinNode joinNode) {
         assert(joinNode != null);
-        if (joinNode.m_table != null) {
-            // End of recursion
-            AbstractPlanNode scanNode = getAccessPlanForTable(joinNode.m_table, joinNode.m_currentAccessPath);
-            // Add the send/receive pair to the outer table only if required.
-            // In case of the inner table, the position of the send/receive pair depends on the join type and
-            // will be be added later (if required) during the join node construction.
-            // For the inner join, it will be placed above the join node to allow for
-            // the NLIJ/inline IndexScan plan. For the outer join, the pair must be added
-            // immediately above the table node.
-            if (!isInnerNode && !joinNode.m_table.getIsreplicated() && !canDeferSendReceivePairForNode()) {
-                scanNode = addSendReceivePair(scanNode);
-            }
-            return scanNode;
-        } else {
+        if (joinNode.m_table == null) {
             assert(joinNode.m_leftNode != null && joinNode.m_rightNode != null);
             // Outer node
-            AbstractPlanNode outerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_leftNode, false);
+            AbstractPlanNode outerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_leftNode);
+            if (outerScanPlan == null) {
+                return null;
+            }
 
             // Inner Node.
-            AbstractPlanNode innerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_rightNode, true);
+            AbstractPlanNode innerScanPlan = getSelectSubPlanForJoinNode(joinNode.m_rightNode);
+            if (innerScanPlan == null) {
+                return null;
+            }
 
             // Join Node
-            return getSelectSubPlanForOuterAccessPathStep(joinNode, outerScanPlan, innerScanPlan);
+            return getSelectSubPlanForJoin(joinNode, outerScanPlan, innerScanPlan);
         }
+        // End of recursion
+        AbstractPlanNode scanNode = getAccessPlanForTable(joinNode.m_table, joinNode.m_currentAccessPath);
+        return scanNode;
     }
 
 
@@ -763,55 +831,97 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @param joinNode A parent join node.
      * @param outerPlan The outer node plan-sub-graph.
      * @param innerPlan The inner node plan-sub-graph.
-     * @return A completed plan-sub-graph.
+     * @return A completed plan-sub-graph
+     * or null if a valid plan can not be produced for given access paths.
      */
-    private AbstractPlanNode getSelectSubPlanForOuterAccessPathStep(JoinNode joinNode, AbstractPlanNode outerPlan, AbstractPlanNode innerPlan) {
+    private AbstractPlanNode getSelectSubPlanForJoin(JoinNode joinNode,
+                                                     AbstractPlanNode outerPlan,
+                                                     AbstractPlanNode innerPlan)
+    {
         // Filter (post-join) expressions
         ArrayList<AbstractExpression> whereClauses  = new ArrayList<AbstractExpression>();
         whereClauses.addAll(joinNode.m_whereInnerList);
         whereClauses.addAll(joinNode.m_whereInnerOuterList);
 
+        // The usual approach of calculating a local (partial) join result on each partition,
+        // then sending and merging them with other partial results on the coordinator does not
+        // ensure correct answers for some queries like:
+        //     SELECT * FROM replicated LEFT JOIN partitioned ON ...
+        // They require a "global view" of the partitioned working set in order to
+        // properly identify which replicated rows need to be null-padded,
+        // and to ensure that the same replicated row is not null-padded redundantly on multiple partitions.
+        // Many queries using this pattern impractically require redistribution and caching of a considerable
+        // subset of a partitioned table in preparation for a "coordinated" join.
+        // Yet, there may be useful cases with sufficient constant-based partitioned table filtering
+        // in the "ON clause" to keep the distributed working set size under control, like
+        //     SELECT * FROM replicated R LEFT JOIN partitioned P
+        //     ON R.key == P.non_partition_key AND P.non_partition_key BETWEEN ? and ?;
+        //
+        // Such queries need to be prohibited by the planner if it can not guarantee the
+        // correct results that require a "send before join" plan.
+        // This could be the case if the replicated-to-partition join in these examples
+        // were subject to another join with a partitioned table, like
+        //     SELECT * FROM replicated R LEFT JOIN partitioned P1 ON ...
+        //                                LEFT JOIN also_partitioned P2 ON ...
+        //
+
+        assert(joinNode.m_rightNode != null);
         AccessPath innerAccessPath = joinNode.m_rightNode.m_currentAccessPath;
+        // We may need to add a send/receive pair to the inner plan for the special case.
+        // This trick only works once per plan, BUT once the partitioned data has been
+        // received on the coordinator, it can be treated as replicated data in later
+        // joins, which MAY help with later outer joins with replicated data.
+        boolean needInnerSendReceive = ( ! m_partitioning.wasSpecifiedAsSingle()) &&
+                                       (m_partitioning.getCountOfPartitionedTables() > 0) &&
+                                       (joinNode.m_joinType != JoinType.INNER) &&
+                                       ( ! hasReplicatedResult(innerPlan)) &&
+                                       hasReplicatedResult(outerPlan);
+
+        // When the inner plan is an IndexScan, there MAY be a choice of whether to join using a
+        // NestLoopJoin (NLJ) or a NestLoopIndexJoin (NLIJ). The NLJ will have an advantage over the
+        // NLIJ in the cases where it applies, since it does a single access or iteration over the index
+        // and caches the result, where the NLIJ does an index access or iteration for each outer row.
+        // The NestLoopJoin applies when the inner IndexScan is driven only by parameter and constant
+        // expressions determined at the start of the query. That requires that none of the IndexScan's
+        // various expressions that drive the index access may reference columns from the outer row
+        // -- they can only reference columns of the index's base table (the indexed expressions)
+        // as well as constants and parameters. The IndexScan's "otherExprs" expressions that only
+        // drive post-filtering are not an issue since the NestLoopJoin does feature per-outer-tuple
+        // post-filtering on each pass over the cached index scan result.
+
+        // The special case of an OUTER JOIN of replicated outer row data with a partitioned inner
+        // table requires that the partitioned data be sent to the coordinator prior to the join.
+        // This limits the join option to NLJ. The index scan must make a single index access on
+        // each partition and cache the result at the coordinator for post-filtering.
+        // This requires that the index access be based on parameters or constants only
+        // -- the replicated outer row data will only be available later at the coordinator,
+        // so it can not drive the per-partition index scan.
+
+        // If the NLJ option is precluded for the usual reason (outer-row-based indexing) AND
+        // the NLIJ is precluded by the special case (OUTER JOIN of replicated outer rows and
+        // partitioned inner rows) this method returns null, effectively rejecting this indexed
+        // access path for the inner node. Other access paths or join orders may prove more successful.
+
+        boolean canHaveNLJ = true;
+        boolean canHaveNLIJ = true;
+        if (innerPlan instanceof IndexScanPlanNode) {
+            if (hasInnerOuterIndexExpression(joinNode.m_rightNode.m_table,
+                                             innerAccessPath.indexExprs,
+                                             innerAccessPath.initialExpr,
+                                             innerAccessPath.endExprs)) {
+                canHaveNLJ = false;
+            }
+        }
+        else {
+            canHaveNLIJ = false;
+        }
+        if (needInnerSendReceive) {
+            canHaveNLIJ = false;
+        }
 
         AbstractJoinPlanNode ajNode = null;
-        AbstractPlanNode retval = null;
-        // We may need to add a send/receive pair to the inner plan. The outer plan should already have it
-        // if it's required.
-        assert(joinNode.m_rightNode != null);
-        boolean needInnerSendReceive = joinNode.m_rightNode.m_table != null &&
-                (!joinNode.m_rightNode.m_table.getIsreplicated() && !canDeferSendReceivePairForNode());
-
-        // In case of innerPlan being an IndexScan the NLIJ will have an advantage
-        // over the NLJ/IndexScan only if there is at least one inner-outer join expression
-        // that is used for the index access. If this is the case then this expression
-        // will be missing from the otherExprs list but is in the original joinNode.m_joinInnerOuterList
-        // If not, NLJ/IndexScan is a better choice.
-        // An additional requirement for the outer joins is that the inner node should not require
-        // the send/receive pair. Otherwise, the outer table will be joined with the individual
-        // partitions instead of the whole table leading to the erroneous rows in the result set.
-        boolean canHaveNLIJ = innerPlan instanceof IndexScanPlanNode &&
-                hasInnerOuterIndexExpression(joinNode.m_joinInnerOuterList, innerAccessPath.otherExprs) &&
-                (joinNode.m_joinType == JoinType.INNER || !needInnerSendReceive);
-        if (canHaveNLIJ) {
-            NestLoopIndexPlanNode nlijNode = new NestLoopIndexPlanNode();
-
-            nlijNode.setJoinType(joinNode.m_joinType);
-
-            @SuppressWarnings("unused")
-            IndexScanPlanNode innerNode = (IndexScanPlanNode) innerPlan;
-            // Set IndexScan predicate
-            innerNode.setPredicate(ExpressionUtil.combine(innerAccessPath.otherExprs));
-
-            nlijNode.addInlinePlanNode(innerPlan);
-
-            // combine the tails plan graph with the new head node
-            nlijNode.addAndLinkChild(outerPlan);
-            // now generate the output schema for this join
-            nlijNode.generateOutputSchema(m_db);
-
-            ajNode = nlijNode;
-            retval = (needInnerSendReceive) ? addSendReceivePair(ajNode) : ajNode;
-        } else {
+        if (canHaveNLJ) {
+            NestLoopPlanNode nljNode = new NestLoopPlanNode();
             // get all the clauses that join the applicable two tables
             ArrayList<AbstractExpression> joinClauses = innerAccessPath.joinExprs;
             if (innerPlan instanceof IndexScanPlanNode) {
@@ -823,31 +933,65 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 AbstractExpression indexScanPredicate = ExpressionUtil.combine(innerExpr);
                 ((IndexScanPlanNode)innerPlan).setPredicate(indexScanPredicate);
             }
-            NestLoopPlanNode nljNode = new NestLoopPlanNode();
             nljNode.setJoinPredicate(ExpressionUtil.combine(joinClauses));
-            nljNode.setJoinType(joinNode.m_joinType);
 
             // combine the tails plan graph with the new head node
             nljNode.addAndLinkChild(outerPlan);
 
-            // Add send/receive pair above the inner plan
+            // If successful in the special case, the NLJ plan must be modified to cause the
+            // partitioned inner data to be sent to the coordinator prior to the join.
+            // This is done by adding send and receive plan nodes between the NLJ and its
+            // right child node.
             if (needInnerSendReceive) {
+                // This trick only works once per plan.
+                if (outerPlan.hasAnyNodeOfType(PlanNodeType.RECEIVE) || innerPlan.hasAnyNodeOfType(PlanNodeType.RECEIVE)) {
+                    return null;
+                }
                 innerPlan = addSendReceivePair(innerPlan);
             }
 
             nljNode.addAndLinkChild(innerPlan);
             // now generate the output schema for this join
             nljNode.generateOutputSchema(m_db);
-
             ajNode = nljNode;
-            retval = ajNode;
         }
+        else if (canHaveNLIJ) {
+            NestLoopIndexPlanNode nlijNode = new NestLoopIndexPlanNode();
 
+            IndexScanPlanNode innerNode = (IndexScanPlanNode) innerPlan;
+            // Set IndexScan predicate
+            innerNode.setPredicate(ExpressionUtil.combine(innerAccessPath.otherExprs));
+
+            nlijNode.addInlinePlanNode(innerPlan);
+
+            // combine the tails plan graph with the new head node
+            nlijNode.addAndLinkChild(outerPlan);
+            ajNode = nlijNode;
+        }
+        else {
+            m_recentErrorMsg =
+                "Unsupported special case of complex OUTER JOIN between replicated outer table and partitioned inner table.";
+            return null;
+        }
+        ajNode.setJoinType(joinNode.m_joinType);
         ajNode.setPreJoinPredicate(ExpressionUtil.combine(joinNode.m_joinOuterList));
-
         ajNode.setWherePredicate(ExpressionUtil.combine(whereClauses));
+        ajNode.generateOutputSchema(m_db);
+        return ajNode;
+    }
 
-        return retval;
+    private boolean hasReplicatedResult(AbstractPlanNode plan)
+    {
+        HashSet<String> tablesRead = new HashSet<String>();
+        plan.getTablesReadByFragment(tablesRead);
+        for (String tableName : tablesRead) {
+            Table table = m_parsedStmt.getTableFromDB(tableName);
+            if ( ! table.getIsreplicated()) {
+                return false;
+            }
+
+        }
+        return true;
     }
 
     /**
@@ -870,19 +1014,37 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     }
 
     /**
-     * For a join node determines whether any of the inner-outer expressions were used
-     * for an index access.
+     * For a join node, determines whether any of the inner-outer expressions were used
+     * for an inner index access -- this requires joining with a NestLoopIndexJoin.
+     * These are detected as TVE references in the various clauses that drive the indexing
+     * -- as opposed to TVE references in post-filters that pose no problem with either
+     * NLIJ or the more efficient (one-pass through the index) NestLoopJoin.
      *
      * @param originalInnerOuterExprs The initial list of inner-outer join expressions.
-     * @param nonIndexInnerOuterList The list of inner-outer join expressions which are not
-     *        used for an index access
-     * @return true if at least one of the original expressions is used for index access.
+     * @param indexExprs - a list of expressions used in the indexing
+     * @param endExprs - a list of expressions used in the indexing
+     * @param initialExpr - a list of expressions used in the indexing
+     * @return true if at least one of the expression lists references a TVE.
      */
-    private boolean hasInnerOuterIndexExpression(List<AbstractExpression> originalInnerOuterExprs,
-            List<AbstractExpression> nonIndexInnerOuterList) {
-        HashSet<AbstractExpression> otherSet = new HashSet<AbstractExpression>();
-        otherSet.addAll(nonIndexInnerOuterList);
-        return !otherSet.containsAll(originalInnerOuterExprs);
+    private boolean hasInnerOuterIndexExpression(Table innerTable,
+                                                 Collection<AbstractExpression> indexExprs,
+                                                 Collection<AbstractExpression> initialExpr,
+                                                 Collection<AbstractExpression> endExprs)
+    {
+        HashSet<AbstractExpression> indexedExprs = new HashSet<AbstractExpression>();
+        indexedExprs.addAll(indexExprs);
+        indexedExprs.addAll(initialExpr);
+        indexedExprs.addAll(endExprs);
+        // Find an outer TVE by ignoring any TVEs based on the inner table.
+        for (AbstractExpression indexed : indexedExprs) {
+            Collection<AbstractExpression> indexedTVEs = indexed.findBaseTVEs();
+            for (AbstractExpression indexedTVExpr : indexedTVEs) {
+                if ( ! TupleValueExpression.isOperandDependentOnTable(indexedTVExpr, innerTable)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
 }
