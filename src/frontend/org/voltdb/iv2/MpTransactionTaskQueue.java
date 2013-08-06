@@ -17,6 +17,8 @@
 
 package org.voltdb.iv2;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -35,6 +37,8 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
 
     private final Map<Long, TransactionTask> m_currentWrites = new HashMap<Long, TransactionTask>();
     private final Map<Long, TransactionTask> m_currentReads = new HashMap<Long, TransactionTask>();
+    private Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
+    private Deque<TransactionTask> m_readBacklog = new ArrayDeque<TransactionTask>();
 
     MpTransactionTaskQueue(SiteTaskerQueue queue)
     {
@@ -51,7 +55,12 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     synchronized boolean offer(TransactionTask task)
     {
         Iv2Trace.logTransactionTaskQueueOffer(task);
-        m_backlog.addLast(task);
+        if (task.getTransactionState().isReadOnly()) {
+            m_readBacklog.addLast(task);
+        }
+        else {
+            m_backlog.addLast(task);
+        }
         taskQueueOffer();
         return true;
     }
@@ -106,7 +115,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                 assert(false);
             }
         }
-        // Now, iterate through the backlog and update the partition masters
+        // Now, iterate through both backlogs and update the partition masters
         // for all MpProcedureTasks not at the head of the TransactionTaskQueue
         Iterator<TransactionTask> iter = m_backlog.iterator();
         while (iter.hasNext()) {
@@ -115,6 +124,18 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             if (task instanceof MpProcedureTask) {
                 MpProcedureTask next = (MpProcedureTask)tt;
                 next.updateMasters(masters, partitionMasters);
+            }
+            else {
+                assert(false);
+            }
+        }
+        iter = m_readBacklog.iterator();
+        while (iter.hasNext()) {
+            // EveryPartition work is just going to cross its fingers here.
+            TransactionTask tt = iter.next();
+            if (task instanceof MpProcedureTask) {
+                MpProcedureTask next = (MpProcedureTask)tt;
+                next.updateMasters(masters);
             }
             else {
                 assert(false);
@@ -132,8 +153,11 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     {
         boolean retval = false;
         if (m_currentReads.isEmpty() && m_currentWrites.isEmpty()) {
-            if (!m_backlog.isEmpty()) {
+            if (!m_backlog.isEmpty() || !m_readBacklog.isEmpty()) {
                 TransactionTask task = m_backlog.pollFirst();
+                if (task == null) {
+                    task = m_readBacklog.pollFirst();
+                }
                 if (task.getTransactionState().isReadOnly()) {
                     m_currentReads.put(task.getTxnId(), task);
                 }
@@ -193,7 +217,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
      */
     synchronized int size()
     {
-        return m_backlog.size();
+        return m_backlog.size() + m_readBacklog.size();
     }
 
     @Override
@@ -201,9 +225,13 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     {
         StringBuilder sb = new StringBuilder();
         sb.append("MpTransactionTaskQueue:").append("\n");
-        sb.append("\tSIZE: ").append(size());
+        sb.append("\tWRITE SIZE: ").append(m_backlog.size()).append("\n");
         if (!m_backlog.isEmpty()) {
-            sb.append("\tHEAD: ").append(m_backlog.getFirst());
+            sb.append("\tWRITE HEAD: ").append(m_backlog.getFirst()).append("\n");
+        }
+        sb.append("\tREAD SIZE:  ").append(m_readBacklog.size()).append("\n");
+        if (!m_backlog.isEmpty()) {
+            sb.append("\tREAD HEAD: ").append(m_readBacklog.getFirst()).append("\n");
         }
         return sb.toString();
     }

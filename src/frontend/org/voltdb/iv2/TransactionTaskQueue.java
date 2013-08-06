@@ -34,7 +34,7 @@ public class TransactionTaskQueue
      * created for each multi-part task to maintain the backlog until the next
      * multi-part task.
      */
-    protected Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
+    private Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
 
     TransactionTaskQueue(SiteTaskerQueue queue)
     {
