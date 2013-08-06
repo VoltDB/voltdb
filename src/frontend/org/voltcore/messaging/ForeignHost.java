@@ -23,6 +23,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.Level;
@@ -56,6 +57,8 @@ public class ForeignHost {
     // Set the default here for TestMessaging, which currently has no VoltDB instance
     private long m_deadHostTimeout;
     private final AtomicLong m_lastMessageMillis = new AtomicLong(Long.MAX_VALUE);
+
+    private AtomicInteger m_deadReportsCount = new AtomicInteger(0);
 
     /** ForeignHost's implementation of InputHandler */
     public class FHInputHandler extends VoltProtocolHandler {
@@ -230,12 +233,14 @@ public class ForeignHost {
         if ((!m_closing && m_isUp) &&
             (current_delta > m_deadHostTimeout))
         {
-            hostLog.error("DEAD HOST DETECTED, hostname: " + hostname());
-            hostLog.info("\tcurrent time: " + current_time);
-            hostLog.info("\tlast message: " + m_lastMessageMillis);
-            hostLog.info("\tdelta (millis): " + current_delta);
-            hostLog.info("\ttimeout value (millis): " + m_deadHostTimeout);
-            VoltDB.dropStackTrace("Timed out foreign host " + hostname() + " with delta " + current_delta);
+            if (m_deadReportsCount.getAndIncrement() == 0) {
+                hostLog.error("DEAD HOST DETECTED, hostname: " + hostname());
+                hostLog.info("\tcurrent time: " + current_time);
+                hostLog.info("\tlast message: " + m_lastMessageMillis);
+                hostLog.info("\tdelta (millis): " + current_delta);
+                hostLog.info("\ttimeout value (millis): " + m_deadHostTimeout);
+                VoltDB.dropStackTrace("Timed out foreign host " + hostname() + " with delta " + current_delta);
+            }
             m_hostMessenger.reportForeignHostFailed(m_hostId);
         }
     }
@@ -306,6 +311,18 @@ public class ForeignHost {
         final VoltMessage message =
             m_hostMessenger.getMessageFactory().createMessageFromBuffer(in, sourceHSId);
 
+        // ENG-1608.  We sniff for SiteFailureMessage here so
+        // that a node will participate in the failure resolution protocol
+        // even if it hasn't directly witnessed a node fault.
+        if (   message instanceof SiteFailureMessage
+                && !(message instanceof SiteFailureForwardMessage))
+        {
+            SiteFailureMessage sfm = (SiteFailureMessage)message;
+            for (FaultMessage fm: sfm.asFaultMessages()) {
+                m_hostMessenger.relayForeignHostFailed(fm);
+            }
+        }
+
         for (int i = 0; i < destCount; i++) {
             deliverMessage( recvDests[i], message);
         }
@@ -313,15 +330,6 @@ public class ForeignHost {
         //m_lastMessageMillis = System.currentTimeMillis();
         m_lastMessageMillis.lazySet(EstTime.currentTimeMillis());
 
-        // ENG-1608.  We sniff for FailureSiteUpdateMessages here so
-        // that a node will participate in the failure resolution protocol
-        // even if it hasn't directly witnessed a node fault.
-        if (message instanceof FailureSiteUpdateMessage)
-        {
-            for (long failedHostId : ((FailureSiteUpdateMessage)message).m_failedHSIds) {
-                m_hostMessenger.reportForeignHostFailed((int)failedHostId);
-            }
-        }
     }
 
     public void sendPoisonPill(String err) {

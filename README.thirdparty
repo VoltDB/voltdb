@@ -1298,6 +1298,15 @@ WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
 DAMAGE.
 
 ================================================================================
+make-it-easy
+ * Copyright 2010 Nat Pryce.
+This software is released under Apache software license as mentioned below.
+
+/*
+
+See Apache 2.0 license below.
+
+================================================================================
 Linked with or Included in VoltDB tools
 ================================================================================
 VoltDB sqlcmd uses the following third party component:
