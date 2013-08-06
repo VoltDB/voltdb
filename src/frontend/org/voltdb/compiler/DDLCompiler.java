@@ -775,7 +775,7 @@ public class DDLCompiler {
         else if (nchar[0] == '\n') {
             // normalize newlines to spaces
             m_currLineNo += 1;
-            retval.statement += "\n";
+            retval.statement += " ";
         }
         else if (nchar[0] == '\r') {
             // ignore carriage returns
