@@ -27,6 +27,25 @@ from voltcli import utility
 from voltcli import environment
 
 
+def get_config(runner, *keys):
+    class O(object):
+        pass
+    o = O()
+    missing = [];
+    for name in keys:
+        key = 'mysql.%s' % name
+        value = runner.config.get(key)
+        if value:
+            setattr(o, name, value)
+        else:
+            missing.append(key)
+    if missing:
+        utility.abort('Configuration properties are missing from "%s".' % runner.config.path,
+                      'Use the "config" and "show" subcommands to work with the configuration.',
+                      'Missing properties:', missing)
+    return o
+
+
 @VOLT.Command(
     description='VoltDB quick start from a live MySQL database.',
     description2='''
@@ -36,16 +55,8 @@ Use the "config" and "show" sub-commands to update and view the configuration.
 ''' % environment.config_name,
 )
 def mysql(runner):
-    uri = runner.config.get('mysql.uri')
-    partition_table = runner.config.get('mysql.partition_table')
-    if not uri:
-        utility.error('"mysql.uri" configuration property is not set.')
-    if not partition_table:
-        utility.error('"mysql.partition_table" configuration property is not set.')
-    if not uri or not partition_table:
-        utility.abort('%s configuration is incomplete.' % runner.config.path,
-                      'Use the "config" and "show" subcommands to work with the configuration.')
-    mysqlutil.generate_schema(uri, partition_table)
+    config = get_config(runner, 'uri', 'partition_table')
+    mysqlutil.generate_schema(config.uri, config.partition_table)
 
 
 @VOLT.Command(description = 'Configure project settings.',
