@@ -65,7 +65,7 @@ public class SSHTools {
     }
 
     public String cmdSSH(String user, String key, String host, String command) {
-        return cmdSSH(user, key, host, null, command);
+        return cmdSSH(user, null, key, host, command);
     }
 
     public String cmdSSH(String user, String key, String host, String[] command) {
@@ -76,8 +76,8 @@ public class SSHTools {
         return new SFTPSession(m_username, m_keyFile, hostname, logger);
     }
 
-    public SFTPSession getSftpSession(String user, String key, String hostname, String password, VoltLogger logger) {
-        return new SFTPSession(user, key, hostname, password, logger);
+    public SFTPSession getSftpSession(String user, String password, String key, String hostname, VoltLogger logger) {
+        return new SFTPSession(user, password, key, hostname, logger);
     }
 
     /*
@@ -85,7 +85,7 @@ public class SSHTools {
      * SSH library (JSCH, http://www.jcraft.com/jsch/).  If you wish to replaces this
      * library, these are the methods that need to be re-worked.
      */
-    public String cmdSSH(String user, String key, String host, String password, String command) {
+    public String cmdSSH(String user, String password, String key, String host, String command) {
         StringBuilder result = new StringBuilder(2048);
         try{
             JSch jsch=new JSch();

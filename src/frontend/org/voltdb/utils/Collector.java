@@ -27,6 +27,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
@@ -38,7 +39,6 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.processtools.SFTPSession;
-import org.voltdb.processtools.SFTPSession.SFTPException;
 import org.voltdb.processtools.SSHTools;
 import org.voltdb.types.TimestampType;
 
@@ -55,11 +55,11 @@ public class Collector {
     private static String m_host = "";
     private static String m_username = "";
     private static String m_password = "";
-    private static boolean m_noprompt = false;
-    private static boolean m_dryrun = false;
-    private static boolean m_noheapdump = false;
-    private static boolean m_calledfromvem = false;
-    private static boolean m_fileinfoonly = false;
+    private static boolean m_noPrompt = false;
+    private static boolean m_dryRun = false;
+    private static boolean m_noHeapDump = false;
+    private static boolean m_calledFromVEM = false;
+    private static boolean m_fileInfoOnly = false;
 
     private static int m_pid = 0;
     private static String m_workingDir = null;
@@ -67,25 +67,27 @@ public class Collector {
 
     private static final VoltLogger m_log = new VoltLogger("CONSOLE");
 
+    public static String[] cmdFilenames = {"sardata", "dmesgdata"};
+
     public static void main(String[] args) {
         m_voltDbRootPath = args[0];
         m_uniqueid = args[1];
         m_host = args[2];
         m_username = args[3];
         m_password = args[4];
-        m_noprompt = Boolean.parseBoolean(args[5]);
-        m_dryrun = Boolean.parseBoolean(args[6]);
-        m_noheapdump = Boolean.parseBoolean(args[7]);
+        m_noPrompt = Boolean.parseBoolean(args[5]);
+        m_dryRun = Boolean.parseBoolean(args[6]);
+        m_noHeapDump = Boolean.parseBoolean(args[7]);
 
         // arguments only used when Collector is called from VEM
         if (args.length > 8) {
             // generate resulting file in voltdbroot instead of current working dir and do not append timestamp in filename
             // so the resulting file is easier to be located and copied to VEM
-            m_calledfromvem = Boolean.parseBoolean(args[8]);
+            m_calledFromVEM = Boolean.parseBoolean(args[8]);
 
             // generate a list of information (server name, size, and path) of files rather than actually collect files
             // used by files display panel in VEM UI
-            m_fileinfoonly = Boolean.parseBoolean(args[9]);
+            m_fileInfoOnly = Boolean.parseBoolean(args[9]);
         }
 
         File voltDbRoot = new File(m_voltDbRootPath);
@@ -99,9 +101,9 @@ public class Collector {
         JSONObject jsonObject = parseJSONFile(m_configInfoPath);
         parseJSONObject(jsonObject);
 
-        List<String> collectionFilesList = listCollection(m_noheapdump);
+        List<String> collectionFilesList = listCollection(m_noHeapDump);
 
-        if (m_dryrun) {
+        if (m_dryRun) {
             System.out.println("List of the files to be collected:");
             for (String path: collectionFilesList) {
                 System.out.println("  " + path);
@@ -109,7 +111,7 @@ public class Collector {
             System.out.println("[dry-run] A tgz file containing above files would be generated in current dir");
             System.out.println("          Use --upload option to enable uploading via SFTP");
         }
-        else if (m_fileinfoonly) {
+        else if (m_fileInfoOnly) {
             String collectionFilesListPath = m_voltDbRootPath + File.separator + m_uniqueid;
 
             byte jsonBytes[] = null;
@@ -122,7 +124,7 @@ public class Collector {
                 for (String path: collectionFilesList) {
                     stringer.object();
                     stringer.key("filename").value(path);
-                    if (path.startsWith("sardata") || path.startsWith("dmesgdata")) {
+                    if (Arrays.asList(cmdFilenames).contains(path.split(" ")[0])) {
                         stringer.key("size").value(0);
                     }
                     else {
@@ -139,17 +141,23 @@ public class Collector {
                 Throwables.propagate(e);
             }
 
+            FileOutputStream fos = null;
             try {
-                FileOutputStream fos = new FileOutputStream(collectionFilesListPath);
+                fos = new FileOutputStream(collectionFilesListPath);
                 fos.write(jsonBytes);
                 fos.getFD().sync();
-                fos.close();
             } catch (IOException e) {
                 Throwables.propagate(e);
+            } finally {
+                try {
+                    fos.close();
+                } catch (IOException e) {
+                    Throwables.propagate(e);
+                }
             }
         }
         else {
-            generateCollection(collectionFilesList, m_calledfromvem);
+            generateCollection(collectionFilesList, m_calledFromVEM);
         }
     }
 
@@ -202,7 +210,7 @@ public class Collector {
         }
     }
 
-    private static List<String> listCollection(boolean noheapdump) {
+    private static List<String> listCollection(boolean noHeapDump) {
         List<String> collectionFilesList = new ArrayList<String>();
 
         try {
@@ -232,7 +240,7 @@ public class Collector {
                 }
             }
 
-            if (!noheapdump) {
+            if (!noHeapDump) {
                 for (File file: new File("/tmp").listFiles()) {
                     if (file.getName().equals("java_pid" + m_pid + ".hprof")) {
                         collectionFilesList.add(file.getCanonicalPath());
@@ -260,12 +268,12 @@ public class Collector {
         return collectionFilesList;
     }
 
-    private static void generateCollection(List<String> paths, boolean calledfromvem) {
+    private static void generateCollection(List<String> paths, boolean calledFromVEM) {
         try {
             String timestamp = "";
             String rootpath = "";
 
-            if (calledfromvem) {
+            if (calledFromVEM) {
                 rootpath = m_voltDbRootPath;
             }
             else {
@@ -279,8 +287,10 @@ public class Collector {
             File collectionFile = new File(collectionFilePath);
             TarGenerator tarGenerator = new TarGenerator(collectionFile, true, null);
 
+            // Collect files with paths indicated in the list
             for (String path: paths) {
-                if (path.startsWith("sardata") || path.startsWith("dmesgdata")) {
+                // Skip particular items corresponding to temporary files that are only generated during collecting
+                if (Arrays.asList(cmdFilenames).contains(path.split(" ")[0])) {
                     continue;
                 }
 
@@ -320,7 +330,7 @@ public class Collector {
 
             boolean upload = false;
             if (!m_host.isEmpty()) {
-                if (m_noprompt) {
+                if (m_noPrompt) {
                     upload = true;
                 }
                 else {
@@ -344,7 +354,7 @@ public class Collector {
                         m_log.info("Uploaded " + new File(collectionFilePath).getName() + " via SFTP");
 
                         boolean delLocalCopy = false;
-                        if (m_noprompt) {
+                        if (m_noPrompt) {
                             delLocalCopy = true;
                         }
                         else {
@@ -352,8 +362,12 @@ public class Collector {
                         }
 
                         if (delLocalCopy) {
-                            collectionFile.delete();
-                            m_log.info("Local copy "  + collectionFilePath + " deleted");
+                            try {
+                                collectionFile.delete();
+                                m_log.info("Local copy "  + collectionFilePath + " deleted");
+                            } catch (SecurityException e) {
+                                m_log.info("Failed to delete local copy " + collectionFilePath + ". " + e.getMessage());
+                            }
                         }
                     }
                     else {
@@ -388,52 +402,52 @@ public class Collector {
         }
     }
 
-    private static void cmd(TarGenerator tarGenerator, String[] command, String resFilename) {
-        try {
-            File tempFile = File.createTempFile(resFilename, null);
-            tempFile.deleteOnExit();
+    private static void cmd(TarGenerator tarGenerator, String[] command, String resFilename)
+            throws IOException, TarMalformatException {
+        File tempFile = File.createTempFile(resFilename, null);
+        tempFile.deleteOnExit();
 
-            Process p = Runtime.getRuntime().exec(command);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            BufferedWriter writer = new BufferedWriter(new FileWriter(tempFile));
+        Process p = Runtime.getRuntime().exec(command);
+        BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+        BufferedWriter writer = new BufferedWriter(new FileWriter(tempFile));
 
-            String line = null;
-            while ((line = reader.readLine()) != null) {
-                writer.write(line);
-                writer.newLine();
-            }
-            writer.close();
+        String line = null;
+        while ((line = reader.readLine()) != null) {
+            writer.write(line);
+            writer.newLine();
+        }
+        writer.close();
 
-            if (tempFile.length() > 0) {
-                tarGenerator.queueEntry(resFilename, tempFile);
-            }
-        } catch (IOException e) {
-            m_log.error(e.getMessage());
-        } catch (TarMalformatException e) {
-            m_log.error(e.getMessage());
+        if (tempFile.length() > 0) {
+            tarGenerator.queueEntry(resFilename, tempFile);
         }
     }
 
-    public static boolean uploadToServer(String outputTgzPath, String host, String username, String password) {
+    public static boolean uploadToServer(String collectionFilePath, String host, String username, String password) {
         SSHTools ssh = new SSHTools(username, null);
 
-        String rootpath = ssh.cmdSSH(username, null, host, password, "pwd").trim();
+        String rootpath = ssh.cmdSSH(username, password, null, host, "pwd").trim();
         if (rootpath.isEmpty()) {
             // SSH cannot connect
             return false;
         }
 
         HashMap<File, File> files = new HashMap<File, File>();
-        File src = new File(outputTgzPath);
-        File dest = new File(rootpath + File.separator + new File(outputTgzPath).getName());
+        File src = new File(collectionFilePath);
+        File dest = new File(rootpath + File.separator + new File(collectionFilePath).getName());
         files.put(src, dest);
 
-        SFTPSession sftp = ssh.getSftpSession(username, null, host, password, null);
+        SFTPSession sftp = null;
+        try {
+            sftp = ssh.getSftpSession(username, password, null, host, null);
 
-        sftp.ensureDirectoriesExistFor(files.values());
-        sftp.copyOverFiles(files);
-
-        sftp.terminate();
+            sftp.ensureDirectoriesExistFor(files.values());
+            sftp.copyOverFiles(files);
+        } finally {
+            if (sftp != null) {
+                sftp.terminate();
+            }
+        }
 
         return true;
     }

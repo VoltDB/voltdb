@@ -26,10 +26,10 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 @VOLT.Command(
-    description = 'Collect artifacts for problem analysis.',
+    description = 'Collect logs for problem analysis.',
     options = (
         VOLT.StringOption (None, '--prefix', 'uniqueid',
-                           'file name prefix for uniquely identifying output file',
+                           'file name prefix for uniquely identifying collection',
                            default = 'voltdb_logs'),
         VOLT.StringOption (None, '--upload', 'host',
                            'upload resulting collection to HOST via SFTP',
@@ -44,7 +44,7 @@
                            'automatically upload collection (without user prompt)',
                            default = False),
         VOLT.BooleanOption(None, '--dry-run', 'dryrun',
-                           'list the files to be collected but do not do real collecting',
+                           'list the log files without collecting them',
                            default = False),
         VOLT.BooleanOption(None, '--no-heap-dump', 'noheapdump',
                            'exclude heap dump file from collection',
