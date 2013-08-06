@@ -288,7 +288,13 @@ public class JoinNode implements Cloneable {
     {
         assert(m_leftNode == null);
         assert(m_rightNode == null);
-        return m_whereExpr;
+        if (m_whereExpr != null) {
+            if (m_joinExpr != null) {
+                return ExpressionUtil.combine(m_whereExpr, m_joinExpr);
+            }
+            return m_whereExpr;
+        }
+        return m_joinExpr;
     }
 
     /**

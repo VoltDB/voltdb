@@ -424,28 +424,42 @@ public class PlanAssembler {
                 commonPartitioning = partitioning;
                 continue;
             }
-            if (partitioning.requiresTwoFragments()) {
-                throw new PlanningErrorException(
-                        "Statements are too complex in set operation using multiple partitioned tables.");
-            }
+
             AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpression();
-            if (statementPartitionExpression == null) {
+            if (commonPartitioning.requiresTwoFragments()) {
+                if (partitioning.requiresTwoFragments() || statementPartitionExpression != null) {
+                    // If two child statements need to use a second fragment,
+                    // it can't currently be a two-fragment plan.
+                    // The coordinator expects a single-table result from each partition.
+                    // Also, currently the coordinator of a two-fragment plan is not allowed to
+                    // target a particular partition, so neither can the union of the coordinator
+                    // and a statement that wants to run single-partition.
+                    throw new PlanningErrorException(
+                            "Statements are too complex in set operation using multiple partitioned tables.");
+                }
+                // the new statement is apparently a replicated read and has no effect on partitioning
                 continue;
             }
-            if (commonPartitioning.requiresTwoFragments()) {
-                // If two child statements need to use a second fragment,
-                // it can't currently be a two-fragment plan.
-                // The coordinator expects a single-table result from each partition.
-                throw new PlanningErrorException(
-                        "Statements are too complex in set operation using multiple partitioned tables.");
-            }
             AbstractExpression
-            targetPartitionExpression = commonPartitioning.singlePartitioningExpression();
-            if (targetPartitionExpression == null) {
+            commonPartitionExpression = commonPartitioning.singlePartitioningExpression();
+            if (commonPartitionExpression == null) {
+                // the prior statement(s) were apparently replicated reads
+                // and have no effect on partitioning
                 commonPartitioning = partitioning;
                 continue;
             }
-            if ( ! targetPartitionExpression.equals(statementPartitionExpression)) {
+            if (partitioning.requiresTwoFragments()) {
+                // Again, currently the coordinator of a two-fragment plan is not allowed to
+                // target a particular partition, so neither can the union of the coordinator
+                // and a statement that wants to run single-partition.
+                throw new PlanningErrorException(
+                        "Statements are too complex in set operation using multiple partitioned tables.");
+            }
+            if (statementPartitionExpression == null) {
+                // the new statement is apparently a replicated read and has no effect on partitioning
+                continue;
+            }
+            if ( ! commonPartitionExpression.equals(statementPartitionExpression)) {
                 throw new PlanningErrorException(
                         "Statements use conflicting partitioned table filters in set operation.");
             }
