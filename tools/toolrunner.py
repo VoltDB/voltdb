@@ -59,7 +59,15 @@ class G:
     verbose = False
 
 
-def go(cmd_name, cmd_dir, base_dir, description, standalone, directory, verbose, *args):
+def go(cmd_name,
+       cmd_dir,
+       base_dir,
+       description,
+       standalone,
+       directory,
+       verbose,
+       libpath,
+       *args):
     """
     Run tool after tweaking the Python library path to find voltcli libraries.
     Optionally change to a relative or absolute directory provided by the
@@ -72,9 +80,13 @@ def go(cmd_name, cmd_dir, base_dir, description, standalone, directory, verbose,
     :param standalone:
     :param directory:
     :param verbose:
+    :param libpath:
     :param args:
     """
     G.verbose = verbose
+    # Append libpath to module loading path.
+    if libpath:
+        sys.path.extend(libpath.split(':'))
     start_logging()
     try:
         version = None
@@ -106,21 +118,31 @@ def go(cmd_name, cmd_dir, base_dir, description, standalone, directory, verbose,
         stop_logging()
 
 
-def main(description='(no description)', standalone=False, directory=None, verbose=False):
+def main(description='(no description)',
+         standalone=False,
+         directory=None,
+         verbose=False,
+         libpath=''):
     """
     Main entry point for commands not running in a virtual environment.
     :param description:
     :param standalone:
     :param directory:
     :param verbose:
+    :param libpath:
     """
     cmd_path = sys.argv[0]
     cmd_dir, cmd_name = os.path.split(os.path.realpath(cmd_path))
     base_dir = os.path.dirname(cmd_dir)
-    go(cmd_name, cmd_dir, base_dir, description, standalone, directory, verbose, *sys.argv[1:])
+    go(cmd_name, cmd_dir, base_dir, description, standalone, directory, verbose, libpath, *sys.argv[1:])
 
 
-def vmain(description='(no description)', standalone=False, directory='', packages=None, verbose=False):
+def vmain(description='(no description)',
+          standalone=False,
+          directory='',
+          packages=None,
+          verbose=False,
+          libpath=''):
     """
     Main entry point for commands running in an auto-generated virtual environment.
     :param description:
@@ -166,7 +188,6 @@ def vmain(description='(no description)', standalone=False, directory='', packag
         # Exec the toolrunner.py script inside the virtual environment by using
         # the virtual environment's Python.
         python = os.path.join(venv_dir, 'bin', 'python')
-        #def go(cmd_name, cmd_dir, base_dir, description, standalone, directory, verbose, *args):
         args = [
             python,
             G.module_path,
@@ -177,6 +198,7 @@ def vmain(description='(no description)', standalone=False, directory='', packag
             str(standalone),
             str(directory),
             str(verbose),
+            libpath,
         ] + sys.argv[1:]
         verbose_info('Re-starting with virtual environment:', args)
         os.execvp(python, args)

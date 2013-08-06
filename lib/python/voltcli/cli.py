@@ -32,6 +32,7 @@ import os
 import optparse
 import shlex
 import copy
+import textwrap
 
 from voltcli import utility
 
@@ -517,14 +518,14 @@ class CLIParser(ExtendedHelpOptionParser):
     def on_format_epilog(self):
         if not self.verb:
             return self._format_verb_list()
-        if self.verb.get_argument_count() == 0:
-            return ''
-        rows = [(get_argument_usage(a), a.help) for a in self.verb.iter_arguments()]
-        lines = ['Arguments:', utility.format_table(rows, indent = 2)]
+        blocks = []
+        if self.verb.get_argument_count() > 0:
+            rows = [(get_argument_usage(a), a.help) for a in self.verb.iter_arguments()]
+            blocks.append('\n'.join(['Arguments:', utility.format_table(rows, indent = 2)]))
         description2 = self.verb.cli_spec.get_attr('description2', None)
         if description2:
-            lines.extend(('', description2))
-        return '\n%s\n' % ('\n'.join(lines))
+            blocks.append(description2)
+        return '\n'.join(['\n%s' % '\n'.join(textwrap.wrap(block.strip())) for block in blocks])
 
     def _abort(self, *msgs):
         utility.error(*msgs)

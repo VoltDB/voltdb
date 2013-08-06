@@ -36,6 +36,8 @@ standalone = False
 # Required packages (auto-installed into virtual environment using pip).
 packages = ('mysql-python', 'ez_setup', 'schemaobject')
 verbose = (sys.argv[1:] == ['-v'])
+myDir, myName = os.path.split(os.path.realpath(sys.argv[0]))
+libpath = os.path.join(myDir, 'lib', 'python')
 
 # Work around a problem with the OSX MySQL installation that makes the MySQL
 # client library not load. Rely on the fact that vmain() exec's Python again.
@@ -46,5 +48,9 @@ if sys.platform == 'darwin':
     os.environ['DYLD_LIBRARY_PATH'] = '/usr/local/mysql/lib'
 
 # Run in an automatically-built virtual environment.
-toolrunner.vmain(description=description, standalone=standalone,
-                 packages=packages, verbose=verbose)
+toolrunner.vmain(description=description,
+                 standalone=standalone,
+                 packages=packages,
+                 directory=os.getcwd(),
+                 verbose=verbose,
+                 libpath=libpath)

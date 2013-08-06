@@ -878,7 +878,8 @@ class INIConfigManager(object):
                 parser.add_section(section)
                 cur_section = section
             parser.set(cur_section, name, d[key])
-        f = FileWriter(path)
+        f = File(path, 'w')
+        f.open()
         try:
             parser.write(f)
         finally:
@@ -892,18 +893,18 @@ class PersistentConfig(object):
     files, one for permanent configuration and the other for local state.
     """
 
-    def __init__(self, format, permanent_path, local_path):
+    def __init__(self, format, path, local_path):
         """
         Construct persistent configuration based on specified format name, path
         to permanent config file, and path to local config file.
         """
-        self.permanent_path = permanent_path
+        self.path = path
         self.local_path = local_path
         if format.lower() == 'ini':
             self.config_manager = INIConfigManager()
         else:
             abort('Unsupported configuration format "%s".' % format)
-        self.permanent = self.config_manager.load(self.permanent_path)
+        self.permanent = self.config_manager.load(self.path)
         if self.local_path:
             self.local = self.config_manager.load(self.local_path)
         else:
@@ -913,7 +914,7 @@ class PersistentConfig(object):
         """
         Save the permanent configuration.
         """
-        self.config_manager.save(self.permanent_path, self.permanent)
+        self.config_manager.save(self.path, self.permanent)
 
     def save_local(self):
         """
@@ -923,7 +924,7 @@ class PersistentConfig(object):
             self.config_manager.save(self.local_path, self.local)
         else:
             error('No local configuration was specified. (%s)' % tag,
-                  'For reference, the permanent configuration is "%s".' % self.permanent_path)
+                  'For reference, the permanent configuration is "%s".' % self.path)
 
     def get(self, key):
         """

@@ -21,362 +21,71 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import sys
-import re
+import os
+import mysqlutil
 from voltcli import utility
 from voltcli import environment
-
-# A common OS X mysql installation problem can prevent _mysql.so from loading.
-# Postpone database imports until initialize() is called to avoid errors for
-# in non-mysql commands and to provide good messages for handle import errors.
-schemaobject = None
-MySQLdb = None
-
-
-class G:
-    """
-    Globals.
-    """
-    # Regular expression to parse a MySQL type.
-    re_type = re.compile(r'^\s*\b([a-z0-9_ ]+)\b\s*([(]([^)]*)[)])?\s*$')
-    # The suggestion to display when OS X mysql module import fails.
-    osx_fix = 'ln -s /usr/local/mysql/lib/libmysqlclient.[0-9][0-9]*.dylib /usr/local/lib/'
-    # The comment prefix used to annotate generated lines.
-    vcomment_prefix = 'GEN:'
-
-
-# Conversion error/warning messages.
-MESSAGES = utility.MessageDict(
-    WIDTH_PARAM = 'Width parameter is not supported.',
-    MEDIUM_INT = '3 byte integer was expanded to 4 bytes.',
-    PREC_PARAMS = 'Precision and scale parameters are not supported.',
-    BIT_TYPE = 'BIT type was replaced by VARBINARY.',
-    DATE_TIME = 'Date/time type was replaced by TIMESTAMP.',
-    ENUM = 'ENUM type was replaced by VARCHAR.',
-    SET = 'SET type was replaced by VARCHAR.',
-    CHAR = 'CHAR type was replaced by VARCHAR.',
-    TEXT = 'TEXT type was replaced by VARCHAR.',
-    BINARY = 'BINARY type was replaced by VARBINARY.',
-    BLOB = 'BLOB type was replaced by VARBINARY.',
-    UNSUPPORTED = 'Unsupported MySQL type.',
-    PARSE_ERROR = 'Unable to parse.',
-)
-
-# Perform the delayed MySQL module imports.
-def initialize():
-    try:
-        import schemaobject as schemaobject_
-        import MySQLdb as MySQLdb_
-        global schemaobject, MySQLdb
-        schemaobject = schemaobject_
-        MySQLdb = MySQLdb_
-    except ImportError, e:
-        msgs = [
-            'Failed to import MySQL-related module.',
-            'Is MySQL properly installed?',
-                ('http://dev.mysql.com/downloads/',)
-        ]
-        if sys.platform == 'darwin':
-            msgs.extend([
-                'On OS X you may need to create a symlink, e.g.',
-                    (G.osx_fix,)
-            ])
-        msgs.append(e)
-        utility.abort(*msgs)
 
 
 @VOLT.Command(
     description='VoltDB quick start from a live MySQL database.',
-    description2='Run from a project directory where new files can be generated.',
-    options=(
-        VOLT.StringOption('-p', '--partition-table', 'partition_table',
-                          'primary partitioning table.'),
-    ),
-    arguments=(
-        VOLT.StringArgument('uri', help='Database URI, e.g. mysql://user@host/database.'),
-    ),
+    description2='''
+Run from a project directory where new files can be generated.
+Edit %s to specify database parameters and generation options.
+Use the "config" and "show" sub-commands to update and view the configuration.
+''' % environment.config_name,
 )
 def mysql(runner):
-    initialize()
-    schema_generator = MySQLSchemaGenerator(runner.opts.uri, runner.opts.partition_table)
-    schema_generator.write_schema(sys.stdout)
+    uri = runner.config.get('mysql.uri')
+    partition_table = runner.config.get('mysql.partition_table')
+    if not uri:
+        utility.error('"mysql.uri" configuration property is not set.')
+    if not partition_table:
+        utility.error('"mysql.partition_table" configuration property is not set.')
+    if not uri or not partition_table:
+        utility.abort('%s configuration is incomplete.' % runner.config.path,
+                      'Use the "config" and "show" subcommands to work with the configuration.')
+    mysqlutil.generate_schema(uri, partition_table)
 
 
-class MySQLTable(object):
-    def __init__(self, schema, row_count):
-        self.schema = schema
-        self.row_count = row_count
-        self.name = schema.name
-        self.primary_key_columns = []
-        for column_name in self.schema.columns:
-            column = self.schema.columns[column_name]
-            if column.key == 'PRI':
-                self.primary_key_columns.append(column)
+@VOLT.Command(description = 'Configure project settings.',
+              arguments = (
+                  VOLT.StringArgument('keyvalue', 'KEY=VALUE assignment',
+                                      min_count = 1, max_count = None),))
+def config(runner):
+    bad = []
+    for arg in runner.opts.keyvalue:
+        if arg.find('=') == -1:
+            bad.append(arg)
+    if bad:
+        runner.abort('Bad arguments (must be KEY=VALUE format):', bad)
+    for arg in runner.opts.keyvalue:
+        key, value = [s.strip() for s in arg.split('=', 1)]
+        # Default to 'volt.' if simple name is given.
+        if key.find('.') == -1:
+            key = 'volt.%s' % key
+        runner.config.set_permanent(key, value)
+        runner.info('Configuration: %s=%s' % (key, value))
 
 
-class PartitionedTable(object):
-    def __init__(self, table, pkey_column_name, reason_chosen):
-        self.table = table
-        self.name = table.name
-        self.pkey_column_name = pkey_column_name
-        self.reason_chosen = reason_chosen
-
-
-class MySQLSchemaGenerator(object):
-
-    def __init__(self, uri, partition_table):
-        self.uri = uri
-        self.partition_table_name = partition_table
-        self.formatter = utility.CodeFormatter(vcomment_prefix=G.vcomment_prefix)
-        # Initialized in initialize()
-        self.schema = None
-        self.database = None
-        # Maps table names to MySQLTable objects.
-        self.tables = {}
-        self.table_names = []
-        # Maps partitioned table names to PartitionedTable objects.
-        self.partitioned_tables = {}
-
-    #=== Public methods.
-
-    def write_schema(self, f):
-        f.write(self.format_schema())
-
-    def format_schema(self):
-        self._initialize()
-        self.formatter.vcomment('::: Generated by %s :::' % environment.command_name,
-                                'Generated comments are prefixed by "%s"' % G.vcomment_prefix)
-        for table_name in self.table_names:
-            self.format_table(table_name)
-            self.format_table_indexes(table_name)
-            self.format_table_partitioning(table_name)
-        return str(self.formatter)
-
-    def format_table(self, table_name):
-        table = self.get_table(table_name)
-        table_comment = table.schema.options.get('comment', '').value
-        if table_comment:
-            self.formatter.comment(table_comment)
-        self.formatter.block_start('CREATE TABLE %s' % table_name)
-        for column_name in table.schema.columns:
-            self.format_column(table_name, column_name)
-        self.format_primary_key(table_name)
-        self.formatter.block_end()
-        self.format_foreign_keys(table_name)
-
-    def format_foreign_keys(self, table_name):
-        table = self.get_table(table_name)
-        if table.schema.foreign_keys:
-            self.formatter.blank()
-            for fk_name in sorted(table.schema.foreign_keys.keys()):
-                fk = table.schema.foreign_keys[fk_name]
-                self.formatter.comment('Foreign key: %s' % fk.name),
-                for i in range(len(fk.columns)):
-                    self.formatter.comment('  %s.%s -> %s.%s'
-                                                % (table.name,
-                                                   fk.columns[i],
-                                                   fk.referenced_table_name,
-                                                   fk.referenced_columns[i]))
-
-    def format_table_partitioning(self, table_name):
-        if table_name in self.partitioned_tables:
-            ptable = self.partitioned_tables[table_name]
-            self.formatter.blank()
-            self.formatter.vcomment(ptable.reason_chosen)
-            self.formatter.code('PARTITION TABLE %s ON COLUMN %s;'
-                                    % (ptable.name, ptable.pkey_column_name))
-
-    def format_table_indexes(self, table_name):
-        table = self.get_table(table_name)
-        nindex = 0
-        for index_name in sorted(table.schema.indexes.keys()):
-            index = table.schema.indexes[index_name]
-            if index.kind != 'PRIMARY':
-                nindex += 1
-                if index.comment:
-                    self.formatter.comment(index.comment)
-                if index.non_unique:
-                    unique = ''
-                else:
-                    unique = ' UNIQUE'
-                self.formatter.block_start('CREATE%s INDEX IDX_%s_%s ON %s'
-                                                % (unique, table_name, index.name, table_name))
-                for column_name, sub_part in index.fields:
-                    self.formatter.code(column_name)
-                    if sub_part != 0:
-                        self.formatter.block_vcomment('Ignored sub-partition %d on field "%s".'
-                                                            % (sub_part, column_name))
-                self.formatter.block_end()
-
-    def format_column(self, table_name, column_name):
-        table = self.get_table(table_name)
-        column = table.schema.columns[column_name]
-        if column.comment:
-            self.formatter.comment(column.comment)
-        voltdb_type, message_number = convert_type(column.type)
-        if message_number:
-            self.formatter.block_vcomment('column #%d %s %s: %s'
-                                                % (column.ordinal_position,
-                                                   column.name,
-                                                   column.type,
-                                                   MESSAGES[message_number]))
-        if column.null:
-            voltdb_null = ''
-        else:
-            voltdb_null = ' NOT NULL'
-        self.formatter.code('%s %s%s' % (column.name, voltdb_type, voltdb_null))
-
-    def format_primary_key(self, table_name):
-        table = self.get_table(table_name)
-        if table.primary_key_columns:
-            self.formatter.blank()
-            self.formatter.block_start('CONSTRAINT PK_%s PRIMARY KEY' % table_name)
-            for primary_key_column in table.primary_key_columns:
-                self.formatter.code(primary_key_column.name)
-            self.formatter.block_end()
-
-    def get_table(self, table_name):
-        try:
-            return self.tables[table_name]
-        except KeyError:
-            utility.abort('Attempted to access schema for unknown table "%s".' % table_name)
-
-    def execute(self, query, *args):
-        try:
-            return self.schema.connection.execute(query, args)
-        except Exception, e:
-            utility.abort('Query failed to execute.', (' '.join([query, str(list(args))]), e))
-
-    def iter_tables(self):
-        for table_name in self.table_names:
-            yield self.get_table(table_name)
-
-    #=== Private methods.
-
-    def _initialize(self):
-        try:
-            self.schema = schemaobject.SchemaObject(self.uri)
-        except MySQLdb.DatabaseError, e:
-            utility.abort('MySQL database connection exception:', ('URI: %s' % self.uri, e))
-        num_databases = len(self.schema.databases)
-        if num_databases != 1:
-            utility.abort('Expect the URI to uniquely identify a single database.',
-                          '"%s" returns %d databases.' % (self.uri, num_databases))
-        self.database = self.schema.databases[self.schema.databases.keys()[0]]
-        for table_name in self.database.tables:
-            self.table_names.append(table_name)
-            result = self.execute('SELECT count(*) FROM %s' % table_name)
-            row_count = result[0]['count(*)']
-            self.tables[table_name] = MySQLTable(self.database.tables[table_name], row_count)
-        self.table_names.sort()
-        self._determine_partitioning()
-
-    def _determine_partitioning(self):
-        # Partition around either a user-specified table or the largest row count.
-        partition_table = None
-        if self.partition_table_name:
-            # Find the user-specified table schema.
-            for table in self.iter_tables():
-                if table.name == self.partition_table_name:
-                    partition_table = table
-                    reason_chosen = ('%s was explicitly specified for partitioning.' % table.name)
-                    break
-            else:
-                utility.abort('Partitioning table "%s" is not in the schema.'
-                                    % self.partition_table_name)
-        else:
-            # Find the largest row count.
-            max_row_count = 0
-            for table in self.iter_tables():
-                if table.row_count > max_row_count:
-                    max_row_count = table.row_count
-                    partition_table = table
-                    reason_chosen = ('%s has the largest row count of %d.'
-                                            % (table.name, max_row_count))
-        if not partition_table:
-            utility.abort('Unable to generate partitioning without one of the following:', (
-                          '- A database populated with representative data.',
-                          '- A partitioning table specified on the command line.'))
-        pkey_column_name = partition_table.primary_key_columns[0].name
-        biggest_ptable = PartitionedTable(partition_table, pkey_column_name, reason_chosen)
-        self.partitioned_tables[partition_table.name] = biggest_ptable
-        # Partition other tables having a foreign key referencing the biggest table.
-        for table in self.iter_tables():
-            if table.name == partition_table.name:
-                continue
-            for fk_name in table.schema.foreign_keys:
-                fk = table.schema.foreign_keys[fk_name]
-                if fk.referenced_table_name != partition_table.name:
-                    continue
-                # It's a winner if one of the FK reference columns is the
-                # referenced table's partition key.
-                for icolumn in range(len(fk.columns)):
-                    # Check if the referenced column is the partition key.
-                    # If it is use the corresponding column in this table.
-                    # Assume columns and referenced_columns are synchronized.
-                    if fk.referenced_columns[icolumn] == biggest_ptable.pkey_column_name:
-                        pkey_column_name = fk.columns[icolumn]
-                        reason_chosen = ('%s references partitioned table %s through a '
-                                         'foreign key that references the partition key'
-                                                % (table.name, biggest_ptable.name))
-                        fk_ptable = PartitionedTable(table, pkey_column_name, reason_chosen)
-                        self.partitioned_tables[table.name] = fk_ptable
-                        break
-
-
-def convert_type(mysql_type):
-    """
-    Convert MySQL type to VoltDB type.
-    Return (volt_type, message)
-    message is a string with information about conversion issues when they occur.
-    """
-    m = G.re_type.match(mysql_type)
-    if not m:
-        return 'VARCHAR(50)', MESSAGES.PARSE_ERROR
-    # Normalize compound names with arbitrary spacing,
-    # e.g. "DOUBLE   PRECISION".
-    name = ''.join(m.group(1).upper().split())
-    param = m.group(3)
-    # Generate the return pair based on the presence of an unsupported parameter.
-    def noparam(volt_type, message):
-        if param:
-            return volt_type, message
-        return volt_type, None
-    if name == 'TINYINT':
-        return noparam('TINYINT', MESSAGES.WIDTH_PARAM)
-    if name == 'SMALLINT':
-        return noparam('SMALLINT', MESSAGES.WIDTH_PARAM)
-    if name == 'MEDIUMINT':
-        return 'INTEGER', MESSAGES.MEDIUM_INT
-    if name == 'INT':
-        return noparam('INTEGER', MESSAGES.WIDTH_PARAM)
-    if name == 'BIGINT':
-        return noparam('BIGINT', MESSAGES.WIDTH_PARAM)
-    if name in ('DECIMAL', 'NUMERIC'):
-        return noparam('DECIMAL', MESSAGES.PREC_PARAMS)
-    if name in ('FLOAT', 'REAL', 'DOUBLE', 'DOUBLE PRECISION'):
-        return noparam('FLOAT', MESSAGES.PREC_PARAMS)
-    if name == 'BIT':
-        nbytes = (int(param) + 7) // 8
-        return 'VARBINARY(%d)' % nbytes, MESSAGES.BIT_TYPE
-    if name  == 'TIMESTAMP':
-        return 'TIMESTAMP', None
-    if name in ('DATE', 'DATETIME', 'TIME', 'YEAR'):
-        return 'TIMESTAMP', MESSAGES.DATE_TIME
-    if name == 'CHAR':
-        return 'VARCHAR(%d)' % int(param), MESSAGES.CHAR
-    if name == 'VARCHAR':
-        return 'VARCHAR(%d)' % int(param), None
-    if name == 'ENUM':
-        return 'VARCHAR(50)', MESSAGES.ENUM
-    if name == 'SET':
-        return 'VARCHAR(50)', MESSAGES.SET
-    if name in ('TEXT', 'TINYTEXT', 'MEDIUMTEXT', 'LONGTEXT'):
-        return 'VARCHAR(1024)', MESSAGES.TEXT
-    if name == 'BINARY':
-        return 'VARBINARY(%d)' % int(param), MESSAGES.BINARY
-    if name == 'VARBINARY':
-        return 'VARBINARY(%d)' % int(param), None
-    if name in ('BLOB', 'TINYBLOB', 'MEDIUMBLOB', 'LONGBLOB'):
-        return 'VARBINARY(1024)', MESSAGES.BLOB
-    # Default to varchar and BAD as the result code in case of failure.
-    return 'VARCHAR(50)', MESSAGES.UNSUPPORTED
+@VOLT.Command(
+    description = 'Display project configuration settings.',
+    description2 = 'Displays all settings if no keys are specified.',
+    arguments = (
+        VOLT.StringArgument('arg', 'configuration key(s)', min_count = 0, max_count = None)
+    ),
+)
+def show(runner):
+    if not runner.opts.arg:
+        # All labels.
+        for (key, value) in runner.config.query_pairs():
+            sys.stdout.write('%s=%s\n' % (key, value))
+    else:
+        # Specific keys requested.
+        for filter in runner.opts.arg:
+            n = 0
+            for (key, value) in runner.config.query_pairs(filter = filter):
+                sys.stdout.write('%s=%s\n' % (key, d[key]))
+                n += 1
+            if n == 0:
+                sys.stdout.write('%s *not found*\n' % filter)

@@ -609,8 +609,8 @@ def main(command_name, command_dir, version, description, *args, **kwargs):
         utility.set_debug(opts.debug)
 
         # Load the configuration and state
-        permanent_path = os.path.join(os.getcwd(), 'volt.cfg')
-        local_path     = os.path.join(os.getcwd(), 'volt_local.cfg')
+        permanent_path = os.path.join(os.getcwd(), environment.config_name)
+        local_path     = os.path.join(os.getcwd(), environment.config_name_local)
         config = VoltConfig(permanent_path, local_path)
 
         # Initialize the environment
