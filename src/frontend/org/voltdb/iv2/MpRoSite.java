@@ -382,8 +382,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params)
     {
-        ProcedureRunner runner = m_loadedProcedures.getSysproc(fragmentId);
-        return runner.executeSysProcPlanFragment(txnState, dependencies, fragmentId, params);
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
@@ -463,40 +462,15 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     /**
      * Update the catalog.  If we're the MPI, don't bother with the EE.
      */
-    // IZZY-MP-RO: PLAN ON GETTING RID OF THIS
     public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp,
             boolean requiresSnapshotIsolationboolean, boolean isMPI)
     {
-        m_context = context;
-        m_loadedProcedures.loadProcedures(m_context, m_backend, csp);
-        return true;
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds) {
-        boolean foundMultipartTxnId = false;
-        boolean foundSinglepartTxnId = false;
-        for (long txnId : perPartitionTxnIds) {
-            if (TxnEgo.getPartitionId(txnId) == m_partitionId) {
-                if (foundSinglepartTxnId) {
-                    VoltDB.crashLocalVoltDB(
-                            "Found multiple transactions ids during restore for a partition", false, null);
-                }
-                foundSinglepartTxnId = true;
-                m_initiatorMailbox.setMaxLastSeenTxnId(txnId);
-            }
-            if (TxnEgo.getPartitionId(txnId) == MpInitiator.MP_INIT_PID) {
-                if (foundMultipartTxnId) {
-                    VoltDB.crashLocalVoltDB(
-                            "Found multiple transactions ids during restore for a multipart txnid", false, null);
-                }
-                foundMultipartTxnId = true;
-                m_initiatorMailbox.setMaxLastSeenMultipartTxnId(txnId);
-            }
-        }
-        if (!foundMultipartTxnId) {
-            VoltDB.crashLocalVoltDB("Didn't find a multipart txnid on restore", false, null);
-        }
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
     /**
