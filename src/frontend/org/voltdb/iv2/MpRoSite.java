@@ -23,24 +23,19 @@ import java.util.concurrent.Future;
 
 //import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DependencyPair;
 import org.voltdb.HsqlBackend;
-import org.voltdb.IndexStats;
 import org.voltdb.LoadedProcedureSet;
-import org.voltdb.MemoryStats;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
-import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.SystemProcedureExecutionContext;
-import org.voltdb.TableStats;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -84,11 +79,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     // Still need m_hsql here.
     HsqlBackend m_hsql;
 
-    // Stats
-    final TableStats m_tableStats;
-    final IndexStats m_indexStats;
-    final MemoryStats m_memStats;
-
     // Current catalog
     volatile CatalogContext m_context;
 
@@ -115,10 +105,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     // Advanced in complete transaction.
-    long m_lastCommittedTxnId = 0;
-    long m_lastCommittedSpHandle = 0;
-    long m_currentTxnId = Long.MIN_VALUE;
-    long m_lastTxnTime = System.currentTimeMillis();
+    private long m_currentTxnId = Long.MIN_VALUE;
 
     SiteProcedureConnection getSiteProcedureConnection()
     {
@@ -142,7 +129,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public long getLastCommittedSpHandle() {
-            return m_lastCommittedSpHandle;
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
 
         @Override
@@ -255,19 +242,15 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
     };
 
-    /** Create a new execution site and the corresponding EE */
+    /** Create a new RO MP execution site */
     public MpRoSite(
             SiteTaskerQueue scheduler,
             long siteId,
             BackendTarget backend,
             CatalogContext context,
-            String serializedCatalog,
-            long txnId,
             int partitionId,
             int numPartitions,
-            InitiatorMailbox initiatorMailbox,
-            StatsAgent agent,
-            MemoryStats memStats)
+            InitiatorMailbox initiatorMailbox)
     {
         m_siteId = siteId;
         m_context = context;
@@ -275,27 +258,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         m_numberOfPartitions = numPartitions;
         m_scheduler = scheduler;
         m_backend = backend;
-        m_lastCommittedTxnId = TxnEgo.makeZero(partitionId).getTxnId();
-        m_lastCommittedSpHandle = TxnEgo.makeZero(partitionId).getTxnId();
         m_currentTxnId = Long.MIN_VALUE;
         m_initiatorMailbox = initiatorMailbox;
-
-        if (agent != null) {
-            m_tableStats = new TableStats(m_siteId);
-            agent.registerStatsSource(StatsSelector.TABLE,
-                                      m_siteId,
-                                      m_tableStats);
-            m_indexStats = new IndexStats(m_siteId);
-            agent.registerStatsSource(StatsSelector.INDEX,
-                                      m_siteId,
-                                      m_indexStats);
-            m_memStats = memStats;
-        } else {
-            // MPI doesn't need to track these stats
-            m_tableStats = null;
-            m_indexStats = null;
-            m_memStats = null;
-        }
     }
 
     /** Update the loaded procedures. */
@@ -334,7 +298,6 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
                 SiteTasker task = m_scheduler.take();
                 if (task instanceof TransactionTask) {
                     m_currentTxnId = ((TransactionTask)task).getTxnId();
-                    m_lastTxnTime = EstTime.currentTimeMillis();
                 }
                 task.run(getSiteProcedureConnection());
             }
