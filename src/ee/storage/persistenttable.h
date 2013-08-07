@@ -228,8 +228,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                                     std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & end,
                                     std::vector<catalog::MaterializedViewInfo*> &survivingInfosOut,
                                     std::vector<MaterializedViewMetadata*> &survivingViewsOut,
-                                    std::vector<catalog::MaterializedViewInfo*> &changingInfosOut,
-                                    std::vector<MaterializedViewMetadata*> &changingViewsOut,
                                     std::vector<MaterializedViewMetadata*> &obsoleteViewsOut);
     void updateMaterializedViewTargetTable(PersistentTable* target);
 
