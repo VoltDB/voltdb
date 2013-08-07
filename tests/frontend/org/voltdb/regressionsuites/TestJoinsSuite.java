@@ -178,13 +178,29 @@ public class TestJoinsSuite extends RegressionSuite {
                 .getResults()[0];
         assertEquals(1, result.getRowCount());
 
+        result = client.callProcedure("@AdHoc", "SELECT * FROM R1 JOIN R2 USING (A,C) WHERE A > 0;")
+                .getResults()[0];
+        assertEquals(1, result.getRowCount());
+
+        result = client.callProcedure("@AdHoc", "SELECT * FROM R1 JOIN R2 USING (A,C) WHERE A > 4;")
+                .getResults()[0];
+        assertEquals(0, result.getRowCount());
+
         client.callProcedure("InsertP1", 1, 1); // 1,1,1,1,1
         client.callProcedure("InsertP1", 2, 2); // Eliminated by JOIN
         client.callProcedure("InsertP1", 3, 3); // Eliminated by JOIN
         result = client.callProcedure("@AdHoc", "SELECT * FROM P1 JOIN R2 USING (A,C);")
                 .getResults()[0];
         assertEquals(1, result.getRowCount());
-   }
+
+        result = client.callProcedure("@AdHoc", "SELECT * FROM P1 JOIN R2 USING (A,C) WHERE A > 0;")
+                .getResults()[0];
+        assertEquals(1, result.getRowCount());
+
+        result = client.callProcedure("@AdHoc", "SELECT * FROM P1 JOIN R2 USING (A,C) WHERE A > 4;")
+                .getResults()[0];
+        assertEquals(0, result.getRowCount());
+}
 
     /**
      * Three table NLJ
