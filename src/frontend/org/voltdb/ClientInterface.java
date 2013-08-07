@@ -1015,6 +1015,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         else {
             //Multi-part transactions go to the multi-part coordinator
             initiatorHSId = m_cartographer.getHSIdForMultiPartitionInitiator();
+            // Treat all MP reads as short-circuit
+            if (isReadOnly) {
+                isShortCircuitRead = true;
+            }
         }
 
         if (initiatorHSId == null) {
