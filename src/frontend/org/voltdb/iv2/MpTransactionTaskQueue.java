@@ -84,16 +84,19 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         // SiteTaskerQueue at a time.  So, when we offer this repair task, we
         // know it will be the next thing to run once we poison the current
         // TXN.
-        m_taskQueue.offer(task);
         // First, poison all the stuff that is currently running
         Map<Long, TransactionTask> currentSet;
         if (!m_currentReads.isEmpty()) {
             assert(m_currentWrites.isEmpty());
             tmLog.debug("MpTTQ: repairing reads");
+            for (Long txnId : m_currentReads.keySet()) {
+                m_sitePool.repair(txnId, task);
+            }
             currentSet = m_currentReads;
         }
         else {
             tmLog.debug("MpTTQ: repairing writes");
+            m_taskQueue.offer(task);
             currentSet = m_currentWrites;
         }
         for (Entry<Long, TransactionTask> e : currentSet.entrySet()) {
@@ -163,22 +166,37 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
 
     private boolean taskQueueOffer()
     {
+        // Do we have a write to do?
+        //   if so, are there reads outstanding?
+        //     if not, pull it from the write backlog, add it to current write set, and queue it
+        //     if so, bail for now
+        //   if not, do we have a read to do?
+        //     if so, are we currently trying to do a write?
+        //       if not, is there more capacity in the pool?
+        //         if so, pull it from the read backlog, add it to current read set, and queue it
+        //         if not, bail for now
+        //       if so, bail for now
+        //     if not, bail for now
+
         boolean retval = false;
-        if (m_currentReads.isEmpty() && m_currentWrites.isEmpty()) {
-            if (!m_backlog.isEmpty() || !m_readBacklog.isEmpty()) {
+        if (!m_backlog.isEmpty()) {
+            if (m_currentReads.isEmpty()) {
                 TransactionTask task = m_backlog.pollFirst();
-                if (task == null) {
-                    task = m_readBacklog.pollFirst();
-                }
-                if (task.getTransactionState().isReadOnly()) {
-                    m_currentReads.put(task.getTxnId(), task);
-                }
-                else {
-                    assert(m_currentWrites.isEmpty());
-                    m_currentWrites.put(task.getTxnId(), task);
-                }
+                assert(!task.getTransactionState().isReadOnly());
+                m_currentWrites.put(task.getTxnId(), task);
                 taskQueueOffer(task);
                 retval = true;
+            }
+        }
+        else if (!m_readBacklog.isEmpty()) {
+            if (m_currentWrites.isEmpty()) {
+                if (m_sitePool.canAcceptWork()) {
+                    TransactionTask task = m_readBacklog.pollFirst();
+                    assert(task.getTransactionState().isReadOnly());
+                    m_currentReads.put(task.getTxnId(), task);
+                    taskQueueOffer(task);
+                    retval = true;
+                }
             }
         }
         return retval;

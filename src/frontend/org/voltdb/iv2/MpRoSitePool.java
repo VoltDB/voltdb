@@ -37,7 +37,7 @@ import org.voltdb.StarvationTracker;
 class MpRoSitePool
 {
     // IZZY: temporary static vars
-    static int MAX_POOL_SIZE = 1;
+    static int MAX_POOL_SIZE = 1000;
     static int INITIAL_POOL_SIZE = 0;
 
     class MpRoSiteContext
@@ -132,8 +132,16 @@ class MpRoSitePool
     /**
      * Repair placeholder
      */
-    void repair(long txnId)
+    void repair(long txnId, SiteTasker task)
     {
+        if (m_busySites.containsKey(txnId)) {
+            MpRoSiteContext site = m_busySites.get(txnId);
+            site.offer(task);
+        }
+        else {
+            //bad
+            throw new RuntimeException("THIS IS BAD!");
+        }
     }
 
     /**
@@ -155,16 +163,23 @@ class MpRoSitePool
         if (!retval) {
             return false;
         }
-        if (m_idleSites.isEmpty()) {
-            m_idleSites.push(new MpRoSiteContext(m_siteId,
-                        m_backend,
-                        m_catalogContext,
-                        m_partitionId,
-                        m_initiatorMailbox,
-                        m_csp));
+        MpRoSiteContext site;
+        // Repair case
+        if (m_busySites.containsKey(txnId)) {
+            site = m_busySites.get(txnId);
         }
-        MpRoSiteContext site = m_idleSites.pop();
-        m_busySites.put(txnId, site);
+        else {
+            if (m_idleSites.isEmpty()) {
+                m_idleSites.push(new MpRoSiteContext(m_siteId,
+                            m_backend,
+                            m_catalogContext,
+                            m_partitionId,
+                            m_initiatorMailbox,
+                            m_csp));
+            }
+            site = m_idleSites.pop();
+            m_busySites.put(txnId, site);
+        }
         site.offer(task);
         return true;
     }
