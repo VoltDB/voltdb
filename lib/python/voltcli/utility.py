@@ -41,6 +41,7 @@ import re
 import pkgutil
 import binascii
 import stat
+import textwrap
 
 __author__ = 'scooper'
 
@@ -789,6 +790,18 @@ def parse_hosts(host_string, min_hosts = None, max_hosts = None, default_port = 
         abort('Too many hosts in host string "%s". The maximum is %d.'
                     % (host_string, max_hosts))
     return hosts
+
+#===============================================================================
+def paragraph(*lines):
+#===============================================================================
+    """
+    Strip leading and trailing whitespace and wrap text into a paragraph block.
+    The arguments can include arbitrarily nested sequences.
+    """
+    wlines = []
+    for line in flatten_to_list(lines):
+        wlines.extend(line.strip().split('\n'))
+    return '\n'.join(textwrap.wrap('\n'.join(wlines)))
 
 #===============================================================================
 class File(object):

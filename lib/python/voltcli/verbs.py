@@ -274,7 +274,7 @@ class PackageVerb(CommandVerb):
         self.set_defaults(description  = 'Create a runnable Python program package.',
                           baseverb     = True,
                           hideverb     = True,
-                          description2 = '''\
+                          description2 = '''
 The optional NAME argument(s) allow package generation for base commands other
 than the current one. If no NAME is provided the current base command is
 packaged.''')
@@ -324,8 +324,8 @@ class MultiVerb(CommandVerb):
                 usage = '%s %s' % (self.name, mod.name)
             rows.append((usage, mod.description))
         caption = '"%s" Command Variations' % self.name
-        description2 = utility.format_table(rows, caption = caption, separator = '  ')
-        self.set_defaults(description2 = description2.strip())
+        other_info = utility.format_table(rows, caption = caption, separator = '  ')
+        self.set_defaults(other_info = other_info.strip())
         args = [
             cli.StringArgument('modifier',
                                'command modifier (valid modifiers: %s)' % valid_modifiers)]

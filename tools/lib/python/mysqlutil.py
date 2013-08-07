@@ -95,10 +95,10 @@ def initialize_mysql_imports():
         utility.abort(*msgs)
 
 
-def generate_schema(uri, partition_table):
+def generate_schema(uri, partition_table, output_stream):
     initialize()
     schema_generator = MySQLSchemaGenerator(uri, partition_table)
-    schema_generator.write_schema(sys.stdout)
+    schema_generator.write_schema(output_stream)
 
 
 class MySQLTable(object):

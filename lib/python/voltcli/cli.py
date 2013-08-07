@@ -522,10 +522,15 @@ class CLIParser(ExtendedHelpOptionParser):
         if self.verb.get_argument_count() > 0:
             rows = [(get_argument_usage(a), a.help) for a in self.verb.iter_arguments()]
             blocks.append('\n'.join(['Arguments:', utility.format_table(rows, indent = 2)]))
+        # other_info is used for the multi-verb variation list.
+        other_info = self.verb.cli_spec.get_attr('other_info', None)
+        if other_info:
+            blocks.append(other_info.strip())
+        # Automatically wrap description2 as a paragraph.
         description2 = self.verb.cli_spec.get_attr('description2', None)
         if description2:
-            blocks.append(description2)
-        return '\n'.join(['\n%s' % '\n'.join(textwrap.wrap(block.strip())) for block in blocks])
+            blocks.append('\n'.join(textwrap.wrap(description2.strip())))
+        return '\n%s' % '\n\n'.join(blocks)
 
     def _abort(self, *msgs):
         utility.error(*msgs)
