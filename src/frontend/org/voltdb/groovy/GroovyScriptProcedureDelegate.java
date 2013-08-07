@@ -33,7 +33,7 @@ import com.google.common.collect.ImmutableMap;
 
 public class GroovyScriptProcedureDelegate extends VoltProcedure implements GroovyCodeBlockConstants {
 
-    public final Closure<Object> m_closure;
+    protected final Closure<Object> m_closure;
     protected final String m_procedureName;
     protected final Class<?>[] m_parameterTypes;
     protected final Map<String, SQLStmt> m_statementMap;
@@ -41,6 +41,10 @@ public class GroovyScriptProcedureDelegate extends VoltProcedure implements Groo
 
     public GroovyScriptProcedureDelegate(Class<?> scriptClass)  {
         String shortName = scriptClass.getSimpleName();
+
+        if (!JvmProbe.mayLoadGroovy()) {
+            throw new UnsupportedOperationException("Groovy procedures are supported on Java version 7 or higher");
+        }
 
         // all groovy scripts have an implicit run method defined
         Method run;
@@ -137,6 +141,10 @@ public class GroovyScriptProcedureDelegate extends VoltProcedure implements Groo
         bld.putAll(m_statementMap);
         bld.put(GVY_PROCEDURE_ENTRY_CLOSURE, m_closure);
         return bld.build();
+    }
+
+    public Object invoke(Object[] paramList) {
+        return m_closure.call(paramList);
     }
 
     public static class SetupException extends RuntimeException {

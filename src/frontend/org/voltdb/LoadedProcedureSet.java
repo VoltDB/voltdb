@@ -28,6 +28,7 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.compiler.Language;
 import org.voltdb.groovy.GroovyScriptProcedureDelegate;
+import org.voltdb.groovy.JvmProbe;
 import org.voltdb.utils.LogKeys;
 
 import com.google.common.collect.ImmutableMap;
@@ -98,7 +99,12 @@ public class LoadedProcedureSet {
             VoltProcedure procedure = null;
             if (proc.getHasjava()) {
                 final String className = proc.getClassname();
+
                 final Language lang = Language.valueOf(proc.getLanguage());
+                if (!JvmProbe.mayLoad(lang)) {
+                    VoltDB.crashLocalVoltDB("VoltDB " + lang + " procedures require Java version 7 or higher", false, null);
+                }
+
                 Class<?> procClass = null;
                 try {
                     procClass = catalogContext.classForProcedure(className);

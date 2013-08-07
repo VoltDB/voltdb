@@ -17,9 +17,6 @@
 
 package org.voltdb.compiler;
 
-import groovy.lang.GroovyClassLoader;
-import groovy_voltpatches.util.DelegatingScript;
-
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -37,15 +34,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
-import org.codehaus.groovy.control.CompilationFailedException;
-import org.codehaus.groovy.control.CompilerConfiguration;
-import org.codehaus.groovy.control.customizers.ImportCustomizer;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
-import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -61,6 +54,8 @@ import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.groovy.GroovyCodeBlockCompiler;
+import org.voltdb.groovy.JvmProbe;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.types.ConstraintType;
@@ -401,46 +396,7 @@ public class DDLCompiler {
         int lineNo;
     }
 
-    Language.Visitor<Class<?>, Pair<String,String>> codeBlockCompiler =
-            new Language.SimpleVisitor<Class<?>, Pair<String, String>>() {
-
-        CompilerConfiguration conf = new CompilerConfiguration(CompilerConfiguration.DEFAULT);
-        ImportCustomizer imports = new ImportCustomizer();
-        GroovyClassLoader gcl;
-
-        {
-            imports.addStarImports("org.voltdb");
-            conf.addCompilationCustomizers(imports);
-            conf.getOptimizationOptions().put("indy", true);
-            conf.setScriptBaseClass(DelegatingScript.class.getName());
-
-
-            File groovyOut = new File("groovyout");
-            if (!groovyOut.exists()) groovyOut.mkdir();
-            if (!groovyOut.isDirectory() || !groovyOut.canRead() || !groovyOut.canWrite()) {
-                throw new RuntimeException("Cannot access directory\"" + groovyOut + "\"");
-            }
-            List<String> classPath = conf.getClasspath();
-            classPath.add(groovyOut.getName());
-            conf.setClasspathList(classPath);
-
-            conf.setTargetDirectory(groovyOut);
-
-            gcl = new GroovyClassLoader(Thread.currentThread().getContextClassLoader(), conf);
-        }
-
-        @Override
-        public Class<?> visitJava(Pair<String, String> p) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public Class<?> visitGroovy(Pair<String, String> p) {
-            return gcl.parseClass(p.getSecond(),p.getFirst() + ".groovy");
-        }
-    };
-
-    public DDLCompiler(VoltCompiler compiler, HSQLInterface hsql, VoltDDLElementTracker tracker) {
+    public DDLCompiler(VoltCompiler compiler, HSQLInterface hsql, VoltDDLElementTracker tracker)  {
         assert(compiler != null);
         assert(hsql != null);
         assert(tracker != null);
@@ -639,15 +595,25 @@ public class DDLCompiler {
             String codeBlock = statementMatcher.group(3);
             Language language = Language.valueOf(statementMatcher.group(4).toUpperCase());
 
+
             Class<?> scriptClass = null;
-            try {
-                scriptClass = language.accept(codeBlockCompiler, Pair.of(className,codeBlock));
-            } catch (CompilationFailedException ex) {
+
+            if (language == Language.GROOVY) {
+                if (!JvmProbe.mayLoadGroovy()) {
+                    throw m_compiler.new VoltCompilerException("Groovy Procedures require Java version 7 or newer");
+                }
+                try {
+                    scriptClass = GroovyCodeBlockCompiler.instance().parseCodeBlock(codeBlock, className);
+                } catch (CodeBlockCompilerException ex) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "Procedure \"%s\" code block has syntax errors:\n%s",
+                            className, ex.getMessage()));
+                } catch (Exception ex) {
+                    throw m_compiler.new VoltCompilerException(ex);
+                }
+            } else {
                 throw m_compiler.new VoltCompilerException(String.format(
-                        "Procedure \"%s\" code block has syntax errors:\n%s",
-                        className, ex.getMessage()));
-            } catch (Exception ex) {
-                throw m_compiler.new VoltCompilerException(ex);
+                        "Language \"%s\" is not a supported", language.name()));
             }
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(

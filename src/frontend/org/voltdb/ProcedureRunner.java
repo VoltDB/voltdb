@@ -286,7 +286,7 @@ public class ProcedureRunner {
                             log.trace("invoking... groovy closure on class=" + getClass().getName());
                         }
                         GroovyScriptProcedureDelegate proc = (GroovyScriptProcedureDelegate)m_procedure;
-                        Object rawResult = proc.m_closure.call(paramList);
+                        Object rawResult = proc.invoke(paramList);
                         results = getResultsFromRawResults(rawResult);
                     }
                     log.trace("invoked");
