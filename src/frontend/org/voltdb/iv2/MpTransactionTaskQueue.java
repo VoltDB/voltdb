@@ -40,9 +40,16 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     private Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
     private Deque<TransactionTask> m_readBacklog = new ArrayDeque<TransactionTask>();
 
+    private MpRoSitePool m_sitePool = null;
+
     MpTransactionTaskQueue(SiteTaskerQueue queue)
     {
         super(queue);
+    }
+
+    void setMpRoSitePool(MpRoSitePool sitePool)
+    {
+        m_sitePool = sitePool;
     }
 
     /**

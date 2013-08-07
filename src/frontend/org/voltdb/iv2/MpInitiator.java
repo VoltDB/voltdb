@@ -82,6 +82,16 @@ public class MpInitiator extends BaseInitiator implements Promotable
 
         super.configureCommon(backend, serializedCatalog, catalogContext,
                 csp, numberOfPartitions, startAction, null, null, cl, coreBindIds, null);
+        // Hacky
+        MpScheduler sched = (MpScheduler)m_scheduler;
+        MpRoSitePool sitePool = new MpRoSitePool(m_initiatorMailbox.getHSId(),
+                backend,
+                catalogContext,
+                m_partitionId,
+                m_initiatorMailbox,
+                csp);
+        sched.setMpRoSitePool(sitePool);
+
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),
