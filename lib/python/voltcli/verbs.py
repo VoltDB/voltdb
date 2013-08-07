@@ -432,11 +432,12 @@ class VerbSpace(object):
     """
     Manages a collection of Verb objects that support a particular CLI interface.
     """
-    def __init__(self, name, version, description, VOLT, verbs):
+    def __init__(self, name, version, description, VOLT, scan_dirs, verbs):
         self.name        = name
         self.version     = version
         self.description = description.strip()
         self.VOLT        = VOLT
+        self.scan_dirs   = scan_dirs
         self.verbs       = verbs
         self.verb_names  = self.verbs.keys()
         self.verb_names.sort()

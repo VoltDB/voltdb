@@ -43,8 +43,6 @@ import binascii
 import stat
 import textwrap
 
-__author__ = 'scooper'
-
 #===============================================================================
 class Global:
 #===============================================================================
@@ -801,7 +799,7 @@ def paragraph(*lines):
     wlines = []
     for line in flatten_to_list(lines):
         wlines.extend(line.strip().split('\n'))
-    return '\n'.join(textwrap.wrap('\n'.join(wlines)))
+    return textwrap.fill('\n'.join(wlines))
 
 #===============================================================================
 class File(object):

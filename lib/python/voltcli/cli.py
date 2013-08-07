@@ -32,7 +32,6 @@ import os
 import optparse
 import shlex
 import copy
-import textwrap
 
 from voltcli import utility
 
@@ -529,7 +528,7 @@ class CLIParser(ExtendedHelpOptionParser):
         # Automatically wrap description2 as a paragraph.
         description2 = self.verb.cli_spec.get_attr('description2', None)
         if description2:
-            blocks.append('\n'.join(textwrap.wrap(description2.strip())))
+            blocks.append(utility.paragraph(description2))
         return '\n%s' % '\n\n'.join(blocks)
 
     def _abort(self, *msgs):

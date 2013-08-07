@@ -23,6 +23,8 @@
 import sys
 import os
 import mysqlutil
+import shutil
+import string
 from voltcli import utility
 from voltcli import environment
 
@@ -37,6 +39,9 @@ class G:
     config_properties = dict(
         connection_string = ConfigProperty('database connection string'),
         ddl_file          = ConfigProperty('generated DDL file name', default='ddl.sql'),
+        deployment_file   = ConfigProperty('generated deployment file name', default='deployment.xml'),
+        package           = ConfigProperty('package/application name', default='voltapp'),
+        run_file          = ConfigProperty('generated run script', default='run.sh'),
         partition_table   = ConfigProperty('table to use for partitioning analysis'),
         source_type       = ConfigProperty('source database type, e.g. "mysql', default='mysql'),
     )
@@ -91,6 +96,7 @@ def get_config(runner, reset = False):
     o = O()
     missing = []
     defaults = []
+    msgblocks = []
     for name in sorted(G.config_properties.keys()):
         config_property = G.config_properties[name]
         key = config_key(name)
@@ -103,6 +109,7 @@ def get_config(runner, reset = False):
                 defaults.append(name)
                 value = G.config_properties[name].default
                 runner.config.set_permanent(key, value)
+                setattr(o, name, value)
         else:
             # Use an existing config value.
             setattr(o, name, value)
@@ -112,10 +119,11 @@ def get_config(runner, reset = False):
             plural = 's'
         else:
             plural = ''
-        print('\nThe following setting%s must be configured before proceeding:\n' % plural)
         table = [(name, G.config_properties[name].description) for name in missing]
-        print utility.format_table(table, headings=['PROPERTY', 'DESCRIPTION'],
-                                          indent=3, separator='  ')
+        msgblocks.append(['The following setting%s must be configured before proceeding:' % plural,
+                          '',
+                          utility.format_table(table, headings=['PROPERTY', 'DESCRIPTION'],
+                                                      indent=3, separator='  ')])
         samples.extend(missing)
         o = None
     if defaults:
@@ -123,14 +131,21 @@ def get_config(runner, reset = False):
             plural = 's were'
         else:
             plural = ' was'
-        print '\nThe following setting default%s applied and saved permanently:\n' % plural
-        print utility.format_table(
-                    [(name, G.config_properties[name].default) for name in defaults],
-                    indent=3, separator='  ', headings=['PROPERTY', 'VALUE'])
+        msgblocks.append(['The following setting default%s applied and saved permanently:' % plural,
+                          '',
+                          utility.format_table(
+                                [(name, G.config_properties[name].default) for name in defaults],
+                                indent=3, separator='  ', headings=['PROPERTY', 'VALUE'])])
     if reset:
         o = None
     elif o is None:
-        print '\n%s' % config_help(samples=samples)
+        msgblocks.append([config_help(samples=samples)])
+    if msgblocks:
+        for msgblock in msgblocks:
+            print ''
+            for msg in msgblock:
+                print msg
+        print ''
     return o
 
 
@@ -152,17 +167,42 @@ def port(runner):
     source_type = config.source_type.lower()
     if source_type != 'mysql':
         utility.abort('Unsupported source type "%s".' % source_type, 'Only "mysql" is valid.')
-    if os.path.exists(config.ddl_file) and not runner.opts.overwrite:
-        utility.abort('"%s" exists, delete the file or use the -O or --overwrite options.'
-                            % config.ddl_file)
+    output_files = [config.ddl_file, config.deployment_file, config.run_file]
+    overwrites = [p for p in output_files if os.path.exists(p)]
+    if overwrites and not runner.opts.overwrite:
+        utility.abort('Output files exist, delete or use the -O or --overwrite options.', overwrites)
     generated_files = []
+    utility.info('Generating "%s"...' % config.ddl_file)
     output_stream = utility.File(config.ddl_file, 'w')
     output_stream.open()
     try:
         mysqlutil.generate_schema(config.connection_string, config.partition_table, output_stream)
-        generated_files.append(output_stream.path)
+        generated_files.append(config.ddl_file)
     finally:
         output_stream.close()
+    utility.info('Generating "%s"...' % config.deployment_file)
+    src_path = runner.find_resource('template/deployment.xml', required=True)
+    try:
+        shutil.copy(src_path, config.deployment_file)
+        generated_files.append(config.deployment_file)
+    except IOError, e:
+        utility.abort('Failed to copy "%s" to "%s".' % (src_path, config.deployment_file))
+    utility.info('Generating "%s"...' % config.run_file)
+    src_path = runner.find_resource('template/run.sh', required=True)
+    src_file = utility.File(src_path)
+    src_file.open()
+    try:
+        template = string.Template(src_file.read())
+        s = template.safe_substitute(appname=config.package)
+    finally:
+        src_file.close()
+    tgt_file = utility.File(config.run_file, 'w')
+    tgt_file.open()
+    try:
+        tgt_file.write(s)
+        generated_files.append(config.run_file)
+    finally:
+        tgt_file.close()
     utility.info('Project files were successfully generated.',
                  'A thorough examination of their contents is recommended.',
                  generated_files)
@@ -178,13 +218,13 @@ def run_config_get(runner):
             sys.stdout.write('%s=%s\n' % (key, value))
     else:
         # Specific keys requested.
-        for filter in runner.opts.arg:
+        for arg in runner.opts.arg:
             n = 0
-            for (key, value) in runner.config.query_pairs(filter = config_key(filter)):
+            for (key, value) in runner.config.query_pairs(filter=config_key(arg)):
                 sys.stdout.write('%s=%s\n' % (key, value))
                 n += 1
             if n == 0:
-                sys.stdout.write('%s *not found*\n' % filter)
+                sys.stdout.write('%s *not found*\n' % arg)
 
 
 def run_config_set(runner):
