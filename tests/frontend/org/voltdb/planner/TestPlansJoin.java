@@ -206,19 +206,27 @@ public class TestPlansJoin extends PlannerTestCase {
         p = ((AbstractScanPlanNode) n).getPredicate();
         assertEquals(ExpressionType.COMPARE_GREATERTHAN, p.getExpressionType());
 
-        pn = compile("select A,C FROM R1 JOIN R2 USING (A, C) WHERE A > 0");
+        pn = compile("select A,C FROM R1 JOIN R2 USING (A, C)");
         n = pn.getChild(0).getChild(0);
         assertTrue(n instanceof AbstractJoinPlanNode);
         p = ((AbstractJoinPlanNode) n).getJoinPredicate();
         assertEquals(ExpressionType.CONJUNCTION_AND, p.getExpressionType());
         assertEquals(ExpressionType.COMPARE_EQUAL, p.getLeft().getExpressionType());
         assertEquals(ExpressionType.COMPARE_EQUAL, p.getRight().getExpressionType());
+
+        pn = compile("select * FROM R1 JOIN R2 ON R1.A = R2.A JOIN R3 ON R1.C = R3.C WHERE R1.A > 0");
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof AbstractJoinPlanNode);
+        p = ((AbstractJoinPlanNode) n).getJoinPredicate();
+        assertEquals(ExpressionType.COMPARE_EQUAL, p.getExpressionType());
         n = n.getChild(0);
-        assertTrue(n instanceof AbstractScanPlanNode);
-        AbstractScanPlanNode s = (AbstractScanPlanNode) n;
-        assertEquals(ExpressionType.COMPARE_GREATERTHAN, s.getPredicate().getExpressionType());
-
-
+        assertTrue(n instanceof AbstractJoinPlanNode);
+        p = ((AbstractJoinPlanNode) n).getJoinPredicate();
+        assertEquals(ExpressionType.COMPARE_EQUAL, p.getExpressionType());
+        n = n.getChild(0);
+        assertTrue(((AbstractScanPlanNode) n).getTargetTableName().equalsIgnoreCase("R1"));
+        p = ((AbstractScanPlanNode) n).getPredicate();
+        assertEquals(ExpressionType.COMPARE_GREATERTHAN, p.getExpressionType());
     }
 
     public void testTransitiveValueEquivalenceConditions() {
@@ -472,7 +480,7 @@ public class TestPlansJoin extends PlannerTestCase {
 
        // Two Distributed tables join on non-partitioned column
        failToCompile("select * FROM P1 JOIN P2 ON P1.C = P2.E",
-                     "Join or union of multiple partitioned tables has insufficient join criteria.");
+                     "Join of multiple partitioned tables has insufficient join criteria.");
    }
 
     public void testBasicOuterJoin() {
@@ -627,25 +635,28 @@ public class TestPlansJoin extends PlannerTestCase {
 
     public void testDistributedSeqScanOuterJoinCondition() {
         // Distributed Outer table
-        AbstractPlanNode pn = compile("select * FROM P1 LEFT JOIN R2 ON P1.C = R2.C");
-        AbstractPlanNode n = pn.getChild(0).getChild(0);
+        List<AbstractPlanNode> lpn;
+        AbstractPlanNode pn;
+        AbstractPlanNode n;
+        lpn = compileToFragments("select * FROM P1 LEFT JOIN R2 ON P1.C = R2.C");
+        assertEquals(2, lpn.size());
+        n = lpn.get(1).getChild(0);
         assertTrue(n instanceof NestLoopPlanNode);
-        NestLoopPlanNode nl = (NestLoopPlanNode) n;
-        assertEquals(2, nl.getChildCount());
-        assertTrue(nl.getChild(0) instanceof ReceivePlanNode);
-        assertTrue(nl.getChild(1) instanceof SeqScanPlanNode);
+        assertEquals(2, n.getChildCount());
+        assertTrue(n.getChild(0) instanceof SeqScanPlanNode);
+        assertTrue(n.getChild(1) instanceof SeqScanPlanNode);
 
         // Distributed Inner table
         pn = compile("select * FROM R2 LEFT JOIN P1 ON P1.C = R2.C");
         n = pn.getChild(0).getChild(0);
         assertTrue(n instanceof NestLoopPlanNode);
-        nl = (NestLoopPlanNode) n;
+        NestLoopPlanNode nl = (NestLoopPlanNode) n;
         assertEquals(2, nl.getChildCount());
         assertTrue(nl.getChild(0) instanceof SeqScanPlanNode);
         assertTrue(nl.getChild(1) instanceof ReceivePlanNode);
 
         // Distributed Inner and Outer table joined on the partition column
-        List<AbstractPlanNode> lpn = compileToFragments("select * FROM P1 LEFT JOIN P4 ON P1.A = P4.A");
+        lpn = compileToFragments("select * FROM P1 LEFT JOIN P4 ON P1.A = P4.A");
         assertEquals(2, lpn.size());
         n = lpn.get(1).getChild(0);
         assertTrue(n instanceof NestLoopPlanNode);
@@ -655,7 +666,7 @@ public class TestPlansJoin extends PlannerTestCase {
 
         // Distributed Inner and Outer table joined on the non-partition column
         failToCompile("select * FROM P1 LEFT JOIN P4 ON P1.A = P4.E",
-                "Join or union of multiple partitioned tables has insufficient join criteria");
+                "Join of multiple partitioned tables has insufficient join criteria");
     }
 
     public void testBasicIndexOuterJoin() {
@@ -773,17 +784,56 @@ public class TestPlansJoin extends PlannerTestCase {
 
     }
 
+    public void XXX() {
+        // Distributed Outer table
+        List<AbstractPlanNode> lpn;
+        AbstractPlanNode pn;
+        AbstractPlanNode n;
+        lpn = compileToFragments("select * FROM P1 LEFT JOIN R2 ON P1.C = R2.C");
+        assertEquals(2, lpn.size());
+        n = lpn.get(1).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        assertEquals(2, n.getChildCount());
+        assertTrue(n.getChild(0) instanceof SeqScanPlanNode);
+        assertTrue(n.getChild(1) instanceof SeqScanPlanNode);
+
+        // Distributed Inner table
+        pn = compile("select * FROM R2 LEFT JOIN P1 ON P1.C = R2.C");
+        n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        NestLoopPlanNode nl = (NestLoopPlanNode) n;
+        assertEquals(2, nl.getChildCount());
+        assertTrue(nl.getChild(0) instanceof SeqScanPlanNode);
+        assertTrue(nl.getChild(1) instanceof ReceivePlanNode);
+
+        // Distributed Inner and Outer table joined on the partition column
+        lpn = compileToFragments("select * FROM P1 LEFT JOIN P4 ON P1.A = P4.A");
+        assertEquals(2, lpn.size());
+        n = lpn.get(1).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        assertEquals(2, n.getChildCount());
+        assertTrue(n.getChild(0) instanceof SeqScanPlanNode);
+        assertTrue(n.getChild(1) instanceof SeqScanPlanNode);
+
+        // Distributed Inner and Outer table joined on the non-partition column
+        failToCompile("select * FROM P1 LEFT JOIN P4 ON P1.A = P4.E",
+                "Join of multiple partitioned tables has insufficient join criteria");
+    }
+
     public void testDistributedIndexJoinConditions() {
         // Distributed outer table, replicated inner -NLIJ/inlined IndexScan
-        AbstractPlanNode pn = compile("select * FROM P1 LEFT JOIN R3 ON P1.C = R3.A");
-        AbstractPlanNode n = pn.getChild(0).getChild(0);
+        List<AbstractPlanNode> lpn;
+        //AbstractPlanNode pn;
+        AbstractPlanNode n;
+        lpn = compileToFragments("select * FROM P1 LEFT JOIN R3 ON P1.C = R3.A");
+        assertEquals(2, lpn.size());
+        n = lpn.get(1).getChild(0);
         assertTrue(n instanceof NestLoopIndexPlanNode);
-        NestLoopIndexPlanNode nl = (NestLoopIndexPlanNode) n;
-        assertEquals(1, nl.getChildCount());
-        assertTrue(nl.getChild(0) instanceof ReceivePlanNode);
+        assertEquals(1, n.getChildCount());
+        assertTrue(n.getChild(0) instanceof SeqScanPlanNode);
 
         // Distributed inner  and replicated outer tables -NLJ/IndexScan
-        List<AbstractPlanNode> lpn = compileToFragments("select *  FROM R3 LEFT JOIN P2 ON R3.A = P2.A AND P2.A < 0 AND P2.E > 3 WHERE P2.A IS NULL");
+        lpn = compileToFragments("select *  FROM R3 LEFT JOIN P2 ON R3.A = P2.A AND P2.A < 0 AND P2.E > 3 WHERE P2.A IS NULL");
         assertEquals(2, lpn.size());
         n = lpn.get(0).getChild(0).getChild(0);
         assertTrue(n instanceof NestLoopPlanNode);
@@ -797,7 +847,9 @@ public class TestPlansJoin extends PlannerTestCase {
         n = lpn.get(1).getChild(0);
         assertTrue(n instanceof IndexScanPlanNode);
         IndexScanPlanNode in = (IndexScanPlanNode) n;
+
         assertNotNull(in.getPredicate());
+
         assertEquals(ExpressionType.CONJUNCTION_AND, in.getPredicate().getExpressionType());
         assertEquals(IndexLookupType.LT, in.getLookupType());
         assertEquals(ExpressionType.CONJUNCTION_AND, in.getPredicate().getLeft().getExpressionType());

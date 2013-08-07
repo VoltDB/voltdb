@@ -1205,44 +1205,25 @@ final class RangeVariable {
                 cond = indexEndCondition;
             }
         }
-
-
-        Expression joinConditions = null;
-        Expression whereConditions = null;
-        if (isJoinIndex) {
-            joinConditions = cond;
-        }
-        else {
-            whereConditions = cond;
-        }
-
         // then go to the nonIndexJoinCondition
         if (nonIndexJoinCondition != null) {
-            if (joinConditions != null) {
-                joinConditions = new ExpressionLogical(OpTypes.AND, joinConditions, nonIndexJoinCondition);
+            if (cond != null) {
+                cond = new ExpressionLogical(OpTypes.AND, cond, nonIndexJoinCondition);
             } else {
-                joinConditions = nonIndexJoinCondition;
+                cond = nonIndexJoinCondition;
             }
         }
-        if (joinConditions != null) {
-            joinConditions = joinConditions.eliminateDuplicates(session);
+        if (cond != null) {
+            cond = cond.eliminateDuplicates(session);
             VoltXMLElement joinCond = new VoltXMLElement("joincond");
-            joinCond.children.add(joinConditions.voltGetXML(session));
+            joinCond.children.add(cond.voltGetXML(session));
             scan.children.add(joinCond);
         }
 
         // then go to the nonIndexWhereCondition
         if (nonIndexWhereCondition != null) {
-            if (whereConditions != null) {
-                whereConditions = new ExpressionLogical(OpTypes.AND, whereConditions, nonIndexWhereCondition);
-            } else {
-                whereConditions = nonIndexWhereCondition;
-            }
-        }
-        if (whereConditions != null) {
-            whereConditions = whereConditions.eliminateDuplicates(session);
             VoltXMLElement whereCond = new VoltXMLElement("wherecond");
-            whereCond.children.add(whereConditions.voltGetXML(session));
+            whereCond.children.add(nonIndexWhereCondition.voltGetXML(session));
             scan.children.add(whereCond);
         }
 

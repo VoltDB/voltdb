@@ -424,7 +424,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 (CatalogChangeSingleProcessServer) m_config;
         config.recompile(1);
         try {
-            m_config.startUp(false);
+            m_config.restartUp();
             client = getClient();
 
             client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults();
@@ -505,7 +505,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                 client.close();
             }
             lc.shutDown();
-            lc.startUp(false);
+            lc.restartUp();
 
             client = ClientFactory.createClient();
             client.createConnection(lc.getListenerAddresses().get(0));

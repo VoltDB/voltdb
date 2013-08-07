@@ -28,6 +28,7 @@ import java.util.List;
 
 import junit.framework.TestCase;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -178,13 +179,8 @@ public class PlannerTestCase extends TestCase {
     /** A helper here where the junit test can assert success */
     protected AbstractPlanNode compile(String sql)
     {
-        int paramCount = 0;
-        for (int ii = 0; ii < sql.length(); ii++) {
-            // Yes, we ARE assuming that test queries don't contain quoted question marks.
-            if (sql.charAt(ii) == '?') {
-                paramCount++;
-            }
-        }
+        // Yes, we ARE assuming that test queries don't contain quoted question marks.
+        int paramCount = StringUtils.countMatches(sql, "?");
         return compile(sql, paramCount);
     }
 

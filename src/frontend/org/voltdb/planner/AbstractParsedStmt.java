@@ -38,7 +38,6 @@ import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
-import org.voltdb.planner.JoinNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
@@ -58,9 +57,6 @@ public abstract class AbstractParsedStmt {
     public void setTable(Table tbl) {
         m_DDLIndexedTable = tbl;
     }
-
-
-    public HashMap<AbstractExpression, Set<AbstractExpression> > valueEquivalence = new HashMap<AbstractExpression, Set<AbstractExpression>>();
 
     public ArrayList<AbstractExpression> noTableSelectionList = new ArrayList<AbstractExpression>();
 
@@ -202,9 +198,6 @@ public abstract class AbstractParsedStmt {
      * @param joinOrder
      */
     void postParse(String sql, String joinOrder) {
-        // collect value equivalence expressions
-        this.analyzeValueEquivalence();
-
         this.sql = sql;
         this.joinOrder = joinOrder;
     }
@@ -330,6 +323,9 @@ public abstract class AbstractParsedStmt {
 
         String alias = exprNode.attributes.get("alias");
         String tableName = exprNode.attributes.get("table");
+        // When the column lacks required detail,
+        // use the more detailed column that got attached to it as a columnref child.
+        // This is the convention specific to the case of a column referenced in JOIN ... USING ...
         if (tableName == null && !exprNode.children.isEmpty()) {
             VoltXMLElement childExpr = exprNode.children.get(0);
             if (childExpr.name.toLowerCase().equals("columnref")) {
@@ -520,7 +516,7 @@ public abstract class AbstractParsedStmt {
     /**
      * Build a WHERE expression for a single-table statement.
      */
-    public AbstractExpression getSimpleFilterExpression() {
+    public AbstractExpression getSingleTableFilterExpression() {
         if (joinTree == null) { // Not possible.
             assert(joinTree != null);
             return null;
@@ -661,25 +657,13 @@ public abstract class AbstractParsedStmt {
 
     /**
      * Collect value equivalence expressions across the entire SQL statement
+     * @return a map of tuple value expressions to the other expressions,
+     * TupleValueExpressions, ConstantValueExpressions, or ParameterValueExpressions,
+     * that they are constrained to equal.
      */
-    void analyzeValueEquivalence() {
-        if (joinTree == null) {
-            return;
-        }
+    HashMap<AbstractExpression, Set<AbstractExpression>> analyzeValueEquivalence() {
         // collect individual where/join expressions
-        Collection<AbstractExpression> exprList = joinTree.getAllEquivalenceFilters();
-        valueEquivalence.putAll(analyzeValueEquivalence(exprList));
-    }
-
-    /**
-     */
-    HashMap<AbstractExpression, Set<AbstractExpression> > analyzeValueEquivalence(Collection<AbstractExpression> exprList) {
-        HashMap<AbstractExpression, Set<AbstractExpression> > equivalenceSet =
-                new HashMap<AbstractExpression, Set<AbstractExpression> >();
-        for (AbstractExpression expr : exprList) {
-            addExprToEquivalenceSets(expr, equivalenceSet);
-        }
-        return equivalenceSet;
+        return joinTree.getAllEquivalenceFilters();
     }
 
     /**
@@ -770,10 +754,6 @@ public abstract class AbstractParsedStmt {
         // In case of multi-table joins certain expressions could be pushed down to the children
         // to improve join performance.
         pushDownExpressions(joinNode);
-
-        // these just shouldn't happen right?
-        assert(multiTableSelectionList.size() == 0);
-        assert(noTableSelectionList.size() == 0);
     }
 
     /**
@@ -842,22 +822,27 @@ public abstract class AbstractParsedStmt {
      * @param outerTableExprs outer table expressions
      * @param innerOuterTableExprs inner-outer tables expressions
      */
-    private void applyTransitiveEquivalence(List<AbstractExpression> outerTableExprs,
+    private static void applyTransitiveEquivalence(List<AbstractExpression> outerTableExprs,
             List<AbstractExpression> innerTableExprs,
-            List<AbstractExpression> innerOuterTableExprs) {
+            List<AbstractExpression> innerOuterTableExprs)
+    {
         List<AbstractExpression> simplifiedOuterExprs = applyTransitiveEquivalence(innerTableExprs, innerOuterTableExprs);
         List<AbstractExpression> simplifiedInnerExprs = applyTransitiveEquivalence(outerTableExprs, innerOuterTableExprs);
         outerTableExprs.addAll(simplifiedOuterExprs);
         innerTableExprs.addAll(simplifiedInnerExprs);
     }
 
-    private List<AbstractExpression> applyTransitiveEquivalence(List<AbstractExpression> singleTableExprs,
-            List<AbstractExpression> twoTableExprs) {
+    private static List<AbstractExpression>
+    applyTransitiveEquivalence(List<AbstractExpression> singleTableExprs,
+                               List<AbstractExpression> twoTableExprs)
+    {
         ArrayList<AbstractExpression> simplifiedExprs = new ArrayList<AbstractExpression>();
-        HashMap<AbstractExpression, Set<AbstractExpression> > eqMap1 = analyzeValueEquivalence(singleTableExprs);
+        HashMap<AbstractExpression, Set<AbstractExpression> > eqMap1 =
+                new HashMap<AbstractExpression, Set<AbstractExpression> >();
+        ExpressionUtil.collectPartitioningFilters(singleTableExprs, eqMap1);
 
         for (AbstractExpression expr : twoTableExprs) {
-            if (! ExpressionUtil.isSimpleEquivalenceExpression(expr)) {
+            if (! ExpressionUtil.isColumnEquivalenceFilter(expr)) {
                 continue;
             }
             AbstractExpression leftExpr = expr.getLeft();
@@ -1020,46 +1005,6 @@ public abstract class AbstractParsedStmt {
             retval += "\t(" + String.valueOf(i++) + ") " + expr.toString() + "\n";
 
         return retval;
-    }
-
-    private void addExprToEquivalenceSets(AbstractExpression expr, HashMap<AbstractExpression, Set<AbstractExpression> > equivalenceSet) {
-        if (! ExpressionUtil.isSimpleEquivalenceExpression(expr)) {
-            return;
-        }
-
-        AbstractExpression leftExpr = expr.getLeft();
-        AbstractExpression rightExpr = expr.getRight();
-
-        // Any two asserted-equal expressions need to map to the same equivalence set,
-        // which must contain them and must be the only such set that contains them.
-        Set<AbstractExpression> eqSet1 = null;
-        if (equivalenceSet.containsKey(leftExpr)) {
-            eqSet1 = equivalenceSet.get(leftExpr);
-        }
-        if (equivalenceSet.containsKey(rightExpr)) {
-            Set<AbstractExpression> eqSet2 = equivalenceSet.get(rightExpr);
-            if (eqSet1 == null) {
-                // Add new leftExpr into existing rightExpr's eqSet.
-                equivalenceSet.put(leftExpr, eqSet2);
-                eqSet2.add(leftExpr);
-            } else {
-                // Merge eqSets, re-mapping all the rightExpr's equivalents into leftExpr's eqset.
-                for (AbstractExpression eqMember : eqSet2) {
-                    eqSet1.add(eqMember);
-                    equivalenceSet.put(eqMember, eqSet1);
-                }
-            }
-        } else {
-            if (eqSet1 == null) {
-                // Both leftExpr and rightExpr are new -- add leftExpr to the new eqSet first.
-                eqSet1 = new HashSet<AbstractExpression>();
-                equivalenceSet.put(leftExpr, eqSet1);
-                eqSet1.add(leftExpr);
-            }
-            // Add new rightExpr into leftExpr's eqSet.
-            equivalenceSet.put(rightExpr, eqSet1);
-            eqSet1.add(rightExpr);
-        }
     }
 
     /** Parse a where or join clause. This behavior is common to all kinds of statements.

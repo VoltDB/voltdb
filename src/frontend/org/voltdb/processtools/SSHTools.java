@@ -52,7 +52,7 @@ public class SSHTools {
         } else {
             m_keyFile = key;
         }
-   }
+    }
 
     // Execute a remote SSH command on the specified host.
     public String cmd(String hostname, String command) {
@@ -64,6 +64,10 @@ public class SSHTools {
         return cmdSSH(m_username, m_keyFile, hostname, command);
     }
 
+    public String cmdSSH(String user, String key, String host, String command) {
+        return cmdSSH(user, null, key, host, command);
+    }
+
     public String cmdSSH(String user, String key, String host, String[] command) {
         return cmdSSH(user, key, host, stringify(command));
     }
@@ -72,12 +76,16 @@ public class SSHTools {
         return new SFTPSession(m_username, m_keyFile, hostname, logger);
     }
 
+    public SFTPSession getSftpSession(String user, String password, String key, String hostname, VoltLogger logger) {
+        return new SFTPSession(user, password, key, hostname, logger);
+    }
+
     /*
      * The code from here to the end of the file is code that integrates with an external
      * SSH library (JSCH, http://www.jcraft.com/jsch/).  If you wish to replaces this
      * library, these are the methods that need to be re-worked.
      */
-    public String cmdSSH(String user, String key, String host, String command) {
+    public String cmdSSH(String user, String password, String key, String host, String command) {
         StringBuilder result = new StringBuilder(2048);
         try{
             JSch jsch=new JSch();
@@ -92,6 +100,10 @@ public class SSHTools {
             java.util.Properties config = new java.util.Properties();
             config.put("StrictHostKeyChecking", "no");
             session.setConfig(config);
+
+            if (password != null && !password.trim().isEmpty()) {
+                session.setPassword(password);
+            }
 
             session.connect();
 
