@@ -118,12 +118,40 @@ public class TestIndexesSuite extends RegressionSuite {
             client.callProcedure("Insert", table, 7, "g", 300, 7, 18.5);
             client.callProcedure("Insert", table, 8, "h", 300, 8, 19.5);
             client.callProcedure("Insert", table, 9, "h", 300, 8, 19.5);
-            VoltTable results =
-                client.callProcedure(
-                        "@AdHoc",
-                        "select R1.ID, MIN(R1.ID) from R1 group by R1.ID order by R1.ID limit 4").getResults()[0];
+
+            String sql = String.format("select T.ID, MIN(T.ID) from %s T group by T.ID order by T.ID limit 4",
+                    table);
+            VoltTable results = client.callProcedure("@AdHoc", sql).getResults()[0];
             System.out.println(results);
         }
+    }
+
+    public void testNaNInIndexes() throws Exception {
+        // current hsql seems to fail on null handling
+        if (isHSQL()) return;
+
+        Client client = getClient();
+
+        int i = 0;
+        for (int j = 0; j < 20; j++) {
+            client.callProcedure("R1IX.insert", i++, "a", 100 * i, 0.0 / 0.0);
+            client.callProcedure("R1IX.insert", i++, "b", 100 * i, 16.5);
+            client.callProcedure("R1IX.insert", i++, "c", 100 * i, 119.5);
+            client.callProcedure("R1IX.insert", i++, "d", 100 * i, 9.5);
+            client.callProcedure("R1IX.insert", i++, "e", 100 * i, 1.0 / 0.0);
+            client.callProcedure("R1IX.insert", i++, "f", 100 * i, -14.5);
+            client.callProcedure("R1IX.insert", i++, "g", 100 * i, 0.0 / 0.0);
+            client.callProcedure("R1IX.insert", i++, "h", 100 * i, 14.5);
+            client.callProcedure("R1IX.insert", i++, "i", 100 * i, 14.5);
+            client.callProcedure("R1IX.insert", i++, "j", 100 * i, 1.0 / 0.0);
+            client.callProcedure("R1IX.insert", i++, "k", 100 * i, 14.5);
+            client.callProcedure("R1IX.insert", i++, "l", 100 * i, 0.0 / 0.0);
+            client.callProcedure("R1IX.insert", i++, "m", 100 * i, 11.5);
+            client.callProcedure("R1IX.insert", i++, "n", 100 * i, 10.5);
+        }
+
+        VoltTable results = client.callProcedure("@AdHoc", "delete from R1IX;").getResults()[0];
+        System.out.println(results);
     }
 
     public void testOrderedUniqueOneColumnIntIndex()
@@ -792,6 +820,12 @@ public class TestIndexesSuite extends RegressionSuite {
         callHelper(client, "InsertR1IX", 985, "XtQOuGWNzVKtrpnMj", 32677, 6.78465381526806687873e-01);
         callHelper(client, "InsertR1IX", 988, "XtQOuGWNzVKtrpnMj", 32677, 3.98623510723492113783e-01);
         callHelper(client, "InsertR1IX", 989, "XtQOuGWNzVKtrpnMj", 32677, 3.98623510723492113783e-01);
+
+        // add NaN for fun
+        if (!isHSQL()) {
+            callHelper(client, "InsertR1IX", 974, "XtQOuGWNzVKtrpnMj", 32677, 0.0 / 0.0);
+        }
+
         callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 44 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID<45)");
         callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 44 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID<43)");
         callHelper(client, "@AdHoc", "UPDATE R1IX SET NUM = 66 WHERE (R1IX.ID<R1IX.NUM) AND (R1IX.ID<86)");
@@ -983,7 +1017,18 @@ public class TestIndexesSuite extends RegressionSuite {
         VoltTable result = results[0];
         long modified = result.fetchRow(0).getLong(0);
         System.out.printf("Update statement modified %d rows.\n", modified);
-        assertEquals(16, modified);
+
+        if (isHSQL()) {
+            assertEquals(16, modified);
+        }
+        else {
+            // extra NaN row got added if not HSQL
+            // for now, this query includes the NaN value, but it shouldn't forever
+            assertEquals(17, modified);
+        }
+
+        // check we can clear out with a NaN involved
+        results = client.callProcedure("@AdHoc", "delete from R1IX").getResults();
     }
 
     public void testKeyCastingOverflow() throws NoConnectionsException, IOException, ProcCallException {
