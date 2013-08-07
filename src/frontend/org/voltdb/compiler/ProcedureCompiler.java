@@ -17,12 +17,9 @@
 
 package org.voltdb.compiler;
 
-import groovy.lang.Binding;
 import groovy.lang.Closure;
-import groovy.lang.Script;
 
 import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.HashMap;
@@ -55,6 +52,7 @@ import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.groovy.GroovyCodeBlockConstants;
+import org.voltdb.groovy.GroovyScriptProcedureDelegate;
 import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.CatalogUtil;
@@ -214,72 +212,13 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
 
                 @Override
                 public Map<String,Object> visitGroovy(Class<?> p) throws VoltCompilerException {
-                    // get the short name of the class (no package)
-                    String shortName = deriveShortProcedureName(p.getName());
-
-                    // all groovy scripts have an implicit run method defined
-                    Method run;
+                    GroovyScriptProcedureDelegate scripDelegate;
                     try {
-                        run = p.getMethod("run", (Class<?>[]) null);
-                    } catch (NoSuchMethodException ex) {
-                        throw compiler.new VoltCompilerException(String.format(
-                                "Procedure \"%s\" code block is not a groovy script",
-                                shortName
-                                ));
+                        scripDelegate = new GroovyScriptProcedureDelegate(p);
+                    } catch (GroovyScriptProcedureDelegate.SetupException tupex) {
+                        throw compiler.new VoltCompilerException(tupex.getMessage());
                     }
-                    // instantiate the script
-                    Script script;
-                    try {
-                        script = (Script)p.newInstance();
-                    } catch (InstantiationException e) {
-                        throw new RuntimeException(
-                                "Error instantiating the code block script for \"" + shortName + "\"", e
-                                );
-                    } catch (IllegalAccessException e) {
-                        throw new RuntimeException(
-                                "Error instantiating the code block script for \"" + shortName + "\"", e
-                                );
-                    } catch (ClassCastException ex) {
-                        throw compiler.new VoltCompilerException(String.format(
-                                "Procedure \"%s\" code block is not a groovy script",
-                                shortName
-                                ));
-                    }
-
-                    // inject the required volt binding
-                    Binding binding = new Binding();
-                    binding.setVariable(GVY_PROCEDURE_INSTANCE_VAR,(VoltProcedure)null);
-                    script.setBinding(binding);
-
-                    try {
-                        run.invoke(script, (Object[]) null);
-                    } catch (IllegalAccessException e) {
-                        throw new RuntimeException(
-                                "Error running the code block script for \"" + shortName + "\"", e
-                                );
-                    } catch (InvocationTargetException e) {
-                        throw new RuntimeException(
-                                "Error running the code block script for \"" + shortName + "\"", e
-                                );
-                    }
-                    Object transactOn = binding.getVariable(GVY_PROCEDURE_ENTRY_CLOSURE);
-                    if (transactOn == null || ! (transactOn instanceof Closure)) {
-                        throw compiler.new VoltCompilerException(String.format(
-                                "Procedure \"%s\" code block does not contain the required \"%s\" closure",
-                                shortName, GVY_PROCEDURE_ENTRY_CLOSURE
-                                ));
-                    }
-                    @SuppressWarnings("unchecked")
-                    Map<String,Object> bindings  = binding.getVariables();
-                    ImmutableMap.Builder<String, Object> builder = ImmutableMap.builder();
-
-                    for ( Map.Entry<String, Object> entry: bindings.entrySet()) {
-                        if (entry.getValue() != null) {
-                            builder.put(entry.getKey(), entry.getValue());
-                        }
-                    }
-
-                    return builder.build();
+                    return scripDelegate.getIntrospectedFields();
                 }
             };
     };

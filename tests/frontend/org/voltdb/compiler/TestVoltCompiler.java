@@ -2185,6 +2185,203 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(isFeedbackPresent(expectedError, fbs));
     }
 
+    public void testInvalidGtroovyProcedureDDL() throws Exception {
+        ArrayList<Feedback> fbs;
+        String expectedError;
+
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS ###\n" +
+                "    stmt = new SQLStmt('SELECT PKEY, DESCR FROM PKEY = ?')\n" +
+                "    transactOn = { int key -> \n" +
+                "        voltQueueSQL(stmt,key)\n" +
+                "        voltExecuteSQL(true)\n" +
+                "    }\n" +
+                "### LANGUAGE GROOVY;\n" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
+                );
+        expectedError = "user lacks privilege or object not found: PKEY";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS ###\n" +
+                "    stmt = new SQLStmt('SELECT PKEY, DESCR FROM PKEY_INTEGER WHERE PKEY = ?')\n" +
+                "    transactOn = { int key -> \n" +
+                "        voltQueueSQL(stmt,key)\n" +
+                "        voltExecuteSQL(true)\n" +
+                "    \n" +
+                "### LANGUAGE GROOVY;\n" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
+                );
+        expectedError = "Procedure \"Foo\" code block has syntax errors";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS ###\n" +
+                "    stmt = new SQLStmt('SELECT PKEY, DESCR FROM PKEY_INTEGER WHERE PKEY = ?')\n" +
+                "    runMeInstead = { int key -> \n" +
+                "        voltQueueSQL(stmt,key)\n" +
+                "        voltExecuteSQL(true)\n" +
+                "    }\n" +
+                "### LANGUAGE GROOVY;\n" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
+                );
+        expectedError = "Procedure \"Foo\" code block does not contain the required \"transactOn\" closure";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS ###\n" +
+                "package voltkv.procedures;\n" +
+                "\n" +
+                "import org.voltdb.*;\n" +
+                "\n" +
+                "@ProcInfo(partitionInfo=\"store.key:0\", singlePartition=true)\n" +
+                "public class Put extends VoltProcedure {\n" +
+                "    // Checks if key exists\n" +
+                "    public final SQLStmt checkStmt = new SQLStmt(\"SELECT key FROM store WHERE key = ?;\");\n" +
+                "    // Updates a key/value pair\n" +
+                "    public final SQLStmt updateStmt = new SQLStmt(\"UPDATE store SET value = ? WHERE key = ?;\");\n" +
+                "    // Inserts a key/value pair\n" +
+                "    public final SQLStmt insertStmt = new SQLStmt(\"INSERT INTO store (key, value) VALUES (?, ?);\");\n" +
+                "\n" +
+                "    public VoltTable[] run(String key, byte[] value) {\n" +
+                "        // Check whether the pair exists\n" +
+                "        voltQueueSQL(checkStmt, key);\n" +
+                "        // Insert new or update existing key depending on result\n" +
+                "        if (voltExecuteSQL()[0].getRowCount() == 0)\n" +
+                "            voltQueueSQL(insertStmt, key, value);\n" +
+                "        else\n" +
+                "            voltQueueSQL(updateStmt, value, key);\n" +
+                "        return voltExecuteSQL(true);\n" +
+                "    }\n" +
+                "}\n" +
+                "### LANGUAGE GROOVY;\n"
+                );
+        expectedError = "Procedure \"voltkv.procedures.Put\" is not a groovy script";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS ###\n" +
+                "    stmt = new SQLStmt('SELECT PKEY, DESCR FROM PKEY_INTEGER WHERE PKEY = ?')\n" +
+                "    transactOn = 'Is it me that you wanted instead?'\n" +
+                "### LANGUAGE GROOVY;\n" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
+                );
+        expectedError = "Procedure \"Foo\" code block does not contain the required \"transactOn\" closure";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS ###\n" +
+                "    // ###\n" +
+                "    stmt = new SQLStmt('SELECT PKEY, DESCR FROM PKEY_INTEGER WHERE PKEY = ?')\n" +
+                "    transactOn = { int key -> \n" +
+                "        voltQueueSQL(stmt,key)\n" +
+                "        voltExecuteSQL(true)\n" +
+                "    }\n" +
+                "### LANGUAGE GROOVY;\n" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
+                );
+        expectedError = "Schema file ended mid-statement (no semicolon found)";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS ##\n" +
+                "    stmt = new SQLStmt('SELECT PKEY, DESCR FROM PKEY_INTEGER WHERE PKEY = ?')\n" +
+                "    transactOn = { int key -> \n" +
+                "        voltQueueSQL(stmt,key)\n" +
+                "        voltExecuteSQL(true)\n" +
+                "    }\n" +
+                "### LANGUAGE GROOVY;\n" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
+                );
+        expectedError = "Schema file ended mid-statement (no semicolon found)";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS ###\n" +
+                "    stmt = new SQLStmt('SELECT PKEY, DESCR FROM PKEY_INTEGER WHERE PKEY = ?')\n" +
+                "    transactOn = { int key -> \n" +
+                "        voltQueueSQL(stmt,key)\n" +
+                "        voltExecuteSQL(true)\n" +
+                "    }\n" +
+                "### LANGUAGE KROOVY;\n" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
+                );
+        expectedError = "### LANGUAGE KROOVY\", expected syntax: \"CREATE PROCEDURE [ALLOW";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+    }
+
+    public void testValidGroovyProcedureDDL() throws Exception {
+
+        Database db = goodDDLAgainstSimpleSchema(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS ###\n" +
+                "    stmt = new SQLStmt('SELECT PKEY, DESCR FROM PKEY_INTEGER WHERE PKEY = ?')\n" +
+                "    transactOn = { int key -> \n" +
+                "        voltQueueSQL(stmt,key)\n" +
+                "        voltExecuteSQL(true)\n" +
+                "    }\n" +
+                "### LANGUAGE GROOVY;\n" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
+                );
+        Procedure proc = db.getProcedures().get("Foo");
+        assertNotNull(proc);
+
+        db = goodDDLAgainstSimpleSchema(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS ###\n" +
+                "    // #\n" +
+                "    // ##\n" +
+                "    stmt = new SQLStmt('SELECT PKEY, DESCR FROM PKEY_INTEGER WHERE PKEY = ?')\n" +
+                "    transactOn = { int key -> \n" +
+                "        def str = '# ## # ##'\n" +
+                "        voltQueueSQL(stmt,key)\n" +
+                "        voltExecuteSQL(true)\n" +
+                "    }\n" +
+                "### LANGUAGE GROOVY;\n" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
+                );
+        proc = db.getProcedures().get("Foo");
+        assertNotNull(proc);
+
+        db = goodDDLAgainstSimpleSchema(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE   \n" +
+                "PROCEDURE     Foo    \n" +
+                "  AS   \n" +
+                "###\n" +
+                "    stmt = new SQLStmt('SELECT PKEY, DESCR FROM PKEY_INTEGER WHERE PKEY = ?')\n" +
+                "    transactOn = { int key -> \n" +
+                "        voltQueueSQL(stmt,key)\n" +
+                "        voltExecuteSQL(true)\n" +
+                "    }\n" +
+                "###\n" +
+                "   LANGUAGE   \n" +
+                "GROOVY;\n" +
+                "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
+                );
+        proc = db.getProcedures().get("Foo");
+        assertNotNull(proc);
+    }
+
     private ArrayList<Feedback> checkInvalidProcedureDDL(String ddl) {
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
         final String schemaPath = schemaFile.getPath();

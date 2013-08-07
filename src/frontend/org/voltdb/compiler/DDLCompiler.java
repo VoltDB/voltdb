@@ -18,6 +18,7 @@
 package org.voltdb.compiler;
 
 import groovy.lang.GroovyClassLoader;
+import groovy_voltpatches.util.DelegatingScript;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -411,6 +412,7 @@ public class DDLCompiler {
             imports.addStarImports("org.voltdb");
             conf.addCompilationCustomizers(imports);
             conf.getOptimizationOptions().put("indy", true);
+            conf.setScriptBaseClass(DelegatingScript.class.getName());
 
 
             File groovyOut = new File("groovyout");
@@ -816,7 +818,8 @@ public class DDLCompiler {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Invalid CREATE PROCEDURE statement: \"%s\", " +
                     "expected syntax: \"CREATE PROCEDURE [ALLOW <role> [, <role> ...] FROM CLASS <class-name>\" " +
-                    "or: \"CREATE PROCEDURE <name> [ALLOW <role> [, <role> ...] AS <single-select-or-dml-statement>\"",
+                    "or: \"CREATE PROCEDURE <name> [ALLOW <role> [, <role> ...] AS <single-select-or-dml-statement>\" " +
+                    "or: \"CREATE PROCEDURE <proc-name> [ALLOW <role> ...] AS ### <code-block> ### LANGUAGE GROOVY\"",
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
 

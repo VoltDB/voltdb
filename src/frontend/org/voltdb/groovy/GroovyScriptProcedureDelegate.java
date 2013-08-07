@@ -19,7 +19,8 @@ package org.voltdb.groovy;
 
 import groovy.lang.Binding;
 import groovy.lang.Closure;
-import groovy.lang.Script;
+import groovy.lang.MissingPropertyException;
+import groovy_voltpatches.util.DelegatingScript;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -36,6 +37,7 @@ public class GroovyScriptProcedureDelegate extends VoltProcedure implements Groo
     protected final String m_procedureName;
     protected final Class<?>[] m_parameterTypes;
     protected final Map<String, SQLStmt> m_statementMap;
+    protected final DelegatingScript m_script;
 
     public GroovyScriptProcedureDelegate(Class<?> scriptClass)  {
         String shortName = scriptClass.getSimpleName();
@@ -49,9 +51,8 @@ public class GroovyScriptProcedureDelegate extends VoltProcedure implements Groo
                     "Procedure \"" + scriptClass.getName() + "\" is not a groovy script", e
                     );
         }
-        Script script;
         try {
-            script = (Script)scriptClass.newInstance();
+            m_script = (DelegatingScript)scriptClass.newInstance();
         } catch (InstantiationException e) {
             throw new SetupException(
                     "Error instantiating the code block script for \"" + shortName + "\"", e
@@ -68,10 +69,11 @@ public class GroovyScriptProcedureDelegate extends VoltProcedure implements Groo
         // inject the required volt binding
         Binding binding = new Binding();
         binding.setVariable(GVY_PROCEDURE_INSTANCE_VAR, this);
-        script.setBinding(binding);
+        m_script.setBinding(binding);
+        m_script.setDelegate(this);
 
         try {
-            run.invoke(script, (Object[]) null);
+            run.invoke(m_script, (Object[]) null);
         } catch (IllegalAccessException e) {
             throw new SetupException(
                     "Error running the code block script for \"" + shortName+ "\"", e
@@ -82,7 +84,15 @@ public class GroovyScriptProcedureDelegate extends VoltProcedure implements Groo
                     e.getTargetException() == null ? e : e.getTargetException()
                     );
         }
-        Object transactOn = binding.getVariable(GVY_PROCEDURE_ENTRY_CLOSURE);
+        Object transactOn = null;
+        try {
+            transactOn = binding.getVariable(GVY_PROCEDURE_ENTRY_CLOSURE);
+        } catch ( MissingPropertyException mpex) {
+            throw new SetupException(String.format(
+                    "Procedure \"%s\" code block does not contain the required \"%s\" closure",
+                    shortName, GVY_PROCEDURE_ENTRY_CLOSURE
+                    ));
+        }
         if (transactOn == null || ! (transactOn instanceof Closure)) {
             throw new SetupException(String.format(
                     "Procedure \"%s\" code block does not contain the required \"%s\" closure",
@@ -91,7 +101,7 @@ public class GroovyScriptProcedureDelegate extends VoltProcedure implements Groo
         }
 
         @SuppressWarnings("unchecked")
-        Map<String,Object> bindings = (Map<String,Object>)binding.getVariables();
+        Map<String,Object> bindings = binding.getVariables();
         ImmutableMap.Builder<String, SQLStmt> builder = ImmutableMap.builder();
 
         for (Map.Entry<String, Object>entry: bindings.entrySet()) {
@@ -120,6 +130,13 @@ public class GroovyScriptProcedureDelegate extends VoltProcedure implements Groo
 
     public Map<String,SQLStmt> getStatementMap() {
         return m_statementMap;
+    }
+
+    public Map<String,Object> getIntrospectedFields() {
+        ImmutableMap.Builder<String, Object> bld = ImmutableMap.builder();
+        bld.putAll(m_statementMap);
+        bld.put(GVY_PROCEDURE_ENTRY_CLOSURE, m_closure);
+        return bld.build();
     }
 
     public static class SetupException extends RuntimeException {
