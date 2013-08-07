@@ -26,9 +26,9 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.compiler.JvmProbe;
 import org.voltdb.compiler.Language;
 import org.voltdb.groovy.GroovyScriptProcedureDelegate;
-import org.voltdb.groovy.JvmProbe;
 import org.voltdb.utils.LogKeys;
 
 import com.google.common.collect.ImmutableMap;

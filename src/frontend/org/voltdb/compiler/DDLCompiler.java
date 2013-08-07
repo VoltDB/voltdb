@@ -55,7 +55,6 @@ import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.groovy.GroovyCodeBlockCompiler;
-import org.voltdb.groovy.JvmProbe;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.types.ConstraintType;
@@ -868,7 +867,7 @@ public class DDLCompiler {
         else if (nchar[0] == '\n') {
             // normalize newlines to spaces
             m_currLineNo += 1;
-            retval.statement += "\n";
+            retval.statement += " ";
         }
         else if (nchar[0] == '\r') {
             // ignore carriage returns

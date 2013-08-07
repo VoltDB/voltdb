@@ -28,6 +28,7 @@ import java.util.Map;
 
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
+import org.voltdb.compiler.JvmProbe;
 
 import com.google.common.collect.ImmutableMap;
 

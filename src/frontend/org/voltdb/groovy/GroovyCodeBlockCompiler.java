@@ -34,12 +34,14 @@ public class GroovyCodeBlockCompiler  {
     private GroovyCodeBlockCompiler() {
 
         CompilerConfiguration conf = new CompilerConfiguration(CompilerConfiguration.DEFAULT);
+
         ImportCustomizer imports = new ImportCustomizer();
         imports.addStarImports("org.voltdb");
+        imports.addStaticStars("org.voltdb.VoltProcedure","org.voltdb.VoltType");
+
         conf.addCompilationCustomizers(imports);
         conf.getOptimizationOptions().put("indy", true);
         conf.setScriptBaseClass(DelegatingScript.class.getName());
-
 
         File groovyOut = new File("groovyout");
         if (!groovyOut.exists()) groovyOut.mkdir();

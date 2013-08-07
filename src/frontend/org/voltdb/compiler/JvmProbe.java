@@ -15,9 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.groovy;
+package org.voltdb.compiler;
 
-import org.voltdb.compiler.Language;
 
 public class JvmProbe {
     public final static float version = Float.parseFloat(System.getProperty("java.specification.version"));
