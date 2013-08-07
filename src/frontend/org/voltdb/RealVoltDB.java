@@ -490,9 +490,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     m_iv2InitiatorStartingTxnIds.put(
                             MpInitiator.MP_INIT_PID,
                             TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId());
-                    // each node has an MPInitiator (and exactly 1 node has the master MPI).
-                    long mpiBuddyHSId = m_iv2Initiators.get(0).getInitiatorHSId();
-                    m_MPI = new MpInitiator(m_messenger, mpiBuddyHSId, getStatsAgent());
+                    // Pass the local HSIds to the MPI so it can farm out buddy sites
+                    // to the RO MP site pool
+                    List<Long> localHSIds = new ArrayList<Long>();
+                    for (Initiator ii : m_iv2Initiators) {
+                        localHSIds.add(ii.getInitiatorHSId());
+                    }
+                    m_MPI = new MpInitiator(m_messenger, localHSIds, getStatsAgent());
                     m_iv2Initiators.add(m_MPI);
                 }
 

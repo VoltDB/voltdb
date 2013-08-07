@@ -37,7 +37,7 @@ import org.voltdb.StarvationTracker;
 class MpRoSitePool
 {
     // IZZY: temporary static vars
-    static int MAX_POOL_SIZE = 1000;
+    static int MAX_POOL_SIZE = 100;
     static int INITIAL_POOL_SIZE = 0;
 
     class MpRoSiteContext

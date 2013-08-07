@@ -48,14 +48,14 @@ public class MpInitiator extends BaseInitiator implements Promotable
 {
     public static final int MP_INIT_PID = TxnEgo.PARTITIONID_MAX_VALUE;
 
-    public MpInitiator(HostMessenger messenger, long buddyHSId, StatsAgent agent)
+    public MpInitiator(HostMessenger messenger, List<Long> buddyHSIds, StatsAgent agent)
     {
         super(VoltZK.iv2mpi,
                 messenger,
                 MP_INIT_PID,
                 new MpScheduler(
                     MP_INIT_PID,
-                    buddyHSId,
+                    buddyHSIds,
                     new SiteTaskerQueue()),
                 "MP",
                 agent,
