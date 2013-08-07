@@ -43,7 +43,9 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -152,6 +154,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * Counter of the number of client connections. Used to enforce a limit on the maximum number of connections
      */
     private final AtomicInteger m_numConnections = new AtomicInteger(0);
+
+    private final AtomicLong m_lastprint = new AtomicLong();
+    private final AtomicBoolean m_hasPrinted = new AtomicBoolean(false);
+    private final AtomicLong m_authCount = new AtomicLong();
+    private final AtomicLong m_authLatency = new AtomicLong();
 
     /**
      * ZooKeeper is used for @Promote to trigger a truncation snapshot.
@@ -421,6 +428,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                      */
                     m_numConnections.incrementAndGet();
 
+                    final long startAuth = System.nanoTime();
                     final Runnable authRunnable = new Runnable() {
                         @Override
                         public void run() {
@@ -458,6 +466,26 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                             m_network.registerChannel(socket, handler, SelectionKey.OP_READ);
                                         }
                                         success = true;
+                                    }
+
+                                    long authDuration = System.nanoTime() - startAuth;
+                                    long avg = m_authLatency.addAndGet(authDuration) / m_authCount.incrementAndGet();
+
+                                    if (System.currentTimeMillis() - m_lastprint.get() > 3000) {
+                                        if (m_hasPrinted.compareAndSet(false, true)) {
+                                            m_lastprint.set(System.currentTimeMillis());
+
+                                            hostLog.info("Average authentication duration is " +
+                                                         (avg / 1000.0) + " microseconds across " +
+                                                         m_authCount.get() + " attempts in the " +
+                                                         "past 3 seconds");
+
+                                            // reset
+                                            m_authCount.set(0);
+                                            m_authLatency.set(0);
+
+                                            m_hasPrinted.set(false);
+                                        }
                                     }
                                 } catch (IOException e) {
                                     try {
