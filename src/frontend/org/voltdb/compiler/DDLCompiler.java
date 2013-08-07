@@ -492,8 +492,11 @@ public class DDLCompiler {
             }
             if (!processed) {
                 try {
-                    // check for CREATE TABLE or CREATE VIEW
-                    Matcher tableMatcher = createTablePattern.matcher(stmt.statement);
+                    // Check for CREATE TABLE or CREATE VIEW.
+                    // We sometimes choke at parsing statements with newlines, so
+                    // check against a newline free version of the stmt.
+                    String oneLinerStmt = stmt.statement.replace("\n", " ");
+                    Matcher tableMatcher = createTablePattern.matcher(oneLinerStmt);
                     if (tableMatcher.find()) {
                         String tableName = tableMatcher.group(2);
                         m_tableNameToDDL.put(tableName.toUpperCase(), stmt.statement);
