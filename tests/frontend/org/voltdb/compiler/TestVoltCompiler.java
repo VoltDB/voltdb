@@ -2189,6 +2189,8 @@ public class TestVoltCompiler extends TestCase {
         ArrayList<Feedback> fbs;
         String expectedError;
 
+        if (Float.parseFloat(System.getProperty("java.specification.version")) < 1.7) return;
+
         fbs = checkInvalidProcedureDDL(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
@@ -2327,6 +2329,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testValidGroovyProcedureDDL() throws Exception {
+        if (Float.parseFloat(System.getProperty("java.specification.version")) < 1.7) return;
 
         Database db = goodDDLAgainstSimpleSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
