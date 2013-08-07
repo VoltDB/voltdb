@@ -27,6 +27,7 @@ import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ProcedureRunnerFactory;
+import org.voltdb.StarvationTracker;
 
 /**
  * Provide a pool of MP Read-only sites to do MP RO work.
@@ -60,6 +61,8 @@ class MpRoSitePool
             m_backend = backend;
             m_catalogContext = context;
             m_queue = new SiteTaskerQueue();
+            // IZZY: Just need something non-null for now
+            m_queue.setStarvationTracker(new StarvationTracker(siteId));
             m_site = new MpRoSite(m_queue, siteId, backend, m_catalogContext, partitionId, initiatorMailbox);
             m_prf = new ProcedureRunnerFactory();
             m_prf.configure(m_site, m_site.m_sysprocContext);

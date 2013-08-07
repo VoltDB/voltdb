@@ -153,7 +153,12 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     private void taskQueueOffer(TransactionTask task)
     {
         Iv2Trace.logSiteTaskerQueueOffer(task);
-        m_taskQueue.offer(task);
+        if (task.getTransactionState().isReadOnly()) {
+            m_sitePool.doWork(task.getTxnId(), task);
+        }
+        else {
+            m_taskQueue.offer(task);
+        }
     }
 
     private boolean taskQueueOffer()
@@ -188,6 +193,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         int offered = 0;
         if (m_currentReads.containsKey(txnId)) {
             m_currentReads.remove(txnId);
+            m_sitePool.completeWork(txnId);
         }
         else {
             assert(m_currentWrites.containsKey(txnId));
