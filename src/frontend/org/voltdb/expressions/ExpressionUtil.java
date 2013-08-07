@@ -21,8 +21,10 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Stack;
 
 import org.voltdb.types.ExpressionType;
@@ -114,48 +116,6 @@ public abstract class ExpressionUtil {
         return leaf;
     }
 
-    public static boolean isSimpleEquivalenceExpression(AbstractExpression expr) {
-        // Ignore expressions that are not of COMPARE_EQUAL type
-        if (expr.getExpressionType() != ExpressionType.COMPARE_EQUAL) {
-            return false;
-        }
-        AbstractExpression leftExpr = expr.getLeft();
-        AbstractExpression rightExpr = expr.getRight();
-        // Can't use an expression based on a column value that is not just a simple column value.
-        if ( ( ! (leftExpr instanceof TupleValueExpression)) && leftExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
-            return false;
-        }
-        if ( ( ! (rightExpr instanceof TupleValueExpression)) && rightExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
-            return false;
-        }
-        return true;
-    }
-
-    static class FilterCondition
-    {
-        boolean qualifies(AbstractExpression anything) { return true; }
-        static FilterCondition allPass = new FilterCondition();
-
-        static FilterCondition filterSimpleEqualities = new FilterCondition()
-        {
-            boolean qualifies(AbstractExpression inExpr)
-            {
-                return isSimpleEquivalenceExpression(inExpr);
-            }
-        };
-
-        static FilterCondition filterTveToTveEqualities = new FilterCondition()
-        {
-            boolean qualifies(AbstractExpression inExpr)
-            {
-                return isSimpleEquivalenceExpression(inExpr) &&
-                        (inExpr.getLeft() instanceof TupleValueExpression) &&
-                        (inExpr.getRight() instanceof TupleValueExpression);
-            }
-        };
-
-    };
-
     /**
      * Convert one or more predicates, potentially in an arbitrarily nested conjunction tree
      * into a flattened collection. Similar to uncombine but for arbitrary tree shapes and with no
@@ -168,41 +128,6 @@ public abstract class ExpressionUtil {
      */
     public static Collection<AbstractExpression> uncombineAny(AbstractExpression expr)
     {
-        return collectSomeFilters(expr, FilterCondition.allPass);
-    }
-
-    /**
-     * Convert one or more predicates, potentially in an arbitrarily nested conjunction tree
-     * into a flattened collection and filter out any that do not qualify as potential
-     * partioning join filters, which is to say are not equality comparisons between
-     * tuple value expressions.
-     * Adds filtering to uncombineAny.
-     * @param expr
-     * @return a Collection containing the qualifying expr or if expr is a conjunction, its top-level
-     * non-conjunction child expressions that qualify.
-     */
-    public static Collection<AbstractExpression> collectPartitioningJoinFilters(AbstractExpression expr)
-    {
-        return collectSomeFilters(expr, FilterCondition.filterTveToTveEqualities);
-    }
-
-    /**
-     * Convert one or more predicates, potentially in an arbitrarily nested conjunction tree
-     * into a flattened collection and filter out any that do not qualify as potential
-     * partioning where filters, which is to say are not equality comparisons.
-     * Adds filtering to uncombineAny.
-     * @param expr
-     * @return a Collection containing the qualifying expr or if expr is a conjunction, its top-level
-     * non-conjunction child expressions that qualify.
-     */
-    public static Collection<AbstractExpression> collectPartitioningWhereFilters(AbstractExpression expr)
-    {
-        return collectSomeFilters(expr, FilterCondition.filterSimpleEqualities);
-    }
-
-    private static Collection<AbstractExpression> collectSomeFilters(AbstractExpression expr,
-                                                                     FilterCondition condition)
-    {
         ArrayDeque<AbstractExpression> out = new ArrayDeque<AbstractExpression>();
         if (expr != null) {
             ArrayDeque<AbstractExpression> in = new ArrayDeque<AbstractExpression>();
@@ -214,14 +139,100 @@ public abstract class ExpressionUtil {
                 if (inExpr.getExpressionType() == ExpressionType.CONJUNCTION_AND) {
                     in.add(inExpr.getLeft());
                     in.add(inExpr.getRight());
-                    continue;
                 }
-                if (condition.qualifies(inExpr)) {
+                else {
                     out.add(inExpr);
                 }
             }
         }
         return out;
+    }
+
+    public static boolean isColumnEquivalenceFilter(AbstractExpression expr) {
+        // Ignore expressions that are not of COMPARE_EQUAL type
+        if (expr.getExpressionType() != ExpressionType.COMPARE_EQUAL) {
+            return false;
+        }
+        AbstractExpression leftExpr = expr.getLeft();
+        AbstractExpression rightExpr = expr.getRight();
+        // Can't use an expression that is based on a column value but is not just a simple column value.
+        if ( ( ! (leftExpr instanceof TupleValueExpression)) &&
+                leftExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
+            return false;
+        }
+        if ( ( ! (rightExpr instanceof TupleValueExpression)) &&
+                rightExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Find any listed expressions that qualify as potential partitioning where filters,
+     * which is to say are equality comparisons with a TupleValueExpression on at least one side,
+     * and a TupleValueExpression, ConstantValueExpression, or ParameterValueExpression on the other.
+     * Add them to a map keyed by the TupleValueExpression(s) involved.
+     * @param filterList a list of candidate expressions
+     * @param the running result
+     * @return a Collection containing the qualifying filter expressions.
+     */
+    public static void
+    collectPartitioningFilters(Collection<AbstractExpression> filterList,
+                               HashMap<AbstractExpression, Set<AbstractExpression> > equivalenceSet)
+    {
+        ArrayList<AbstractExpression> output = new ArrayList<AbstractExpression>();
+        for (AbstractExpression expr : filterList) {
+            if ( ! isColumnEquivalenceFilter(expr)) {
+                continue;
+            }
+            AbstractExpression leftExpr = expr.getLeft();
+            AbstractExpression rightExpr = expr.getRight();
+
+            // Any two asserted-equal expressions need to map to the same equivalence set,
+            // which must contain them and must be the only such set that contains them.
+            Set<AbstractExpression> eqSet1 = null;
+            if (equivalenceSet.containsKey(leftExpr)) {
+                eqSet1 = equivalenceSet.get(leftExpr);
+            }
+            if (equivalenceSet.containsKey(rightExpr)) {
+                Set<AbstractExpression> eqSet2 = equivalenceSet.get(rightExpr);
+                if (eqSet1 == null) {
+                    // Add new leftExpr into existing rightExpr's eqSet.
+                    equivalenceSet.put(leftExpr, eqSet2);
+                    eqSet2.add(leftExpr);
+                } else {
+                    // Merge eqSets, re-mapping all the rightExpr's equivalents into leftExpr's eqset.
+                    for (AbstractExpression eqMember : eqSet2) {
+                        eqSet1.add(eqMember);
+                        equivalenceSet.put(eqMember, eqSet1);
+                    }
+                }
+            } else {
+                if (eqSet1 == null) {
+                    // Both leftExpr and rightExpr are new -- add leftExpr to the new eqSet first.
+                    eqSet1 = new HashSet<AbstractExpression>();
+                    equivalenceSet.put(leftExpr, eqSet1);
+                    eqSet1.add(leftExpr);
+                }
+                // Add new rightExpr into leftExpr's eqSet.
+                equivalenceSet.put(rightExpr, eqSet1);
+                eqSet1.add(rightExpr);
+            }
+        }
+    }
+
+    /**
+     * "Uncombine" a potentially AND-ed set of one or more filters, typically from a single table,
+     * and add any equivalence expressions to the statement's collection.
+     * @param compoundFilter a clause that may be or contain (ANDed) an equivalence expression
+     * @param the running result collecting the statement's equivalence filters
+     */
+    public static void
+    collectPartitioningFilters(AbstractExpression compoundFilter,
+                               HashMap<AbstractExpression, Set<AbstractExpression> > equivalenceSet)
+    {
+        Collection<AbstractExpression> filterList = uncombineAny(compoundFilter);
+        collectPartitioningFilters(filterList, equivalenceSet);
     }
 
     /**

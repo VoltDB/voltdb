@@ -54,10 +54,10 @@ public interface VoltServerConfig {
     public void startUp();
 
     /**
-     * Start the instance of VoltDB and optionally clear the
+     * Restart the instance of VoltDB without clearing the
      * data directories first
      */
-    public void startUp(boolean clearDataDirectories);
+    public void restartUp();
 
     /**
      * Shutdown the instance of VoltDB.

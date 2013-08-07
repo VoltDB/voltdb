@@ -885,6 +885,47 @@ public class TestIndexCountSuite extends RegressionSuite {
 
     }
 
+    void testENG4959Float() throws Exception {
+        Client client = getClient();
+
+        client.callProcedure("TU5.insert", 1, 0.1);
+        client.callProcedure("TU5.insert", 1, 0.2);
+        client.callProcedure("TU5.insert", 1, 0.3);
+        client.callProcedure("TU5.insert", 1, 0.4);
+        client.callProcedure("TU5.insert", 1, 0.5);
+        client.callProcedure("TU5.insert", 2, 0.1);
+        client.callProcedure("TU5.insert", 2, 0.2);
+        client.callProcedure("TU5.insert", 2, 0.3);
+        client.callProcedure("TU5.insert", 2, 0.4);
+        client.callProcedure("TU5.insert", 2, 0.5);
+
+        VoltTable table = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM TU5 WHERE ID = 1 AND POINTS > 0.2").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(3, table.getLong(0));
+
+        table = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM TU5 WHERE ID = 1 AND POINTS > 0.5").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(0, table.getLong(0));
+
+        table = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM TU5 WHERE ID = 2 AND POINTS > 0.3").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(2, table.getLong(0));
+
+        table = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM TU5 WHERE ID = 2 AND POINTS > 0.5").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(0, table.getLong(0));
+
+        table = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM TU5 WHERE ID = 1 AND POINTS >= 0.1").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(5, table.getLong(0));
+
+    }
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.

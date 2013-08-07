@@ -147,6 +147,7 @@ public class QueryPlanner {
         }
 
         m_planSelector.outputCompiledStatement(m_xmlSQL);
+        // System.out.println("DEBUG: SQL IN: " + m_sql + "; SQL OUT:\n" + m_xmlSQL);
     }
 
     /**

@@ -41,7 +41,7 @@ try:
     base_dir    = os.path.dirname(cmd_dir)
     version     = open(os.path.join(base_dir, 'version.txt')).read().strip()
     description = 'This is the command line interface to VoltDB administrative functions.'
-    standalone  = True if len(sys.argv) > 1 and sys.argv[1] != "collect" else False
+    standalone  = True
     # Tweak the Python library path to call voltcli.runner.main().
     # Possible installed library locations.
     if os.path.isdir('/opt/lib/voltdb/python'):

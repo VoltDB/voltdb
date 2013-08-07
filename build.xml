@@ -1351,8 +1351,14 @@ TEST CASES
                 <include name='org/voltdb/utils/**/*Test.class'/>
                 <!-- Exclude many tests not directly related to sql functionality -->
                 <exclude name="**/*$*.class"/>
-                <exclude name="org/voltdb/quarantine/**/*.class"/>
+                <exclude name='org/voltdb/client/TestClientFeatures.class'/>
                 <exclude name='org/voltdb/dtxn/Test*.class'/>
+                <exclude name='org/voltdb/iv2/Test*.class'/>
+                <exclude name='org/voltdb/jdbc/Test*.class'/>
+                <exclude name='org/voltdb/jni/Test*.class'/>
+                <exclude name='org/voltdb/messaging/Test*.class'/>
+                <exclude name='org/voltdb/regressionsuites/TestAdminMode.class'/>
+                <exclude name="org/voltdb/quarantine/**/*.class"/>
                 <exclude name="**/TestCommandLog*.class" />
                 <exclude name="**/TestExport*.class"/>
                 <exclude name="**/TestJoin.class"/>

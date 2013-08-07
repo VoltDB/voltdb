@@ -483,12 +483,12 @@ public class TestReplaceWithIndexLimit extends PlannerTestCase {
 
     public void testMin4023() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT MAX(C1) FROM R WHERE C1 < ?");
-        checkIndexLimit(pn, false, null);
+        checkIndexLimit(pn, true, new String[] {"R_IDX1_TREE", "R_IDX2_TREE", "R_IDX4_TREE"});
     }
 
     public void testMin4024() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT MAX(C1) FROM R WHERE C1 <= ?");
-        checkIndexLimit(pn, false, null);
+        checkIndexLimit(pn, true, new String[] {"R_IDX1_TREE", "R_IDX2_TREE", "R_IDX4_TREE"});
     }
 
     public void testMin4025() {

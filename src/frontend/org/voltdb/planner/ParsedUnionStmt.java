@@ -23,7 +23,6 @@ import java.util.HashSet;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
-import org.voltdb.expressions.AbstractExpression;
 
 public class ParsedUnionStmt extends AbstractParsedStmt {
 
@@ -37,9 +36,9 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         EXCEPT
     };
     /** Hash Set to enforce table uniqueness across all the sub-selects */
-    public HashSet<String> m_uniqueTables = new HashSet<String>();
-    public ArrayList<AbstractParsedStmt> m_children = new ArrayList<AbstractParsedStmt>();
-    public UnionType m_unionType = UnionType.NOUNION;
+    private HashSet<String> m_uniqueTables = new HashSet<String>();
+    ArrayList<AbstractParsedStmt> m_children = new ArrayList<AbstractParsedStmt>();
+    UnionType m_unionType = UnionType.NOUNION;
 
     /**
     * Class constructor
@@ -69,6 +68,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
      * @param root
      * @param db
      */
+    @Override
     void parseTablesAndParams(VoltXMLElement stmtNode) {
 
         assert(stmtNode.children.size() > 1);
@@ -120,31 +120,12 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
      * @param db
      * @param joinOrder
      */
-    void postParse(String sql, String joinOrder) {
-        /** Collection of COMPARE_EQ filter expressions across all the the sub-selects */
-        ArrayList<AbstractExpression> equivalenceFilters = new ArrayList<AbstractExpression>();
-
+    @Override
+    void postParse(String sql, String joinOrder)
+    {
         for (AbstractParsedStmt selectStmt : m_children) {
             selectStmt.postParse(sql, joinOrder);
-            // Propagate parsing results to the parent union
-            if (selectStmt.joinTree != null) {
-                equivalenceFilters.addAll(selectStmt.joinTree.getAllEquivalenceFilters());
-            }
         }
-        // Analyze children's where expressions together to identify possible identically
-        // partitioned tables.
-        // TODO: There actually should be separate logic to determine the partitioning of each
-        // sub-statement and then decide if the resulting partitionings are compatible.
-        // The latter step should be based solely on the final partitioning expression
-        // that was determined separately for each statement.
-        // The current algorithm is a bit dodgy because it relies on the "union" of the
-        // sub-statements' equivalences determining the partitioning of the "union" of the
-        // sub-statements' tables.
-        // This may not be reliable if seemingly related (transitive) equivalence filters like
-        // "(A.X = B.Y) and (A.X = 1)" ever appear in different sub-statements.
-        // It works for now because a table can only be referenced once in a UNION statement
-        // -- no self-UNIONs, no UNIONs of joins that partially share tables.
-        valueEquivalence.putAll(analyzeValueEquivalence(equivalenceFilters));
 
         // these just shouldn't happen right?
         assert(multiTableSelectionList.size() == 0);

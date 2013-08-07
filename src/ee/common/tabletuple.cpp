@@ -112,7 +112,7 @@ bool TableTuple::compatibleForCopy(const TableTuple &source) {
     for (int i = 0; i < m_schema->columnCount(); ++i) {
         const ValueType mType = m_schema->columnType(i);
         const ValueType sType = source.m_schema->columnType(i);
-        if (mType != sType) {
+        if (mType != sType && NValue::promoteForOp(mType, mType) != sType) {
             VOLT_ERROR("Can not copy tuple: incompatible column types.");
             return false;
         }

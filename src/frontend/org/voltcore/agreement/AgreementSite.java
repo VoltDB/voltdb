@@ -23,12 +23,8 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
@@ -49,18 +45,16 @@ import org.voltcore.TransactionIdManager;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.AgreementTaskMessage;
 import org.voltcore.messaging.BinaryPayloadMessage;
-import org.voltcore.messaging.FailureSiteUpdateMessage;
+import org.voltcore.messaging.DisconnectFailedHostsCallback;
+import org.voltcore.messaging.FaultMessage;
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HeartbeatResponseMessage;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.RecoveryMessage;
-import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
-import org.voltdb.VoltDB;
 
 import com.google.common.collect.ImmutableSet;
 
@@ -112,40 +106,9 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     private byte m_recoverySnapshot[] = null;
     private Long m_recoverBeforeTxn = null;
     private Long m_siteRequestingRecovery = null;
+    private final DisconnectFailedHostsCallback m_failedHostsCallback;
+    private final MeshArbiter m_meshArbiter;
 
-    /**
-     * Failed sites which haven't been agreed upon as failed
-     */
-    private final HashSet<Long> m_pendingFailedSites = new HashSet<Long>();
-
-    public static final class FaultMessage extends VoltMessage {
-
-        public final long failedSite;
-
-        public FaultMessage(long failedSite) {
-            this.failedSite = failedSite;
-        }
-
-        @Override
-        public int getSerializedSize() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void flattenToBuffer(ByteBuffer buf) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        protected void initFromBuffer(ByteBuffer buf) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public byte getSubject() {
-            return Subject.FAILURE.getId();
-        }
-    }
 
     public AgreementSite(
             long myAgreementHSId,
@@ -153,10 +116,13 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             int initiatorId,
             Mailbox mailbox,
             InetSocketAddress address,
-            long backwardsTimeForgiveness) throws IOException {
+            long backwardsTimeForgiveness,
+            DisconnectFailedHostsCallback failedHostsCallback
+            ) throws IOException {
         m_mailbox = mailbox;
         m_hsId = myAgreementHSId;
         m_hsIds.addAll(agreementHSIds);
+        m_failedHostsCallback = failedHostsCallback;
 
         m_idManager = new TransactionIdManager( initiatorId, 0, backwardsTimeForgiveness );
         // note, the agreement site always uses the safety dance, even
@@ -170,8 +136,8 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             m_safetyState.addState(hsId);
         }
 
-        m_cnxnFactory =
-            new NIOServerCnxn.Factory( address, 10);
+        m_meshArbiter = new MeshArbiter(m_hsId, mailbox, m_meshAide);
+        m_cnxnFactory = new NIOServerCnxn.Factory( address, 10);
         m_server = new ZooKeeperServer(this);
         if (agreementHSIds.size() > 1) {
             m_recovering = true;
@@ -342,8 +308,12 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     }
 
     private void sendHeartbeats() {
+        sendHeartbeats(m_hsIds);
+    }
+
+    private void sendHeartbeats(Set<Long> hsIds) {
         long txnId = m_idManager.getNextUniqueTransactionId();
-        for (long initiatorId : m_hsIds) {
+        for (long initiatorId : hsIds) {
             HeartbeatMessage heartbeat =
                 new HeartbeatMessage( m_hsId, txnId, m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(initiatorId));
             m_mailbox.send( initiatorId, heartbeat);
@@ -500,13 +470,8 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
 
         } else if (message instanceof FaultMessage) {
             FaultMessage fm = (FaultMessage)message;
-
-            if (m_pendingFailedSites.contains(fm.failedSite)) {
-                m_recoveryLog.info("Received fault message for failed site " + CoreUtils.hsIdToString(fm.failedSite) +
-                " ignoring");
-                return;
-            }
             discoverGlobalFaultData(fm);
+
         } else if (message instanceof RecoveryMessage) {
             RecoveryMessage rm = (RecoveryMessage)message;
             assert(m_recoverBeforeTxn == null);
@@ -554,12 +519,16 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         m_recoverBeforeTxn = null;
     }
 
-    /*
-     * Key is source site, and initiator id
-     * Value is safe txnid
-     */
-    private final HashMap<Pair<Long, Long>, Long>
-    m_failureSiteUpdateLedger = new HashMap<Pair<Long, Long>, Long>();
+    private final MeshAide m_meshAide = new MeshAide() {
+        @Override
+        public void sendHeartbeats(Set<Long> hsIds) {
+            AgreementSite.this.sendHeartbeats(hsIds);
+        }
+        @Override
+        public Long getNewestSafeTransactionForInitiator(Long initiatorId) {
+            return m_txnQueue.getNewestSafeTransactionForInitiator(initiatorId);
+        }
+    };
 
     private void discoverGlobalFaultData(FaultMessage faultMessage) {
         //Keep it simple and don't try to recover on the recovering node.
@@ -570,30 +539,25 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                     true,
                     null);
         }
+        Map<Long, Long> initiatorSafeInitPoint = m_meshArbiter.reconfigureOnFault(m_hsIds, faultMessage);
+        if (initiatorSafeInitPoint.isEmpty()) return;
 
-        if (!m_pendingFailedSites.add(faultMessage.failedSite)) {
-            VoltDB.crashLocalVoltDB("A site id shouldn't be distributed as a fault twice", false, null);
+        Set<Long> failedSites = initiatorSafeInitPoint.keySet();
+        handleSiteFaults(failedSites,initiatorSafeInitPoint);
+
+        ImmutableSet.Builder<Integer> failedHosts = ImmutableSet.builder();
+        for (long hsId: failedSites) {
+            failedHosts.add(CoreUtils.getHostIdFromHSId(hsId));
         }
+        m_failedHostsCallback.disconnect(failedHosts.build());
 
-        discoverGlobalFaultData_send();
-
-        HashMap<Long, Long> initiatorSafeInitPoint = new HashMap<Long, Long>();
-        if (discoverGlobalFaultData_rcv()) {
-            extractGlobalFaultData(initiatorSafeInitPoint);
-        } else {
-            return;
-        }
-
-        handleSiteFaults(initiatorSafeInitPoint);
-
-        m_hsIds.removeAll(m_pendingFailedSites);
-        m_pendingFailedSites.clear();
-        assert(m_pendingFailedSites.isEmpty());
+        m_hsIds.removeAll(failedSites);
     }
 
     private void handleSiteFaults(
-            HashMap<Long, Long> initiatorSafeInitPoint) {
-        Set<Long> newFailedSiteIds = Collections.unmodifiableSet(m_pendingFailedSites);
+            Set<Long> newFailedSiteIds,
+            Map<Long, Long> initiatorSafeInitPoint) {
+
         m_recoveryLog.info("Agreement, handling site faults for newly failed sites " +
                 CoreUtils.hsIdCollectionToString(newFailedSiteIds) +
                 " initiatorSafeInitPoints " + CoreUtils.hsIdKeyMapToString(initiatorSafeInitPoint));
@@ -625,170 +589,6 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 m_txnQueue.faultTransaction(ts);
             }
         }
-    }
-
-    /**
-     * Send one message to each surviving execution site providing this site's
-     * multi-partition commit point and this site's safe txnid
-     * (the receiver will filter the later for its
-     * own partition). Do this once for each failed initiator that we know about.
-     * Sends all data all the time to avoid a need for request/response.
-     */
-    private int discoverGlobalFaultData_send()
-    {
-        HashSet<Long> survivorSet = new HashSet<Long>(m_hsIds);
-        survivorSet.removeAll(m_pendingFailedSites);
-        long survivors[] = com.google.common.primitives.Longs.toArray(survivorSet);
-        m_recoveryLog.info("Agreement, Sending fault data " + CoreUtils.hsIdCollectionToString(m_pendingFailedSites)
-                + " to "
-                + CoreUtils.hsIdCollectionToString(survivorSet) + " survivors");
-        for (Long site : m_pendingFailedSites) {
-            /*
-             * Check the queue for the data and get it from the ledger if necessary.\
-             * It might not even be in the ledger if the site has been failed
-             * since recovery of this node began.
-             */
-            Long txnId = m_txnQueue.getNewestSafeTransactionForInitiator(site);
-            FailureSiteUpdateMessage srcmsg =
-                new FailureSiteUpdateMessage(m_pendingFailedSites,
-                        site,
-                        txnId != null ? txnId : Long.MIN_VALUE,
-                        site);
-
-            m_mailbox.send(survivors, srcmsg);
-        }
-        m_recoveryLog.info("Agreement, Sent fault data. Expecting " + (survivors.length * m_pendingFailedSites.size()) + " responses.");
-        return (survivors.length * m_pendingFailedSites.size());
-    }
-
-    /**
-     * Collect the failure site update messages from all sites This site sent
-     * its own mailbox the above broadcast the maximum is local to this site.
-     * This also ensures at least one response.
-     *
-     * Concurrent failures can be detected by additional reports from the FaultDistributor
-     * or a mismatch in the set of failed hosts reported in a message from another site
-     */
-    private boolean discoverGlobalFaultData_rcv()
-    {
-        HashSet<Long> survivorSet = new HashSet<Long>(m_hsIds);
-        survivorSet.removeAll(m_pendingFailedSites);
-
-        java.util.ArrayList<FailureSiteUpdateMessage> messages = new java.util.ArrayList<FailureSiteUpdateMessage>();
-        long blockedOnReceiveStart = System.currentTimeMillis();
-        long lastReportTime = 0;
-        do {
-            VoltMessage m = m_mailbox.recvBlocking(new Subject[] { Subject.FAILURE, Subject.FAILURE_SITE_UPDATE }, 5);
-
-            /*
-             * If fault resolution takes longer then 10 seconds start logging
-             */
-            final long now = System.currentTimeMillis();
-            if (now - blockedOnReceiveStart > 10000) {
-                if (now - lastReportTime > 60000) {
-                    lastReportTime = System.currentTimeMillis();
-                    haveNecessaryFaultInfo(m_pendingFailedSites, true);
-                }
-            }
-
-            if (m == null) {
-                // Send a heartbeat to keep the dead host timeout active.  Needed because IV2 doesn't
-                // generate its own heartbeats to keep this running.
-                sendHeartbeats();
-                continue;
-            }
-            if (!m_hsIds.contains(m.m_sourceHSId)) continue;
-
-            FailureSiteUpdateMessage fm = null;
-
-            if (m.getSubject() == Subject.FAILURE_SITE_UPDATE.getId()) {
-                fm = (FailureSiteUpdateMessage)m;
-                messages.add(fm);
-                m_failureSiteUpdateLedger.put(
-                        Pair.of(fm.m_sourceHSId, fm.m_initiatorForSafeTxnId),
-                        fm.m_safeTxnId);
-            } else if (m.getSubject() == Subject.FAILURE.getId()) {
-                /*
-                 * If the fault distributor reports a new fault, assert that the fault currently
-                 * being handled is included, redeliver the message to ourself and then abort so
-                 * that the process can restart.
-                 */
-                Long newFault = ((FaultMessage)m).failedSite;
-                m_mailbox.deliverFront(m);
-                m_recoveryLog.info("Agreement, Detected a concurrent failure from FaultDistributor, new failed site "
-                        + CoreUtils.hsIdToString(newFault));
-                return false;
-            }
-
-            m_recoveryLog.info("Agreement, Received failure message from " +
-                    CoreUtils.hsIdToString(fm.m_sourceHSId) + " for failed sites " +
-                    CoreUtils.hsIdCollectionToString(fm.m_failedHSIds) +
-                    " safe txn id " + fm.m_safeTxnId + " failed site " +
-                    CoreUtils.hsIdToString(fm.m_initiatorForSafeTxnId));
-        } while(!haveNecessaryFaultInfo(survivorSet, false));
-        return true;
-    }
-
-    private boolean haveNecessaryFaultInfo(
-            Set<Long> survivors,
-            boolean log) {
-        List<Pair<Long, Long>> missingMessages = new ArrayList<Pair<Long, Long>>();
-        for (long survivingSite : survivors) {
-            for (Long failingSite : m_pendingFailedSites) {
-                Pair<Long, Long> key = Pair.of( survivingSite, failingSite);
-                if (!m_failureSiteUpdateLedger.containsKey(key)) {
-                    missingMessages.add(key);
-                }
-            }
-        }
-        if (log) {
-            StringBuilder sb = new StringBuilder();
-            sb.append('[');
-            boolean first = true;
-            for (Pair<Long, Long> p : missingMessages) {
-                if (!first) sb.append(", ");
-                first = false;
-                sb.append(CoreUtils.hsIdToString(p.getFirst()));
-                sb.append('-');
-                sb.append(CoreUtils.hsIdToString(p.getSecond()));
-            }
-            sb.append(']');
-
-            m_recoveryLog.warn("Failure resolution stalled waiting for ( ExecutionSite, Initiator ) " +
-                                "information: " + sb.toString());
-        }
-        return missingMessages.isEmpty();
-    }
-
-    private void extractGlobalFaultData(
-            HashMap<Long, Long> initiatorSafeInitPoint) {
-        HashSet<Long> survivorSet = new HashSet<Long>(m_hsIds);
-        survivorSet.removeAll(m_pendingFailedSites);
-        if (!haveNecessaryFaultInfo(survivorSet, false)) {
-            VoltDB.crashLocalVoltDB("Error extracting fault data", true, null);
-        }
-
-        Iterator<Map.Entry<Pair<Long, Long>, Long>> iter =
-            m_failureSiteUpdateLedger.entrySet().iterator();
-
-        while (iter.hasNext()) {
-            final Map.Entry<Pair<Long, Long>, Long> entry = iter.next();
-            final Pair<Long, Long> key = entry.getKey();
-            final Long safeTxnId = entry.getValue();
-
-            if (!m_hsIds.contains(key.getFirst())) {
-                continue;
-            }
-
-            Long initiatorId = key.getSecond();
-            if (!initiatorSafeInitPoint.containsKey(initiatorId)) {
-                initiatorSafeInitPoint.put( initiatorId, Long.MIN_VALUE);
-            }
-
-            initiatorSafeInitPoint.put( initiatorId,
-                    Math.max(initiatorSafeInitPoint.get(initiatorId), safeTxnId));
-        }
-        assert(!initiatorSafeInitPoint.containsValue(Long.MIN_VALUE));
     }
 
     @Override
@@ -858,7 +658,12 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     }
 
     public void reportFault(long faultingSite) {
-        FaultMessage fm = new FaultMessage(faultingSite);
+        FaultMessage fm = new FaultMessage(m_hsId,faultingSite);
+        fm.m_sourceHSId = m_hsId;
+        m_mailbox.deliver(fm);
+    }
+
+    public void reportFault(FaultMessage fm) {
         fm.m_sourceHSId = m_hsId;
         m_mailbox.deliver(fm);
     }

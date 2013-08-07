@@ -117,7 +117,7 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
 
     public void testCountStar10() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS > ?");
-        checkIndexCounter(pn, false);
+        checkIndexCounter(pn, true);
     }
 
     // Down below are cases that we can replace
@@ -171,7 +171,7 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
     public void testCountStar20() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT AGE, count(*) from T2 WHERE USERNAME ='XIN' AND POINTS < 1 Group by AGE");
         for ( AbstractPlanNode nd : pn)
-            System.out.println("PlanNode Explan string:\n" + nd.toExplainPlanString());
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
         AbstractPlanNode p = pn.get(0).getChild(0);
         assertTrue(p instanceof AggregatePlanNode);
         p = p.getChild(0);
@@ -182,7 +182,7 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
     public void testCountStar21() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT RATIO, count(*) from P1 WHERE NUM < 1 Group by RATIO");
         for ( AbstractPlanNode nd : pn)
-            System.out.println("PlanNode Explan string:\n" + nd.toExplainPlanString());
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
         AbstractPlanNode p = pn.get(0).getChild(0);
         assertTrue(p instanceof AggregatePlanNode);
         p = pn.get(1).getChild(0);
@@ -195,7 +195,7 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
     public void testCountStar22() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from P1 WHERE NUM < ?");
         for ( AbstractPlanNode nd : pn)
-            System.out.println("PlanNode Explan string:\n" + nd.toExplainPlanString());
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
         AbstractPlanNode p = pn.get(0).getChild(0);
         assertTrue(p instanceof AggregatePlanNode);
         p = pn.get(1).getChild(0);
@@ -211,6 +211,49 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
         // Special case: un-comment it to replace the checking when we fix ticket
         // ENG-4937 - As a developer, I want to ignore the "order by" clause on non-grouped aggregate queries.
         //assertTrue(p instanceof IndexCountPlanNode);
+    }
+
+    public void testCountStar24() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T2 WHERE ID = 1 AND USERNAME > 'JOHN' ");
+        checkIndexCounter(pn, false);
+    }
+
+    public void testCountStar25() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS >= ?");
+        checkIndexCounter(pn, true);
+    }
+
+    // test with FLOAT type
+    public void testCountStar26() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from P1 WHERE NUM = 1 AND RATIO >= ?");
+        for ( AbstractPlanNode nd : pn)
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+        AbstractPlanNode p = pn.get(0).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        p = pn.get(1).getChild(0);
+        assertTrue(p instanceof IndexCountPlanNode);
+    }
+
+    // should not replace
+    public void testCountStar27() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT COUNT(*) FROM T2 WHERE USERNAME >= 'XIN' AND POINTS = ?");
+        checkIndexCounter(pn, false);
+    }
+
+    public void testCountStar28() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT COUNT(*) FROM T1 WHERE AGE = 18 AND ID + POINTS > ?");
+        checkIndexCounter(pn, true);
+    }
+
+    public void testCountStar29() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT COUNT(*) FROM T1 WHERE AGE / 2 = 10 AND ABS(AGE) > ?");
+        checkIndexCounter(pn, true);
+    }
+
+    // should not replace
+    public void testCountStar30() {
+        List<AbstractPlanNode> pn = compileToFragments("SELECT COUNT(*) FROM T1 WHERE AGE / 2 <= ?");
+        checkIndexCounter(pn, false);
     }
 
     /**

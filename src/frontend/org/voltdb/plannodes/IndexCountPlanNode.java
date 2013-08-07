@@ -18,24 +18,30 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
-import java.util.SortedSet;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SortDirectionType;
+import org.voltdb.utils.CatalogUtil;
 
 public class IndexCountPlanNode extends AbstractScanPlanNode {
 
@@ -59,7 +65,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     protected Boolean m_keyIterate = false;
 
     //
-    final protected List<AbstractExpression> m_endkeyExpressions = new ArrayList<AbstractExpression>();
+    protected List<AbstractExpression> m_endkeyExpressions = new ArrayList<AbstractExpression>();
 
     // This list of expressions corresponds to the values that we will use
     // at runtime in the lookup on the index
@@ -96,16 +102,26 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_targetTableName = isp.m_targetTableName;
         m_targetIndexName = isp.m_targetIndexName;
 
-        m_lookupType = isp.m_lookupType;
-        m_searchkeyExpressions = isp.m_searchkeyExpressions;
         m_predicate = null;
         m_bindings = isp.getBindings();
 
         m_outputSchema = apn.getOutputSchema().clone();
         m_hasSignificantOutputSchema = true;
 
-        m_endType = endType;
-        m_endkeyExpressions.addAll(endKeys);
+        if (isp.getSortDirection() != SortDirectionType.DESC) {
+            m_lookupType = isp.m_lookupType;
+            m_searchkeyExpressions = isp.m_searchkeyExpressions;
+
+            m_endType = endType;
+            m_endkeyExpressions.addAll(endKeys);
+        } else {
+            // for reverse scan, swap everything of searchkey and endkey
+            // because we added the last < / <= to searchkey but not endExpr
+            m_lookupType = endType;     // must be EQ, but doesn't matter, since previous lookup type is not GT
+            m_searchkeyExpressions.addAll(endKeys);
+            m_endType = isp.m_lookupType;
+            m_endkeyExpressions = isp.getSearchKeyExpressions();
+        }
     }
 
     // Create an IndexCountPlanNode that replaces the parent aggregate and chile indexscan
@@ -114,6 +130,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     //   - null
     //   - one filter expression per index key component (ANDed together) as "combined" for the IndexScan.
     //   - fewer filter expressions than index key components with one of them (the last) being a LT comparison.
+    //   - 1 fewer filter expressions than index key components, but all ANDed equality filters
     // The LT restriction comes because when index key prefixes are identical to the prefix-only end key,
     // the entire index key sorts greater than the prefix-only end-key, because it is always longer.
     // These prefix-equal cases would be missed in an EQ or LTE filter, causing undercounts.
@@ -121,6 +138,8 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     // @return the IndexCountPlanNode or null if one is not possible.
     public static IndexCountPlanNode createOrNull(IndexScanPlanNode isp, AggregatePlanNode apn)
     {
+        // add support for reverse scan
+        // for ASC scan, check endExpression; for DESC scan, need to check searchkeys
         List<AbstractExpression> endKeys = new ArrayList<AbstractExpression>();
         // Initially assume that there will be an equality filter on all key components.
         IndexLookupType endType = IndexLookupType.EQ;
@@ -144,21 +163,99 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             endKeys.add((AbstractExpression)ae.getRight().clone());
         }
 
+        int indexSize = 0;
+        String jsonstring = isp.getCatalogIndex().getExpressionsjson();
+        List<ColumnRef> indexedColRefs = null;
+        List<AbstractExpression> indexedExprs = null;
+        if (jsonstring.isEmpty()) {
+            indexedColRefs = CatalogUtil.getSortedCatalogItems(isp.getCatalogIndex().getColumns(), "index");
+            indexSize = indexedColRefs.size();
+        } else {
+            try {
+                indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring, null);
+                indexSize = indexedExprs.size();
+            } catch (JSONException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
+
+        // decide whether to pad last endKey to solve
+        // SELECT COUNT(*) FROM T WHERE C1 = ? AND C2 > / >= ?
+        if (isp.getSortDirection() != SortDirectionType.DESC &&
+                endType == IndexLookupType.EQ &&
+                endKeys.size() > 0 &&
+                endKeys.size() == indexSize - 1 &&
+                isp.getSearchKeyExpressions().size() == indexSize) {
+
+            VoltType missingKeyType = VoltType.INVALID;
+            boolean canPadding = true;
+
+            // need to check the filter we are missing is the last indexable expr
+            // and find out the missing key
+            if (jsonstring.isEmpty()) {
+                int lastIndex = indexedColRefs.get(indexSize - 1).getColumn().getIndex();
+                for (AbstractExpression expr : endComparisons) {
+                    if (((TupleValueExpression)(expr.getLeft())).getColumnIndex() == lastIndex) {
+                        canPadding = false;
+                        break;
+                    }
+                }
+                if (canPadding) {
+                    missingKeyType = VoltType.get((byte)(indexedColRefs.get(indexSize - 1).getColumn().getType()));
+                }
+            } else {
+                AbstractExpression lastIndexableExpr = indexedExprs.get(indexSize - 1);
+                for (AbstractExpression expr : endComparisons) {
+                    if (expr.getLeft().bindingToIndexedExpression(lastIndexableExpr) != null) {
+                        canPadding = false;
+                        break;
+                    }
+                }
+                if (canPadding) {
+                    missingKeyType = lastIndexableExpr.getValueType();
+                }
+            }
+            if (canPadding && missingKeyType.isMaxValuePaddable()) {
+                ConstantValueExpression missingKey = new ConstantValueExpression();
+                missingKey.setValueType(missingKeyType);
+                missingKey.setValue(String.valueOf(VoltType.getPaddedMaxTypeValue(missingKeyType)));
+                missingKey.setValueSize(missingKeyType.getLengthInBytesForFixedTypes());
+                endType = IndexLookupType.LTE;
+                endKeys.add(missingKey);
+            } else {
+                return null;
+            }
+        }
+
+        // check endkey for ASC or searchkey for DESC case separately
+
         // Avoid the cases that would cause undercounts for prefix matches.
         // A prefix-only key exists and does not use LT.
-        if ((endType != IndexLookupType.LT) &&
+        if (isp.getSortDirection() != SortDirectionType.DESC &&
+            (endType != IndexLookupType.LT) &&
             (endKeys.size() > 0) &&
-            (endKeys.size() < isp.getCatalogIndex().getColumns().size())) {
+            (endKeys.size() < indexSize)) {
+            return null;
+        }
+
+        // DESC case
+        if ((isp.getSearchKeyExpressions().size() > 0) &&
+                (isp.getSearchKeyExpressions().size() < indexSize)) {
             return null;
         }
         return new IndexCountPlanNode(isp, apn, endType, endKeys);
     }
 
     @Override
-    protected void getThisNodesTablesAndIndexes(SortedSet<String> tablesRead, SortedSet<String> tablesUpdated, SortedSet<String> indexes) {
-        super.getThisNodesTablesAndIndexes(tablesRead, tablesUpdated, indexes);
-        assert(m_targetIndexName.length() > 0);
-        indexes.add(m_targetIndexName);
+    public void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tableUpdated,
+                                    Collection<String> indexes)
+    {
+        super.getTablesAndIndexes(tablesRead, tableUpdated, indexes);
+        if (indexes != null) {
+            assert(m_targetIndexName.length() > 0);
+            indexes.add(m_targetIndexName);
+        }
     }
 
     @Override
@@ -212,7 +309,6 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         stringer.key(Members.END_TYPE.name()).value(m_endType.toString());
         stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_targetIndexName);
 
-
         stringer.key(Members.ENDKEY_EXPRESSIONS.name());
         if ( m_endkeyExpressions.isEmpty()) {
             stringer.value(null);
@@ -264,7 +360,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     protected String explainPlanForNode(String indent) {
         assert(m_catalogIndex != null);
 
-        int indexSize = m_catalogIndex.getColumns().size();
+        int indexSize = CatalogUtil.getCatalogIndexSize(m_catalogIndex);
         int keySize = m_searchkeyExpressions.size();
 
         String scanType = "tree-counter";

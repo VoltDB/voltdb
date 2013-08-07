@@ -142,7 +142,8 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     // The planner sometimes used to lie in this case: index_lookup_type_eq is incorrect.
     // Index_lookup_type_gte is necessary.
     assert(m_lookupType != INDEX_LOOKUP_TYPE_EQ ||
-           m_searchKey.getSchema()->columnCount() == m_numOfSearchkeys);
+           m_searchKey.getSchema()->columnCount() == m_numOfSearchkeys ||
+           m_searchKey.getSchema()->columnCount() == m_numOfEndkeys);
     return true;
 }
 
