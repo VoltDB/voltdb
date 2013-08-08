@@ -176,7 +176,7 @@ class LogfilePackage():
             raise IOError(f + " isn't a valid logfile package")
 
     def get_logs(self):
-        pat = '[/^]log/.*'
+        pat = '^log/.*|/log/.*'
         return [f for f in self.tar.getnames() if re.search(pat, f)]
 
     def get_syslogs(self):
