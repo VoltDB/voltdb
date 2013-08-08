@@ -19,6 +19,7 @@ package org.voltdb.plannodes;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -26,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.SortedSet;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -222,33 +222,36 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     /**
-     * Recursively build sets of read and updated tables, as well as used indexes.
-     * {@see AbstractPlanNode#getThisNodesTablesAndIndexes(SortedSet, SortedSet, SortedSet)}
+     * Recursively build a set of tables read by the (sub)plan or (sub)plan fragment
+     * {@see AbstractPlanNode#getTablesAndIndexes(Collection, Collection, Collection, boolean)}
      *
      * @param tablesRead Set of tables read potentially added to at each recursive level.
-     * @param tablesUpdated Set of tables updated/inserted into/deleted potentially added to at each recursive level.
-     * @param indexes Set of indexes potentially added to at each recursive level.
      */
-    public final void getTablesAndIndexes(SortedSet<String> tablesRead, SortedSet<String> tableUpdated, SortedSet<String> indexes) {
-        getThisNodesTablesAndIndexes(tablesRead, tableUpdated, indexes);
+    public final void getTablesReadByFragment(Collection<String> tablesRead)
+    {
+        getTablesAndIndexes(tablesRead, null, null);
+    }
+    /**
+     * Recursively build sets of read and updated tables, as well as used indexes.
+     *
+     * @param tablesRead Set of tables read potentially added to at each recursive level.
+     * @param tablesUpdated Set of tables updated/inserted into/deleted
+     * potentially added to at each recursive level.
+     * @param indexes Set of indexes potentially added to at each recursive level.
+     * @boolean acrossFragments Controls whether any ReceivePlanNode should be traversed
+     * so that the sets will reflect the plan's other fragment.
+     * Only the current fragment is of interest when called from the PlanAssembler.
+     */
+    public void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tablesUpdated,
+                                    Collection<String> indexes)
+    {
         for (AbstractPlanNode node : m_inlineNodes.values()) {
-            node.getTablesAndIndexes(tablesRead, tableUpdated, indexes);
+            node.getTablesAndIndexes(tablesRead, tablesUpdated, indexes);
         }
         for (AbstractPlanNode node : m_children) {
-            node.getTablesAndIndexes(tablesRead, tableUpdated, indexes);
+            node.getTablesAndIndexes(tablesRead, tablesUpdated, indexes);
         }
     }
-
-    /**
-     * Add any tables read/updateded or indexes used to existing sets. This is used to build complete sets
-     * of read/modified tables and indexes. Currently this info is used for the catalog report.
-     * It is called recursively from {@see AbstractPlanNode#getTablesAndIndexes(SortedSet, SortedSet, SortedSet)}.
-     *
-     * @param tablesRead Set of tables read this method should add to.
-     * @param tablesUpdated Set of tables updated/inserted into/deleted from this method should add to.
-     * @param indexes Set of indexes this node should add its used index to.
-     */
-    protected void getThisNodesTablesAndIndexes(SortedSet<String> tablesRead, SortedSet<String> tablesUpdated, SortedSet<String> indexes) {}
 
     /**
      * Does the (sub)plan guarantee an identical result/effect when "replayed"
@@ -396,6 +399,30 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         m_children.remove(child);
         child.m_parents.remove(this);
     }
+
+    /**
+     * Replace an existing child with a new one preserving the child's position.
+     * @param oldChild The node to replace.
+     * @param newChild The new node.
+     * @return true if the child was replaced
+     */
+    public boolean replaceChild(AbstractPlanNode oldChild, AbstractPlanNode newChild) {
+        int idx = 0;
+        for (AbstractPlanNode child : m_children) {
+            if (child.equals(oldChild)) {
+                break;
+            }
+            ++idx;
+        }
+        if (idx == m_children.size()) {
+            return false;
+        }
+        oldChild.removeFromGraph();
+        m_children.add(idx, newChild);
+        newChild.m_parents.add(this);
+        return true;
+    }
+
 
     /**
      * Gets the children.

@@ -351,9 +351,9 @@ public class RangeVariableResolver {
 
             if (inExpressions[i] != null) {
                 if (!flags[i] && isOuter) {
-                    rangeVariables[i].addWhereCondition(inExpressions[i]);
-                } else {
                     rangeVariables[i].addJoinCondition(inExpressions[i]);
+                } else {
+                    rangeVariables[i].addWhereCondition(inExpressions[i]);
                 }
 
                 inExpressions[i] = null;

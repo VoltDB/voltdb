@@ -64,20 +64,20 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         VoltTable[] results = null;
 
         results = client.callProcedure("AggAges", 1).getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 0);
+        assertEquals(1, results.length);
+        assertEquals(0, results[0].getRowCount());
         assert(results != null);
 
         results = client.callProcedure("AddPerson", 1, 1L, 31L, 27500.20, 7).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddPerson", 1, 2L, 31L, 28920.99, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddPerson", 1, 3L, 32L, 63250.01, -1).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
 
         results = client.callProcedure("AggAges", 1).getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 2);
+        assertEquals(1, results.length);
+        assertEquals(2, results[0].getRowCount());
         assert(results != null);
     }
 
@@ -86,21 +86,21 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         VoltTable[] results = null;
 
         results = client.callProcedure("AggAges", 1).getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 0);
+        assertEquals(1, results.length);
+        assertEquals(0, results[0].getRowCount());
         assert(results != null);
 
         results = client.callProcedure("AddPerson", 1, 1L, 31L, 27500.20, 7).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddPerson", 1, 2L, 31L, 28920.99, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
 
         results = client.callProcedure("DeletePerson", 1, 1L).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
 
         results = client.callProcedure("AggAges", 1).getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 1);
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
         while (results[0].advanceRow()) {
             assertEquals(31L, results[0].getLong(0));
             assertEquals(1L, results[0].getLong(2));
@@ -110,11 +110,11 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assert(results != null);
 
         results = client.callProcedure("DeletePerson", 1, 2L).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
 
         results = client.callProcedure("AggAges", 1).getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 0);
+        assertEquals(1, results.length);
+        assertEquals(0, results[0].getRowCount());
         assert(results != null);
     }
 
@@ -123,37 +123,37 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         VoltTable[] results = null;
 
         results = client.callProcedure("AggAges", 1).getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 0);
+        assertEquals(1, results.length);
+        assertEquals(0, results[0].getRowCount());
         assert(results != null);
 
         results = client.callProcedure("AddPerson", 1, 1L, 31L, 27500.20, 7).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddPerson", 1, 2L, 31L, 28920.99, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddPerson", 1, 3L, 33L, 28920.99, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("UpdatePerson", 1, 2L, 31L, 15000.00, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("UpdatePerson", 1, 1L, 31L, 15000.00, 5).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
 
         results = client.callProcedure("AggAges", 1).getResults();
         assert(results != null);
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 2);
+        assertEquals(1, results.length);
+        assertEquals(2, results[0].getRowCount());
         System.out.println(results[0].toString());
         VoltTableRow r1 = results[0].fetchRow(0);
         VoltTableRow r2 = results[0].fetchRow(1);
-        assertEquals(r1.getLong(0), 31L);
-        assertEquals(r1.getLong(2), 2L);
+        assertEquals(31L, r1.getLong(0));
+        assertEquals(2L, r1.getLong(2));
         assertTrue(Math.abs(r1.getDouble(3) - 30000.0) < .01);
-        assertEquals(r1.getLong(4), 8L);
+        assertEquals(8L, r1.getLong(4));
 
-        assertEquals(r2.getLong(0), 33L);
-        assertEquals(r2.getLong(2), 1L);
+        assertEquals(33L, r2.getLong(0));
+        assertEquals(1L, r2.getLong(2));
         assertTrue(Math.abs(r2.getDouble(3) - 28920.99) < .01);
-        assertEquals(r2.getLong(4), 3L);
+        assertEquals(3L, r2.getLong(4));
     }
 
     public void testSinglePartitionWithPredicates() throws IOException, ProcCallException {
@@ -161,43 +161,43 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         VoltTable[] results = null;
 
         results = client.callProcedure("AggAges", 1).getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 0);
+        assertEquals(1, results.length);
+        assertEquals(0, results[0].getRowCount());
         assert(results != null);
 
         // expecting the 2yr old won't make it
         results = client.callProcedure("AddPerson", 1, 1L, 31L, 1000.0, 7).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddPerson", 1, 2L, 2L, 2000.0, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
 
         results = client.callProcedure("AggAges", 1).getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 1);
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
         assert(results != null);
 
         results = client.callProcedure("UpdatePerson", 1, 1L, 3L, 1000.0, 6).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
 
         results = client.callProcedure("AggAges", 1).getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 0);
+        assertEquals(1, results.length);
+        assertEquals(0, results[0].getRowCount());
         assert(results != null);
 
         results = client.callProcedure("UpdatePerson", 1, 2L, 50L, 4000.0, 4).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
 
         results = client.callProcedure("AggAges", 1).getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 1);
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
         assert(results != null);
 
         results = client.callProcedure("DeletePerson", 1, 1L).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
 
         results = client.callProcedure("AggAges", 1).getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 1);
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
         assert(results != null);
     }
 
@@ -206,34 +206,34 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         VoltTable[] results = null;
 
         results = client.callProcedure("AggAges", 1).getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 0);
+        assertEquals(1, results.length);
+        assertEquals(0, results[0].getRowCount());
         assert(results != null);
 
         results = client.callProcedure("AddPerson", 1, 1L, 31L, 1000.0, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddPerson", 1, 2L, 2L, 1000.0, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddPerson", 2, 3L, 23L, 1000.0, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddPerson", 2, 4L, 23L, 1000.0, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddPerson", 2, 5L, 35L, 1000.0, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddPerson", 2, 6L, 35L, 1000.0, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("UpdatePerson", 1, 2L, 32L, 1000.0, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("DeletePerson", 2, 6L).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
 
         results = client.callProcedure("AggAges", 1).getResults();
         assert(results != null);
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
 
         VoltTable results2[] = client.callProcedure("AggAges", 2).getResults();
         assert(results != null);
-        assertEquals(results2.length, 1);
+        assertEquals(1, results2.length);
 
         int totalRows = results[0].getRowCount() + results2[0].getRowCount();
         // unfortunately they're both 4 in the hsql case, the fact that partitioning
@@ -247,20 +247,20 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         VoltTable[] results = null;
 
         results = client.callProcedure("AggThings").getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 0);
+        assertEquals(1, results.length);
+        assertEquals(0, results[0].getRowCount());
         assert(results != null);
 
         results = client.callProcedure("AddThing", 1L, 10L).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddThing", 2L, 12L).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddThing", 3L, 10L).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
 
         results = client.callProcedure("AggThings").getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 2);
+        assertEquals(1, results.length);
+        assertEquals(2, results[0].getRowCount());
         assert(results != null);
     }
 
@@ -347,9 +347,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
         //project.setBackendTarget(BackendTarget.NATIVE_EE_IPC);
         project.addSchema(schemaPath);
-        project.addPartitionInfo("PEOPLE", "PARTITION");
-        project.addPartitionInfo("OVERFLOWTEST", "COL_1");
-        project.addPartitionInfo("ENG798", "C1");
+
         project.addProcedures(PROCEDURES);
         // build the jarfile
         boolean success = config.compile(project);
