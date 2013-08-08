@@ -407,15 +407,12 @@ void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & vie
                   std::map<std::string, CatalogDelegate*> const &delegatesByName)
 {
     std::vector<catalog::MaterializedViewInfo*> survivingInfos;
-    std::vector<catalog::MaterializedViewInfo*> changingInfos;
     std::vector<MaterializedViewMetadata*> survivingViews;
-    std::vector<MaterializedViewMetadata*> changingViews;
     std::vector<MaterializedViewMetadata*> obsoleteViews;
 
     // Now, it's safe to transfer the wholesale state of the surviving dependent materialized views.
     existingTable->segregateMaterializedViews(views.begin(), views.end(),
                                               survivingInfos, survivingViews,
-                                              changingInfos, changingViews,
                                               obsoleteViews);
 
     // This process temporarily duplicates the materialized view definitions and their
