@@ -167,7 +167,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     private boolean taskQueueOffer()
     {
         // Do we have a write to do?
-        //   if so, are there reads outstanding?
+        //   if so, are there reads or writes outstanding?
         //     if not, pull it from the write backlog, add it to current write set, and queue it
         //     if so, bail for now
         //   if not, do we have a read to do?
@@ -180,7 +180,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
 
         boolean retval = false;
         if (!m_backlog.isEmpty()) {
-            if (m_currentReads.isEmpty()) {
+            if (m_currentReads.isEmpty() && m_currentWrites.isEmpty()) {
                 TransactionTask task = m_backlog.pollFirst();
                 assert(!task.getTransactionState().isReadOnly());
                 m_currentWrites.put(task.getTxnId(), task);
