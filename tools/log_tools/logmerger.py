@@ -56,7 +56,9 @@ def decorated_log_split(f, offset, keyfunc, fnamedict = {}):
                              ''' % (ts_format, ts_format_syslog), re.VERBOSE)
     new_epoch_ms = None
 
-    if hasattr(f, 'name'):
+    if f.name in fnamedict:
+        fname = fnamedict[f.name]
+    elif hasattr(f, 'name'):
         fname = os.path.basename(f.name)
     else:
         fname = ''
@@ -118,9 +120,9 @@ def tz_offset_callback(option, opt_str, value, parser):
         raise OptionValueError(value + " is not a valid timezone offset")
 
 
-def merge_logs(files, offsets):
+def merge_logs(files, offsets, fnamedict = {}):
     #print options.tzoffset
-    for (epoch_ms, entry) in heapq.merge(*[decorated_log_split(f, offsets[f.name], epochtimemillis_keyfunc) for f in files]):
+    for (epoch_ms, entry) in heapq.merge(*[decorated_log_split(f, offsets[f.name], epochtimemillis_keyfunc, fnamedict) for f in files]):
         yield (epoch_ms, entry)
 
 
@@ -304,6 +306,14 @@ if __name__ == "__main__":
         for f in files:
             offsets[f.name] = int(options.tzoffset)
 
+    # Use directory paths if there are identical filenames
+    fnamedict = {}
+    filenames = [os.path.basename(f.name) for f in files]
+    if len(filenames) - len(set(filenames)) > 0:
+        fnamedict = {f.name: f.name for f in files}
+    else:
+        fnamedict = {f.name: os.path.basename(f.name) for f in files}
+
     if options.outputfile:
         try:
             sys.stdout = open(options.outputfile, 'w')
@@ -331,7 +341,7 @@ if __name__ == "__main__":
     print "------ Files merged"
     print '\n'.join(sorted(['  ' + f.name for f in files]))
     print "------"
-    for  (time_str, entry) in merge_logs(files, offsets):
+    for  (time_str, entry) in merge_logs(files, offsets, fnamedict):
         #This is really only good for apprunnerish stuff
         if tar:
             for key in name_dict:
