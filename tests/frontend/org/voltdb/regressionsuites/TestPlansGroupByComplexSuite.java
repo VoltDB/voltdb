@@ -712,21 +712,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 3, 60} , {2, 2, 90}};
             compareTable(vt, expected);
-
-            ex = null;
-            try {
-                // Test order by agg not in display columns
-                cr = client.callProcedure("@AdHoc", "SELECT dept, count(*) from " + tb +
-                        " GROUP BY dept ORDER BY sum(wage) DESC");
-                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-                vt = cr.getResults()[0];
-                expected = new long[][] { {1, 3} , {2, 2}};
-                compareTable(vt, expected);
-            } catch (ProcCallException e) {
-                ex = e;
-            } finally {
-                assertTrue(ex.getMessage().contains("invalid ORDER BY expression"));
-            }
         }
     }
 
@@ -745,6 +730,20 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         for (String tb: tbs) {
             // Test order by agg without tag
             // Weird, works fine if order by
+            ex = null;
+            try {
+                cr = client.callProcedure("@AdHoc", "SELECT dept, COUNT(*) as tag, sum(wage) from " + tb +
+                        " GROUP BY dept ORDER BY COUNT(*) DESC");
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+                vt = cr.getResults()[0];
+                expected = new long[][] { {1, 3, 60} , {2, 2, 90}};
+                compareTable(vt, expected);
+            } catch (ProcCallException e) {
+                ex = e;
+            } finally {
+                assertTrue(ex.getMessage().contains("invalid ORDER BY expression"));
+            }
+
             ex = null;
             try {
                 cr = client.callProcedure("@AdHoc", "SELECT dept, COUNT(*), sum(wage) from " + tb +
@@ -767,6 +766,21 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
                 assertEquals(ClientResponse.SUCCESS, cr.getStatus());
                 vt = cr.getResults()[0];
                 expected = new long[][] { {1, 20, 60} , {2, 45, 90}};
+                compareTable(vt, expected);
+            } catch (ProcCallException e) {
+                ex = e;
+            } finally {
+                assertTrue(ex.getMessage().contains("invalid ORDER BY expression"));
+            }
+
+            ex = null;
+            try {
+                // Test order by agg not in display columns
+                cr = client.callProcedure("@AdHoc", "SELECT dept, count(*) from " + tb +
+                        " GROUP BY dept ORDER BY sum(wage) DESC");
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+                vt = cr.getResults()[0];
+                expected = new long[][] { {1, 3} , {2, 2}};
                 compareTable(vt, expected);
             } catch (ProcCallException e) {
                 ex = e;
