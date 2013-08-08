@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-APPNAME=${appname}
+APPNAME=${package}
 
 # find voltdb binaries in either installation or distribution directory.
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
@@ -35,16 +35,18 @@ function clean() {
 
 # compile the source code for procedures and the client
 function srccompile() {
-    mkdir -p obj
-    javac -target 1.6 -source 1.6 -classpath $APPCLASSPATH -d obj *.java
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+    if [ -d src ]; then
+        mkdir -p obj
+        javac -target 1.6 -source 1.6 -classpath $APPCLASSPATH -d obj src/com/$APPNAME/*.java
+        # stop if compilation fails
+        if [ $? != 0 ]; then exit; fi
+    fi
 }
 
 # build an application catalog
 function catalog() {
     srccompile
-    $VOLTDB compile --classpath obj -o $APPNAME.jar %(ddl_file)s
+    $VOLTDB compile --classpath obj -o $APPNAME.jar ${ddl_file}
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }

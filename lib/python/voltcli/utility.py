@@ -42,6 +42,7 @@ import pkgutil
 import binascii
 import stat
 import textwrap
+import string
 
 #===============================================================================
 class Global:
@@ -858,6 +859,52 @@ class File(object):
         if e:
             msgs.append(str(e))
         abort(*msgs)
+
+#===============================================================================
+class FileGenerator(object):
+#===============================================================================
+    """
+    File generator.
+    """
+
+    def __init__(self, resource_finder, **symbols):
+        """
+        resource_finder must implement a find_resource(path) method.
+        """
+        self.resource_finder = resource_finder
+        self.symbols = symbols
+        self.generated = []
+
+    def from_template(self, src, tgt, permissions=None):
+        info('Generating "%s"...' % tgt)
+        src_path = self.resource_finder.find_resource(src)
+        src_file = File(src_path)
+        src_file.open()
+        try:
+            template = string.Template(src_file.read())
+            s = template.safe_substitute(**self.symbols)
+        finally:
+            src_file.close()
+        tgt_file = File(tgt, 'w')
+        tgt_file.open()
+        try:
+            tgt_file.write(s)
+            self.generated.append(tgt)
+        finally:
+            tgt_file.close()
+        if permissions is not None:
+            os.chmod(tgt, 0755)
+
+    def custom(self, tgt, callback):
+        info('Generating "%s"...' % tgt)
+        output_stream = File(tgt, 'w')
+        output_stream.open()
+        try:
+            callback(output_stream)
+            self.generated.append(tgt)
+        finally:
+            output_stream.close()
+
 
 #===============================================================================
 class INIConfigManager(object):

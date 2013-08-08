@@ -103,7 +103,6 @@ def go(cmd_name,
             sys.path.insert(0, '/usr/lib/voltdb/python')
             # Library location relative to script.
         sys.path.insert(0, os.path.join(base_dir, 'lib', 'python'))
-        os.chdir(base_dir)
         if directory:
             os.chdir(directory)
         runner = None

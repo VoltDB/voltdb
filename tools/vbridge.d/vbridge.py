@@ -24,37 +24,41 @@ import sys
 import os
 import mysqlutil
 import shutil
-import string
 from voltcli import utility
 from voltcli import environment
 
-
+#===============================================================================
 class ConfigProperty:
+#===============================================================================
     def __init__(self, description, default=None):
         self.description = description
         self.default = default
 
-class G:
+#===============================================================================
+class Global:
+#===============================================================================
     config_key = 'vbridge'
     config_properties = dict(
         connection_string = ConfigProperty('database connection string'),
         ddl_file          = ConfigProperty('generated DDL file name', default='ddl.sql'),
         deployment_file   = ConfigProperty('generated deployment file name', default='deployment.xml'),
         package           = ConfigProperty('package/application name', default='voltapp'),
-        run_file          = ConfigProperty('generated run script', default='run.sh'),
+        run_script        = ConfigProperty('generated run script', default='run.sh'),
         partition_table   = ConfigProperty('table to use for partitioning analysis'),
         source_type       = ConfigProperty('source database type, e.g. "mysql', default='mysql'),
     )
 
-
+#===============================================================================
 def config_key(name):
+#===============================================================================
     """
     Generate a configuration property key from a property name.
     """
-    return '.'.join([G.config_key, name])
+    return '.'.join([Global.config_key, name])
 
-
+#===============================================================================
 def config_help(samples=None):
+#===============================================================================
     if samples:
         paren = ' (using actual property name)'
     else:
@@ -86,19 +90,29 @@ To get "config" command help:
 
 You can also edit "%(config)s" directly in a text editor.''' % format_dict
 
+#===============================================================================
+class Configuration(dict):
+#===============================================================================
+    """
+    Dictionary that also allows attribute-based access.
+    """
+    def __getattr__(self, name):
+        return self[name]
+    def __setattr__(self, name, value):
+        self[name] = value
 
+#===============================================================================
 def get_config(runner, reset = False):
+#===============================================================================
     """
     Utility function to look for and validate a set of configuration properties.
     """
-    class O(object):
-        pass
-    o = O()
+    config = Configuration()
     missing = []
     defaults = []
     msgblocks = []
-    for name in sorted(G.config_properties.keys()):
-        config_property = G.config_properties[name]
+    for name in sorted(Global.config_properties.keys()):
+        config_property = Global.config_properties[name]
         key = config_key(name)
         value = runner.config.get(key)
         if not value or reset:
@@ -107,38 +121,34 @@ def get_config(runner, reset = False):
                 runner.config.set_permanent(key, '')
             else:
                 defaults.append(name)
-                value = G.config_properties[name].default
+                value = Global.config_properties[name].default
                 runner.config.set_permanent(key, value)
-                setattr(o, name, value)
+                setattr(config, name, value)
         else:
             # Use an existing config value.
-            setattr(o, name, value)
+            config[name] = value
     samples = []
     if not reset and missing:
-        if len(missing) > 1:
-            plural = 's'
-        else:
-            plural = ''
-        table = [(name, G.config_properties[name].description) for name in missing]
-        msgblocks.append(['The following setting%s must be configured before proceeding:' % plural,
-                          '',
-                          utility.format_table(table, headings=['PROPERTY', 'DESCRIPTION'],
-                                                      indent=3, separator='  ')])
+        table = [(name, Global.config_properties[name].description) for name in missing]
+        msgblocks.append([
+            'The following settings must be configured before proceeding:',
+            '',
+            utility.format_table(table, headings=['PROPERTY', 'DESCRIPTION'],
+                                        indent=3, separator='  ')
+        ])
         samples.extend(missing)
-        o = None
+        config = None
     if defaults:
-        if len(defaults) > 1:
-            plural = 's were'
-        else:
-            plural = ' was'
-        msgblocks.append(['The following setting default%s applied and saved permanently:' % plural,
-                          '',
-                          utility.format_table(
-                                [(name, G.config_properties[name].default) for name in defaults],
-                                indent=3, separator='  ', headings=['PROPERTY', 'VALUE'])])
+        msgblocks.append([
+            'The following setting defaults were applied and saved permanently:',
+            '',
+            utility.format_table(
+                [(name, Global.config_properties[name].default) for name in defaults],
+                indent=3, separator='  ', headings=['PROPERTY', 'VALUE'])
+        ])
     if reset:
-        o = None
-    elif o is None:
+        config = None
+    elif config is None:
         msgblocks.append([config_help(samples=samples)])
     if msgblocks:
         for msgblock in msgblocks:
@@ -146,9 +156,53 @@ def get_config(runner, reset = False):
             for msg in msgblock:
                 print msg
         print ''
-    return o
+    return config
 
+#===============================================================================
+class FileGenerator(utility.FileGenerator):
+#===============================================================================
 
+    def __init__(self, runner, config):
+        self.runner = runner
+        self.config = config
+        if config.source_type != 'mysql':
+            utility.abort('Unsupported source type "%s".' % config.source_type,
+                          'Only "mysql" is valid.')
+        output_files = [config.ddl_file, config.deployment_file, config.run_script]
+        overwrites = [p for p in output_files if os.path.exists(p)]
+        if overwrites and not runner.opts.overwrite:
+            utility.abort('Output files exist, delete or use the overwrite option.', overwrites)
+        utility.FileGenerator.__init__(self, self, **config)
+
+    def generate_readme(self):
+        self.from_template('vbridge-README.txt', 'vbridge-README.txt')
+
+    def generate_ddl(self):
+        def generate_schema(output_stream):
+            mysqlutil.generate_schema(self.config.connection_string,
+                                      self.config.partition_table,
+                                      output_stream)
+        self.custom(self.config.ddl_file, generate_schema)
+
+    def generate_deployment(self):
+        self.from_template('deployment.xml', self.config.deployment_file)
+
+    def generate_run_script(self):
+        self.from_template('run.sh', self.config.run_script, permissions=0755)
+
+    def generate_all(self):
+        self.generate_readme()
+        self.generate_ddl()
+        self.generate_deployment()
+        self.generate_run_script()
+        utility.info('Project files were generated successfully.',
+                     'Please examine the following files thoroughly before using.',
+                     self.generated)
+
+    def find_resource(self, path):
+        return self.runner.find_resource(os.path.join('template', path), required=True)
+
+#===============================================================================
 @VOLT.Command(
     description='Port a live database to a starter VoltDB project.',
     description2='''
@@ -161,54 +215,16 @@ Use "config" sub-commands to set and get configuration properties.
     ),
 )
 def port(runner):
+#===============================================================================
     config = get_config(runner)
     if config is None:
         sys.exit(1)
-    source_type = config.source_type.lower()
-    if source_type != 'mysql':
-        utility.abort('Unsupported source type "%s".' % source_type, 'Only "mysql" is valid.')
-    output_files = [config.ddl_file, config.deployment_file, config.run_file]
-    overwrites = [p for p in output_files if os.path.exists(p)]
-    if overwrites and not runner.opts.overwrite:
-        utility.abort('Output files exist, delete or use the -O or --overwrite options.', overwrites)
-    generated_files = []
-    utility.info('Generating "%s"...' % config.ddl_file)
-    output_stream = utility.File(config.ddl_file, 'w')
-    output_stream.open()
-    try:
-        mysqlutil.generate_schema(config.connection_string, config.partition_table, output_stream)
-        generated_files.append(config.ddl_file)
-    finally:
-        output_stream.close()
-    utility.info('Generating "%s"...' % config.deployment_file)
-    src_path = runner.find_resource('template/deployment.xml', required=True)
-    try:
-        shutil.copy(src_path, config.deployment_file)
-        generated_files.append(config.deployment_file)
-    except IOError, e:
-        utility.abort('Failed to copy "%s" to "%s".' % (src_path, config.deployment_file))
-    utility.info('Generating "%s"...' % config.run_file)
-    src_path = runner.find_resource('template/run.sh', required=True)
-    src_file = utility.File(src_path)
-    src_file.open()
-    try:
-        template = string.Template(src_file.read())
-        s = template.safe_substitute(appname=config.package)
-    finally:
-        src_file.close()
-    tgt_file = utility.File(config.run_file, 'w')
-    tgt_file.open()
-    try:
-        tgt_file.write(s)
-        generated_files.append(config.run_file)
-    finally:
-        tgt_file.close()
-    utility.info('Project files were successfully generated.',
-                 'A thorough examination of their contents is recommended.',
-                 generated_files)
+    generator = FileGenerator(runner, config)
+    generator.generate_all()
 
-
+#===============================================================================
 def run_config_get(runner):
+#===============================================================================
     """
     Implementation of "config get" sub-command."
     """
@@ -226,8 +242,9 @@ def run_config_get(runner):
             if n == 0:
                 sys.stdout.write('%s *not found*\n' % arg)
 
-
+#===============================================================================
 def run_config_set(runner):
+#===============================================================================
     """
     Implementation of "config set" sub-command.
     """
@@ -244,8 +261,9 @@ def run_config_set(runner):
         runner.config.set_permanent(key, value)
         print 'set %s=%s' % (key, value)
 
-
+#===============================================================================
 def run_config_reset(runner):
+#===============================================================================
     """
     Implementation of "config reset" sub-command.
     """
@@ -255,7 +273,7 @@ def run_config_reset(runner):
     # Display the help.
     get_config(runner)
 
-
+#===============================================================================
 @VOLT.Multi_Command(
     description  = 'Manipulate and view configuration properties.',
     modifiers = [
@@ -270,4 +288,5 @@ def run_config_reset(runner):
     ]
 )
 def config(runner):
+#===============================================================================
     runner.go()
