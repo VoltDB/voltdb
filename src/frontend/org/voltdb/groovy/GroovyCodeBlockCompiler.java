@@ -37,6 +37,7 @@ public class GroovyCodeBlockCompiler  {
 
         ImportCustomizer imports = new ImportCustomizer();
         imports.addStarImports("org.voltdb");
+        imports.addImports("org.voltdb.groovy.TableBuilder","org.voltdb.groovy.Tuplerator");
         imports.addStaticStars("org.voltdb.VoltProcedure","org.voltdb.VoltType");
 
         conf.addCompilationCustomizers(imports);

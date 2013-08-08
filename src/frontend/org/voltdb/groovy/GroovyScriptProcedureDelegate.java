@@ -28,6 +28,8 @@ import java.util.Map;
 
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.compiler.JvmProbe;
 
 import com.google.common.collect.ImmutableMap;
@@ -121,7 +123,15 @@ public class GroovyScriptProcedureDelegate extends VoltProcedure implements Groo
 
         m_procedureName = shortName;
         m_closure = procedureInvocationClosure;
-        m_parameterTypes = procedureInvocationClosure.getParameterTypes();
+
+        Class<?> [] parameterTypes = procedureInvocationClosure.getParameterTypes();
+        // closure with no parameters has an object as the default parameter
+        if (parameterTypes.length == 1 && parameterTypes[0] == Object.class) {
+            m_parameterTypes = new Class<?>[0];
+        } else {
+            m_parameterTypes = parameterTypes;
+        }
+
         m_statementMap = builder.build();
     }
 
@@ -144,8 +154,22 @@ public class GroovyScriptProcedureDelegate extends VoltProcedure implements Groo
         return bld.build();
     }
 
-    public Object invoke(Object[] paramList) {
-        return m_closure.call(paramList);
+    public Object invoke(Object[] paramList) throws InvocationTargetException {
+        Object retVal;
+        try {
+            retVal = m_closure.call(paramList);
+        } catch (Exception e) {
+            throw new InvocationTargetException(e);
+        }
+        return retVal;
+    }
+
+    public Tuplerator tuplerator(VoltTable table) {
+        return new Tuplerator(table);
+    }
+
+    public VoltTable buildTable(Map<String, VoltType> cols, Closure<Void> c) {
+        return new TableBuilder(cols).make(c);
     }
 
     public static class SetupException extends RuntimeException {

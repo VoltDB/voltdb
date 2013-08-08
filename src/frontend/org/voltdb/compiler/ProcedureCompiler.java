@@ -236,6 +236,12 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
                 public Class<?>[] visitGroovy(Map<String, Object> p) {
                     @SuppressWarnings("unchecked")
                     Closure<Object> transactOn = (Closure<Object>)p.get(GVY_PROCEDURE_ENTRY_CLOSURE);
+
+                    // closure with no parameters has an object as the default parameter
+                    Class<?> [] parameterTypes = transactOn.getParameterTypes();
+                    if ( parameterTypes.length == 1 && parameterTypes[0] == Object.class) {
+                        return new Class<?>[0];
+                    }
                     return transactOn.getParameterTypes();
                 }
     };
