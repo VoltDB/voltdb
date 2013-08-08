@@ -47,8 +47,13 @@ def decorated_log_split(f, offset, keyfunc, fnamedict = {}):
                           "message": <log message>
                           "filename":<filename>})
     """
-    ts_format = '\d{0,4}-?\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2},?\d{0,3}'
-    ts_format_syslog = r'\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}'
+    ts_date = '\d{0,4}-?\d{2}-\d{2}'
+    ts_mmm = '\w{3}'
+    ts_day = '\d{1,2}'
+    ts_time = '\d{2}:\d{2}:\d{2},?\d{0,3}'
+
+    ts_format = ts_date + '\s+' + ts_time
+    ts_format_syslog = ts_mmm + '\s+' + ts_day + '\s+' + ts_time
 
     log_re = re.compile(r'''(?P<datetime>%s|%s)
                              \s+
@@ -171,8 +176,11 @@ class LogfilePackage():
     def __init__(self, f):
         self.tar = tarfile.open(f)
 
+        self.ts_date = '\d{4}-\d{2}-\d{2}'
+        self.ts_time = '\d{2}:\d{2}:\d{2}\.\d{6}'
+
         # validate f is valid logfile package
-        if not re.match(r'.*\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}\.\d{6}\.tgz', f):
+        if not re.match('.*' + self.ts_date + '-' + self.ts_time + '\.tgz', f):
             raise IOError(f + " isn't a valid logfile package")
 
     def get_logs(self):
@@ -184,7 +192,7 @@ class LogfilePackage():
         return [f for f in self.tar.getnames() if re.search(pat, f)]
 
     def get_crashfiles(self):
-        pat = 'voltdb_crash/voltdb_crash\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}\.\d{6}\.txt'
+        pat = 'voltdb_crash/voltdb_crash' + self.ts_date + '-' + self.ts_time + '\.txt'
         crashfiles = [f for f in self.tar.getnames() if re.match(pat, f)]
         return sorted(crashfiles)
 
@@ -204,7 +212,7 @@ class LogfilePackage():
 
         self.f = tempfile.NamedTemporaryFile()
 
-        ts_format = '\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{6}'
+        ts_format = self.ts_date + '\s+' + self.ts_time
         header_re = re.compile(r'Time:\s+(?P<timestamp>%s)' % ts_format)
 
         for f in crashfiles:
@@ -262,7 +270,10 @@ if __name__ == "__main__":
 
     #If we have 1 arg, see if it is a tarfile
     if len(args) == 1 and tarfile.is_tarfile(args[0]):
-        if re.match(r'.*\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}\.\d{6}\.tgz', f):
+        ts_date = '\d{4}-\d{2}-\d{2}'
+        ts_time = '\d{2}:\d{2}:\d{2}\.\d{6}'
+
+        if re.match('.*' + ts_date + '-' + ts_time + '\.tgz', f):
             try:
                 tar = LogfilePackage(args[0])
             except IOError as e:
