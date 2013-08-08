@@ -242,6 +242,7 @@ if __name__ == "__main__":
 
     (options, args) = parser.parse_args()
 
+    fnamedict = {}
     offsets = {}
     tar = None
 
@@ -282,6 +283,7 @@ if __name__ == "__main__":
             if os.path.getsize(tar.f.name) > 0:
                 files += [tar.f]
                 offsets[tar.f.name] = 0
+                fnamedict[tar.f.name] = 'file_creation'
 
         else:
             try:
@@ -307,12 +309,13 @@ if __name__ == "__main__":
             offsets[f.name] = int(options.tzoffset)
 
     # Use directory paths if there are identical filenames
-    fnamedict = {}
+    _fnamedict = {}
     filenames = [os.path.basename(f.name) for f in files]
     if len(filenames) - len(set(filenames)) > 0:
-        fnamedict = {f.name: f.name for f in files}
+        _fnamedict = {f.name: f.name for f in files if f.name not in fnamedict}
     else:
-        fnamedict = {f.name: os.path.basename(f.name) for f in files}
+        _fnamedict = {f.name: os.path.basename(f.name) for f in files if f.name not in fnamedict}
+    fnamedict.update(_fnamedict)
 
     if options.outputfile:
         try:
