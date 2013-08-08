@@ -19,11 +19,14 @@ import re
 import sys
 import tarfile
 import time
+import gzip
+import tempfile
 
 #Known timestamp formats
 # apprunner           04-18 07:14:35
 # dragent             2013-03-14 00:00:33
 # servers             2013-03-14 00:00:33,877
+# syslog              Aug  6 09:06:38
 
 def epochtimemillis_keyfunc(ts):
     """Return ms since epoch for timestamp of format yyyy-mm-dd hh:mm:ss[,xxx]
@@ -45,11 +48,12 @@ def decorated_log_split(f, offset, keyfunc, fnamedict = {}):
                           "filename":<filename>})
     """
     ts_format = '\d{0,4}-?\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2},?\d{0,3}'
+    ts_format_syslog = r'\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}'
 
-    log_re = re.compile(r'''(?P<datetime>%s)
+    log_re = re.compile(r'''(?P<datetime>%s|%s)
                              \s+
                              (?P<message>.*)
-                             ''' % ts_format, re.VERBOSE)
+                             ''' % (ts_format, ts_format_syslog), re.VERBOSE)
     new_epoch_ms = None
 
     if hasattr(f, 'name'):
@@ -68,6 +72,10 @@ def decorated_log_split(f, offset, keyfunc, fnamedict = {}):
             currentdict["filename"] = fname
             #Add a year if none exists (like in apprunner.log)
             #Note to self: make apprunner log the year.
+
+            if re.match(ts_format_syslog, currentdict["datetime"]):
+               ts = time.strptime(str(datetime.now().year) + ' ' + currentdict["datetime"], "%Y %b %d %H:%M:%S")
+               currentdict["datetime"] = time.strftime("%Y-%m-%d %H:%M:%S", ts)
 
             if currentdict["datetime"][4] != '-':
                 currentdict["datetime"] = str(datetime.now().year) + \
@@ -156,6 +164,62 @@ class ApprunnerTarFile():
             offset_hours = -5
         return str(offset_hours * 60 * 60 * 1000)
 
+
+class LogfilePackage():
+    def __init__(self, f):
+        self.tar = tarfile.open(f)
+
+        # validate f is valid logfile package
+        if not re.match(r'.*\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}\.\d{6}\.tgz', f):
+            raise IOError(f + " isn't a valid logfile package")
+
+    def get_logs(self):
+        pat = '[/^]log/.*'
+        return [f for f in self.tar.getnames() if re.search(pat, f)]
+
+    def get_syslogs(self):
+        pat = 'syslog/syslog.*'
+        return [f for f in self.tar.getnames() if re.search(pat, f)]
+
+    def get_crashfiles(self):
+        pat = 'voltdb_crash/voltdb_crash\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}\.\d{6}\.txt'
+        crashfiles = [f for f in self.tar.getnames() if re.match(pat, f)]
+        return sorted(crashfiles)
+
+    # copied from ApprunnerTarFile
+    def get_server_tzoffset(self):
+        mtime = self.tar.getmember(self.tar.getnames()[0]).mtime
+        if time.localtime(mtime).tm_isdst:
+            offset_hours = -4
+        else:
+            offset_hours = -5
+        return str(offset_hours * 60 * 60 * 1000)
+
+    # add a timestamped line for each file created
+    # for now only interested in voltdb crash files
+    def get_file_creation_events(self):
+        crashfiles = self.get_crashfiles()
+
+        self.f = tempfile.NamedTemporaryFile()
+
+        ts_format = '\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{6}'
+        header_re = re.compile(r'Time:\s+(?P<timestamp>%s)' % ts_format)
+
+        for f in crashfiles:
+            header = self.tar.extractfile(f).readline()
+
+            m = header_re.match(header)
+            if m:
+                ts = m.groupdict()['timestamp']
+                line = ts[-4::-1].replace('.', ",", 1)[::-1] + " crash file " + os.path.basename(f) + " created\n"
+                self.f.write(line)
+
+        self.f.flush()
+        self.f.seek(0)
+
+        return self.f
+
+
 if __name__ == "__main__":
 
     parser = OptionParser(usage = "usage: %prog [options] FILE...")
@@ -195,18 +259,41 @@ if __name__ == "__main__":
 
     #If we have 1 arg, see if it is a tarfile
     if len(args) == 1 and tarfile.is_tarfile(args[0]):
-        try:
-            tar = ApprunnerTarFile(args[0])
-        except IOError as e:
-            sys.exit(e)
+        if re.match(r'.*\d{4}-\d{2}-\d{2}-\d{2}:\d{2}:\d{2}\.\d{6}\.tgz', f):
+            try:
+                tar = LogfilePackage(args[0])
+            except IOError as e:
+                sys.exit(e)
 
-        serverlogs = tar.get_serverlogs()
-        for f in serverlogs:
-           offsets[f] = int(tar.get_server_tzoffset())
-        otherlogs = tar.get_otherlogs()
-        for f in otherlogs:
-            offsets[f] = 0
-        files = map(tar.tar.extractfile, serverlogs + otherlogs)
+            logs = tar.get_logs()
+            for f in logs:
+                offsets[f] = int(tar.get_server_tzoffset())
+
+            syslogs = tar.get_syslogs()
+            for f in syslogs:
+                offsets[f] = 0
+
+            tar.get_file_creation_events()
+
+            files = [gzip.GzipFile(fileobj=f) if f.name.endswith('.gz') else f for f in map(tar.tar.extractfile, logs + syslogs)]
+
+            if os.path.getsize(tar.f.name) > 0:
+                files += [tar.f]
+                offsets[tar.f.name] = 0
+
+        else:
+            try:
+                tar = ApprunnerTarFile(args[0])
+            except IOError as e:
+                sys.exit(e)
+
+            serverlogs = tar.get_serverlogs()
+            for f in serverlogs:
+                offsets[f] = int(tar.get_server_tzoffset())
+            otherlogs = tar.get_otherlogs()
+            for f in otherlogs:
+                offsets[f] = 0
+            files = map(tar.tar.extractfile, serverlogs + otherlogs)
 
 
     else:
