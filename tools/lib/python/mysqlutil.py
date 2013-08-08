@@ -26,8 +26,8 @@ from voltcli import utility
 from voltcli import environment
 
 # A common OS X mysql installation problem can prevent _mysql.so from loading.
-# Postpone database imports until initialize() is called to avoid errors for
-# in non-mysql commands and to provide good messages for handle import errors.
+# Postpone database imports until initialize() is called to avoid errors in
+# non-mysql commands and to provide good messages to help diagnose errors.
 schemaobject = None
 MySQLdb = None
 
@@ -41,7 +41,17 @@ class Global:
     Globals.
     """
     # Regular expression to parse a MySQL type.
-    re_type = re.compile(r'^\s*\b([a-z0-9_ ]+)\b\s*([(]([^)]*)[)])?\s*$')
+    re_type = re.compile(
+            # Whitespace
+            r'^\s'
+            # Token (group 1)
+            r'*\b([a-z0-9_ ]+)\b'
+            # Whitespace
+            r'\s*'
+            # Optional [MODIFIER] (group 2)
+            r'([(]([^)]*)[)])?'
+            # Whitespace
+            r'\s*$')
     # The suggestion to display when OS X mysql module import fails.
     osx_fix = 'ln -s /usr/local/mysql/lib/libmysqlclient.[0-9][0-9]*.dylib /usr/local/lib/'
     # The comment prefix used to annotate generated lines.
@@ -244,7 +254,7 @@ class MySQLSchemaGenerator(object):
                                                            fix_name(index.name),
                                                            fix_name(table_name)))
                 for column_name, sub_part in index.fields:
-                    self.formatter.code(fix_name(column_name))
+                    self.formatter.code_fragment(fix_name(column_name))
                     if sub_part != 0:
                         self.formatter.block_vcomment('Ignored sub-partition %d on field "%s".'
                                                             % (sub_part, fix_name(column_name)))
@@ -266,7 +276,7 @@ class MySQLSchemaGenerator(object):
             voltdb_null = ''
         else:
             voltdb_null = ' NOT NULL'
-        self.formatter.code('%s %s%s' % (fix_name(column.name), voltdb_type, voltdb_null))
+        self.formatter.code_fragment('%s %s%s' % (fix_name(column.name), voltdb_type, voltdb_null))
 
     def format_primary_key(self, table_name):
         table = self.get_table(table_name)
@@ -274,7 +284,7 @@ class MySQLSchemaGenerator(object):
             self.formatter.blank()
             self.formatter.block_start('CONSTRAINT PK_%s PRIMARY KEY' % fix_name(table_name))
             for primary_key_column in table.primary_key_columns:
-                self.formatter.code(fix_name(primary_key_column.name))
+                self.formatter.code_fragment(fix_name(primary_key_column.name))
             self.formatter.block_end()
 
     def get_table(self, table_name):
@@ -316,7 +326,7 @@ class MySQLSchemaGenerator(object):
     def _determine_partitioning(self):
         # Partition around either a user-specified table or the largest row count.
         partition_table = None
-        if self.partition_table_name:
+        if self.partition_table_name and self.partition_table_name.upper() != 'AUTO':
             # Find the user-specified table schema.
             for table in self.iter_tables():
                 if table.name == self.partition_table_name:

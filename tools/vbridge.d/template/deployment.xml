@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <deployment>
-   <cluster hostcount="1" sitesperhost="2" />
-   <httpd enabled="true">
-      <jsonapi enabled="true" />
-   </httpd>
+    <cluster hostcount="${host_count}" sitesperhost="${sites_per_host}" />
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
 </deployment>

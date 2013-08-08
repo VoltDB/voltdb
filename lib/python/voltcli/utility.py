@@ -1167,6 +1167,8 @@ class CodeFormatter(object):
             self._line(True, ')')
         self.block_start_index.pop()
     def code(self, *lines):
+        self._line(False, *lines)
+    def code_fragment(self, *lines):
         self._line(True, *lines)
     def comment(self, *lines):
         for line in lines:

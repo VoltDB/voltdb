@@ -44,8 +44,10 @@ class Global:
         deployment_file   = ConfigProperty('generated deployment file name', default='deployment.xml'),
         package           = ConfigProperty('package/application name', default='voltapp'),
         run_script        = ConfigProperty('generated run script', default='run.sh'),
-        partition_table   = ConfigProperty('table to use for partitioning analysis'),
-        source_type       = ConfigProperty('source database type, e.g. "mysql', default='mysql'),
+        partition_table   = ConfigProperty('table to use for partitioning analysis', default='AUTO'),
+        source_type       = ConfigProperty('source database type, e.g. "mysql"', default='mysql'),
+        host_count        = ConfigProperty('number of hosts', default='1'),
+        sites_per_host    = ConfigProperty('number of sites per host', default='2'),
     )
 
 #===============================================================================
