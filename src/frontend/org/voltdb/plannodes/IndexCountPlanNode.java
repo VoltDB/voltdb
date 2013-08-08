@@ -18,8 +18,8 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
-import java.util.SortedSet;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -40,7 +40,6 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.PlanNodeType;
-import org.voltdb.utils.CatalogUtil;
 import org.voltdb.types.SortDirectionType;
 import org.voltdb.utils.CatalogUtil;
 
@@ -249,10 +248,14 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    protected void getThisNodesTablesAndIndexes(SortedSet<String> tablesRead, SortedSet<String> tablesUpdated, SortedSet<String> indexes) {
-        super.getThisNodesTablesAndIndexes(tablesRead, tablesUpdated, indexes);
-        assert(m_targetIndexName.length() > 0);
-        indexes.add(m_targetIndexName);
+    public void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tableUpdated,
+                                    Collection<String> indexes)
+    {
+        super.getTablesAndIndexes(tablesRead, tableUpdated, indexes);
+        if (indexes != null) {
+            assert(m_targetIndexName.length() > 0);
+            indexes.add(m_targetIndexName);
+        }
     }
 
     @Override

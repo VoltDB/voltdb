@@ -176,18 +176,17 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         // NULL_rejection simplification is the first transformation -
         // before the LEFT-to-RIGHT and the WHERE expressions push down
 
-        // Both join expressions stays at the top join
         AbstractPlanNode pn = compile("select * FROM R1, R3 RIGHT JOIN R2 ON R1.A = R2.A WHERE R3.C = R1.C");
         AbstractPlanNode n = pn.getChild(0).getChild(0);
         assertTrue(n instanceof NestLoopPlanNode);
         NestLoopPlanNode nlj = (NestLoopPlanNode) n;
         assertTrue(JoinType.INNER == nlj.getJoinType());
         assertTrue(nlj.getJoinPredicate() != null);
-        n = nlj.getChild(1);
+        n = nlj.getChild(0);
         assertTrue(n instanceof NestLoopPlanNode);
         nlj = (NestLoopPlanNode) n;
         assertTrue(JoinType.INNER == nlj.getJoinType());
-        assertTrue(nlj.getJoinPredicate() == null);
+        assertTrue(nlj.getJoinPredicate() != null);
 
         // The second R3.C = R2.C join condition is NULL-rejecting for the first LEFT join
         pn = compile("select * FROM R1 LEFT JOIN R2 ON R1.A = R2.A LEFT JOIN R3 ON R3.C = R2.C");

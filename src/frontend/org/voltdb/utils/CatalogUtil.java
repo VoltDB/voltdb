@@ -17,7 +17,6 @@
 
 package org.voltdb.utils;
 
-import com.google.common.base.Charsets;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -37,15 +36,16 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
+
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
+
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -113,6 +113,8 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.xml.sax.SAXException;
+
+import com.google.common.base.Charsets;
 
 /**
  *
@@ -1536,9 +1538,9 @@ public abstract class CatalogUtil {
                                               AbstractPlanNode topPlan,
                                               AbstractPlanNode bottomPlan)
     {
-        SortedSet<String> tablesRead = new TreeSet<String>();
-        SortedSet<String> tablesUpdated = new TreeSet<String>();
-        SortedSet<String> indexes = new TreeSet<String>();
+        Collection<String> tablesRead = new TreeSet<String>();
+        Collection<String> tablesUpdated = new TreeSet<String>();
+        Collection<String> indexes = new TreeSet<String>();
         if (topPlan != null) {
             topPlan.getTablesAndIndexes(tablesRead, tablesUpdated, indexes);
         }

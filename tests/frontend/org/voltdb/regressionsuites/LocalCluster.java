@@ -69,7 +69,7 @@ public class LocalCluster implements VoltServerConfig {
     }
 
     // how long to wait for startup of external procs
-    static final long PIPE_WAIT_MAX_TIMEOUT = 60 * 1000;
+    static final long PIPE_WAIT_MAX_TIMEOUT = 60 * 1000 *2; //*2 == slow machine allowance
 
     String m_callingClassName = "";
     String m_callingMethodName = "";
@@ -378,7 +378,8 @@ public class LocalCluster implements VoltServerConfig {
         m_localServer.start();
     }
 
-    boolean waitForAllReady() {
+    private boolean waitForAllReady()
+    {
         if (!m_expectedToInitialize) {
             return true;
         }

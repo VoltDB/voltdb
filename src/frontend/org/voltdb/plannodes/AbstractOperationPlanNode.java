@@ -17,7 +17,7 @@
 
 package org.voltdb.plannodes;
 
-import java.util.SortedSet;
+import java.util.Collection;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -40,10 +40,11 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    protected void getThisNodesTablesAndIndexes(SortedSet<String> tablesRead, SortedSet<String> tablesUpdated, SortedSet<String> indexes) {
-        super.getThisNodesTablesAndIndexes(tablesRead, tablesUpdated, indexes);
+    public final void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tableUpdated,
+                                          Collection<String> indexes)
+    {
         assert(m_targetTableName.length() > 0);
-        tablesUpdated.add(m_targetTableName);
+        tableUpdated.add(m_targetTableName);
     }
 
     protected String debugInfo(String spacer) {
