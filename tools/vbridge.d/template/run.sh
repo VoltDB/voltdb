@@ -63,7 +63,7 @@ function server() {
 # run the client that drives the example
 function client() {
     srccompile
-    java -classpath obj:$APPCLASSPATH Client $SERVERLIST
+    java -classpath obj:$APPCLASSPATH com.$APPNAME.Client $SERVERLIST
 }
 
 function help() {

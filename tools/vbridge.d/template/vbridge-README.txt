@@ -27,6 +27,8 @@ What was generated
 - Run script (${run_script}):
   Bash script command line interface to running your client and server.
 
+- Sample client and procedure code in the src directory.
+
 Using the generated files
 -------------------------
 

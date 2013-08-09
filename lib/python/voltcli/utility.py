@@ -809,14 +809,22 @@ class File(object):
     File reader/writer object that aborts on any error. Must explicitly call
     close(). The main point is to standardize the error-handling.
     """
-    def __init__(self, path, mode = 'r'):
+    def __init__(self, path, mode = 'r', make_dirs=False):
         if mode not in ('r', 'w'):
             abort('Invalid file mode "%s".' % mode)
-        self.path = path
-        self.mode = mode
-        self.f    = None
+        self.path      = path
+        self.mode      = mode
+        self.make_dirs = make_dirs
+        self.f         = None
     def open(self):
         self.close()
+        if self.mode == 'w' and self.make_dirs:
+            dir = os.path.dirname(self.path)
+            if dir and not os.path.exists(dir):
+                try:
+                    os.makedirs(dir)
+                except (IOError, OSError), e:
+                    self._abort('Unable to create directory "%s".' % dir)
         self.f = self._open()
     def read(self):
         if self.mode != 'r':
@@ -872,8 +880,11 @@ class FileGenerator(object):
         resource_finder must implement a find_resource(path) method.
         """
         self.resource_finder = resource_finder
-        self.symbols = symbols
+        self.symbols = copy.copy(symbols)
         self.generated = []
+
+    def add_symbols(self, **symbols):
+        self.symbols.update(symbols)
 
     def from_template(self, src, tgt, permissions=None):
         info('Generating "%s"...' % tgt)
@@ -885,7 +896,7 @@ class FileGenerator(object):
             s = template.safe_substitute(**self.symbols)
         finally:
             src_file.close()
-        tgt_file = File(tgt, 'w')
+        tgt_file = File(tgt, mode='w', make_dirs=True)
         tgt_file.open()
         try:
             tgt_file.write(s)

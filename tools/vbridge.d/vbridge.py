@@ -48,6 +48,7 @@ class Global:
         source_type       = ConfigProperty('source database type, e.g. "mysql"', default='mysql'),
         host_count        = ConfigProperty('number of hosts', default='1'),
         sites_per_host    = ConfigProperty('number of sites per host', default='2'),
+        kfactor           = ConfigProperty('K factor redundancy', default='0'),
     )
 
 #===============================================================================
@@ -181,9 +182,11 @@ class FileGenerator(utility.FileGenerator):
 
     def generate_ddl(self):
         def generate_schema(output_stream):
-            mysqlutil.generate_schema(self.config.connection_string,
-                                      self.config.partition_table,
-                                      output_stream)
+            schema = mysqlutil.generate_schema(self.config.connection_string,
+                                               self.config.partition_table,
+                                               output_stream)
+            table_list = ',\n'.join(['        "%s"' % name for name in schema.table_names])
+            self.add_symbols(table_list=table_list)
         self.custom(self.config.ddl_file, generate_schema)
 
     def generate_deployment(self):
@@ -192,11 +195,19 @@ class FileGenerator(utility.FileGenerator):
     def generate_run_script(self):
         self.from_template('run.sh', self.config.run_script, permissions=0755)
 
+    def generate_sample_client(self):
+        self.from_template('Client.java', 'src/com/%s/Client.java' % self.config.package)
+
+    def generate_sample_procedure(self):
+        self.from_template('Counts.java', 'procedures/com/%s/Counts.java' % self.config.package)
+
     def generate_all(self):
         self.generate_readme()
-        self.generate_ddl()
         self.generate_deployment()
         self.generate_run_script()
+        self.generate_ddl()
+        self.generate_sample_client()
+        self.generate_sample_procedure()
         utility.info('Project files were generated successfully.',
                      'Please examine the following files thoroughly before using.',
                      self.generated)

@@ -137,6 +137,7 @@ def generate_schema(uri, partition_table, output_stream):
     initialize()
     schema_generator = MySQLSchemaGenerator(uri, partition_table)
     schema_generator.write_schema(output_stream)
+    return schema_generator
 
 
 def fix_name(name):
