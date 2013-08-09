@@ -907,6 +907,20 @@ public class ProcedureRunner {
             }
         };
 
+   protected boolean isProcedureStackTraceElement(StackTraceElement stel) {
+       int lastPeriodPos = stel.getClassName().lastIndexOf('.');
+
+       if (lastPeriodPos == -1) {
+           lastPeriodPos = 0;
+       } else {
+           ++lastPeriodPos;
+       }
+
+       String simpleName = stel.getClassName().substring(lastPeriodPos);
+       return simpleName.equals(m_procedureName)
+           || (simpleName.startsWith(m_procedureName) && simpleName.charAt(m_procedureName.length()) == '$');
+   }
+
    /**
     *
     * @param e
@@ -919,7 +933,7 @@ public class ProcedureRunner {
        StackTraceElement[] stack = e.getStackTrace();
        ArrayList<StackTraceElement> matches = new ArrayList<StackTraceElement>();
        for (StackTraceElement ste : stack) {
-           if (ste.getClassName().equals(m_procedure.getClass().getName()))
+           if (isProcedureStackTraceElement(ste))
                matches.add(ste);
        }
 

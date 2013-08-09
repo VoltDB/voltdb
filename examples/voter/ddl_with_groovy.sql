@@ -163,19 +163,19 @@ CREATE PROCEDURE voter.procedures.Vote AS ###
     long ERR_VOTER_OVER_VOTE_LIMIT = 2
 
     // Checks if the vote is for a valid contestant
-    SQLStmt checkContestantStmt = new SQLStmt(
+    checkContestantStmt = new SQLStmt(
             'SELECT contestant_number FROM contestants WHERE contestant_number = ?;')
 
     // Checks if the voter has exceeded their allowed number of votes
-    SQLStmt checkVoterStmt = new SQLStmt(
+    checkVoterStmt = new SQLStmt(
             'SELECT num_votes FROM v_votes_by_phone_number WHERE phone_number = ?;')
 
     // Checks an area code to retrieve the corresponding state
-    SQLStmt checkStateStmt = new SQLStmt(
+    checkStateStmt = new SQLStmt(
             'SELECT state FROM area_code_state WHERE area_code = ?;')
 
     // Records a vote
-    SQLStmt insertVoteStmt = new SQLStmt(
+    insertVoteStmt = new SQLStmt(
             'INSERT INTO votes (phone_number, state, contestant_number) VALUES (?, ?, ?);')
 
     transactOn = { long phoneNumber, int contestantNumber, long maxVotesPerPhoneNumber -> 
@@ -229,7 +229,7 @@ CREATE PROCEDURE voter.procedures.ContestantWinningStates AS ###
             }
         }
         buildTable(state:STRING, num_votes:BIGINT) {
-            results.sort { a,b -> b.votes - a.votes }[0..max-1].each {
+            results.sort { a,b -> b.votes - a.votes }[0..<max].each {
                 row it.state, it.votes
             }
         }
