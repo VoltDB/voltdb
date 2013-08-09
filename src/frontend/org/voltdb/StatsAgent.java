@@ -118,7 +118,7 @@ public class StatsAgent extends OpsAgent
     /**
      * Produce PROCEDUREOUTPUT aggregation of PROCEDURE subselector
      */
-    
+
     private VoltTable[] aggregateProcedureOutputStats(VoltTable[] baseStats)
     {
         if (baseStats == null || baseStats.length != 1) {
