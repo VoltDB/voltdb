@@ -22,6 +22,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
@@ -36,6 +37,8 @@ import org.voltdb.StarvationTracker;
  */
 class MpRoSitePool
 {
+    final static VoltLogger tmLog = new VoltLogger("TM");
+
     // IZZY: temporary static vars
     static int MAX_POOL_SIZE = 100;
     static int INITIAL_POOL_SIZE = 0;
@@ -189,11 +192,10 @@ class MpRoSitePool
      */
     void completeWork(long txnId)
     {
-        MpRoSiteContext site = m_busySites.get(txnId);
+        MpRoSiteContext site = m_busySites.remove(txnId);
         if (site == null) {
             throw new RuntimeException("No busy site for txnID: " + txnId + " found, shouldn't happen.");
         }
-        m_busySites.remove(site);
         m_idleSites.push(site);
     }
 }
