@@ -559,6 +559,11 @@ public abstract class SubPlanAssembler {
             if (retval.use == IndexUseType.COVERING_UNIQUE_EQUALITY) {
                 retval.use = IndexUseType.INDEX_SCAN;
                 retval.lookupType = IndexLookupType.GTE;
+                // This approach only supports forward scanning of the unfiltered components,
+                // so descending order can not be supported.
+                if (retval.sortDirection == SortDirectionType.DESC) {
+                    retval.sortDirection = SortDirectionType.INVALID;
+                }
             }
             // GTE scans can have any number of null key components appended without changing
             // the effective value. So, that leaves GT scans.
