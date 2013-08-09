@@ -32,7 +32,7 @@ public class TestStatsProcInputTable {
     static class ResultRow {
         long timestamp;
         String procedure;
-        String percent;
+        long percent;
         long invocations;
         long minIN;
         long maxIN;
@@ -77,7 +77,7 @@ public class TestStatsProcInputTable {
         int ii = 0;
         while (vt.advanceRow()) {
             System.out.printf("%s: validating row %d\n", testname, ii);
-            assertEquals(data[ii].percent, vt.getString("WEIGHTED_PERC"));
+            assertEquals(data[ii].percent, vt.getLong("WEIGHTED_PERC"));
             assertEquals(data[ii].timestamp, vt.getLong("TIMESTAMP"));
             assertEquals(data[ii].procedure, vt.getString("PROCEDURE"));
             assertEquals(data[ii].invocations, vt.getLong("INVOCATIONS"));
@@ -125,12 +125,12 @@ public class TestStatsProcInputTable {
     @Test
     public void testMultipleProcs() throws Exception {
         ProcInputRow data[] = {     //proc/part/time/invok/min/max/avg
-            new ProcInputRow("A", 0L, 12345L, 300L, 3L, 5L, 4L)
-            new ProcInputRow("B", 0L, 12345L, 100L, 1L, 4L, 2L)
+            new ProcInputRow("A", 0L, 12345L, 300L, 3L, 5L, 4L),
+            new ProcInputRow("B", 0L, 12345L, 100L, 1L, 4L, 2L),
             new ProcInputRow("B", 1L, 12345L, 100L, 1L, 3L, 2L)
         };
         ResultRow result[] = {  //time/proc/perc/inok/min/max/avg/tot
-            new ResultRow(12345L, "A", 75L, 300L, 3L, 5L, 4L, 1200L)
+            new ResultRow(12345L, "A", 75L, 300L, 3L, 5L, 4L, 1200L),
             new ResultRow(12345L, "B", 25L, 200L, 1L, 4L, 2L, 400L)
         };
         StatsProcInputTable dut = new StatsProcInputTable();
@@ -144,9 +144,9 @@ public class TestStatsProcInputTable {
         // need to not double count invocations at replicas, but do look at
         // min, max, avg
         ProcInputRow data[] = { //proc/part/time/invok/min/max/avg
-            new ProcInputRow("proc", 0L, 12345L, 200L, 4L, 10L, 6L)
-            new ProcInputRow("proc", 0L, 12345L, 100L, 4L, 25L, 10L)
-            new ProcInputRow("proc", 0L, 12345L, 100L, 1L, 4L, 2L)
+            new ProcInputRow("proc", 0L, 12345L, 200L, 4L, 10L, 6L),
+            new ProcInputRow("proc", 0L, 12345L, 100L, 4L, 25L, 10L),
+            new ProcInputRow("proc", 0L, 12345L, 100L, 1L, 4L, 2L),
             new ProcInputRow("proc", 1L, 12345L, 400L, 2L, 8L, 4L)
         };
         ResultRow result[] = { //time/proc/perc/inok/min/max/avg/tot
