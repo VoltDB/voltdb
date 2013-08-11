@@ -25,12 +25,14 @@ package org.voltdb.planner;
 
 import java.util.List;
 
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 
 public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
@@ -97,6 +99,17 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         nlj = (NestLoopPlanNode) n;
         assertTrue(JoinType.LEFT == nlj.getJoinType());
         assertTrue(nlj.getJoinPredicate() != null);
+    }
+
+    public void testMultiTableJoinExpressions() {
+        AbstractPlanNode pn = compile("select * FROM R1, R2 LEFT JOIN R3 ON R3.A = R2.C OR R3.A = R1.A WHERE R1.C = R2.C");
+        AbstractPlanNode n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        NestLoopPlanNode nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.LEFT == nlj.getJoinType());
+        assertTrue(nlj.getJoinPredicate() != null);
+        AbstractExpression p = nlj.getJoinPredicate();
+        assertEquals(ExpressionType.CONJUNCTION_OR, p.getExpressionType());
     }
 
     public void testPushDownExprJoin() {
