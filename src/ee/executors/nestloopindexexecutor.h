@@ -94,7 +94,7 @@ protected:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
-    inline void setStatsForLongOp(Table* targetTable, TableIndex* index) {
+    inline void setStatsForLongOp(Table* targetTable) {
         if(m_engine->isPrepareStatsForLongOp()) {
                 m_engine->setPlanNodeName(planNodeToString(m_abstractNode->getPlanNodeType()));
                 m_engine->setTargetTableInfo(targetTable->name(), targetTable->activeTupleCount());
