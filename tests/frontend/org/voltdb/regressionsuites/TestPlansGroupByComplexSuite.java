@@ -700,8 +700,8 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         long[][] expected;
 
         for (String tb: tbs) {
-            cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage-id), avg(wage-id), count(*) from " + tb +
-                    " GROUP BY dept ORDER BY dept");
+            cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage-id), avg(wage-id), " +
+                    "count(*) from " + tb + " GROUP BY dept ORDER BY dept");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 54, 18, 3} , {2, 81, 40, 2}};
@@ -709,8 +709,8 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             compareTable(vt, expected);
 
 
-            cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage-id) + 1, avg(wage-id), count(*) from " + tb +
-                    " GROUP BY dept ORDER BY dept");
+            cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage-id) + 1, " +
+                    "avg(wage-id), count(*) from " + tb + " GROUP BY dept ORDER BY dept");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 55, 18, 3} , {2, 82, 40, 2}};
@@ -954,15 +954,15 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         //project.addStmtProcedure("failedProcedure", "SELECT wage, SUM(wage) from R1 group by ID;");
         //project.addStmtProcedure("groupby", "SELECT (dept+1) as tag, count(wage) from R1 GROUP BY dept+1 ORDER BY tag");
 
-//        config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-//        success = config.compile(project);
-//        assertTrue(success);
-//        builder.addServerConfig(config);
-//
-//        config = new LocalCluster("plansgroupby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-//        success = config.compile(project);
-//        assertTrue(success);
-//        builder.addServerConfig(config);
+        config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        success = config.compile(project);
+        assertTrue(success);
+        builder.addServerConfig(config);
+
+        config = new LocalCluster("plansgroupby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        success = config.compile(project);
+        assertTrue(success);
+        builder.addServerConfig(config);
 
         // Cluster
         config = new LocalCluster("plansgroupby-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
