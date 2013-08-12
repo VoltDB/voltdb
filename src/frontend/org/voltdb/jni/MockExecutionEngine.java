@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Random;
 
 import org.voltcore.utils.DBBPool;
-import org.voltdb.FragmentPlanSource;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.ParameterSet;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
@@ -37,10 +37,6 @@ import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 
 public class MockExecutionEngine extends ExecutionEngine {
-
-    public MockExecutionEngine(FragmentPlanSource planSource) {
-        super(planSource);
-    }
 
     @Override
     protected void throwExceptionForError(int errorCode) {
