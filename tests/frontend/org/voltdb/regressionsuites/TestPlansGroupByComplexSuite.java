@@ -700,6 +700,15 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         long[][] expected;
 
         for (String tb: tbs) {
+            cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage-id) from " + tb +
+                    " GROUP BY dept ORDER BY dept");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {1, 54} , {2, 81}};
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+
             cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage-id), avg(wage-id), " +
                     "count(*) from " + tb + " GROUP BY dept ORDER BY dept");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -929,27 +938,29 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
                 "DEPT INTEGER NOT NULL, " +
                 "TM TIMESTAMP DEFAULT NULL, " +
                 "PRIMARY KEY (ID) );" +
+                "PARTITION TABLE P1 ON COLUMN ID;" +
+
                 "CREATE TABLE P2 ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
                 "WAGE INTEGER NOT NULL, " +
                 "DEPT INTEGER NOT NULL, " +
                 "TM TIMESTAMP DEFAULT NULL, " +
                 "PRIMARY KEY (ID) );" +
+                "PARTITION TABLE P2 ON COLUMN DEPT;" +
+
                 "CREATE TABLE P3 ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
                 "WAGE INTEGER NOT NULL, " +
                 "DEPT INTEGER NOT NULL, " +
                 "TM TIMESTAMP DEFAULT NULL, " +
-                "PRIMARY KEY (ID) );"
+                "PRIMARY KEY (ID) );" +
+                "PARTITION TABLE P3 ON COLUMN WAGE;"
                 ;
         try {
             project.addLiteralSchema(literalSchema);
         } catch (IOException e) {
             assertFalse(true);
         }
-        project.addPartitionInfo("P1", "ID");
-        project.addPartitionInfo("P2", "DEPT");
-        project.addPartitionInfo("P3", "WAGE");
         boolean success;
         //project.addStmtProcedure("failedProcedure", "SELECT wage, SUM(wage) from R1 group by ID;");
         //project.addStmtProcedure("groupby", "SELECT (dept+1) as tag, count(wage) from R1 GROUP BY dept+1 ORDER BY tag");
