@@ -23,25 +23,24 @@
 
 package org.voltdb;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
+import au.com.bytecode.opencsv_voltpatches.CSVWriter;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.VoltTableUtil;
-
-import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 
 public class TestVoltTableUtil {
     @Test
@@ -86,7 +85,8 @@ public class TestVoltTableUtil {
         CSVWriter writer = mock(CSVWriter.class);
         ColumnInfo[] columns = new ColumnInfo[] {new ColumnInfo("", VoltType.TIMESTAMP)};
         ArrayList<VoltType> columnTypes = new ArrayList<VoltType>();
-        TimestampType ts = new TimestampType(System.currentTimeMillis() * 1000);
+        // we have microseconds.
+        TimestampType ts = new TimestampType((System.currentTimeMillis() * 1000) + System.currentTimeMillis() % 1000);
         VoltTable vt = new VoltTable(columns);
         vt.addRow(ts);
 
