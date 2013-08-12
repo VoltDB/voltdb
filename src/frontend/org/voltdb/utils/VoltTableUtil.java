@@ -24,13 +24,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.TimeZone;
 
+import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 import org.voltcore.utils.Pair;
+
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
-
-import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 
 /*
  * Utility methods for work with VoltTables.
@@ -103,7 +103,7 @@ public class VoltTableUtil {
                         fields[ii] = VoltTable.CSV_NULL;
                     } else {
                         fields[ii] = sdf.format(timestamp.asApproximateJavaDate());
-                        fields[ii] += String.valueOf(timestamp.getUSec());
+                        fields[ii] += String.format("%03d", timestamp.getUSec());
                     }
                 } else if (type == VoltType.VARBINARY) {
                    byte bytes[] = vt.getVarbinary(ii);
