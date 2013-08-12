@@ -191,11 +191,11 @@ inline void TableIterator::setEngine(VoltDBEngine* engine) {
 }
 
 inline bool TableIterator::next(TableTuple &out) {
-    if( m_foundTuples > LONG_OP_THRESHOLD-3 && m_engine ) {
-        if(!m_engine->isLongOp()) {
-            m_engine->setLongOp(true);
+    if( m_foundTuples > LONG_OP_THRESHOLD-2 && m_engine ) {
+        if(m_foundTuples % LONG_OP_THRESHOLD == -1 && !m_engine->isPrepareStatsForLongOp()) {
+            m_engine->setPrepareStatsForLongOp(true);
         }
-        if(m_foundTuples > LONG_OP_THRESHOLD-1 && m_foundTuples % LONG_OP_THRESHOLD == 0) {
+        if(m_foundTuples % LONG_OP_THRESHOLD == 0) {
             //Update stats in java and let java determine if we should cancel this query.
             if(m_engine->getTopend()->updateStats(m_engine->getBatchIndex(),
                     m_engine->getPlanNodeName(),

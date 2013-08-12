@@ -183,8 +183,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         inline Table* getTargetTable() {return m_targetTable;}
         inline void setIndex(TableIndex* index) {m_index = index;}
         inline TableIndex* getIndex() {return m_index;}
-        inline void setLongOp(bool isLongOp) {m_isLongOp = isLongOp;}
-        inline bool isLongOp() {return m_isLongOp;}
+        inline void setPrepareStatsForLongOp(bool prepareStats) {m_prepareStatsForLongOp = prepareStats;}
+        inline bool isPrepareStatsForLongOp() {return m_prepareStatsForLongOp;}
 
         // Created to transition existing unit tests to context abstraction.
         // If using this somewhere new, consider if you're being lazy.
@@ -545,7 +545,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         std::string m_planNode;
         Table* m_targetTable;
         TableIndex* m_index;
-        bool m_isLongOp;
+        bool m_prepareStatsForLongOp;
 
         /** buffer object for result tables. set when the result table is sent out to localsite. */
         FallbackSerializeOutput m_resultOutput;
