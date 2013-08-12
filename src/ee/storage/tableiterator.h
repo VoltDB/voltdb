@@ -192,7 +192,7 @@ inline void TableIterator::setEngine(VoltDBEngine* engine) {
 
 inline bool TableIterator::next(TableTuple &out) {
     if( m_foundTuples > LONG_OP_THRESHOLD-2 && m_engine ) {
-        if(m_foundTuples % LONG_OP_THRESHOLD == -1 && !m_engine->isPrepareStatsForLongOp()) {
+        if((m_foundTuples + 1) % LONG_OP_THRESHOLD == 0) {
             m_engine->setPrepareStatsForLongOp(true);
         }
         if(m_foundTuples % LONG_OP_THRESHOLD == 0) {
