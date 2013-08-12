@@ -38,6 +38,7 @@ import org.supercsv.io.ICsvListReader;
 import org.supercsv.prefs.CsvPreference;
 import org.supercsv_voltpatches.tokenizer.Tokenizer;
 import org.voltcore.logging.VoltLogger;
+
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -179,7 +180,8 @@ public class CSVLoader {
 
         @Option(desc = "port to use when connecting to database (default: 21212)")
         int port = Client.VOLTDB_SERVER_PORT;
-
+        @Option(desc = "Check CSV Input Data Only.")
+        boolean check = false;
         @AdditionalArgs(desc = "insert the data into database by TABLENAME.insert procedure by default")
         String table = "";
 
@@ -273,56 +275,59 @@ public class CSVLoader {
         c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
                                              // timeout, see ENG-2670
         Client csvClient = null;
-        try {
-            csvClient = CSVLoader.getClient(c_config, serverlist, config.port);
-        } catch (Exception e) {
-            m_log.error("Error to connect to the servers:"
-                    + config.servers);
-            close_cleanup();
-            System.exit(-1);
+        if (!config.check) {
+            try {
+                csvClient = CSVLoader.getClient(c_config, serverlist, config.port);
+            } catch (Exception e) {
+                m_log.error("Error to connect to the servers:"
+                        + config.servers);
+                close_cleanup();
+                System.exit(-1);
+            }
+            assert (csvClient != null);
         }
-        assert(csvClient != null);
 
         try {
-            ProcedureCallback cb = null;
-
-            boolean lastOK = true;
-
             int columnCnt = 0;
-            VoltTable procInfo = null;
-            boolean isProcExist = false;
-            try {
-                procInfo = csvClient.callProcedure("@SystemCatalog",
-                        "PROCEDURECOLUMNS").getResults()[0];
-                while (procInfo.advanceRow()) {
-                    if (insertProcedure.matches((String) procInfo.get(
-                            "PROCEDURE_NAME", VoltType.STRING))) {
-                        columnCnt++;
-                        isProcExist = true;
-                        String typeStr = (String)procInfo.get("TYPE_NAME", VoltType.STRING);
-                        typeList.add(VoltType.typeFromString(typeStr));
+            ProcedureCallback cb = null;
+            boolean lastOK = true;
+            if (!cfg.check) {
+
+                VoltTable procInfo = null;
+                boolean isProcExist = false;
+                try {
+                    procInfo = csvClient.callProcedure("@SystemCatalog",
+                            "PROCEDURECOLUMNS").getResults()[0];
+                    while (procInfo.advanceRow()) {
+                        if (insertProcedure.matches((String) procInfo.get(
+                                "PROCEDURE_NAME", VoltType.STRING))) {
+                            columnCnt++;
+                            isProcExist = true;
+                            String typeStr = (String) procInfo.get("TYPE_NAME", VoltType.STRING);
+                            typeList.add(VoltType.typeFromString(typeStr));
+                        }
                     }
+                } catch (Exception e) {
+                    m_log.error(e.getMessage(), e);
+                    close_cleanup();
+                    System.exit(-1);
                 }
-            } catch (Exception e) {
-                m_log.error(e.getMessage(), e);
-                close_cleanup();
-                System.exit(-1);
-            }
-            if (isProcExist == false) {
-                m_log.error("No matching insert procedure available");
-                close_cleanup();
-                System.exit(-1);
-            }
-            try {
-                if (isProcedureMp(csvClient)) {
-                    m_log.warn("Using a multi-partitioned procedure to load data will be slow. " +
-                            "If loading a partitioned table, use a single-partitioned procedure " +
-                            "for best performance.");
+                if (isProcExist == false) {
+                    m_log.error("No matching insert procedure available");
+                    close_cleanup();
+                    System.exit(-1);
                 }
-            } catch (Exception e) {
-                m_log.fatal(e.getMessage(), e);
-                close_cleanup();
-                System.exit(-1);
+                try {
+                    if (isProcedureMp(csvClient)) {
+                        m_log.warn("Using a multi-partitioned procedure to load data will be slow. "
+                                + "If loading a partitioned table, use a single-partitioned procedure "
+                                + "for best performance.");
+                    }
+                } catch (Exception e) {
+                    m_log.fatal(e.getMessage(), e);
+                    close_cleanup();
+                    System.exit(-1);
+                }
             }
 
             List<String> lineList = new ArrayList<String>();
@@ -345,20 +350,24 @@ public class CSVLoader {
                     boolean queued = false;
                     while (queued == false) {
                         String[] correctedLine = lineList.toArray(new String[0]);
-                        cb = new MyCallback(totalLineCount.get()+1, config,
-                                lineList);
-                        String lineCheckResult;
+                        if (!config.check) {
+                            cb = new MyCallback(totalLineCount.get() + 1, config,
+                                    lineList);
+                            String lineCheckResult;
 
-                        if ((lineCheckResult = checkparams_trimspace(correctedLine,
-                                columnCnt)) != null) {
-                            String[] info = { lineList.toString(), lineCheckResult };
-                            synchronizeErrorInfo( totalLineCount.get()+1, info );
-                            break;
+                            if ((lineCheckResult = checkparams_trimspace(correctedLine,
+                                    columnCnt)) != null) {
+                                String[] info = {lineList.toString(), lineCheckResult};
+                                synchronizeErrorInfo(totalLineCount.get() + 1, info);
+                                break;
+                            }
+
+                            queued = csvClient.callProcedure(cb, insertProcedure,
+                                    (Object[]) correctedLine);
+                            outCount.incrementAndGet();
+                        } else {
+                            queued = true;
                         }
-
-                        queued = csvClient.callProcedure(cb, insertProcedure,
-                                (Object[]) correctedLine);
-                        outCount.incrementAndGet();
 
                         if (queued == false) {
                             ++waits;
@@ -377,7 +386,9 @@ public class CSVLoader {
                     synchronizeErrorInfo( totalLineCount.get()+1, info );
                 }
             }
-            csvClient.drain();
+            if (csvClient != null) {
+                csvClient.drain();
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -395,7 +406,9 @@ public class CSVLoader {
         produceFiles();
         close_cleanup();
         listReader.close();
-        csvClient.close();
+        if (csvClient != null) {
+            csvClient.close();
+        }
     }
 
     private static void synchronizeErrorInfo( long errLineNum, String[] info ) throws IOException, InterruptedException {
