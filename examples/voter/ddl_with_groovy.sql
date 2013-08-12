@@ -221,13 +221,14 @@ CREATE PROCEDURE voter.procedures.ContestantWinningStates AS ###
         state = ""
 
         tuplerator(voltExecuteSQL()[0]).eachRow {
-            isWinning = state != it.getString(1)
-            state = it.getString(1)
+            isWinning = state != it[1]
+            state = it[1]
 
-            if (isWinning && it.getLong(0) == contestantNumber) {
-                results << [state: state, votes: it.getLong(2)]
+            if (isWinning && it[0] == contestantNumber) {
+                results << [state: state, votes: it[2]]
             }
         }
+        if (max > results.size) max = results.size
         buildTable(state:STRING, num_votes:BIGINT) {
             results.sort { a,b -> b.votes - a.votes }[0..<max].each {
                 row it.state, it.votes
@@ -250,11 +251,11 @@ CREATE PROCEDURE voter.procedures.GetStateHeatmap AS ###
         state = ""
 
         buildTable(state:STRING, contestant_number:INTEGER, num_votes:BIGINT, is_winning:TINYINT) {
-            tuplerator(voltExecuteSQL()[0]).eachRow {
-                byte isWinning = state != it.getString(1) ? (byte)1 : (byte)0
-                state = it.getString(1)
+            tuplerator(voltExecuteSQL()[0]).eachRow { 
+                byte isWinning = state != it.state ? (byte)1 : (byte)0
+                state = it.state
                 
-                row state, it.get(0,INTEGER), it.getLong(2), isWinning
+                row state, it.contestantNumber, it.numVotes, isWinning
             }
         }
     }
