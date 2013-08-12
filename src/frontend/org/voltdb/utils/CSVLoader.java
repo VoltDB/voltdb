@@ -238,6 +238,10 @@ public class CSVLoader {
     public static void main(String[] args) throws IOException,
             InterruptedException {
         start = System.currentTimeMillis();
+        long parsingTimeStart = start;
+        long parsingTimeEnd = start;
+        long insertTimeStart = start;
+        long insertTimeEnd = start;
         int waits = 0;
         int shortWaits = 0;
 
@@ -250,6 +254,7 @@ public class CSVLoader {
         ICsvListReader listReader = null;
 
         try {
+            long st = System.currentTimeMillis();
             if (CSVLoader.standin) {
                 tokenizer = new Tokenizer(new BufferedReader( new InputStreamReader(System.in)), csvPreference,
                         config.strictquotes, config.escape, config.columnsizelimit,
@@ -262,6 +267,8 @@ public class CSVLoader {
                         config.skip) ;
                 listReader = new CsvListReader(tokenizer, csvPreference);
             }
+            long end = System.currentTimeMillis();
+            parsingTimeEnd += (end - st);
         } catch (FileNotFoundException e) {
             m_log.error("CSV file '" + config.file + "' could not be found.");
             System.exit(-1);
@@ -339,7 +346,11 @@ public class CSVLoader {
                         totalLineCount.set(cfg.skip);
                     else
                         totalLineCount.set( listReader.getLineNumber() );
+                    long st = System.currentTimeMillis();
                     lineList = listReader.read();
+                    long end = System.currentTimeMillis();
+                    parsingTimeEnd += (end - st);
+
                     //EOF
                     if(lineList == null) {
                         if( totalLineCount.get() > listReader.getLineNumber() )
@@ -389,12 +400,19 @@ public class CSVLoader {
             if (csvClient != null) {
                 csvClient.drain();
             }
+            insertTimeEnd = System.currentTimeMillis();
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        m_log.info("Inserted " + outCount.get() + " and acknowledged "
-                + inCount.get() + " rows (final)");
+        m_log.info("Parsing CSV file took " + (parsingTimeEnd - parsingTimeStart) + " milliseconds.");
+        if (!config.check) {
+            m_log.info("Inserting Data took " + ((insertTimeEnd - insertTimeStart) - (parsingTimeEnd - parsingTimeStart)) + " milliseconds.");
+            m_log.info("Inserted " + outCount.get() + " and acknowledged "
+                    + inCount.get() + " rows (final)");
+        } else {
+            m_log.info("Verification of CSV input completed.");
+        }
         if (waits > 0) {
             m_log.info("Waited " + waits + " times");
             if (shortWaits > 0) {
@@ -403,7 +421,9 @@ public class CSVLoader {
             }
         }
 
-        produceFiles();
+        if (!config.check) {
+            produceFiles();
+        }
         close_cleanup();
         listReader.close();
         if (csvClient != null) {
@@ -512,7 +532,7 @@ public class CSVLoader {
 
     private static void produceFiles() {
         latency = System.currentTimeMillis() - start;
-        m_log.info("CSVLoader elapsed: " + latency / 1000F
+        m_log.info("CSVLoader elapsed: " + latency
                 + " seconds");
 
         int bulkflush = 300; // by default right now
