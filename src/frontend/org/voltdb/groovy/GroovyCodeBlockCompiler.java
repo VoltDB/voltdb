@@ -45,7 +45,8 @@ public class GroovyCodeBlockCompiler  {
         imports.addStaticStars("org.voltdb.VoltProcedure","org.voltdb.VoltType");
 
         conf.addCompilationCustomizers(imports);
-        conf.getOptimizationOptions().put("indy", true);
+        // conf.getOptimizationOptions().put("int", false);
+        // conf.getOptimizationOptions().put("indy", true);
         conf.setScriptBaseClass(DelegatingScript.class.getName());
 
         File groovyOut = new File("groovyout");
