@@ -39,6 +39,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.processtools.SFTPSession;
+import org.voltdb.processtools.SFTPSession.SFTPException;
 import org.voltdb.processtools.SSHTools;
 import org.voltdb.types.TimestampType;
 
@@ -349,8 +350,9 @@ public class Collector {
                         m_password = new String(System.console().readPassword());
                     }
 
-                    boolean res = uploadToServer(collectionFilePath, m_host, m_username, m_password);
-                    if (res) {
+                    try {
+                        uploadToServer(collectionFilePath, m_host, m_username, m_password);
+
                         m_log.info("Uploaded " + new File(collectionFilePath).getName() + " via SFTP");
 
                         boolean delLocalCopy = false;
@@ -369,19 +371,15 @@ public class Collector {
                                 m_log.info("Failed to delete local copy " + collectionFilePath + ". " + e.getMessage());
                             }
                         }
-                    }
-                    else {
-                        m_log.info("Failed to upload. Probably due to wrong credential provided. "
-                                + "Local copy could be found at " + collectionFilePath);
+                    } catch (Exception e) {
+                        m_log.error(e.getMessage());
                     }
                 }
                 else {
                     m_log.info("Uploading is only available in the Enterprise Edition");
                 }
             }
-        } catch (IOException e) {
-            m_log.error(e.getMessage());
-        } catch (TarMalformatException e) {
+        } catch (Exception e) {
             m_log.error(e.getMessage());
         }
     }
@@ -423,13 +421,23 @@ public class Collector {
         }
     }
 
-    public static boolean uploadToServer(String collectionFilePath, String host, String username, String password) {
+    public static boolean uploadToServer(String collectionFilePath, String host, String username, String password) throws Exception {
         SSHTools ssh = new SSHTools(username, null);
 
-        String rootpath = ssh.cmdSSH(username, password, null, host, "pwd").trim();
-        if (rootpath.isEmpty()) {
-            // SSH cannot connect
-            return false;
+        SFTPSession sftp = null;
+        String rootpath = null;
+        try {
+            sftp = ssh.getSftpSession(username, password, null, host, null);
+            rootpath = sftp.exec("pwd").trim();
+        } catch (SFTPException e) {
+            String errorMsg = e.getCause().getMessage();
+
+            if (errorMsg.equals("Auth cancel")) {
+                // "Auth cancel" appears when username doesn't exist or password is wrong
+                throw new Exception("Authorization failed");
+            } else {
+                throw new Exception(errorMsg);
+            }
         }
 
         HashMap<File, File> files = new HashMap<File, File>();
@@ -437,10 +445,7 @@ public class Collector {
         File dest = new File(rootpath + File.separator + new File(collectionFilePath).getName());
         files.put(src, dest);
 
-        SFTPSession sftp = null;
         try {
-            sftp = ssh.getSftpSession(username, password, null, host, null);
-
             sftp.ensureDirectoriesExistFor(files.values());
             sftp.copyOverFiles(files);
         } finally {
