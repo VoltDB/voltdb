@@ -51,6 +51,7 @@
 #include "common/tabletuple.h"
 #include "expressions/abstractexpression.h"
 #include "executors/abstractexecutor.h"
+#include "indexes/tableindex.h"
 
 
 namespace voltdb {
@@ -96,8 +97,8 @@ protected:
     inline void setStatsForLongOp(Table* targetTable, TableIndex* index) {
         if(m_engine->isPrepareStatsForLongOp()) {
                 m_engine->setPlanNodeName(planNodeToString(m_abstractNode->getPlanNodeType()));
-                m_engine->setTargetTable(targetTable);
-                m_engine->setIndex(index);
+                m_engine->setTargetTableInfo(targetTable->name(), targetTable->activeTupleCount());
+                m_engine->setIndexName(index->getName());
                 m_engine->setPrepareStatsForLongOp(false);
         }
     };

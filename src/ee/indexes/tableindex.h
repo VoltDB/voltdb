@@ -57,6 +57,8 @@
 #include "common/TupleSchema.h"
 #include "indexes/IndexStats.h"
 #include "common/ThreadLocalPool.h"
+#include "execution/VoltDBEngine.h"
+#include "common/TimeOutException.h"
 
 namespace voltdb {
 
@@ -360,6 +362,32 @@ public:
         return m_scheme.countable;
     }
 
+    void setEngine(VoltDBEngine* engine)
+    {
+        m_engine = engine;
+    }
+
+    void checkFoundNextValues()
+    {
+        if(m_foundNextValues > LONG_OP_THRESHOLD_INDEX_ENTRIES-2 && m_engine) {
+            if((m_foundNextValues + 1) % LONG_OP_THRESHOLD_INDEX_ENTRIES == 0) {
+                m_engine->setPrepareStatsForLongOp(true);
+            }
+            if(m_foundNextValues % LONG_OP_THRESHOLD_INDEX_ENTRIES == 0) {
+                //Update stats in java and let java determine if we should cancel this query.
+                if(m_engine->getTopend()->updateStats(m_engine->getBatchIndex(),
+                        m_engine->getPlanNodeName(),
+                        m_engine->getTargetTableName(),
+                        m_engine->getTargetTableSize(),
+                        m_foundNextValues,
+                        m_engine->getIndexName() )){
+                    VOLT_ERROR("Time out read only query.");
+                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "Time out read only query.");
+                }
+            }
+        }
+    }
+
     virtual bool hasKey(const TableTuple *searchKey) = 0;
 
     /**
@@ -472,9 +500,13 @@ protected:
     int m_inserts;
     int m_deletes;
     int m_updates;
+    int m_foundNextValues;
 
     // stats
     IndexStats m_stats;
+
+    //
+    VoltDBEngine* m_engine;
 
 private:
 

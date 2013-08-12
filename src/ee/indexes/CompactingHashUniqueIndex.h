@@ -126,8 +126,10 @@ class CompactingHashUniqueIndex : public TableIndex
     }
 
     TableTuple nextValueAtKey() {
+        checkFoundNextValues();
         TableTuple retval = m_match;
         m_match.move(NULL);
+        m_foundNextValues++;
         return retval;
     }
 

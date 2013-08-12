@@ -69,8 +69,8 @@ namespace voltdb
         void setStatsForLongOp(Table* targetTable) {
                 if(m_engine->isPrepareStatsForLongOp()) {
                         m_engine->setPlanNodeName(planNodeToString(m_abstractNode->getPlanNodeType()));
-                        m_engine->setTargetTable(targetTable);
-                        m_engine->setIndex(NULL);
+                        m_engine->setTargetTableInfo(targetTable->name(), targetTable->activeTupleCount());
+                        m_engine->setIndexName("None");
                         m_engine->setPrepareStatsForLongOp(false);
                 }
         };
