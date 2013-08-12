@@ -843,15 +843,21 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(result.getTimestampAsLong(0), result.getTimestampAsLong(1));
 
         // Test user error input, Only accept JDBC's timestamp format: YYYY-MM-DD-SS.sss.
+        Exception ex = null;
         try {
             cr = client.callProcedure("@AdHoc", "select SINCE_EPOCH (MICROS, 'I am a timestamp')  from P2 where id = 5");
-        } catch (Exception ex) {
+        } catch (Exception e) {
+            ex = e;
+        } finally {
             assertTrue(ex.getMessage().contains("PlanningErrorException"));
             assertTrue(ex.getMessage().contains("incompatible data type in conversion"));
         }
+        ex = null;
         try {
             cr = client.callProcedure("@AdHoc", "select SINCE_EPOCH (MICROS, '2013-7-2 2:34:12')  from P2 where id = 5");
-        } catch (Exception ex) {
+        } catch (Exception e) {
+            ex = e;
+        } finally {
             assertTrue(ex.getMessage().contains("PlanningErrorException"));
             assertTrue(ex.getMessage().contains("incompatible data type in conversion"));
         }
@@ -948,7 +954,24 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         cr = client.callProcedure("P2.insert", 2, new Timestamp(1000L));
         cr = client.callProcedure("P2.insert", 3, new Timestamp(-1000L));
 
+        // Test AdHoc
+        cr = client.callProcedure("@AdHoc", "select to_timestamp(second, 1372640523) from P2 limit 1");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(1372640523 * 1000000L, result.getTimestampAsLong(0));
+
+        // Test string input number, expect error
+        Exception ex = null;
+        try {
+            cr = client.callProcedure("@AdHoc", "select to_timestamp(second, '1372640523') from P2 limit 1");
+        } catch (Exception e) {
+            ex = e;
+        } finally {
+            assertTrue(ex.getMessage().contains("PlanningErrorException"));
+            assertTrue(ex.getMessage().contains("incompatible data type"));
+        }
 
         String[] procedures = {"FROM_UNIXTIME", "TO_TIMESTAMP_SECOND", "TO_TIMESTAMP_MILLIS",
                 "TO_TIMESTAMP_MILLISECOND", "TO_TIMESTAMP_MICROS", "TO_TIMESTAMP_MICROSECOND"};
