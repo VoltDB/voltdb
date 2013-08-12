@@ -185,6 +185,23 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
     }
 
+    public void testOptimizedAVG() {
+        pns = compileToFragments("SELECT A1, AVG(PKEY) FROM P1 GROUP BY A1");
+        for (AbstractPlanNode apn: pns) {
+            System.out.println(apn.toExplainPlanString());
+        }
+
+        // Test avg pushed down by replacing it with sum, count
+        AbstractPlanNode p = pns.get(0).getChild(0);
+        assertTrue(p instanceof ProjectionPlanNode);
+        assertTrue(p.getChild(0) instanceof AggregatePlanNode);
+
+        p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+
+    }
+
     private void checkHasComplexAgg(List<AbstractPlanNode> pns) {
         assertTrue(pns.size() > 0);
         boolean isDistributed = pns.size() > 1 ? true: false;
