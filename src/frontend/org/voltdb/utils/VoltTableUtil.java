@@ -16,7 +16,6 @@
  */
 package org.voltdb.utils;
 
-import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.math.BigDecimal;
@@ -24,11 +23,14 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.TimeZone;
+
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
+
+import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 
 /*
  * Utility methods for work with VoltTables.
