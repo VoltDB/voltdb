@@ -96,7 +96,7 @@ public abstract class ActivePlanRepository {
         }
     }
 
-    static void evictLRUfragment() {
+    private static void evictLRUfragment() {
         /// Evict the least recently used fragment (if any are currently unused).
         /// Along the way, update any obsolete entries that were left
         /// by the laziness of the fragment state changes (fragment reuse).
