@@ -264,7 +264,7 @@ public class TarGenerator {
         }
     }
 
-    public void write(boolean outputToStream) throws IOException, TarMalformatException {
+    public void write(boolean outputToStream, boolean verbose) throws IOException, TarMalformatException {
 
         if (TarFileOutputStream.debug) {
             System.out.println(RB.singleton.getString(RB.WRITE_QUEUE_REPORT,
@@ -275,21 +275,30 @@ public class TarGenerator {
 
         try {
             for (int i = 0; i < entryQueue.size(); i++) {
-                System.err.print(Integer.toString(i + 1) + " / "
-                                 + entryQueue.size() + ' ');
+                if (verbose) {
+                    System.err.print(Integer.toString(i + 1) + " / "
+                                     + entryQueue.size() + ' ');
+                }
 
                 entry = (TarEntrySupplicant) entryQueue.get(i);
 
-                System.err.print(entry.getPath() + "... ");
+                if (verbose) {
+                    System.err.print(entry.getPath() + "... ");
+                }
 
                 if (entry.getDataSize() >= paxThreshold) {
                     entry.makeXentry().write();
-                    System.err.print("x... ");
+                    if (verbose) {
+                        System.err.print("x... ");
+                    }
                 }
 
                 entry.write();
                 archive.assertAtBlockBoundary();
-                System.err.println();
+
+                if (verbose) {
+                    System.err.println();
+                }
             }
 
             archive.finish(outputToStream);
