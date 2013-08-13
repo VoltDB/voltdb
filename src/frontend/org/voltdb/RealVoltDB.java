@@ -418,7 +418,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // when we construct it below
             m_globalServiceElector = new GlobalServiceElector(m_messenger.getZK(), m_messenger.getHostId());
 
-            // Always create a mailbox for elasitc join data transfer
+            // Always create a mailbox for elastic join data transfer
             if (m_config.m_isEnterprise) {
                 long elasticHSId = m_messenger.getHSIdForLocalSite(HostMessenger.REBALANCE_SITE_ID);
                 m_messenger.createMailbox(elasticHSId, new SiteMailbox(m_messenger, elasticHSId));
