@@ -26,7 +26,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
-import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
@@ -126,26 +125,28 @@ public class RepairLog
             }
         } else if (msg instanceof FragmentTaskMessage) {
             final TransactionInfoBaseMessage m = (TransactionInfoBaseMessage)msg;
-            truncate(m.getTruncationHandle(), Long.MIN_VALUE);
-            // only log the first fragment of a procedure (and handle 1st case)
-            if (m.getTxnId() > m_lastMpHandle || m_lastMpHandle == Long.MAX_VALUE) {
-                m_log.add(new Item(IS_MP, m, m.getSpHandle(), m.getTxnId()));
-                m_lastMpHandle = m.getTxnId();
-                m_lastSpHandle = m.getSpHandle();
+            if (!m.isReadOnly()) {
+                truncate(m.getTruncationHandle(), Long.MIN_VALUE);
+                // only log the first fragment of a procedure (and handle 1st case)
+                if (m.getTxnId() > m_lastMpHandle || m_lastMpHandle == Long.MAX_VALUE) {
+                    m_log.add(new Item(IS_MP, m, m.getSpHandle(), m.getTxnId()));
+                    m_lastMpHandle = m.getTxnId();
+                    m_lastSpHandle = m.getSpHandle();
+                }
             }
         }
         else if (msg instanceof CompleteTransactionMessage) {
             // a CompleteTransactionMessage which indicates restart is not the end of the
             // transaction.  We don't want to log it in the repair log.
-            if (!((CompleteTransactionMessage)msg).isRestart()) {
-                final TransactionInfoBaseMessage m = (TransactionInfoBaseMessage)msg;
-                truncate(m.getTruncationHandle(), Long.MIN_VALUE);
-                m_log.add(new Item(IS_MP, m, m.getSpHandle(), m.getTxnId()));
+            CompleteTransactionMessage ctm = (CompleteTransactionMessage)msg;
+            if (!ctm.isReadOnly() && !ctm.isRestart()) {
+                truncate(ctm.getTruncationHandle(), Long.MIN_VALUE);
+                m_log.add(new Item(IS_MP, ctm, ctm.getSpHandle(), ctm.getTxnId()));
                 //Restore will send a complete transaction message with a lower mp transaction id because
                 //the restore transaction precedes the loading of the right mp transaction id from the snapshot
                 //Hence Math.max
-                m_lastMpHandle = Math.max(m_lastMpHandle, m.getTxnId());
-                m_lastSpHandle = m.getSpHandle();
+                m_lastMpHandle = Math.max(m_lastMpHandle, ctm.getTxnId());
+                m_lastSpHandle = ctm.getSpHandle();
             }
         }
     }
