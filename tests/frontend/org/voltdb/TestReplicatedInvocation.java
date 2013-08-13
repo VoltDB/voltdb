@@ -166,8 +166,7 @@ public class TestReplicatedInvocation {
                 e.getKey().equalsIgnoreCase("@SnapshotRestore") ||
                 e.getKey().equalsIgnoreCase("@BalancePartitions") ||
                 e.getKey().equalsIgnoreCase("@LoadMultipartitionTable") ||
-                e.getKey().equalsIgnoreCase("@LoadSinglePartitionTable") ||
-                e.getKey().equalsIgnoreCase("@UpdateTopology")) {
+                e.getKey().equalsIgnoreCase("@LoadSinglePartitionTable")) {
                 // Rejected
                 assertTrue(policy.shouldAccept(null, invocation, e.getValue().asCatalogProcedure()) != null);
             } else if (e.getKey().equalsIgnoreCase("@AdHoc")) {

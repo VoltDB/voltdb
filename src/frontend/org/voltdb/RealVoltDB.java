@@ -72,6 +72,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.SiteMailbox;
 import org.voltcore.utils.COWMap;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
@@ -416,6 +417,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // Create the GlobalServiceElector.  Do this here so we can register the MPI with it
             // when we construct it below
             m_globalServiceElector = new GlobalServiceElector(m_messenger.getZK(), m_messenger.getHostId());
+
+            // Always create a mailbox for elastic join data transfer
+            if (m_config.m_isEnterprise) {
+                long elasticHSId = m_messenger.getHSIdForLocalSite(HostMessenger.REBALANCE_SITE_ID);
+                m_messenger.createMailbox(elasticHSId, new SiteMailbox(m_messenger, elasticHSId));
+            }
 
             if (m_joining) {
                 Class<?> elasticJoinCoordClass =
