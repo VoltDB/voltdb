@@ -114,6 +114,8 @@ class RecoveryProtoMsg;
 
 const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
 const size_t PLAN_CACHE_SIZE = 1024 * 10;
+const int64_t LONG_OP_THRESHOLD_TUPLES = 100000000;
+const int64_t LONG_OP_THRESHOLD_INDEX_ENTRIES = 100000000;
 
 /**
  * Represents an Execution Engine which holds catalog objects (i.e. table) and executes
@@ -172,6 +174,27 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         inline int getUsedParamcnt() const { return m_usedParamcnt;}
         inline void setUsedParamcnt(int usedParamcnt) { m_usedParamcnt = usedParamcnt;}
 
+        // Some context information of the current executor
+        inline void setBatchIndex(int index) {m_currentBatchIndex = index;}
+        inline int getBatchIndex() {return m_currentBatchIndex;}
+        inline void setPlanNodeName(std::string executor) {m_planNode = executor;}
+        inline std::string getPlanNodeName() {return m_planNode;}
+        inline void setTargetTableInfo(std::string tableName, int64_t tableSize) {
+            m_targetTableName = tableName;
+            m_targetTableSize = tableSize;
+        }
+        inline std::string getTargetTableName() {return m_targetTableName;}
+        inline int64_t getTargetTableSize() {return m_targetTableSize;}
+        inline void setIndexInfo(std::string indexName, int64_t size, int64_t indexVaulesFound) {
+            m_indexName = indexName;
+            m_indexSize = size;
+            m_indexValuesFound = indexVaulesFound;
+        }
+        inline std::string getIndexName() {return m_indexName;}
+        inline int64_t getIndexSize() {return m_indexSize;}
+        inline int64_t getIndexVaulesFound() {return m_indexValuesFound;}
+        inline void setPrepareStatsForLongOp(bool prepareStats) {m_prepareStatsForLongOp = prepareStats;}
+        inline bool isPrepareStatsForLongOp() {return m_prepareStatsForLongOp;}
 
         // Created to transition existing unit tests to context abstraction.
         // If using this somewhere new, consider if you're being lazy.
@@ -523,6 +546,19 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         NValueArray m_staticParams;
         /** TODO : should be passed as execute() parameter..*/
         int m_usedParamcnt;
+
+        // ------------------------------------------------------------------
+        // Context: Context information of the current executor
+        // ------------------------------------------------------------------
+        /** index of the batch piece being executed */
+        int m_currentBatchIndex;
+        std::string m_planNode;
+        std::string m_targetTableName;
+        int64_t m_targetTableSize;
+        std::string m_indexName;
+        int64_t m_indexSize;
+        int64_t m_indexValuesFound;
+        bool m_prepareStatsForLongOp;
 
         /** buffer object for result tables. set when the result table is sent out to localsite. */
         FallbackSerializeOutput m_resultOutput;

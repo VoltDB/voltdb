@@ -262,8 +262,8 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     TableTuple null_tuple = m_null_tuple;
 
     TableIterator iterator0 = outer_table->iterator();
+    iterator0.setEngine(m_engine);
     while (iterator0.next(outer_tuple)) {
-
         // did this loop body find at least one match for this tuple?
         bool match = false;
         // For outer joins if outer tuple fails pre-join predicate
@@ -277,7 +277,9 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
             joined.setNValues(0, outer_tuple, 0, outer_cols);
 
             TableIterator iterator1 = inner_table->iterator();
+            iterator1.setEngine(m_engine);
             while (iterator1.next(inner_tuple)) {
+                setStatsForLongOp();
                 // Apply join filter to produce matches for each outer that has them,
                 // then pad unmatched outers, then filter them all
                 if (joinPredicate == NULL || joinPredicate->eval(&outer_tuple, &inner_tuple).isTrue()) {

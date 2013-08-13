@@ -49,6 +49,7 @@
 #include "common/common.h"
 #include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
+#include "execution/VoltDBEngine.h"
 
 namespace voltdb
 {
@@ -65,6 +66,14 @@ namespace voltdb
                     TempTableLimits* limits);
         bool p_execute(const NValueArray& params);
         bool needsOutputTableClear();
+        void setStatsForLongOp(Table* targetTable) {
+                if(m_engine->isPrepareStatsForLongOp()) {
+                        m_engine->setPlanNodeName(planNodeToString(m_abstractNode->getPlanNodeType()));
+                        m_engine->setTargetTableInfo(targetTable->name(), targetTable->activeTupleCount());
+                        m_engine->setIndexInfo("None", 0, 0);
+                        m_engine->setPrepareStatsForLongOp(false);
+                }
+        };
     };
 }
 

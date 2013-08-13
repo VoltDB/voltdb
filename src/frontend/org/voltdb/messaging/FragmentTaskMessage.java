@@ -125,6 +125,14 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     Iv2InitiateTaskMessage m_initiateTask;
     ByteBuffer m_initiateTaskBuffer;
 
+    byte[] m_procNameInBytes = "".getBytes();
+    public void setProcName(String procName) {
+        m_procNameInBytes = procName.getBytes();
+    }
+    public byte[] getProcNameInBytes() {
+        return m_procNameInBytes;
+    }
+
     /** Empty constructor for de-serialization */
     FragmentTaskMessage() {
         m_subject = Subject.DEFAULT.getId();
@@ -151,6 +159,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         assert(selfCheck());
     }
 
+    // If you add a new field to the message and you don't want to lose information at all point,
+    // remember to add it to the constructor below, Because this constructor is used to copy a message at some place.
+    // for example, in SpScheduler.handleFragmentTaskMessage()
     // The parameter sets are .duplicate()'d in flattenToBuffer,
     // so we can make a shallow copy here and still be thread-safe
     // when we serialize the copy.
@@ -168,6 +179,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_items = ftask.m_items;
         m_initiateTask = ftask.m_initiateTask;
         m_emptyForRestart = ftask.m_emptyForRestart;
+        m_procNameInBytes = ftask.m_procNameInBytes;
         if (ftask.m_initiateTaskBuffer != null) {
             m_initiateTaskBuffer = ftask.m_initiateTaskBuffer.duplicate();
         }
@@ -404,6 +416,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
      * Fragment ID block (1 per item):
      *     fragment ID: long: 8 * nitems
      *
+     * Porcedure name: byte: length of the name string.
+     *
      * Parameter set block (1 per item):
      *     parameter buffer size: int: 4 * nitems
      *     parameter buffer: bytes: ? * nitems
@@ -435,6 +449,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         // Fragment ID block (20 bytes per sha1-hash)
         msgsize += 20 * m_items.size();
+
+        // Procedure name gets an length (4) and the name (.length)
+        msgsize += 4;
+        if(m_procNameInBytes.length != 0)
+            msgsize += m_procNameInBytes.length;
 
         //nested initiate task message length prefix
         msgsize += 4;
@@ -557,6 +576,14 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             }
         }
 
+        // Procedure name
+        if (m_procNameInBytes.length != 0) {
+            buf.putInt(m_procNameInBytes.length);
+            buf.put(m_procNameInBytes);
+        } else {
+           buf.putInt(0);
+        }
+
         if (m_initiateTaskBuffer != null) {
             ByteBuffer dup = m_initiateTaskBuffer.duplicate();
             buf.putInt(dup.remaining());
@@ -647,6 +674,13 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             }
         }
 
+        // Procedure name
+        int procNameLen = buf.getInt();
+        if(procNameLen > 0) {
+            m_procNameInBytes = new byte[procNameLen];
+            buf.get(m_procNameInBytes);
+        }
+
         int initiateTaskMessageLength = buf.getInt();
         if (initiateTaskMessageLength > 0) {
             int startPosition = buf.position();
@@ -689,7 +723,6 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 buf.get(item.m_fragmentPlan);
             }
         }
-
     }
 
     @Override

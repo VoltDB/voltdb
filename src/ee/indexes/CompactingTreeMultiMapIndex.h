@@ -193,6 +193,8 @@ class CompactingTreeMultiMapIndex : public TableIndex
 
     TableTuple nextValue()
     {
+        checkFoundNextValues();
+
         TableTuple retval(getTupleSchema());
 
         if (! m_keyIter.isEnd()) {
@@ -204,11 +206,13 @@ class CompactingTreeMultiMapIndex : public TableIndex
             }
         }
 
+        m_foundNextValues++;
         return retval;
     }
 
     TableTuple nextValueAtKey()
     {
+        checkFoundNextValues();
         if (m_match.isNullTuple()) {
             return m_match;
         }
@@ -219,11 +223,13 @@ class CompactingTreeMultiMapIndex : public TableIndex
         } else {
             m_match.move(const_cast<void*>(m_keyIter.value()));
         }
+        m_foundNextValues++;
         return retval;
     }
 
     bool advanceToNextKey()
     {
+        checkFoundNextValues();
         if (m_keyEndIter.isEnd()) {
             return false;
         }
@@ -237,6 +243,7 @@ class CompactingTreeMultiMapIndex : public TableIndex
             return false;
         }
         m_match.move(const_cast<void*>(m_keyIter.value()));
+        m_foundNextValues++;
         return true;
     }
 

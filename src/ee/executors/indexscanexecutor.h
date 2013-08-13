@@ -48,8 +48,10 @@
 
 #include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
+#include "indexes/tableindex.h"
 
 #include "boost/shared_array.hpp"
+
 
 namespace voltdb {
 
@@ -79,6 +81,15 @@ private:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
+    inline void setStatsForLongOp() {
+        if(m_engine->isPrepareStatsForLongOp()) {
+                Table* targetTable = reinterpret_cast<Table*> (m_targetTable);
+                m_engine->setPlanNodeName(planNodeToString(m_abstractNode->getPlanNodeType()));
+                m_engine->setTargetTableInfo(targetTable->name(), targetTable->activeTupleCount());
+                m_engine->setIndexInfo(m_index->getName(), m_index->getSize(), m_index->getFoundNextVaules());
+                m_engine->setPrepareStatsForLongOp(false);
+        }
+    };
 
     // Data in this class is arranged roughly in the order it is read for
     // p_execute(). Please don't reshuffle it only in the name of beauty.

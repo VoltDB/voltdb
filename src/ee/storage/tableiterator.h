@@ -51,6 +51,8 @@
 #include "common/tabletuple.h"
 #include "table.h"
 #include "storage/TupleIterator.h"
+#include "execution/VoltDBEngine.h"
+#include "common/TimeOutException.h"
 
 namespace voltdb {
 
@@ -81,6 +83,7 @@ public:
      * @return true if succeeded. false if no more active tuple is there.
     */
     bool next(TableTuple &out);
+    void setEngine(VoltDBEngine* engine);
     bool hasNext();
     int getLocation() const;
 
@@ -88,7 +91,6 @@ private:
     // Get an iterator via table->iterator()
     TableIterator(Table *, TBMapI);
     TableIterator(Table *, std::vector<TBPtr>::iterator);
-
 
     bool persistentNext(TableTuple &out);
     bool tempNext(TableTuple &out);
@@ -120,6 +122,7 @@ private:
     TBPtr m_currentBlock;
     std::vector<TBPtr>::iterator m_tempBlockIterator;
     bool m_tempTableIterator;
+    VoltDBEngine* m_engine;
 };
 
 inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator start)
@@ -131,10 +134,10 @@ inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator 
       m_foundTuples(0), m_tupleLength(parent->m_tupleLength),
       m_tuplesPerBlock(parent->m_tuplesPerBlock), m_currentBlock(NULL),
       m_tempBlockIterator(start),
-      m_tempTableIterator(true)
+      m_tempTableIterator(true),
+      m_engine(NULL)
     {
     }
-
 
 inline TableIterator::TableIterator(Table *parent, TBMapI start)
     :
@@ -146,7 +149,8 @@ inline TableIterator::TableIterator(Table *parent, TBMapI start)
       m_activeTuples((int) m_table->m_tupleCount),
       m_foundTuples(0), m_tupleLength(parent->m_tupleLength),
       m_tuplesPerBlock(parent->m_tuplesPerBlock), m_currentBlock(NULL),
-      m_tempTableIterator(false)
+      m_tempTableIterator(false),
+      m_engine(NULL)
     {
     }
 
@@ -160,6 +164,7 @@ inline void TableIterator::reset(std::vector<TBPtr>::iterator start) {
     m_tupleLength = m_table->m_tupleLength;
     m_tuplesPerBlock = m_table->m_tuplesPerBlock;
     m_currentBlock = NULL;
+    m_engine = NULL;
 }
 
 inline void TableIterator::reset(TBMapI start) {
@@ -172,13 +177,37 @@ inline void TableIterator::reset(TBMapI start) {
     m_tupleLength = m_table->m_tupleLength;
     m_tuplesPerBlock = m_table->m_tuplesPerBlock;
     m_currentBlock = NULL;
+    m_engine = NULL;
 }
 
 inline bool TableIterator::hasNext() {
     return m_foundTuples < m_activeTuples;
 }
 
+inline void TableIterator::setEngine(VoltDBEngine* engine) {
+    m_engine = engine;
+}
+
 inline bool TableIterator::next(TableTuple &out) {
+    if( m_foundTuples > LONG_OP_THRESHOLD_TUPLES-2 && m_engine ) {
+        if((m_foundTuples + 1) % LONG_OP_THRESHOLD_TUPLES == 0) {
+            m_engine->setPrepareStatsForLongOp(true);
+        }
+        if(m_foundTuples % LONG_OP_THRESHOLD_TUPLES == 0) {
+            //Update stats in java and let java determine if we should cancel this query.
+            if(m_engine->getTopend()->updateStats(m_engine->getBatchIndex(),
+                    m_engine->getPlanNodeName(),
+                    m_engine->getTargetTableName(),
+                    m_engine->getTargetTableSize(),
+                    m_foundTuples,
+                    m_engine->getIndexName(),
+                    m_engine->getIndexSize(),
+                    m_engine->getIndexVaulesFound())){
+                VOLT_ERROR("Time out read only query.");
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "Time out read only query.");
+            }
+        }
+    }
     if (!m_tempTableIterator) {
         return persistentNext(out);
     }
@@ -264,5 +293,4 @@ inline int TableIterator::getLocation() const {
 }
 
 }
-
 #endif

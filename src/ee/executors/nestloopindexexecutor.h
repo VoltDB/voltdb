@@ -51,6 +51,7 @@
 #include "common/tabletuple.h"
 #include "expressions/abstractexpression.h"
 #include "executors/abstractexecutor.h"
+#include "indexes/tableindex.h"
 
 
 namespace voltdb {
@@ -84,6 +85,7 @@ public:
         index = NULL;
         outer_table = NULL;
         m_lookupType = INDEX_LOOKUP_TYPE_INVALID;
+        m_engine = engine;
     }
 
     ~NestLoopIndexExecutor();
@@ -92,6 +94,14 @@ protected:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
+    inline void setStatsForLongOp(Table* targetTable) {
+        if(m_engine->isPrepareStatsForLongOp()) {
+                m_engine->setPlanNodeName(planNodeToString(m_abstractNode->getPlanNodeType()));
+                m_engine->setTargetTableInfo(targetTable->name(), targetTable->activeTupleCount());
+                m_engine->setIndexInfo(index->getName(), index->getSize(), index->getFoundNextVaules());
+                m_engine->setPrepareStatsForLongOp(false);
+        }
+    };
 
     NestLoopIndexPlanNode* node;
     IndexScanPlanNode* inline_node;

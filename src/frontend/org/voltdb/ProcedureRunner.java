@@ -113,6 +113,9 @@ public class ProcedureRunner {
     // current hash of sql and params
     protected final PureJavaCrc32C m_inputCRC = new PureJavaCrc32C();
 
+    // running procedure info
+    RunningProcedureContext m_rProcContext = new RunningProcedureContext();
+
     // Used to get around the "abstract" for StmtProcedures.
     // Path of least resistance?
     static class StmtProcedure extends VoltProcedure {
@@ -568,8 +571,11 @@ public class ProcedureRunner {
             // memo-ize the original batch size here
             int batchSize = m_batch.size();
 
+            m_rProcContext.m_procedureName = this.m_procedureName;
+
             // if batch is small (or reasonable size), do it in one go
             if (batchSize <= MAX_BATCH_SIZE) {
+                //m_rProcContext.m_batch = m_batch;
                 return executeQueriesInABatch(m_batch, isFinalSQL);
             }
             // otherwise, break it into sub-batches
@@ -587,6 +593,7 @@ public class ProcedureRunner {
                     // decide if this sub-batch should be marked final
                     boolean finalSubBatch = isFinalSQL && (subSize == m_batch.size());
 
+                    //m_rProcContext.m_batch = subBatch;
                     // run the sub-batch and copy the sub-results into the list of lists of results
                     // note: executeQueriesInABatch removes items from the batch as it runs.
                     //  this means subBatch will be empty after running and since subBatch is a
@@ -1063,7 +1070,6 @@ public class ProcedureRunner {
                                                        m_txnState.isReadOnly(),
                                                        finalTask,
                                                        txnState.isForReplay());
-
        }
 
        /*
@@ -1173,6 +1179,7 @@ public class ProcedureRunner {
                                           state.m_localFragsAreNonTransactional && finalTask);
 
        if (!state.m_distributedTask.isEmpty()) {
+           state.m_distributedTask.setProcName(m_procedureName);
            m_txnState.createAllParticipatingFragmentWork(state.m_distributedTask);
        }
 
@@ -1221,6 +1228,7 @@ public class ProcedureRunner {
            params,
            m_txnState.spHandle,
            m_txnState.uniqueId,
-           m_catProc.getReadonly());
+           m_catProc.getReadonly(),
+           m_rProcContext);
     }
 }
