@@ -24,6 +24,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.SettableFuture;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
@@ -315,9 +316,8 @@ public class RejoinProducer extends JoinProducerBase {
             REJOINLOG.debug(m_whoami + "Rejoin snapshot transfer is finished");
             m_rejoinSiteProcessor.close();
 
-            if (m_streamSnapshotMb != null) {
-                VoltDB.instance().getHostMessenger().removeMailbox(m_streamSnapshotMb.getHSId());
-            }
+            Preconditions.checkNotNull(m_streamSnapshotMb);
+            VoltDB.instance().getHostMessenger().removeMailbox(m_streamSnapshotMb.getHSId());
 
             // m_rejoinSnapshotBytes = m_rejoinSiteProcessor.bytesTransferred();
             // m_rejoinSiteProcessor = null;
@@ -383,9 +383,8 @@ public class RejoinProducer extends JoinProducerBase {
         REJOINLOG.debug(m_whoami + "Rejoin snapshot transfer is finished");
         m_rejoinSiteProcessor.close();
 
-        if (m_streamSnapshotMb != null) {
-            VoltDB.instance().getHostMessenger().removeMailbox(m_streamSnapshotMb.getHSId());
-        }
+        Preconditions.checkNotNull(m_streamSnapshotMb);
+        VoltDB.instance().getHostMessenger().removeMailbox(m_streamSnapshotMb.getHSId());
 
         // m_rejoinSnapshotBytes = m_rejoinSiteProcessor.bytesTransferred();
         // m_rejoinSiteProcessor = null;
