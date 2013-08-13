@@ -17,6 +17,9 @@ TEST_HOME=$VOLTDB_HOME/obj/release/test
 for f in $VOLTDB_HOME/lib/*.jar; do
   CLASSPATH=${CLASSPATH}:$f;
 done
+for f in $VOLTDB_HOME/third_party/java/jars/*.jar; do
+  CLASSPATH=${CLASSPATH}:$f;
+done
 
 java -Xmx512m -classpath $TEST_HOME:${CLASSPATH} org.voltdb.planner.plannerTester "$@"
 

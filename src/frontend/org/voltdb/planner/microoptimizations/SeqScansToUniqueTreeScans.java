@@ -86,8 +86,8 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
             if (newChild == child) {
                 continue;
             }
-            child.removeFromGraph();
-            plan.addAndLinkChild(newChild);
+            boolean replaced = plan.replaceChild(child, newChild);
+            assert(true == replaced);
         }
 
         // skip the meat if this isn't a scan node
