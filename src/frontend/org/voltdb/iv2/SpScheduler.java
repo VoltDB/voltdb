@@ -493,10 +493,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             msg.isForReplay());
                 // Update the handle in the copy since the constructor doesn't set it
                 replmsg.setSpHandle(newSpHandle);
-                for (long hsId : m_sendToHSIds) {
-                    m_mailbox.send(hsId,
-                            replmsg);
-                }
+                m_mailbox.send(m_sendToHSIds, replmsg);
                 DuplicateCounter counter = new DuplicateCounter(
                         msg.getInitiatorHSId(),
                         msg.getTxnId(), m_replicaHSIds, msg.getStoredProcedureName());
