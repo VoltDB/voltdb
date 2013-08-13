@@ -317,7 +317,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             String targetTableName,
             long targetTableSize,
             long tuplesFound,
-            String indexName) {
+            String indexName,
+            long indexSize,
+            long indexValuesFound) {
         long currentTime = System.currentTimeMillis();
         long duration = currentTime - m_startTime;
         if(duration > m_logDuration) {
@@ -327,7 +329,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                     +"["+"Executor:"+planNodeName+"]"
                     +"["+"Target table(size):"+targetTableName+"("+targetTableSize+")"+"]"
                     +"["+"Tuples processed:"+tuplesFound+"]"
-                    +"["+"Index:"+indexName+"]"
+                    +"["+"Index(processed/size):"+indexName+"("+indexValuesFound+"/"+indexSize+")"+"]"
                     +"["+"Batch index:"+batchIndex+"]"
                     );
             m_logDuration = (m_logDuration < 30000) ? 2*m_logDuration : 30000;

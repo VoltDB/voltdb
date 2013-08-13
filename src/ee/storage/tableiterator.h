@@ -200,7 +200,9 @@ inline bool TableIterator::next(TableTuple &out) {
                     m_engine->getTargetTableName(),
                     m_engine->getTargetTableSize(),
                     m_foundTuples,
-                    m_engine->getIndexName() )){
+                    m_engine->getIndexName(),
+                    m_engine->getIndexSize(),
+                    m_engine->getIndexVaulesFound())){
                 VOLT_ERROR("Time out read only query.");
                 throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "Time out read only query.");
             }

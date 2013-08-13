@@ -185,8 +185,14 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         }
         inline std::string getTargetTableName() {return m_targetTableName;}
         inline int64_t getTargetTableSize() {return m_targetTableSize;}
-        inline void setIndexName(std::string indexName) {m_indexName = indexName;}
+        inline void setIndexInfo(std::string indexName, int64_t size, int64_t indexVaulesFound) {
+            m_indexName = indexName;
+            m_indexSize = size;
+            m_indexValuesFound = indexVaulesFound;
+        }
         inline std::string getIndexName() {return m_indexName;}
+        inline int64_t getIndexSize() {return m_indexSize;}
+        inline int64_t getIndexVaulesFound() {return m_indexValuesFound;}
         inline void setPrepareStatsForLongOp(bool prepareStats) {m_prepareStatsForLongOp = prepareStats;}
         inline bool isPrepareStatsForLongOp() {return m_prepareStatsForLongOp;}
 
@@ -550,6 +556,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         std::string m_targetTableName;
         int64_t m_targetTableSize;
         std::string m_indexName;
+        int64_t m_indexSize;
+        int64_t m_indexValuesFound;
         bool m_prepareStatsForLongOp;
 
         /** buffer object for result tables. set when the result table is sent out to localsite. */
