@@ -434,7 +434,7 @@ public class Collector {
 
             if (errorMsg.equals("Auth cancel")) {
                 // "Auth cancel" appears when username doesn't exist or password is wrong
-                throw new Exception("Authorization failed");
+                throw new Exception("Authorization failed, check username and password");
             } else {
                 throw new Exception(errorMsg);
             }
