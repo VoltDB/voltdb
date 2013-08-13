@@ -18,19 +18,14 @@
 package org.voltcore.network;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.SocketException;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.CoreUtils;
+
 /** Encapsulates a socket registration for a VoltNetwork */
 public class VoltPort implements Connection
 {
@@ -40,16 +35,6 @@ public class VoltPort implements Connection
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
 
     private final NetworkDBBPool m_pool;
-
-    /*
-     * Thread pool for doing reverse DNS lookups. It will create new threads on
-     * demand, until the maximum of 16 threads is reached, in which case it will
-     * queue new works.
-     */
-    private static final ThreadPoolExecutor m_es =
-            new ThreadPoolExecutor(0, 16, 1, TimeUnit.SECONDS,
-                                   new LinkedBlockingQueue<Runnable>(),
-                                   CoreUtils.getThreadFactory("VoltPort DNS Reverse Lookup"));
 
     /** The currently selected operations on this port. */
     private int m_readyOps = 0;
@@ -87,13 +72,6 @@ public class VoltPort implements Connection
     private long m_messagesRead = 0;
     private long m_lastMessagesRead = 0;
 
-    /*
-     * This variable will be changed to the actual hostname some time later. It
-     * is not guaranteed on how long it will take to do the reverse DNS lookup.
-     * It is not recommended to use the value of this variable as a key. Use
-     * m_remoteIP if you need to identify a host.
-     */
-    volatile String m_remoteHost = null;
     final String m_remoteIP;
     private String m_toString = null;
 
@@ -107,34 +85,6 @@ public class VoltPort implements Connection
         m_handler = handler;
         m_remoteIP = remoteIP;
         m_pool = pool;
-    }
-
-    /**
-     * If the port is still alive, start a thread in background to do a reverse
-     * DNS lookup of the remote hostname.
-     */
-    void resolveHostname() {
-        synchronized (m_lock) {
-            if (!m_running) {
-                return;
-            }
-
-            /*
-             * Start the reverse DNS lookup in background because it might be
-             * very slow if the hostname is not specified in local /etc/hosts.
-             */
-            m_es.submit(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        m_remoteHost = InetAddress.getByName(m_remoteIP).getHostName();
-                    } catch (UnknownHostException e) {
-                        networkLog.warn("Unable to resolve hostname of host "
-                                        + m_remoteIP);
-                    }
-                }
-            });
-        }
     }
 
     void setKey (SelectionKey key) {
@@ -420,11 +370,7 @@ public class VoltPort implements Connection
 
     @Override
     public String getHostnameOrIP() {
-        if (m_remoteHost != null) {
-            return m_remoteHost;
-        } else {
-            return m_remoteIP;
-        }
+        return m_remoteIP;
     }
 
     @Override
