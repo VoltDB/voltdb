@@ -114,8 +114,7 @@ class RecoveryProtoMsg;
 
 const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
 const size_t PLAN_CACHE_SIZE = 1024 * 10;
-const int64_t LONG_OP_THRESHOLD_TUPLES = 100000000;
-const int64_t LONG_OP_THRESHOLD_INDEX_ENTRIES = 100000000;
+const int64_t LONG_OP_THRESHOLD = 100000000;
 
 /**
  * Represents an Execution Engine which holds catalog objects (i.e. table) and executes
@@ -174,19 +173,29 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         inline int getUsedParamcnt() const { return m_usedParamcnt;}
         inline void setUsedParamcnt(int usedParamcnt) { m_usedParamcnt = usedParamcnt;}
 
-        // Some context information of the current executor
-        inline void setBatchIndex(int index) {m_currentBatchIndex = index;}
-        inline int getBatchIndex() {return m_currentBatchIndex;}
-        inline void setPlanNodeName(std::string executor) {m_planNode = executor;}
-        inline std::string getPlanNodeName() {return m_planNode;}
-        inline void setTargetTableInfo(std::string tableName, int64_t tableSize) {
-            m_targetTableName = tableName;
-            m_targetTableSize = tableSize;
+        // ------------------------------------------------------------------
+         // FragContextMetadata: meta data of the current executor
+         // ------------------------------------------------------------------
+         struct FragContextMetadata {
+             /** index of the batch piece being executed */
+             int currentIndexInBatch;
+             std::string currentExecutor;
+             std::string currentTable;
+             int64_t currentTableSize;
+         };
+
+        inline void setIndexInBatch(int indexInBatch) {
+            m_fragContext.currentIndexInBatch = indexInBatch;
         }
-        inline std::string getTargetTableName() {return m_targetTableName;}
-        inline int64_t getTargetTableSize() {return m_targetTableSize;}
-        inline void setIndexName(std::string indexName) {m_indexName = indexName;}
-        inline std::string getIndexName() {return m_indexName;}
+        inline void setFragContext(std::string executorName, std::string tableName, int64_t tableSize) {
+            m_fragContext.currentExecutor = executorName;
+            m_fragContext.currentTable = tableName;
+            m_fragContext.currentTableSize = tableSize;
+        }
+        inline FragContextMetadata getFragContext() {
+            return m_fragContext;
+        }
+
         inline void setPrepareStatsForLongOp(bool prepareStats) {m_prepareStatsForLongOp = prepareStats;}
         inline bool isPrepareStatsForLongOp() {return m_prepareStatsForLongOp;}
 
@@ -541,15 +550,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /** TODO : should be passed as execute() parameter..*/
         int m_usedParamcnt;
 
-        // ------------------------------------------------------------------
-        // Context: Context information of the current executor
-        // ------------------------------------------------------------------
-        /** index of the batch piece being executed */
-        int m_currentBatchIndex;
-        std::string m_planNode;
-        std::string m_targetTableName;
-        int64_t m_targetTableSize;
-        std::string m_indexName;
+        FragContextMetadata m_fragContext;
         bool m_prepareStatsForLongOp;
 
         /** buffer object for result tables. set when the result table is sent out to localsite. */

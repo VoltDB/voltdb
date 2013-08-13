@@ -312,12 +312,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
     }
 
-    public boolean updateStats(int batchIndex,
+    public boolean fragmentProgressUpdate(int batchIndex,
             String planNodeName,
-            String targetTableName,
-            long targetTableSize,
-            long tuplesFound,
-            String indexName) {
+            String lastAccessedTable,
+            long lastAccessedTableSize,
+            long tuplesFound) {
         long currentTime = System.currentTimeMillis();
         long duration = currentTime - m_startTime;
         if(duration > m_logDuration) {
@@ -325,9 +324,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             log.info("Long running operation");
             log.info("[Proc:"+m_rProcContext.m_procedureName+"]"
                     +"["+"Executor:"+planNodeName+"]"
-                    +"["+"Target table(size):"+targetTableName+"("+targetTableSize+")"+"]"
+                    +"["+"Target table(size):"+lastAccessedTable+"("+lastAccessedTableSize+")"+"]"
                     +"["+"Tuples processed:"+tuplesFound+"]"
-                    +"["+"Index:"+indexName+"]"
                     +"["+"Batch index:"+batchIndex+"]"
                     );
             m_logDuration = (m_logDuration < 30000) ? 2*m_logDuration : 30000;

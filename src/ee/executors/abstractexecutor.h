@@ -157,12 +157,11 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
  * Set up statistics for long running operations thru m_engine
  */
 inline void AbstractExecutor::setStatsForLongOp() {
-        if(m_engine->isPrepareStatsForLongOp()) {
-                m_engine->setPlanNodeName(planNodeToString(m_abstractNode->getPlanNodeType()));
-                m_engine->setTargetTableInfo("None",0);
-                m_engine->setIndexName("None");
-                m_engine->setPrepareStatsForLongOp(false);
-        }
+    if(m_engine->isPrepareStatsForLongOp()) {
+        m_engine->setFragContext(planNodeToString(m_abstractNode->getPlanNodeType()),
+                "None", 0);
+        m_engine->setPrepareStatsForLongOp(false);
+    }
 }
 
 }

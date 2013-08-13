@@ -96,10 +96,11 @@ protected:
     bool p_execute(const NValueArray &params);
     inline void setStatsForLongOp(Table* targetTable) {
         if(m_engine->isPrepareStatsForLongOp()) {
-                m_engine->setPlanNodeName(planNodeToString(m_abstractNode->getPlanNodeType()));
-                m_engine->setTargetTableInfo(targetTable->name(), targetTable->activeTupleCount());
-                m_engine->setIndexName(index->getName());
-                m_engine->setPrepareStatsForLongOp(false);
+            m_engine->setFragContext(planNodeToString(m_abstractNode->getPlanNodeType()),
+                    targetTable->name(),
+                    targetTable->activeTupleCount()
+            );
+            m_engine->setPrepareStatsForLongOp(false);
         }
     };
 

@@ -83,11 +83,11 @@ private:
     bool p_execute(const NValueArray &params);
     inline void setStatsForLongOp() {
         if(m_engine->isPrepareStatsForLongOp()) {
-                Table* targetTable = reinterpret_cast<Table*> (m_targetTable);
-                m_engine->setPlanNodeName(planNodeToString(m_abstractNode->getPlanNodeType()));
-                m_engine->setTargetTableInfo(targetTable->name(), targetTable->activeTupleCount());
-                m_engine->setIndexName(m_index->getName());
-                m_engine->setPrepareStatsForLongOp(false);
+            Table* targetTable = reinterpret_cast<Table*> (m_targetTable);
+            m_engine->setFragContext(planNodeToString(m_abstractNode->getPlanNodeType()),
+                    targetTable->name(),
+                    targetTable->activeTupleCount());
+            m_engine->setPrepareStatsForLongOp(false);
         }
     };
 

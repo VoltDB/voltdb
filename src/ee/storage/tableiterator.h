@@ -189,18 +189,17 @@ inline void TableIterator::setEngine(VoltDBEngine* engine) {
 }
 
 inline bool TableIterator::next(TableTuple &out) {
-    if( m_foundTuples > LONG_OP_THRESHOLD_TUPLES-2 && m_engine ) {
-        if((m_foundTuples + 1) % LONG_OP_THRESHOLD_TUPLES == 0) {
+    if( m_foundTuples > LONG_OP_THRESHOLD-2 && m_engine ) {
+        if((m_foundTuples + 1) % LONG_OP_THRESHOLD == 0) {
             m_engine->setPrepareStatsForLongOp(true);
         }
-        if(m_foundTuples % LONG_OP_THRESHOLD_TUPLES == 0) {
+        if(m_foundTuples % LONG_OP_THRESHOLD == 0) {
             //Update stats in java and let java determine if we should cancel this query.
-            if(m_engine->getTopend()->updateStats(m_engine->getBatchIndex(),
-                    m_engine->getPlanNodeName(),
-                    m_engine->getTargetTableName(),
-                    m_engine->getTargetTableSize(),
-                    m_foundTuples,
-                    m_engine->getIndexName() )){
+            if(m_engine->getTopend()->fragmentProgressUpdate(m_engine->getFragContext().currentIndexInBatch,
+                    m_engine->getFragContext().currentExecutor,
+                    m_engine->getFragContext().currentTable,
+                    m_engine->getFragContext().currentTableSize,
+                    m_foundTuples)){
                 VOLT_ERROR("Time out read only query.");
                 throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "Time out read only query.");
             }
