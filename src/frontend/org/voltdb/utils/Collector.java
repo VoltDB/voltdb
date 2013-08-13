@@ -323,7 +323,7 @@ public class Collector {
             String[] dmesgCmd = {"bash", "-c", "/bin/dmesg"};
             cmd(tarGenerator, dmesgCmd, "dmesgdata");
 
-            tarGenerator.write();
+            tarGenerator.write(false, true);
 
             long sizeInByte = collectionFile.length();
             String sizeStringInKB = String.format("%5.2f", (double)sizeInByte / 1000);

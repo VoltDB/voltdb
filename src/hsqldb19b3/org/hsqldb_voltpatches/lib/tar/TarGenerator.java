@@ -276,20 +276,20 @@ public class TarGenerator {
         try {
             for (int i = 0; i < entryQueue.size(); i++) {
                 if (verbose) {
-                    System.err.print(Integer.toString(i + 1) + " / "
+                    System.out.print(Integer.toString(i + 1) + " / "
                                      + entryQueue.size() + ' ');
                 }
 
                 entry = (TarEntrySupplicant) entryQueue.get(i);
 
                 if (verbose) {
-                    System.err.print(entry.getPath() + "... ");
+                    System.out.print(entry.getPath() + "... ");
                 }
 
                 if (entry.getDataSize() >= paxThreshold) {
                     entry.makeXentry().write();
                     if (verbose) {
-                        System.err.print("x... ");
+                        System.out.print("x... ");
                     }
                 }
 
@@ -297,7 +297,7 @@ public class TarGenerator {
                 archive.assertAtBlockBoundary();
 
                 if (verbose) {
-                    System.err.println();
+                    System.out.println();
                 }
             }
 

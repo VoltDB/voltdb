@@ -659,6 +659,10 @@ public class SFTPSession {
     }
 
     public String exec(String command) {
+        return exec(command, 5000);
+    }
+
+    public String exec(String command, int timeout) {
         ChannelExec channel = null;
         BufferedReader outStrBufRdr = null;
         BufferedReader errStrBufRdr = null;
@@ -695,8 +699,8 @@ public class SFTPSession {
             StringBuffer stderr = new StringBuffer();
 
             try {
-                channel.connect(5000);
-                int retries = 50;
+                channel.connect(timeout);
+                int retries = timeout / 100;
                 while (!channel.isClosed() && retries-- > 0) {
                     // Read from both streams here so that they are not blocked,
                     // if they are blocked because the buffer is full, channel.isClosed() will never
@@ -744,16 +748,20 @@ public class SFTPSession {
             } catch (IOException ioex) {
                 throw new SSHException("capturing '" + command + "' error", ioex);
             }
+            if (stderr.length() > 0) {
+                throw new SSHException(stderr.toString());
+            }
 
-            // After the command is executed, gather the results (both stdin and stderr).
             result.append(stdout.toString());
             result.append(stderr.toString());
-
-            // Shutdown the connection
-            channel.disconnect();
         } finally {
             if (outStrBufRdr != null) try { outStrBufRdr.close(); } catch (Exception ignoreIt) {}
             if (errStrBufRdr != null) try { errStrBufRdr.close(); } catch (Exception ignoreIt) {}
+
+            if (channel != null && channel.isConnected()) {
+                // Shutdown the connection
+                channel.disconnect();
+            }
         }
 
         return result.toString();
