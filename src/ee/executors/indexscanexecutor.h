@@ -86,7 +86,7 @@ private:
                 Table* targetTable = reinterpret_cast<Table*> (m_targetTable);
                 m_engine->setPlanNodeName(planNodeToString(m_abstractNode->getPlanNodeType()));
                 m_engine->setTargetTableInfo(targetTable->name(), targetTable->activeTupleCount());
-                m_engine->setIndexInfo(m_index->getName(), m_index->getSize(), m_index->getFoundNextVaules());
+                m_engine->setIndexName(m_index->getName());
                 m_engine->setPrepareStatsForLongOp(false);
         }
     };

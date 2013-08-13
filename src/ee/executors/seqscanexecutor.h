@@ -70,7 +70,7 @@ namespace voltdb
                 if(m_engine->isPrepareStatsForLongOp()) {
                         m_engine->setPlanNodeName(planNodeToString(m_abstractNode->getPlanNodeType()));
                         m_engine->setTargetTableInfo(targetTable->name(), targetTable->activeTupleCount());
-                        m_engine->setIndexInfo("None", 0, 0);
+                        m_engine->setIndexName("None");
                         m_engine->setPrepareStatsForLongOp(false);
                 }
         };

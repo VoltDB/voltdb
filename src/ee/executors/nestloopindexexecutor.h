@@ -98,7 +98,7 @@ protected:
         if(m_engine->isPrepareStatsForLongOp()) {
                 m_engine->setPlanNodeName(planNodeToString(m_abstractNode->getPlanNodeType()));
                 m_engine->setTargetTableInfo(targetTable->name(), targetTable->activeTupleCount());
-                m_engine->setIndexInfo(index->getName(), index->getSize(), index->getFoundNextVaules());
+                m_engine->setIndexName(index->getName());
                 m_engine->setPrepareStatsForLongOp(false);
         }
     };

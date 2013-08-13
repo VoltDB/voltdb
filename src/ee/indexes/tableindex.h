@@ -374,15 +374,13 @@ public:
                 m_engine->setPrepareStatsForLongOp(true);
             }
             if(m_foundNextValues % LONG_OP_THRESHOLD_INDEX_ENTRIES == 0) {
-                // Update stats in java and let java determine if we should cancel this query.
+                //Update stats in java and let java determine if we should cancel this query.
                 if(m_engine->getTopend()->updateStats(m_engine->getBatchIndex(),
                         m_engine->getPlanNodeName(),
                         m_engine->getTargetTableName(),
                         m_engine->getTargetTableSize(),
                         m_foundNextValues,
-                        m_engine->getIndexName(),
-                        m_engine->getIndexSize(),
-                        m_engine->getIndexVaulesFound())){
+                        m_engine->getIndexName() )){
                     VOLT_ERROR("Time out read only query.");
                     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "Time out read only query.");
                 }
@@ -484,10 +482,6 @@ public:
     virtual bool equals(const TableIndex *other) const;
 
     virtual voltdb::IndexStats* getIndexStats();
-
-    int getFoundNextVaules () {
-        return m_foundNextValues;
-    }
 
 protected:
     const TupleSchema *getTupleSchema() const
