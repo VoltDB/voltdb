@@ -182,6 +182,11 @@ public class CSVLoader {
         int port = Client.VOLTDB_SERVER_PORT;
         @Option(desc = "Check CSV Input Data Only.")
         boolean check = false;
+        @Option(desc = "Use @Ping")
+        boolean ping = false;
+        @Option(desc = "Use DoNothingProcedure which does full round trip but no transaction.")
+        boolean dnp = false;
+        @Option(desc = "Stream file to procedure")
         @AdditionalArgs(desc = "insert the data into database by TABLENAME.insert procedure by default")
         String table = "";
 
@@ -373,8 +378,16 @@ public class CSVLoader {
                                 break;
                             }
 
-                            queued = csvClient.callProcedure(cb, insertProcedure,
-                                    (Object[]) correctedLine);
+                            if (config.ping) {
+                                queued = csvClient.callProcedure(cb, "@Ping",
+                                        (Object[]) correctedLine);
+                            } else if (config.dnp) {
+                                queued = csvClient.callProcedure(cb, "DoNothingProcedure",
+                                        (Object[]) correctedLine);
+                            } else {
+                                queued = csvClient.callProcedure(cb, insertProcedure,
+                                        (Object[]) correctedLine);
+                            }
                             outCount.incrementAndGet();
                         } else {
                             queued = true;
