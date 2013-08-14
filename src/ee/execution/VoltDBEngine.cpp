@@ -1503,7 +1503,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
 
     // Perform the streaming.
     if (table != NULL) {
-        remaining = table->streamMore(outputStreams, retPositions);
+        remaining = table->streamMore(outputStreams, streamType, retPositions);
 
         // Clear it from the snapshot table as appropriate.
         if (remaining <= 0 && tableStreamTypeIsSnapshot(streamType)) {

@@ -18,8 +18,10 @@
 #ifndef TABLE_STREAMER_INTERFACE_H
 #define TABLE_STREAMER_INTERFACE_H
 
+#include <boost/shared_ptr.hpp>
 #include "common/types.h"
 #include "storage/TupleBlock.h"
+#include "storage/TableStreamerContext.h"
 
 namespace voltdb
 {
@@ -49,6 +51,7 @@ namespace voltdb
          * Continue streaming.
          */
         virtual int64_t streamMore(TupleOutputStreamProcessor &outputStreams,
+                                   TableStreamType streamType,
                                    std::vector<int> &retPositions) = 0;
 
         /**
@@ -91,14 +94,25 @@ namespace voltdb
                                          TableTuple &sourceTuple, TableTuple &targetTuple) = 0;
 
         /**
-         * Return stream type for active stream or TABLE_STREAM_NONE if nothing is active.
+         * Return context or null for specified type.
          */
-        virtual TableStreamType getActiveStreamType() const = 0;
+        virtual TableStreamerContextPtr findStreamContext(TableStreamType streamType) = 0;
+
+        /**
+         * Return context or null for specified type (const flavor).
+         */
+        TableStreamerContextPtr findStreamContext(TableStreamType streamType) const
+        {
+            return const_cast<TableStreamerInterface*>(this)->findStreamContext(streamType);
+        }
 
         /**
          * Return true if managing a stream of the specified type.
          */
-        virtual bool hasStreamType(TableStreamType streamType) const = 0;
+        bool hasStreamType(TableStreamType streamType) const
+        {
+            return (findStreamContext(streamType) != NULL);
+        }
     };
 
 } // namespace voltdb

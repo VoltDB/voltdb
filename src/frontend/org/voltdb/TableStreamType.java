@@ -35,6 +35,11 @@ public enum TableStreamType {
      */
     ELASTIC_INDEX,
     /*
+     * An elastic index read stream materializes the index created by ELASTIC_INDEX
+     * using the SNAPSHOT streaming mechanism.
+     */
+    ELASTIC_INDEX_READ,
+    /*
      * A stream of tuple data that can be used to retrieve the latest state of a table
      * that is actively being modified. The stream starts by transporting all the tuple data
      * and then transports the set of modified and deleted tuples in a separate synchronous phase.
