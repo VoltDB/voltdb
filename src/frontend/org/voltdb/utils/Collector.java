@@ -486,10 +486,10 @@ public class Collector {
 
             if (matcher.matches()) {
                 if (errorMsg.startsWith("java.net.UnknownHostException")) {
-                    throw new Exception("Unknown host: " + matcher.group("Message"));
+                    throw new Exception("Unknown host: " + matcher.group(2));
                 }
                 else {
-                    throw new Exception(matcher.group("Message"));
+                    throw new Exception(matcher.group(2));
                 }
             }
             else {
