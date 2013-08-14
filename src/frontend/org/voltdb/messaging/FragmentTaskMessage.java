@@ -451,7 +451,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         msgsize += 20 * m_items.size();
 
         // Procedure name gets an length (4) and the name (.length)
-        msgsize += 4;
+        msgsize += 2;
         if(m_procNameInBytes.length != 0)
             msgsize += m_procNameInBytes.length;
 
@@ -578,10 +578,10 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         // Procedure name
         if (m_procNameInBytes.length != 0) {
-            buf.putInt(m_procNameInBytes.length);
+            buf.putShort((short)m_procNameInBytes.length);
             buf.put(m_procNameInBytes);
         } else {
-           buf.putInt(0);
+           buf.putShort((short)0);
         }
 
         if (m_initiateTaskBuffer != null) {
@@ -675,7 +675,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         }
 
         // Procedure name
-        int procNameLen = buf.getInt();
+        short procNameLen = buf.getShort();
         if(procNameLen > 0) {
             m_procNameInBytes = new byte[procNameLen];
             buf.get(m_procNameInBytes);

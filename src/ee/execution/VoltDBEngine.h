@@ -174,15 +174,15 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         inline void setUsedParamcnt(int usedParamcnt) { m_usedParamcnt = usedParamcnt;}
 
         // ------------------------------------------------------------------
-         // FragContextMetadata: meta data of the current executor
-         // ------------------------------------------------------------------
-         struct FragContextMetadata {
-             /** index of the batch piece being executed */
-             int currentIndexInBatch;
-             std::string currentExecutor;
-             std::string currentTable;
-             int64_t currentTableSize;
-         };
+        // FragContextMetadata: meta data of the current executor
+        // ------------------------------------------------------------------
+        struct FragContextMetadata {
+            /** index of the batch piece being executed */
+            int currentIndexInBatch;
+            std::string currentExecutor;
+            std::string currentTable;
+            int64_t currentTableSize;
+        };
 
         inline void setIndexInBatch(int indexInBatch) {
             m_fragContext.currentIndexInBatch = indexInBatch;
@@ -550,7 +550,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /** TODO : should be passed as execute() parameter..*/
         int m_usedParamcnt;
 
+        /** context struct for the current executing executor*/
         FragContextMetadata m_fragContext;
+        /** indicates if it's time to gather statistics for the current executing executor. set when approaching long op reporting threshold*/
         bool m_prepareStatsForLongOp;
 
         /** buffer object for result tables. set when the result table is sent out to localsite. */

@@ -1494,27 +1494,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             Object[] parameterSets,
             long txnId,//txnid is both sphandle and uniqueid pre-iv2
             long txnIdAsUniqueId,
-            boolean readOnly) throws EEException
-    {
-        return ee.executePlanFragments(
-            numFragmentIds,
-            planFragmentIds,
-            inputDepIds,
-            parameterSets,
-            txnId,
-            lastCommittedTxnId,
-            txnIdAsUniqueId,
-            readOnly ? Long.MAX_VALUE : getNextUndoToken());
-    }
-
-    @Override
-    public VoltTable[] executePlanFragments(
-            int numFragmentIds,
-            long[] planFragmentIds,
-            long[] inputDepIds,
-            Object[] parameterSets,
-            long txnId,//txnid is both sphandle and uniqueid pre-iv2
-            long txnIdAsUniqueId,
             boolean readOnly,
             RunningProcedureContext rProcContext) throws EEException
     {
