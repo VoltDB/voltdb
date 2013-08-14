@@ -26,6 +26,7 @@
 #include "common/types.h"
 #include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
+#include "common/serializeio.h"
 #include "execution/VoltDBEngine.h"
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
@@ -172,6 +173,82 @@ TEST_F(PersistentTableLogTest, InsertDeleteThenUndoOneTest) {
     m_engine->undoUndoToken(INT64_MIN + 2);
 
     ASSERT_FALSE(m_table->lookupTuple(tuple).isNullTuple());
+}
+
+TEST_F(PersistentTableLogTest, LoadTableThenUndoTest) {
+    initTable(true);
+    tableutil::addRandomTuples(m_table, 1000);
+
+    CopySerializeOutput serialize_out;
+    m_table->serializeTo(serialize_out);
+
+    m_engine->setUndoToken(INT64_MIN + 2);
+    // this next line is a testing hack until engine data is
+    // de-duplicated with executorcontext data
+    m_engine->getExecutorContext();
+
+    m_table->deleteAllTuples(true);
+    m_engine->releaseUndoToken(INT64_MIN + 2);
+
+    delete m_table;
+
+    initTable(true);
+
+    ReferenceSerializeInput serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
+
+    m_engine->setUndoToken(INT64_MIN + 3);
+    // this next line is a testing hack until engine data is
+    // de-duplicated with executorcontext data
+    m_engine->getExecutorContext();
+
+    m_table->loadTuplesFrom(serialize_in, NULL, NULL);
+    voltdb::TableTuple tuple(m_tableSchema);
+
+    tableutil::getRandomTuple(m_table, tuple);
+    ASSERT_FALSE( m_table->lookupTuple(tuple).isNullTuple());
+
+    m_engine->undoUndoToken(INT64_MIN + 3);
+
+    ASSERT_TRUE(m_table->lookupTuple(tuple).isNullTuple());
+    ASSERT_TRUE(m_table->activeTupleCount() == (int64_t)0);
+}
+
+TEST_F(PersistentTableLogTest, LoadTableThenReleaseTest) {
+    initTable(true);
+    tableutil::addRandomTuples(m_table, 1000);
+
+    CopySerializeOutput serialize_out;
+    m_table->serializeTo(serialize_out);
+
+    m_engine->setUndoToken(INT64_MIN + 2);
+    // this next line is a testing hack until engine data is
+    // de-duplicated with executorcontext data
+    m_engine->getExecutorContext();
+
+    m_table->deleteAllTuples(true);
+    m_engine->releaseUndoToken(INT64_MIN + 2);
+
+    delete m_table;
+
+    initTable(true);
+
+    ReferenceSerializeInput serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
+
+    m_engine->setUndoToken(INT64_MIN + 3);
+    // this next line is a testing hack until engine data is
+    // de-duplicated with executorcontext data
+    m_engine->getExecutorContext();
+
+    m_table->loadTuplesFrom(serialize_in, NULL, NULL);
+    voltdb::TableTuple tuple(m_tableSchema);
+
+    tableutil::getRandomTuple(m_table, tuple);
+    ASSERT_FALSE( m_table->lookupTuple(tuple).isNullTuple());
+
+    m_engine->releaseUndoToken(INT64_MIN + 3);
+
+    ASSERT_FALSE(m_table->lookupTuple(tuple).isNullTuple());
+    ASSERT_TRUE(m_table->activeTupleCount() == (int64_t)1000);
 }
 
 TEST_F(PersistentTableLogTest, InsertUpdateThenUndoOneTest) {

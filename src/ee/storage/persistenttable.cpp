@@ -898,6 +898,11 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple,
                                              CONSTRAINT_TYPE_UNIQUE);
         }
     }
+    UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+    if (uq) {
+        char* tupleData = uq->allocatePooledCopy(tuple.address(), tuple.tupleLength());
+        uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, this));
+    }
 
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
