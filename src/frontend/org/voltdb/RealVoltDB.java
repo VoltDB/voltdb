@@ -109,6 +109,7 @@ import org.voltdb.iv2.SpInitiator;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
+import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.rejoin.Iv2RejoinCoordinator;
 import org.voltdb.rejoin.JoinCoordinator;
 import org.voltdb.utils.CLibrary;
@@ -152,7 +153,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    private static final String m_defaultVersionString = "3.5";
+    private static final String m_defaultVersionString = "3.6";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
@@ -345,6 +346,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_pathToStartupCatalog = m_config.m_pathToCatalog;
             m_replicationActive = false;
             m_configLogger = null;
+            ActivePlanRepository.clear();
 
             // set up site structure
             m_localSites = new COWMap<Long, ExecutionSite>();

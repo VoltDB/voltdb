@@ -24,7 +24,6 @@ import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.FragmentPlanSource;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
@@ -100,11 +99,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final String hostname,
             final int tempTableMemory,
             final TheHashinator.HashinatorType hashinatorType,
-            final byte hashinatorConfig[],
-            final FragmentPlanSource planSource)
+            final byte hashinatorConfig[])
     {
         // base class loads the volt shared library.
-        super(siteId, partitionId, planSource);
+        super(siteId, partitionId);
 
         //exceptionBuffer.order(ByteOrder.nativeOrder());
         LOG.trace("Creating Execution Engine on clusterIndex=" + clusterIndex
