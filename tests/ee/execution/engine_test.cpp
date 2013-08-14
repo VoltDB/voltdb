@@ -199,34 +199,6 @@ class ExecutionEngineTest : public Test {
         void compareTables(Table *first, Table* second);
 };
 
-//Shouldn't this functionality go into table.h?
-void ExecutionEngineTest::compareTables(Table *first, Table *second) {
-    ASSERT_TRUE(first->columnCount() == second->columnCount());
-    ASSERT_TRUE(first->indexCount() == second->indexCount());
-    ASSERT_TRUE(first->activeTupleCount() == second->activeTupleCount());
-    ASSERT_TRUE(first->databaseId() == second->databaseId());
-    ASSERT_TRUE(first->name() == second->name());
-    ASSERT_TRUE(first->tableType() == second->tableType());
-    vector<TableIndex*> firstAllIndexes = first->allIndexes();
-    vector<TableIndex*> secondAllIndexes = second->allIndexes();
-    ASSERT_TRUE(firstAllIndexes.size() == secondAllIndexes.size());
-    for (size_t ii = 0; ii < firstAllIndexes.size(); ii++) {
-        ASSERT_TRUE(firstAllIndexes[ii]->equals(secondAllIndexes[ii]));
-    }
-    const TupleSchema *firstSchema = first->schema();
-    const TupleSchema *secondSchema = second->schema();
-    ASSERT_TRUE(firstSchema->equals(secondSchema));
-
-    TableIterator firstTI = first->iterator();
-    TableIterator secondTI = second->iterator();
-    TableTuple firstTuple(firstSchema);
-    TableTuple secondTuple(secondSchema);
-    while(firstTI.next(firstTuple)) {
-        ASSERT_TRUE(secondTI.next(secondTuple));
-        ASSERT_TRUE(firstTuple.equals(secondTuple));
-    }
-}
-
 /*
 // ------------------------------------------------------------------
 // Execute_PlanFragmentInfo

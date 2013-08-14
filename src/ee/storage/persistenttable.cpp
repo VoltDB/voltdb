@@ -91,7 +91,7 @@ PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetS
     m_partitionColumn(partitionColumn),
     stats_(this),
     m_failedCompactionCount(0),
-    m_tuplesPendingDeleteCount(0)
+    m_invisibleTuplesPendingDeleteCount(0)
 {
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
@@ -292,6 +292,7 @@ void PersistentTable::insertTupleForUndo(char *tuple)
     target.move(tuple);
     target.setPendingDeleteOnUndoReleaseFalse();
     m_tuplesPinnedByUndo--;
+    --m_invisibleTuplesPendingDeleteCount;
 
     /*
      * The only thing to do is reinsert the tuple into the indexes. It was never moved,
@@ -536,6 +537,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
         if (uq) {
             target.setPendingDeleteOnUndoReleaseTrue();
             m_tuplesPinnedByUndo++;
+            ++m_invisibleTuplesPendingDeleteCount;
             // Create and register an undo action.
             uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), this), this);
             return true;
@@ -557,6 +559,7 @@ void PersistentTable::deleteTupleRelease(char* tupleData)
     target.move(tupleData);
     target.setPendingDeleteOnUndoReleaseFalse();
     m_tuplesPinnedByUndo--;
+    --m_invisibleTuplesPendingDeleteCount;
     deleteTupleFinalize(target);
 }
 
@@ -587,9 +590,8 @@ void PersistentTable::deleteTupleFinalize(TableTuple &target)
             return;
         }
 
+        ++m_invisibleTuplesPendingDeleteCount;
         target.setPendingDeleteTrue();
-        // This count is a testability feature not intended for use in product logic.
-        ++m_tuplesPendingDeleteCount;
         return;
     }
 
@@ -990,7 +992,7 @@ int64_t PersistentTable::streamMore(TupleOutputStreamProcessor &outputStreams,
 void PersistentTable::processRecoveryMessage(RecoveryProtoMsg* message, Pool *pool) {
     switch (message->msgType()) {
     case RECOVERY_MSG_TYPE_SCAN_TUPLES: {
-        if (activeTupleCount() == 0) {
+        if (isPersistentTableEmpty()) {
             uint32_t tupleCount = message->totalTupleCount();
             BOOST_FOREACH(TableIndex *index, m_indexes) {
                 index->ensureCapacity(tupleCount);
