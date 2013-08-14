@@ -617,7 +617,22 @@ class Distributer {
         final SocketChannel aChannel = (SocketChannel)socketChannelAndInstanceIdAndBuildString[0];
         final long instanceIdWhichIsTimestampAndLeaderIp[] = (long[])socketChannelAndInstanceIdAndBuildString[1];
         final int hostId = (int)instanceIdWhichIsTimestampAndLeaderIp[0];
+
+        NodeConnection cxn = new NodeConnection(instanceIdWhichIsTimestampAndLeaderIp, address);
+        Connection c = m_network.registerChannel( aChannel, cxn);
+        cxn.m_hostname = c.getHostnameOrIP();
+        cxn.m_port = port;
+        cxn.m_connection = c;
+
         synchronized (this) {
+
+            // If there are no connections, discard any previous connection ids and allow the client
+            // to connect to a new cluster.
+            // Careful, this is slightly less safe than the previous behavior.
+            if (m_connections.size() == 0) {
+                m_clusterInstanceId = null;
+            }
+
             if (m_clusterInstanceId == null) {
                 long timestamp = instanceIdWhichIsTimestampAndLeaderIp[2];
                 int addr = (int)instanceIdWhichIsTimestampAndLeaderIp[3];
@@ -625,21 +640,17 @@ class Distributer {
             } else {
                 if (!(((Long)m_clusterInstanceId[0]).longValue() == instanceIdWhichIsTimestampAndLeaderIp[2]) ||
                         !(((Integer)m_clusterInstanceId[1]).longValue() == instanceIdWhichIsTimestampAndLeaderIp[3])) {
-                    aChannel.close();
+                    // clean up the pre-registered voltnetwork connection/channel
+                    c.unregister();
                     throw new IOException(
-                            "Cluster instance id mismatch. Current is " + m_clusterInstanceId[0] + "," + m_clusterInstanceId[1]
-                                                                                                                             + " and server's was " + instanceIdWhichIsTimestampAndLeaderIp[2] + "," + instanceIdWhichIsTimestampAndLeaderIp[3]);
+                            "Cluster instance id mismatch. Current is " + m_clusterInstanceId[0] + "," + m_clusterInstanceId[1] +
+                            " and server's was " + instanceIdWhichIsTimestampAndLeaderIp[2] + "," + instanceIdWhichIsTimestampAndLeaderIp[3]);
                 }
             }
             m_buildString = (String)socketChannelAndInstanceIdAndBuildString[2];
-        }
-        NodeConnection cxn = new NodeConnection(instanceIdWhichIsTimestampAndLeaderIp, address);
 
-        Connection c = m_network.registerChannel( aChannel, cxn);
-        cxn.m_hostname = c.getHostnameOrIP();
-        cxn.m_port = port;
-        cxn.m_connection = c;
-        m_connections.add(cxn);
+            m_connections.add(cxn);
+        }
 
         if (m_useClientAffinity) {
             synchronized (this) {
