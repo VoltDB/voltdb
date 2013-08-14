@@ -39,7 +39,6 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.processtools.SFTPSession;
 import org.voltdb.processtools.SFTPSession.SFTPException;
 import org.voltdb.processtools.SSHTools;
@@ -69,8 +68,6 @@ public class Collector {
     private static String m_workingDir = null;
     private static List<String> m_logPaths = new ArrayList<String>();
 
-    private static final VoltLogger m_log = new VoltLogger("CONSOLE");
-
     public static String[] cmdFilenames = {"sardata", "dmesgdata"};
 
     public static void main(String[] args) {
@@ -96,7 +93,7 @@ public class Collector {
 
         File voltDbRoot = new File(m_voltDbRootPath);
         if (!voltDbRoot.exists()) {
-            m_log.error("voltdbroot path '" + m_voltDbRootPath + "' does not exist.");
+            System.err.println("voltdbroot path '" + m_voltDbRootPath + "' does not exist.");
             System.exit(-1);
         }
 
@@ -188,11 +185,11 @@ public class Collector {
 
             jsonObject = new JSONObject(builder.toString());
         } catch (FileNotFoundException e) {
-            m_log.error("config log file '" + configInfoPath + "' could not be found.");
+            System.err.println("config log file '" + configInfoPath + "' could not be found.");
         } catch (IOException e) {
-            m_log.error(e.getMessage());
+            System.err.println(e.getMessage());
         } catch (JSONException e) {
-            m_log.error(e.getMessage());
+            System.err.println(e.getMessage());
         }
 
         return jsonObject;
@@ -210,7 +207,7 @@ public class Collector {
                 m_logPaths.add(path);
             }
         } catch (JSONException e) {
-            m_log.error(e.getMessage());
+            System.err.println(e.getMessage());
         }
     }
 
@@ -266,7 +263,7 @@ public class Collector {
                 }
             }
         } catch (IOException e) {
-            m_log.error(e.getMessage());
+            System.err.println(e.getMessage());
         }
 
         return collectionFilesList;
@@ -333,7 +330,7 @@ public class Collector {
 
             long sizeInByte = collectionFile.length();
             String sizeStringInKB = String.format("%5.2f", (double)sizeInByte / 1000);
-            m_log.info("Collection file created at " + collectionFilePath + " size: " + sizeStringInKB + " KB");
+            System.out.println("Collection file created at " + collectionFilePath + " size: " + sizeStringInKB + " KB");
 
             boolean upload = false;
             if (!m_host.isEmpty()) {
@@ -359,7 +356,7 @@ public class Collector {
                     try {
                         uploadToServer(collectionFilePath, m_host, m_username, m_password);
 
-                        m_log.info("Uploaded " + new File(collectionFilePath).getName() + " via SFTP");
+                        System.out.println("Uploaded " + new File(collectionFilePath).getName() + " via SFTP");
 
                         boolean delLocalCopy = false;
                         if (m_noPrompt) {
@@ -372,21 +369,21 @@ public class Collector {
                         if (delLocalCopy) {
                             try {
                                 collectionFile.delete();
-                                m_log.info("Local copy "  + collectionFilePath + " deleted");
+                                System.out.println("Local copy "  + collectionFilePath + " deleted");
                             } catch (SecurityException e) {
-                                m_log.info("Failed to delete local copy " + collectionFilePath + ". " + e.getMessage());
+                                System.out.println("Failed to delete local copy " + collectionFilePath + ". " + e.getMessage());
                             }
                         }
                     } catch (Exception e) {
-                        m_log.error(e.getMessage());
+                        System.err.println(e.getMessage());
                     }
                 }
                 else {
-                    m_log.info("Uploading is only available in the Enterprise Edition");
+                    System.out.println("Uploading is only available in the Enterprise Edition");
                 }
             }
         } catch (Exception e) {
-            m_log.error(e.getMessage());
+            System.err.println(e.getMessage());
         }
     }
 
