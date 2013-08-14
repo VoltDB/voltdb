@@ -129,7 +129,7 @@ class AbstractExecutor {
     // cache to avoid runtime virtual function call
     bool needs_outputtable_clear_cached;
 
-    /** reference to the engine/context to log executing context*/
+    /** reference to the engine to call up to the top end */
     VoltDBEngine* m_engine;
 };
 
