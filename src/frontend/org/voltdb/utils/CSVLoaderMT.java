@@ -111,9 +111,9 @@ public class CSVLoaderMT {
     private static final class MyCallback implements ProcedureCallback {
         private final long m_lineNum;
         private final CSVConfig m_config;
-        private final List<String> m_rowdata;
+        private final String[] m_rowdata;
 
-        MyCallback(long lineNumber, CSVConfig cfg, List<String> rowdata) {
+        MyCallback(long lineNumber, CSVConfig cfg, String[] rowdata) {
             m_lineNum = lineNumber;
             m_config = cfg;
             m_rowdata = rowdata;
@@ -130,9 +130,9 @@ public class CSVLoaderMT {
 
             long currentCount = inCount.incrementAndGet();
 
-//            if (currentCount % reportEveryNRows == 0) {
-//                m_log.info( "Inserted " + currentCount + " rows" );
-//            }
+            if (currentCount % reportEveryNRows == 0) {
+                m_log.info( "Inserted " + currentCount + " rows" );
+            }
         }
     }
 
@@ -315,7 +315,6 @@ public class CSVLoaderMT {
         try {
             int columnCnt = 0;
             ProcedureCallback cb = null;
-            boolean lastOK = true;
             if (!cfg.check) {
 
                 VoltTable procInfo = null;
@@ -362,13 +361,16 @@ public class CSVLoaderMT {
             class CSVFileReader implements Runnable {
                 public CSVConfig config;
                 public ICsvListReader listReader;
-                public BlockingQueue<List<String>> lineq;
+                public BlockingQueue<String[]> lineq;
                 public boolean done = false;
                 long parsingTimeSt = System.nanoTime();
                 long parsingTimeEnd = System.nanoTime();
+                int columnCnt = 0;
+
                 @Override
                 public void run() {
                     List<String> lineList = new ArrayList<String>();
+                    long ecnt = 0;
                     while ((config.limitrows-- > 0)) {
                         try {
                             //Initial setting of totalLineCount
@@ -381,14 +383,30 @@ public class CSVLoaderMT {
                             long st = System.nanoTime();
                             lineList = listReader.read();
                             long end = System.nanoTime();
+                            parsingTimeEnd += (end - st);
                             if (lineList == null) {
                                 if (totalLineCount.get() > listReader.getLineNumber()) {
                                     totalLineCount.set(listReader.getLineNumber());
                                 }
                                 break;
                             }
-                            lineq.put(lineList);
-                            parsingTimeEnd += (end - st);
+
+                            String lineCheckResult;
+                            String[] correctedLine = lineList.toArray(new String[0]);
+
+                            if (!config.check) {
+                                if ((lineCheckResult = checkparams_trimspace(correctedLine,
+                                        columnCnt)) != null) {
+                                    String[] info = {lineList.toString(), lineCheckResult};
+                                    synchronizeErrorInfoForFuture(totalLineCount.get() + 1, info);
+                                    if (++ecnt > config.maxerrors) {
+                                        break;
+                                    }
+                                    totalRowCount.getAndIncrement();
+                                    continue;
+                                }
+                            }
+                            lineq.put(correctedLine);
                             totalRowCount.getAndIncrement();
                         } catch (SuperCsvException e) {
                             //Catch rows that can not be read by superCSV listReader. E.g. items without quotes when strictquotes is enabled.
@@ -399,6 +417,7 @@ public class CSVLoaderMT {
                             } catch (IOException ex) {
                             } catch (InterruptedException ex) {
                             }
+                            break;
                         } catch (Throwable ex) {
                             //Catch rows that can not be read by superCSV listReader. E.g. items without quotes when strictquotes is enabled.
                             totalRowCount.getAndIncrement();
@@ -422,8 +441,9 @@ public class CSVLoaderMT {
             }
 
             CSVFileReader rdr = new CSVFileReader();
-            BlockingQueue<List<String>> lineq = new ArrayBlockingQueue<List<String>>(20000);
+            BlockingQueue<String[]> lineq = new ArrayBlockingQueue<String[]>(20000);
             rdr.config = config;
+            rdr.columnCnt = columnCnt;
             rdr.lineq = lineq;
             rdr.listReader = listReader;
             Thread th = new Thread(rdr);
@@ -436,7 +456,7 @@ public class CSVLoaderMT {
                 if (rdr.done && lineq.size() == 0) {
                     break;
                 }
-                List<String> lineList = lineq.poll(50, TimeUnit.MILLISECONDS);
+                String[] lineList = lineq.poll(50, TimeUnit.MILLISECONDS);
                 if (lineList == null) {
                     if (!rdr.done) {
                         m_log.info("Waited no data to pull reader is slower than processor.");
@@ -444,34 +464,21 @@ public class CSVLoaderMT {
                     continue;
                 }
                 pcnt++;
-                boolean queued = false;
-                while (queued == false) {
-                    String[] correctedLine = lineList.toArray(new String[0]);
-                    if (!config.check) {
-                        cb = new MyCallback(pcnt, config,
-                                lineList);
-                        String lineCheckResult;
+                if (!config.check) {
+                    cb = new MyCallback(pcnt, config,
+                            lineList);
 
-                        if ((lineCheckResult = checkparams_trimspace(correctedLine,
-                                columnCnt)) != null) {
-                            String[] info = {lineList.toString(), lineCheckResult};
-                            synchronizeErrorInfo(pcnt, info);
-                            break;
-                        }
-                        if (config.ping) {
-                            queued = csvClient.callProcedure(cb, "@Ping",
-                                    (Object[]) correctedLine);
-                        } else if (config.dnp) {
-                            queued = csvClient.callProcedure(cb, "DoNothingProcedure",
-                                    (Object[]) correctedLine);
-                        } else {
-                            queued = csvClient.callProcedure(cb, insertProcedure,
-                                    (Object[]) correctedLine);
-                        }
-                        outCount.incrementAndGet();
+                    if (config.ping) {
+                        csvClient.callProcedure(cb, "@Ping",
+                                (Object[]) lineList);
+                    } else if (config.dnp) {
+                        csvClient.callProcedure(cb, "DoNothingProcedure",
+                                (Object[]) lineList);
                     } else {
-                        queued = true;
+                        csvClient.callProcedure(cb, insertProcedure,
+                                (Object[]) lineList);
                     }
+                    outCount.incrementAndGet();
                 }
             }
             if (csvClient != null) {
@@ -534,6 +541,14 @@ public class CSVLoaderMT {
 
         m_log.info(String.format("%02d:%02d:%02d Throughput %d/s, Aborts/Failures %d/%d", time / 3600,
                 (time / 60) % 60, time % 60, stats.getTxnThroughput(), stats.getInvocationAborts(), stats.getInvocationErrors()));
+    }
+
+    private static void synchronizeErrorInfoForFuture(long errLineNum, String[] info) throws IOException, InterruptedException {
+        synchronized (errorInfo) {
+            if (!errorInfo.containsKey(errLineNum)) {
+                errorInfo.put(errLineNum, info);
+            }
+        }
     }
 
     private static void synchronizeErrorInfo( long errLineNum, String[] info ) throws IOException, InterruptedException {
