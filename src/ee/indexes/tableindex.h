@@ -57,8 +57,6 @@
 #include "common/TupleSchema.h"
 #include "indexes/IndexStats.h"
 #include "common/ThreadLocalPool.h"
-#include "execution/VoltDBEngine.h"
-#include "common/TimeOutException.h"
 
 namespace voltdb {
 
@@ -482,9 +480,6 @@ protected:
 
     // stats
     IndexStats m_stats;
-
-    //
-    VoltDBEngine* m_engine;
 
 private:
 

@@ -51,8 +51,6 @@
 #include "common/tabletuple.h"
 #include "table.h"
 #include "storage/TupleIterator.h"
-#include "execution/VoltDBEngine.h"
-#include "common/TimeOutException.h"
 
 namespace voltdb {
 
@@ -122,7 +120,6 @@ private:
     TBPtr m_currentBlock;
     std::vector<TBPtr>::iterator m_tempBlockIterator;
     bool m_tempTableIterator;
-    VoltDBEngine* m_engine;
 };
 
 inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator start)
@@ -134,8 +131,7 @@ inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator 
       m_foundTuples(0), m_tupleLength(parent->m_tupleLength),
       m_tuplesPerBlock(parent->m_tuplesPerBlock), m_currentBlock(NULL),
       m_tempBlockIterator(start),
-      m_tempTableIterator(true),
-      m_engine(NULL)
+      m_tempTableIterator(true)
     {
     }
 
@@ -149,8 +145,7 @@ inline TableIterator::TableIterator(Table *parent, TBMapI start)
       m_activeTuples((int) m_table->m_tupleCount),
       m_foundTuples(0), m_tupleLength(parent->m_tupleLength),
       m_tuplesPerBlock(parent->m_tuplesPerBlock), m_currentBlock(NULL),
-      m_tempTableIterator(false),
-      m_engine(NULL)
+      m_tempTableIterator(false)
     {
     }
 
@@ -163,8 +158,7 @@ inline void TableIterator::reset(std::vector<TBPtr>::iterator start) {
     m_foundTuples = 0;
     m_tupleLength = m_table->m_tupleLength;
     m_tuplesPerBlock = m_table->m_tuplesPerBlock;
-    m_currentBlock = NULL;
-    m_engine = NULL;
+    m_currentBlock = NULL
 }
 
 inline void TableIterator::reset(TBMapI start) {
@@ -176,8 +170,7 @@ inline void TableIterator::reset(TBMapI start) {
     m_foundTuples = 0;
     m_tupleLength = m_table->m_tupleLength;
     m_tuplesPerBlock = m_table->m_tuplesPerBlock;
-    m_currentBlock = NULL;
-    m_engine = NULL;
+    m_currentBlock = NULL
 }
 
 inline bool TableIterator::hasNext() {

@@ -62,8 +62,7 @@ TableIndex::TableIndex(const TupleSchema *keySchema, const TableIndexScheme &sch
     m_updates(0),
     m_foundNextValues(0),
 
-    m_stats(this),
-    m_engine(NULL)
+    m_stats(this)
 {}
 
 TableIndex::~TableIndex()
