@@ -129,7 +129,16 @@ namespace
         while (predicate != NULL) {
             const AbstractExpression *left = predicate->getLeft();
             const AbstractExpression *right = predicate->getRight();
+            const std::vector<AbstractExpression*> args = predicate->getArgs();
 
+            for (int i = 0; i < args.size(); i++) {
+                if (args[i]->getExpressionType() == EXPRESSION_TYPE_VALUE_TUPLE &&
+                        !assignTupleValueIndex(const_cast<AbstractExpression*>(args[i]), outer_name, inner_name))
+                {
+                    return false;
+                }
+                stack.push(const_cast<AbstractExpression*>(args[i]));
+            }
             if (right != NULL) {
                 if (right->getExpressionType() == EXPRESSION_TYPE_VALUE_TUPLE) {
                     if (!assignTupleValueIndex(const_cast<AbstractExpression*>(right),
@@ -341,14 +350,14 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     AbstractExpression* prejoin_expression = node->getPreJoinPredicate();
     if (prejoin_expression != NULL) {
         prejoin_expression->substitute(params);
-        VOLT_TRACE("Post Expression:\n%s", prejoin_expression->debug(true).c_str());
+        VOLT_TRACE("Prejoin Expression:\n%s", prejoin_expression->debug(true).c_str());
     }
 
     // where expression
     AbstractExpression* where_expression = node->getWherePredicate();
     if (where_expression != NULL) {
         where_expression->substitute(params);
-        VOLT_TRACE("Post Expression:\n%s", where_expression->debug(true).c_str());
+        VOLT_TRACE("Where Expression:\n%s", where_expression->debug(true).c_str());
     }
     AbstractExpression* initial_expression = inline_node->getInitialExpression();
     if (initial_expression != NULL) {

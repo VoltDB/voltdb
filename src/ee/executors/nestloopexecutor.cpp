@@ -125,7 +125,16 @@ namespace
         while (predicate != NULL) {
             const AbstractExpression *left = predicate->getLeft();
             const AbstractExpression *right = predicate->getRight();
+            const std::vector<AbstractExpression*> args = predicate->getArgs();
 
+            for (int i = 0; i < args.size(); i++) {
+                if (args[i]->getExpressionType() == EXPRESSION_TYPE_VALUE_TUPLE &&
+                        !assignTupleValueIndex(const_cast<AbstractExpression*>(args[i]), outer_name, inner_name))
+                {
+                    return false;
+                }
+                stack.push(const_cast<AbstractExpression*>(args[i]));
+            }
             if (right != NULL) {
                 if (right->getExpressionType() == EXPRESSION_TYPE_VALUE_TUPLE) {
                     if (!assignTupleValueIndex(const_cast<AbstractExpression*>(right),
