@@ -735,7 +735,7 @@ public:
                 int64_t hash[2];
                 MurmurHash3_x64_128(tuple.address()+1, sizeof(int32_t), 0, hash);
                 ElasticIndexKey key(hash[0], NULL);
-                isIndexed = index.has(key);
+                isIndexed = index.exists(key);
             }
             else {
                 isIndexed = index.has(*m_table, tuple);

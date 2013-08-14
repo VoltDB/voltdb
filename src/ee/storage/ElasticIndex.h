@@ -109,11 +109,6 @@ class ElasticIndex : public stx::btree_set<ElasticIndexKey, ElasticIndexComparat
     bool has(const PersistentTable &table, const TableTuple &tuple) const;
 
     /**
-     * Return true if key is in the index (direct).
-     */
-    bool has(const ElasticIndexKey &key) const;
-
-    /**
      * Get the hash and tuple address if found.
      * Return true if key is in the index.
      */
@@ -244,15 +239,7 @@ inline ElasticIndexKey ElasticIndex::generateKey(const PersistentTable &table, c
  */
 inline bool ElasticIndex::has(const PersistentTable &table, const TableTuple &tuple) const
 {
-    return has(generateKey(table, tuple));
-}
-
-/**
- * Return true if key is in the index (direct).
- */
-inline bool ElasticIndex::has(const ElasticIndexKey &key) const
-{
-    return exists(key);
+    return exists(generateKey(table, tuple));
 }
 
 /**
