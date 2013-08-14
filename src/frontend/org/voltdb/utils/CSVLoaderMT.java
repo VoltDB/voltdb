@@ -300,7 +300,9 @@ public class CSVLoaderMT {
             try {
                 csvClient = CSVLoaderMT.getClient(c_config, serverlist, config.port);
                 periodicStatsContext = csvClient.createStatsContext();
-                timer = schedulePeriodicStats(periodicStatsContext, start);
+                if (!config.check) {
+                    timer = schedulePeriodicStats(periodicStatsContext, start);
+                }
             } catch (Exception e) {
                 m_log.error("Error to connect to the servers:"
                         + config.servers);
@@ -431,44 +433,46 @@ public class CSVLoaderMT {
 
             int pcnt = 0;
             while (true) {
-                    if (rdr.done && lineq.size() == 0) {
-                        break;
-                    }
-                    List<String> lineList = lineq.poll(100, TimeUnit.MILLISECONDS);
-                    if (lineList == null) {
+                if (rdr.done && lineq.size() == 0) {
+                    break;
+                }
+                List<String> lineList = lineq.poll(50, TimeUnit.MILLISECONDS);
+                if (lineList == null) {
+                    if (!rdr.done) {
                         m_log.info("Waited no data to pull reader is slower than processor.");
-                        continue;
+                    }
+                    continue;
                 }
                 pcnt++;
-                    boolean queued = false;
-                    while (queued == false) {
-                        String[] correctedLine = lineList.toArray(new String[0]);
-                        if (!config.check) {
-                            cb = new MyCallback(pcnt, config,
-                                    lineList);
-                            String lineCheckResult;
+                boolean queued = false;
+                while (queued == false) {
+                    String[] correctedLine = lineList.toArray(new String[0]);
+                    if (!config.check) {
+                        cb = new MyCallback(pcnt, config,
+                                lineList);
+                        String lineCheckResult;
 
-                            if ((lineCheckResult = checkparams_trimspace(correctedLine,
-                                    columnCnt)) != null) {
-                                String[] info = {lineList.toString(), lineCheckResult};
-                                synchronizeErrorInfo(pcnt, info);
-                                break;
-                            }
-                            if (config.ping) {
-                                queued = csvClient.callProcedure(cb, "@Ping",
-                                        (Object[]) correctedLine);
-                            } else if (config.dnp) {
-                                queued = csvClient.callProcedure(cb, "DoNothingProcedure",
-                                        (Object[]) correctedLine);
-                            } else {
-                                queued = csvClient.callProcedure(cb, insertProcedure,
-                                        (Object[]) correctedLine);
-                            }
-                            outCount.incrementAndGet();
-                        } else {
-                            queued = true;
+                        if ((lineCheckResult = checkparams_trimspace(correctedLine,
+                                columnCnt)) != null) {
+                            String[] info = {lineList.toString(), lineCheckResult};
+                            synchronizeErrorInfo(pcnt, info);
+                            break;
                         }
+                        if (config.ping) {
+                            queued = csvClient.callProcedure(cb, "@Ping",
+                                    (Object[]) correctedLine);
+                        } else if (config.dnp) {
+                            queued = csvClient.callProcedure(cb, "DoNothingProcedure",
+                                    (Object[]) correctedLine);
+                        } else {
+                            queued = csvClient.callProcedure(cb, insertProcedure,
+                                    (Object[]) correctedLine);
+                        }
+                        outCount.incrementAndGet();
+                    } else {
+                        queued = true;
                     }
+                }
             }
             if (csvClient != null) {
                 csvClient.drain();
