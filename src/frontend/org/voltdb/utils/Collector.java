@@ -482,7 +482,7 @@ public class Collector {
              * e.getCause() is JSchException and the java exception class name only appears in message
              * hide java class name and extract error message
              */
-            Pattern pattern = Pattern.compile("(?<ExceptionClass>java.*Exception: )(?<Message>.*)");
+            Pattern pattern = Pattern.compile("(java.*Exception: )(.*)");
             Matcher matcher = pattern.matcher(errorMsg);
 
             if (matcher.matches()) {
@@ -494,7 +494,7 @@ public class Collector {
                 }
             }
             else {
-                if (errorMsg.equals("Auth cancel")) {
+                if (errorMsg.equals("Auth cancel") || errorMsg.equals("Auth fail")) {
                     // "Auth cancel" appears when username doesn't exist or password is wrong
                     throw new Exception("Authorization rejected");
                 }
