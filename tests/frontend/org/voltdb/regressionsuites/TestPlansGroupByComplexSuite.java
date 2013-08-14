@@ -42,6 +42,9 @@ import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestPlansGroupByComplexSuite extends RegressionSuite {
 
+    private final String[] procs = {"R1.insert", "P1.insert", "P2.insert", "P3.insert"};
+    private final String [] tbs = {"R1","P1","P2","P3"};
+
     private void compareTable(VoltTable vt, long[][] expected) {
         int len = expected.length;
         for (int i=0; i < len; i++) {
@@ -73,7 +76,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         ClientResponse cr = null;
 
         // id, wage, dept, rate
-        String[] procs = {"R1.insert", "P1.insert"};
         for (String tb: procs) {
             cr = client.callProcedure(tb, 1,  10,  1 , "2013-06-18 02:00:00.123457");
             cr = client.callProcedure(tb, 2,  20,  1 , "2013-07-18 02:00:00.123457");
@@ -93,7 +95,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         VoltTable vt;
         long[][] expected;
 
-        String [] tbs = {"R1", "P1"};
         for (String tb: tbs) {
             // Test pass-through columns, group by primary key
             cr = client.callProcedure("@AdHoc", "SELECT dept, count(wage) from " + tb +
@@ -149,7 +150,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         VoltTable vt;
         long[][] expected;
 
-        String [] tbs = {"R1", "P1"};
         for (String tb: tbs) {
             // (0) Test no group by cases
             cr = client.callProcedure("@AdHoc", "SELECT id+dept from " + tb + " ORDER BY ABS(id+dept)");
@@ -240,7 +240,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         VoltTable vt;
         long[][] expected;
 
-        String [] tbs = {"R1", "P1"};
         for (String tb: tbs) {
             // Test normal group by with expressions, addition, division for avg.
             cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage), count(wage)+5, " +
@@ -288,15 +287,12 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         VoltTable vt;
         long[][] expected;
 
-        // id, wage, dept, rate
-        String[] procs = {"R1.insert", "P1.insert"};
         for (String tb: procs) {
             cr = client.callProcedure(tb, 6,  10,  2 , "2013-07-18 02:00:00.123457");
             cr = client.callProcedure(tb, 7,  40,  2 , "2013-07-18 02:00:00.123457");
         }
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        String [] tbs = {"R1","P1"};
         for (String tb: tbs) {
             // Test distinct with complex aggregations.
             cr = client.callProcedure("@AdHoc", "SELECT dept, count(wage), sum(distinct wage), sum(wage), " +
@@ -335,14 +331,11 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         VoltTable vt;
         long[][] expected;
 
-        // id, wage, dept, rate
-        String[] procs = {"R1.insert", "P1.insert"};
         for (String tb: procs) {
             cr = client.callProcedure(tb, 6,  10,  2 , "2013-07-18 02:00:00.123457");
             cr = client.callProcedure(tb, 7,  40,  2 , "2013-09-18 02:00:00.123457");
         }
 
-        String [] tbs = {"R1","P1"};
         for (String tb: tbs) {
             // (1) Without extra aggregation expression
             // Test complex group-by (Function expression) without complex aggregation.
@@ -422,14 +415,11 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         VoltTable vt;
         long[][] expected;
 
-        // id, wage, dept, rate
-        String[] procs = {"R1.insert", "P1.insert"};
         for (String tb: procs) {
             cr = client.callProcedure(tb, 6,  10,  2 , "2013-07-18 02:00:00.123457");
             cr = client.callProcedure(tb, 7,  40,  2 , "2013-09-18 02:00:00.123457");
         }
 
-        String [] tbs = {"R1","P1"};
         for (String tb: tbs) {
             // (1) Without extra aggregation expression
             // Test complex group-by (Function expression) without complex aggregation. (Depulicates: two 2s for dept)
@@ -530,14 +520,11 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         VoltTable vt;
         long[][] expected;
 
-        // id, wage, dept, rate
-        String[] procs = {"R1.insert", "P1.insert"};
         for (String tb: procs) {
             cr = client.callProcedure(tb, 6,  10,  2 , "2013-07-18 02:00:00.123457");
             cr = client.callProcedure(tb, 7,  40,  2 , "2013-09-18 02:00:00.123457");
         }
 
-        String [] tbs = {"R1","P1"};
         for (String tb: tbs) {
             //(1) Test complex group-by with no extra aggregation expressions.
             // Test order by with tag
@@ -626,26 +613,30 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
 
 
             //(4) Other order by expressions (id+dept), expressions on that.
-            cr = client.callProcedure("@AdHoc", "SELECT id+dept, sum(wage)+1 from " + tb + " GROUP BY id+dept ORDER BY ABS(id+dept)");
+            cr = client.callProcedure("@AdHoc", "SELECT id+dept, sum(wage)+1 from " + tb +
+                    " GROUP BY id+dept ORDER BY ABS(id+dept)");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 11}, {3,21}, {4,31}, {6,41}, {7,51}, {8,11}, {9,41} };
             compareTable(vt, expected);
 
-            cr = client.callProcedure("@AdHoc", "SELECT id+dept, avg(wage) from " + tb + " GROUP BY id+dept ORDER BY ABS(id+dept)");
+            cr = client.callProcedure("@AdHoc", "SELECT id+dept, avg(wage) from " + tb +
+                    " GROUP BY id+dept ORDER BY ABS(id+dept)");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 10}, {3,20}, {4,30}, {6,40}, {7,50}, {8,10}, {9,40} };
             compareTable(vt, expected);
 
-            cr = client.callProcedure("@AdHoc", "SELECT id+dept from " + tb + " GROUP BY id+dept ORDER BY ABS(id+dept)");
+            cr = client.callProcedure("@AdHoc", "SELECT id+dept from " + tb +
+                    " GROUP BY id+dept ORDER BY ABS(id+dept)");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2}, {3}, {4}, {6}, {7}, {8}, {9} };
             System.out.println(vt.toString());
             compareTable(vt, expected);
 
-            cr = client.callProcedure("@AdHoc", "SELECT id+dept, wage from " + tb + " GROUP BY id+dept, wage ORDER BY ABS(id+dept), abs(wage)");
+            cr = client.callProcedure("@AdHoc", "SELECT id+dept, wage from " + tb +
+                    " GROUP BY id+dept, wage ORDER BY ABS(id+dept), abs(wage)");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 10}, {3,20}, {4,30}, {6,40}, {7,50}, {8,10}, {9,40} };
@@ -654,44 +645,97 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
 
 
             // Expressions on the columns from selected list
-            cr = client.callProcedure("@AdHoc", "SELECT id+dept, avg(wage) as tag from " + tb + " GROUP BY id+dept ORDER BY ABS(tag), id+dept");
+            cr = client.callProcedure("@AdHoc", "SELECT id+dept, avg(wage) as tag from " + tb +
+                    " GROUP BY id+dept ORDER BY ABS(tag), id+dept");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 10}, {8,10}, {3,20}, {4,30}, {6,40}, {9,40}, {7,50}};
             compareTable(vt, expected);
 
-            cr = client.callProcedure("@AdHoc", "SELECT id+dept, avg(wage) as tag from " + tb + " GROUP BY id+dept ORDER BY ABS(avg(wage)), id+dept");
+            cr = client.callProcedure("@AdHoc", "SELECT id+dept, avg(wage) as tag from " + tb +
+                    " GROUP BY id+dept ORDER BY ABS(avg(wage)), id+dept");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 10}, {8,10}, {3,20}, {4,30}, {6,40}, {9,40}, {7,50}};
             compareTable(vt, expected);
 
-            cr = client.callProcedure("@AdHoc", "SELECT id+dept, avg(wage) as tag from " + tb + " GROUP BY id+dept ORDER BY ABS(avg(wage)) + 1, id+dept");
+            cr = client.callProcedure("@AdHoc", "SELECT id+dept, avg(wage) as tag from " + tb +
+                    " GROUP BY id+dept ORDER BY ABS(avg(wage)) + 1, id+dept");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 10}, {8,10}, {3,20}, {4,30}, {6,40}, {9,40}, {7,50}};
             compareTable(vt, expected);
 
 
-            cr = client.callProcedure("@AdHoc", "SELECT id+dept, avg(wage)+1 as tag from " + tb + " GROUP BY id+dept ORDER BY ABS(tag), id+dept");
+            cr = client.callProcedure("@AdHoc", "SELECT id+dept, avg(wage)+1 as tag from " + tb +
+                    " GROUP BY id+dept ORDER BY ABS(tag), id+dept");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 11}, {8,11}, {3,21}, {4,31}, {6,41}, {9,41}, {7,51}};
             compareTable(vt, expected);
 
-            cr = client.callProcedure("@AdHoc", "SELECT id+dept, avg(wage)+1 as tag from " + tb + " GROUP BY id+dept ORDER BY ABS(avg(wage)+1), id+dept");
+            cr = client.callProcedure("@AdHoc", "SELECT id+dept, avg(wage)+1 as tag from " + tb +
+                    " GROUP BY id+dept ORDER BY ABS(avg(wage)+1), id+dept");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 11}, {8,11}, {3,21}, {4,31}, {6,41}, {9,41}, {7,51}};
             compareTable(vt, expected);
 
-            cr = client.callProcedure("@AdHoc", "SELECT id+dept, avg(wage)+1 as tag from " + tb + " GROUP BY id+dept ORDER BY ABS(avg(wage)+1) + 1, id+dept");
+            cr = client.callProcedure("@AdHoc", "SELECT id+dept, avg(wage)+1 as tag from " + tb +
+                    " GROUP BY id+dept ORDER BY ABS(avg(wage)+1) + 1, id+dept");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 11}, {8,11}, {3,21}, {4,31}, {6,41}, {9,41}, {7,51}};
             compareTable(vt, expected);
 
         }
+    }
+
+    public void testENG4285() throws IOException, ProcCallException {
+        loadData();
+
+        Client client = this.getClient();
+        ClientResponse cr = null;
+        VoltTable vt;
+        long[][] expected;
+
+        for (String tb: tbs) {
+            cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage-id) from " + tb +
+                    " GROUP BY dept ORDER BY dept");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {1, 54} , {2, 81}};
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+
+            cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage-id), avg(wage-id), " +
+                    "count(*) from " + tb + " GROUP BY dept ORDER BY dept");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {1, 54, 18, 3} , {2, 81, 40, 2}};
+            System.out.println(vt.toString());
+            compareTable(vt, expected);
+
+
+            cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage-id) + 1, " +
+                    "avg(wage-id), count(*) from " + tb + " GROUP BY dept ORDER BY dept");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {1, 55, 18, 3} , {2, 82, 40, 2}};
+            compareTable(vt, expected);
+
+
+            cr = client.callProcedure("@AdHoc", "SELECT dept, sum(wage-extract(month from tm)), " +
+                    "avg(wage-extract(month from tm)), count(dept) from " + tb +
+                    " GROUP BY dept ORDER BY dept");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {1, 40, 13, 3} , {2, 73, 36, 2}};
+            compareTable(vt, expected);
+
+        }
+
     }
 
     public void testSupportedCases() throws IOException, ProcCallException {
@@ -702,8 +746,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         VoltTable vt;
         long[][] expected;
 
-        Exception ex = null;
-        String [] tbs = {"R1","P1"};
         for (String tb: tbs) {
             // Test order by agg without tag
             cr = client.callProcedure("@AdHoc", "SELECT dept, count(*), sum(wage) from " + tb +
@@ -726,7 +768,6 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
         long[][] expected;
 
         Exception ex = null;
-        String [] tbs = {"R1","P1"};
         for (String tb: tbs) {
             // Test order by agg without tag
             // Weird, works fine if order by
@@ -893,16 +934,33 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
                 "PRIMARY KEY (ID) );" +
                 "CREATE TABLE P1 ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
-                "WAGE INTEGER, " +
-                "DEPT INTEGER, " +
+                "WAGE INTEGER NOT NULL, " +
+                "DEPT INTEGER NOT NULL, " +
                 "TM TIMESTAMP DEFAULT NULL, " +
-                "PRIMARY KEY (ID) );";
+                "PRIMARY KEY (ID) );" +
+                "PARTITION TABLE P1 ON COLUMN ID;" +
+
+                "CREATE TABLE P2 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "WAGE INTEGER NOT NULL, " +
+                "DEPT INTEGER NOT NULL, " +
+                "TM TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) );" +
+                "PARTITION TABLE P2 ON COLUMN DEPT;" +
+
+                "CREATE TABLE P3 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "WAGE INTEGER NOT NULL, " +
+                "DEPT INTEGER NOT NULL, " +
+                "TM TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) );" +
+                "PARTITION TABLE P3 ON COLUMN WAGE;"
+                ;
         try {
             project.addLiteralSchema(literalSchema);
         } catch (IOException e) {
             assertFalse(true);
         }
-        project.addPartitionInfo("P1", "ID");
         boolean success;
         //project.addStmtProcedure("failedProcedure", "SELECT wage, SUM(wage) from R1 group by ID;");
         //project.addStmtProcedure("groupby", "SELECT (dept+1) as tag, count(wage) from R1 GROUP BY dept+1 ORDER BY tag");
