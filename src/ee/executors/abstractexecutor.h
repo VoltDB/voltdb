@@ -119,7 +119,7 @@ class AbstractExecutor {
     /**
      * Set up statistics for long running operations thru m_engine
      */
-    void setStatsForLongOp(TableIterator it);
+    void progressCheck(TableIterator it);
 
     // execution engine owns the plannode allocation.
     AbstractPlanNode* m_abstractNode;
@@ -156,7 +156,7 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
 /**
  * Set up statistics for long running operations thru m_engine
  */
-inline void AbstractExecutor::setStatsForLongOp(TableIterator it) {
+inline void AbstractExecutor::progressCheck(TableIterator it) {
     int foundTuples = it.getFoundTuples();
     if(foundTuples % LONG_OP_THRESHOLD == 0) {
         //Update stats in java and let java determine if we should cancel this query.

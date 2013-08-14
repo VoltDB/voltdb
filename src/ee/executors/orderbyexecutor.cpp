@@ -166,7 +166,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
     vector<TableTuple> xs;
     while (iterator.next(tuple))
     {
-        setStatsForLongOp(iterator);
+        progressCheck(iterator);
         assert(tuple.isActive());
         xs.push_back(tuple);
     }

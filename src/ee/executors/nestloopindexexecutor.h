@@ -94,7 +94,7 @@ protected:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
-    inline void setStatsForLongOp(TableIterator it, Table* targetTable) {
+    inline void progressCheck(TableIterator it, Table* targetTable) {
         int foundTuples = it.getFoundTuples() + index->getFoundNextValues();
         if(foundTuples % LONG_OP_THRESHOLD == 0) {
             //Update stats in java and let java determine if we should cancel this query.

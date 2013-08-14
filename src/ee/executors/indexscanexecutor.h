@@ -81,7 +81,7 @@ private:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
-    inline void setStatsForLongOp() {
+    inline void progressCheck() {
         int foundTuples = m_index->getFoundNextValues();
         Table* targetTable = reinterpret_cast<Table*> (m_targetTable);
         if(foundTuples % LONG_OP_THRESHOLD == 0) {

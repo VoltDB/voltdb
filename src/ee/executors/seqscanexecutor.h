@@ -66,7 +66,7 @@ namespace voltdb
                     TempTableLimits* limits);
         bool p_execute(const NValueArray& params);
         bool needsOutputTableClear();
-        void setStatsForLongOp(TableIterator it, Table* targetTable) {
+        void progressCheck(TableIterator it, Table* targetTable) {
             int foundTuples = it.getFoundTuples();
             if(foundTuples % LONG_OP_THRESHOLD == 0) {
                 //Update stats in java and let java determine if we should cancel this query.
