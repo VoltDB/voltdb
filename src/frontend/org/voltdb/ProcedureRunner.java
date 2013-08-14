@@ -53,6 +53,7 @@ import org.voltdb.exceptions.SerializableException;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
@@ -499,11 +500,11 @@ public class ProcedureRunner {
             QueuedSQL queuedSQL = new QueuedSQL();
             AdHocPlannedStatement plannedStatement = paw.plannedStatements.get(0);
 
-            long aggFragId = m_site.loadOrAddRefPlanFragment(
+            long aggFragId = ActivePlanRepository.loadOrAddRefPlanFragment(
                     plannedStatement.core.aggregatorHash, plannedStatement.core.aggregatorFragment);
             long collectorFragId = 0;
             if (plannedStatement.core.collectorFragment != null) {
-                collectorFragId = m_site.loadOrAddRefPlanFragment(
+                collectorFragId = ActivePlanRepository.loadOrAddRefPlanFragment(
                         plannedStatement.core.collectorHash, plannedStatement.core.collectorFragment);
             }
 
@@ -721,7 +722,7 @@ public class ProcedureRunner {
         for (PlanFragment frag : catStmt.getFragments()) {
             byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
             byte[] plan = Encoder.base64Decode(frag.getPlannodetree());
-            long id = m_site.loadOrAddRefPlanFragment(planHash, plan);
+            long id = ActivePlanRepository.loadOrAddRefPlanFragment(planHash, plan);
             boolean transactional = frag.getNontransactional() == false;
 
             SQLStmt.Frag stmtFrag = new SQLStmt.Frag(id, planHash, transactional);
@@ -1087,7 +1088,7 @@ public class ProcedureRunner {
                    m_localTask.addFragment(stmt.aggregator.planHash, m_depsToResume[index], params);
                }
                else {
-                   byte[] planBytes = site.planForFragmentId(stmt.aggregator.id);
+                   byte[] planBytes = ActivePlanRepository.planForFragmentId(stmt.aggregator.id);
                    m_localTask.addCustomFragment(stmt.aggregator.planHash, m_depsToResume[index], params, planBytes);
                }
            }
@@ -1102,9 +1103,9 @@ public class ProcedureRunner {
                    m_distributedTask.addFragment(stmt.collector.planHash, outputDepId, params);
                }
                else {
-                   byte[] planBytes = site.planForFragmentId(stmt.aggregator.id);
+                   byte[] planBytes = ActivePlanRepository.planForFragmentId(stmt.aggregator.id);
                    m_localTask.addCustomFragment(stmt.aggregator.planHash, m_depsToResume[index], params, planBytes);
-                   planBytes = site.planForFragmentId(stmt.collector.id);
+                   planBytes = ActivePlanRepository.planForFragmentId(stmt.collector.id);
                    m_distributedTask.addCustomFragment(stmt.collector.planHash, outputDepId, params, planBytes);
                }
            }
