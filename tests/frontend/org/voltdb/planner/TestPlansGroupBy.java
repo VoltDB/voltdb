@@ -167,6 +167,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
         pns = compileToFragments("SELECT A1, SUM(PKEY) as A2, (SUM(PKEY) / 888) as A3, (SUM(PKEY) + 1) as A4 FROM P1 GROUP BY A1");
         checkHasComplexAgg(pns);
 
+        pns = compileToFragments("SELECT A1, SUM(PKEY), COUNT(PKEY), (AVG(PKEY) + 1) as A4 FROM P1 GROUP BY A1");
+        checkHasComplexAgg(pns);
     }
 
     public void testComplexGroupby() {
@@ -183,6 +185,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertTrue(p instanceof AggregatePlanNode);
         assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
 
+        pns = compileToFragments("SELECT A1+PKEY, avg(B1) as tag FROM P1 GROUP BY A1+PKEY ORDER BY ABS(tag), A1+PKEY");
+        checkHasComplexAgg(pns);
     }
 
     public void testOptimizedAVG() {

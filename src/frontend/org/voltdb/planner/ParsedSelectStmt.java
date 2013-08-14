@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -37,6 +38,7 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.SchemaColumn;
+import org.voltdb.types.ExpressionType;
 
 public class ParsedSelectStmt extends AbstractParsedStmt {
 
@@ -98,12 +100,19 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
 
         @Override
-        public Object clone() {
+        public ParsedColInfo clone() {
             ParsedColInfo col = new ParsedColInfo();
             col.expression = (AbstractExpression) expression.clone();
             col.tableName = tableName;
             col.columnName = columnName;
             col.alias = alias;
+            col.index = index;
+            col.size = size;
+            col.orderBy= orderBy;
+            col.ascending = ascending;
+            col.groupBy = groupBy;
+            col.finalOutput = finalOutput;
+
             return col;
         }
     }
@@ -116,6 +125,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     // It may has the consistent element order as the displayColumns
     public ArrayList<ParsedColInfo> aggResultColumns = new ArrayList<ParsedColInfo>();
     public Map<String, AbstractExpression> groupByExpressions = null;
+    private ArrayList<ParsedColInfo> optimalDisplayColumns = null;
+    private ArrayList<ParsedColInfo> optimalAggResultColumns = null;
+    private ArrayList<ParsedColInfo> optimalOrderColumns = null;
+    private NodeSchema optimalNewAggSchema;
     private NodeSchema newAggSchema;
 
     public long limit = -1;
@@ -126,6 +139,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private boolean hasComplexAgg = false;
     private boolean hasComplexGroupby = false;
     private boolean hasAggregateExpression = false;
+    private boolean hasAverage = false;
+    private boolean isDistributed = false;
 
     /**
     * Class constructor
@@ -182,7 +197,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (orderbyElement != null) {
             parseOrderColumns(orderbyElement);
         }
-
+        // At this point, we have collected all aggregations in the select statement.
         // We do not need aggregationList container in parseXMLtree
         // Make it null to prevent others adding elements to it when parsing the tree
         aggregationList = null;
@@ -193,6 +208,80 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             aggResultColumns = displayColumns;
         }
         placeTVEsinColumns();
+
+        // We are going to guess whether we will need optimization for AVG or not
+        if (hasAverage()) {
+            ArrayList<ParsedColInfo> tmpDisplayColumns = new ArrayList<ParsedColInfo>();
+            ArrayList<ParsedColInfo> tmpAggResultColumns = new ArrayList<ParsedColInfo>();
+            ArrayList<ParsedColInfo> tmpOrderColumns = new ArrayList<ParsedColInfo>();
+            NodeSchema tmpNodeSchema = null;
+            boolean tmpHasComplexAgg = hasComplexAgg();
+            for (ParsedColInfo col: displayColumns) {
+                tmpDisplayColumns.add(col.clone());
+            }
+            for (ParsedColInfo col: aggResultColumns) {
+                tmpAggResultColumns.add(col.clone());
+            }
+            for (ParsedColInfo col: orderColumns) {
+                tmpOrderColumns.add(col.clone());
+            }
+            if (hasComplexAgg()) {
+                tmpNodeSchema = newAggSchema.clone();
+            } else {
+                aggResultColumns = new ArrayList<ParsedColInfo>();
+            }
+            displayColumns.clear();
+            aggResultColumns.clear();
+            orderColumns.clear();
+
+            // Guess it right now. Remove this block when we can know it early
+            isDistributed = true;
+            if (aggregationList == null) {
+                aggregationList = new ArrayList<AbstractExpression>();
+            }
+            if (displayElement != null) {
+                parseDisplayColumns(displayElement);
+            }
+            if (groupbyElement != null) {
+                insertToAggResultColumns(groupByColumns);
+            }
+            if (orderbyElement != null) {
+                parseOrderColumns(orderbyElement);
+            }
+            aggregationList = null;
+            fillUpAggResultColumns();
+            placeTVEsinColumns();
+
+            // Switch them back
+            optimalDisplayColumns = new ArrayList<ParsedSelectStmt.ParsedColInfo>();
+            optimalAggResultColumns = new ArrayList<ParsedSelectStmt.ParsedColInfo>();
+            optimalOrderColumns = new ArrayList<ParsedSelectStmt.ParsedColInfo>();
+            for (ParsedColInfo col: displayColumns) {
+                optimalDisplayColumns.add(col.clone());
+            }
+            for (ParsedColInfo col: aggResultColumns) {
+                optimalAggResultColumns.add(col.clone());
+            }
+            for (ParsedColInfo col: orderColumns) {
+                optimalOrderColumns.add(col.clone());
+            }
+
+            optimalNewAggSchema = newAggSchema.clone();
+
+            displayColumns = tmpDisplayColumns;
+            aggResultColumns = tmpAggResultColumns;
+            orderColumns = tmpOrderColumns;
+            newAggSchema = tmpNodeSchema;
+            hasComplexAgg = tmpHasComplexAgg;
+        }
+    }
+
+    public void switchOptimalSuite () {
+        displayColumns = optimalDisplayColumns;
+        aggResultColumns = optimalAggResultColumns;
+        orderColumns = optimalOrderColumns;
+        newAggSchema = optimalNewAggSchema;
+        hasComplexAgg = true;
     }
 
     private boolean needComplexAggregation () {
@@ -343,27 +432,37 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     /**
      * ParseDisplayColumns and ParseOrderColumns will call this function to add Aggregation expressions to aggResultColumns
-     * @param colCollection
+     * @param aggColumns
      * @param cookedCol
      */
-    private void insertAggExpressionsToAggResultColumns (List<AbstractExpression> colCollection, ParsedColInfo cookedCol) {
+    private void insertAggExpressionsToAggResultColumns (List<AbstractExpression> aggColumns, ParsedColInfo cookedCol) {
         // Why IF ELSE, because AggResultColumn care about its alias,tableName
-        if (colCollection.size() == 1 && cookedCol.expression.equals(colCollection.get(0))) {
+        if (aggColumns.size() == 1 && cookedCol.expression.equals(aggColumns.get(0))) {
             ParsedColInfo col = new ParsedColInfo();
-            col.expression = (AbstractExpression) colCollection.get(0).clone();
+            col.expression = (AbstractExpression) aggColumns.get(0).clone();
+            assert(col.expression instanceof AggregateExpression);
+            if (!hasAverage() && col.expression.getExpressionType() == ExpressionType.AGGREGATE_AVG) {
+                hasAverage = true;
+            }
+
             col.alias = cookedCol.alias;
             col.tableName = cookedCol.tableName;
             col.columnName = cookedCol.columnName;
             if (isNewtoAggResultColumn(col)) {
                 aggResultColumns.add(col);
             }
-        } else if (colCollection.size() != 0) {
+        } else if (aggColumns.size() != 0) {
             // Try to check complexAggs earlier
             hasComplexAgg = true;
-            for (AbstractExpression expr: colCollection) {
+            for (AbstractExpression expr: aggColumns) {
                 ParsedColInfo col = new ParsedColInfo();
                 col.expression = (AbstractExpression) expr.clone();
+                assert(col.expression instanceof AggregateExpression);
                 ExpressionUtil.finalizeValueTypes(col.expression);
+                if (!hasAverage() && col.expression.getExpressionType() == ExpressionType.AGGREGATE_AVG) {
+                    hasAverage = true;
+                }
+
                 // Aggregation column use the the hacky stuff
                 col.tableName = "VOLT_TEMP_TABLE";
                 col.columnName = "";
@@ -413,6 +512,27 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
+    private void updateAvgExprresions () {
+        List<AbstractExpression> optimalAvgAggs = new ArrayList<AbstractExpression>();
+        Iterator<AbstractExpression> itr = aggregationList.iterator();
+        while(itr.hasNext()) {
+            AbstractExpression aggExpr = itr.next();
+            assert(aggExpr instanceof AggregateExpression);
+            if (aggExpr.getExpressionType() == ExpressionType.AGGREGATE_AVG) {
+                itr.remove();
+
+                AbstractExpression left = new AggregateExpression(ExpressionType.AGGREGATE_SUM);
+                left.setLeft(aggExpr.getLeft());
+                AbstractExpression right = new AggregateExpression(ExpressionType.AGGREGATE_COUNT);
+                right.setLeft(aggExpr.getLeft());
+
+                optimalAvgAggs.add(left);
+                optimalAvgAggs.add(right);
+            }
+        }
+        aggregationList.addAll(optimalAvgAggs);
+    }
+
     private void parseDisplayColumns(VoltXMLElement columnsNode) {
         for (VoltXMLElement child : columnsNode.children) {
             ParsedColInfo col = new ParsedColInfo();
@@ -421,10 +541,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (col.expression instanceof ConstantValueExpression) {
                 assert(col.expression.getValueType() != VoltType.NUMERIC);
             }
-            ExpressionUtil.finalizeValueTypes(col.expression);
             assert(col.expression != null);
-            col.alias = child.attributes.get("alias");
+            if (isDistributed) {
+                col.expression = col.expression.replaceAVG();
+                updateAvgExprresions();
+            }
+            ExpressionUtil.finalizeValueTypes(col.expression);
 
+            col.alias = child.attributes.get("alias");
             if (child.name.equals("columnref")) {
                 col.columnName =
                     child.attributes.get("column");
@@ -523,6 +647,13 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         order_col.ascending = !descending;
         aggregationList.clear();
         AbstractExpression order_exp = parseExpressionTree(child);
+        assert(order_exp != null);
+        if (isDistributed) {
+            order_exp = order_exp.replaceAVG();
+            updateAvgExprresions();
+        }
+        order_col.expression = order_exp;
+        ExpressionUtil.finalizeValueTypes(order_col.expression);
 
         // Cases:
         // child could be columnref, in which case it's just a normal column.
@@ -566,12 +697,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             order_col.columnName = orig_col.columnName;
             order_col.tableName = orig_col.tableName;
         }
-
         assert( ! (order_exp instanceof ConstantValueExpression));
         assert( ! (order_exp instanceof ParameterValueExpression));
-
-        ExpressionUtil.finalizeValueTypes(order_exp);
-        order_col.expression = order_exp;
 
         insertAggExpressionsToAggResultColumns(aggregationList, order_col);
         if (aggregationList.size() >= 1) {
@@ -628,6 +755,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public boolean hasComplexAgg() {
         return hasComplexAgg;
+    }
+
+    public boolean hasAverage() {
+        return hasAverage;
     }
 
     public boolean hasOrderByColumns() {
