@@ -762,12 +762,11 @@ char *VoltDBIPC::retrieveDependency(int32_t dependencyId, size_t *dependencySz) 
     return dependencyData;
 }
 
-bool VoltDBIPC::updateStats(int32_t batchIndex,
+bool VoltDBIPC::fragmentProgressUpdate(int32_t batchIndex,
         std::string planNodeName,
         std::string targetTableName,
         int64_t targetTableSize,
-        int64_t tuplesFound,
-        std::string indexName) {
+        int64_t tuplesFound) {
     return false;
 }
 
