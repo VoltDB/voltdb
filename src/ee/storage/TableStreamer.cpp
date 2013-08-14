@@ -111,7 +111,15 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                 default:
                     assert(false);
             }
-            m_streams.push_back(StreamPtr(new Stream(streamType, context)));
+            if (context->handleActivation(streamType)) {
+                // Activation was accepted by the new context. Attach it to a stream.
+                m_streams.push_back(StreamPtr(new Stream(streamType, context)));
+            }
+            else {
+                // Activation was rejected by the new context.
+                // Let the context disappear when it goes out of scope.
+                failed = true;
+            }
         }
         catch(SerializableEEException &e) {
             // The stream will not be added.

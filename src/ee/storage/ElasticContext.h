@@ -47,6 +47,11 @@ public:
     virtual ~ElasticContext();
 
     /**
+     * Activation handler.
+     */
+    virtual bool handleActivation(TableStreamType streamType);
+
+    /**
      * Reactivation handler.
      */
     virtual bool handleReactivation(TableStreamType streamType);

@@ -32,7 +32,6 @@ ElasticContext::ElasticContext(PersistentTable &table,
     m_scanner(table, surgeon.getData()),
     m_nTuplesPerCall(nTuplesPerCall)
 {
-    surgeon.clearIndex();
     if (predicateStrings.size() != 1) {
         throwFatalException("ElasticContext::ElasticContext() expects a single predicate.");
     }
@@ -42,12 +41,31 @@ ElasticContext::~ElasticContext()
 {}
 
 /**
+ * Activation handler.
+ */
+bool ElasticContext::handleActivation(TableStreamType streamType)
+{
+    // Don't allow activation if there's an existing index.
+    if (m_surgeon.hasIndex()) {
+        VOLT_ERROR("Elastic context activation is not allowed while an index is "
+                   "present that has not been completely consumed.");
+        return false;
+    }
+    m_surgeon.createIndex();
+    return true;
+}
+
+/**
  * Reactivation handler.
  */
 bool ElasticContext::handleReactivation(TableStreamType streamType)
 {
-    m_surgeon.clearIndex();
-    // Okay to reuse this context.
+    if (m_surgeon.hasIndex()) {
+        VOLT_ERROR("Elastic context reactivation is not allowed while an index is "
+                   "present that has not been completely consumed.");
+        return false;
+    }
+    m_surgeon.createIndex();
     return true;
 }
 
@@ -67,8 +85,13 @@ bool ElasticContext::handleDeactivation()
 int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStreams,
                                          std::vector<int> &retPositions)
 {
-    if (m_surgeon.isIndexed()) {
-        throwFatalException("ElasticContext::handleStreamMore() was called more than once.");
+    if (!m_surgeon.hasIndex()) {
+        VOLT_ERROR("Elastic streaming was invoked without proper activation.");
+        return -1;
+    }
+    if (m_surgeon.isIndexingComplete()) {
+        VOLT_ERROR("Elastic streaming was called after indexing had already completed.");
+        return -1;
     }
 
     // Populate index with current tuples.
@@ -79,16 +102,18 @@ int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStrea
         if (getPredicates()[0].eval(&tuple).isTrue()) {
             m_surgeon.indexAdd(tuple);
         }
-        // Take a breather after every chunk of m_n
+        // Take a breather after every chunk of m_nTuplesPerCall tuples.
         if (++i == m_nTuplesPerCall) {
             break;
         }
     }
 
-    // We're done with indexing.
-    bool isIndexed = m_scanner.isScanComplete();
-    m_surgeon.setIsIndexed(isIndexed);
-    return isIndexed ? 0 : 1;
+    // Done with indexing?
+    bool indexingComplete = m_scanner.isScanComplete();
+    if (indexingComplete) {
+        m_surgeon.setIndexingComplete();
+    }
+    return indexingComplete ? 0 : 1;
 }
 
 /**

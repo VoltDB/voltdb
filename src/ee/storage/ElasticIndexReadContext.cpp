@@ -36,23 +36,20 @@ ElasticIndexReadContext::ElasticIndexReadContext(
         TupleSerializer &serializer,
         const std::vector<std::string> &predicateStrings) :
     TableStreamerContext(table, surgeon, partitionId, serializer),
-    m_range(), // Parsed below
-    m_wrapsAround(false),
+    m_range(parseHashRange(predicateStrings)),   // throws on error
     m_wrappedAround(false)
 {
-    if (predicateStrings.size() != 1) {
-        throwFatalException("Too many ElasticIndexReadContext predicates (>1): %ld",
-                            predicateStrings.size())
+    // Make sure the index is available and complete.
+    if (!m_surgeon.hasIndex()) {
+        throwFatalException("Attempted to create ElasticIndexReadContext with no index available.");
     }
-    if (!m_range.parse(predicateStrings.at(0))) {
-        throwFatalException("Unable to parse ElasticIndexReadContext predicate \"%s\".",
-                            predicateStrings.at(0).c_str())
+    if (!m_surgeon.isIndexingComplete()) {
+        throwFatalException("Attempted to create ElasticIndexReadContext before indexing was completed.");
     }
-    m_wrapsAround = (m_range.m_from >= m_range.m_to);
     // Initialize the iterator to start from the range lower bounds or higher.
     m_iter = m_surgeon.indexIterator(m_range.m_from);
     if (m_iter == m_surgeon.indexEnd()) {
-        if (m_wrapsAround) {
+        if (m_range.wrapsAround()) {
             m_iter = m_surgeon.indexIterator(std::numeric_limits<int64_t>::min());
             m_wrappedAround = true;
         }
@@ -65,16 +62,27 @@ ElasticIndexReadContext::ElasticIndexReadContext(
 ElasticIndexReadContext::~ElasticIndexReadContext()
 {}
 
+/**
+ * Activation handler.
+ */
+bool ElasticIndexReadContext::handleActivation(TableStreamType streamType)
+{
+    if (!m_surgeon.hasIndex() || !m_surgeon.isIndexingComplete()) {
+        VOLT_ERROR("Elastic index consumption is not allowed until index generation completes.");
+        return false;
+    }
+    return true;
+}
+
 /*
- * Serialize to multiple output streams.
- * Return remaining tuple count, 0 if done, or -1 on error.
- * Not keeping track of the actual tuple count. Returns only maxint, 0, or -1.
+ * Serialize to output stream. Receive a list of streams, but expect only 1.
+ * Return 1 if tuples remain, 0 if done, or -1 on error.
  */
 int64_t ElasticIndexReadContext::handleStreamMore(
         TupleOutputStreamProcessor &outputStreams,
         std::vector<int> &retPositions)
 {
-    int64_t remaining = std::numeric_limits<int64_t>::max();
+    int64_t remaining = 1;
 
     // End of iteration or wrap around?
     if (m_iter == m_surgeon.indexEnd()) {
@@ -107,7 +115,7 @@ int64_t ElasticIndexReadContext::handleStreamMore(
             yield = outputStreams.writeRow(getSerializer(), tuple, deleteTuple);
             assert(deleteTuple == false);
             if (++m_iter == m_surgeon.indexEnd()) {
-                if (m_wrapsAround && !m_wrappedAround) {
+                if (m_range.wrapsAround() && !m_wrappedAround) {
                     m_iter = m_surgeon.indexIterator(std::numeric_limits<int64_t>::min());
                     if (m_iter == m_surgeon.indexEnd()) {
                         yield = true;
@@ -124,7 +132,7 @@ int64_t ElasticIndexReadContext::handleStreamMore(
             }
             else {
                 // End of range (if already wrapped around or didn't need to)?
-                if ((!m_wrapsAround || m_wrappedAround) && m_iter->getHash() >= m_range.m_to) {
+                if ((!m_range.wrapsAround() || m_wrappedAround) && m_iter->getHash() >= m_range.m_to) {
                     yield = true;
                     remaining = 0;
                 }
@@ -135,33 +143,39 @@ int64_t ElasticIndexReadContext::handleStreamMore(
         outputStreams.close();
     }
 
-    // If more was streamed copy current positions for return.
-    // Can this copy be avoided?
-    for (size_t i = 0; i < outputStreams.size(); i++) {
-        retPositions.push_back((int)outputStreams.at(i).position());
+    // If more was streamed copy current position for return (exactly one stream).
+    retPositions.push_back((int)outputStreams.at(0).position());
+
+    // Drop the index after completely consuming it.
+    if (remaining <= 0) {
+        m_surgeon.dropIndex();
     }
 
     return remaining;
 }
 
 /**
- * Parse a hash range string and update data members.
+ * Parse and validate the hash range.
  */
-bool ElasticIndexReadContext::HashRange::parse(const std::string &predicateString)
+ElasticIndexReadContext::HashRange ElasticIndexReadContext::parseHashRange(
+        const std::vector<std::string> &predicateStrings)
 {
-    bool success = false;
-    std::vector<std::string> rangeStrings = MiscUtil::splitToTwoString(predicateString, ':');
+    if (predicateStrings.size() != 1) {
+        throwFatalException("Too many ElasticIndexReadContext predicates (>1): %ld",
+                            predicateStrings.size())
+    }
+    std::vector<std::string> rangeStrings = MiscUtil::splitToTwoString(predicateStrings.at(0), ':');
     if (rangeStrings.size() == 2) {
         try {
-            m_from = boost::lexical_cast<int64_t>(rangeStrings[0]);
-            m_to = boost::lexical_cast<int64_t>(rangeStrings[1]);
-            success = true;
+            return ElasticIndexReadContext::HashRange(boost::lexical_cast<int64_t>(rangeStrings[0]),
+                                                      boost::lexical_cast<int64_t>(rangeStrings[1]));
         }
         catch(boost::bad_lexical_cast) {
-            // success = false
+            // Throws below.
         }
     }
-    return success;
+    throwFatalException("Unable to parse ElasticIndexReadContext predicate \"%s\".",
+                        predicateStrings.at(0).c_str())
 }
 
 } // namespace voltdb

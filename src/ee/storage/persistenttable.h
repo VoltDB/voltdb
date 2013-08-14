@@ -49,6 +49,7 @@
 #include <string>
 #include <vector>
 #include <cassert>
+#include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include "common/ids.h"
 #include "common/valuevector.h"
@@ -109,13 +110,18 @@ public:
 
     // Elastic index methods. Used by ElasticContext.
     void clearIndex();
-    bool isIndexed() const;
-    void setIsIndexed(bool isIndexed);
+    void createIndex();
+    void dropIndex();
+    bool hasIndex() const;
+    bool isIndexingComplete() const;
+    void setIndexingComplete();
     bool indexHas(TableTuple &tuple) const;
     bool indexAdd(TableTuple &tuple);
     bool indexRemove(TableTuple &tuple);
-    ElasticIndex::iterator indexIterator(int64_t lowerBound = 0);
-    ElasticIndex::const_iterator indexIterator(int64_t lowerBound = 0) const;
+    ElasticIndex::iterator indexIterator();
+    ElasticIndex::iterator indexIterator(int64_t lowerBound);
+    ElasticIndex::const_iterator indexIterator() const;
+    ElasticIndex::const_iterator indexIterator(int64_t lowerBound) const;
     ElasticIndex::iterator indexEnd();
     ElasticIndex::const_iterator indexEnd() const;
 
@@ -136,12 +142,12 @@ private:
     /**
      * Elastic index.
      */
-    ElasticIndex m_index;
+    boost::scoped_ptr<ElasticIndex> m_index;
 
     /**
      * Set to true after handleStreamMore() was called once after building the index.
      */
-    bool m_isIndexed;
+    bool m_indexingComplete;
 };
 
 /**
@@ -475,7 +481,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :
     m_table(table),
-    m_isIndexed(false)
+    m_indexingComplete(false)
 {}
 
 inline PersistentTableSurgeon::~PersistentTableSurgeon()
@@ -511,45 +517,81 @@ inline void PersistentTableSurgeon::snapshotFinishedScanningBlock(TBPtr finished
     m_table.snapshotFinishedScanningBlock(finishedBlock, nextBlock);
 }
 
-inline bool PersistentTableSurgeon::isIndexed() const {
-    return m_isIndexed;
+inline bool PersistentTableSurgeon::hasIndex() const {
+    return (m_index != NULL);
 }
 
-inline void PersistentTableSurgeon::setIsIndexed(bool isIndexed) {
-    m_isIndexed = isIndexed;
+inline bool PersistentTableSurgeon::isIndexingComplete() const {
+    assert (m_index != NULL);
+    return m_indexingComplete;
+}
+
+inline void PersistentTableSurgeon::setIndexingComplete() {
+    assert (m_index != NULL);
+    m_indexingComplete = true;
+}
+
+inline void PersistentTableSurgeon::createIndex() {
+    assert(m_index == NULL);
+    m_index.reset(new ElasticIndex());
+    m_indexingComplete = false;
+}
+
+inline void PersistentTableSurgeon::dropIndex() {
+    assert(m_index != NULL);
+    m_index.reset(NULL);
+    m_indexingComplete = false;
 }
 
 inline void PersistentTableSurgeon::clearIndex() {
-    m_index.clear();
-    m_isIndexed = false;
+    assert (m_index != NULL);
+    m_index->clear();
+    m_indexingComplete = false;
 }
 
 inline bool PersistentTableSurgeon::indexHas(TableTuple &tuple) const {
-    return m_index.has(m_table, tuple);
+    assert (m_index != NULL);
+    return m_index->has(m_table, tuple);
 }
 
 inline bool PersistentTableSurgeon::indexAdd(TableTuple &tuple) {
-    return m_index.add(m_table, tuple);
+    assert (m_index != NULL);
+    return m_index->add(m_table, tuple);
 }
 
 inline bool PersistentTableSurgeon::indexRemove(TableTuple &tuple) {
-    return m_index.remove(m_table, tuple);
+    assert (m_index != NULL);
+    return m_index->remove(m_table, tuple);
+}
+
+inline ElasticIndex::iterator PersistentTableSurgeon::indexIterator() {
+    assert (m_index != NULL);
+    return m_index->createIterator();
 }
 
 inline ElasticIndex::iterator PersistentTableSurgeon::indexIterator(int64_t lowerBound) {
-    return m_index.createIterator(lowerBound);
+    assert (m_index != NULL);
+    return m_index->createIterator(lowerBound);
+}
+
+inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIterator() const {
+    assert (m_index != NULL);
+    return m_index->createIterator();
 }
 
 inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIterator(int64_t lowerBound) const {
-    return m_index.createIterator(lowerBound);
+    assert (m_index != NULL);
+    return m_index->createIterator(lowerBound);
 }
 
 inline ElasticIndex::iterator PersistentTableSurgeon::indexEnd() {
-    return m_index.end();
+    assert (m_index != NULL);
+    return m_index->end();
 }
 
 inline ElasticIndex::const_iterator PersistentTableSurgeon::indexEnd() const {
-    return m_index.end();
+    assert (m_index != NULL);
+    return m_index->end();
 }
 
 inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {

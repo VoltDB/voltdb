@@ -46,6 +46,11 @@ public:
     virtual ~ElasticIndexReadContext();
 
     /**
+     * Activation handler.
+     */
+    virtual bool handleActivation(TableStreamType streamType);
+
+    /**
      * Mandatory TableStreamContext override.
      */
     virtual int64_t handleStreamMore(TupleOutputStreamProcessor &outputStreams,
@@ -76,26 +81,40 @@ private:
     {
     public:
 
-        HashRange() : m_from(0), m_to(0)
+        /**
+         * Full constructor.
+         */
+        HashRange(int64_t from, int64_t to) : m_from(from), m_to(to)
         {}
 
+        /**
+         * Copy constructor.
+         */
         HashRange(const HashRange &other) : m_from(other.m_from), m_to(other.m_to)
         {}
 
-        bool parse(const std::string &predicateString);
+        /**
+         * Return true if the range wraps around.
+         */
+        bool wrapsAround() const
+        {
+            return m_from >= m_to;
+        }
 
         int64_t m_from;
         int64_t m_to;
     };
+
+    /**
+     * Parse and validate the hash range.
+     */
+    static HashRange parseHashRange(const std::vector<std::string> &predicateStrings);
 
     /// Active hash range.
     HashRange m_range;
 
     /// Elastic index iterator
     ElasticIndex::const_iterator m_iter;
-
-    /// Set to true if the range crosses zero.
-    bool m_wrapsAround;
 
     /// Set to true when iteration continues after wrapping around.
     bool m_wrappedAround;

@@ -138,14 +138,24 @@ class ElasticIndex : public stx::btree_set<ElasticIndexKey, ElasticIndexComparat
     bool remove(const PersistentTable &table, const TableTuple &tuple);
 
     /**
-     * Get iterator with optional search for first hash >= lowerBound.
+     * Get full iterator.
      */
-    iterator createIterator(ElasticHash lowerBound = 0);
+    iterator createIterator();
 
     /**
-     * Get const_iterator with optional search for first hash >= lowerBound.
+     * Get partial iterator based on lower bound.
      */
-    const_iterator createIterator(ElasticHash lowerBound = 0) const;
+    iterator createIterator(ElasticHash lowerBound);
+
+    /**
+     * Get full const_iterator.
+     */
+    const_iterator createIterator() const;
+
+    /**
+     * Get partial const_iterator based on lower bound.
+     */
+    const_iterator createIterator(ElasticHash lowerBound) const;
 
   private:
 
@@ -298,19 +308,35 @@ inline bool ElasticIndex::remove(const PersistentTable &table, const TableTuple 
 }
 
 /**
- * Get iterator with optional search for first hash >= lowerBound.
+ * Get full iterator.
  */
-inline ElasticIndex::iterator ElasticIndex::createIterator(ElasticHash lowerBound)
+inline ElasticIndex::iterator ElasticIndex::createIterator()
 {
-    return (lowerBound == 0 ? begin() : lower_bound(ElasticIndexKey(lowerBound, NULL)));
+    return begin();
 }
 
 /**
- * Get const_iterator with optional search for first hash >= lowerBound.
+ * Get partial iterator based on lower bound.
+ */
+inline ElasticIndex::iterator ElasticIndex::createIterator(ElasticHash lowerBound)
+{
+    return lower_bound(ElasticIndexKey(lowerBound, NULL));
+}
+
+/**
+ * Get full const_iterator.
+ */
+inline ElasticIndex::const_iterator ElasticIndex::createIterator() const
+{
+    return begin();
+}
+
+/**
+ * Get partial const_iterator based on lower bound.
  */
 inline ElasticIndex::const_iterator ElasticIndex::createIterator(ElasticHash lowerBound) const
 {
-    return (lowerBound == 0 ? begin() : lower_bound(ElasticIndexKey(lowerBound, NULL)));
+    return lower_bound(ElasticIndexKey(lowerBound, NULL));
 }
 
 /**

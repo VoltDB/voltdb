@@ -890,7 +890,7 @@ public:
     }
 
     voltdb::ElasticIndex &getElasticIndex() {
-        return m_table->m_surgeon.m_index;
+        return *m_table->m_surgeon.m_index;
     }
 
     bool setElasticIndexTuplesPerCall(size_t nTuplesPerCall) {
@@ -1553,7 +1553,7 @@ public:
                                 std::vector<std::string> &predicateStrings) {
         m_context.reset(new ElasticContext(*m_test.m_table, surgeon, m_partitionId,
                                            tupleSerializer, m_predicateStrings));
-        return false;
+        return m_context->handleActivation(streamType);
     }
 
     virtual int64_t streamMore(TupleOutputStreamProcessor &outputStreams,

@@ -51,6 +51,15 @@ public:
                                      std::vector<int> &retPositions) = 0;
 
     /**
+     * Optional activation handler.
+     *  Called after creating the context to see if activation is allowed.
+     *  Return true if activation is allowed. (default=true)
+     */
+    virtual bool handleActivation(TableStreamType streamType) {
+        return true;
+    }
+
+    /**
      * Optional reactivation handler.
      *  Called during activation when the stream already exists.
      *  Return true if reactivation is allowed. (default=false)
