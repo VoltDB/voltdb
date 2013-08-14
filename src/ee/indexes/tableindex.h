@@ -422,10 +422,6 @@ public:
         return m_scheme.name;
     }
 
-    int getFoundNextValues() {
-        return m_foundNextValues;
-    }
-
     void rename(std::string name) {
         if (m_scheme.name.compare(name) != 0) {
             m_scheme.name = name;
@@ -476,7 +472,6 @@ protected:
     int m_inserts;
     int m_deletes;
     int m_updates;
-    int m_foundNextValues;
 
     // stats
     IndexStats m_stats;
