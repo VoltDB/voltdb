@@ -156,27 +156,5 @@ public interface SiteProcedureConnection {
     public Future<?> doSnapshotWork();
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds);
 
-    /**
-     * Get the site-local fragment id for a given plan identified by 20-byte sha-1 hash
-     */
-    public long getFragmentIdForPlanHash(byte[] planHash);
-
-    /**
-     * Get the site-local fragment id for a given plan identified by 20-byte sha-1 hash
-     * If the plan isn't known to this SPC, load it up. Otherwise addref it.
-     */
-    public long loadOrAddRefPlanFragment(byte[] planHash, byte[] plan);
-
-    /**
-     * Decref the plan associated with this site-local fragment id. If the refcount
-     * goes to 0, the plan may be removed (depending on caching policy).
-     */
-    public void decrefPlanFragmentById(long fragmentId);
-
-    /**
-     * Get the full JSON plan associated with a given site-local fragment id.
-     */
-    public byte[] planForFragmentId(long fragmentId);
-
     public long[] validatePartitioning(long tableIds[], int hashinatorType, byte hashinatorConfig[]);
 }
