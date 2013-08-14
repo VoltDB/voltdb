@@ -575,7 +575,6 @@ public class ProcedureRunner {
 
             // if batch is small (or reasonable size), do it in one go
             if (batchSize <= MAX_BATCH_SIZE) {
-                //m_rProcContext.m_batch = m_batch;
                 return executeQueriesInABatch(m_batch, isFinalSQL);
             }
             // otherwise, break it into sub-batches
