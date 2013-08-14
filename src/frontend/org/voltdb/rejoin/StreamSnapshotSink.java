@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.google.common.base.Preconditions;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -41,7 +42,7 @@ import org.voltdb.utils.FixedDBBPool;
 public class StreamSnapshotSink {
     private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
 
-    private Mailbox m_mb = null;
+    private final Mailbox m_mb;
     private StreamSnapshotDataReceiver m_in = null;
     private Thread m_inThread = null;
     private StreamSnapshotAckSender m_ack = null;
@@ -52,10 +53,13 @@ public class StreamSnapshotSink {
     private final Map<Integer, byte[]> m_schemas = new HashMap<Integer, byte[]>();
     private long m_bytesReceived = 0;
 
-    public long initialize(int sourceCount, FixedDBBPool bufferPool) {
-        // Mailbox used to transfer snapshot data
-        m_mb = VoltDB.instance().getHostMessenger().createMailbox();
+    public StreamSnapshotSink(Mailbox mb)
+    {
+        Preconditions.checkArgument(mb != null);
+        m_mb = mb;
+    }
 
+    public long initialize(int sourceCount, FixedDBBPool bufferPool) {
         // Expect sourceCount number of EOFs at the end
         m_expectedEOFs.set(sourceCount);
 
@@ -93,10 +97,6 @@ public class StreamSnapshotSink {
 
         m_in = null;
         m_ack = null;
-
-        if (m_mb != null) {
-            VoltDB.instance().getHostMessenger().removeMailbox(m_mb.getHSId());
-        }
     }
 
     /**
