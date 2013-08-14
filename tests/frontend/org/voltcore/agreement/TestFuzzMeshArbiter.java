@@ -375,8 +375,11 @@ public class TestFuzzMeshArbiter extends TestCase
                 || m_expectations.size() > expectations.size()) return false;
 
             int sumtest = 0;
-            for (int fc: expectations.values()) {
-                sumtest += fc;
+            int sumfails = 0;
+
+            for (Map.Entry<Integer, Integer> fc: expectations.entrySet()) {
+                sumtest += fc.getValue();
+                sumfails += fc.getKey();
             }
 
             int sumexp = 0;
@@ -384,8 +387,7 @@ public class TestFuzzMeshArbiter extends TestCase
                 sumexp += fc;
             }
 
-            return sumexp == sumtest;
-
+            return sumfails > 0 && sumexp == sumtest;
         }
 
         void expect() throws InterruptedException {
@@ -586,7 +588,6 @@ public class TestFuzzMeshArbiter extends TestCase
         state.setUpExpectations();
 
         state.expect();
-        // assertEquals(state.m_expectations, state.getFailedCountMap());
 
         state.pruneDeadNodes();
 
@@ -601,7 +602,6 @@ public class TestFuzzMeshArbiter extends TestCase
         state.setUpExpectations();
 
         state.expect();
-        assertEquals(state.m_expectations, state.getFailedCountMap());
     }
 
     public void thereBeDragonsHeretestNastyFuzz() throws InterruptedException {
