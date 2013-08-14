@@ -284,6 +284,9 @@ public class Collector {
                 TimestampType ts = new TimestampType(new java.util.Date());
                 timestamp = ts.toString().replace(' ', '-');
 
+                // get rid of microsecond part
+                timestamp = timestamp.substring(0, "YYYY-mm-DD-HH:MM:ss".length());
+
                 rootpath = System.getProperty("user.dir");
             }
 
