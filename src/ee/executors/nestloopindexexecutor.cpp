@@ -367,10 +367,13 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     TableTuple &join_tuple = output_table->tempTuple();
     TableTuple null_tuple = m_null_tuple;
     int num_of_inner_cols = (join_type == JOIN_TYPE_LEFT)? null_tuple.sizeInValues() : 0;
+    int foundTuples = 0;
 
     VOLT_TRACE("<num_of_outer_cols>: %d\n", num_of_outer_cols);
     while (outer_iterator.next(outer_tuple)) {
-        progressCheck(outer_iterator, inner_table);
+        if(++foundTuples % LONG_OP_THRESHOLD == 0) {
+            progressUpdate(foundTuples, inner_table);
+        }
         VOLT_TRACE("outer_tuple:%s",
                    outer_tuple.debug(outer_table->name()).c_str());
         // Set the outer tuple columns. Must be outside the inner loop
@@ -509,7 +512,9 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                         // start point to do reverse scan
                         index->moveToGreaterThanKey(&index_values);
                         while (!(inner_tuple = index->nextValue()).isNullTuple()) {
-                            progressCheck(outer_iterator, inner_table);
+                            if(++foundTuples % LONG_OP_THRESHOLD == 0) {
+                                progressUpdate(foundTuples, inner_table);
+                            }
                             if (initial_expression != NULL && initial_expression->eval(&inner_tuple, NULL).isFalse()) {
                                 break;
                             }
@@ -532,7 +537,9 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                 {
                     VOLT_TRACE("inner_tuple:%s",
                                inner_tuple.debug(inner_table->name()).c_str());
-                    progressCheck(outer_iterator, inner_table);
+                    if(++foundTuples % LONG_OP_THRESHOLD == 0) {
+                        progressUpdate(foundTuples, inner_table);
+                    }
                     //
                     // First check whether the end_expression is now false
                     //

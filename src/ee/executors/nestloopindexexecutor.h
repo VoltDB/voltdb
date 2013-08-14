@@ -94,18 +94,15 @@ protected:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
-    inline void progressCheck(TableIterator it, Table* targetTable) {
-        int foundTuples = it.getFoundTuples() + index->getFoundNextValues();
-        if(foundTuples % LONG_OP_THRESHOLD == 0) {
-            //Update stats in java and let java determine if we should cancel this query.
-            if(m_engine->getTopend()->fragmentProgressUpdate(m_engine->getIndexInBatch(),
-                    planNodeToString(m_abstractNode->getPlanNodeType()),
-                    targetTable->name(),
-                    targetTable->activeTupleCount(),
-                    foundTuples)){
-                VOLT_ERROR("Time out read only query.");
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "Time out read only query.");
-            }
+    inline void progressUpdate(int foundTuples, Table* targetTable) {
+        //Update stats in java and let java determine if we should cancel this query.
+        if(m_engine->getTopend()->fragmentProgressUpdate(m_engine->getIndexInBatch(),
+                planNodeToString(m_abstractNode->getPlanNodeType()),
+                targetTable->name(),
+                targetTable->activeTupleCount(),
+                foundTuples)){
+            VOLT_ERROR("Time out read only query.");
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "Time out read only query.");
         }
     };
 

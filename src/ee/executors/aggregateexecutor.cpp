@@ -570,8 +570,11 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
     TableTuple nxtTuple(input_table->schema());
     PoolBackedTupleStorage nextGroupByKeyStorage(m_groupByKeySchema, &m_memoryPool);
     TableTuple& nextGroupByKeyTuple = nextGroupByKeyStorage;
+    int foundTuples = 0;
     while (it.next(nxtTuple)) {
-        progressCheck(it);
+        if(++foundTuples % LONG_OP_THRESHOLD == 0) {
+            progressUpdate(foundTuples);
+        }
         initGroupByKeyTuple(nextGroupByKeyStorage, nxtTuple);
         AggregateRow *aggregateRow;
         // Search for the matching group.
@@ -652,8 +655,11 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     }
 
     TableTuple inProgressGroupByKeyTuple(m_groupByKeySchema);
+    int foundTuples = 0;
     while (it.next(nxtTuple)) {
-        progressCheck(it);
+        if(++foundTuples % LONG_OP_THRESHOLD == 0) {
+            progressUpdate(foundTuples);
+        }
         // The nextGroupByKeyTuple now stores the key(s) of the current group in progress.
         // Swap its storage with that of the inProgressGroupByKeyTuple.
         // The inProgressGroupByKeyTuple will be null initially, until the first call to initGroupByKeyTuple below

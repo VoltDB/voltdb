@@ -83,7 +83,6 @@ public:
     bool next(TableTuple &out);
     bool hasNext();
     int getLocation() const;
-    int getFoundTuples();
 
 private:
     // Get an iterator via table->iterator()
@@ -158,7 +157,7 @@ inline void TableIterator::reset(std::vector<TBPtr>::iterator start) {
     m_foundTuples = 0;
     m_tupleLength = m_table->m_tupleLength;
     m_tuplesPerBlock = m_table->m_tuplesPerBlock;
-    m_currentBlock = NULL
+    m_currentBlock = NULL;
 }
 
 inline void TableIterator::reset(TBMapI start) {
@@ -170,7 +169,7 @@ inline void TableIterator::reset(TBMapI start) {
     m_foundTuples = 0;
     m_tupleLength = m_table->m_tupleLength;
     m_tuplesPerBlock = m_table->m_tuplesPerBlock;
-    m_currentBlock = NULL
+    m_currentBlock = NULL;
 }
 
 inline bool TableIterator::hasNext() {
@@ -260,10 +259,6 @@ inline bool TableIterator::tempNext(TableTuple &out) {
 
 inline int TableIterator::getLocation() const {
     return m_location;
-}
-
-inline int TableIterator::getFoundTuples() {
-    return m_foundTuples;
 }
 
 }
