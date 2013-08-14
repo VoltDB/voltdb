@@ -319,7 +319,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long tuplesFound) {
         long currentTime = System.currentTimeMillis();
         long duration = currentTime - m_startTime;
-        if(duration > m_logDuration) {
+        if(duration > 0){//m_logDuration) {
             VoltLogger log = new VoltLogger("CONSOLE");
             log.info("Long running operation");
             log.info("[Proc:"+m_rProcContext.m_procedureName+"]"
