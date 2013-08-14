@@ -15,13 +15,26 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb;
+package org.voltcore.agreement;
 
-/**
- * Interface for objects that, given an Id, can return a plan. A plan in this
- * case is the raw bytes representing a UTF-8 JSON plan. This is mainly for
- * {@link org.voltdb.iv2.Site}, but can also be used for test code.
- */
-public interface FragmentPlanSource {
-    public byte[] planForFragmentId(long fragmentId);
+public enum ArbitrationStrategy {
+    NO_QUARTER {
+        @Override
+        public <R, P> R accept(Visitor<R, P> vtor, P param) {
+            return vtor.visitNoQuarter(param);
+        }
+    },
+    MATCHING_CARDINALITY {
+        @Override
+        public <R, P> R accept(Visitor<R, P> vtor, P param) {
+            return vtor.visitMatchingCardinality(param);
+        }
+    };
+
+    public interface Visitor<R,P> {
+        R visitNoQuarter(P param);
+        R visitMatchingCardinality(P param);
+    }
+
+    public abstract <R,P> R accept(Visitor<R,P> vtor, P param);
 }

@@ -41,12 +41,13 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineJNI;
+import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb_testprocs.regressionsuites.multipartitionprocs.MultiSiteSelect;
 
-public class TestTwoSitePlans extends TestCase implements FragmentPlanSource {
+public class TestTwoSitePlans extends TestCase {
 
     static final String JAR = "distplanningregression.jar";
 
@@ -63,6 +64,7 @@ public class TestTwoSitePlans extends TestCase implements FragmentPlanSource {
     PlanFragment selectBottomFrag = null;
     PlanFragment insertFrag = null;
 
+    @SuppressWarnings("deprecation")
     @Override
     public void setUp() throws IOException, InterruptedException {
         VoltDB.instance().readBuildInfo("Test");
@@ -112,8 +114,7 @@ public class TestTwoSitePlans extends TestCase implements FragmentPlanSource {
                                 "",
                                 100,
                                 HashinatorType.LEGACY,
-                                configBytes,
-                                TestTwoSitePlans.this));
+                                configBytes));
             }
         };
         site1Thread.start();
@@ -132,8 +133,7 @@ public class TestTwoSitePlans extends TestCase implements FragmentPlanSource {
                                 "",
                                 100,
                                 HashinatorType.LEGACY,
-                                configBytes,
-                                TestTwoSitePlans.this));
+                                configBytes));
             }
         };
         site2Thread.start();
@@ -166,12 +166,26 @@ public class TestTwoSitePlans extends TestCase implements FragmentPlanSource {
             selectBottomFrag = temp;
         }
 
-        // insert some data
+        // get the insert frag
         Statement insertStmt = insertProc.getStatements().get("insert");
         assert(insertStmt != null);
 
         for (PlanFragment f : insertStmt.getFragments())
             insertFrag = f;
+
+        // populate plan cache
+        ActivePlanRepository.clear();
+        ActivePlanRepository.addFragmentForTest(
+                CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
+                Encoder.base64Decode(selectBottomFrag.getPlannodetree()));
+        ActivePlanRepository.addFragmentForTest(
+                CatalogUtil.getUniqueIdForFragment(selectTopFrag),
+                Encoder.base64Decode(selectTopFrag.getPlannodetree()));
+        ActivePlanRepository.addFragmentForTest(
+                CatalogUtil.getUniqueIdForFragment(insertFrag),
+                Encoder.base64Decode(insertFrag.getPlannodetree()));
+
+        // insert some data
         ParameterSet params = ParameterSet.fromArrayNoCopy(1L, 1L, 1L);
 
         VoltTable[] results = ee2.executePlanFragments(
@@ -250,25 +264,4 @@ public class TestTwoSitePlans extends TestCase implements FragmentPlanSource {
             e.printStackTrace();
         }
     }
-
-    @Override
-    public byte[] planForFragmentId(long fragmentId) {
-        if (fragmentId == CatalogUtil.getUniqueIdForFragment(selectBottomFrag)) {
-            return Encoder.base64Decode(selectBottomFrag.getPlannodetree());
-        }
-        else if (fragmentId == CatalogUtil.getUniqueIdForFragment(selectTopFrag)) {
-            return Encoder.base64Decode(selectTopFrag.getPlannodetree());
-        }
-        else if (fragmentId == CatalogUtil.getUniqueIdForFragment(insertFrag)) {
-            return Encoder.base64Decode(insertFrag.getPlannodetree());
-        }
-        else {
-            fail();
-            assert(false);
-            return null;
-        }
-    }
-
-
-
 }

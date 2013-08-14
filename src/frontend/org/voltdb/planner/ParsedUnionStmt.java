@@ -23,7 +23,6 @@ import java.util.HashSet;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
-import org.voltdb.expressions.AbstractExpression;
 
 public class ParsedUnionStmt extends AbstractParsedStmt {
 
@@ -37,11 +36,9 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         EXCEPT
     };
     /** Hash Set to enforce table uniqueness across all the sub-selects */
-    public HashSet<String> m_uniqueTables = new HashSet<String>();
-    public ArrayList<AbstractParsedStmt> m_children = new ArrayList<AbstractParsedStmt>();
-    public UnionType m_unionType = UnionType.NOUNION;
-    /** Collection of filter expressions across all the the sub-selects */
-    public ArrayList<AbstractExpression> m_filterSelectionList = new ArrayList<AbstractExpression>();
+    private HashSet<String> m_uniqueTables = new HashSet<String>();
+    ArrayList<AbstractParsedStmt> m_children = new ArrayList<AbstractParsedStmt>();
+    UnionType m_unionType = UnionType.NOUNION;
 
     /**
     * Class constructor
@@ -71,6 +68,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
      * @param root
      * @param db
      */
+    @Override
     void parseTablesAndParams(VoltXMLElement stmtNode) {
 
         assert(stmtNode.children.size() > 1);
@@ -122,16 +120,12 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
      * @param db
      * @param joinOrder
      */
-    void postParse(String sql, String joinOrder) {
-
+    @Override
+    void postParse(String sql, String joinOrder)
+    {
         for (AbstractParsedStmt selectStmt : m_children) {
             selectStmt.postParse(sql, joinOrder);
-            // Propagate parsing results to the parent union
-            m_filterSelectionList.addAll(selectStmt.joinTree.getAllExpressions());
         }
-        // Analyze children's where expressions together to identify possible identically
-        // partitioned tables
-        valueEquivalence.putAll(analyzeValueEquivalence(m_filterSelectionList));
 
         // these just shouldn't happen right?
         assert(multiTableSelectionList.size() == 0);

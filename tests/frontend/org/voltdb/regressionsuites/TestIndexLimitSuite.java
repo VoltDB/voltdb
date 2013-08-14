@@ -251,6 +251,7 @@ public class TestIndexLimitSuite extends RegressionSuite {
         callWithExpectedResult(client, -3, "@AdHoc", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS < 1");
         callWithExpectedResult(client, true, "@Explain", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS < 1");
 
+
         callWithExpectedResult(client, -3, "@AdHoc", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS <= 2");
         callWithExpectedResult(client, true, "@Explain", "SELECT MIN(POINTS) FROM TU1 WHERE POINTS <= 2");
 
@@ -260,13 +261,15 @@ public class TestIndexLimitSuite extends RegressionSuite {
         callWithExpectedResult(client, 2, "@AdHoc", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS >= 2");
         callWithExpectedResult(client, true, "@Explain", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS >= 2");
 
+        // NEW: optimizable after adding reserve scan
         // MAX() with upper bound is not optimized
         callWithExpectedResult(client, 1, "@AdHoc", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS < 2");
-        callWithExpectedResult(client, false, "@Explain", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS < 2");
+        callWithExpectedResult(client, true, "@Explain", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS < 2");
 
+        // NEW: optimizable after adding reserve scan
         // MAX() with upper bound is not optimized
         callWithExpectedResult(client, 2, "@AdHoc", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS <= 2");
-        callWithExpectedResult(client, false, "@Explain", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS <= 2");
+        callWithExpectedResult(client, true, "@Explain", "SELECT MAX(POINTS) FROM TU1 WHERE POINTS <= 2");
 
         callWithExpectedResult(client, -1, "@AdHoc", "SELECT MIN(POINTS) FROM TU2 WHERE UNAME = 'jim' AND POINTS < 5");
         callWithExpectedResult(client, true, "@Explain", "SELECT MIN(POINTS) FROM TU2 WHERE UNAME = 'jim' AND POINTS < 5");
@@ -312,6 +315,12 @@ public class TestIndexLimitSuite extends RegressionSuite {
         callWithExpectedResult(client, 1, "@AdHoc", "SELECT MIN(POINTS) FROM T1 WHERE ID = 1;");
         callWithExpectedResult(client, false, "@Explain", "SELECT MIN(POINTS) FROM T1 WHERE ID = 1");
 
+        callWithExpectedResult(client, -1, "@AdHoc", "SELECT POINTS FROM TU2 WHERE UNAME = 'jim' ORDER BY POINTS ASC LIMIT 1;");
+        callWithExpectedResult(client, true, "@Explain", "SELECT POINTS FROM TU2 WHERE UNAME = 'jim' ORDER BY POINTS ASC LIMIT 1;");
+        callWithExpectedResult(client, 3, "@AdHoc", "SELECT POINTS FROM TU2 WHERE UNAME = 'jim' ORDER BY POINTS DESC LIMIT 1;");
+        callWithExpectedResult(client, true, "@Explain", "SELECT POINTS FROM TU2 WHERE UNAME = 'jim' ORDER BY POINTS DESC LIMIT 1;");
+
+
 
     }
 
@@ -333,10 +342,6 @@ public class TestIndexLimitSuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlindex-ddl.sql"));
         project.addProcedures(PROCEDURES);
-        project.addPartitionInfo("TU1", "ID");
-        project.addPartitionInfo("TU2", "UNAME");
-        project.addPartitionInfo("TU3", "TEL");
-        project.addPartitionInfo("TU4", "UNAME");
 
         // pure column index queries
         project.addStmtProcedure("COL_TU1_MIN_POINTS", "SELECT MIN(POINTS) FROM TU1;");

@@ -86,7 +86,9 @@ public class TestVoltTableUtil {
         CSVWriter writer = mock(CSVWriter.class);
         ColumnInfo[] columns = new ColumnInfo[] {new ColumnInfo("", VoltType.TIMESTAMP)};
         ArrayList<VoltType> columnTypes = new ArrayList<VoltType>();
-        TimestampType ts = new TimestampType(System.currentTimeMillis() * 1000);
+        // To make sure we have microseconds we get millisecond from current timestamp
+        // and add remainder to ensure we have micros in timestamp.
+        TimestampType ts = new TimestampType((System.currentTimeMillis() * 1000) + System.currentTimeMillis() % 1000);
         VoltTable vt = new VoltTable(columns);
         vt.addRow(ts);
 

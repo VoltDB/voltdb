@@ -41,6 +41,8 @@ public class TestPlansOrderBy extends PlannerTestCase {
     private void validatePlan(String sql, boolean expectIndexScan, boolean expectSeqScan, boolean expectOrderBy, boolean expectHashAggregate)
     {
         AbstractPlanNode pn = compile(sql);
+        //System.out.println(pn.getChild(0).toJSONString());
+        System.out.println(pn.getChild(0).toExplainPlanString());
         assertEquals(expectIndexScan, pn.hasAnyNodeOfType(PlanNodeType.INDEXSCAN));
         assertEquals(expectSeqScan, pn.hasAnyNodeOfType(PlanNodeType.SEQSCAN));
         assertEquals(expectOrderBy, pn.hasAnyNodeOfType(PlanNodeType.ORDERBY));

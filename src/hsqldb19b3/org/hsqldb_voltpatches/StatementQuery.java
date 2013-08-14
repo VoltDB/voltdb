@@ -32,6 +32,8 @@
 package org.hsqldb_voltpatches;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
@@ -423,42 +425,15 @@ public class StatementQuery extends StatementDMQL {
          *
          * Serialize the display columns in the exprColumn order.
          */
+        Set<Integer> ignoredColsIndexes = new HashSet<Integer>();
         for (int jj=0; jj < displayCols.size(); ++jj) {
             Expression expr = displayCols.get(jj);
-            if (expr == null) {
+            if (ignoredColsIndexes.contains(jj)) {
                 continue;
             }
-            else if (expr.opType == OpTypes.SIMPLE_COLUMN)
-            {
-                // simple columns are not serialized as display columns
-                // but they are place holders for another column
-                // in the output schema. Go find that corresponding column
-                // and serialize it in this place.
-                for (int ii=jj; ii < displayCols.size(); ++ii)
-                {
-                    Expression otherCol = displayCols.get(ii);
-                    if (otherCol == null) {
-                        continue;
-                    }
-                    else if ((otherCol.opType != OpTypes.SIMPLE_COLUMN) &&
-                             (otherCol.columnIndex == expr.columnIndex))
-                    {
-                        // serialize the column this simple column stands-in for
-                        VoltXMLElement xml = otherCol.voltGetXML(session);
-                        cols.children.add(xml);
-                        assert(xml != null);
-                        // null-out otherCol to not serialize it twice
-                        displayCols.set(ii, null);
-                        // quit seeking simple_column's replacement
-                        break;
-                    }
-                }
-            }
-            else {
-                VoltXMLElement xml = expr.voltGetXML(session);
-                cols.children.add(xml);
-                assert(xml != null);
-            }
+            VoltXMLElement xml = expr.voltGetXML(session, displayCols, ignoredColsIndexes, jj);
+            cols.children.add(xml);
+            assert(xml != null);
         }
 
         // parameters
@@ -487,26 +462,24 @@ public class StatementQuery extends StatementDMQL {
         if (select.isGrouped) {
             VoltXMLElement groupCols = new VoltXMLElement("groupcolumns");
             query.children.add(groupCols);
-            for (Expression groupByCol : groupByCols) {
-                groupCols.children.add(groupByCol.voltGetXML(session));
+
+            for (int jj=0; jj < groupByCols.size(); ++jj) {
+                Expression expr = groupByCols.get(jj);
+                VoltXMLElement xml = expr.voltGetXML(session, displayCols, ignoredColsIndexes, jj);
+                groupCols.children.add(xml);
             }
         }
+
         // orderby
         if (orderByCols.size() > 0) {
             VoltXMLElement orderCols = new VoltXMLElement("ordercolumns");
             query.children.add(orderCols);
-            for (Expression orderByCol : orderByCols) {
-                orderCols.children.add(orderByCol.voltGetXML(session));
+            for (int jj=0; jj < orderByCols.size(); ++jj) {
+                Expression expr = orderByCols.get(jj);
+                VoltXMLElement xml = expr.voltGetXML(session, displayCols, ignoredColsIndexes, jj);
+                orderCols.children.add(xml);
             }
         }
-
-        // query condition should be covered by table scans, but can un-comment
-        // this to see if anything is missed
-        /*if (select.queryCondition != null) {
-            VoltXMLElement queryCond = new VoltXMLElement("querycondition");
-            query.children.add(queryCond);
-            queryCond.children.add(select.queryCondition.voltGetXML(session));
-        }*/
 
         return query;
     }

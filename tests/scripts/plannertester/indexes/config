@@ -104,3 +104,10 @@ select * from P1 where P1.ID > 2 Limit 4;
 select * from R2 where R2.ID > 2 Limit 5;
 select * from P2 where P2.ID > 2 Limit 6;
 select * from P1 where ID < 600000000000;
+select * from P3 T where T.NUM = 100 AND T.NUM2 <= 200 LIMIT 10;
+select * from P3 T where T.NUM = 100 AND T.NUM2 < 200 LIMIT 10;
+select * from P3 T where T.NUM = 100 AND T.NUM2 <= 200;
+select * from P3 T where T.NUM = 100 AND T.NUM2 < 200;
+select * from P3 T where T.NUM IN (1, 2) AND T.NUM2 < 100 ORDER BY T.NUM, T.NUM2;
+select * from P3 T where T.NUM IN (1, 2) AND T.NUM2 < 100 ORDER BY T.NUM DESC, T.NUM2 DESC;
+

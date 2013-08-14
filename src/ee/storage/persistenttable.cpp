@@ -759,8 +759,6 @@ PersistentTable::segregateMaterializedViews(std::map<std::string, catalog::Mater
                                             std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & end,
                                             std::vector< catalog::MaterializedViewInfo*> &survivingInfosOut,
                                             std::vector<MaterializedViewMetadata*> &survivingViewsOut,
-                                            std::vector<catalog::MaterializedViewInfo*> &changingInfosOut,
-                                            std::vector<MaterializedViewMetadata*> &changingViewsOut,
                                             std::vector<MaterializedViewMetadata*> &obsoleteViewsOut)
 {
     //////////////////////////////////////////////////////////
@@ -899,6 +897,11 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple,
             throw ConstraintFailureException(this, tuple, TableTuple(),
                                              CONSTRAINT_TYPE_UNIQUE);
         }
+    }
+    UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+    if (uq) {
+        char* tupleData = uq->allocatePooledCopy(tuple.address(), tuple.tupleLength());
+        uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, this));
     }
 
     // handle any materialized views

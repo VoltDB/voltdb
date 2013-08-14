@@ -822,6 +822,21 @@ public class TestExpressionUtil extends TestCase {
         }
 
         {
+            // Test "T1.C IN (1,2)" is NULL-rejecting
+            TupleValueExpression tve1 = new TupleValueExpression();
+            tve1.setTableName("T1");
+            tve1.setColumnName("C");
+            VectorValueExpression vve = new VectorValueExpression();
+
+            InComparisonExpression ine = new InComparisonExpression();
+            ine.m_left = tve1;
+            ine.m_right = vve;
+            assertTrue(ExpressionUtil.isNullRejectingExpression(ine, "T1"));
+            // Wrong table
+            assertTrue(!ExpressionUtil.isNullRejectingExpression(ine, "T"));
+        }
+
+        {
             // Test AND expressions
             // Test "T1.C > T2.C AND T2.B IS NULL " is NULL-rejecting
             TupleValueExpression tve1 = new TupleValueExpression();
