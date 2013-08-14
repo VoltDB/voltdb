@@ -92,6 +92,7 @@ public class RandomMsgGenerator
         else if (!m_mpInProgress) {
             m_currentMpReadOnly = (m_rand.nextDouble() < READCHANCE);
             FragmentTaskMessage msg = makeFragmentTaskMsg(m_currentMpReadOnly, false);
+            msg.setInitiateTask(mock(Iv2InitiateTaskMessage.class));
             m_mpInProgress = true;
             return msg;
         }
