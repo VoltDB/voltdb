@@ -57,10 +57,6 @@ struct tableutil {
     static bool setRandomTupleValues(voltdb::Table* table, voltdb::TableTuple *tuple);
     static bool addRandomTuples(voltdb::Table* table, int num_of_tuples);
 
-    static bool copy(const voltdb::Table* from_table, voltdb::Table* to_table);
-    static bool equals(const voltdb::Table* table, voltdb::TableTuple *tuple0, voltdb::TableTuple *tuple1);
-    static bool getTupleAt(const voltdb::Table* table, int64_t position, voltdb::TableTuple &out);
-
 };
 
 }
