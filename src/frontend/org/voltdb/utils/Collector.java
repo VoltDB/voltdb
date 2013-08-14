@@ -47,6 +47,7 @@ import org.voltdb.types.TimestampType;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Throwables;
+import com.google.common.net.HostAndPort;
 
 public class Collector {
     private static String m_voltDbRootPath = null;
@@ -433,8 +434,16 @@ public class Collector {
         attemptConnect(host, username, password);
 
         SSHTools ssh = new SSHTools(username, null);
+        SFTPSession sftp = null;
 
-        SFTPSession sftp = ssh.getSftpSession(username, password, null, host, null);
+        HostAndPort hostAndPort = HostAndPort.fromString(host);
+        if (hostAndPort.hasPort()) {
+            sftp = ssh.getSftpSession(username, password, null, hostAndPort.getHostText(), hostAndPort.getPort(), null);
+        }
+        else {
+            sftp = ssh.getSftpSession(username, password, null, host, null);
+        }
+
         String rootpath = sftp.exec("pwd").trim();
 
         HashMap<File, File> files = new HashMap<File, File>();
@@ -458,7 +467,13 @@ public class Collector {
         SSHTools ssh = new SSHTools(username, null);
 
         try {
-            ssh.getSftpSession(username, password, null, host, null);
+            HostAndPort hostAndPort = HostAndPort.fromString(host);
+            if (hostAndPort.hasPort()) {
+                ssh.getSftpSession(username, password, null, hostAndPort.getHostText(), hostAndPort.getPort(), null);
+            }
+            else {
+                ssh.getSftpSession(username, password, null, host, null);
+            }
         } catch (SFTPException e) {
             String errorMsg = e.getCause().getMessage();
 
