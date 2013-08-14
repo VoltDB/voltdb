@@ -25,7 +25,9 @@ import java.util.List;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
@@ -48,6 +50,9 @@ public class RepairLog
 
     // is this a partition leader?
     boolean m_isLeader = false;
+
+    // The HSID of this initiator, for logging purposes
+    long m_HSId = Long.MIN_VALUE;
 
     // want voltmessage as payload with message-independent metadata.
     static class Item
@@ -96,6 +101,12 @@ public class RepairLog
     RepairLog()
     {
         m_log = new ArrayList<Item>();
+    }
+
+    // get the HSID for dump logging
+    void setHSId(long HSId)
+    {
+        m_HSId = HSId;
     }
 
     // leaders log differently
@@ -147,6 +158,14 @@ public class RepairLog
                 //Hence Math.max
                 m_lastMpHandle = Math.max(m_lastMpHandle, ctm.getTxnId());
                 m_lastSpHandle = ctm.getSpHandle();
+            }
+        }
+        else if (msg instanceof DumpMessage) {
+            String who = CoreUtils.hsIdToString(m_HSId);
+            tmLog.warn("Repair log dump for site: " + who + ", isLeader: " + m_isLeader);
+            tmLog.warn("" + who + ": lastSpHandle: " + m_lastSpHandle + ", lastMpHandle: " + m_lastMpHandle);
+            for (Iv2RepairLogResponseMessage il : contents(0l, false)) {
+               tmLog.warn("" + who + ": msg: " + il);
             }
         }
     }
