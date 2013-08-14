@@ -21,6 +21,7 @@ import java.nio.ByteBuffer;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltdb.common.Constants;
+import org.voltdb.planner.ActivePlanRepository;
 
 /**
  * <p>A simple wrapper of a parameterized SQL statement. VoltDB uses this instead of
@@ -111,9 +112,9 @@ public class SQLStmt {
     @Override
     protected void finalize() throws Throwable {
         if (site != null) {
-            site.decrefPlanFragmentById(aggregator.id);
+            ActivePlanRepository.decrefPlanFragmentById(aggregator.id);
             if (collector != null) {
-                site.decrefPlanFragmentById(collector.id);
+                ActivePlanRepository.decrefPlanFragmentById(collector.id);
             }
         }
 

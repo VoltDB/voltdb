@@ -754,12 +754,12 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             PartitionDRGateway.getInstance(partitionId, nodeDRGateway, false, m_rejoining);
 
         if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
-            ee = new MockExecutionEngine(null);
+            ee = new MockExecutionEngine();
             hsql = null;
         }
         else if (voltdb.getBackendTargetType() == BackendTarget.HSQLDB_BACKEND) {
             hsql = HsqlBackend.initializeHSQLBackend(m_siteId, m_context);
-            ee = new MockExecutionEngine(null);
+            ee = new MockExecutionEngine();
         }
         else {
             String serializedCatalog = serializedCatalogIn;
@@ -1764,28 +1764,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     @Override
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds) {
         //A noop pre-IV2
-    }
-
-    @Override
-    public long getFragmentIdForPlanHash(byte[] planHash) {
-        //A noop pre-IV2
-        return 0;
-    }
-
-    @Override
-    public long loadOrAddRefPlanFragment(byte[] planHash, byte[] plan) {
-        //A noop pre-IV2
-        return 0;
-    }
-
-    @Override
-    public void decrefPlanFragmentById(long fragmentId) {
-        //A noop pre-IV2
-    }
-
-    @Override
-    public byte[] planForFragmentId(long fragmentId) {
-        return null;
     }
 
     @Override
