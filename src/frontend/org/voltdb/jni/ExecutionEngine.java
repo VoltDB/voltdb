@@ -29,7 +29,6 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltdb.ExecutionSite;
-import org.voltdb.FragmentPlanSource;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.StatsAgent;
@@ -42,6 +41,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
+import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTableUtil;
 
@@ -84,8 +84,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     private int m_cacheMisses = 0;
     private int m_eeCacheSize = 0;
 
-    protected FragmentPlanSource m_planSource;
-
     /** Make the EE clean and ready to do new transactional work. */
     public void resetDirtyStatus() {
         m_dirty = false;
@@ -115,7 +113,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     /** Create an ee and load the volt shared library */
-    public ExecutionEngine(long siteId, int partitionId, FragmentPlanSource planSource) {
+    public ExecutionEngine(long siteId, int partitionId) {
         m_partitionId = partitionId;
         org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
         // In mock test environments there may be no stats agent.
@@ -124,14 +122,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             m_plannerStats = new PlannerStatsCollector(siteId);
             statsAgent.registerStatsSource(StatsSelector.PLANNER, siteId, m_plannerStats);
         }
-        m_planSource = planSource;
     }
 
     /** Alternate constructor without planner statistics tracking. */
-    public ExecutionEngine(FragmentPlanSource planSource) {
+    public ExecutionEngine() {
         m_partitionId = 0;  // not used
         m_plannerStats = null;
-        m_planSource = planSource;
     }
 
     /*
@@ -316,7 +312,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         // estimate the cache size by the number of misses
         m_eeCacheSize = Math.max(EE_PLAN_CACHE_SIZE, m_eeCacheSize + 1);
         // get the plan for realz
-        return m_planSource.planForFragmentId(fragmentId);
+        return ActivePlanRepository.planForFragmentId(fragmentId);
     }
 
     /*
