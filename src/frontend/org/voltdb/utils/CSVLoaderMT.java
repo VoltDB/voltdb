@@ -193,7 +193,9 @@ public class CSVLoaderMT {
         boolean ping = false;
         @Option(desc = "Use DoNothingProcedure which does full round trip but no transaction.")
         boolean dnp = false;
-        @AdditionalArgs(desc = "insert the data into database by TABLENAME.insert procedure by default")
+            @Option(desc = "Use Multiple Client Threads")
+            boolean mct = false;
+            @AdditionalArgs(desc = "insert the data into database by TABLENAME.insert procedure by default")
         String table = "";
 
         @Override
@@ -289,7 +291,10 @@ public class CSVLoaderMT {
         // Create connection
         ClientConfig c_config = new ClientConfig(config.user, config.password);
         c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
-                                             // timeout, see ENG-2670
+        // timeout, see ENG-2670
+        if (config.mct) {
+            c_config.setHeavyweight(true);
+        }
         Client csvClient = null;
         if (!config.check) {
             try {

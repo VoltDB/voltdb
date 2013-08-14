@@ -29,6 +29,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -46,7 +48,11 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ClientStats;
+import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ProcedureCallback;
+import static org.voltdb.utils.CSVLoaderMT.printStatistics;
+import static org.voltdb.utils.CSVLoaderMT.schedulePeriodicStats;
 
 /**
  * CSVLoader is a simple utility to load data from a CSV formatted file to a
@@ -186,7 +192,9 @@ public class CSVLoader {
         boolean ping = false;
         @Option(desc = "Use DoNothingProcedure which does full round trip but no transaction.")
         boolean dnp = false;
-        @AdditionalArgs(desc = "insert the data into database by TABLENAME.insert procedure by default")
+            @Option(desc = "Use Multiple Client Threads")
+            boolean mct = false;
+            @AdditionalArgs(desc = "insert the data into database by TABLENAME.insert procedure by default")
         String table = "";
 
         @Override
@@ -248,6 +256,8 @@ public class CSVLoader {
         long insertTimeEnd = start;
         int waits = 0;
         int shortWaits = 0;
+        ClientStatsContext periodicStatsContext = null;
+        Timer timer = null;
 
         CSVConfig cfg = new CSVConfig();
         cfg.parse(CSVLoader.class.getName(), args);
@@ -284,11 +294,16 @@ public class CSVLoader {
         // Create connection
         ClientConfig c_config = new ClientConfig(config.user, config.password);
         c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
-                                             // timeout, see ENG-2670
+            // timeout, see ENG-2670
+            if (config.mct) {
+                c_config.setHeavyweight(true);
+            }
         Client csvClient = null;
         if (!config.check) {
             try {
                 csvClient = CSVLoader.getClient(c_config, serverlist, config.port);
+                periodicStatsContext = csvClient.createStatsContext();
+                timer = schedulePeriodicStats(periodicStatsContext, start);
             } catch (Exception e) {
                 m_log.error("Error to connect to the servers:"
                         + config.servers);
@@ -438,6 +453,11 @@ public class CSVLoader {
         }
         close_cleanup();
         listReader.close();
+        if (timer != null) {
+            timer.cancel();
+            //Print stats one last time.
+            printStatistics(periodicStatsContext, start);
+        }
         if (csvClient != null) {
             csvClient.close();
         }
@@ -456,6 +476,36 @@ public class CSVLoader {
                 System.exit(-1);
             }
         }
+    }
+
+    /**
+     * Create a Timer task to display performance data on the Vote procedure
+     * It calls printStatistics() every displayInterval seconds
+     */
+    public static Timer schedulePeriodicStats(final ClientStatsContext periodicStatsContext, final long startTime) {
+        Timer timer = new Timer();
+        TimerTask statsPrinting = new TimerTask() {
+            @Override
+            public void run() {
+                printStatistics(periodicStatsContext, startTime);
+            }
+        };
+        timer.scheduleAtFixedRate(statsPrinting,
+                2 * 1000,
+                2 * 1000);
+        return timer;
+    }
+
+    /**
+     * Prints a one line update on performance that can be printed
+     * periodically during a benchmark.
+     */
+    public static synchronized void printStatistics(ClientStatsContext periodicStatsContext, long startTime) {
+        ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
+        long time = Math.round((stats.getEndTimestamp() - startTime) / 1000.0);
+
+        m_log.info(String.format("%02d:%02d:%02d Throughput %d/s, Aborts/Failures %d/%d", time / 3600,
+                (time / 60) % 60, time % 60, stats.getTxnThroughput(), stats.getInvocationAborts(), stats.getInvocationErrors()));
     }
 
     private static String checkparams_trimspace(String[] slot, int columnCnt) {
