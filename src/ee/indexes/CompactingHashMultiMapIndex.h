@@ -131,7 +131,6 @@ class CompactingHashMultiMapIndex : public TableIndex
     }
 
     TableTuple nextValueAtKey() {
-        checkFoundNextValues();
         if (m_match.isNullTuple()) {
             return m_match;
         }

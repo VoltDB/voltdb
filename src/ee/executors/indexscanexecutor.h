@@ -82,12 +82,18 @@ private:
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
     inline void setStatsForLongOp() {
-        if(m_engine->isPrepareStatsForLongOp()) {
-            Table* targetTable = reinterpret_cast<Table*> (m_targetTable);
-            m_engine->setFragContext(planNodeToString(m_abstractNode->getPlanNodeType()),
+        int foundTuples = m_index->getFoundNextValues();
+        Table* targetTable = reinterpret_cast<Table*> (m_targetTable);
+        if(foundTuples % LONG_OP_THRESHOLD == 0) {
+            // Update stats in java and let java determine if we should cancel this query.
+            if(m_engine->getTopend()->fragmentProgressUpdate(m_engine->getIndexInBatch(),
+                    planNodeToString(m_abstractNode->getPlanNodeType()),
                     targetTable->name(),
-                    targetTable->activeTupleCount());
-            m_engine->setPrepareStatsForLongOp(false);
+                    targetTable->activeTupleCount(),
+                    foundTuples)){
+                VOLT_ERROR("Time out read only query.");
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "Time out read only query.");
+            }
         }
     };
 

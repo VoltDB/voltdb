@@ -83,9 +83,9 @@ public:
      * @return true if succeeded. false if no more active tuple is there.
     */
     bool next(TableTuple &out);
-    void setEngine(VoltDBEngine* engine);
     bool hasNext();
     int getLocation() const;
+    int getFoundTuples();
 
 private:
     // Get an iterator via table->iterator()
@@ -184,27 +184,7 @@ inline bool TableIterator::hasNext() {
     return m_foundTuples < m_activeTuples;
 }
 
-inline void TableIterator::setEngine(VoltDBEngine* engine) {
-    m_engine = engine;
-}
-
 inline bool TableIterator::next(TableTuple &out) {
-    if( m_foundTuples > LONG_OP_THRESHOLD-2 && m_engine ) {
-        if((m_foundTuples + 1) % LONG_OP_THRESHOLD == 0) {
-            m_engine->setPrepareStatsForLongOp(true);
-        }
-        if(m_foundTuples % LONG_OP_THRESHOLD == 0) {
-            //Update stats in java and let java determine if we should cancel this query.
-            if(m_engine->getTopend()->fragmentProgressUpdate(m_engine->getFragContext().currentIndexInBatch,
-                    m_engine->getFragContext().currentExecutor,
-                    m_engine->getFragContext().currentTable,
-                    m_engine->getFragContext().currentTableSize,
-                    m_foundTuples)){
-                VOLT_ERROR("Time out read only query.");
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "Time out read only query.");
-            }
-        }
-    }
     if (!m_tempTableIterator) {
         return persistentNext(out);
     }
@@ -287,6 +267,10 @@ inline bool TableIterator::tempNext(TableTuple &out) {
 
 inline int TableIterator::getLocation() const {
     return m_location;
+}
+
+inline int TableIterator::getFoundTuples() {
+    return m_foundTuples;
 }
 
 }

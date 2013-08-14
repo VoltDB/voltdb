@@ -193,8 +193,6 @@ class CompactingTreeMultiMapIndex : public TableIndex
 
     TableTuple nextValue()
     {
-        checkFoundNextValues();
-
         TableTuple retval(getTupleSchema());
 
         if (! m_keyIter.isEnd()) {
@@ -212,7 +210,6 @@ class CompactingTreeMultiMapIndex : public TableIndex
 
     TableTuple nextValueAtKey()
     {
-        checkFoundNextValues();
         if (m_match.isNullTuple()) {
             return m_match;
         }
@@ -229,7 +226,6 @@ class CompactingTreeMultiMapIndex : public TableIndex
 
     bool advanceToNextKey()
     {
-        checkFoundNextValues();
         if (m_keyEndIter.isEnd()) {
             return false;
         }

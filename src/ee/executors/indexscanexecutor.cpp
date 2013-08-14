@@ -361,7 +361,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         VOLT_DEBUG("Initial Expression:\n%s", initial_expression->debug(true).c_str());
     }
 
-    m_index->setEngine(m_engine);
     //
     // An index scan has three parts:
     //  (1) Lookup tuples using the search key

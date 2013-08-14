@@ -362,31 +362,6 @@ public:
         return m_scheme.countable;
     }
 
-    void setEngine(VoltDBEngine* engine)
-    {
-        m_engine = engine;
-    }
-
-    void checkFoundNextValues()
-    {
-        if(m_foundNextValues > LONG_OP_THRESHOLD-2 && m_engine) {
-            if((m_foundNextValues + 1) % LONG_OP_THRESHOLD == 0) {
-                m_engine->setPrepareStatsForLongOp(true);
-            }
-            if(m_foundNextValues % LONG_OP_THRESHOLD == 0) {
-                //Update stats in java and let java determine if we should cancel this query.
-                if(m_engine->getTopend()->fragmentProgressUpdate(m_engine->getFragContext().currentIndexInBatch,
-                        m_engine->getFragContext().currentExecutor,
-                        m_engine->getFragContext().currentTable,
-                        m_engine->getFragContext().currentTableSize,
-                        m_foundNextValues)){
-                    VOLT_ERROR("Time out read only query.");
-                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "Time out read only query.");
-                }
-            }
-        }
-    }
-
     virtual bool hasKey(const TableTuple *searchKey) = 0;
 
     /**
@@ -447,6 +422,10 @@ public:
     const std::string& getName() const
     {
         return m_scheme.name;
+    }
+
+    int getFoundNextValues() {
+        return m_foundNextValues;
     }
 
     void rename(std::string name) {

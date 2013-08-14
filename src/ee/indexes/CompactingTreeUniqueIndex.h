@@ -188,7 +188,6 @@ class CompactingTreeUniqueIndex : public TableIndex
 
     TableTuple nextValue()
     {
-        checkFoundNextValues();
         TableTuple retval(getTupleSchema());
 
         if (! m_keyIter.isEnd()) {
@@ -206,7 +205,6 @@ class CompactingTreeUniqueIndex : public TableIndex
 
     TableTuple nextValueAtKey()
     {
-        checkFoundNextValues();
         TableTuple retval = m_match;
         m_match.move(NULL);
 
@@ -216,7 +214,6 @@ class CompactingTreeUniqueIndex : public TableIndex
 
     bool advanceToNextKey()
     {
-        checkFoundNextValues();
         if (m_forward) {
             m_keyIter.moveNext();
         } else {

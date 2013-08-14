@@ -119,7 +119,7 @@ class AbstractExecutor {
     /**
      * Set up statistics for long running operations thru m_engine
      */
-    void setStatsForLongOp();
+    void setStatsForLongOp(TableIterator it);
 
     // execution engine owns the plannode allocation.
     AbstractPlanNode* m_abstractNode;
@@ -156,11 +156,18 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
 /**
  * Set up statistics for long running operations thru m_engine
  */
-inline void AbstractExecutor::setStatsForLongOp() {
-    if(m_engine->isPrepareStatsForLongOp()) {
-        m_engine->setFragContext(planNodeToString(m_abstractNode->getPlanNodeType()),
-                "None", 0);
-        m_engine->setPrepareStatsForLongOp(false);
+inline void AbstractExecutor::setStatsForLongOp(TableIterator it) {
+    int foundTuples = it.getFoundTuples();
+    if(foundTuples % LONG_OP_THRESHOLD == 0) {
+        //Update stats in java and let java determine if we should cancel this query.
+        if(m_engine->getTopend()->fragmentProgressUpdate(m_engine->getIndexInBatch(),
+                planNodeToString(m_abstractNode->getPlanNodeType()),
+                "None",
+                0,
+                foundTuples)){
+            VOLT_ERROR("Time out read only query.");
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "Time out read only query.");
+        }
     }
 }
 

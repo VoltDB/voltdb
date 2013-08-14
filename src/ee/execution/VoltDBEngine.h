@@ -173,31 +173,15 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         inline int getUsedParamcnt() const { return m_usedParamcnt;}
         inline void setUsedParamcnt(int usedParamcnt) { m_usedParamcnt = usedParamcnt;}
 
-        // ------------------------------------------------------------------
-        // FragContextMetadata: meta data of the current executor
-        // ------------------------------------------------------------------
-        struct FragContextMetadata {
-            /** index of the batch piece being executed */
-            int currentIndexInBatch;
-            std::string currentExecutor;
-            std::string currentTable;
-            int64_t currentTableSize;
-        };
+        /** index of the batch piece being executed */
+        int m_currentIndexInBatch;
 
         inline void setIndexInBatch(int indexInBatch) {
-            m_fragContext.currentIndexInBatch = indexInBatch;
+            m_currentIndexInBatch = indexInBatch;
         }
-        inline void setFragContext(std::string executorName, std::string tableName, int64_t tableSize) {
-            m_fragContext.currentExecutor = executorName;
-            m_fragContext.currentTable = tableName;
-            m_fragContext.currentTableSize = tableSize;
+        inline int getIndexInBatch() {
+            return m_currentIndexInBatch;
         }
-        inline FragContextMetadata getFragContext() {
-            return m_fragContext;
-        }
-
-        inline void setPrepareStatsForLongOp(bool prepareStats) {m_prepareStatsForLongOp = prepareStats;}
-        inline bool isPrepareStatsForLongOp() {return m_prepareStatsForLongOp;}
 
         // Created to transition existing unit tests to context abstraction.
         // If using this somewhere new, consider if you're being lazy.
@@ -549,11 +533,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         NValueArray m_staticParams;
         /** TODO : should be passed as execute() parameter..*/
         int m_usedParamcnt;
-
-        /** context struct for the current executing executor*/
-        FragContextMetadata m_fragContext;
-        /** indicates if it's time to gather statistics for the current executing executor. set when approaching long op reporting threshold*/
-        bool m_prepareStatsForLongOp;
 
         /** buffer object for result tables. set when the result table is sent out to localsite. */
         FallbackSerializeOutput m_resultOutput;
