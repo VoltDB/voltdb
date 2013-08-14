@@ -220,9 +220,10 @@ public class TarFileInputStream {
                                 requiredBytes - bytesSoFar);
 
             if (i < 0) {
-                throw new EOFException(
+                return;
+                /*throw new EOFException(
                     RB.singleton.getString(
-                        RB.DECOMPRESS_RANOUT, bytesSoFar, requiredBytes));
+                        RB.DECOMPRESS_RANOUT, bytesSoFar, requiredBytes));*/
             }
 
             bytesRead  += i;
