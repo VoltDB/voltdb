@@ -133,8 +133,8 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
 
     // determine which indices are updated by this executor
     // iterate through all target table indices and see if they contain
-    //  tables mutated by this executor
-    std::vector<TableIndex*> allIndexes = m_targetTable->allIndexes();
+    // columns mutated by this executor
+    const std::vector<TableIndex*>& allIndexes = m_targetTable->allIndexes();
     BOOST_FOREACH(TableIndex *index, allIndexes) {
         bool indexKeyUpdated = false;
         BOOST_FOREACH(int colIndex, index->getColumnIndices()) {

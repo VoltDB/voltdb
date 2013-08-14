@@ -207,8 +207,8 @@ void ExecutionEngineTest::compareTables(Table *first, Table *second) {
     ASSERT_TRUE(first->databaseId() == second->databaseId());
     ASSERT_TRUE(first->name() == second->name());
     ASSERT_TRUE(first->tableType() == second->tableType());
-    vector<TableIndex*> firstAllIndexes = first->allIndexes();
-    vector<TableIndex*> secondAllIndexes = second->allIndexes();
+    const vector<TableIndex*> & firstAllIndexes = first->allIndexes();
+    const vector<TableIndex*> & secondAllIndexes = second->allIndexes();
     ASSERT_TRUE(firstAllIndexes.size() == secondAllIndexes.size());
     for (size_t ii = 0; ii < firstAllIndexes.size(); ii++) {
         ASSERT_TRUE(firstAllIndexes[ii]->equals(secondAllIndexes[ii]));

@@ -195,6 +195,13 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     void insertPersistentTuple(TableTuple &source, bool fallible);
 
+    /// This is not used in any production code path -- it is a convenient wrapper used by tests.
+    bool updateTuple(TableTuple &targetTupleToUpdate, TableTuple &sourceTupleWithNewValues)
+    {
+        updateTupleWithSpecificIndexes(targetTupleToUpdate, sourceTupleWithNewValues, m_indexes, true);
+        return true;
+    }
+
     /*
      * Lookup the address of the tuple that is identical to the specified tuple.
      * Does a primary key lookup or table scan if necessary.
