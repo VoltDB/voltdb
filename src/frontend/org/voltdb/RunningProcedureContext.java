@@ -19,5 +19,7 @@ package org.voltdb;
 
 public class RunningProcedureContext {
     public String m_procedureName;
+    public short m_voltExecuteSQLIndex = 0;
+    public short m_batchIndexBase = 0;
     //public List<QueuedSQL> m_batch;
 }

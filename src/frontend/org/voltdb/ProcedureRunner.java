@@ -572,6 +572,7 @@ public class ProcedureRunner {
             int batchSize = m_batch.size();
 
             m_rProcContext.m_procedureName = this.m_procedureName;
+            m_rProcContext.m_voltExecuteSQLIndex++;
 
             // if batch is small (or reasonable size), do it in one go
             if (batchSize <= MAX_BATCH_SIZE) {
@@ -598,6 +599,7 @@ public class ProcedureRunner {
                     //  this means subBatch will be empty after running and since subBatch is a
                     //  view on the larger batch, it removes subBatch.size() elements from m_batch.
                     results.add(executeQueriesInABatch(subBatch, finalSubBatch));
+                    m_rProcContext.m_batchIndexBase += subSize;
                 }
 
                 // merge the list of lists into something returnable
@@ -1178,7 +1180,7 @@ public class ProcedureRunner {
                                           state.m_localFragsAreNonTransactional && finalTask);
 
        if (!state.m_distributedTask.isEmpty()) {
-           state.m_distributedTask.setProcName(m_procedureName);
+           state.m_distributedTask.setRunningProcedureContext(m_procedureName, m_rProcContext.m_voltExecuteSQLIndex, m_rProcContext.m_batchIndexBase);
            m_txnState.createAllParticipatingFragmentWork(state.m_distributedTask);
        }
 
