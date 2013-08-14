@@ -68,7 +68,7 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
         assert(streamPtr != NULL);
         found = streamPtr->m_streamType == streamType;
         if (found) {
-            if (streamPtr->m_context->handleReactivation(streamType)) {
+            if (streamPtr->m_context->handleActivation(streamType, true)) {
                 m_streams.push_back(streamPtr);
             }
             else {
@@ -111,7 +111,7 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                 default:
                     assert(false);
             }
-            if (context->handleActivation(streamType)) {
+            if (context->handleActivation(streamType, false)) {
                 // Activation was accepted by the new context. Attach it to a stream.
                 m_streams.push_back(StreamPtr(new Stream(streamType, context)));
             }

@@ -39,13 +39,6 @@ ElasticIndexReadContext::ElasticIndexReadContext(
     m_range(parseHashRange(predicateStrings)),   // throws on error
     m_wrappedAround(false)
 {
-    // Make sure the index is available and complete.
-    if (!m_surgeon.hasIndex()) {
-        throwFatalException("Attempted to create ElasticIndexReadContext with no index available.");
-    }
-    if (!m_surgeon.isIndexingComplete()) {
-        throwFatalException("Attempted to create ElasticIndexReadContext before indexing was completed.");
-    }
     // Initialize the iterator to start from the range lower bounds or higher.
     m_iter = m_surgeon.indexIterator(m_range.m_from);
     if (m_iter == m_surgeon.indexEnd()) {
@@ -65,8 +58,12 @@ ElasticIndexReadContext::~ElasticIndexReadContext()
 /**
  * Activation handler.
  */
-bool ElasticIndexReadContext::handleActivation(TableStreamType streamType)
+bool ElasticIndexReadContext::handleActivation(TableStreamType streamType, bool reactivate)
 {
+    // Reactivation is not supported.
+    if (reactivate) {
+        return false;
+    }
     if (!m_surgeon.hasIndex() || !m_surgeon.isIndexingComplete()) {
         VOLT_ERROR("Elastic index consumption is not allowed until index generation completes.");
         return false;

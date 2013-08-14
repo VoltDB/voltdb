@@ -48,7 +48,7 @@ public:
     /**
      * Activation handler.
      */
-    virtual bool handleActivation(TableStreamType streamType);
+    virtual bool handleActivation(TableStreamType streamType, bool reactivate);
 
     /**
      * Mandatory TableStreamContext override.
@@ -72,9 +72,10 @@ private:
     /**
      * Hash range for filtering.
      * The range specification is exclusive, specifically:
-     *  from=to => all values
-     *  from<to => from..to-1 or from..maximum if to=0
-     *  from>to => from..maximum and 0..to (wrap around)
+     *  from < to:
+     *      from..to-1
+     *  from >= to:
+     *      from..max_int and min_int..to-1 (wraps around)
      * All possible value pairs are valid.
      */
     class HashRange

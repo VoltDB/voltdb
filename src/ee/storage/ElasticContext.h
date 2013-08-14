@@ -47,14 +47,9 @@ public:
     virtual ~ElasticContext();
 
     /**
-     * Activation handler.
+     * Activation/reactivation handler.
      */
-    virtual bool handleActivation(TableStreamType streamType);
-
-    /**
-     * Reactivation handler.
-     */
-    virtual bool handleReactivation(TableStreamType streamType);
+    virtual bool handleActivation(TableStreamType streamType, bool reactivate);
 
     /**
      * Deactivation handler.
@@ -108,7 +103,7 @@ private:
     }
 
     /**
-     * Scanner for retrieveing rows.
+     * Scanner for retrieving rows.
      */
     ElasticScanner m_scanner;
 

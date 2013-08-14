@@ -118,6 +118,7 @@ public:
     bool indexHas(TableTuple &tuple) const;
     bool indexAdd(TableTuple &tuple);
     bool indexRemove(TableTuple &tuple);
+    bool hasStreamType(TableStreamType streamType) const;
     ElasticIndex::iterator indexIterator();
     ElasticIndex::iterator indexIterator(int64_t lowerBound);
     ElasticIndex::const_iterator indexIterator() const;
@@ -592,6 +593,10 @@ inline ElasticIndex::iterator PersistentTableSurgeon::indexEnd() {
 inline ElasticIndex::const_iterator PersistentTableSurgeon::indexEnd() const {
     assert (m_index != NULL);
     return m_index->end();
+}
+
+inline bool PersistentTableSurgeon::hasStreamType(TableStreamType streamType) const {
+    return m_table.m_tableStreamer->hasStreamType(streamType);
 }
 
 inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {

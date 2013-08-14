@@ -53,20 +53,11 @@ public:
     /**
      * Optional activation handler.
      *  Called after creating the context to see if activation is allowed.
-     *  Return true if activation is allowed. (default=true)
+     *  Return true if (re)activation is allowed.
+     *      default is true for activation and false for reactivation.
      */
-    virtual bool handleActivation(TableStreamType streamType) {
-        return true;
-    }
-
-    /**
-     * Optional reactivation handler.
-     *  Called during activation when the stream already exists.
-     *  Return true if reactivation is allowed. (default=false)
-     */
-    virtual bool handleReactivation(TableStreamType streamType) {
-        VOLT_ERROR("Not allowed to reactivate stream type %d", static_cast<int>(streamType));
-        return false;
+    virtual bool handleActivation(TableStreamType streamType, bool reactivate) {
+        return !reactivate;
     }
 
     /**

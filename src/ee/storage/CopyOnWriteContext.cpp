@@ -62,6 +62,23 @@ CopyOnWriteContext::CopyOnWriteContext(
 CopyOnWriteContext::~CopyOnWriteContext()
 {}
 
+
+/**
+ * Activation handler.
+ */
+bool CopyOnWriteContext::handleActivation(TableStreamType streamType, bool reactivate)
+{
+    // Reactivation is not allowed, but rejecting it isn't a failure.
+    if (reactivate) {
+        return false;
+    }
+    if (m_surgeon.hasIndex() && !m_surgeon.isIndexingComplete()) {
+        VOLT_ERROR("COW context activation is not allowed while elastic indexing is in progress.");
+        return false;
+    }
+    return true;
+}
+
 /*
  * Serialize to multiple output streams.
  * Return remaining tuple count, 0 if done, or -1 on error.

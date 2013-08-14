@@ -41,27 +41,17 @@ ElasticContext::~ElasticContext()
 {}
 
 /**
- * Activation handler.
+ * Activation/reactivation handler.
  */
-bool ElasticContext::handleActivation(TableStreamType streamType)
+bool ElasticContext::handleActivation(TableStreamType streamType, bool reactivate)
 {
+    if (m_surgeon.hasStreamType(TABLE_STREAM_SNAPSHOT)) {
+        VOLT_ERROR("Elastic context activation is not allowed while a snapshot is in progress.");
+        return false;
+    }
     // Don't allow activation if there's an existing index.
     if (m_surgeon.hasIndex()) {
         VOLT_ERROR("Elastic context activation is not allowed while an index is "
-                   "present that has not been completely consumed.");
-        return false;
-    }
-    m_surgeon.createIndex();
-    return true;
-}
-
-/**
- * Reactivation handler.
- */
-bool ElasticContext::handleReactivation(TableStreamType streamType)
-{
-    if (m_surgeon.hasIndex()) {
-        VOLT_ERROR("Elastic context reactivation is not allowed while an index is "
                    "present that has not been completely consumed.");
         return false;
     }

@@ -1553,7 +1553,7 @@ public:
                                 std::vector<std::string> &predicateStrings) {
         m_context.reset(new ElasticContext(*m_test.m_table, surgeon, m_partitionId,
                                            tupleSerializer, m_predicateStrings));
-        return m_context->handleActivation(streamType);
+        return m_context->handleActivation(streamType, false);
     }
 
     virtual int64_t streamMore(TupleOutputStreamProcessor &outputStreams,
