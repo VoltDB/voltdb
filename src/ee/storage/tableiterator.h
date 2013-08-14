@@ -89,6 +89,7 @@ private:
     TableIterator(Table *, TBMapI);
     TableIterator(Table *, std::vector<TBPtr>::iterator);
 
+
     bool persistentNext(TableTuple &out);
     bool tempNext(TableTuple &out);
 
@@ -133,6 +134,7 @@ inline TableIterator::TableIterator(Table *parent, std::vector<TBPtr>::iterator 
       m_tempTableIterator(true)
     {
     }
+
 
 inline TableIterator::TableIterator(Table *parent, TBMapI start)
     :
@@ -262,4 +264,5 @@ inline int TableIterator::getLocation() const {
 }
 
 }
+
 #endif
