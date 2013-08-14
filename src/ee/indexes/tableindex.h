@@ -472,6 +472,7 @@ protected:
     int m_inserts;
     int m_deletes;
     int m_updates;
+    int m_foundNextValues;
 
     // stats
     IndexStats m_stats;
