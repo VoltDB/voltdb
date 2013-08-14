@@ -30,6 +30,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 import org.hsqldb_voltpatches.lib.tar.TarGenerator;
 import org.hsqldb_voltpatches.lib.tar.TarMalformatException;
@@ -387,7 +389,13 @@ public class Collector {
     private static boolean getUserResponse(String prompt) {
         while (true) {
             System.out.print(prompt + " [y/n]? ");
-            switch (System.console().readLine().charAt(0)) {
+            String response = System.console().readLine();
+
+            if (response.isEmpty()) {
+                continue;
+            }
+
+            switch (response.charAt(0)) {
             case 'Y':
             case 'y':
                 return true;
@@ -422,23 +430,12 @@ public class Collector {
     }
 
     public static boolean uploadToServer(String collectionFilePath, String host, String username, String password) throws Exception {
+        attemptConnect(host, username, password);
+
         SSHTools ssh = new SSHTools(username, null);
 
-        SFTPSession sftp = null;
-        String rootpath = null;
-        try {
-            sftp = ssh.getSftpSession(username, password, null, host, null);
-            rootpath = sftp.exec("pwd").trim();
-        } catch (SFTPException e) {
-            String errorMsg = e.getCause().getMessage();
-
-            if (errorMsg.equals("Auth cancel")) {
-                // "Auth cancel" appears when username doesn't exist or password is wrong
-                throw new Exception("Authorization failed, check username and password");
-            } else {
-                throw new Exception(errorMsg);
-            }
-        }
+        SFTPSession sftp = ssh.getSftpSession(username, password, null, host, null);
+        String rootpath = sftp.exec("pwd").trim();
 
         HashMap<File, File> files = new HashMap<File, File>();
         File src = new File(collectionFilePath);
@@ -455,5 +452,44 @@ public class Collector {
         }
 
         return true;
+    }
+
+    public static void attemptConnect(String host, String username, String password) throws Exception {
+        SSHTools ssh = new SSHTools(username, null);
+
+        try {
+            ssh.getSftpSession(username, password, null, host, null);
+        } catch (SFTPException e) {
+            String errorMsg = e.getCause().getMessage();
+
+            /*
+             * e.getCause() is JSchException and the java exception class name only appears in message
+             * hide java class name and extract error message
+             */
+            Pattern pattern = Pattern.compile("(?<ExceptionClass>java.*Exception: )(?<Message>.*)");
+            Matcher matcher = pattern.matcher(errorMsg);
+
+            if (matcher.matches()) {
+                if (errorMsg.startsWith("java.net.UnknownHostException")) {
+                    throw new Exception("Unknown host: " + matcher.group("Message"));
+                }
+                else {
+                    throw new Exception(matcher.group("Message"));
+                }
+            }
+            else {
+                if (errorMsg.equals("Auth cancel")) {
+                    // "Auth cancel" appears when username doesn't exist or password is wrong
+                    throw new Exception("Authorization rejected");
+                }
+                else {
+                    throw new Exception(errorMsg.substring(0, 1).toUpperCase() + errorMsg.substring(1));
+                }
+            }
+        } catch (Exception e) {
+            String errorMsg = e.getMessage();
+
+            throw new Exception(errorMsg.substring(0, 1).toUpperCase() + errorMsg.substring(1));
+        }
     }
 }
