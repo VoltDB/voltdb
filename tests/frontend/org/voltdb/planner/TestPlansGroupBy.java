@@ -189,6 +189,28 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkHasComplexAgg(pns);
     }
 
+
+    public void testUnOptimizedAVG() {
+        pns = compileToFragments("SELECT AVG(A1) FROM R1");
+        assertTrue(pns.size() == 1);
+        AbstractPlanNode p = pns.get(0).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+
+        pns = compileToFragments("SELECT A1, AVG(PKEY) FROM R1 GROUP BY A1");
+        assertTrue(pns.size() == 1);
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+
+        pns = compileToFragments("SELECT A1, AVG(PKEY)+1 FROM R1 GROUP BY A1");
+        assertTrue(pns.size() == 1);
+        p = pns.get(0).getChild(0);
+        assertTrue(p instanceof ProjectionPlanNode);
+        assertTrue(p.getChild(0) instanceof AggregatePlanNode);
+        assertTrue(p.getChild(0).getChild(0) instanceof AbstractScanPlanNode);
+    }
+
     public void testOptimizedAVG() {
         pns = compileToFragments("SELECT AVG(A1) FROM P1");
         checkHasComplexAgg(pns);
