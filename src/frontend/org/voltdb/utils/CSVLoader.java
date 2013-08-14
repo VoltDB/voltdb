@@ -186,7 +186,6 @@ public class CSVLoader {
         boolean ping = false;
         @Option(desc = "Use DoNothingProcedure which does full round trip but no transaction.")
         boolean dnp = false;
-        @Option(desc = "Stream file to procedure")
         @AdditionalArgs(desc = "insert the data into database by TABLENAME.insert procedure by default")
         String table = "";
 
