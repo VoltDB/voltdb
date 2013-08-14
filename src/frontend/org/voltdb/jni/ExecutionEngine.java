@@ -321,13 +321,20 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         long duration = currentTime - m_startTime;
         if(duration > m_logDuration) {
             VoltLogger log = new VoltLogger("CONSOLE");
-            log.info("Long running operation");
-            log.info("[Proc:"+m_rProcContext.m_procedureName+"]"
-                    +"["+"Executor:"+planNodeName+"]"
-                    +"["+"Target table(size):"+lastAccessedTable+"("+lastAccessedTableSize+")"+"]"
-                    +"["+"Tuples processed:"+tuplesFound+"]"
-                    +"["+"Batch index:"+batchIndex+"]"
-                    );
+            log.info("Procedure "+m_rProcContext.m_procedureName+" is taking a long time to execute. Current statistics:");
+            log.info("Execution time: "+duration/1000.0+"s");
+            log.info("Current statement being executed: Statement {sub-index} in Queue {index}");
+            log.info("Current plan fragment: "+planNodeName);
+            log.info("Last table accessed: "+lastAccessedTable+", "+lastAccessedTableSize+" tuples");
+            log.info("Total tuples accessed: "+tuplesFound);
+
+//            log.info("Long running operation");
+//            log.info("[Proc:"+m_rProcContext.m_procedureName+"]"
+//                    +"["+"Executor:"+planNodeName+"]"
+//                    +"["+"Target table(size):"+lastAccessedTable+"("+lastAccessedTableSize+")"+"]"
+//                    +"["+"Tuples processed:"+tuplesFound+"]"
+//                    +"["+"Batch index:"+batchIndex+"]"
+//                    );
             m_logDuration = (m_logDuration < 30000) ? 2*m_logDuration : 30000;
         }
         //Set timer and time out read only queries.
