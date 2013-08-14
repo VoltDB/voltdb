@@ -30,7 +30,6 @@ import java.util.logging.Logger;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.BackendTarget;
-import org.voltdb.FragmentPlanSource;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
@@ -520,9 +519,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final BackendTarget target,
             final int port,
             final HashinatorType type,
-            final byte config[],
-            FragmentPlanSource planSource) {
-        super(siteId, partitionId, planSource);
+            final byte config[]) {
+        super(siteId, partitionId);
 
         // m_counter = 0;
         m_clusterIndex = clusterIndex;

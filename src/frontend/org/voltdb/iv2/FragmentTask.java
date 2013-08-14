@@ -33,6 +33,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
@@ -205,11 +206,11 @@ public class FragmentTask extends TransactionTask
 
                 // if custom fragment, load the plan and get local fragment id
                 if (fragmentPlan != null) {
-                    fragmentId = siteConnection.loadOrAddRefPlanFragment(planHash, fragmentPlan);
+                    fragmentId = ActivePlanRepository.loadOrAddRefPlanFragment(planHash, fragmentPlan);
                 }
                 // otherwise ask the plan source for a local fragment id
                 else {
-                    fragmentId = siteConnection.getFragmentIdForPlanHash(planHash);
+                    fragmentId = ActivePlanRepository.getFragmentIdForPlanHash(planHash);
                 }
 
                 dependency = siteConnection.executePlanFragments(
@@ -239,7 +240,7 @@ public class FragmentTask extends TransactionTask
             finally {
                 // ensure adhoc plans are unloaded
                 if (fragmentPlan != null) {
-                    siteConnection.decrefPlanFragmentById(fragmentId);
+                    ActivePlanRepository.decrefPlanFragmentById(fragmentId);
                 }
             }
         }
