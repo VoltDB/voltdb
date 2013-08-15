@@ -48,7 +48,6 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
-import org.voltdb.jni.ExecutionEngine;
 
 public class MpRoSite implements Runnable, SiteProcedureConnection
 {
