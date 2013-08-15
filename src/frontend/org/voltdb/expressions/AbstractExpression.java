@@ -606,9 +606,9 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (getExpressionType() == ExpressionType.AGGREGATE_AVG) {
             AbstractExpression child = getLeft();
             AbstractExpression left = new AggregateExpression(ExpressionType.AGGREGATE_SUM);
-            left.setLeft(child);
+            left.setLeft((AbstractExpression) child.clone());
             AbstractExpression right = new AggregateExpression(ExpressionType.AGGREGATE_COUNT);
-            right.setLeft(child);
+            right.setLeft((AbstractExpression) child.clone());
 
             return new OperatorExpression(ExpressionType.OPERATOR_DIVIDE, left, right);
         }

@@ -101,18 +101,13 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         @Override
         public ParsedColInfo clone() {
-            ParsedColInfo col = new ParsedColInfo();
+            ParsedColInfo col = null;
+            try {
+                col = (ParsedColInfo) super.clone();
+            } catch (CloneNotSupportedException e) {
+                e.printStackTrace();
+            }
             col.expression = (AbstractExpression) expression.clone();
-            col.tableName = tableName;
-            col.columnName = columnName;
-            col.alias = alias;
-            col.index = index;
-            col.size = size;
-            col.orderBy= orderBy;
-            col.ascending = ascending;
-            col.groupBy = groupBy;
-            col.finalOutput = finalOutput;
-
             return col;
         }
     }
@@ -125,11 +120,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     // It may has the consistent element order as the displayColumns
     public ArrayList<ParsedColInfo> aggResultColumns = new ArrayList<ParsedColInfo>();
     public Map<String, AbstractExpression> groupByExpressions = null;
-    private ArrayList<ParsedColInfo> optimalDisplayColumns = null;
-    private ArrayList<ParsedColInfo> optimalAggResultColumns = null;
-    private ArrayList<ParsedColInfo> optimalOrderColumns = null;
-    private NodeSchema optimalNewAggSchema;
     private NodeSchema newAggSchema;
+
+    private ArrayList<ParsedColInfo> avgPushdownDisplayColumns = null;
+    private ArrayList<ParsedColInfo> avgPushdownAggResultColumns = null;
+    private ArrayList<ParsedColInfo> avgPushdownOrderColumns = null;
+    private NodeSchema avgPushdownNewAggSchema;
 
     public long limit = -1;
     public long offset = 0;
@@ -140,7 +136,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private boolean hasComplexGroupby = false;
     private boolean hasAggregateExpression = false;
     private boolean hasAverage = false;
-    private boolean isDistributed = false;
 
     /**
     * Class constructor
@@ -186,16 +181,16 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // We want to extract display first, groupBy second before processing orderBy
         // Because groupBy and orderBy need display columns to tag its columns
         // OrderBy needs groupBy columns to stop recursively finding TVEs for pass-through columns.
-        if (displayElement != null) {
-            parseDisplayColumns(displayElement);
-        }
+        assert(displayElement != null);
+        parseDisplayColumns(displayElement, false);
+
         if (groupbyElement != null) {
             parseGroupByColumns(groupbyElement);
             insertToAggResultColumns(groupByColumns);
         }
 
         if (orderbyElement != null) {
-            parseOrderColumns(orderbyElement);
+            parseOrderColumns(orderbyElement, false);
         }
         // At this point, we have collected all aggregations in the select statement.
         // We do not need aggregationList container in parseXMLtree
@@ -210,63 +205,40 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         placeTVEsinColumns();
 
         // We are going to guess whether we will need optimization for AVG or not
-        if (hasAverage()) {
-            ArrayList<ParsedColInfo> tmpDisplayColumns = new ArrayList<ParsedColInfo>();
-            ArrayList<ParsedColInfo> tmpAggResultColumns = new ArrayList<ParsedColInfo>();
-            ArrayList<ParsedColInfo> tmpOrderColumns = new ArrayList<ParsedColInfo>();
+        if (mayNeedAvgPushdown()) {
+            ArrayList<ParsedColInfo> tmpDisplayColumns = displayColumns;
+            displayColumns = new ArrayList<ParsedColInfo>();
+            ArrayList<ParsedColInfo> tmpAggResultColumns = aggResultColumns;
+            aggResultColumns = new ArrayList<ParsedColInfo>();
+            ArrayList<ParsedColInfo> tmpOrderColumns = orderColumns;
+            orderColumns = new ArrayList<ParsedColInfo>();
+
             NodeSchema tmpNodeSchema = null;
             boolean tmpHasComplexAgg = hasComplexAgg();
-            for (ParsedColInfo col: displayColumns) {
-                tmpDisplayColumns.add(col.clone());
-            }
-            for (ParsedColInfo col: aggResultColumns) {
-                tmpAggResultColumns.add(col.clone());
-            }
-            for (ParsedColInfo col: orderColumns) {
-                tmpOrderColumns.add(col.clone());
-            }
-            if (hasComplexAgg()) {
-                tmpNodeSchema = newAggSchema.clone();
-            } else {
-                aggResultColumns = new ArrayList<ParsedColInfo>();
-            }
-            displayColumns.clear();
-            aggResultColumns.clear();
-            orderColumns.clear();
 
-            // Guess it right now. Remove this block when we can know it early
-            isDistributed = true;
-            if (aggregationList == null) {
-                aggregationList = new ArrayList<AbstractExpression>();
+            if (hasComplexAgg()) {
+                tmpNodeSchema = newAggSchema;
             }
-            if (displayElement != null) {
-                parseDisplayColumns(displayElement);
-            }
+            // Prepare for the AVG push-down optimization only if it might be required.
+            aggregationList = new ArrayList<AbstractExpression>();
+            assert(displayElement != null);
+            parseDisplayColumns(displayElement, true);
+
             if (groupbyElement != null) {
                 insertToAggResultColumns(groupByColumns);
             }
             if (orderbyElement != null) {
-                parseOrderColumns(orderbyElement);
+                parseOrderColumns(orderbyElement, true);
             }
             aggregationList = null;
             fillUpAggResultColumns();
             placeTVEsinColumns();
 
             // Switch them back
-            optimalDisplayColumns = new ArrayList<ParsedSelectStmt.ParsedColInfo>();
-            optimalAggResultColumns = new ArrayList<ParsedSelectStmt.ParsedColInfo>();
-            optimalOrderColumns = new ArrayList<ParsedSelectStmt.ParsedColInfo>();
-            for (ParsedColInfo col: displayColumns) {
-                optimalDisplayColumns.add(col.clone());
-            }
-            for (ParsedColInfo col: aggResultColumns) {
-                optimalAggResultColumns.add(col.clone());
-            }
-            for (ParsedColInfo col: orderColumns) {
-                optimalOrderColumns.add(col.clone());
-            }
-
-            optimalNewAggSchema = newAggSchema.clone();
+            avgPushdownDisplayColumns = displayColumns;
+            avgPushdownAggResultColumns = aggResultColumns;
+            avgPushdownOrderColumns = orderColumns;
+            avgPushdownNewAggSchema = newAggSchema;
 
             displayColumns = tmpDisplayColumns;
             aggResultColumns = tmpAggResultColumns;
@@ -277,10 +249,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     public void switchOptimalSuite () {
-        displayColumns = optimalDisplayColumns;
-        aggResultColumns = optimalAggResultColumns;
-        orderColumns = optimalOrderColumns;
-        newAggSchema = optimalNewAggSchema;
+        displayColumns = avgPushdownDisplayColumns;
+        aggResultColumns = avgPushdownAggResultColumns;
+        orderColumns = avgPushdownOrderColumns;
+        newAggSchema = avgPushdownNewAggSchema;
         hasComplexAgg = true;
     }
 
@@ -436,40 +408,31 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      * @param cookedCol
      */
     private void insertAggExpressionsToAggResultColumns (List<AbstractExpression> aggColumns, ParsedColInfo cookedCol) {
-        // Why IF ELSE, because AggResultColumn care about its alias,tableName
-        if (aggColumns.size() == 1 && cookedCol.expression.equals(aggColumns.get(0))) {
+        for (AbstractExpression expr: aggColumns) {
             ParsedColInfo col = new ParsedColInfo();
-            col.expression = (AbstractExpression) aggColumns.get(0).clone();
+            col.expression = (AbstractExpression) expr.clone();
             assert(col.expression instanceof AggregateExpression);
-            if (!hasAverage() && col.expression.getExpressionType() == ExpressionType.AGGREGATE_AVG) {
+            if (col.expression.getExpressionType() == ExpressionType.AGGREGATE_AVG) {
                 hasAverage = true;
             }
-
-            col.alias = cookedCol.alias;
-            col.tableName = cookedCol.tableName;
-            col.columnName = cookedCol.columnName;
-            if (isNewtoAggResultColumn(col)) {
-                aggResultColumns.add(col);
-            }
-        } else if (aggColumns.size() != 0) {
-            // Try to check complexAggs earlier
-            hasComplexAgg = true;
-            for (AbstractExpression expr: aggColumns) {
-                ParsedColInfo col = new ParsedColInfo();
-                col.expression = (AbstractExpression) expr.clone();
-                assert(col.expression instanceof AggregateExpression);
-                ExpressionUtil.finalizeValueTypes(col.expression);
-                if (!hasAverage() && col.expression.getExpressionType() == ExpressionType.AGGREGATE_AVG) {
-                    hasAverage = true;
-                }
-
-                // Aggregation column use the the hacky stuff
-                col.tableName = "VOLT_TEMP_TABLE";
-                col.columnName = "";
+            if (aggColumns.size() == 1 && cookedCol.expression.equals(aggColumns.get(0))) {
+                col.alias = cookedCol.alias;
+                col.tableName = cookedCol.tableName;
+                col.columnName = cookedCol.columnName;
                 if (isNewtoAggResultColumn(col)) {
                     aggResultColumns.add(col);
                 }
+                return;
             }
+            // Try to check complexAggs earlier
+            hasComplexAgg = true;
+            // Aggregation column use the the hacky stuff
+            col.tableName = "VOLT_TEMP_TABLE";
+            col.columnName = "";
+            if (isNewtoAggResultColumn(col)) {
+                aggResultColumns.add(col);
+            }
+            ExpressionUtil.finalizeValueTypes(col.expression);
         }
     }
 
@@ -512,7 +475,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
-    private void updateAvgExprresions () {
+    private void updateAvgExpresions () {
         List<AbstractExpression> optimalAvgAggs = new ArrayList<AbstractExpression>();
         Iterator<AbstractExpression> itr = aggregationList.iterator();
         while(itr.hasNext()) {
@@ -533,7 +496,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         aggregationList.addAll(optimalAvgAggs);
     }
 
-    private void parseDisplayColumns(VoltXMLElement columnsNode) {
+    private void parseDisplayColumns(VoltXMLElement columnsNode, boolean isDistributed) {
         for (VoltXMLElement child : columnsNode.children) {
             ParsedColInfo col = new ParsedColInfo();
             aggregationList.clear();
@@ -544,7 +507,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             assert(col.expression != null);
             if (isDistributed) {
                 col.expression = col.expression.replaceAVG();
-                updateAvgExprresions();
+                updateAvgExpresions();
             }
             ExpressionUtil.finalizeValueTypes(col.expression);
 
@@ -623,13 +586,13 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         groupByColumns.add(groupbyCol);
     }
 
-    private void parseOrderColumns(VoltXMLElement columnsNode) {
+    private void parseOrderColumns(VoltXMLElement columnsNode, boolean isDistributed) {
         for (VoltXMLElement child : columnsNode.children) {
-            parseOrderColumn(child);
+            parseOrderColumn(child, isDistributed);
         }
     }
 
-    private void parseOrderColumn(VoltXMLElement orderByNode) {
+    private void parseOrderColumn(VoltXMLElement orderByNode, boolean isDistributed) {
         // make sure everything is kosher
         assert(orderByNode.name.equalsIgnoreCase("orderby"));
 
@@ -650,7 +613,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         assert(order_exp != null);
         if (isDistributed) {
             order_exp = order_exp.replaceAVG();
-            updateAvgExprresions();
+            updateAvgExpresions();
         }
         order_col.expression = order_exp;
         ExpressionUtil.finalizeValueTypes(order_col.expression);
@@ -757,7 +720,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return hasComplexAgg;
     }
 
-    public boolean hasAverage() {
+    public boolean mayNeedAvgPushdown() {
         return hasAverage;
     }
 
