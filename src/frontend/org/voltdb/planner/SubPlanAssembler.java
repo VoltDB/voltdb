@@ -559,6 +559,11 @@ public abstract class SubPlanAssembler {
             if (retval.use == IndexUseType.COVERING_UNIQUE_EQUALITY) {
                 retval.use = IndexUseType.INDEX_SCAN;
                 retval.lookupType = IndexLookupType.GTE;
+                // With no prefix key, the ee can do either a forward or reverse scan.
+                // When there is a prefix equality, descending order is not supported.
+                if (retval.sortDirection == SortDirectionType.DESC && retval.indexExprs.size() > 0) {
+                    retval.sortDirection = SortDirectionType.INVALID;
+                }
             }
             // GTE scans can have any number of null key components appended without changing
             // the effective value. So, that leaves GT scans.
@@ -576,8 +581,6 @@ public abstract class SubPlanAssembler {
                 //  - adding the GT condition as a special "initialExpr" post-condition
                 //    that disables itself as soon as it evaluates to true for any row
                 //    -- it would be expected to always evaluate to true after that.
-                // Restoring the original form of the filter to otherExprs simplifies later
-                // coverage checks that influence the form of parent joins (NLJ vs. NLIJ).
                 AbstractExpression comparator = startingBoundExpr.getOriginalFilter();
                 retval.otherExprs.add(comparator);
             }

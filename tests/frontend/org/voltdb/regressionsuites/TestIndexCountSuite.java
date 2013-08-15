@@ -944,12 +944,6 @@ public class TestIndexCountSuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlindex-ddl.sql"));
         project.addProcedures(PROCEDURES);
-        project.addPartitionInfo("TU1", "ID");
-        project.addPartitionInfo("TU2", "UNAME");
-        project.addPartitionInfo("TU3", "TEL");
-        project.addPartitionInfo("TU4", "UNAME");
-        project.addPartitionInfo("TM1", "ID");
-        project.addPartitionInfo("TM2", "UNAME");
 
         project.addStmtProcedure("TU1_LT",       "SELECT COUNT(*) FROM TU1 WHERE POINTS < ?");
         project.addStmtProcedure("TU1_LET",       "SELECT COUNT(*) FROM TU1 WHERE POINTS <= ?");

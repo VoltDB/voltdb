@@ -296,6 +296,9 @@ class NValue {
     /* Check if the value represents SQL NULL */
     bool isNull() const;
 
+    /* Check if the value represents IEEE 754 NaN */
+    bool isNaN() const;
+
     /* For boolean NValues, convert to bool */
     bool isTrue() const;
     bool isFalse() const;
@@ -311,7 +314,8 @@ class NValue {
 
     /* Evaluate the ordering relation against two NValues. Promotes
        exact types to allow disparate type comparison. See also the
-       op_ functions which return boolean NValues. */
+       op_ functions which return boolean NValues.
+     */
     int compare(const NValue rhs) const;
 
     /* Return a boolean NValue with the comparison result */
@@ -1558,54 +1562,55 @@ class NValue {
     }
 
     int compareDoubleValue (const NValue rhs) const {
+        const double lhsValue = getDouble();
+        double rhsValue;
+
         switch (rhs.getValueType()) {
-          case VALUE_TYPE_DOUBLE: {
-              const double lhsValue = getDouble();
-              const double rhsValue = rhs.getDouble();
-              if (lhsValue == rhsValue) {
-                  return VALUE_COMPARE_EQUAL;
-              } else if (lhsValue > rhsValue) {
-                  return VALUE_COMPARE_GREATERTHAN;
-              } else {
-                  return VALUE_COMPARE_LESSTHAN;
-              }
-          }
-          case VALUE_TYPE_TINYINT:
-          case VALUE_TYPE_SMALLINT:
-          case VALUE_TYPE_INTEGER:
-          case VALUE_TYPE_BIGINT:
-          case VALUE_TYPE_TIMESTAMP: {
-              const double lhsValue = getDouble();
-              const double rhsValue = rhs.castAsDouble().getDouble();
-              if (lhsValue == rhsValue) {
-                  return VALUE_COMPARE_EQUAL;
-              } else if (lhsValue > rhsValue) {
-                  return VALUE_COMPARE_GREATERTHAN;
-              } else {
-                  return VALUE_COMPARE_LESSTHAN;
-              }
-          }
-          case VALUE_TYPE_DECIMAL:
-          {
-              double val = rhs.castAsDoubleAndGetValue();
-              if (rhs.isNegative()) {
-                  val *= -1;
-              }
-              return ((getDouble() > val) - (getDouble() < val));
-          }
-          default:
-          {
-              char message[128];
-              snprintf(message, 128,
-                       "Type %s cannot be cast for comparison to type %s",
-                       valueToString(rhs.getValueType()).c_str(),
-                       valueToString(getValueType()).c_str());
-              throw SQLException(SQLException::
-                                 data_exception_most_specific_type_mismatch,
-                                 message);
-              // Not reached
-              return 0;
-          }
+            case VALUE_TYPE_DOUBLE:
+                rhsValue = rhs.getDouble();
+                break;
+            case VALUE_TYPE_TINYINT:
+            case VALUE_TYPE_SMALLINT:
+            case VALUE_TYPE_INTEGER:
+            case VALUE_TYPE_BIGINT:
+            case VALUE_TYPE_TIMESTAMP:
+                rhsValue = rhs.castAsDouble().getDouble();
+                break;
+            case VALUE_TYPE_DECIMAL:
+                rhsValue = rhs.castAsDoubleAndGetValue();
+                if (rhs.isNegative()) {
+                    rhsValue *= -1;
+                }
+                break;
+            default:
+                char message[128];
+                snprintf(message, 128,
+                         "Type %s cannot be cast for comparison to type %s",
+                         valueToString(rhs.getValueType()).c_str(),
+                         valueToString(getValueType()).c_str());
+                throw SQLException(SQLException::
+                                   data_exception_most_specific_type_mismatch,
+                                   message);
+                // Not reached
+                return 0;
+        }
+
+        // Treat NaN values as equals and also make them smaller than neagtive infinity.
+        // This breaks IEEE754 for expressions slightly.
+        if (std::isnan(lhsValue)) {
+            return std::isnan(rhsValue) ? VALUE_COMPARE_EQUAL : VALUE_COMPARE_LESSTHAN;
+        }
+        else if (std::isnan(rhsValue)) {
+            return VALUE_COMPARE_GREATERTHAN;
+        }
+        else if (lhsValue > rhsValue) {
+            return VALUE_COMPARE_GREATERTHAN;
+        }
+        else if (lhsValue < rhsValue) {
+            return VALUE_COMPARE_LESSTHAN;
+        }
+        else {
+            return VALUE_COMPARE_EQUAL;
         }
     }
 
@@ -2811,35 +2816,43 @@ inline void NValue::allocatePersistentObjectFromInlineValue()
 
 inline bool NValue::isNull() const {
     switch (getValueType()) {
-      case VALUE_TYPE_NULL:
-      case VALUE_TYPE_INVALID:
-        return true;
-      case VALUE_TYPE_TINYINT:
-        return getTinyInt() == INT8_NULL;
-      case VALUE_TYPE_SMALLINT:
-        return getSmallInt() == INT16_NULL;
-      case VALUE_TYPE_INTEGER:
-        return getInteger() == INT32_NULL;
-      case VALUE_TYPE_TIMESTAMP:
-      case VALUE_TYPE_BIGINT:
-        return getBigInt() == INT64_NULL;
-      case VALUE_TYPE_ADDRESS:
-        return *reinterpret_cast<void* const*>(m_data) == NULL;
-      case VALUE_TYPE_DOUBLE:
-        return getDouble() <= DOUBLE_NULL;
-      case VALUE_TYPE_VARCHAR:
-      case VALUE_TYPE_VARBINARY:
-        return *reinterpret_cast<void* const*>(m_data) == NULL ||
-          *reinterpret_cast<const int32_t*>(&m_data[8]) == OBJECTLENGTH_NULL;
-      case VALUE_TYPE_DECIMAL: {
-          TTInt min;
-          min.SetMin();
-          return getDecimal() == min;
-      }
-      default:
-          throwDynamicSQLException(
-                  "NValue::isNull() called with unknown ValueType '%s'",
-                  getValueTypeString().c_str());
+        case VALUE_TYPE_NULL:
+        case VALUE_TYPE_INVALID:
+            return true;
+        case VALUE_TYPE_TINYINT:
+            return getTinyInt() == INT8_NULL;
+        case VALUE_TYPE_SMALLINT:
+            return getSmallInt() == INT16_NULL;
+        case VALUE_TYPE_INTEGER:
+            return getInteger() == INT32_NULL;
+        case VALUE_TYPE_TIMESTAMP:
+        case VALUE_TYPE_BIGINT:
+            return getBigInt() == INT64_NULL;
+        case VALUE_TYPE_ADDRESS:
+            return *reinterpret_cast<void* const*>(m_data) == NULL;
+        case VALUE_TYPE_DOUBLE:
+            return getDouble() <= DOUBLE_NULL;
+        case VALUE_TYPE_VARCHAR:
+        case VALUE_TYPE_VARBINARY:
+            return *reinterpret_cast<void* const*>(m_data) == NULL ||
+            *reinterpret_cast<const int32_t*>(&m_data[8]) == OBJECTLENGTH_NULL;
+        case VALUE_TYPE_DECIMAL: {
+            TTInt min;
+            min.SetMin();
+            return getDecimal() == min;
+        }
+        case VALUE_TYPE_ARRAY:
+            return false;
+        default:
+            throwDynamicSQLException("NValue::isNull() called with unknown ValueType '%s'",
+                                     getValueTypeString().c_str());
+    }
+    return false;
+}
+
+inline bool NValue::isNaN() const {
+    if (getValueType() == VALUE_TYPE_DOUBLE) {
+        return std::isnan(getDouble());
     }
     return false;
 }

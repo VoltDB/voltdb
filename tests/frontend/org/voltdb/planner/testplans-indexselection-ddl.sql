@@ -25,3 +25,13 @@ create index idx_c on l (lname, a, b, id);
 create index idx_b on l (lname, b, id);
 create index idx_a on l (lname, a, id);
 
+CREATE TABLE a
+(
+    id BIGINT NOT NULL,
+    deleted TINYINT NOT NULL,
+    updated_date BIGINT NOT NULL,
+    CONSTRAINT id PRIMARY KEY (id)
+);
+
+CREATE INDEX deleted_since_idx ON a (deleted, updated_date, id);
+

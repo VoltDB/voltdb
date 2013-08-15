@@ -33,6 +33,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.AddPerson;
@@ -43,6 +44,7 @@ import org.voltdb_testprocs.regressionsuites.matviewprocs.DeletePerson;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.Eng798Insert;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.OverflowTest;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.SelectAllPeople;
+import org.voltdb_testprocs.regressionsuites.matviewprocs.TruncateMatViewDataMP;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.UpdatePerson;
 
 
@@ -52,15 +54,50 @@ public class TestMaterializedViewSuite extends RegressionSuite {
     static final Class<?>[] PROCEDURES = {
         AddPerson.class, DeletePerson.class, UpdatePerson.class, AggAges.class,
         SelectAllPeople.class, AggThings.class, AddThing.class, OverflowTest.class,
-        Eng798Insert.class
+        Eng798Insert.class, TruncateMatViewDataMP.class
     };
 
     public TestMaterializedViewSuite(String name) {
         super(name);
     }
 
-    public void testInsertSinglePartition() throws IOException, ProcCallException {
+    private void truncateBeforeTest(Client client) {
+        // TODO Auto-generated method stub
+        VoltTable[] results = null;
+        try {
+            results = client.callProcedure("TruncateMatViewDataMP").getResults();
+        } catch (NoConnectionsException e) {
+            e.printStackTrace();
+            fail("Unexpected:" + e);
+        } catch (IOException e) {
+            e.printStackTrace();
+            fail("Unexpected:" + e);
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+            fail("Unexpected:" + e);
+        }
+        int nStatement = 0;
+        for (VoltTable countTable : results) {
+            // System.out.println(countTable);
+            ++nStatement;
+            long count = countTable.asScalarLong();
+            assertEquals("COUNT statement " + nStatement + "/" + results.length + " should have found no undeleted rows.", 0, count);
+        }
+    }
+
+    public void testSinglePartition() throws IOException, ProcCallException
+    {
+        subtestInsertSinglePartition();
+        subtestDeleteSinglePartition();
+        subtestUpdateSinglePartition();
+        subtestSinglePartitionWithPredicates();
+    }
+
+
+    private void subtestInsertSinglePartition() throws IOException, ProcCallException
+    {
         Client client = getClient();
+        truncateBeforeTest(client);
         VoltTable[] results = null;
 
         results = client.callProcedure("AggAges", 1).getResults();
@@ -81,8 +118,10 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assert(results != null);
     }
 
-    public void testDeleteSinglePartition() throws IOException, ProcCallException {
+    private void subtestDeleteSinglePartition() throws IOException, ProcCallException
+    {
         Client client = getClient();
+        truncateBeforeTest(client);
         VoltTable[] results = null;
 
         results = client.callProcedure("AggAges", 1).getResults();
@@ -118,8 +157,10 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assert(results != null);
     }
 
-    public void testUpdateSinglePartition() throws IOException, ProcCallException {
+    private void subtestUpdateSinglePartition() throws IOException, ProcCallException
+    {
         Client client = getClient();
+        truncateBeforeTest(client);
         VoltTable[] results = null;
 
         results = client.callProcedure("AggAges", 1).getResults();
@@ -156,8 +197,10 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(3L, r2.getLong(4));
     }
 
-    public void testSinglePartitionWithPredicates() throws IOException, ProcCallException {
+    private void subtestSinglePartitionWithPredicates() throws IOException, ProcCallException
+    {
         Client client = getClient();
+        truncateBeforeTest(client);
         VoltTable[] results = null;
 
         results = client.callProcedure("AggAges", 1).getResults();
@@ -201,8 +244,18 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assert(results != null);
     }
 
-    public void testMultiPartitionSimple() throws IOException, ProcCallException {
+    public void testMPAndRegressions() throws IOException, ProcCallException
+    {
+        subtestMultiPartitionSimple();
+        subtestInsertReplicated();
+        subtestInsertAndOverflowSum();
+        subtestENG798();
+    }
+
+    private void subtestMultiPartitionSimple() throws IOException, ProcCallException
+    {
         Client client = getClient();
+        truncateBeforeTest(client);
         VoltTable[] results = null;
 
         results = client.callProcedure("AggAges", 1).getResults();
@@ -242,8 +295,10 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                    (results[0].getRowCount() == 4) || (results2[0].getRowCount() == 4));
     }
 
-    public void testInsertReplicated() throws IOException, ProcCallException {
+    private void subtestInsertReplicated() throws IOException, ProcCallException
+    {
         Client client = getClient();
+        truncateBeforeTest(client);
         VoltTable[] results = null;
 
         results = client.callProcedure("AggThings").getResults();
@@ -264,11 +319,13 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assert(results != null);
     }
 
-    public void testInsertAndOverflowSum() throws IOException, ProcCallException {
+    private void subtestInsertAndOverflowSum() throws IOException, ProcCallException
+    {
         if (isHSQL()) {
             return;
         }
         Client client = getClient();
+        truncateBeforeTest(client);
         int invocationIndex = 0;
         VoltTable[] results = client.callProcedure("OverflowTest", 0, 0, invocationIndex++).getResults();
         results = client.callProcedure("OverflowTest", 2, 0, invocationIndex++).getResults();
@@ -304,13 +361,15 @@ public class TestMaterializedViewSuite extends RegressionSuite {
     }
 
     /** Test a view that re-orders the source table's columns */
-    public void testENG798() throws Exception {
+    private void subtestENG798() throws IOException, ProcCallException
+    {
         if (isHSQL()) {
             return;
         }
 
         // this would throw on a bad cast in the broken case.
         Client client = getClient();
+        truncateBeforeTest(client);
         ClientResponse callProcedure = client.callProcedure("Eng798Insert", "clientname");
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
         assertTrue(callProcedure.getResults().length == 1);

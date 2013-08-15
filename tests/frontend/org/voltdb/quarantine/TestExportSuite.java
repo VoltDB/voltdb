@@ -339,7 +339,7 @@ public class TestExportSuite extends TestExportBase {
         quiesce(client);
 
         m_config.shutDown();
-        m_config.restartUp();
+        m_config.startUp(false);
 
         client = getClient();
 
@@ -486,7 +486,7 @@ public class TestExportSuite extends TestExportBase {
         client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte)1);
 
         m_config.shutDown();
-        m_config.restartUp();
+        m_config.startUp(false);
 
         client = getClient();
 
