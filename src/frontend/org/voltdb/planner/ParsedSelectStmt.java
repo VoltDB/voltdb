@@ -204,7 +204,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         placeTVEsinColumns();
 
-        // We are going to guess whether we will need optimization for AVG or not
+        // Prepare for the AVG push-down optimization only if it might be required.
         if (mayNeedAvgPushdown()) {
             ArrayList<ParsedColInfo> tmpDisplayColumns = displayColumns;
             displayColumns = new ArrayList<ParsedColInfo>();
@@ -219,7 +219,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (hasComplexAgg()) {
                 tmpNodeSchema = newAggSchema;
             }
-            // Prepare for the AVG push-down optimization only if it might be required.
+            
             aggregationList = new ArrayList<AbstractExpression>();
             assert(displayElement != null);
             parseDisplayColumns(displayElement, true);
