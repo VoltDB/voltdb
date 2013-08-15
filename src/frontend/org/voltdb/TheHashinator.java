@@ -23,6 +23,7 @@ import java.nio.ByteOrder;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 
@@ -93,10 +94,30 @@ public abstract class TheHashinator {
      */
     abstract public int pHashinateLong(long value);
     abstract public int pHashinateBytes(byte[] bytes);
+    abstract public long pGetConfigurationSignature();
     abstract public Pair<HashinatorType, byte[]> pGetCurrentConfig();
     abstract public Map<Long, Integer> pPredecessors(int partition);
     abstract public Pair<Long, Integer> pPredecessor(int partition, long token);
     abstract public Map<Long, Long> pGetRanges(int partition);
+
+    /**
+     * Returns the configuration signature
+     * @return the configuration signature
+     */
+    static public long getConfigurationSignature() {
+        return instance.get().getSecond().pGetConfigurationSignature();
+    }
+
+    /**
+     * It computes a signature from the given configuration bytes
+     * @param config configuration byte array
+     * @return signature from the given configuration bytes
+     */
+    static public long computeConfigurationSignature(byte [] config) {
+        PureJavaCrc32C crc = new PureJavaCrc32C();
+        crc.update(config);
+        return crc.getValue();
+    }
 
     /**
      * Given a long value, pick a partition to store the data. It's only called for legacy

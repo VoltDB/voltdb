@@ -164,4 +164,7 @@ public class SysProcFragmentId
 
     public static final long PF_validatePartitioning = 240;
     public static final long PF_validatePartitioningResults = 241;
+
+    public static final long PF_matchesHashinator = 250;
+    public static final long PF_matchesHashinatorResults = 251;
 }

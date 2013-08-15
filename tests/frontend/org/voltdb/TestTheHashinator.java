@@ -23,6 +23,13 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
@@ -45,8 +52,6 @@ import org.voltcore.utils.Pair;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineJNI;
-
-import static org.junit.Assert.*;
 
 /**
  * This test verifies that the Java Hashinator behaves
@@ -806,6 +811,17 @@ public class TestTheHashinator {
         checkRangesAfterExpansion(/* beforePartitionCount = */ 2, /* afterPartitionCount = */ 6);
         checkRangesAfterExpansion(/* beforePartitionCount = */ 21, /* afterPartitionCount = */ 28);
         checkRangesAfterExpansion(/* beforePartitionCount = */ 24, /* afterPartitionCount = */ 48);
+    }
+
+    @Test
+    public void testGetConfigurationSignature()
+    {
+        final byte configBytes[] = getConfigBytes(2);
+        TheHashinator.initialize(getHashinatorClass(), configBytes);
+
+
+        long expected = TheHashinator.computeConfigurationSignature(configBytes);
+        assertEquals(expected, TheHashinator.getConfigurationSignature());
     }
 }
 
