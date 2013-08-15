@@ -60,7 +60,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 import com.google.common.collect.ImmutableMap;
 
-public class Iv2TestSpSchedulerDedupe extends TestCase
+public class TestSpSchedulerDedupe extends TestCase
 {
     Mailbox mbox;
     SnapshotCompletionMonitor snapMonitor;
