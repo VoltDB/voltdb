@@ -79,8 +79,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Partition ID */
     protected final int m_partitionId;
 
-    /** Site ID */
-    protected final int m_hostId;
+    /** Host ID */
+    protected final long m_siteId;
 
     /** Statistics collector (provided later) */
     private PlannerStatsCollector m_plannerStats = null;
@@ -125,7 +125,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Create an ee and load the volt shared library */
     public ExecutionEngine(long siteId, int partitionId) {
         m_partitionId = partitionId;
-        m_hostId = CoreUtils.getHostIdFromHSId(siteId);
+        m_siteId = siteId;
         org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
         // In mock test environments there may be no stats agent.
         final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
@@ -138,7 +138,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Alternate constructor without planner statistics tracking. */
     public ExecutionEngine() {
         m_partitionId = 0;  // not used
-        m_hostId = 0; // not used
+        m_siteId = 0; // not used
         m_plannerStats = null;
     }
 
@@ -321,29 +321,34 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long tuplesFound) {
         long currentTime = System.currentTimeMillis();
         long duration = currentTime - m_startTime;
-        if(duration > m_logDuration) {
+        if(duration > 0) {// m_logDuration) {
             VoltLogger log = new VoltLogger("CONSOLE");
-            log.info("Long Running Procedure Status: "+m_rProcContext.m_procedureName+" procedure on site "+m_hostId+" has spent "+duration/1000.0
-                    +"s, has processed "+tuplesFound+" tuples. Current executor is "+planNodeName+" Last accessed table was "+lastAccessedTable+" containing "+
-                    lastAccessedTableSize+" tuples. Current stmt is the "+m_rProcContext.m_voltExecuteSQLIndex+
-                    "'th call to voltExecuteSQL, batch index "+(m_rProcContext.m_batchIndexBase+batchIndex+1));
 
-            log.info("Procedure "+m_rProcContext.m_procedureName+" is taking a long time to execute on site "+m_hostId+". Current statistics:");
-            log.info("Execution time: "+duration/1000.0+"s");
-            log.info("Current statement being executed: Statement "+(m_rProcContext.m_batchIndexBase+batchIndex+1)+" of "+m_rProcContext.m_voltExecuteSQLIndex+"'th call to VoltExecuteSQL");
-            log.info("Current plan fragment: "+planNodeName);
-            log.info("Last table accessed: "+lastAccessedTable+", "+lastAccessedTableSize+" tuples");
-            log.info("Total tuples accessed: "+tuplesFound);
+            log.info("Procedure "+m_rProcContext.m_procedureName+" is taking  a long time to execute -- "+duration/1000.0+" seconds spent accessing "
+                    +tuplesFound+" tuples. Current plan fragment "+planNodeName+" in query "+(m_rProcContext.m_batchIndexBase+batchIndex+1)
+                    +" of batch "+m_rProcContext.m_voltExecuteSQLIndex+" on site "+CoreUtils.hsIdToString(m_siteId)+".");
 
-            log.info("Long running operation on site "+m_hostId);
-            log.info("[Proc:"+m_rProcContext.m_procedureName+"]"
-                    +"["+"Execution time:"+duration/1000.0+"s]"
-                    +"["+"Executor:"+planNodeName+"]"
-                    +"["+"Target table(size):"+lastAccessedTable+"("+lastAccessedTableSize+")"+"]"
-                    +"["+"Tuples processed:"+tuplesFound+"]"
-                    +"["+"VoltExecuteSQL index:"+m_rProcContext.m_voltExecuteSQLIndex+"]"
-                    +"["+"Batch index:"+(m_rProcContext.m_batchIndexBase+batchIndex+1)+"]"
-                    );
+//            log.info("Long Running Procedure Status: "+m_rProcContext.m_procedureName+" procedure on site "+m_hostId+" has spent "+duration/1000.0
+//                    +"s, has processed "+tuplesFound+" tuples. Current executor is "+planNodeName+" Last accessed table was "+lastAccessedTable+" containing "+
+//                    lastAccessedTableSize+" tuples. Current stmt is the "+m_rProcContext.m_voltExecuteSQLIndex+
+//                    "'th call to voltExecuteSQL, batch index "+(m_rProcContext.m_batchIndexBase+batchIndex+1));
+//
+//            log.info("Procedure "+m_rProcContext.m_procedureName+" is taking a long time to execute on site "+m_hostId+". Current statistics:");
+//            log.info("Execution time: "+duration/1000.0+"s");
+//            log.info("Current statement being executed: Statement "+(m_rProcContext.m_batchIndexBase+batchIndex+1)+" of "+m_rProcContext.m_voltExecuteSQLIndex+"'th call to VoltExecuteSQL");
+//            log.info("Current plan fragment: "+planNodeName);
+//            log.info("Last table accessed: "+lastAccessedTable+", "+lastAccessedTableSize+" tuples");
+//            log.info("Total tuples accessed: "+tuplesFound);
+//
+//            log.info("Long running operation on site "+m_hostId);
+//            log.info("[Proc:"+m_rProcContext.m_procedureName+"]"
+//                    +"["+"Execution time:"+duration/1000.0+"s]"
+//                    +"["+"Executor:"+planNodeName+"]"
+//                    +"["+"Target table(size):"+lastAccessedTable+"("+lastAccessedTableSize+")"+"]"
+//                    +"["+"Tuples processed:"+tuplesFound+"]"
+//                    +"["+"VoltExecuteSQL index:"+m_rProcContext.m_voltExecuteSQLIndex+"]"
+//                    +"["+"Batch index:"+(m_rProcContext.m_batchIndexBase+batchIndex+1)+"]"
+//                    );
 
             m_logDuration = (m_logDuration < 30000) ? 2*m_logDuration : 30000;
         }
