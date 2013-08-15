@@ -93,6 +93,7 @@ typedef struct {
     int32_t tableId;
     int64_t spHandle;
     int64_t lastCommittedSpHandle;
+    int64_t undoToken;
     char data[0];
 }__attribute__((packed)) load_table_cmd;
 
@@ -654,11 +655,13 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
     const int32_t tableId = ntohl(loadTableCommand->tableId);
     const int64_t spHandle = ntohll(loadTableCommand->spHandle);
     const int64_t lastCommittedSpHandle = ntohll(loadTableCommand->lastCommittedSpHandle);
+    const int64_t undoToken = ntohll(loadTableCommand->undoToken);
     // ...and fast serialized table last.
     void* offset = loadTableCommand->data;
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(load_table_cmd));
     try {
         ReferenceSerializeInput serialize_in(offset, sz);
+        m_engine->setUndoToken(undoToken);
 
         bool success = m_engine->loadTable(tableId, serialize_in, spHandle, lastCommittedSpHandle, false);
         if (success) {

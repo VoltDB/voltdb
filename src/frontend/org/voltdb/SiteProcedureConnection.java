@@ -71,13 +71,19 @@ public interface SiteProcedureConnection {
             String databaseName,
             String tableName,
             VoltTable data,
-            boolean returnUniqueViolations)
+            boolean returnUniqueViolations,
+            long undoToken)
     throws VoltAbortException;
 
     /**
      * loadTable method used internally by ExecutionSite/Site clients
      */
-    public byte[] loadTable(long txnId, int tableId, VoltTable data, boolean returnUniqueViolations);
+    public byte[] loadTable(
+            long txnId,
+            int tableId,
+            VoltTable data,
+            boolean returnUniqueViolations,
+            long undoToken);
 
     /**
      * Execute a set of plan fragments.
@@ -156,28 +162,6 @@ public interface SiteProcedureConnection {
     // Snapshot services provided by the site
     public Future<?> doSnapshotWork();
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds);
-
-    /**
-     * Get the site-local fragment id for a given plan identified by 20-byte sha-1 hash
-     */
-    public long getFragmentIdForPlanHash(byte[] planHash);
-
-    /**
-     * Get the site-local fragment id for a given plan identified by 20-byte sha-1 hash
-     * If the plan isn't known to this SPC, load it up. Otherwise addref it.
-     */
-    public long loadOrAddRefPlanFragment(byte[] planHash, byte[] plan);
-
-    /**
-     * Decref the plan associated with this site-local fragment id. If the refcount
-     * goes to 0, the plan may be removed (depending on caching policy).
-     */
-    public void decrefPlanFragmentById(long fragmentId);
-
-    /**
-     * Get the full JSON plan associated with a given site-local fragment id.
-     */
-    public byte[] planForFragmentId(long fragmentId);
 
     public long[] validatePartitioning(long tableIds[], int hashinatorType, byte hashinatorConfig[]);
 }

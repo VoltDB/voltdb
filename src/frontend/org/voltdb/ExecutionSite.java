@@ -754,12 +754,12 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             PartitionDRGateway.getInstance(partitionId, nodeDRGateway, false, m_rejoining);
 
         if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
-            ee = new MockExecutionEngine(null);
+            ee = new MockExecutionEngine();
             hsql = null;
         }
         else if (voltdb.getBackendTargetType() == BackendTarget.HSQLDB_BACKEND) {
             hsql = HsqlBackend.initializeHSQLBackend(m_siteId, m_context);
-            ee = new MockExecutionEngine(null);
+            ee = new MockExecutionEngine();
         }
         else {
             String serializedCatalog = serializedCatalogIn;
@@ -964,8 +964,10 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             VoltTable table =
                     PrivateVoltTableFactory.createVoltTableFromBuffer(buffer.duplicate(),
                                                                       true);
-            //m_recoveryLog.info("table " + tableId + ": " + table.toString());
-            loadTable(m_rejoinSnapshotTxnId, tableId, table, false);
+            // m_recoveryLog.info("table " + tableId + ": " + table.toString());
+
+            // Long.MAX_VALUE is a no-op don't track undo token
+            loadTable(m_rejoinSnapshotTxnId, tableId, table, false, Long.MAX_VALUE);
             doneWork = true;
         } else if (m_rejoinSnapshotProcessor.isEOF()) {
             m_rejoinLog.debug("Rejoin snapshot transfer is finished");
@@ -1454,7 +1456,8 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             String databaseName,
             String tableName,
             VoltTable data,
-            boolean returnUniqueViolations)
+            boolean returnUniqueViolations,
+            long undoToken)
     throws VoltAbortException
     {
         Cluster cluster = m_context.cluster;
@@ -1470,7 +1473,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
         }
 
-        return loadTable(txnId, table.getRelativeIndex(), data, returnUniqueViolations);
+        return loadTable(txnId, table.getRelativeIndex(), data, returnUniqueViolations, undoToken);
     }
 
     /**
@@ -1479,11 +1482,14 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
      * @param table
      */
     @Override
-    public byte[] loadTable(long txnId, int tableId, VoltTable data, boolean returnUniqueViolations) {
+    public byte[] loadTable(long txnId, int tableId,
+            VoltTable data, boolean returnUniqueViolations,
+            long undoToken) {
         return ee.loadTable(tableId, data,
                      txnId,
                      lastCommittedTxnId,
-                     returnUniqueViolations);
+                     returnUniqueViolations,
+                     undoToken);
     }
 
     @Override
@@ -1766,28 +1772,6 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     @Override
     public void setPerPartitionTxnIds(long[] perPartitionTxnIds) {
         //A noop pre-IV2
-    }
-
-    @Override
-    public long getFragmentIdForPlanHash(byte[] planHash) {
-        //A noop pre-IV2
-        return 0;
-    }
-
-    @Override
-    public long loadOrAddRefPlanFragment(byte[] planHash, byte[] plan) {
-        //A noop pre-IV2
-        return 0;
-    }
-
-    @Override
-    public void decrefPlanFragmentById(long fragmentId) {
-        //A noop pre-IV2
-    }
-
-    @Override
-    public byte[] planForFragmentId(long fragmentId) {
-        return null;
     }
 
     @Override

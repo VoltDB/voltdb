@@ -30,7 +30,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltdb.ExecutionSite;
-import org.voltdb.FragmentPlanSource;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.RunningProcedureContext;
@@ -44,6 +43,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
+import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTableUtil;
 
@@ -94,8 +94,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     private long m_startTime;
     private long m_logDuration;
 
-    protected FragmentPlanSource m_planSource;
-
     /** Make the EE clean and ready to do new transactional work. */
     public void resetDirtyStatus() {
         m_dirty = false;
@@ -125,7 +123,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     /** Create an ee and load the volt shared library */
-    public ExecutionEngine(long siteId, int partitionId, FragmentPlanSource planSource) {
+    public ExecutionEngine(long siteId, int partitionId) {
         m_partitionId = partitionId;
         m_hostId = CoreUtils.getHostIdFromHSId(siteId);
         org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
@@ -135,15 +133,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             m_plannerStats = new PlannerStatsCollector(siteId);
             statsAgent.registerStatsSource(StatsSelector.PLANNER, siteId, m_plannerStats);
         }
-        m_planSource = planSource;
     }
 
     /** Alternate constructor without planner statistics tracking. */
-    public ExecutionEngine(FragmentPlanSource planSource) {
+    public ExecutionEngine() {
         m_partitionId = 0;  // not used
         m_hostId = 0; // not used
         m_plannerStats = null;
-        m_planSource = planSource;
     }
 
     /*
@@ -368,7 +364,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         // estimate the cache size by the number of misses
         m_eeCacheSize = Math.max(EE_PLAN_CACHE_SIZE, m_eeCacheSize + 1);
         // get the plan for realz
-        return m_planSource.planForFragmentId(fragmentId);
+        return ActivePlanRepository.planForFragmentId(fragmentId);
     }
 
     /*
@@ -476,7 +472,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     abstract public byte[] loadTable(
         int tableId, VoltTable table, long spHandle,
-        long lastCommittedSpHandle, boolean returnUniqueViolations) throws EEException;
+        long lastCommittedSpHandle, boolean returnUniqueViolations,
+        long undoToken) throws EEException;
 
     /**
      * Set the log levels to be used when logging in this engine
@@ -671,9 +668,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param Length of the serialized table
      * @param undoToken token for undo quantum where changes should be logged.
      * @param returnUniqueViolations If true unique violations won't cause a fatal error and will be returned instead
+     * @param undoToken The undo token to release
      */
     protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table,
-            long spHandle, long lastCommittedSpHandle, boolean returnUniqueViolations);
+            long spHandle, long lastCommittedSpHandle, boolean returnUniqueViolations, long undoToken);
 
     /**
      * Executes multiple plan fragments with the given parameter sets and gets the results.

@@ -189,6 +189,10 @@ public class TarReader {
     }
 
     public void read() throws IOException, TarMalformatException {
+        read(true);
+    }
+
+    public void read(boolean verbose) throws IOException, TarMalformatException {
 
         TarEntryHeader header;
         boolean        anyUnsupporteds = false;
@@ -273,7 +277,9 @@ public class TarReader {
                          * Thefore the currently "shown" name is still being
                          * extracted.
                          */
-                        System.out.println(header.toString());
+                        if (verbose) {
+                            System.out.println(header.toString());
+                        }
 
                         // Instance variable mode will be used to differentiate
                         // behavior inside of extractFile().
