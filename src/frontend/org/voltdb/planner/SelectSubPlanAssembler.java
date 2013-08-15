@@ -658,7 +658,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
     /**
      * Given a specific join node and access path set for inner and outer tables, construct the plan
-     * that gives the right tuples.
+     * that gives the right tuples. If
      *
      * @param joinNode The join node to build the plan for.
      * @param isInnerTable True if the join node is the inner node in the join
@@ -791,9 +791,15 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             // get all the clauses that join the applicable two tables
             ArrayList<AbstractExpression> joinClauses = innerAccessPath.joinExprs;
             if (innerPlan instanceof IndexScanPlanNode) {
-                // InnerPlan is an IndexScan. In this case the inner and inner-outer
-                // non-index join expressions (if any) are in the otherExpr. The former should stay as
-                // an IndexScanPlan predicate and the latter stay at the NLJ node as a join predicate
+                // InnerPlan is an IndexScan. If there is a need for the intermediate send/receive pair
+                // the index can not be based on the inner-outer join expression because the outer table
+                // won't be 'visible' for the IndexScan node
+                if (needInnerSendReceive && hasTableTVE(joinNode.m_leftNode, innerAccessPath)) {
+                    return null;
+                }
+                // The inner and inner-outer non-index join expressions (if any) are in the otherExpr container.
+                // The former should stay as an IndexScanPlan predicate and the latter stay at the NLJ node
+                // as a join predicate
                 List<AbstractExpression> innerExpr = filterSingleTVEExpressions(innerAccessPath.otherExprs);
                 joinClauses.addAll(innerAccessPath.otherExprs);
                 AbstractExpression indexScanPredicate = ExpressionUtil.combine(innerExpr);
@@ -886,10 +892,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * -- as opposed to TVE references in post-filters that pose no problem with either
      * NLIJ or the more efficient (one-pass through the index) NestLoopJoin.
      *
-     * @param originalInnerOuterExprs The initial list of inner-outer join expressions.
+     * @param innerTable - the Table of all inner TVEs that are exempt from the check.
      * @param indexExprs - a list of expressions used in the indexing
-     * @param endExprs - a list of expressions used in the indexing
      * @param initialExpr - a list of expressions used in the indexing
+     * @param endExprs - a list of expressions used in the indexing
      * @return true if at least one of the expression lists references a TVE.
      */
     private boolean hasInnerOuterIndexExpression(Table innerTable,
@@ -913,4 +919,35 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         return false;
     }
 
+    /**
+     * For a join node determines whether any of the end or index expressions for a given access path
+     * has a TVE based on a child table of the input node.
+     *
+     * @param joinNode JoinNode.
+     * @param accessPath Access path
+     * @return true if at least one of the tables is involved in the index expressions.
+     */
+    boolean hasTableTVE(JoinNode joinNode, AccessPath accessPath) {
+        assert (joinNode != null);
+        // Get the list of tables for a given node
+        List<Table> tables = joinNode.generateTableJoinOrder();
+        Set<String> tableNames = new HashSet<String>();
+        for (Table table : tables) {
+            tableNames.add(table.getTypeName());
+        }
+        // Collect all TVEs
+        List<TupleValueExpression> tves= new ArrayList<TupleValueExpression>();
+        for (AbstractExpression expr : accessPath.indexExprs) {
+            tves.addAll(ExpressionUtil.getTupleValueExpressions(expr));
+        }
+        for (AbstractExpression expr : accessPath.endExprs) {
+            tves.addAll(ExpressionUtil.getTupleValueExpressions(expr));
+        }
+        Set<String> tveTableNames = new HashSet<String>();
+        for (TupleValueExpression tve : tves) {
+            tveTableNames.add(tve.getTableName());
+        }
+        tveTableNames.retainAll(tableNames);
+        return !tveTableNames.isEmpty();
+    }
 }
