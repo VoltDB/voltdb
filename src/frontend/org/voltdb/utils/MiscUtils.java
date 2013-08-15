@@ -49,6 +49,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.licensetool.LicenseException;
 
 import com.google.common.net.HostAndPort;
 
@@ -91,6 +92,7 @@ public class MiscUtils {
     /**
      * Instantiate the license api impl based on enterprise/community editions
      * @return a valid API for community and pro editions, or null on error.
+     * @throws LicenseException
      */
     public static LicenseApi licenseApiFactory(String pathToLicense) {
 
@@ -171,8 +173,17 @@ public class MiscUtils {
         }
 
         // Perform signature verification - detect modified files
-        if (licenseApi.verify() == false) {
-            hostLog.fatal("Unable to load license file: could not verify license signature.");
+        try
+        {
+            if (licenseApi.verify() == false) {
+                hostLog.fatal("Unable to load license file: could not verify license signature.");
+                return null;
+            }
+        }
+        catch (LicenseException lex)
+        {
+            hostLog.fatal("DUP? Unable to load license file: " + lex.getMessage());
+            hostLog.fatal(lex.getMessage());
             return null;
         }
 
