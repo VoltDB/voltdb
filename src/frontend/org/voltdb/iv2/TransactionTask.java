@@ -48,7 +48,7 @@ public abstract class TransactionTask extends SiteTasker
 
     public long getSpHandle()
     {
-        return m_txnState.spHandle;
+        return m_txnState.m_spHandle;
     }
 
     public long getTxnId() {
