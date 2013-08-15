@@ -101,6 +101,7 @@ public abstract class BaseInitiator implements Initiator
             joinProducer.setMailbox(m_initiatorMailbox);
         }
         m_scheduler.setMailbox(m_initiatorMailbox);
+        m_repairLog.setHSId(m_initiatorMailbox.getHSId());
         StarvationTracker st = new StarvationTracker(getInitiatorHSId());
         m_scheduler.setStarvationTracker(st);
         m_scheduler.setLock(m_initiatorMailbox);
