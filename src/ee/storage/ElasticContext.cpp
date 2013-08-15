@@ -30,7 +30,6 @@ ElasticContext::ElasticContext(PersistentTable &table,
                                size_t nTuplesPerCall) :
     TableStreamerContext(table, surgeon, partitionId, serializer, predicateStrings),
     m_scanner(table, surgeon.getData()),
-    m_isIndexed(false),
     m_nTuplesPerCall(nTuplesPerCall)
 {
     if (predicateStrings.size() != 1) {
@@ -41,15 +40,48 @@ ElasticContext::ElasticContext(PersistentTable &table,
 ElasticContext::~ElasticContext()
 {}
 
+/**
+ * Activation/reactivation handler.
+ */
+bool ElasticContext::handleActivation(TableStreamType streamType, bool reactivate)
+{
+    if (m_surgeon.hasStreamType(TABLE_STREAM_SNAPSHOT)) {
+        VOLT_ERROR("Elastic context activation is not allowed while a snapshot is in progress.");
+        return false;
+    }
+    // Don't allow activation if there's an existing index.
+    if (m_surgeon.hasIndex()) {
+        VOLT_ERROR("Elastic context activation is not allowed while an index is "
+                   "present that has not been completely consumed.");
+        return false;
+    }
+    m_surgeon.createIndex();
+    return true;
+}
+
+/**
+ * Deactivation handler.
+ */
+bool ElasticContext::handleDeactivation()
+{
+    // Keep this context around to maintain the index.
+    return true;
+}
+
 /*
- * Serialize to multiple output streams.
+ * Serialize to output stream.
  * Return remaining tuple count, 0 if done, or -1 on error.
  */
 int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStreams,
                                          std::vector<int> &retPositions)
 {
-    if (m_isIndexed) {
-        throwFatalException("ElasticContext::handleStreamMore() was called more than once.");
+    if (!m_surgeon.hasIndex()) {
+        VOLT_ERROR("Elastic streaming was invoked without proper activation.");
+        return -1;
+    }
+    if (m_surgeon.isIndexingComplete()) {
+        VOLT_ERROR("Elastic streaming was called after indexing had already completed.");
+        return -1;
     }
 
     // Populate index with current tuples.
@@ -58,17 +90,20 @@ int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStrea
     TableTuple tuple(getTable().schema());
     while (m_scanner.next(tuple)) {
         if (getPredicates()[0].eval(&tuple).isTrue()) {
-            m_index.add(getTable(), tuple);
+            m_surgeon.indexAdd(tuple);
         }
-        // Take a breather after every chunk of m_n
+        // Take a breather after every chunk of m_nTuplesPerCall tuples.
         if (++i == m_nTuplesPerCall) {
             break;
         }
     }
 
-    // We're done with indexing.
-    m_isIndexed = m_scanner.isScanComplete();
-    return m_isIndexed ? 0 : 1;
+    // Done with indexing?
+    bool indexingComplete = m_scanner.isScanComplete();
+    if (indexingComplete) {
+        m_surgeon.setIndexingComplete();
+    }
+    return indexingComplete ? 0 : 1;
 }
 
 /**
@@ -76,9 +111,8 @@ int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStrea
  */
 bool ElasticContext::notifyTupleInsert(TableTuple &tuple)
 {
-    PersistentTable &table = getTable();
     if (getPredicates()[0].eval(&tuple).isTrue()) {
-        m_index.add(table, tuple);
+        m_surgeon.indexAdd(tuple);
     }
     return true;
 }
@@ -96,9 +130,8 @@ bool ElasticContext::notifyTupleUpdate(TableTuple &tuple)
  */
 bool ElasticContext::notifyTupleDelete(TableTuple &tuple)
 {
-    PersistentTable &table = getTable();
-    if (m_index.has(table, tuple)) {
-        bool removed = m_index.remove(table, tuple);
+    if (m_surgeon.indexHas(tuple)) {
+        bool removed = m_surgeon.indexRemove(tuple);
         assert(removed);
     }
     return true;
@@ -112,13 +145,12 @@ void ElasticContext::notifyTupleMovement(TBPtr sourceBlock,
                                          TableTuple &sourceTuple,
                                          TableTuple &targetTuple)
 {
-    PersistentTable &table = getTable();
-    if (m_index.has(table, sourceTuple)) {
-        bool removed = m_index.remove(getTable(), sourceTuple);
+    if (m_surgeon.indexHas(sourceTuple)) {
+        bool removed = m_surgeon.indexRemove(sourceTuple);
         assert(removed);
     }
     if (getPredicates()[0].eval(&targetTuple).isTrue()) {
-        bool added = m_index.add(getTable(), targetTuple);
+        bool added = m_surgeon.indexAdd(targetTuple);
         assert(added);
     }
 }

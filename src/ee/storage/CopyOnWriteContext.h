@@ -55,6 +55,11 @@ public:
     virtual ~CopyOnWriteContext();
 
     /**
+     * Activation handler.
+     */
+    virtual bool handleActivation(TableStreamType streamType, bool reactivate);
+
+    /**
      * Mandatory TableStreamContext override.
      */
     virtual int64_t handleStreamMore(TupleOutputStreamProcessor &outputStreams,

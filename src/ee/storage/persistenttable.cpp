@@ -931,7 +931,7 @@ bool PersistentTable::activateStream(
 
     std::vector<std::string> predicateStrings;
     // Grab snapshot or elastic stream predicates.
-    if (streamType == TABLE_STREAM_SNAPSHOT || streamType == TABLE_STREAM_ELASTIC_INDEX) {
+    if (tableStreamTypeHasPredicates(streamType)) {
         int npreds = serializeIn.readInt();
         if (npreds > 0) {
             predicateStrings.reserve(npreds);
@@ -1003,11 +1003,17 @@ bool PersistentTable::activateStreamInternal(TupleSerializer &tupleSerializer,
  * Return remaining tuple count, 0 if done, or -1 on error.
  */
 int64_t PersistentTable::streamMore(TupleOutputStreamProcessor &outputStreams,
+                                    TableStreamType streamType,
                                     std::vector<int> &retPositions) {
     if (m_tableStreamer.get() == NULL) {
         return -1;
     }
-    return m_tableStreamer->streamMore(outputStreams, retPositions);
+    // Balance the zero tuple count short circuiting done in activateStream().
+    //TODO: Improve or eliminate this special logic in both places.
+    if (m_tupleCount == 0) {
+        return 0;
+    }
+    return m_tableStreamer->streamMore(outputStreams, streamType, retPositions);
 }
 
 /**
@@ -1215,8 +1221,7 @@ void PersistentTable::doIdleCompaction() {
 }
 
 void PersistentTable::doForcedCompaction() {
-    if (   m_tableStreamer.get() != NULL
-        && tableStreamTypeIsRecovery(m_tableStreamer->getActiveStreamType())) {
+    if (m_tableStreamer.get() != NULL && m_tableStreamer->hasStreamType(TABLE_STREAM_RECOVERY)) {
         LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO,
             "Deferring compaction until recovery is complete.");
         return;

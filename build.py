@@ -214,6 +214,7 @@ CTX.INPUT['common'] = """
  StreamPredicateList.cpp
  TupleOutputStream.cpp
  TupleOutputStreamProcessor.cpp
+ MiscUtil.cpp
 """
 
 CTX.INPUT['execution'] = """
@@ -313,6 +314,8 @@ CTX.INPUT['storage'] = """
  RecoveryContext.cpp
  TupleBlock.cpp
  TableStreamerContext.cpp
+ ElasticIndex.cpp
+ ElasticIndexReadContext.cpp
 """
 
 CTX.INPUT['stats'] = """
