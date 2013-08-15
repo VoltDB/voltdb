@@ -30,7 +30,6 @@ import java.util.logging.Logger;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.BackendTarget;
-import org.voltdb.FragmentPlanSource;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
@@ -520,9 +519,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final BackendTarget target,
             final int port,
             final HashinatorType type,
-            final byte config[],
-            FragmentPlanSource planSource) {
-        super(siteId, partitionId, planSource);
+            final byte config[]) {
+        super(siteId, partitionId);
 
         // m_counter = 0;
         m_clusterIndex = clusterIndex;
@@ -836,7 +834,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public byte[] loadTable(final int tableId, final VoltTable table, final long spHandle,
-            final long lastCommittedSpHandle, boolean returnUniqueViolations)
+            final long lastCommittedSpHandle, boolean returnUniqueViolations, long undoToken)
     throws EEException
     {
         if (returnUniqueViolations) {
@@ -847,6 +845,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putInt(tableId);
         m_data.putLong(spHandle);
         m_data.putLong(lastCommittedSpHandle);
+        m_data.putLong(undoToken);
         m_data.putInt(returnUniqueViolations ? 1 : 0);
 
         final ByteBuffer tableBytes = table.getTableDataReference();

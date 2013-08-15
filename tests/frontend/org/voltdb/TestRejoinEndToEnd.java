@@ -24,7 +24,6 @@
 package org.voltdb;
 
 import java.net.InetSocketAddress;
-
 import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
@@ -58,7 +57,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
                     BackendTarget.NATIVE_EE_JNI,
                     LocalCluster.FailureState.ALL_RUNNING,
-                    false, true, true);
+                    false, true, true, null);
             cluster.setMaxHeap(256);
             cluster.overrideAnyRequestForValgrind();
             boolean success = cluster.compile(builder);
@@ -239,7 +238,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1,
                 BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ONE_FAILURE,
-                false, false, true);
+                false, false, true, null);
         cluster.overrideAnyRequestForValgrind();
         cluster.setMaxHeap(256);
         boolean success = cluster.compile(builder);
@@ -255,7 +254,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
                 BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ONE_RECOVERING,
-                false, true, true);
+                false, true, true, null);
         cluster.setMaxHeap(256);
         cluster.overrideAnyRequestForValgrind();
         success = cluster.compile(builder);

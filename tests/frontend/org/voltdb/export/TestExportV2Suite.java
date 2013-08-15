@@ -25,6 +25,8 @@ package org.voltdb.export;
 import java.io.File;
 import java.util.Properties;
 
+import com.google.common.collect.ImmutableMap;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.LegacyHashinator;
 import org.voltdb.TheHashinator;
@@ -36,8 +38,6 @@ import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.regressionsuites.TestSQLTypesSuite;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
-
-import com.google.common.collect.ImmutableMap;
 
 public class TestExportV2Suite extends TestExportBase {
 
@@ -154,7 +154,7 @@ public class TestExportV2Suite extends TestExportBase {
          * compile the catalog all tests start with
          */
         config = new LocalCluster("export-ddl-cluster-rep.jar", 2, 3, 1,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, true);
+                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, true, null);
         boolean compile = config.compile(project);
         assertTrue(compile);
         config.setHasLocalServer(false);

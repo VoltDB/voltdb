@@ -18,7 +18,6 @@
 package org.voltdb.planner;
 
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
@@ -66,16 +65,29 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
     AbstractPlanNode nextPlan() {
         if (!m_generatedPlans) {
             // Analyze join conditions
-            m_parsedStmt.analyzeTreeExpressions(m_parsedStmt.joinTree);
+            m_parsedStmt.analyzeJoinExpressions(m_parsedStmt.joinTree);
+            // these just shouldn't happen right?
+            assert(m_parsedStmt.multiTableSelectionList.size() == 0);
+            assert(m_parsedStmt.noTableSelectionList.size() == 0);
 
             m_generatedPlans = true;
-            Table nextTables[] = new Table[0];
-            ArrayList<AccessPath> paths = getRelevantAccessPathsForTable(m_targetTable, nextTables);
-            // for each access path
-            for (AccessPath accessPath : paths) {
-                // get a plan
-                AbstractPlanNode scanPlan = getAccessPlanForTable(m_targetTable, accessPath);
-                m_plans.add(scanPlan);
+            assert (m_parsedStmt.joinTree != null);
+            JoinNode tableNode = m_parsedStmt.joinTree;
+            // This is either UPDATE or DELETE statement. Consolidate all expressions
+            // into the WHERE list.
+            tableNode.m_whereInnerList.addAll(tableNode.m_joinInnerList);
+            tableNode.m_joinInnerList.clear();
+            assert (tableNode.m_table != null);
+            tableNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(tableNode.m_table,
+                    null,
+                    tableNode.m_whereInnerList,
+                    null));
+
+            for (AccessPath path : tableNode.m_accessPaths) {
+                tableNode.m_currentAccessPath = path;
+
+                AbstractPlanNode plan = getAccessPlanForTable(tableNode.m_table, tableNode.m_currentAccessPath);
+                m_plans.add(plan);
             }
 
         }

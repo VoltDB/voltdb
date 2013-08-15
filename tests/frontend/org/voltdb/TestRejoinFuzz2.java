@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
@@ -63,7 +62,7 @@ public class TestRejoinFuzz2 extends RejoinTestBase {
                     BackendTarget.NATIVE_EE_JNI,
                     LocalCluster.FailureState.ALL_RUNNING,
                     false, true,
-                    false); // doesnt run with IV2 yet
+                false, null); // doesnt run with IV2 yet
         cluster.setMaxHeap(256);
         cluster.overrideAnyRequestForValgrind();
         if (cluster.isValgrind() || cluster.isMemcheckDefined()) {

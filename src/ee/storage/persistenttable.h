@@ -288,8 +288,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                                     std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & end,
                                     std::vector<catalog::MaterializedViewInfo*> &survivingInfosOut,
                                     std::vector<MaterializedViewMetadata*> &survivingViewsOut,
-                                    std::vector<catalog::MaterializedViewInfo*> &changingInfosOut,
-                                    std::vector<MaterializedViewMetadata*> &changingViewsOut,
                                     std::vector<MaterializedViewMetadata*> &obsoleteViewsOut);
     void updateMaterializedViewTargetTable(PersistentTable* target);
 
@@ -338,7 +336,19 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     }
 
     // This is a testability feature not intended for use in product logic.
-    int getTuplesPendingDeleteCount() const { return m_tuplesPendingDeleteCount; }
+    int visibleTupleCount() const { return m_tupleCount - m_invisibleTuplesPendingDeleteCount; }
+
+    bool isPersistentTableEmpty()
+    {
+        // The narrow usage of this function (while updating the catalog)
+        // suggests that it could also mean "table is new and never had tuples".
+        // So, it's OK and possibly MORE correct to count active tuples and ignore the effect of
+        // m_invisibleTuplesPendingDeleteCount even when it would change the answer --
+        // if ALL tuples had been deleted earlier in the current transaction.
+        // This should never be the case while updating the catalog.
+        return m_tupleCount == 0;
+    }
+
 
     virtual int64_t validatePartitioning(TheHashinator *hashinator, int32_t partitionId);
 
@@ -473,8 +483,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
     TBMap m_data;
     int m_failedCompactionCount;
+
     // This is a testability feature not intended for use in product logic.
-    int m_tuplesPendingDeleteCount;
+    int m_invisibleTuplesPendingDeleteCount;
 
     // Surgeon passed to classes requiring "deep" access to avoid excessive friendship.
     PersistentTableSurgeon m_surgeon;
@@ -626,8 +637,7 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
     m_tupleCount--;
     if (tuple.isPendingDelete()) {
         tuple.setPendingDeleteFalse();
-        // This count is a testability feature not intended for use in product logic.
-        --m_tuplesPendingDeleteCount;
+        --m_invisibleTuplesPendingDeleteCount;
     }
 
     // Let the context handle it as needed.

@@ -52,14 +52,15 @@
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
-#include "storage/table.h"
+#include "storage/persistenttable.h"
 #include "storage/tableiterator.h"
 
-namespace tableutil {
+namespace voltdb {
 
-bool getRandomTuple(const voltdb::PersistentTable* table, voltdb::TableTuple &out) {
+bool tableutil::getRandomTuple(const voltdb::PersistentTable* table, voltdb::TableTuple &out)
+{
     voltdb::Table* table2 = const_cast<voltdb::PersistentTable*>(table);
-    int cnt = (int)table->activeTupleCount() - table->getTuplesPendingDeleteCount();
+    int cnt = (int)table->visibleTupleCount();
     if (cnt > 0) {
         int idx = (rand() % cnt);
         voltdb::TableIterator it = table2->iterator();
@@ -74,7 +75,8 @@ bool getRandomTuple(const voltdb::PersistentTable* table, voltdb::TableTuple &ou
     return false;
 }
 
-bool setRandomTupleValues(voltdb::Table* table, voltdb::TableTuple *tuple) {
+bool tableutil::setRandomTupleValues(voltdb::Table* table, voltdb::TableTuple *tuple)
+{
     assert(table);
     assert(tuple);
     for (int col_ctr = 0, col_cnt = table->columnCount(); col_ctr < col_cnt; col_ctr++) {
@@ -83,8 +85,8 @@ bool setRandomTupleValues(voltdb::Table* table, voltdb::TableTuple *tuple) {
 
         /*
          * getRandomValue() does an allocation for all strings it generates and those need to be freed
-         * if the pointer wasn't transferred into the tuple by setSlimValue(). The pointer won't be transferred into
-         * the tuple if the schema has that column inlined.
+         * if the pointer wasn't transferred into the tuple.
+         * The pointer won't be transferred into the tuple if the schema has that column inlined.
          */
         voltdb::ValueType t = tuple->getSchema()->columnType(col_ctr);
         if (((t == voltdb::VALUE_TYPE_VARCHAR) || (t == voltdb::VALUE_TYPE_VARBINARY)) &&
@@ -95,7 +97,8 @@ bool setRandomTupleValues(voltdb::Table* table, voltdb::TableTuple *tuple) {
     return (true);
 }
 
-bool addRandomTuples(voltdb::Table* table, int num_of_tuples) {
+bool tableutil::addRandomTuples(voltdb::Table* table, int num_of_tuples)
+{
     assert(num_of_tuples >= 0);
     for (int ctr = 0; ctr < num_of_tuples; ctr++) {
         voltdb::TableTuple &tuple = table->tempTuple();
@@ -109,48 +112,14 @@ bool addRandomTuples(voltdb::Table* table, int num_of_tuples) {
         }
 
         /*
-         * The insert into the table (assuming a persistent table) will make a copy of the strings so the string allocations
-         * for unlined columns need to be freed here.
+         * The insert into the table (assuming a persistent table) will make a copy of the strings
+         * so the string allocations for unlined columns need to be freed here.
          */
         for (int ii = 0; ii < tuple.getSchema()->getUninlinedObjectColumnCount(); ii++) {
             tuple.getNValue(tuple.getSchema()->getUninlinedObjectColumnInfoIndex(ii)).free();
         }
     }
     return (true);
-}
-
-bool equals(const voltdb::Table* table, voltdb::TableTuple *tuple0, voltdb::TableTuple *tuple1) {
-    assert(table);
-    assert(tuple0);
-    assert(tuple1);
-    return tuple0->equals(*tuple1);
-}
-
-
-bool copy(const voltdb::Table *from_table, voltdb::Table* to_table) {
-    voltdb::Table* fromtable2 = const_cast<voltdb::Table*>(from_table);
-    assert(from_table->columnCount() == to_table->columnCount());
-    voltdb::TableIterator iterator = fromtable2->iterator();
-    voltdb::TableTuple tuple(fromtable2->schema());
-    while (iterator.next(tuple)) {
-        if (!to_table->insertTuple(tuple)) {
-            return (false);
-        }
-    }
-    return (true);
-}
-
-bool getTupleAt(const voltdb::Table* table, int64_t position, voltdb::TableTuple &out) {
-    assert(table);
-    voltdb::Table* table2 = const_cast<voltdb::Table*>(table);
-    voltdb::TableIterator iterator = table2->iterator();
-    int64_t ctr = 0;
-    while (iterator.next(out)) {
-        if (ctr++ == position) {
-            return true;
-        }
-    }
-    return false;
 }
 
 }

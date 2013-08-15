@@ -392,6 +392,19 @@ public class TestFixedSQLSuite extends RegressionSuite {
             results = client.callProcedure("@AdHoc", query).getResults();
             results[0].advanceRow();
             assertEquals(3, results[0].getLong(0));
+            // ENG-5035
+            query = String.format("select '%s' from %s", table, table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            results[0].advanceRow();
+            assertEquals(table, results[0].getString(0));
+            query = String.format("select '%s' from %s", "qwertyuiop", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            results[0].advanceRow();
+            assertEquals("qwertyuiop", results[0].getString(0));
+            query = String.format("select %s.RATIO, '%s' from %s", table, "qwertyuiop", table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            results[0].advanceRow();
+            assertEquals("qwertyuiop", results[0].getString(1));
         }
     }
 

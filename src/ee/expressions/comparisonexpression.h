@@ -102,24 +102,33 @@ public:
                                   AbstractExpression *right)
         : AbstractExpression(type, left, right)
     {
-        this->m_left = left;
-        this->m_right = right;
+        m_left = left;
+        m_right = right;
     };
 
     inline NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
         VOLT_TRACE("eval %s. left %s, right %s. ret=%s",
-                   typeid(this->compare).name(), typeid(*(this->m_left)).name(),
-                   typeid(*(this->m_right)).name(),
-                   this->compare.cmp(this->m_left->eval(tuple1, tuple2),
-                                     this->m_right->eval(tuple1, tuple2)).isTrue()
+                   typeid(compare).name(), typeid(*(m_left)).name(),
+                   typeid(*(m_right)).name(),
+                   compare.cmp(m_left->eval(tuple1, tuple2),
+                               m_right->eval(tuple1, tuple2)).isTrue()
                    ? "TRUE" : "FALSE");
 
         assert(m_left != NULL);
         assert(m_right != NULL);
 
-        return this->compare.cmp(
-            this->m_left->eval(tuple1, tuple2),
-            this->m_right->eval(tuple1, tuple2));
+        NValue lnv = m_left->eval(tuple1, tuple2);
+        NValue rnv = m_right->eval(tuple1, tuple2);
+
+        // comparisons with null or NaN are always false
+        // [This code is commented out because doing the right thing breaks voltdb atm.
+        // We need to re-enable after we can verify that all plans in all configs give the
+        // same answer.]
+        /*if (lnv.isNull() || lnv.isNaN() || rnv.isNull() || rnv.isNaN()) {
+            return NValue::getFalse();
+        }*/
+
+        return compare.cmp(lnv, rnv);
     }
 
     std::string debugInfo(const std::string &spacer) const {
@@ -140,19 +149,28 @@ public:
                                          AbstractExpression *right)
         : AbstractExpression(type, left, right)
     {
-        this->m_left = left;
-        this->m_leftTyped = dynamic_cast<L*>(left);
-        this->m_right = right;
-        this->m_rightTyped = dynamic_cast<R*>(right);
+        m_left = left;
+        m_leftTyped = dynamic_cast<L*>(left);
+        m_right = right;
+        m_rightTyped = dynamic_cast<R*>(right);
 
         assert (m_leftTyped != NULL);
         assert (m_rightTyped != NULL);
     };
 
     inline NValue eval(const TableTuple *tuple1, const TableTuple *tuple2 ) const {
-        return this->compare.cmp(
-            this->m_left->eval(tuple1, tuple2),
-            this->m_right->eval(tuple1, tuple2));
+        NValue lnv = m_left->eval(tuple1, tuple2);
+        NValue rnv = m_right->eval(tuple1, tuple2);
+
+        // Comparisons with null or NaN are always false
+        // [This code is commented out because doing the right thing breaks voltdb atm.
+        // We need to re-enable after we can verify that all plans in all configs give the
+        // same answer.]
+        /*if (lnv.isNull() || lnv.isNaN() || rnv.isNull() || rnv.isNaN()) {
+            return NValue::getFalse();
+        }*/
+
+        return compare.cmp(lnv, rnv);
     }
 
     std::string debugInfo(const std::string &spacer) const {

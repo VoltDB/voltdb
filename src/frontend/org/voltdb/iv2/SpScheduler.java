@@ -17,6 +17,7 @@
 
 package org.voltdb.iv2;
 
+import com.google.common.primitives.Longs;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,36 +30,30 @@ import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-
-import org.voltdb.client.ClientResponse;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
-
-import org.voltdb.messaging.DumpMessage;
-import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2LogFaultMessage;
-
-import org.voltdb.VoltTable;
-
-import com.google.common.primitives.Longs;
+import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
 public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 {
@@ -504,7 +499,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 }
                 DuplicateCounter counter = new DuplicateCounter(
                         msg.getInitiatorHSId(),
-                        msg.getTxnId(), m_replicaHSIds);
+                        msg.getTxnId(), m_replicaHSIds, msg.getStoredProcedureName());
                 m_duplicateCounters.put(new DuplicateCounterKey(msg.getTxnId(), newSpHandle), counter);
             }
         }
@@ -575,7 +570,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         List<Long> expectedHSIds = new ArrayList<Long>(needsRepair);
         DuplicateCounter counter = new DuplicateCounter(
                 HostMessenger.VALHALLA,
-                message.getTxnId(), expectedHSIds);
+                message.getTxnId(), expectedHSIds, message.getStoredProcedureName());
         m_duplicateCounters.put(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()), counter);
 
         m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getUniqueId());
@@ -605,7 +600,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         List<Long> expectedHSIds = new ArrayList<Long>(needsRepair);
         DuplicateCounter counter = new DuplicateCounter(
                 message.getCoordinatorHSId(), // Assume that the MPI's HSID hasn't changed
-                message.getTxnId(), expectedHSIds);
+                message.getTxnId(), expectedHSIds, "MP_DETERMINISM_ERROR");
         m_duplicateCounters.put(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()), counter);
 
         // is local repair necessary?
@@ -747,15 +742,20 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_mailbox.send(m_sendToHSIds,
                         replmsg);
                 DuplicateCounter counter;
+                /*
+                 * Non-determinism should be impossible to happen with MP fragments.
+                 * if you see "MP_DETERMINISM_ERROR" as procedure name in the crash logs
+                 * something has horribly gone wrong.
+                 */
                 if (message.getFragmentTaskType() != FragmentTaskMessage.SYS_PROC_PER_SITE) {
                     counter = new DuplicateCounter(
                             msg.getCoordinatorHSId(),
-                            msg.getTxnId(), m_replicaHSIds);
+                            msg.getTxnId(), m_replicaHSIds, "MP_DETERMINISM_ERROR");
                 }
                 else {
                     counter = new SysProcDuplicateCounter(
                             msg.getCoordinatorHSId(),
-                            msg.getTxnId(), m_replicaHSIds);
+                            msg.getTxnId(), m_replicaHSIds, "MP_DETERMINISM_ERROR");
                 }
                 m_duplicateCounters.put(new DuplicateCounterKey(msg.getTxnId(), newSpHandle), counter);
             }

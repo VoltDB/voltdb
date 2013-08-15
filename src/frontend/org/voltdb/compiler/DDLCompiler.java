@@ -404,16 +404,10 @@ public class DDLCompiler {
 
         DDLStatement stmt = getNextStatement(reader, m_compiler);
         while (stmt != null) {
-            // We sometimes choke at parsing statements with newlines, so
-            // make a version without newlines for most of the processing,
-            // but leave the original around because the formatting has
-            // value in the catalog report and perhaps elsewhere in the future.
-            String oneLinerStmt = stmt.statement.replace("\n", " ");
-
             // Some statements are processed by VoltDB and the rest are handled by HSQL.
             boolean processed = false;
             try {
-                processed = processVoltDBStatement(oneLinerStmt, db);
+                processed = processVoltDBStatement(stmt.statement, db);
             } catch (VoltCompilerException e) {
                 // Reformat the message thrown by VoltDB DDL processing to have a line number.
                 String msg = "VoltDB DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
@@ -421,7 +415,10 @@ public class DDLCompiler {
             }
             if (!processed) {
                 try {
-                    // check for CREATE TABLE or CREATE VIEW
+                    // Check for CREATE TABLE or CREATE VIEW.
+                    // We sometimes choke at parsing statements with newlines, so
+                    // check against a newline free version of the stmt.
+                    String oneLinerStmt = stmt.statement.replace("\n", " ");
                     Matcher tableMatcher = createTablePattern.matcher(oneLinerStmt);
                     if (tableMatcher.find()) {
                         String tableName = tableMatcher.group(2);
@@ -431,8 +428,8 @@ public class DDLCompiler {
                     // kind of ugly.  We hex-encode each statement so we can
                     // avoid embedded newlines so we can delimit statements
                     // with newline.
-                    m_fullDDL += Encoder.hexEncode(oneLinerStmt) + "\n";
-                    m_hsql.runDDLCommand(oneLinerStmt);
+                    m_fullDDL += Encoder.hexEncode(stmt.statement) + "\n";
+                    m_hsql.runDDLCommand(stmt.statement);
                 } catch (HSQLParseException e) {
                     String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
                     throw m_compiler.new VoltCompilerException(msg, stmt.lineNo);
@@ -778,7 +775,7 @@ public class DDLCompiler {
         else if (nchar[0] == '\n') {
             // normalize newlines to spaces
             m_currLineNo += 1;
-            retval.statement += "\n";
+            retval.statement += " ";
         }
         else if (nchar[0] == '\r') {
             // ignore carriage returns
@@ -1022,7 +1019,7 @@ public class DDLCompiler {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
                     if (indexName.startsWith("SYS_IDX_SYS_") == false) {
-                        addIndexToCatalog(table, indexNode, indexReplacementMap);
+                        addIndexToCatalog(db, table, indexNode, indexReplacementMap);
                     }
                 }
 
@@ -1031,7 +1028,7 @@ public class DDLCompiler {
                     if (indexNode.name.equals("index") == false) continue;
                     String indexName = indexNode.attributes.get("name");
                     if (indexName.startsWith("SYS_IDX_SYS_") == true) {
-                        addIndexToCatalog(table, indexNode, indexReplacementMap);
+                        addIndexToCatalog(db, table, indexNode, indexReplacementMap);
                     }
                 }
             }
@@ -1197,13 +1194,15 @@ public class DDLCompiler {
         return Arrays.equals(idx1baseTableOrder, idx2baseTableOrder);
     }
 
-    void addIndexToCatalog(Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
+    void addIndexToCatalog(Database db, Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
             throws VoltCompilerException
     {
         assert node.name.equals("index");
 
         String name = node.attributes.get("name");
         boolean unique = Boolean.parseBoolean(node.attributes.get("unique"));
+        AbstractParsedStmt dummy = new ParsedSelectStmt(null, db);
+        dummy.setTable(table);
 
         // "parse" the expression trees for an expression-based index (vs. a simple column value index)
         AbstractExpression[] exprs = null;
@@ -1212,7 +1211,7 @@ public class DDLCompiler {
                 exprs = new AbstractExpression[subNode.children.size()];
                 int j = 0;
                 for (VoltXMLElement exprNode : subNode.children) {
-                    exprs[j] = AbstractParsedStmt.parseExpressionTree(null, exprNode);
+                    exprs[j] = dummy.parseExpressionTree(exprNode);
                     exprs[j].resolveForTable(table);
                     exprs[j].finalizeValueTypes();
                     ++j;
@@ -1468,7 +1467,7 @@ public class DDLCompiler {
             Table srcTable = stmt.tableList.get(0);
             MaterializedViewInfo matviewinfo = srcTable.getViews().add(destTable.getTypeName());
             matviewinfo.setDest(destTable);
-            AbstractExpression where = stmt.getCombinedFilterExpression();
+            AbstractExpression where = stmt.getSingleTableFilterExpression();
             if (where != null) {
                 String hex = Encoder.hexEncode(where.toJSONString());
                 matviewinfo.setPredicate(hex);
@@ -1564,6 +1563,19 @@ public class DDLCompiler {
             msg += "has too few columns.";
             throw m_compiler.new VoltCompilerException(msg);
         }
+
+        if (stmt.hasComplexGroupby()) {
+            msg += "contains an expression involving a group by. " +
+                    "Expressions with group by are not currently supported in views.";
+            throw m_compiler.new VoltCompilerException(msg);
+        }
+
+        if (stmt.hasComplexAgg()) {
+            msg += "contains an expression involving an aggregate function. " +
+                    "Expressions with aggregate functions are not currently supported in views.";
+            throw m_compiler.new VoltCompilerException(msg);
+        }
+
 
         int i;
         for (i = 0; i < groupColCount; i++) {
