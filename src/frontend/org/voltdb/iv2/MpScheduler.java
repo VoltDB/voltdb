@@ -29,6 +29,8 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltdb.CatalogContext;
+import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SystemProcedureCatalog;
@@ -81,6 +83,11 @@ public class MpScheduler extends Scheduler
     void setMpRoSitePool(MpRoSitePool sitePool)
     {
         m_pendingTasks.setMpRoSitePool(sitePool);
+    }
+
+    void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
+    {
+        m_pendingTasks.updateCatalog(diffCmds, context, csp);
     }
 
     @Override

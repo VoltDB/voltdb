@@ -26,6 +26,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.CatalogContext;
+import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.exceptions.TransactionRestartException;
 
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -50,6 +52,11 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     void setMpRoSitePool(MpRoSitePool sitePool)
     {
         m_sitePool = sitePool;
+    }
+
+    synchronized void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
+    {
+        m_sitePool.updateCatalog(diffCmds, context, csp);
     }
 
     /**

@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 import org.voltcore.logging.VoltLogger;
@@ -35,16 +36,14 @@ import org.voltdb.StarvationTracker;
  * This should be owned by the MpTransactionTaskQueue and expects all operations
  * to be done while holding its lock.
  */
-class MpRoSitePool
-{
+class MpRoSitePool {
     final static VoltLogger tmLog = new VoltLogger("TM");
 
     // IZZY: temporary static vars
     static int MAX_POOL_SIZE = 100;
     static int INITIAL_POOL_SIZE = 0;
 
-    class MpRoSiteContext
-    {
+    class MpRoSiteContext {
         final private BackendTarget m_backend;
         final private SiteTaskerQueue m_queue;
         final private MpRoSite m_site;
@@ -53,36 +52,36 @@ class MpRoSitePool
         final private LoadedProcedureSet m_loadedProcedures;
         final private Thread m_siteThread;
 
-        MpRoSiteContext(
-                long siteId,
-                BackendTarget backend,
-                CatalogContext context,
-                int partitionId,
-                InitiatorMailbox initiatorMailbox,
-                CatalogSpecificPlanner csp)
-        {
+        MpRoSiteContext(long siteId, BackendTarget backend,
+                CatalogContext context, int partitionId,
+                InitiatorMailbox initiatorMailbox, CatalogSpecificPlanner csp) {
             m_backend = backend;
             m_catalogContext = context;
             m_queue = new SiteTaskerQueue();
             // IZZY: Just need something non-null for now
             m_queue.setStarvationTracker(new StarvationTracker(siteId));
-            m_site = new MpRoSite(m_queue, siteId, backend, m_catalogContext, partitionId, initiatorMailbox);
+            m_site = new MpRoSite(m_queue, siteId, backend, m_catalogContext,
+                    partitionId, initiatorMailbox);
             m_prf = new ProcedureRunnerFactory();
             m_prf.configure(m_site, m_site.m_sysprocContext);
-            m_loadedProcedures = new LoadedProcedureSet(
-                    m_site,
-                    m_prf,
-                    initiatorMailbox.getHSId(),
-                    0); // Stale constructor arg, fill with bleh
+            m_loadedProcedures = new LoadedProcedureSet(m_site, m_prf,
+                    initiatorMailbox.getHSId(), 0); // Stale constructor arg, fill with bleh
             m_loadedProcedures.loadProcedures(m_catalogContext, m_backend, csp);
             m_site.setLoadedProcedures(m_loadedProcedures);
             m_siteThread = new Thread(m_site);
             m_siteThread.start();
         }
 
-        boolean offer(SiteTasker task)
-        {
+        boolean offer(SiteTasker task) {
             return m_queue.offer(task);
+        }
+
+        long getCatalogCRC() {
+            return m_catalogContext.getCatalogCRC();
+        }
+
+        void shutdown() {
+            m_site.startShutdown();
         }
     }
 
@@ -128,8 +127,19 @@ class MpRoSitePool
     /**
      * Update the catalog
      */
-    void updateCatalog(CatalogContext context, CatalogSpecificPlanner csp)
+    void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
     {
+        m_catalogContext = context;
+        m_csp = csp;
+        // Wipe out all the idle sites with stale catalogs
+        Iterator<MpRoSiteContext> siterator = m_idleSites.iterator();
+        while (siterator.hasNext()) {
+            MpRoSiteContext site = siterator.next();
+            if (site.getCatalogCRC() != m_catalogContext.getCatalogCRC()) {
+                site.shutdown();
+                m_idleSites.remove(site);
+            }
+        }
     }
 
     /**
@@ -196,6 +206,14 @@ class MpRoSitePool
         if (site == null) {
             throw new RuntimeException("No busy site for txnID: " + txnId + " found, shouldn't happen.");
         }
-        m_idleSites.push(site);
+        // check the catalog versions, only push back onto idle if the catalog hasn't changed
+        // otherwise, just let it get garbage collected and let doWork() construct new ones for the
+        // pool with the updated catalog.
+        if (site.getCatalogCRC() == m_catalogContext.getCatalogCRC()) {
+            m_idleSites.push(site);
+        }
+        else {
+            site.shutdown();
+        }
     }
 }

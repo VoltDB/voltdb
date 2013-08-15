@@ -200,6 +200,8 @@ public class MpInitiator extends BaseInitiator implements Promotable
     {
         // note this will never require snapshot isolation because the MPI has no snapshot funtionality
         m_executionSite.updateCatalog(diffCmds, context, csp, false, true);
+        MpScheduler sched = (MpScheduler)m_scheduler;
+        sched.updateCatalog(diffCmds, context, csp);
     }
 
     @Override
