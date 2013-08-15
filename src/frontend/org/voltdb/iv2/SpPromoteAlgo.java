@@ -170,6 +170,8 @@ public class SpPromoteAlgo implements RepairAlgo
             }
             if (response.getPayload() != null) {
                 m_repairLogUnion.add(response);
+                tmLog.trace(m_whoami + " collected from " + CoreUtils.hsIdToString(response.m_sourceHSId) +
+                        ", message: " + response.getPayload());
             }
             if (rrs.update(response)) {
                 tmLog.debug(m_whoami + "collected " + rrs.m_receivedResponses
@@ -211,13 +213,15 @@ public class SpPromoteAlgo implements RepairAlgo
             for (Entry<Long, ReplicaRepairStruct> entry : m_replicaRepairStructs.entrySet()) {
                 if  (entry.getValue().needs(li.getHandle())) {
                     ++queued;
-                    tmLog.debug(m_whoami + "repairing " + entry.getKey() + ". Max seen " +
-                            entry.getValue().m_maxSpHandleSeen + ". Repairing with " +
+                    tmLog.debug(m_whoami + "repairing " + CoreUtils.hsIdToString(entry.getKey()) +
+                            ". Max seen " + entry.getValue().m_maxSpHandleSeen + ". Repairing with " +
                             li.getHandle());
                     needsRepair.add(entry.getKey());
                 }
             }
             if (!needsRepair.isEmpty()) {
+                tmLog.trace(m_whoami + "repairing: " + CoreUtils.hsIdCollectionToString(needsRepair) +
+                        " with message: " + li.getPayload());
                 m_mailbox.repairReplicasWith(needsRepair, li.getPayload());
             }
         }

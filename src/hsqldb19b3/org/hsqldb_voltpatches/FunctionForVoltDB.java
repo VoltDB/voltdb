@@ -367,6 +367,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                     continue;
                 }
                 else if (paramTypes[i].canConvertFrom(nodes[i].dataType)) {
+                    // Add support to pass in a JDBC time string constant
                     if (paramTypes[i].isDateTimeType() && nodes[i].dataType.isCharacterType()) {
                         String datetimestring = (String) nodes[i].valueData;
                         if (datetimestring != null) {
@@ -379,6 +380,8 @@ public class FunctionForVoltDB extends FunctionSQL {
                             }
                             nodes[i].dataType = paramTypes[i];
                         }
+                    } else if (paramTypes[i].isNumberType() && !nodes[i].dataType.isNumberType()) {
+                        throw Error.error(ErrorCode.X_42565);
                     }
                     continue; // accept compatible argument types
                 }
