@@ -27,12 +27,12 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
-import com.google.common.collect.UnmodifiableIterator;
 import org.apache.cassandra_voltpatches.MurmurHash3;
 import org.voltcore.utils.Pair;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSortedMap;
+import com.google.common.collect.UnmodifiableIterator;
 
 /**
  * A hashinator that uses Murmur3_x64_128 to hash values and a consistent hash ring
@@ -48,6 +48,7 @@ public class ElasticHashinator extends TheHashinator {
      */
     private final ImmutableSortedMap<Long, Integer> tokens;
     private final byte m_configBytes[];
+    private final long m_signature;
 
     /**
      * Initialize the hashinator from a binary description of the ring.
@@ -57,6 +58,8 @@ public class ElasticHashinator extends TheHashinator {
      */
     public ElasticHashinator(byte configureBytes[]) {
         m_configBytes = Arrays.copyOf(configureBytes, configureBytes.length);
+        m_signature = TheHashinator.computeConfigurationSignature(m_configBytes);
+
         ByteBuffer buf = ByteBuffer.wrap(configureBytes);
         int numEntries = buf.getInt();
         TreeMap<Long, Integer> buildMap = new TreeMap<Long, Integer>();
@@ -85,6 +88,8 @@ public class ElasticHashinator extends TheHashinator {
     private ElasticHashinator(Map<Long, Integer> tokens) {
         this.tokens = ImmutableSortedMap.copyOf(tokens);
         m_configBytes = toBytes();
+
+        m_signature = TheHashinator.computeConfigurationSignature(m_configBytes);
     }
 
     /**
@@ -348,6 +353,14 @@ public class ElasticHashinator extends TheHashinator {
         }
 
         return ranges;
+    }
+
+    /**
+     * Returns the configuration signature
+     */
+    @Override
+    public long pGetConfigurationSignature() {
+        return m_signature;
     }
 
     @Override
