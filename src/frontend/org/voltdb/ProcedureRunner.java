@@ -114,7 +114,7 @@ public class ProcedureRunner {
     protected final PureJavaCrc32C m_inputCRC = new PureJavaCrc32C();
 
     // running procedure info
-    RunningProcedureContext m_rProcContext = new RunningProcedureContext();
+    protected RunningProcedureContext m_rProcContext;
 
     // Used to get around the "abstract" for StmtProcedures.
     // Path of least resistance?
@@ -142,6 +142,7 @@ public class ProcedureRunner {
         m_site = site;
         m_systemProcedureContext = sysprocContext;
         m_csp = csp;
+        m_rProcContext = new RunningProcedureContext();
 
         m_procedure.init(this);
 
@@ -206,6 +207,7 @@ public class ProcedureRunner {
         ClientResponseImpl retval = null;
         // assert no sql is queued
         assert(m_batch.size() == 0);
+        assert(m_rProcContext.m_voltExecuteSQLIndex == 0);
 
         try {
             m_statsCollector.beginProcedure();
@@ -347,6 +349,7 @@ public class ProcedureRunner {
             m_cachedSingleStmt.params = null;
             m_cachedSingleStmt.expectation = null;
             m_seenFinalBatch = false;
+            m_rProcContext = new RunningProcedureContext();
         }
 
         return retval;
@@ -570,9 +573,9 @@ public class ProcedureRunner {
 
             // memo-ize the original batch size here
             int batchSize = m_batch.size();
+            m_rProcContext.m_voltExecuteSQLIndex++;
 
             m_rProcContext.m_procedureName = this.m_procedureName;
-            m_rProcContext.m_voltExecuteSQLIndex++;
 
             // if batch is small (or reasonable size), do it in one go
             if (batchSize <= MAX_BATCH_SIZE) {
