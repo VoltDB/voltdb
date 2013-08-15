@@ -432,9 +432,14 @@ public class ParameterConverter {
                 bd = bd.setScale(12 ,BigDecimal.ROUND_HALF_EVEN);
                 return bd;
             }
-            if (expectedClz == BigDecimal.class) {
-                return VoltDecimalHelper.deserializeBigDecimalFromString((String) param);
+            if (inputClz == Float.class) {
+                System.out.println(String.format("%f", param));
+                return VoltDecimalHelper.deserializeBigDecimalFromString(String.format("%f", param));
             }
+            if (inputClz == Double.class) {
+                return VoltDecimalHelper.deserializeBigDecimalFromString(String.format("%f", param));
+            }
+            return VoltDecimalHelper.deserializeBigDecimalFromString(String.valueOf(param));
         }
         else if (expectedClz == VoltTable.class && inputClz == VoltTable.class) {
             return param;

@@ -1236,6 +1236,14 @@ public class TestSQLTypesSuite extends RegressionSuite {
         helper_testInvalidParameterSerializations(client, params);
     }
 
+    public void testEng5013() throws NoConnectionsException, ProcCallException, IOException {
+        Client client = this.getClient();
+
+        client.callProcedure("InsertDecimal", 1, 3.4f);
+        client.callProcedure("InsertDecimal", 2, 3.4d);
+
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -1266,6 +1274,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
                 "PassObjectNull",
                 "insert into ALLOW_NULLS values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
                 "NO_NULLS.PKEY: 0");
+        project.addStmtProcedure("InsertDecimal", "INSERT INTO WITH_DEFAULTS (PKEY, A_DECIMAL) VALUES (?, ?);");
 
         boolean success;
 
