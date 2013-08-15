@@ -23,7 +23,7 @@
 
 package org.voltdb.iv2;
 
-import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.*;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -31,14 +31,22 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Random;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import junit.framework.TestCase;
 
 import org.junit.Test;
 import org.mockito.InOrder;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.Pair;
+import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 
@@ -266,6 +274,115 @@ public class TestSpPromoteAlgo extends TestCase
         assertFalse(promotionResult.get());
     }
 
+    @Test
+    public void testFuzz()
+    {
+        InitiatorMailbox mbox = mock(InitiatorMailbox.class);
+        Map<Long, List<TransactionInfoBaseMessage>> finalStreams =
+            new HashMap<Long, List<TransactionInfoBaseMessage>>();
+        Random rand = new Random(System.currentTimeMillis());
+        // Generate a random message stream to several "replicas", interrupted
+        // at random points to all but one.  Validate that promotion repair
+        // results in identical, correct, repair streams to all replicas.
+        TxnEgo sphandle = TxnEgo.makeZero(0);
+        sphandle = sphandle.makeNext();
+        RandomMsgGenerator msgGen = new RandomMsgGenerator();
+        boolean[] stops = new boolean[3];
+        RepairLog[] logs = new RepairLog[3];
+        for (int i = 0; i < 3; i++) {
+            logs[i] = new RepairLog();
+            stops[i] = false;
+            finalStreams.put((long)i, new ArrayList<TransactionInfoBaseMessage>());
+        }
+        for (int i = 0; i < 4000; i++) {
+            // get next message, update the sphandle according to SpScheduler rules,
+            // but only submit messages that would have been forwarded by the master
+            // to the repair log.
+            TransactionInfoBaseMessage msg = msgGen.generateRandomMessageInStream();
+            msg.setSpHandle(sphandle.getTxnId());
+            sphandle = sphandle.makeNext();
+            if (!msg.isReadOnly() || msg instanceof CompleteTransactionMessage) {
+                if (!stops[0]) {
+                    logs[0].deliver(msg);
+                }
+                if (!stops[1]) {
+                    logs[1].deliver(msg);
+                }
+                logs[2].deliver(msg);
+                // Putting this inside this loop
+                // guarantees at least one message in everyone's repair log,
+                // which avoids having to check for the special case where a node
+                // has an empty repair log on account of rejoin and shouldn't
+                // be fed any transactions
+                for (int j = 0; j < 2; j++) {
+                    // Hacky way to get spaced failures
+                    if (rand.nextDouble() < (.01 / ((j + 1) * 5))) {
+                        stops[j] = true;
+                    }
+                }
+            }
+        }
 
+        List<Long> survivors = new ArrayList<Long>();
+        survivors.add(0l);
+        survivors.add(1l);
+        survivors.add(2l);
+        SpPromoteAlgo dut = new SpPromoteAlgo(survivors, mbox, "bleh ", 0);
+        Future<Pair<Boolean, Long>> result = dut.start();
+        for (int i = 0; i < 3; i++) {
+            List<Iv2RepairLogResponseMessage> stuff = logs[i].contents(dut.getRequestId(), false);
+            System.out.println("Repair log size from: " + i + ": " + stuff.size());
+            for (Iv2RepairLogResponseMessage msg : stuff) {
+                msg.m_sourceHSId = (long)i;
+                dut.deliver(msg);
+                // First message is metadata only, skip it in validation stream
+                if (msg.getSequence() > 0) {
+                    //System.out.println("finalstreams: " + finalStreams);
+                    //System.out.println("get(i): " + i + ": " + finalStreams.get((long)i));
+                    //System.out.println("msg: " + msg);
+                    finalStreams.get((long)i).add((TransactionInfoBaseMessage)msg.getPayload());
+                }
+            }
+        }
+        assertFalse(result.isCancelled());
+        assertTrue(result.isDone());
+        // Unfortunately, it's painful to try to stub things to make repairSurvivors() work, so we'll
+        // go and inspect the guts of SpPromoteAlgo instead.  This iteration is largely a copy of the inner loop
+        // of repairSurvivors()
+        for (Iv2RepairLogResponseMessage li : dut.m_repairLogUnion) {
+            for (Entry<Long, SpPromoteAlgo.ReplicaRepairStruct> entry : dut.m_replicaRepairStructs.entrySet()) {
+                if (entry.getValue().needs(li.getHandle())) {
+                    // append the missing message for this 'node' to the list of messages that node has seen
+                    finalStreams.get(entry.getKey()).add((TransactionInfoBaseMessage)li.getPayload());
+                }
+            }
+        }
+        // check that all the lists for all the nodes are identical after repair
+        int longest = Integer.MIN_VALUE;
+        for (Entry<Long, List<TransactionInfoBaseMessage>> entry : finalStreams.entrySet()) {
+            System.out.println("SIZE: " + entry.getValue().size());
+            if (entry.getValue().size() > longest) {
+                if (longest == Integer.MIN_VALUE) {
+                    longest = entry.getValue().size();
+                }
+                else {
+                    fail("Mismatch in repair stream size!");
+                }
+            }
+        }
+        for (int i = 0; i < longest; i++) {
+            TransactionInfoBaseMessage current = null;
+            for (Entry<Long, List<TransactionInfoBaseMessage>> entry : finalStreams.entrySet()) {
+                TransactionInfoBaseMessage msg = entry.getValue().get(i);
+                if (current == null) {
+                    current = msg;
+                }
+                else {
+                    assertEquals(current.getSpHandle(), msg.getSpHandle());
+                    assertEquals(current.getClass(), msg.getClass());
+                }
+            }
+        }
+    }
 }
 

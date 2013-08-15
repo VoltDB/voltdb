@@ -382,7 +382,7 @@ public class ProcedureRunner {
                     }
                 }
             } catch (Exception e) {
-                log.warn("Unable to check partitioning of transaction " + txnState.spHandle, e);
+                log.warn("Unable to check partitioning of transaction " + txnState.m_spHandle, e);
             }
             return false;
         } else {
@@ -655,7 +655,7 @@ public class ProcedureRunner {
         try {
             return m_site.loadTable(m_txnState.txnId,
                              clusterName, databaseName,
-                             tableName, data, returnUniqueViolations);
+                             tableName, data, returnUniqueViolations, Long.MAX_VALUE);
         }
         catch (EEException e) {
             throw new VoltAbortException("Failed to load table: " + tableName);
@@ -1220,7 +1220,7 @@ public class ProcedureRunner {
            fragmentIds,
            null,
            params,
-           m_txnState.spHandle,
+           m_txnState.m_spHandle,
            m_txnState.uniqueId,
            m_catProc.getReadonly());
     }
