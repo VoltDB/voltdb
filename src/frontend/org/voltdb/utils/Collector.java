@@ -55,13 +55,13 @@ public class Collector {
     private static String m_catalogJarPath = null;
     private static String m_deploymentPath = null;
 
-    private static String m_uniqueid = "";
+    private static String m_prefix = "";
     private static String m_host = "";
     private static String m_username = "";
     private static String m_password = "";
     private static boolean m_noPrompt = false;
     private static boolean m_dryRun = false;
-    private static boolean m_noHeapDump = false;
+    private static boolean m_skipHeapDump = false;
     private static boolean m_calledFromVEM = false;
     private static boolean m_fileInfoOnly = false;
 
@@ -73,13 +73,13 @@ public class Collector {
 
     public static void main(String[] args) {
         m_voltDbRootPath = args[0];
-        m_uniqueid = args[1];
+        m_prefix = args[1];
         m_host = args[2];
         m_username = args[3];
         m_password = args[4];
         m_noPrompt = Boolean.parseBoolean(args[5]);
         m_dryRun = Boolean.parseBoolean(args[6]);
-        m_noHeapDump = Boolean.parseBoolean(args[7]);
+        m_skipHeapDump = Boolean.parseBoolean(args[7]);
 
         // arguments only used when Collector is called from VEM
         if (args.length > 8) {
@@ -103,7 +103,7 @@ public class Collector {
         JSONObject jsonObject = parseJSONFile(m_configInfoPath);
         parseJSONObject(jsonObject);
 
-        List<String> collectionFilesList = listCollection(m_noHeapDump);
+        List<String> collectionFilesList = listCollection(m_skipHeapDump);
 
         if (m_dryRun) {
             System.out.println("List of the files to be collected:");
@@ -114,14 +114,14 @@ public class Collector {
             System.out.println("          Use --upload option to enable uploading via SFTP");
         }
         else if (m_fileInfoOnly) {
-            String collectionFilesListPath = m_voltDbRootPath + File.separator + m_uniqueid;
+            String collectionFilesListPath = m_voltDbRootPath + File.separator + m_prefix;
 
             byte jsonBytes[] = null;
             try {
                 JSONStringer stringer = new JSONStringer();
 
                 stringer.object();
-                stringer.key("server").value(m_uniqueid);
+                stringer.key("server").value(m_prefix);
                 stringer.key("files").array();
                 for (String path: collectionFilesList) {
                     stringer.object();
@@ -212,7 +212,7 @@ public class Collector {
         }
     }
 
-    private static List<String> listCollection(boolean noHeapDump) {
+    private static List<String> listCollection(boolean skipHeapDump) {
         List<String> collectionFilesList = new ArrayList<String>();
 
         try {
@@ -242,7 +242,7 @@ public class Collector {
                 }
             }
 
-            if (!noHeapDump) {
+            if (!skipHeapDump) {
                 for (File file: new File("/tmp").listFiles()) {
                     if (file.getName().equals("java_pid" + m_pid + ".hprof")) {
                         collectionFilesList.add(file.getCanonicalPath());
@@ -288,7 +288,7 @@ public class Collector {
                 rootpath = System.getProperty("user.dir");
             }
 
-            String collectionFilePath = rootpath + File.separator + m_uniqueid + timestamp + ".tgz";
+            String collectionFilePath = rootpath + File.separator + m_prefix + timestamp + ".tgz";
             File collectionFile = new File(collectionFilePath);
             TarGenerator tarGenerator = new TarGenerator(collectionFile, true, null);
 
