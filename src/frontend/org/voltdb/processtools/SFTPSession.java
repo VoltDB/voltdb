@@ -660,73 +660,109 @@ public class SFTPSession {
     }
 
     public String exec(String command) {
+        return exec(command, 5000);
+    }
+
+    public String exec(String command, int timeout) {
+        ChannelExec channel = null;
+        BufferedReader outStrBufRdr = null;
+        BufferedReader errStrBufRdr = null;
+
         StringBuilder result = new StringBuilder(2048);
 
-        ChannelExec channel;
         try {
-            channel = (ChannelExec)m_session.openChannel("exec");
-        } catch (JSchException jsex) {
-            throw new SFTPException("create an EXEC channel", jsex);
-        }
-
-        try{
-            channel.setCommand(command);
-
-            // Direct stderr output of command
-            InputStream err = channel.getErrStream();
-            InputStreamReader errStrRdr = new InputStreamReader(err, "UTF-8");
-            Reader errStrBufRdr = new BufferedReader(errStrRdr);
+            try {
+                channel = (ChannelExec)m_session.openChannel("exec");
+            } catch (JSchException jex) {
+                throw new SSHException("opening ssh exec channel", jex);
+            }
 
             // Direct stdout output of command
-            InputStream out = channel.getInputStream();
-            InputStreamReader outStrRdr = new InputStreamReader(out, "UTF-8");
-            Reader outStrBufRdr = new BufferedReader(outStrRdr);
+            try {
+                InputStream out = channel.getInputStream();
+                InputStreamReader outStrRdr = new InputStreamReader(out, "UTF-8");
+                outStrBufRdr = new BufferedReader(outStrRdr);
+            } catch (IOException ioex) {
+                throw new SSHException("geting exec channel input stream", ioex);
+            }
+
+            // Direct stderr output of command
+            try {
+                InputStream err = channel.getErrStream();
+                InputStreamReader errStrRdr = new InputStreamReader(err, "UTF-8");
+                errStrBufRdr = new BufferedReader(errStrRdr);
+            } catch (IOException ioex) {
+                throw new SSHException("getting exec channel error stream", ioex);
+            }
+            channel.setCommand(command);
 
             StringBuffer stdout = new StringBuffer();
             StringBuffer stderr = new StringBuffer();
 
-            channel.connect(5000);  // timeout after 5 seconds
-            while (true) {
-                if (channel.isClosed()) {
-                    break;
-                }
+            try {
+                channel.connect(timeout);
+                int retries = timeout / 100;
+                while (!channel.isClosed() && retries-- > 0) {
+                    // Read from both streams here so that they are not blocked,
+                    // if they are blocked because the buffer is full, channel.isClosed() will never
+                    // be true.
+                    int ch;
+                    try {
+                        while (outStrBufRdr.ready() && (ch = outStrBufRdr.read()) > -1) {
+                            stdout.append((char) ch);
+                        }
+                    } catch (IOException ioex) {
+                        throw new SSHException("capturing '" + command + "' output", ioex);
+                    }
+                    try {
+                        while (errStrBufRdr.ready() && (ch = errStrBufRdr.read()) > -1) {
+                            stderr.append((char) ch);
+                        }
+                    } catch (IOException ioex) {
+                        throw new SSHException("capturing '" + command + "' error", ioex);
+                    }
 
-                // Read from both streams here so that they are not blocked,
-                // if they are blocked because the buffer is full, channel.isClosed() will never
-                // be true.
-                int ch;
-                while (outStrBufRdr.ready() && (ch = outStrBufRdr.read()) > -1) {
-                    stdout.append((char) ch);
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException ignoreIt) {}
                 }
-                while (errStrBufRdr.ready() && (ch = errStrBufRdr.read()) > -1) {
-                    stderr.append((char) ch);
+                if (retries < 0) {
+                    throw new SSHException("'" + command + "' timed out");
                 }
-
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException ie) {
-                }
+            } catch (JSchException jex) {
+                throw new SSHException("executing '" + command + "'", jex);
             }
 
             // In case there's still some more stuff in the buffers, read them
             int ch;
-            while ((ch = outStrBufRdr.read()) > -1) {
-                stdout.append((char) ch);
+            try {
+                while ((ch = outStrBufRdr.read()) > -1) {
+                    stdout.append((char) ch);
+                }
+            } catch (IOException ioex) {
+                throw new SSHException("capturing '" + command + "' output", ioex);
             }
-            while ((ch = errStrBufRdr.read()) > -1) {
-                stderr.append((char) ch);
+            try {
+                while ((ch = errStrBufRdr.read()) > -1) {
+                    stderr.append((char) ch);
+                }
+            } catch (IOException ioex) {
+                throw new SSHException("capturing '" + command + "' error", ioex);
+            }
+            if (stderr.length() > 0) {
+                throw new SSHException(stderr.toString());
             }
 
-            // After the command is executed, gather the results (both stdin and stderr).
             result.append(stdout.toString());
             result.append(stderr.toString());
+        } finally {
+            if (outStrBufRdr != null) try { outStrBufRdr.close(); } catch (Exception ignoreIt) {}
+            if (errStrBufRdr != null) try { errStrBufRdr.close(); } catch (Exception ignoreIt) {}
 
-            // Shutdown the connection
-            channel.disconnect();
-        }
-        catch(Throwable e){
-            e.printStackTrace();
-            // Return empty string if we can't connect.
+            if (channel != null && channel.isConnected()) {
+                // Shutdown the connection
+                channel.disconnect();
+            }
         }
 
         return result.toString();

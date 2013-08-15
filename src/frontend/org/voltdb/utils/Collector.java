@@ -30,6 +30,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 import org.hsqldb_voltpatches.lib.tar.TarGenerator;
 import org.hsqldb_voltpatches.lib.tar.TarMalformatException;
@@ -37,13 +39,15 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltcore.logging.VoltLogger;
+
 import org.voltdb.processtools.SFTPSession;
+import org.voltdb.processtools.SFTPSession.SFTPException;
 import org.voltdb.processtools.SSHTools;
 import org.voltdb.types.TimestampType;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Throwables;
+import com.google.common.net.HostAndPort;
 
 public class Collector {
     private static String m_voltDbRootPath = null;
@@ -64,8 +68,6 @@ public class Collector {
     private static int m_pid = 0;
     private static String m_workingDir = null;
     private static List<String> m_logPaths = new ArrayList<String>();
-
-    private static final VoltLogger m_log = new VoltLogger("CONSOLE");
 
     public static String[] cmdFilenames = {"sardata", "dmesgdata"};
 
@@ -92,7 +94,7 @@ public class Collector {
 
         File voltDbRoot = new File(m_voltDbRootPath);
         if (!voltDbRoot.exists()) {
-            m_log.error("voltdbroot path '" + m_voltDbRootPath + "' does not exist.");
+            System.err.println("voltdbroot path '" + m_voltDbRootPath + "' does not exist.");
             System.exit(-1);
         }
 
@@ -184,11 +186,11 @@ public class Collector {
 
             jsonObject = new JSONObject(builder.toString());
         } catch (FileNotFoundException e) {
-            m_log.error("config log file '" + configInfoPath + "' could not be found.");
+            System.err.println("config log file '" + configInfoPath + "' could not be found.");
         } catch (IOException e) {
-            m_log.error(e.getMessage());
+            System.err.println(e.getMessage());
         } catch (JSONException e) {
-            m_log.error(e.getMessage());
+            System.err.println(e.getMessage());
         }
 
         return jsonObject;
@@ -206,7 +208,7 @@ public class Collector {
                 m_logPaths.add(path);
             }
         } catch (JSONException e) {
-            m_log.error(e.getMessage());
+            System.err.println(e.getMessage());
         }
     }
 
@@ -262,7 +264,7 @@ public class Collector {
                 }
             }
         } catch (IOException e) {
-            m_log.error(e.getMessage());
+            System.err.println(e.getMessage());
         }
 
         return collectionFilesList;
@@ -279,6 +281,9 @@ public class Collector {
             else {
                 TimestampType ts = new TimestampType(new java.util.Date());
                 timestamp = ts.toString().replace(' ', '-');
+
+                // get rid of microsecond part
+                timestamp = timestamp.substring(0, "YYYY-mm-DD-HH:MM:ss".length());
 
                 rootpath = System.getProperty("user.dir");
             }
@@ -322,11 +327,11 @@ public class Collector {
             String[] dmesgCmd = {"bash", "-c", "/bin/dmesg"};
             cmd(tarGenerator, dmesgCmd, "dmesgdata");
 
-            tarGenerator.write();
+            tarGenerator.write(false, true);
 
             long sizeInByte = collectionFile.length();
             String sizeStringInKB = String.format("%5.2f", (double)sizeInByte / 1000);
-            m_log.info("Collection file created at " + collectionFilePath + " size: " + sizeStringInKB + " KB");
+            System.out.println("Collection file created at " + collectionFilePath + " size: " + sizeStringInKB + " KB");
 
             boolean upload = false;
             if (!m_host.isEmpty()) {
@@ -349,9 +354,10 @@ public class Collector {
                         m_password = new String(System.console().readPassword());
                     }
 
-                    boolean res = uploadToServer(collectionFilePath, m_host, m_username, m_password);
-                    if (res) {
-                        m_log.info("Uploaded " + new File(collectionFilePath).getName() + " via SFTP");
+                    try {
+                        uploadToServer(collectionFilePath, m_host, m_username, m_password);
+
+                        System.out.println("Uploaded " + new File(collectionFilePath).getName() + " via SFTP");
 
                         boolean delLocalCopy = false;
                         if (m_noPrompt) {
@@ -364,32 +370,34 @@ public class Collector {
                         if (delLocalCopy) {
                             try {
                                 collectionFile.delete();
-                                m_log.info("Local copy "  + collectionFilePath + " deleted");
+                                System.out.println("Local copy "  + collectionFilePath + " deleted");
                             } catch (SecurityException e) {
-                                m_log.info("Failed to delete local copy " + collectionFilePath + ". " + e.getMessage());
+                                System.out.println("Failed to delete local copy " + collectionFilePath + ". " + e.getMessage());
                             }
                         }
-                    }
-                    else {
-                        m_log.info("Failed to upload. Probably due to wrong credential provided. "
-                                + "Local copy could be found at " + collectionFilePath);
+                    } catch (Exception e) {
+                        System.err.println(e.getMessage());
                     }
                 }
                 else {
-                    m_log.info("Uploading is only available in the Enterprise Edition");
+                    System.out.println("Uploading is only available in the Enterprise Edition");
                 }
             }
-        } catch (IOException e) {
-            m_log.error(e.getMessage());
-        } catch (TarMalformatException e) {
-            m_log.error(e.getMessage());
+        } catch (Exception e) {
+            System.err.println(e.getMessage());
         }
     }
 
     private static boolean getUserResponse(String prompt) {
         while (true) {
             System.out.print(prompt + " [y/n]? ");
-            switch (System.console().readLine().charAt(0)) {
+            String response = System.console().readLine();
+
+            if (response.isEmpty()) {
+                continue;
+            }
+
+            switch (response.charAt(0)) {
             case 'Y':
             case 'y':
                 return true;
@@ -423,24 +431,28 @@ public class Collector {
         }
     }
 
-    public static boolean uploadToServer(String collectionFilePath, String host, String username, String password) {
-        SSHTools ssh = new SSHTools(username, null);
+    public static boolean uploadToServer(String collectionFilePath, String host, String username, String password) throws Exception {
+        attemptConnect(host, username, password);
 
-        String rootpath = ssh.cmdSSH(username, password, null, host, "pwd").trim();
-        if (rootpath.isEmpty()) {
-            // SSH cannot connect
-            return false;
+        SSHTools ssh = new SSHTools(username, null);
+        SFTPSession sftp = null;
+
+        HostAndPort hostAndPort = HostAndPort.fromString(host);
+        if (hostAndPort.hasPort()) {
+            sftp = ssh.getSftpSession(username, password, null, hostAndPort.getHostText(), hostAndPort.getPort(), null);
         }
+        else {
+            sftp = ssh.getSftpSession(username, password, null, host, null);
+        }
+
+        String rootpath = sftp.exec("pwd").trim();
 
         HashMap<File, File> files = new HashMap<File, File>();
         File src = new File(collectionFilePath);
         File dest = new File(rootpath + File.separator + new File(collectionFilePath).getName());
         files.put(src, dest);
 
-        SFTPSession sftp = null;
         try {
-            sftp = ssh.getSftpSession(username, password, null, host, null);
-
             sftp.ensureDirectoriesExistFor(files.values());
             sftp.copyOverFiles(files);
         } finally {
@@ -450,5 +462,50 @@ public class Collector {
         }
 
         return true;
+    }
+
+    public static void attemptConnect(String host, String username, String password) throws Exception {
+        SSHTools ssh = new SSHTools(username, null);
+
+        try {
+            HostAndPort hostAndPort = HostAndPort.fromString(host);
+            if (hostAndPort.hasPort()) {
+                ssh.getSftpSession(username, password, null, hostAndPort.getHostText(), hostAndPort.getPort(), null);
+            }
+            else {
+                ssh.getSftpSession(username, password, null, host, null);
+            }
+        } catch (SFTPException e) {
+            String errorMsg = e.getCause().getMessage();
+
+            /*
+             * e.getCause() is JSchException and the java exception class name only appears in message
+             * hide java class name and extract error message
+             */
+            Pattern pattern = Pattern.compile("(java.*Exception: )(.*)");
+            Matcher matcher = pattern.matcher(errorMsg);
+
+            if (matcher.matches()) {
+                if (errorMsg.startsWith("java.net.UnknownHostException")) {
+                    throw new Exception("Unknown host: " + matcher.group(2));
+                }
+                else {
+                    throw new Exception(matcher.group(2));
+                }
+            }
+            else {
+                if (errorMsg.equals("Auth cancel") || errorMsg.equals("Auth fail")) {
+                    // "Auth cancel" appears when username doesn't exist or password is wrong
+                    throw new Exception("Authorization rejected");
+                }
+                else {
+                    throw new Exception(errorMsg.substring(0, 1).toUpperCase() + errorMsg.substring(1));
+                }
+            }
+        } catch (Exception e) {
+            String errorMsg = e.getMessage();
+
+            throw new Exception(errorMsg.substring(0, 1).toUpperCase() + errorMsg.substring(1));
+        }
     }
 }
