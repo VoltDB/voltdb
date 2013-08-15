@@ -1,0 +1,78 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2013 VoltDB Inc.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+package org.voltdb_testprocs.regressionsuites.matviewprocs;
+
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+
+@ProcInfo (
+    singlePartition = false
+)
+public class TruncateMatViewDataMP extends VoltProcedure {
+    /* TODO: Migrate this use TRUNCATE table as soon as it is supported */
+    public final SQLStmt truncatebase1 = new SQLStmt("DELETE FROM PEOPLE;");
+    public final SQLStmt truncatebase2 = new SQLStmt("DELETE FROM THINGS;");
+    public final SQLStmt truncatebase3 = new SQLStmt("DELETE FROM OVERFLOWTEST;");
+    public final SQLStmt truncatebase4 = new SQLStmt("DELETE FROM ENG798;");
+
+    public final SQLStmt validatebase1 = new SQLStmt("SELECT COUNT(*) FROM PEOPLE;");
+    public final SQLStmt validatebase2 = new SQLStmt("SELECT COUNT(*) FROM THINGS;");
+    public final SQLStmt validatebase3 = new SQLStmt("SELECT COUNT(*) FROM OVERFLOWTEST;");
+    public final SQLStmt validatebase4 = new SQLStmt("SELECT COUNT(*) FROM ENG798;");
+    public final SQLStmt validateview1 = new SQLStmt("SELECT COUNT(*) FROM MATPEOPLE;");
+    public final SQLStmt validateview2 = new SQLStmt("SELECT COUNT(*) FROM MATTHINGS;");
+    public final SQLStmt validateview3 = new SQLStmt("SELECT COUNT(*) FROM V_OVERFLOWTEST;");
+    public final SQLStmt validateview4 = new SQLStmt("SELECT COUNT(*) FROM V_ENG798;");
+
+    public VoltTable[] run() {
+        VoltTable[] result;
+        voltQueueSQL(truncatebase1); // ("DELETE FROM PEOPLE;");
+        voltQueueSQL(truncatebase2); // ("DELETE FROM THINGS;");
+        voltQueueSQL(truncatebase3); // ("DELETE FROM OVERFLOWTEST;");
+        voltQueueSQL(truncatebase4); // ("DELETE FROM ENG798;");
+        result = voltExecuteSQL();
+        /*
+        for (VoltTable deleted : result) {
+            System.out.println("DEBUG Deleted: " + deleted.asScalarLong());
+        }
+        */
+        voltQueueSQL(validatebase1); // ("SELECT COUNT(*) FROM PEOPLE;");
+        voltQueueSQL(validatebase2); // ("SELECT COUNT(*) FROM THINGS;");
+        voltQueueSQL(validatebase3); // ("SELECT COUNT(*) FROM OVERFLOWTEST;");
+        voltQueueSQL(validatebase4); // ("SELECT COUNT(*) FROM ENG798;");
+        voltQueueSQL(validateview1); // ("SELECT COUNT(*) FROM MATPEOPLE;");
+        voltQueueSQL(validateview2); // ("SELECT COUNT(*) FROM MATTHINGS;");
+        voltQueueSQL(validateview3); // ("SELECT COUNT(*) FROM V_OVERFLOWTEST;");
+        voltQueueSQL(validateview4); // ("SELECT COUNT(*) FROM V_ENG798;");
+        result = voltExecuteSQL(true);
+        /*
+        for (VoltTable deleted : result) {
+            System.out.println("DEBUG Validated deletion: " + deleted.asScalarLong());
+        }
+        */
+        return result;
+    }
+}

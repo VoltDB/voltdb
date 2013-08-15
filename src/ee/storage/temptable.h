@@ -128,6 +128,10 @@ class TempTable : public Table {
     // Deprecating this ugly name, and bogus return value. For now it's a wrapper.
     bool insertTupleNonVirtual(TableTuple &source) { insertTempTuple(source); return true; };
 
+    bool isTempTableEmpty() { return m_tupleCount == 0; }
+
+    int64_t tempTableTupleCount() const { return m_tupleCount; }
+
     // ------------------------------------------------------------------
     // INDEXES
     // ------------------------------------------------------------------

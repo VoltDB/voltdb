@@ -1,0 +1,15 @@
+Scan Measurement Application
+===========================
+
+Param explanation:
+
+runs =
+--------------------------------------------
+
+Measures the number of times each table will be scanned. The results will be averaged.
+Since loading is usually slower than scanning, there's no reason not to set this higher.
+
+rows =
+--------------------------------------------
+
+How many rows to load into each table.
