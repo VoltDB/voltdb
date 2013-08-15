@@ -248,6 +248,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         for (TupleValueExpression tve : predicate_tves)
         {
             int index = outer_schema.getIndexOfTve(tve);
+            int tableIdx = 0;   // 0 for outer table
             if (index == -1)
             {
                 index = inner_schema.getIndexOfTve(tve);
@@ -256,8 +257,10 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
                     throw new RuntimeException("Unable to find index for join TVE: " +
                                                tve.toString());
                 }
+                tableIdx = 1;   // 1 for inner table
             }
             tve.setColumnIndex(index);
+            tve.setTableIndex(tableIdx);
         }
     }
 

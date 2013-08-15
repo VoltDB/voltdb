@@ -59,14 +59,13 @@ class SerializeOutput;
 
 class TupleValueExpression : public AbstractExpression {
   public:
-    TupleValueExpression(int value_idx, std::string tableName, std::string colName)
+    TupleValueExpression(int value_idx, std::string tableName, int table_idx)
         : AbstractExpression(EXPRESSION_TYPE_VALUE_TUPLE)
     {
         VOLT_TRACE("OptimizedTupleValueExpression %d %d", m_type, value_idx);
-        this->tuple_idx = 0;
+        this->tuple_idx = table_idx;
         this->value_idx = value_idx;
         this->table_name = tableName;
-        this->column_name = colName;
     };
 
     virtual voltdb::NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
@@ -104,17 +103,11 @@ class TupleValueExpression : public AbstractExpression {
         return table_name;
     }
 
-    // Don't know this index until the executor examines the expression.
-    void setTupleIndex(int idx) {
-        tuple_idx = idx;
-    }
-
   protected:
 
     int tuple_idx;           // which tuple. defaults to tuple1
     int value_idx;           // which (offset) column of the tuple
     std::string table_name;
-    std::string column_name;
 };
 
 }

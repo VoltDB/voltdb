@@ -114,7 +114,6 @@ public:
     UnaryFunctionExpression(AbstractExpression *child)
         : AbstractExpression(EXPRESSION_TYPE_FUNCTION)
         , m_child(child) {
-        this->addArg(child);
     }
 
     virtual ~UnaryFunctionExpression() {
@@ -154,25 +153,20 @@ template <int F>
 class GeneralFunctionExpression : public AbstractExpression {
 public:
     GeneralFunctionExpression(const std::vector<AbstractExpression *>& args)
-        : AbstractExpression(EXPRESSION_TYPE_FUNCTION), m_functionArgs(args)
-{
-    for (int i = 0; i < args.size(); i++) {
-        this->addArg(args[i]);
-    }
-}
+        : AbstractExpression(EXPRESSION_TYPE_FUNCTION), m_args(args) {}
 
     virtual ~GeneralFunctionExpression() {
-        size_t i = m_functionArgs.size();
+        size_t i = m_args.size();
         while (i--) {
-            delete m_functionArgs[i];
+            delete m_args[i];
         }
-        delete &m_functionArgs;
+        delete &m_args;
     }
 
     virtual bool hasParameter() const {
-        for (size_t i = 0; i < m_functionArgs.size(); i++) {
-            assert(m_functionArgs[i]);
-            if (m_functionArgs[i]->hasParameter()) {
+        for (size_t i = 0; i < m_args.size(); i++) {
+            assert(m_args[i]);
+            if (m_args[i]->hasParameter()) {
                 return true;
             }
         }
@@ -184,10 +178,10 @@ public:
             return;
 
         VOLT_TRACE("Substituting parameters for expression \n%s ...", debug(true).c_str());
-        for (size_t i = 0; i < m_functionArgs.size(); i++) {
-            assert(m_functionArgs[i]);
+        for (size_t i = 0; i < m_args.size(); i++) {
+            assert(m_args[i]);
             VOLT_TRACE("Substituting parameters for arg at index %d...", static_cast<int>(i));
-            m_functionArgs[i]->substitute(params);
+            m_args[i]->substitute(params);
         }
     }
 
@@ -195,9 +189,9 @@ public:
         //TODO: Could make this vector a member, if the memory management implications
         // (of the NValue internal state) were clear -- is there a penalty for longer-lived
         // NValues that outweighs the current per-eval allocation penalty?
-        std::vector<NValue> nValue(m_functionArgs.size());
-        for (int i = 0; i < m_functionArgs.size(); ++i) {
-            nValue[i] = m_functionArgs[i]->eval(tuple1, tuple2);
+        std::vector<NValue> nValue(m_args.size());
+        for (int i = 0; i < m_args.size(); ++i) {
+            nValue[i] = m_args[i]->eval(tuple1, tuple2);
         }
         return NValue::call<F>(nValue);
     }
@@ -209,7 +203,7 @@ public:
     }
 
 private:
-    const std::vector<AbstractExpression *>& m_functionArgs;
+    const std::vector<AbstractExpression *>& m_args;
 };
 
 }

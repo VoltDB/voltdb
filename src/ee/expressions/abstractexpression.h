@@ -132,14 +132,6 @@ class AbstractExpression {
         return m_right;
     }
 
-    const std::vector<AbstractExpression*>& getArgs() const {
-        return m_args;
-    }
-
-    void addArg(AbstractExpression* arg) {
-        m_args.push_back(arg);
-    }
-
   protected:
     AbstractExpression();
     AbstractExpression(ExpressionType type);
@@ -153,7 +145,6 @@ class AbstractExpression {
 
   protected:
     AbstractExpression *m_left, *m_right;
-    std::vector<AbstractExpression*> m_args;
     ExpressionType m_type;
     bool m_hasParameter;
     ValueType m_valueType;

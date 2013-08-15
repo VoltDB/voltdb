@@ -86,7 +86,6 @@ AbstractExpression::~AbstractExpression()
 {
     delete m_left;
     delete m_right;
-    m_args.clear();
 }
 
 void
