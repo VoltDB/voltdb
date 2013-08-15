@@ -557,6 +557,37 @@ public class TestOrderBySuite extends RegressionSuite {
         }
     }
 
+    public void testEng5021() throws Exception
+    {
+        Client client = getClient();
+        client.callProcedure("InsertO3", 1,1,1,1);
+        client.callProcedure("InsertO3", 1,2,1,1);
+        client.callProcedure("InsertO3", 1,3,1,1);
+        client.callProcedure("InsertO3", 2,1,2,2);
+        client.callProcedure("InsertO3", 2,2,2,2);
+        client.callProcedure("InsertO3", 2,3,2,2);
+        client.callProcedure("InsertO3", 3,3,3,3);
+        client.callProcedure("InsertO3", 4,4,4,4);
+        client.callProcedure("InsertO3", 5,5,5,5);
+
+        VoltTable vt = client.callProcedure("@AdHoc", "SELECT * FROM O3 WHERE PK1 = 1 ORDER BY PK2 DESC LIMIT 1").getResults()[0];
+        System.out.println(vt.toString());
+        assertEquals(3, vt.fetchRow(0).getLong(1));
+
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM O3 WHERE PK1 = 1 ORDER BY PK1, PK2 DESC").getResults()[0];
+        System.out.println(vt.toString());
+        assertEquals(3, vt.fetchRow(0).getLong(1));
+
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM O3 WHERE PK1 = 1 ORDER BY PK1, PK2").getResults()[0];
+        System.out.println(vt.toString());
+        assertEquals(1, vt.fetchRow(0).getLong(1));
+
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM O3 WHERE PK1 = 1 ORDER BY PK2").getResults()[0];
+        System.out.println(vt.toString());
+        assertEquals(1, vt.fetchRow(0).getLong(1));
+
+    }
+
     //
     // Suite builder boilerplate
     //
@@ -576,6 +607,7 @@ public class TestOrderBySuite extends RegressionSuite {
         project.addPartitionInfo("a", "a");
         project.addStmtProcedure("InsertA", "INSERT INTO A VALUES(?);");
         project.addStmtProcedure("InsertB", "INSERT INTO B VALUES(?);");
+        project.addStmtProcedure("InsertO3", "INSERT INTO 03 VALUES (?, ?, ?, ?);");
         project.addProcedures(PROCEDURES);
 
         config = new LocalCluster("testorderby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
