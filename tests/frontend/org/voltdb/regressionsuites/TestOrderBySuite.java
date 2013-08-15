@@ -607,7 +607,6 @@ public class TestOrderBySuite extends RegressionSuite {
         project.addPartitionInfo("a", "a");
         project.addStmtProcedure("InsertA", "INSERT INTO A VALUES(?);");
         project.addStmtProcedure("InsertB", "INSERT INTO B VALUES(?);");
-        project.addStmtProcedure("InsertO3", "INSERT INTO 03 VALUES (?, ?, ?, ?);");
         project.addProcedures(PROCEDURES);
 
         config = new LocalCluster("testorderby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
