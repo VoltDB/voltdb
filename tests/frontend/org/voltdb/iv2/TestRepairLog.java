@@ -33,6 +33,7 @@ import java.util.List;
 import junit.framework.TestCase;
 
 import org.junit.Test;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -208,4 +209,57 @@ public class TestRepairLog extends TestCase
         assertEquals(1, rl.contents(1L, false).size());
     }
 
+    // validate the invariants on the RepairLog contents:
+    // Every entry in the log should have a unique, constantly increasing SP handle.
+    // There should be only one FragmentTaskMessage per MP TxnID
+    // There should be at most one FragmentTaskMessage uncovered by a CompleteTransactionMessage
+    // There should be no CompleteTransactionMessages indicating restart
+    private void validateRepairLog(List<Iv2RepairLogResponseMessage> stuff)
+    {
+        long prevHandle = Long.MIN_VALUE;
+        Long mpTxnId = null;
+        for (Iv2RepairLogResponseMessage imsg : stuff) {
+            if (imsg.getSequence() > 0) {
+                assertTrue(imsg.getHandle() > prevHandle);
+                prevHandle = imsg.getHandle();
+                if (imsg.getPayload() instanceof FragmentTaskMessage) {
+                    assertEquals(null, mpTxnId);
+                    mpTxnId = imsg.getTxnId();
+                } else if (imsg.getPayload() instanceof CompleteTransactionMessage) {
+                    // can see bare CompleteTransactionMessage, but if we've got an MP
+                    // in progress this should close it
+                    assertFalse(((CompleteTransactionMessage)imsg.getPayload()).isRestart());
+                    if (mpTxnId != null) {
+                        assertEquals((long)mpTxnId, imsg.getTxnId());
+                    }
+                    mpTxnId = null;
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testFuzz()
+    {
+        TxnEgo sphandle = TxnEgo.makeZero(0);
+        sphandle = sphandle.makeNext();
+        RandomMsgGenerator msgGen = new RandomMsgGenerator();
+        RepairLog dut = new RepairLog();
+        for (int i = 0; i < 4000; i++) {
+            // get next message, update the sphandle according to SpScheduler rules,
+            // but only submit messages that would have been forwarded by the master
+            // to the repair log.
+            TransactionInfoBaseMessage msg = msgGen.generateRandomMessageInStream();
+            msg.setSpHandle(sphandle.getTxnId());
+            sphandle = sphandle.makeNext();
+            if (!msg.isReadOnly() || msg instanceof CompleteTransactionMessage) {
+                dut.deliver(msg);
+            }
+        }
+        List<Iv2RepairLogResponseMessage> stuff = dut.contents(1l, false);
+        validateRepairLog(stuff);
+        // Also check the MP version
+        stuff = dut.contents(1l, true);
+        validateRepairLog(stuff);
+    }
 }

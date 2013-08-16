@@ -76,9 +76,15 @@ public class TestPushDownAggregates extends PlannerTestCase {
 
     public void testAvgOnPartitionedTable() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT AVG(A1) from T1");
+        for (AbstractPlanNode apn: pn) {
+            System.out.println(apn.toExplainPlanString());
+        }
         checkPushedDown(pn, true,
-                        new ExpressionType[] {ExpressionType.AGGREGATE_AVG},
-                        null);
+                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_COUNT},
+                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_SUM},
+                        true);
     }
 
     public void testCountStarWithGroupBy() {
@@ -118,14 +124,61 @@ public class TestPushDownAggregates extends PlannerTestCase {
     public void testAllAggregates() {
         List<AbstractPlanNode> pn =
             compileToFragments("SELECT count(*), count(PKEY), sum(PKEY), min(PKEY), max(PKEY), avg(PKEY) FROM T1");
+        for (AbstractPlanNode apn: pn) {
+            System.out.println(apn.toExplainPlanString());
+        }
         checkPushedDown(pn, true,
                         new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR,
                                               ExpressionType.AGGREGATE_COUNT,
                                               ExpressionType.AGGREGATE_SUM,
                                               ExpressionType.AGGREGATE_MIN,
+                                              ExpressionType.AGGREGATE_MAX},
+                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_MIN,
+                                              ExpressionType.AGGREGATE_MAX},
+                        true);
+    }
+
+    public void testAllAggregatesAVG1() {
+        List<AbstractPlanNode> pn =
+            compileToFragments("SELECT count(*), count(PKEY), min(PKEY), max(PKEY), avg(PKEY) FROM T1");
+        for (AbstractPlanNode apn: pn) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        checkPushedDown(pn, true,
+                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR,
+                                              ExpressionType.AGGREGATE_COUNT,
+                                              ExpressionType.AGGREGATE_MIN,
                                               ExpressionType.AGGREGATE_MAX,
-                                              ExpressionType.AGGREGATE_AVG},
-                        null);
+                                              ExpressionType.AGGREGATE_SUM},
+                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_MIN,
+                                              ExpressionType.AGGREGATE_MAX,
+                                              ExpressionType.AGGREGATE_SUM},
+                        true);
+    }
+
+    public void testAllAggregatesAVG2() {
+        List<AbstractPlanNode> pn =
+            compileToFragments("SELECT count(*), min(PKEY), max(PKEY), avg(PKEY) FROM T1");
+        for (AbstractPlanNode apn: pn) {
+            System.out.println(apn.toExplainPlanString());
+        }
+        checkPushedDown(pn, true,
+                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR,
+                                              ExpressionType.AGGREGATE_MIN,
+                                              ExpressionType.AGGREGATE_MAX,
+                                              ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_COUNT},
+                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_MIN,
+                                              ExpressionType.AGGREGATE_MAX,
+                                              ExpressionType.AGGREGATE_SUM,
+                                              ExpressionType.AGGREGATE_SUM},
+                        true);
     }
 
     public void testGroupByNotInDisplayColumn() {
