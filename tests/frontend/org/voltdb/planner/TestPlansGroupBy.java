@@ -167,6 +167,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
         pns = compileToFragments("SELECT A1, SUM(PKEY) as A2, (SUM(PKEY) / 888) as A3, (SUM(PKEY) + 1) as A4 FROM P1 GROUP BY A1");
         checkHasComplexAgg(pns);
 
+        pns = compileToFragments("SELECT A1, SUM(PKEY), COUNT(PKEY), (AVG(PKEY) + 1) as A4 FROM P1 GROUP BY A1");
+        checkHasComplexAgg(pns);
     }
 
     public void testComplexGroupby() {
@@ -183,6 +185,40 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertTrue(p instanceof AggregatePlanNode);
         assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
 
+        pns = compileToFragments("SELECT A1+PKEY, avg(B1) as tag FROM P1 GROUP BY A1+PKEY ORDER BY ABS(tag), A1+PKEY");
+        checkHasComplexAgg(pns);
+    }
+
+
+    public void testUnOptimizedAVG() {
+        pns = compileToFragments("SELECT AVG(A1) FROM R1");
+        checkOptimizedAgg(pns, false);
+
+        pns = compileToFragments("SELECT A1, AVG(PKEY) FROM R1 GROUP BY A1");
+        checkOptimizedAgg(pns, false);
+
+        pns = compileToFragments("SELECT A1, AVG(PKEY)+1 FROM R1 GROUP BY A1");
+        checkHasComplexAgg(pns);
+        AbstractPlanNode p = pns.get(0).getChild(0);
+        assertTrue(p instanceof ProjectionPlanNode);
+        assertTrue(p.getChild(0) instanceof AggregatePlanNode);
+        assertTrue(p.getChild(0).getChild(0) instanceof AbstractScanPlanNode);
+    }
+
+    public void testOptimizedAVG() {
+        pns = compileToFragments("SELECT AVG(A1) FROM P1");
+        checkHasComplexAgg(pns);
+        checkOptimizedAgg(pns, true);
+
+        pns = compileToFragments("SELECT A1, AVG(PKEY) FROM P1 GROUP BY A1");
+        checkHasComplexAgg(pns);
+        // Test avg pushed down by replacing it with sum, count
+        checkOptimizedAgg(pns, true);
+
+        pns = compileToFragments("SELECT A1, AVG(PKEY)+1 FROM P1 GROUP BY A1");
+        checkHasComplexAgg(pns);
+        // Test avg pushed down by replacing it with sum, count
+        checkOptimizedAgg(pns, true);
     }
 
     private void checkHasComplexAgg(List<AbstractPlanNode> pns) {
@@ -203,6 +239,23 @@ public class TestPlansGroupBy extends PlannerTestCase {
         if (isDistributed) {
             p = pns.get(1).getChild(0);
             assertFalse(p instanceof ProjectionPlanNode);
+        }
+    }
+
+    private void checkOptimizedAgg (List<AbstractPlanNode> pns, boolean optimized) {
+        AbstractPlanNode p = pns.get(0).getChild(0);
+        if (optimized) {
+            assertTrue(p instanceof ProjectionPlanNode);
+            assertTrue(p.getChild(0) instanceof AggregatePlanNode);
+
+            p = pns.get(1).getChild(0);
+            // push down for optimization
+            assertTrue(p instanceof AggregatePlanNode);
+            assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
+        } else {
+            assertTrue(pns.size() == 1);
+            assertTrue(p instanceof AggregatePlanNode);
+            assertTrue(p.getChild(0) instanceof AbstractScanPlanNode);
         }
     }
 }

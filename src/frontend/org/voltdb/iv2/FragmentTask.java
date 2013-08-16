@@ -224,7 +224,7 @@ public class FragmentTask extends TransactionTask
                         new long[] { fragmentId },
                         new long [] { inputDepId },
                         new ParameterSet[] { params },
-                        m_txnState.spHandle,
+                        m_txnState.m_spHandle,
                         m_txnState.uniqueId,
                         m_txnState.isReadOnly(),
                         m_procContext)[0];
