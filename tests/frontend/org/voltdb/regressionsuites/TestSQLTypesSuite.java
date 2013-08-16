@@ -1241,6 +1241,12 @@ public class TestSQLTypesSuite extends RegressionSuite {
 
         client.callProcedure("InsertDecimal", 1, 3.4f);
         client.callProcedure("InsertDecimal", 2, 3.4d);
+        client.callProcedure("InsertDecimal", 3, 1f);
+        client.callProcedure("InsertDecimal", 4, 1d);
+        client.callProcedure("InsertDecimal", 5, 0.25f);
+        client.callProcedure("InsertDecimal", 6, 0.25d);
+        client.callProcedure("InsertDecimal", 7, 3.3f);
+        client.callProcedure("InsertDecimal", 8, 3.3d);
 
     }
 
