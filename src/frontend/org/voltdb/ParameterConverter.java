@@ -433,7 +433,7 @@ public class ParameterConverter {
                 return bd;
             }
             if (inputClz == Float.class || inputClz == Double.class) {
-                return VoltDecimalHelper.deserializeBigDecimalFromString(String.format("%f", param));
+                return VoltDecimalHelper.deserializeBigDecimalFromString(String.format("%.12f", param));
             }
             return VoltDecimalHelper.deserializeBigDecimalFromString(String.valueOf(param));
         }

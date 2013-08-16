@@ -1247,7 +1247,41 @@ public class TestSQLTypesSuite extends RegressionSuite {
         client.callProcedure("InsertDecimal", 6, 0.25d);
         client.callProcedure("InsertDecimal", 7, 3.3f);
         client.callProcedure("InsertDecimal", 8, 3.3d);
-
+        try {
+            client.callProcedure("InsertDecimal", 9, Double.MAX_VALUE);
+        } catch (ProcCallException e) {
+            // should give out of precision range error
+            assert(true);
+        }
+        try {
+            client.callProcedure("InsertDecimal", 9, -Double.MAX_VALUE);
+        } catch (ProcCallException e) {
+            // should give out of precision range error
+            assert(true);
+        }
+        try {
+            client.callProcedure("InsertDecimal", 9, Float.MAX_VALUE);
+        } catch (ProcCallException e) {
+            // should give out of precision range error
+            assert(true);
+        }
+        try {
+            client.callProcedure("InsertDecimal", 9, -Float.MAX_VALUE);
+        } catch (ProcCallException e) {
+            // should give out of precision range error
+            assert(true);
+        }
+        try {
+            client.callProcedure("InsertDecimal", 9, 0.0 / 0.0);
+        } catch (Exception e) {
+            assert(true);
+        }
+        client.callProcedure("InsertDecimal", 9, Double.MIN_VALUE);
+        client.callProcedure("InsertDecimal", 10, Float.MIN_VALUE);
+        // will lose some precision by truncated to .12f
+        client.callProcedure("InsertDecimal", 11, 123456789.01234567890123456789f);
+        // will lose some precision by truncated to .12f
+        client.callProcedure("InsertDecimal", 12, 123456789.01234567890123456789d);
     }
 
     //
