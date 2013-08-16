@@ -182,7 +182,6 @@ public class MiscUtils {
         }
         catch (LicenseException lex)
         {
-            hostLog.fatal("DUP? Unable to load license file: " + lex.getMessage());
             hostLog.fatal(lex.getMessage());
             return null;
         }
