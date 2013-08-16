@@ -198,8 +198,9 @@ class FileGenerator(utility.FileGenerator):
     def generate_sample_client(self):
         self.from_template('Client.java', 'src/com/%s/Client.java' % self.config.package)
 
-    def generate_sample_procedure(self):
-        self.from_template('Counts.java', 'procedures/com/%s/Counts.java' % self.config.package)
+    #TODO: Still need to create a useful stored procedure sample.
+    #def generate_sample_procedure(self):
+    #    self.from_template('Counts.java', 'procedures/com/%s/Counts.java' % self.config.package)
 
     def generate_all(self):
         self.generate_readme()
@@ -207,7 +208,7 @@ class FileGenerator(utility.FileGenerator):
         self.generate_run_script()
         self.generate_ddl()
         self.generate_sample_client()
-        self.generate_sample_procedure()
+        #self.generate_sample_procedure()
         utility.info('Project files were generated successfully.',
                      'Please examine the following files thoroughly before using.',
                      self.generated)
