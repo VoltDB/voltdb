@@ -1,4 +1,4 @@
-/* This file is part of VoltDB.
+ /* This file is part of VoltDB.
  * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
@@ -534,6 +534,17 @@ public class TestJSONInterface extends TestCase {
         assertEquals(ClientResponse.SUCCESS, response.status);
         assertEquals(1, response.results.length);
         assertEquals(1, response.results[0].getRowCount());
+
+        // Call @AdHoc with zero parameters
+        pset = ParameterSet.emptyParameterSet();
+        responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
+        assertTrue(responseJSON.contains("Adhoc system procedure requires exactly one or two parameters"));
+
+        // Call @AdHoc with many parameters (more than 2)
+        pset = ParameterSet.fromArrayNoCopy("select * from blah", "foo", "bar");
+        responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
+        assertTrue(responseJSON.contains("Adhoc system procedure requires exactly one or two parameters"));
+
     } finally {
         if (server != null) {
             server.shutdown();
