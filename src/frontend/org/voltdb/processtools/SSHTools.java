@@ -80,6 +80,10 @@ public class SSHTools {
         return new SFTPSession(user, password, key, hostname, logger);
     }
 
+    public SFTPSession getSftpSession(String user, String password, String key, String hostname, int port, VoltLogger logger) {
+        return new SFTPSession(user, password, key, hostname, port, logger);
+    }
+
     /*
      * The code from here to the end of the file is code that integrates with an external
      * SSH library (JSCH, http://www.jcraft.com/jsch/).  If you wish to replaces this

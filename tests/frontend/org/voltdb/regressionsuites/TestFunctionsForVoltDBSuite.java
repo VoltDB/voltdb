@@ -851,14 +851,6 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertTrue(ex.getMessage().contains("incompatible data type in conversion"));
         }
 
-        try {
-            cr = client.callProcedure("@AdHoc", "select SINCE_EPOCH (MICROS, '2013-7-2 2:34:12')  from P2 where id = 5");
-            fail();
-        } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("PlanningErrorException"));
-            assertTrue(ex.getMessage().contains("incompatible data type in conversion"));
-        }
-
         String[] procedures = {"SINCE_EPOCH_SECOND", "SINCE_EPOCH_MILLIS",
                 "SINCE_EPOCH_MILLISECOND", "SINCE_EPOCH_MICROS", "SINCE_EPOCH_MICROSECOND"};
 

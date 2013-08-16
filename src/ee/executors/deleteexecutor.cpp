@@ -97,7 +97,13 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
     if (m_truncate) {
         VOLT_TRACE("truncating table %s...", m_targetTable->name().c_str());
         // count the truncated tuples as deleted
-        modified_tuples = m_targetTable->activeTupleCount();
+        modified_tuples = m_targetTable->visibleTupleCount();
+
+        VOLT_TRACE("Delete all rows from table : %s with %d active, %d visible, %d allocated",
+                   m_targetTable->name().c_str(),
+                   (int)m_targetTable->activeTupleCount(),
+                   (int)m_targetTable->visibleTupleCount(),
+                   (int)m_targetTable->allocatedTupleCount());
 
         // actually delete all the tuples
         m_targetTable->deleteAllTuples(true);
@@ -126,7 +132,14 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
                 return false;
             }
         }
-        modified_tuples = m_inputTable->activeTupleCount();
+        modified_tuples = m_inputTable->tempTableTupleCount();
+        VOLT_TRACE("Deleted %d rows from table : %s with %d active, %d visible, %d allocated",
+                   (int)modified_tuples,
+                   m_targetTable->name().c_str(),
+                   (int)m_targetTable->activeTupleCount(),
+                   (int)m_targetTable->visibleTupleCount(),
+                   (int)m_targetTable->allocatedTupleCount());
+
     }
 
     TableTuple& count_tuple = m_node->getOutputTable()->tempTuple();

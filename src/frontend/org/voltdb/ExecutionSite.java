@@ -964,8 +964,10 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             VoltTable table =
                     PrivateVoltTableFactory.createVoltTableFromBuffer(buffer.duplicate(),
                                                                       true);
-            //m_recoveryLog.info("table " + tableId + ": " + table.toString());
-            loadTable(m_rejoinSnapshotTxnId, tableId, table, false);
+            // m_recoveryLog.info("table " + tableId + ": " + table.toString());
+
+            // Long.MAX_VALUE is a no-op don't track undo token
+            loadTable(m_rejoinSnapshotTxnId, tableId, table, false, Long.MAX_VALUE);
             doneWork = true;
         } else if (m_rejoinSnapshotProcessor.isEOF()) {
             m_rejoinLog.debug("Rejoin snapshot transfer is finished");
@@ -1454,7 +1456,8 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             String databaseName,
             String tableName,
             VoltTable data,
-            boolean returnUniqueViolations)
+            boolean returnUniqueViolations,
+            long undoToken)
     throws VoltAbortException
     {
         Cluster cluster = m_context.cluster;
@@ -1470,7 +1473,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
         }
 
-        return loadTable(txnId, table.getRelativeIndex(), data, returnUniqueViolations);
+        return loadTable(txnId, table.getRelativeIndex(), data, returnUniqueViolations, undoToken);
     }
 
     /**
@@ -1479,11 +1482,14 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
      * @param table
      */
     @Override
-    public byte[] loadTable(long txnId, int tableId, VoltTable data, boolean returnUniqueViolations) {
+    public byte[] loadTable(long txnId, int tableId,
+            VoltTable data, boolean returnUniqueViolations,
+            long undoToken) {
         return ee.loadTable(tableId, data,
                      txnId,
                      lastCommittedTxnId,
-                     returnUniqueViolations);
+                     returnUniqueViolations,
+                     undoToken);
     }
 
     @Override
