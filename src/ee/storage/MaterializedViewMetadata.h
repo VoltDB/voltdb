@@ -106,9 +106,10 @@ private:
     ExpressionType *m_outputColumnAggTypes;
 
     // vector of target table indexes to update.
-    // These should be a subset of the target table indexes that depend on the count and/or
-    // aggregated columns, but there might be some other mostly harmless ones in there.
-    std::vector<TableIndex*> m_indexUpdateList;
+    // Ideally, these should be a subset of the target table indexes that depend on the count and/or
+    // aggregated columns, but there might be some other mostly harmless ones in there that are based
+    // solely on the immutable primary key (GROUP BY columns).
+    std::vector<TableIndex*> m_updatableIndexList;
 };
 
 } // namespace voltdb

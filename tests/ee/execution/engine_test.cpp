@@ -199,7 +199,6 @@ class ExecutionEngineTest : public Test {
         void compareTables(Table *first, Table* second);
 };
 
-
 /*
 // ------------------------------------------------------------------
 // Execute_PlanFragmentInfo

@@ -82,15 +82,15 @@ MaterializedViewMetadata::MaterializedViewMetadata(
     m_index = m_target->primaryKeyIndex();
 
     // When updateTupleWithSpecificIndexes needs to be called,
-    // the context of which base table columns potentially changed is lost,
-    // so the minimal set of indexes that MIGHT need to be updated must include
+    // the context is lost that identifies which base table columns potentially changed.
+    // So the minimal set of indexes that MIGHT need to be updated must include
     // any that are not solely based on primary key components.
     // Until the DDL compiler does this analysis and marks the indexes accordingly,
-    // the only index safe to exclude here is the actual primary key index on the group by columns.
+    // include all target table indexes except the actual primary key index on the group by columns.
     const std::vector<TableIndex*>& targetIndexes = m_target->allIndexes();
     BOOST_FOREACH(TableIndex *index, targetIndexes) {
         if (index != m_index) {
-            m_indexUpdateList.push_back(index);
+            m_updatableIndexList.push_back(index);
         }
     }
 
@@ -240,7 +240,7 @@ void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple, bool fal
         // since their keys shouldn't ever change the key,
         // but do update other indexes.
         m_target->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
-                                                 m_indexUpdateList, fallible);
+                                                 m_updatableIndexList, fallible);
     }
     else {
         m_target->insertPersistentTuple(m_updatedTuple, fallible);
@@ -310,7 +310,7 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
     // since their keys shouldn't ever change the key,
     // but do update other indexes.
     m_target->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
-                                             m_indexUpdateList, fallible);
+                                             m_updatableIndexList, fallible);
 }
 
 bool MaterializedViewMetadata::findExistingTuple(TableTuple &oldTuple, bool expected) {
