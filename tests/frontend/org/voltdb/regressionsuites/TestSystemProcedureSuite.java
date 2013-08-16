@@ -280,7 +280,14 @@ public class TestSystemProcedureSuite extends RegressionSuite {
              * Test once using the current correct hash function,
              * expect no mispartitioned rows
              */
-            VoltTable validateResult = client.callProcedure("@ValidatePartitioning", 0, null).getResults()[0];
+            ClientResponse cr = client.callProcedure("@ValidatePartitioning", 0, null);
+
+            VoltTable hashinatorMatches = cr.getResults()[1];
+            while (hashinatorMatches.advanceRow()) {
+                assertEquals(1L, hashinatorMatches.getLong("HASHINATOR_MATCHES"));
+            }
+
+            VoltTable validateResult = cr.getResults()[0];
             System.out.println(validateResult);
             while (validateResult.advanceRow()) {
                 assertEquals(0L, validateResult.getLong("MISPARTITIONED_ROWS"));
@@ -289,11 +296,14 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             /*
              * Test again with a bad hash function, expect mispartitioned rows
              */
-            validateResult =
-                    client.callProcedure(
-                            "@ValidatePartitioning",
-                            0,
-                            new byte[] { 0, 0, 0, 9 }).getResults()[0];
+            cr = client.callProcedure("@ValidatePartitioning", 0, new byte[] { 0, 0, 0, 9 });
+
+            hashinatorMatches = cr.getResults()[1];
+            while (hashinatorMatches.advanceRow()) {
+                assertEquals(0L, hashinatorMatches.getLong("HASHINATOR_MATCHES"));
+            }
+
+            validateResult = cr.getResults()[0];
             System.out.println(validateResult);
             while (validateResult.advanceRow()) {
                 if (validateResult.getString("TABLE").equals("NEW_ORDER")) {

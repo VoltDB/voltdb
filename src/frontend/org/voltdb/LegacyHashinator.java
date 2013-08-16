@@ -18,7 +18,6 @@ package org.voltdb;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.Set;
 import java.util.Map;
 
 import org.voltcore.logging.VoltLogger;
@@ -27,6 +26,7 @@ import org.voltcore.utils.Pair;
 public class LegacyHashinator extends TheHashinator {
     private final int catalogPartitionCount;
     private final byte m_configBytes[];
+    private final long m_signature;
     private static final VoltLogger hostLogger = new VoltLogger("HOST");
 
     @Override
@@ -52,6 +52,7 @@ public class LegacyHashinator extends TheHashinator {
     public LegacyHashinator(byte config[]) {
         catalogPartitionCount = ByteBuffer.wrap(config).getInt();
         m_configBytes = Arrays.copyOf(config, config.length);
+        m_signature = TheHashinator.computeConfigurationSignature(m_configBytes);
     }
 
     public static byte[] getConfigureBytes(int catalogPartitionCount) {
@@ -82,4 +83,10 @@ public class LegacyHashinator extends TheHashinator {
     {
         throw new RuntimeException("Getting ranges is not supported in the legacy hashinator");
     }
+
+    @Override
+    public long pGetConfigurationSignature() {
+        return m_signature;
+    }
+
 }
