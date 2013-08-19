@@ -161,7 +161,7 @@ public class CSVLoaderMT {
         @Option(desc = "port to use when connecting to database (default: 21212)")
         int port = Client.VOLTDB_SERVER_PORT;
         @Option(desc = "Batch Size for processing.")
-        public long batch = 20;
+        public long batch = 200;
         @AdditionalArgs(desc = "insert the data into database by TABLENAME.insert procedure by default")
         public String table = "";
 
