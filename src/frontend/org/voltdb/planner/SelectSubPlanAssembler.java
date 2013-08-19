@@ -823,8 +823,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             }
 
             nljNode.addAndLinkChild(innerPlan);
-            // now generate the output schema for this join
-            nljNode.generateOutputSchema(m_db);
             ajNode = nljNode;
         }
         else if (canHaveNLIJ) {
@@ -848,7 +846,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         ajNode.setJoinType(joinNode.m_joinType);
         ajNode.setPreJoinPredicate(ExpressionUtil.combine(joinNode.m_joinOuterList));
         ajNode.setWherePredicate(ExpressionUtil.combine(whereClauses));
-        ajNode.generateOutputSchema(m_db);
         return ajNode;
     }
 
