@@ -25,7 +25,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -48,7 +49,7 @@ public class VoltPort implements Connection
      */
     private static final ThreadPoolExecutor m_es =
             new ThreadPoolExecutor(0, 16, 1, TimeUnit.SECONDS,
-                                   new LinkedBlockingQueue<Runnable>(),
+                                   new SynchronousQueue<Runnable>(),
                                    CoreUtils.getThreadFactory("VoltPort DNS Reverse Lookup"));
 
     /** The currently selected operations on this port. */
@@ -123,17 +124,19 @@ public class VoltPort implements Connection
              * Start the reverse DNS lookup in background because it might be
              * very slow if the hostname is not specified in local /etc/hosts.
              */
-            m_es.submit(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        m_remoteHost = InetAddress.getByName(m_remoteIP).getHostName();
-                    } catch (UnknownHostException e) {
-                        networkLog.warn("Unable to resolve hostname of host "
-                                        + m_remoteIP);
+            try {
+                m_es.submit(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            m_remoteHost = InetAddress.getByName(m_remoteIP).getHostName();
+                        } catch (UnknownHostException e) {
+                            networkLog.warn("Unable to resolve hostname of host "
+                                            + m_remoteIP);
+                        }
                     }
-                }
-            });
+                });
+            } catch (RejectedExecutionException e) {}
         }
     }
 
@@ -388,7 +391,7 @@ public class VoltPort implements Connection
             }
         } finally {
             if ( networkLog.isDebugEnabled() ) {
-            networkLog.debug("Closing channel " + m_toString);
+            networkLog.info("Closing channel " + m_toString);
             }
             try {
                 m_channel.close();

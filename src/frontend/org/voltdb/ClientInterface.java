@@ -48,10 +48,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListenableFutureTask;
-import com.google.common.util.concurrent.MoreExecutors;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -74,7 +70,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
-
 import org.voltdb.ClientInterfaceHandleManager.Iv2InFlight;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
@@ -113,6 +108,11 @@ import org.voltdb.sysprocs.SnapshotRestore;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
+
+import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListenableFutureTask;
+import com.google.common.util.concurrent.MoreExecutors;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -691,7 +691,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 handler =
                     new ClientInputHandler(
                             username,
-                            socket.socket().getInetAddress().getHostName(),
                             m_isAdmin);
             }
             else {
@@ -758,7 +757,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         public static final int MAX_READ = 8192 * 4;
 
         private Connection m_connection;
-        private final String m_hostname;
         private final boolean m_isAdmin;
 
         /**
@@ -768,11 +766,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          */
         private final String m_username;
 
-        public ClientInputHandler(String username, String hostname,
+        public ClientInputHandler(String username,
                                   boolean isAdmin)
         {
             m_username = username.intern();
-            m_hostname = hostname;
             m_isAdmin = isAdmin;
         }
 
@@ -1637,7 +1634,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         AdHocPlannerWork ahpw = new AdHocPlannerWork(
                 m_siteId,
                 false, task.clientHandle, handler.connectionId(),
-                handler.m_hostname, handler.isAdmin(), ccxn,
+                ccxn.getHostnameOrIP(), handler.isAdmin(), ccxn,
                 sql, sqlStatements, partitionParam, null, false, true,
                 task.type, task.originalTxnId, task.originalUniqueId,
                 m_adhocCompletionHandler);
@@ -1673,7 +1670,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         LocalObjectMessage work = new LocalObjectMessage(
                 new CatalogChangeWork(
                     m_siteId,
-                    task.clientHandle, handler.connectionId(), handler.m_hostname,
+                    task.clientHandle, handler.connectionId(), ccxn.getHostnameOrIP(),
                     handler.isAdmin(), ccxn, catalogBytes, deploymentString,
                     task.type, task.originalTxnId, task.originalUniqueId,
                     m_adhocCompletionHandler));
@@ -1705,7 +1702,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                           new VoltTable[0], e.getMessage(), task.clientHandle);
         }
         assert(involvedPartitions != null);
-        createTransaction(handler.connectionId(), handler.m_hostname,
+        createTransaction(handler.connectionId(), ccxn.getHostnameOrIP(),
                           handler.isAdmin(),
                           task,
                           catProc.getReadonly(),
@@ -1826,7 +1823,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // This only happens on one node so we don't need to pick a leader.
         createTransaction(
                 handler.connectionId(),
-                handler.m_hostname,
+                ccxn.getHostnameOrIP(),
                 handler.isAdmin(),
                 task,
                 sysProc.getReadonly(),
@@ -2024,7 +2021,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         }
         boolean success =
-                createTransaction(handler.connectionId(), handler.m_hostname,
+                createTransaction(handler.connectionId(), ccxn.getHostnameOrIP(),
                         handler.isAdmin(),
                         task,
                         catProc.getReadonly(),
