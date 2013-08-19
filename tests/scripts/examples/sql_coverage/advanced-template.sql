@@ -14,6 +14,11 @@
 -- {@updatecolumn = "CASH"}
 -- {@updatevalue = "_value[decimal]"}
 
+-- Reduce the explosions that result from 7 _cmp values.
+{_somecmp |= " < "}
+{_somecmp |= " >= "}
+{_somecmp |= " = "}
+
 -- DML, clean out and regenerate random data first.
 DELETE FROM @dmltable
 INSERT INTO @dmltable VALUES (@insertvals)
@@ -31,10 +36,10 @@ SELECT -2, @optionalfn(_variable[numeric] + 5.25)        NUMSUM FROM @fromtables
 SELECT -1, @optionalfn(_variable[numeric]       ) + 5.25 NUMSUM FROM @fromtables ORDER BY NUMSUM
 
 -- cover some select WHERE expressions not covered by the basic templates
+
 SELECT 1, * FROM @fromtables WHERE @columnpredicate
-SELECT 2, * FROM @fromtables WHERE @optionalfn(_variable[#some numeric]) _cmp (            _variable[#other numeric]  _math _value[int:1,3])
-SELECT 3, * FROM @fromtables WHERE             _variable[#some numeric]  _cmp (@optionalfn(_variable[#other numeric]) _math _value[int:1,3])
-SELECT 4, * FROM @fromtables WHERE             _variable[#same numeric]  _cmp (@optionalfn(       __[#same         ]) _math 2)
+SELECT 2, * FROM @fromtables WHERE @optionalfn(_variable[#some numeric]) _somecmp (            _variable[#other numeric]  _math 2)
+SELECT 3, * FROM @fromtables WHERE             _variable[#some numeric]  _somecmp (@optionalfn(_variable[#other numeric]) _math 3)
 
 -- ENG-3196 "SELECT ABS(ID) AS Q4 FROM R1 ORDER BY (ID) LIMIT 10;" gets UNEXPECTED FAILURE tupleValueFactory: invalid column_idx.
 -- SELECT @optionalfn(_variable[#picked @columntype]) AS Q4 FROM @fromtables ORDER BY @optionalfn(__[#picked]) LIMIT _value[int:1,10]
@@ -43,21 +48,21 @@ SELECT 4, * FROM @fromtables WHERE             _variable[#same numeric]  _cmp (@
 
 -- Found ENG-3191 (or similar, anyway) crashes (fixed, since?) with these statements:
 -- -- combine where and limit
--- SELECT @optionalfn(_variable[#picked @columntype]) AS Q5 FROM @fromtables WHERE  @optionalfn(_variable[@comparabletype]) _cmp @optionalfn(_variable[@comparabletype]) ORDER BY @optionalfn(__[#picked]) LIMIT _value[int:1,100]
+-- SELECT @optionalfn(_variable[#picked @columntype]) AS Q5 FROM @fromtables WHERE  @optionalfn(_variable[@comparabletype]) _somecmp @optionalfn(_variable[@comparabletype]) ORDER BY @optionalfn(__[#picked]) LIMIT _value[int:1,100]
 -- -- combine where and offset
--- SELECT @optionalfn(_variable[#picked @columntype]) AS Q6 FROM @fromtables WHERE  @optionalfn(_variable[@comparabletype]) _cmp @optionalfn(_variable[@comparabletype]) ORDER BY @optionalfn(__[#picked]) LIMIT _value[int:1,100] OFFSET _value[int:1,100]
+-- SELECT @optionalfn(_variable[#picked @columntype]) AS Q6 FROM @fromtables WHERE  @optionalfn(_variable[@comparabletype]) _somecmp @optionalfn(_variable[@comparabletype]) ORDER BY @optionalfn(__[#picked]) LIMIT _value[int:1,100] OFFSET _value[int:1,100]
 -- -- compare more columns
--- SELECT @optionalfn(_variable[@comparabletype]    ) AS Q7 FROM @fromtables WHERE (@optionalfn(_variable[@comparabletype]) _cmp @optionalfn(_variable[@comparabletype])) _logicop (@optionalfn(_variable[@comparabletype]) _cmp @optionalfn(_variable[@comparabletype]))
+-- SELECT @optionalfn(_variable[@comparabletype]    ) AS Q7 FROM @fromtables WHERE (@optionalfn(_variable[@comparabletype]) _somecmp @optionalfn(_variable[@comparabletype])) _logicop (@optionalfn(_variable[@comparabletype]) _somecmp @optionalfn(_variable[@comparabletype]))
 -- Now that ENG-3191 is fixed, we keep them watered down to reduce the number of generated combinations:
 -- combine where and limit
 -- Even simplified like this, it crashes (or DID, anyway):
--- SELECT @optionalfn(_variable[#picked            ]) AS Q5 FROM @fromtables WHERE             (_variable[@comparabletype]) _cmp @optionalfn(_variable[@comparabletype]) ORDER BY @optionalfn(__[#picked]) LIMIT _value[int:1,100]
+-- SELECT @optionalfn(_variable[#picked            ]) AS Q5 FROM @fromtables WHERE             (_variable[@comparabletype]) _somecmp @optionalfn(_variable[@comparabletype]) ORDER BY @optionalfn(__[#picked]) LIMIT _value[int:1,100]
 -- so, it was simplified even further
-   SELECT @optionalfn(_variable[#picked @columntype]) AS Q5 FROM @fromtables WHERE             (__[#picked]               ) _cmp            (_variable[@comparabletype]) ORDER BY 1                        LIMIT _value[int:1,100]
+   SELECT @optionalfn(_variable[#picked @columntype]) AS Q5 FROM @fromtables WHERE             (__[#picked]               ) _somecmp            (_variable[@comparabletype]) ORDER BY 1                        LIMIT _value[int:1,100]
 -- combine where and offset
-   SELECT @optionalfn(_variable[#picked @columntype]) AS Q6 FROM @fromtables WHERE             (_variable[@comparabletype]) _cmp            (__[#picked]               ) ORDER BY 1                        LIMIT _value[int:1,100] OFFSET _value[int:1,100]
+   SELECT @optionalfn(_variable[#picked @columntype]) AS Q6 FROM @fromtables WHERE             (_variable[@comparabletype]) _somecmp            (__[#picked]               ) ORDER BY 1                        LIMIT _value[int:1,100] OFFSET _value[int:1,100]
 -- compare more columns
-   SELECT @optionalfn(_variable[#picked @columntype]) AS Q7 FROM @fromtables WHERE (           (__[#picked]               ) _cmp            (_variable[@comparabletype])) _logicop ( @columnpredicate )
+   SELECT @optionalfn(_variable[#picked @columntype]) AS Q7 FROM @fromtables WHERE (           (__[#picked]               ) _somecmp            (_variable[@comparabletype])) _logicop ( @columnpredicate )
 
 -- order by with projection
 SELECT 11, @optionalfn(_variable[@columntype]), ID FROM @fromtables ORDER BY ID _sortorder
@@ -93,9 +98,9 @@ SELECT 21, @optionalfn(_variable[#GB @columntype]), @agg(            _variable[@
 
 -- update
 -- compare two cols
--- UPDATE @fromtables SET @updatecolumn = @updatevalue WHERE @optionalfn(_variable[@columntype]) _cmp @optionalfn(_variable[@columntype])
+-- UPDATE @fromtables SET @updatecolumn = @updatevalue WHERE @optionalfn(_variable[@columntype]) _somecmp @optionalfn(_variable[@columntype])
 -- comparison with set expression
-UPDATE @fromtables SET @updatecolumn = @updatevalue @aftermath WHERE @optionalfn(_variable[@columntype]) _cmp _variable[@comparabletype]
+UPDATE @fromtables SET @updatecolumn = @updatevalue @aftermath WHERE @optionalfn(_variable[@columntype]) _somecmp _variable[@comparabletype]
 
 -- Save more exhaustive LIKE testing for advanced-strings.sql.
 -- This is mostly just to catch the error of applying different forms of LIKE to non-strings.
