@@ -276,7 +276,7 @@ public class CSVLoader {
                 listReader = new CsvListReader(tokenizer, csvPreference);
             }
             else {
-                tokenizer = new Tokenizer(new FileReader(config.file), csvPreference,
+                tokenizer = new Tokenizer(new BufferedReader(new FileReader(config.file)), csvPreference,
                         config.strictquotes, config.escape, config.columnsizelimit,
                         config.skip) ;
                 listReader = new CsvListReader(tokenizer, csvPreference);
