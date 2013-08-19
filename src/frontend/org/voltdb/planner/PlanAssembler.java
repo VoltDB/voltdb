@@ -838,7 +838,6 @@ public class PlanAssembler {
         materializeNode.setOutputSchema(mat_schema);
         // connect the insert and the materialize nodes together
         insertNode.addAndLinkChild(materializeNode);
-        insertNode.generateOutputSchema(m_catalogDb);
 
         if (m_partitioning.wasSpecifiedAsSingle() ||
             (m_partitioning.effectivePartitioningExpression() != null)) {
@@ -852,7 +851,6 @@ public class PlanAssembler {
         sendNode.addAndLinkChild(insertNode);
         AbstractPlanNode recvNode = new ReceivePlanNode();
         recvNode.addAndLinkChild(sendNode);
-        recvNode.generateOutputSchema(m_catalogDb);
 
         // add a count or a limit and send on top of the union
         return addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
