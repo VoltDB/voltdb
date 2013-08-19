@@ -557,6 +557,39 @@ public class TestOrderBySuite extends RegressionSuite {
         }
     }
 
+    public void testEng4760() throws Exception
+    {
+        Client client = getClient();
+        for (int i = 0; i < 10; i++)
+        {
+            client.callProcedure("InsertO1", i, i, "", "");
+            client.callProcedure("InsertO3", i + 1, i + 1, i + 1, i + 1);
+            client.callProcedure("InsertO3", i + 1, i + 2, i + 2, i + 2);
+            client.callProcedure("InsertO3", i + 1, i + 3, i + 3, i + 3);
+        }
+        VoltTable vt;
+
+        vt = client.callProcedure("@AdHoc", "SELECT O3.PK2 FROM O1, O3 WHERE O3.PK1 = O1.A_INT ORDER BY O1.PKEY LIMIT 1").getResults()[0];
+        System.out.println(vt.toString());
+        assertEquals(1, vt.getRowCount());
+        assertEquals(1, vt.fetchRow(0).getLong(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT O3.PK2 FROM O1, O3 WHERE O3.PK1 = O1.A_INT ORDER BY O1.PKEY DESC LIMIT 1").getResults()[0];
+        System.out.println(vt.toString());
+        assertEquals(1, vt.getRowCount());
+        assertEquals(9, vt.fetchRow(0).getLong(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT O1.A_INT FROM O1, O3 WHERE O3.PK2 = O1.A_INT AND O3.PK1 = 5 ORDER BY O1.PKEY LIMIT 1").getResults()[0];
+        System.out.println(vt.toString());
+        assertEquals(1, vt.getRowCount());
+        assertEquals(5, vt.fetchRow(0).getLong(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT O1.A_INT FROM O1, O3 WHERE O3.PK2 = O1.A_INT AND O3.PK1 = 5 ORDER BY O1.PKEY DESC LIMIT 1").getResults()[0];
+        System.out.println(vt.toString());
+        assertEquals(1, vt.getRowCount());
+        assertEquals(7, vt.fetchRow(0).getLong(0));
+    }
+
     //
     // Suite builder boilerplate
     //

@@ -79,6 +79,11 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
             assert (((MaterializedScanPlanNode)m_children.get(0)).getSortDirection() == inlineScan.getSortDirection());
             m_sortDirection = inlineScan.getSortDirection();
         }
+        if (m_children.get(0).getPlanNodeType() == PlanNodeType.INDEXSCAN) {
+            // sortDirection is only used in handleOrderBy(),
+            // and the sortDirection used in EE is from inlined IndexScan node
+            m_sortDirection = ((IndexScanPlanNode)m_children.get(0)).getSortDirection();
+        }
     }
 
     public SortDirectionType getSortDirection() {
@@ -97,9 +102,16 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         }
         for (AbstractPlanNode inline : m_inlineNodes.values())
         {
-            // Some of this will get undone for the inlined index scan later
-            // but this will resolve any column tracking with an inlined projection
-            inline.resolveColumnIndexes();
+            if (inline instanceof LimitPlanNode)
+            {
+                // special handling for possible LIMIT node
+                inline.m_outputSchema = m_outputSchema.clone();
+                inline.m_hasSignificantOutputSchema = false; // It's just another cheap knock-off
+            } else {
+                // Some of this will get undone for the inlined index scan later
+                // but this will resolve any column tracking with an inlined projection
+                inline.resolveColumnIndexes();
+            }
         }
         // We need the schema from the target table from the inlined index
         NodeSchema index_schema = inline_scan.getTableSchema();
