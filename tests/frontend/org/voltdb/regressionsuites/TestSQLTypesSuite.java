@@ -1247,41 +1247,76 @@ public class TestSQLTypesSuite extends RegressionSuite {
         client.callProcedure("InsertDecimal", 6, 0.25d);
         client.callProcedure("InsertDecimal", 7, 3.3f);
         client.callProcedure("InsertDecimal", 8, 3.3d);
+
         try {
             client.callProcedure("InsertDecimal", 9, Double.MAX_VALUE);
         } catch (ProcCallException e) {
             // should give out of precision range error
             assert(true);
+        } catch (Exception e) {
+            fail();
         }
         try {
             client.callProcedure("InsertDecimal", 9, -Double.MAX_VALUE);
         } catch (ProcCallException e) {
             // should give out of precision range error
             assert(true);
+        } catch (Exception e) {
+            fail();
         }
         try {
             client.callProcedure("InsertDecimal", 9, Float.MAX_VALUE);
         } catch (ProcCallException e) {
             // should give out of precision range error
             assert(true);
+        } catch (Exception e) {
+            fail();
         }
         try {
             client.callProcedure("InsertDecimal", 9, -Float.MAX_VALUE);
         } catch (ProcCallException e) {
             // should give out of precision range error
             assert(true);
+        } catch (Exception e) {
+            fail();
+        }
+        double nand = 0.0d / 0.0d;
+        double nanf = 0.0f / 0.0f;
+        try {
+            client.callProcedure("InsertDecimal", 9, nand);
+        } catch (ProcCallException e) {
+            // passing a NaN value will cause NumberFormatException, and fail the proceudre call
+            assert(true);
+        } catch (Exception e) {
+            fail();
         }
         try {
-            client.callProcedure("InsertDecimal", 9, 0.0 / 0.0);
-        } catch (Exception e) {
+            client.callProcedure("InsertDecimal", 9, nanf);
+        } catch (ProcCallException e) {
+            // passing a NaN value will cause NumberFormatException, and fail the proceudre call
             assert(true);
+        } catch (Exception e) {
+            fail();
         }
+
         client.callProcedure("InsertDecimal", 9, Double.MIN_VALUE);
         client.callProcedure("InsertDecimal", 10, Float.MIN_VALUE);
+
         // will lose some precision by truncated to .12f
         client.callProcedure("InsertDecimal", 11, 123456789.01234567890123456789f);
+        VoltTable table;
+        table = client.callProcedure("@AdHoc", "SELECT A_DECIMAL FROM WITH_DEFAULTS WHERE PKEY = 11").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        table.advanceRow();
+        float f = table.getDecimalAsBigDecimal(0).floatValue();
+        assertEquals(123456789.01234567890123456789f, f, 0.000000000001);
         // will lose some precision by truncated to .12f
         client.callProcedure("InsertDecimal", 12, 123456789.01234567890123456789d);
+        table = client.callProcedure("@AdHoc", "SELECT A_DECIMAL FROM WITH_DEFAULTS WHERE PKEY = 12").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        table.advanceRow();
+        double d = table.getDecimalAsBigDecimal(0).doubleValue();
+        assertEquals(123456789.01234567890123456789d, d, 0.000000000001);
     }
 
     //
