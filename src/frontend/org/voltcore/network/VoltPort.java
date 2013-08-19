@@ -137,7 +137,10 @@ public class VoltPort implements Connection
              */
             try {
                 m_es.submit(r);
-            } catch (RejectedExecutionException e) {}
+            } catch (RejectedExecutionException e) {
+                networkLog.debug(
+                        "Reverse DNS lookup for " + m_remoteSocketAddress + " rejected because the queue was full");
+            }
         }
     }
 
