@@ -31,7 +31,6 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
 import org.hsqldb_voltpatches.lib.ArrayListIdentity;
@@ -122,7 +121,7 @@ public class ExpressionColumn extends Expression {
         super(type);
 
         if (type == OpTypes.DYNAMIC_PARAM) {
-            isParam = true;
+            setParam(true);
         }
     }
 

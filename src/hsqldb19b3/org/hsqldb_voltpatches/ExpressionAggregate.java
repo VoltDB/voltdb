@@ -31,7 +31,6 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.lib.ArrayListIdentity;
 import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.store.ValuePool;
@@ -228,7 +227,7 @@ public class ExpressionAggregate extends Expression {
             }
         }
 
-        if (nodes[LEFT].isParam) {
+        if (nodes[LEFT].isParam()) {
             throw Error.error(ErrorCode.X_42567);
         }
 

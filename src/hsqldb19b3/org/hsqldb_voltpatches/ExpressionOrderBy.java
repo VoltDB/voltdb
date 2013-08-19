@@ -31,7 +31,6 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 
 /**
  * Implementation of ORDER BY operations
@@ -91,7 +90,7 @@ public class ExpressionOrderBy extends Expression {
 
         nodes[LEFT].resolveTypes(session, parent);
 
-        if (nodes[LEFT].isParam) {
+        if (nodes[LEFT].isParam()) {
             throw Error.error(ErrorCode.X_42567);
         }
 

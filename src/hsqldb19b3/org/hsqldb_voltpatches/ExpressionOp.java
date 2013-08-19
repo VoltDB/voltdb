@@ -31,7 +31,6 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.types.DateTimeType;
 import org.hsqldb_voltpatches.types.IntervalType;
@@ -389,7 +388,7 @@ public class ExpressionOp extends Expression {
         while (expr.opType == OpTypes.CASEWHEN) {
             expr.nodes[LEFT].resolveTypes(session, expr);
 
-            if (expr.nodes[LEFT].isParam) {
+            if (expr.nodes[LEFT].isParam()) {
                 expr.nodes[LEFT].dataType = Type.SQL_BOOLEAN;
             }
 

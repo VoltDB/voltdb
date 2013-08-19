@@ -87,6 +87,7 @@ public class StatementProcedure extends StatementDMQL {
         checkAccessRights(session);
     }
 
+    @Override
     Result getResult(Session session) {
         return expression == null ? getProcedureResult(session)
                                   : getExpressionResult(session);
@@ -144,7 +145,7 @@ public class StatementProcedure extends StatementDMQL {
             int          mode  = param.getParameterMode();
 
             if (mode != SchemaObject.ParameterModes.PARAM_IN) {
-                if (this.arguments[i].isParam) {
+                if (this.arguments[i].isParam()) {
                     int paramIndex = arguments[i].parameterIndex;
 
                     session.sessionContext.dynamicArguments[paramIndex] =
@@ -202,6 +203,7 @@ public class StatementProcedure extends StatementDMQL {
         return r;
     }
 
+    @Override
     public ResultMetaData getResultMetaData() {
 
         if (resultMetaData != null) {
@@ -254,13 +256,16 @@ public class StatementProcedure extends StatementDMQL {
     /**
      * Returns the metadata for the placeholder parameters.
      */
+    @Override
     public ResultMetaData getParametersMetaData() {
 
         /** @todo - change the auto-names to the names of params */
         return super.getParametersMetaData();
     }
 
+    @Override
     void getTableNamesForRead(OrderedHashSet set) {}
 
+    @Override
     void getTableNamesForWrite(OrderedHashSet set) {}
 }

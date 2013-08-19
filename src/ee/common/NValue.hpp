@@ -1759,6 +1759,18 @@ class NValue {
        }
     }
 
+    int compareNullValue(const NValue rhs) const {
+
+        if (!isNull()) {
+            throwDynamicSQLException( "expected a null type, but not null");
+        }
+        if (rhs.isNull()) {
+            return VALUE_COMPARE_EQUAL;
+        } else {
+            return VALUE_COMPARE_LESSTHAN;
+        }
+    }
+
     NValue opAddBigInts(const int64_t lhs, const int64_t rhs) const {
         if (lhs == INT64_NULL || rhs == INT64_NULL)
             return getBigIntValue(INT64_NULL);
@@ -2250,6 +2262,8 @@ inline int NValue::compare(const NValue rhs) const {
         return compareBinaryValue(rhs);
       case VALUE_TYPE_DECIMAL:
         return compareDecimalValue(rhs);
+      case VALUE_TYPE_NULL:
+        return compareNullValue(rhs);
       default: {
           throwDynamicSQLException(
                   "non comparable types lhs '%s' rhs '%s'",

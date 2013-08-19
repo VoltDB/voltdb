@@ -200,7 +200,7 @@ public class Expression {
 
     //
     int     queryTableColumnIndex = -1;    // >= 0 when it is used for order by
-    boolean isParam;
+    private boolean isParam;
 
     // index of a session-dependent field
     int parameterIndex = -1;
@@ -1082,12 +1082,12 @@ public class Expression {
 
             nodeDataTypes[j] = type;
 
-            if (row != null && row.nodes[j].isParam) {
+            if (row != null && row.nodes[j].isParam()) {
                 row.nodes[j].dataType = type;
             }
 
             for (int i = 0; i < nodes.length; i++) {
-                if (nodes[i].nodes[j].isParam) {
+                if (nodes[i].nodes[j].isParam()) {
                     nodes[i].nodes[j].dataType = nodeDataTypes[j];
 
                     continue;
@@ -1333,6 +1333,10 @@ public class Expression {
 
     boolean isParam() {
         return isParam;
+    }
+
+    void setParam(boolean param) {
+        isParam = param;
     }
 
     void setAttributesAsColumn(ColumnSchema column, boolean isWritable) {
@@ -1622,9 +1626,13 @@ public class Expression {
             // Apparently at this stage, all valid non-NULL values must have a type determined by HSQL.
             // I'm not sure why this must be the case --paul.
             // if the actual value is null, make sure the type is null as well
-            if ((dataType == null) || (valueData == null)) {
-                exp.attributes.put("valuetype", "NULL");
-                exp.attributes.put("value", "NULL");
+            if (valueData == null) {
+                exp.attributes.put("value", "\\N");
+                if (dataType == null) {
+                    exp.attributes.put("valuetype", "NULL");
+                    return exp;
+                }
+                exp.attributes.put("valuetype", Types.getTypeName(dataType.typeCode));
                 return exp;
             }
 

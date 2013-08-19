@@ -110,8 +110,9 @@ public class ConstantValueExpression extends AbstractValueExpression {
         int result = 0;
         if (m_isNull) {
             result += 1;
+        } else {
+            result += m_value.hashCode();
         }
-        result += m_value.hashCode();
         return result += super.hashCode();
     }
 
