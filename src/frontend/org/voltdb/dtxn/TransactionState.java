@@ -48,6 +48,8 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected ClientResponseImpl m_response = null;
     protected final boolean m_isForReplay;
     protected int m_hash = -1; // -1 shows where the value comes from (they only have to match)
+    // IZZY: make me protected/private
+    public final long m_spHandle;
 
     /**
      * Set up the final member variables from the parameters. This will
@@ -59,7 +61,8 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected TransactionState(Mailbox mbox,
                                TransactionInfoBaseMessage notice)
     {
-        super(notice.getTxnId(), notice.getSpHandle(), notice.getUniqueId(), notice.getInitiatorHSId());
+        super(notice.getTxnId(), notice.getUniqueId(), notice.getInitiatorHSId());
+        m_spHandle = notice.getSpHandle();
         m_mbox = mbox;
         m_notice = notice;
         m_isReadOnly = notice.isReadOnly();
