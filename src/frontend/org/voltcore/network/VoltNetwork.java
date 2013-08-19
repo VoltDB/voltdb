@@ -148,7 +148,7 @@ class VoltNetwork implements Runnable
             final SocketChannel channel,
             final InputHandler handler,
             final int interestOps,
-            final DNS_RESOLUTION dns) throws IOException {
+            final ReverseDNSPolicy dns) throws IOException {
         channel.configureBlocking (false);
         channel.socket().setKeepAlive(true);
 
@@ -167,8 +167,8 @@ class VoltNetwork implements Runnable
                  * This means we are used by a client. No need to wait then, trigger
                  * the reverse DNS lookup now.
                  */
-                if (dns != DNS_RESOLUTION.NONE) {
-                    port.resolveHostname(dns == DNS_RESOLUTION.SYNCHRONOUS);
+                if (dns != ReverseDNSPolicy.NONE) {
+                    port.resolveHostname(dns == ReverseDNSPolicy.SYNCHRONOUS);
                 }
 
                 try {

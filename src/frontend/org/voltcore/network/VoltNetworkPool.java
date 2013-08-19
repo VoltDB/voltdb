@@ -77,14 +77,14 @@ public class VoltNetworkPool {
     public Connection registerChannel(
             final SocketChannel channel,
             final InputHandler handler) throws IOException {
-        return registerChannel( channel, handler, SelectionKey.OP_READ, DNS_RESOLUTION.ASYNCHRONOUS);
+        return registerChannel( channel, handler, SelectionKey.OP_READ, ReverseDNSPolicy.ASYNCHRONOUS);
     }
 
     public Connection registerChannel(
             final SocketChannel channel,
             final InputHandler handler,
             final int interestOps,
-            final DNS_RESOLUTION dns) throws IOException {
+            final ReverseDNSPolicy dns) throws IOException {
         VoltNetwork vn = m_networks[(int)(m_nextWorkerSelection.incrementAndGet() % m_networks.length)];
         return vn.registerChannel(channel, handler, interestOps, dns);
     }

@@ -60,7 +60,7 @@ import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
-import org.voltcore.network.DNS_RESOLUTION;
+import org.voltcore.network.ReverseDNSPolicy;
 import org.voltcore.network.InputHandler;
 import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.QueueMonitor;
@@ -452,7 +452,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                             socket,
                                                             handler,
                                                             0,
-                                                            DNS_RESOLUTION.ASYNCHRONOUS);
+                                                            ReverseDNSPolicy.ASYNCHRONOUS);
                                             /*
                                              * If IV2 is enabled the logic initially enabling read is
                                              * in the started method of the InputHandler
@@ -473,7 +473,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                     socket,
                                                     handler,
                                                     SelectionKey.OP_READ,
-                                                    DNS_RESOLUTION.ASYNCHRONOUS);
+                                                    ReverseDNSPolicy.ASYNCHRONOUS);
                                         }
                                         success = true;
                                     }
