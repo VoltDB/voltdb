@@ -233,7 +233,7 @@ public class TestPlansJoin extends PlannerTestCase {
         assertEquals(ExpressionType.COMPARE_EQUAL, p.getExpressionType());
         n = n.getChild(0);
         assertTrue(n instanceof AbstractScanPlanNode);
-        AbstractScanPlanNode s = (AbstractScanPlanNode) n;
+        s = (AbstractScanPlanNode) n;
         assertEquals(ExpressionType.COMPARE_GREATERTHAN, s.getPredicate().getExpressionType());
 
 
