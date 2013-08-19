@@ -437,15 +437,17 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
+        System.out.println("testDECODEWithNULL:" + result);
 
-        assertEquals(expected[0],result.getString(0));
-        assertEquals(expected[1],result.getString(1));
-        if (expected[2].startsWith("null")) {
-            assertEquals(expected[2],result.getString(2));
-        } else {
-            assertTrue(Math.abs(
-                    Double.valueOf(expected[2]) - Double.valueOf(result.getString(2))
-                    ) < 0.00001);
+        for (int i = 0; i < expected.length; i++) {
+            if ( (i == 4 || i == 7) && !expected[i].startsWith("null") ) {
+                // Float type, decimal type
+                assertTrue(Math.abs(
+                        Double.valueOf(expected[i]) - Double.valueOf(result.getString(i))
+                        ) < 0.00001);
+            } else {
+                assertEquals(expected[i],result.getString(i));
+            }
         }
     }
 
@@ -454,31 +456,51 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         Client client = getClient();
         ClientResponse cr;
 
-        cr = client.callProcedure("P1.insert", 1, "IBM", 10, 1.1);
-        cr = client.callProcedure("P1.insert", 2, null, null, null);
+        cr = client.callProcedure("P2.insert", 2, new Timestamp(1000L));
+
+        cr = client.callProcedure("P3.insert", 1, 1, 1, 1, 1, 1.1, "2013-07-18 02:00:00.123457", "IBM", 1);
+        cr = client.callProcedure("P3.insert", 2, null, null, null, null, null, null, null, null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         // Stored procedure tests
         cr = client.callProcedure("TestDecodeNull", 1);
-        checkDecodeNullResult(cr, new String[]{"IBM","10", "1.1"});
+        checkDecodeNullResult(cr, new String[]{"1","1","1","1","1.1","tm","IBM","1"});
 
         cr = client.callProcedure("TestDecodeNull", 2);
-        checkDecodeNullResult(cr, new String[]{"null desc","null num", "null ratio"});
+        checkDecodeNullResult(cr, new String[]{"null tiny","null small", "null num", "null big",
+                "null ratio", "null tm", "null var", "null dec"});
 
-        cr = client.callProcedure("TestDecodeNullParam", "\\N","\\N","\\N",2);
-        checkDecodeNullResult(cr, new String[]{"null desc","null num", "null ratio"});
+        cr = client.callProcedure("TestDecodeNullParam", null, null, null, null, null, null, null, null, 1);
+        checkDecodeNullResult(cr, new String[]{"1","1","1","1","1.1","tm","IBM","1"});
 
-        cr = client.callProcedure("TestDecodeNullParam", null, null, null, 2);
-        checkDecodeNullResult(cr, new String[]{"null desc","null num", "null ratio"});
+        cr = client.callProcedure("TestDecodeNullParam", null, null, null, null, null, null, null, null, 2);
+        checkDecodeNullResult(cr, new String[]{"null tiny","null small", "null num", "null big",
+                "null ratio", "null tm", "null var", "null dec"});
+
+        // Test CSV_NULL for params
+        cr = client.callProcedure("TestDecodeNullParam", "\\N","\\N","\\N","\\N","\\N","\\N","\\N","\\N", 1);
+        checkDecodeNullResult(cr, new String[]{"1","1","1","1","1.1","tm","IBM","1"});
+
+        cr = client.callProcedure("TestDecodeNullParam", "\\N","\\N","\\N","\\N","\\N","\\N","\\N","\\N", 2);
+        checkDecodeNullResult(cr, new String[]{"null tiny","null small", "null num", "null big",
+                "null ratio", "null tm", "null var", "null dec"});
+
 
         // AdHoc queries tests
-        cr = client.callProcedure("@AdHoc", "select DECODE(desc, NULL, 'null desc', desc)," +
-                "DECODE(num, NULL, 'null num', num), DECODE(ratio, NULL, 'null ratio', ratio) from P1 where id = 1");
-        checkDecodeNullResult(cr, new String[]{"IBM","10", "1.1"});
+        cr = client.callProcedure("@AdHoc", "select DECODE(tiny, NULL, 'null tiny', tiny)," +
+                "DECODE(small, NULL, 'null small', small), DECODE(num, NULL, 'null num', num),  " +
+                "DECODE(big, NULL, 'null big', big), DECODE(ratio, NULL, 'null ratio', ratio),  " +
+                "DECODE(tm, NULL, 'null tm', 'tm'), DECODE(var, NULL, 'null var', var), " +
+                "DECODE(dec, NULL, 'null dec', dec) from P3 where id = 1");
+        checkDecodeNullResult(cr, new String[]{"1","1","1","1","1.1","tm","IBM","1"});
 
-        cr = client.callProcedure("@AdHoc", "select DECODE(desc, NULL, 'null desc', desc)," +
-                "DECODE(num, NULL, 'null num', num), DECODE(ratio, NULL, 'null ratio', ratio) from P1 where id = 2");
-        checkDecodeNullResult(cr, new String[]{"null desc","null num", "null ratio"});
+        cr = client.callProcedure("@AdHoc", "select DECODE(tiny, NULL, 'null tiny', tiny)," +
+                "DECODE(small, NULL, 'null small', small), DECODE(num, NULL, 'null num', num),  " +
+                "DECODE(big, NULL, 'null big', big), DECODE(ratio, NULL, 'null ratio', ratio),  " +
+                "DECODE(tm, NULL, 'null tm', 'tm'), DECODE(var, NULL, 'null var', var), " +
+                "DECODE(dec, NULL, 'null dec', dec) from P3 where id = 2");
+        checkDecodeNullResult(cr, new String[]{"null tiny","null small", "null num", "null big",
+                "null ratio", "null tm", "null var", "null dec"});
     }
 
     /**
@@ -1366,7 +1388,14 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
                 "CREATE TABLE P3 ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "TINY TINYINT, " +
+                "SMALL SMALLINT, " +
+                "NUM INTEGER, " +
+                "BIG BIGINT, " +
+                "RATIO FLOAT, " +
                 "TM TIMESTAMP DEFAULT NULL, " +
+                "VAR VARCHAR(300), " +
+                "DEC DECIMAL, " +
                 "PRIMARY KEY (ID) ); " +
 
                 "CREATE TABLE JS1 (\n" +
@@ -1472,10 +1501,16 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         project.addStmtProcedure("FROM_UNIXTIME", "select FROM_UNIXTIME (?) from P2 where id = ?");
 
-        project.addStmtProcedure("TestDecodeNull", "select DECODE(desc, NULL, 'null desc', desc)," +
-                "DECODE(num, NULL, 'null num', num), DECODE(ratio, NULL, 'null ratio', ratio) from P1 where id = ?");
-        project.addStmtProcedure("TestDecodeNullParam", "select DECODE(desc, ?, 'null desc', desc)," +
-                "DECODE(num, ?, 'null num', num), DECODE(ratio, ?, 'null ratio', ratio) from P1 where id = ?");
+        project.addStmtProcedure("TestDecodeNull", "select DECODE(tiny, NULL, 'null tiny', tiny)," +
+                "DECODE(small, NULL, 'null small', small), DECODE(num, NULL, 'null num', num),  " +
+                "DECODE(big, NULL, 'null big', big), DECODE(ratio, NULL, 'null ratio', ratio),  " +
+                "DECODE(tm, NULL, 'null tm', 'tm'), DECODE(var, NULL, 'null var', var), " +
+                "DECODE(dec, NULL, 'null dec', dec) from P3 where id = ?");
+        project.addStmtProcedure("TestDecodeNullParam", "select DECODE(tiny, ?, 'null tiny', tiny)," +
+                "DECODE(small, ?, 'null small', small), DECODE(num, ?, 'null num', num),  " +
+                "DECODE(big, ?, 'null big', big), DECODE(ratio, ?, 'null ratio', ratio),  " +
+                "DECODE(tm, ?, 'null tm', 'tm'), DECODE(var, ?, 'null var', var), " +
+                "DECODE(dec, ?, 'null dec', dec) from P3 where id = ?");
 
         // CONFIG #1: Local Site/Partition running on JNI backend
         config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);

@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
-import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
@@ -285,7 +284,6 @@ public abstract class AbstractParsedStmt {
 
         if (needConstant) {
             String type = exprNode.attributes.get("valuetype");
-            String valueStr = exprNode.attributes.get("value");
             VoltType vt = VoltType.typeFromString(type);
             int size = VoltType.MAX_VALUE_LENGTH;
             assert(vt != VoltType.VOLTTABLE);
@@ -298,12 +296,8 @@ public abstract class AbstractParsedStmt {
             cve.setValueType(vt);
             cve.setValueSize(size);
             if ( ! needParameter && vt != VoltType.NULL) {
-                if (valueStr == VoltTable.CSV_NULL) {
-                    cve.setValueType(VoltType.NULL);
-                    cve.setValueSize(0);
-                } else {
-                    cve.setValue(valueStr);
-                }
+                String valueStr = exprNode.attributes.get("value");
+                cve.setValue(valueStr);
             }
         }
 

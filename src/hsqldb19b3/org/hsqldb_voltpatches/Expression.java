@@ -1627,7 +1627,6 @@ public class Expression {
             // I'm not sure why this must be the case --paul.
             // if the actual value is null, make sure the type is null as well
             if (valueData == null) {
-                exp.attributes.put("value", "\\N");
                 if (dataType == null) {
                     exp.attributes.put("valuetype", "NULL");
                     return exp;
