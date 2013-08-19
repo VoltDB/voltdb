@@ -456,8 +456,6 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         Client client = getClient();
         ClientResponse cr;
 
-        cr = client.callProcedure("P2.insert", 2, new Timestamp(1000L));
-
         cr = client.callProcedure("P3.insert", 1, 1, 1, 1, 1, 1.1, "2013-07-18 02:00:00.123457", "IBM", 1);
         cr = client.callProcedure("P3.insert", 2, null, null, null, null, null, null, null, null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -501,6 +499,18 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "DECODE(dec, NULL, 'null dec', dec) from P3 where id = 2");
         checkDecodeNullResult(cr, new String[]{"null tiny","null small", "null num", "null big",
                 "null ratio", "null tm", "null var", "null dec"});
+
+
+        cr = client.callProcedure("P2.insert", 1, new Timestamp(1000L));
+        cr = client.callProcedure("P2.insert", 2, null);
+        // Test timestamp
+        try {
+            // Timstamp converted to varchar, See ENG-4284.
+            cr = client.callProcedure("TestDecodeNullTimestamp", 1);
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("TIMESTAMP can't be cast as VARCHAR"));
+        }
     }
 
     /**
@@ -1511,6 +1521,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "DECODE(big, ?, 'null big', big), DECODE(ratio, ?, 'null ratio', ratio),  " +
                 "DECODE(tm, ?, 'null tm', 'tm'), DECODE(var, ?, 'null var', var), " +
                 "DECODE(dec, ?, 'null dec', dec) from P3 where id = ?");
+
+        project.addStmtProcedure("TestDecodeNullTimestamp", "select DECODE(tm, NULL, 'null tm', tm) from p2 where id = ?");
 
         // CONFIG #1: Local Site/Partition running on JNI backend
         config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
