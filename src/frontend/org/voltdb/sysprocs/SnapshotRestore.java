@@ -1843,8 +1843,8 @@ public class SnapshotRestore extends VoltSystemProcedure
             try
             {
                 partition =
-                        TheHashinator.hashToPartition(loadedTable.get(partition_col,
-                                partition_type));
+                    TheHashinator.getPartitionForParameter(partition_type.getValue(),
+                            loadedTable.get(partition_col, partition_type));
             }
             catch (Exception e)
             {

@@ -1322,10 +1322,7 @@ TEST CASES
                 <exclude name="**/TestExportBase.class"/>
                 <!-- Excluded pro tests -->
                 <exclude name="**/TestCommandLogServer.class" />
-                <exclude name="**/TestCommandLogReinitiator.class"/>
                 <exclude name="**/TestCommandLog.class"/>
-                <exclude name="**/TestLogReader.class"/>
-                <exclude name="**/TestRestoreWithReplay.class" />
                 <exclude name="**/TestPauselessRejoinFuzz.class" /> <!-- fails legacy -->
                 <!-- Exclude community tests -->
                 <!-- Recorded as ENG-4423 -->
