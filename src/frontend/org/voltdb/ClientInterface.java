@@ -60,6 +60,7 @@ import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
+import org.voltcore.network.DNS_RESOLUTION;
 import org.voltcore.network.InputHandler;
 import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.QueueMonitor;
@@ -446,7 +447,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                         socket.socket().setKeepAlive(true);
 
                                         if (handler instanceof ClientInputHandler) {
-                                            final Connection c = m_network.registerChannel(socket, handler, 0);
+                                            final Connection c =
+                                                    m_network.registerChannel(
+                                                            socket,
+                                                            handler,
+                                                            0,
+                                                            DNS_RESOLUTION.ASYNCHRONOUS);
                                             /*
                                              * If IV2 is enabled the logic initially enabling read is
                                              * in the started method of the InputHandler
@@ -463,7 +469,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                 }
                                             }
                                         } else {
-                                            m_network.registerChannel(socket, handler, SelectionKey.OP_READ);
+                                            m_network.registerChannel(
+                                                    socket,
+                                                    handler,
+                                                    SelectionKey.OP_READ,
+                                                    DNS_RESOLUTION.ASYNCHRONOUS);
                                         }
                                         success = true;
                                     }
@@ -983,7 +993,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              */
             cihm.m_acg.logTransactionCompleted(
                     cihm.connection.connectionId(),
-                    cihm.connection.getHostnameOrIP(),
+                    cihm.connection.getHostnameAndIP(),
                     clientData.m_procName,
                     delta,
                     clientResponse.getStatus());
@@ -1634,7 +1644,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         AdHocPlannerWork ahpw = new AdHocPlannerWork(
                 m_siteId,
                 false, task.clientHandle, handler.connectionId(),
-                ccxn.getHostnameOrIP(), handler.isAdmin(), ccxn,
+                ccxn.getHostnameAndIP(), handler.isAdmin(), ccxn,
                 sql, sqlStatements, partitionParam, null, false, true,
                 task.type, task.originalTxnId, task.originalUniqueId,
                 m_adhocCompletionHandler);
@@ -1670,7 +1680,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         LocalObjectMessage work = new LocalObjectMessage(
                 new CatalogChangeWork(
                     m_siteId,
-                    task.clientHandle, handler.connectionId(), ccxn.getHostnameOrIP(),
+                    task.clientHandle, handler.connectionId(), ccxn.getHostnameAndIP(),
                     handler.isAdmin(), ccxn, catalogBytes, deploymentString,
                     task.type, task.originalTxnId, task.originalUniqueId,
                     m_adhocCompletionHandler));
@@ -1702,7 +1712,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                           new VoltTable[0], e.getMessage(), task.clientHandle);
         }
         assert(involvedPartitions != null);
-        createTransaction(handler.connectionId(), ccxn.getHostnameOrIP(),
+        createTransaction(handler.connectionId(), ccxn.getHostnameAndIP(),
                           handler.isAdmin(),
                           task,
                           catProc.getReadonly(),
@@ -1823,7 +1833,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // This only happens on one node so we don't need to pick a leader.
         createTransaction(
                 handler.connectionId(),
-                ccxn.getHostnameOrIP(),
+                ccxn.getHostnameAndIP(),
                 handler.isAdmin(),
                 task,
                 sysProc.getReadonly(),
@@ -2021,7 +2031,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         }
         boolean success =
-                createTransaction(handler.connectionId(), ccxn.getHostnameOrIP(),
+                createTransaction(handler.connectionId(), ccxn.getHostnameAndIP(),
                         handler.isAdmin(),
                         task,
                         catProc.getReadonly(),
@@ -2521,7 +2531,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
-        public String getHostnameOrIP() {
+        public String getHostnameAndIP() {
             return "";
         }
 
@@ -2610,7 +2620,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 long outstandingTxns = e.getValue().getOutstandingTxns();
                 client_stats.put(
                         e.getKey(), new Pair<String, long[]>(
-                            e.getValue().connection.getHostnameOrIP(),
+                            e.getValue().connection.getHostnameAndIP(),
                             new long[] {adminMode, readWait, writeWait, outstandingTxns}));
             }
         }
