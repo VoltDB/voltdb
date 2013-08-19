@@ -1250,51 +1250,56 @@ public class TestSQLTypesSuite extends RegressionSuite {
 
         try {
             client.callProcedure("InsertDecimal", 9, Double.MAX_VALUE);
+            fail();
         } catch (ProcCallException e) {
             // should give out of precision range error
-            assert(true);
+            assertTrue(e.getMessage().contains("has more than  38 digits of precision"));
         } catch (Exception e) {
             fail();
         }
         try {
             client.callProcedure("InsertDecimal", 9, -Double.MAX_VALUE);
+            fail();
         } catch (ProcCallException e) {
             // should give out of precision range error
-            assert(true);
+            assertTrue(e.getMessage().contains("has more than  38 digits of precision"));
         } catch (Exception e) {
             fail();
         }
         try {
             client.callProcedure("InsertDecimal", 9, Float.MAX_VALUE);
+            fail();
         } catch (ProcCallException e) {
             // should give out of precision range error
-            assert(true);
+            assertTrue(e.getMessage().contains("has more than  38 digits of precision"));
         } catch (Exception e) {
             fail();
         }
         try {
             client.callProcedure("InsertDecimal", 9, -Float.MAX_VALUE);
+            fail();
         } catch (ProcCallException e) {
             // should give out of precision range error
-            assert(true);
+            assertTrue(e.getMessage().contains("has more than  38 digits of precision"));
         } catch (Exception e) {
             fail();
         }
         double nand = 0.0d / 0.0d;
-        double nanf = 0.0f / 0.0f;
+        float nanf = 0.0f / 0.0f;
         try {
             client.callProcedure("InsertDecimal", 9, nand);
         } catch (ProcCallException e) {
             // passing a NaN value will cause NumberFormatException, and fail the proceudre call
-            assert(true);
+            assertTrue(e.getMessage().contains("NumberFormatException"));
         } catch (Exception e) {
             fail();
         }
         try {
             client.callProcedure("InsertDecimal", 9, nanf);
+            fail();
         } catch (ProcCallException e) {
             // passing a NaN value will cause NumberFormatException, and fail the proceudre call
-            assert(true);
+            assertTrue(e.getMessage().contains("NumberFormatException"));
         } catch (Exception e) {
             fail();
         }
