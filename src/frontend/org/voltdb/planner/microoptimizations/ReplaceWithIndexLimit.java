@@ -156,7 +156,6 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
                 lpn.setOffset(0);
 
                 ispn.addInlinePlanNode(lpn);
-                ispn.generateOutputSchema(db);
 
                 // remove old SeqScan node and link the new generated IndexScan node
                 plan.clearChildren();
@@ -289,7 +288,6 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
                 aggplan.setPredicate(newPredicate);
             }
 
-            plan.generateOutputSchema(db);
             return plan;
         }
     }
