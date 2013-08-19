@@ -339,6 +339,21 @@ public class CSVLoaderMT {
                 colInfo[i] = ci;
             }
 
+            int numPartitions = -1;
+            procInfo = csvClient.callProcedure("@SystemInformation",
+                    "deployment").getResults()[0];
+            while (procInfo.advanceRow()) {
+                String prop = procInfo.getString("PROPERTY");
+                if (prop != null && prop.equalsIgnoreCase("sitesperhost")) {
+                    numPartitions = Integer.parseInt(procInfo.getString("VALUE"));
+                }
+            }
+            if (numPartitions == -1) {
+                System.out.println("Could not figure out number of partitions...exiting..");
+                System.exit(-1);
+            }
+            TheHashinator.initialize(LegacyHashinator.class, LegacyHashinator.getConfigureBytes(numPartitions));
+
             CSVPartitionProcessor.colInfo = colInfo;
             CSVPartitionProcessor.colNames = colNames;
             CSVPartitionProcessor.columnTypes = columnTypes;
@@ -362,7 +377,6 @@ public class CSVLoaderMT {
             th.setName("CSVReader");
             th.setDaemon(true);
 
-            TheHashinator.initialize(LegacyHashinator.class, LegacyHashinator.getConfigureBytes(6));
 
             th.start();
 

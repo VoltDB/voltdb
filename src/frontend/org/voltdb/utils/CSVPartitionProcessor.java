@@ -31,8 +31,6 @@ class CSVPartitionProcessor implements Runnable {
     public Client csvClient;
     public BlockingQueue<CSVLineWithMetaData> lineq;
     public boolean done = false;
-    long parsingTimeSt = System.nanoTime();
-    long parsingTimeEnd = System.nanoTime();
     int columnCnt = 0;
     int partitionedColumnIndex;
     String parColumnName;
@@ -45,6 +43,7 @@ class CSVPartitionProcessor implements Runnable {
     public static ArrayList<VoltType> columnTypes;
     public static ArrayList<String> colNames;
     public static VoltTable.ColumnInfo colInfo[];
+    long partitionProcessedCount = 0;
 
     @Override
     public void run() {
@@ -57,17 +56,18 @@ class CSVPartitionProcessor implements Runnable {
                 Logger.getLogger(CSVLoaderMT.class.getName()).log(Level.SEVERE, null, ex);
             }
             if (lineList == dummy) {
-                System.out.println("Done Processing partition: " + partitionId);
                 //Process anything that we didnt process.
                 if (table.getRowCount() > 0) {
                     CSVLoaderMT.MyMTCallback cbmt = new CSVLoaderMT.MyMTCallback(table.getRowCount());
                     try {
                         csvClient.callProcedure(cbmt, "@LoadPartitionData", partitionId, tableName, table);
                         CSVFileReader.inCount.addAndGet(table.getRowCount());
+                        partitionProcessedCount += table.getRowCount();
                     } catch (IOException ex) {
                         Logger.getLogger(CSVPartitionProcessor.class.getName()).log(Level.SEVERE, null, ex);
                     }
                 }
+                System.out.println("Done Processing partition: " + partitionId + " Processed: " + partitionProcessedCount);
                 break;
             }
             if (lineList == null) {
@@ -79,6 +79,7 @@ class CSVPartitionProcessor implements Runnable {
                     CSVLoaderMT.MyMTCallback cbmt = new CSVLoaderMT.MyMTCallback(table.getRowCount());
                     csvClient.callProcedure(cbmt, "@LoadPartitionData", partitionId, tableName, table);
                     CSVFileReader.inCount.addAndGet(table.getRowCount());
+                    partitionProcessedCount += table.getRowCount();
                     table = new VoltTable(colInfo);
                 } catch (IOException ex) {
                     Logger.getLogger(CSVPartitionProcessor.class.getName()).log(Level.SEVERE, null, ex);
