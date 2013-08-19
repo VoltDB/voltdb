@@ -38,13 +38,15 @@ public class AdHocAcceptancePolicy extends InvocationAcceptancePolicy {
         }
 
         ParameterSet params = invocation.getParams();
-        // note the second secret param
-        if (params.toArray().length > 2) {
+        // Make sure there is at least 1 parameter!  ENG-4921
+        // Note the second secret param, so 1 or 2 params is legal.
+        if (params.toArray().length < 1 || params.toArray().length > 2) {
             return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
                     new VoltTable[0], "Adhoc system procedure requires exactly one or two parameters, " +
                     "the SQL statement to execute with an optional partitioning value.",
                     invocation.clientHandle);
         }
+
         // check the types are both strings
         if ((params.toArray()[0] instanceof String) == false) {
             return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
