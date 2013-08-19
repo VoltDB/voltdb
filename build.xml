@@ -1304,40 +1304,8 @@ TEST CASES
     </sequential>
 </target>
 
-<target name="junit"
+<target name="junit" depends="junit_other, junit_regression"
     description="Execute JUnit test suites.">
-    <run_junit>
-        <tests>
-            <fileset dir='${build.test.dir}'>
-                <!-- Standard junit fileset -->
-                <include name='org/hsqldb_voltpatches/**/Test*.class'/>
-                <include name='org/voltcore/**/Test*.class' />
-                <include name='org/voltdb/**/Test*.class'/>
-                <include name='org/voltdb/network/**/Test*.class'/>
-                <include name='org/voltdb/messaging/**/*Test.class'/>
-                <include name='org/voltdb/network/**/*Test.class'/>
-                <include name='org/voltdb/utils/**/*Test.class'/>
-                <exclude name="**/*$*.class"/>
-                <exclude name="org/voltdb/quarantine/**/*.class"/>
-                <exclude name="**/TestExportBase.class"/>
-                <!-- Excluded pro tests -->
-                <exclude name="**/TestCommandLogServer.class" />
-                <exclude name="**/TestCommandLogReinitiator.class"/>
-                <exclude name="**/TestCommandLog.class"/>
-                <exclude name="**/TestLogReader.class"/>
-                <exclude name="**/TestRestoreWithReplay.class" />
-                <exclude name="**/TestPauselessRejoinFuzz.class" /> <!-- fails legacy -->
-                <!-- Exclude community tests -->
-                <!-- Recorded as ENG-4423 -->
-                <exclude name="**/TestIV2BlacklistSaveRestoreSysprocSuite.class" />
-                <exclude name="**/TestRejoinFuzz.class" />
-                <exclude name="**/TestRejoinFuzz2.class" />
-                <exclude name="**/TestMaliciousClientSuite.class" /> <!-- fails legacy -->
-                <!-- Recorded as ENG-3038 -->
-                <exclude name="**/TestMultipleOuterJoinPlans.class" />
-            </fileset>
-        </tests>
-    </run_junit>
 </target>
 
 <target name="junit_sql"
@@ -1374,20 +1342,8 @@ TEST CASES
     </run_junit>
 </target>
 
-<target name="junit_regression"
+<target name="junit_regression" depends="junit_regression_h1, junit_regression_h2"
     description="Execute JUnit regression test suites.">
-    <run_junit>
-        <tests>
-            <fileset dir='${build.test.dir}'>
-                <!-- Standard junit fileset -->
-                <include name='org/voltdb/regressionsuites/Test*.class'/>
-                <!-- Exclude tests -->
-                <exclude name="**/*$*.class"/>
-                <exclude name="**/TestIV2BlacklistSaveRestoreSysprocSuite.class" />
-                <exclude name="**/TestMaliciousClientSuite.class" /> <!-- fails legacy -->
-            </fileset>
-        </tests>
-    </run_junit>
 </target>
 
 <target name="junit_regression_h1"
@@ -1416,8 +1372,6 @@ TEST CASES
                 <include name='org/voltdb/regressionsuites/Test*.class'/>
                 <!-- Exclude tests -->
                 <exclude name="**/*$*.class"/>
-                <exclude name="**/TestIV2BlacklistSaveRestoreSysprocSuite.class" />
-                <exclude name="**/TestMaliciousClientSuite.class" /> <!-- fails legacy -->
                 <filename regex=".*Test[Q-Z].*class" />
             </fileset>
         </tests>
