@@ -237,14 +237,14 @@ public class Collector {
                 if (file.getName().startsWith("voltdb_crash") && file.getName().endsWith(".txt")) {
                     collectionFilesList.add(file.getCanonicalPath());
                 }
-                if (file.getName().equals("hs_err_pid" + m_pid + ".log")) {
+                if (file.getName().startsWith("hs_err_pid") && file.getName().endsWith(".log")) {
                     collectionFilesList.add(file.getCanonicalPath());
                 }
             }
 
             if (!skipHeapDump) {
                 for (File file: new File("/tmp").listFiles()) {
-                    if (file.getName().equals("java_pid" + m_pid + ".hprof")) {
+                    if (file.getName().startsWith("java_pid") && file.getName().endsWith(".hprof")) {
                         collectionFilesList.add(file.getCanonicalPath());
                     }
                 }
