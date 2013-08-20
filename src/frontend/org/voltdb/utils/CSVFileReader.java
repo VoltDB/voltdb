@@ -108,8 +108,9 @@ class CSVFileReader implements Runnable {
                     pp.columnCnt = columnCnt;
                     pp.lineq = q;
                     pp.rdr = this;
+                    pp.dummy = dummy;
                     Thread th = new Thread(pp);
-                    th.setName("PartitionProcessor" + partitionId);
+                    th.setName("PartitionProcessor-" + partitionId);
                     th.setDaemon(true);
                     th.start();
                     spawned.add(th);

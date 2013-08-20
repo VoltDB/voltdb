@@ -19,7 +19,6 @@ package org.voltdb.utils;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.voltdb.VoltTable;
@@ -51,7 +50,7 @@ class CSVPartitionProcessor implements Runnable {
         while (true) {
             CSVLineWithMetaData lineList = null;
             try {
-                lineList = lineq.poll(50, TimeUnit.MILLISECONDS);
+                lineList = lineq.take();
             } catch (InterruptedException ex) {
                 Logger.getLogger(CSVLoaderMT.class.getName()).log(Level.SEVERE, null, ex);
             }
@@ -60,6 +59,8 @@ class CSVPartitionProcessor implements Runnable {
                 if (table.getRowCount() > 0) {
                     CSVLoaderMT.MyMTCallback cbmt = new CSVLoaderMT.MyMTCallback(table.getRowCount());
                     try {
+                        byte pparam[] = new byte[1];
+                        pparam[0] = ((Integer) partitionId).byteValue();
                         csvClient.callProcedure(cbmt, "@LoadPartitionData", partitionId, tableName, table);
                         CSVFileReader.inCount.addAndGet(table.getRowCount());
                         partitionProcessedCount += table.getRowCount();
@@ -77,10 +78,12 @@ class CSVPartitionProcessor implements Runnable {
             if (table.getRowCount() > batchmax) {
                 try {
                     CSVLoaderMT.MyMTCallback cbmt = new CSVLoaderMT.MyMTCallback(table.getRowCount());
+                    byte pparam[] = new byte[1];
+                    pparam[0] = ((Integer) partitionId).byteValue();
                     csvClient.callProcedure(cbmt, "@LoadPartitionData", partitionId, tableName, table);
                     CSVFileReader.inCount.addAndGet(table.getRowCount());
                     partitionProcessedCount += table.getRowCount();
-                    table = new VoltTable(colInfo);
+                    table.clearRowData();
                 } catch (IOException ex) {
                     Logger.getLogger(CSVPartitionProcessor.class.getName()).log(Level.SEVERE, null, ex);
                 }

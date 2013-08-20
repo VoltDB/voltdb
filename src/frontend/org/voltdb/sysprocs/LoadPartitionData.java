@@ -26,7 +26,6 @@ import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
 
 /**
@@ -81,76 +80,10 @@ public class LoadPartitionData extends VoltSystemProcedure
         if (catTable == null) {
             throw new VoltAbortException("Table not present in catalog.");
         }
-        if (catTable.getIsreplicated()) {
-            throw new VoltAbortException(
-                    String.format("LoadSinglepartitionTable incompatible with replicated table %s.",
-                            tableName));
-        }
         // fix any case problems
         tableName = catTable.getTypeName();
 
-        m_runner.voltLoadTable("cluster", "database", tableName, table, false);
-        return 0L;
-    }
-
-    /**
-     * Execute a set of queued inserts. Ensure each insert successfully
-     * inserts one row. Throw exception if not.
-     *
-     * @return Count of rows inserted.
-     * @throws VoltAbortException if any failure at all.
-     */
-    long executeSQL() throws VoltAbortException {
-        long count = 0;
-        VoltTable[] results = voltExecuteSQL();
-        for (VoltTable result : results) {
-            long dmlUpdated = result.asScalarLong();
-            if (dmlUpdated == 0) {
-                throw new VoltAbortException("Insert failed for tuple.");
-            }
-            if (dmlUpdated > 1) {
-                throw new VoltAbortException("Insert modified more than one tuple.");
-            }
-            ++count;
-        }
-        return count;
-    }
-
-    /**
-     * Called by the client interface to partition this invocation based on parameters.
-     *
-     * @param tables The set of active tables in the catalog.
-     * @param spi The stored procedure invocation object
-     * @return An object suitable for hashing to a partition with The Hashinator
-     * @throws Exception thown on error with a descriptive message
-     */
-    public static Object partitionValueFromInvocation(Table catTable, VoltTable table) throws Exception {
-        if (catTable.getIsreplicated()) {
-            throw new Exception("Target table for LoadSinglepartitionTable is replicated.");
-        }
-
-        // check the number of columns
-        int colCount = catTable.getColumns().size();
-        if (table.getColumnCount() != colCount) {
-            throw new Exception("Input table has the wrong number of columns for bulk insert.");
-        }
-
-        // note there's no type checking
-
-        // get the partitioning info from the catalog
-        Column pCol = catTable.getPartitioncolumn();
-        int pIndex = pCol.getIndex();
-
-        // make sure the table has one row and move to it
-        table.resetRowPosition();
-        boolean hasRow = table.advanceRow();
-        if (!hasRow) {
-            // table has no rows, so it can partition any which way
-            return 0;
-        }
-
-        // get the value from the first row of the table at the partition key
-        Object pvalue = table.get(pIndex, table.getColumnType(pIndex));
-        return pvalue;
+        byte num[] = m_runner.voltLoadTable("cluster", "database", tableName, table, false);
+        return num.length;
     }
 }

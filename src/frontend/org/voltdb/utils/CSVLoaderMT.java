@@ -116,7 +116,6 @@ public class CSVLoaderMT {
                 m_log.error(response.getStatusString());
                 return;
             }
-
             long currentCount = CSVFileReader.outCount.addAndGet(m_batchCount);
             if (currentCount % reportEveryNRows == 0) {
                 m_log.info("Inserted " + currentCount + " rows");
@@ -542,7 +541,7 @@ public class CSVLoaderMT {
         }
     }
 
-    private static Client getClient(ClientConfig config, String[] servers,
+    public static Client getClient(ClientConfig config, String[] servers,
             int port) throws Exception {
         final Client client = ClientFactory.createClient(config);
 

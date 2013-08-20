@@ -595,7 +595,7 @@ public class CSVLoader {
     private static void produceFiles() {
         latency = System.currentTimeMillis() - start;
         m_log.info("CSVLoader elapsed: " + latency
-                + " seconds");
+                + " milliseconds");
 
         int bulkflush = 300; // by default right now
         try {
