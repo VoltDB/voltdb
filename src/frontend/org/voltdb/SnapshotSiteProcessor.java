@@ -483,7 +483,7 @@ public class SnapshotSiteProcessor {
             // empty expressions. So activateTableStream() doesn't have to do a null check.
             SnapshotPredicates predicates = tablesAndPredicates.get(task.m_table.getRelativeIndex());
             if (predicates == null) {
-                predicates = new SnapshotPredicates(task.m_table);
+                predicates = new SnapshotPredicates(task.m_table.getRelativeIndex());
                 tablesAndPredicates.put(task.m_table.getRelativeIndex(), predicates);
             }
 
