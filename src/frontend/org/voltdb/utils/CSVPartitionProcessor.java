@@ -37,7 +37,6 @@ class CSVPartitionProcessor implements Runnable {
     String parColumnName;
     CSVLineWithMetaData dummy;
     int partitionId;
-    int batchmax = 200;
     public static String insertProcedure = "";
     public CSVFileReader rdr;
     public String tableName;
@@ -103,7 +102,7 @@ class CSVPartitionProcessor implements Runnable {
             }
             if (!config.legacy) {
                 VoltTableUtil.toVoltTableFromLine(table, lineList.line, colNames, columnTypes);
-                if (table.getRowCount() > batchmax) {
+                if (table.getRowCount() > config.batch) {
                     try {
                         CSVLoaderMT.MyMTCallback cbmt = new CSVLoaderMT.MyMTCallback(table.getRowCount(), lineList.line);
                         if (!isMP) {

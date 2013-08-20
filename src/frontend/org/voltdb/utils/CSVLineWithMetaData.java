@@ -20,4 +20,5 @@ public class CSVLineWithMetaData {
 
     public String[] line;
     public String parColumnName;
+    public int partitionId;
 }

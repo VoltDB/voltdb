@@ -117,8 +117,8 @@ public class CSVLoaderMT {
         public void clientCallback(ClientResponse response) throws Exception {
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 m_log.error(response.getStatusString());
-                String[] info = {m_rowdata.toString(), response.getStatusString()};
-                synchronizeErrorInfo(m_lineNum, info);
+//                String[] info = {m_rowdata.toString(), response.getStatusString()};
+//                synchronizeErrorInfo(m_lineNum, info);
                 return;
             }
             long currentCount = CSVFileReader.outCount.addAndGet(m_batchCount);
@@ -379,18 +379,33 @@ public class CSVLoaderMT {
             }
 
             int numPartitions = -1;
+            int sitesPerHost = 1;
+            int kfactor = 0;
+            int hostcount = 1;
             procInfo = csvClient.callProcedure("@SystemInformation",
                     "deployment").getResults()[0];
             while (procInfo.advanceRow()) {
                 String prop = procInfo.getString("PROPERTY");
                 if (prop != null && prop.equalsIgnoreCase("sitesperhost")) {
-                    numPartitions = Integer.parseInt(procInfo.getString("VALUE"));
+                    sitesPerHost = Integer.parseInt(procInfo.getString("VALUE"));
+                }
+                if (prop != null && prop.equalsIgnoreCase("hostcount")) {
+                    hostcount = Integer.parseInt(procInfo.getString("VALUE"));
+                }
+                if (prop != null && prop.equalsIgnoreCase("kfactor")) {
+                    kfactor = Integer.parseInt(procInfo.getString("VALUE"));
                 }
             }
+            numPartitions = (hostcount * sitesPerHost) / (kfactor + 1);
             if (partitionedColumnIndex != -1 && numPartitions == -1) {
                 System.out.println("Could not figure out number of partitions...exiting..");
                 System.exit(-1);
             }
+            long batch_sz = config.batch / numPartitions;
+            System.out.println("Number of Partitions: " + numPartitions);
+            System.out.println("Batch Size is: " + batch_sz);
+            config.batch = batch_sz;
+
             TheHashinator.initialize(LegacyHashinator.class, LegacyHashinator.getConfigureBytes(numPartitions));
 
             CSVPartitionProcessor.colInfo = colInfo;

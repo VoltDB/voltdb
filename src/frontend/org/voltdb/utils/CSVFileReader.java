@@ -99,7 +99,7 @@ class CSVFileReader implements Runnable {
                 int partitionId = 0;
                 if (!config.check) {
                     if (!CSVPartitionProcessor.isMP) {
-                        partitionId = TheHashinator.getPartitionForParameter(VoltType.INTEGER.getValue(), (Object) lineData.line[partitionedColumnIndex - 1]);
+                        partitionId = TheHashinator.getPartitionForParameter(VoltType.BIGINT.getValue(), (Object) lineData.line[partitionedColumnIndex - 1]);
                     }
                     if (lineq.get(partitionId) == null) {
                         ArrayBlockingQueue<CSVLineWithMetaData> q = new ArrayBlockingQueue<CSVLineWithMetaData>(2000);
