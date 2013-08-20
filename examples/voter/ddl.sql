@@ -1,3 +1,25 @@
+create table text_narrow_noix (
+      a bigint NOT NULL
+    , b varchar(512)
+);
+PARTITION TABLE text_narrow_noix ON COLUMN a;
+create table text_all_with_idx (
+      a bigint NOT NULL
+    , b varchar(512)
+    , c int
+    , d timestamp
+    , e varchar(1024)
+);
+PARTITION TABLE text_all_with_idx ON COLUMN a;
+CREATE INDEX idx_col_one ON text_all_with_idx(a,c);
+CREATE INDEX idx_col_two ON text_all_with_idx(a,b);
+CREATE INDEX idx_col_three ON text_all_with_idx(a,d);
+
+create table text_narrow_mp (
+      a bigint NOT NULL
+    , b varchar(512)
+);
+
 -- contestants table holds the contestants numbers (for voting) and names
 CREATE TABLE contestants
 (
@@ -66,3 +88,5 @@ CREATE PROCEDURE FROM CLASS voter.procedures.Results;
 CREATE PROCEDURE FROM CLASS voter.procedures.Vote;
 CREATE PROCEDURE FROM CLASS voter.procedures.ContestantWinningStates;
 CREATE PROCEDURE FROM CLASS voter.procedures.GetStateHeatmap;
+CREATE PROCEDURE FROM CLASS voter.procedures.CSVLoad;
+CREATE PROCEDURE FROM CLASS voter.procedures.CSVLoadRaw;

@@ -96,27 +96,32 @@ class CSVFileReader implements Runnable {
                 CSVLineWithMetaData lineData = new CSVLineWithMetaData();
                 lineData.parColumnName = parColumnName;
                 lineData.line = correctedLine;
-                int partitionId = TheHashinator.getPartitionForParameter(VoltType.INTEGER.getValue(), (Object) lineData.line[partitionedColumnIndex - 1]);
-                if (lineq.get(partitionId) == null) {
-                    ArrayBlockingQueue<CSVLineWithMetaData> q = new ArrayBlockingQueue<CSVLineWithMetaData>(2000);
-                    q.put(lineData);
-                    lineq.put(partitionId, q);
-                    CSVPartitionProcessor pp = new CSVPartitionProcessor();
-                    pp.csvClient = csvClient;
-                    pp.partitionId = partitionId;
-                    pp.tableName = tableName;
-                    pp.columnCnt = columnCnt;
-                    pp.lineq = q;
-                    pp.rdr = this;
-                    pp.dummy = dummy;
-                    Thread th = new Thread(pp);
-                    th.setName("PartitionProcessor-" + partitionId);
-                    th.setDaemon(true);
-                    th.start();
-                    spawned.add(th);
-                } else {
-                    BlockingQueue<CSVLineWithMetaData> q = lineq.get(partitionId);
-                    q.put(lineData);
+                int partitionId = 0;
+                if (!config.check) {
+                    if (!CSVPartitionProcessor.isMP) {
+                        partitionId = TheHashinator.getPartitionForParameter(VoltType.INTEGER.getValue(), (Object) lineData.line[partitionedColumnIndex - 1]);
+                    }
+                    if (lineq.get(partitionId) == null) {
+                        ArrayBlockingQueue<CSVLineWithMetaData> q = new ArrayBlockingQueue<CSVLineWithMetaData>(2000);
+                        q.put(lineData);
+                        lineq.put(partitionId, q);
+                        CSVPartitionProcessor pp = new CSVPartitionProcessor();
+                        pp.csvClient = csvClient;
+                        pp.partitionId = partitionId;
+                        pp.tableName = tableName;
+                        pp.columnCnt = columnCnt;
+                        pp.lineq = q;
+                        pp.rdr = this;
+                        pp.dummy = dummy;
+                        Thread th = new Thread(pp);
+                        th.setName("PartitionProcessor-" + partitionId);
+                        th.setDaemon(true);
+                        th.start();
+                        spawned.add(th);
+                    } else {
+                        BlockingQueue<CSVLineWithMetaData> q = lineq.get(partitionId);
+                        q.put(lineData);
+                    }
                 }
                 totalRowCount.getAndIncrement();
             } catch (SuperCsvException e) {

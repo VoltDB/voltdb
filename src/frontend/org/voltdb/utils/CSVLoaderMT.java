@@ -105,18 +105,52 @@ public class CSVLoaderMT {
     public static final class MyMTCallback implements ProcedureCallback {
 
         private int m_batchCount;
+        private final long m_lineNum = 0;
+        private final String[] m_rowdata;
 
-        public MyMTCallback(int batchCount) {
+        public MyMTCallback(int batchCount, String[] rowData) {
             m_batchCount = batchCount;
+            m_rowdata = rowData;
         }
 
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 m_log.error(response.getStatusString());
+                String[] info = {m_rowdata.toString(), response.getStatusString()};
+                synchronizeErrorInfo(m_lineNum, info);
                 return;
             }
             long currentCount = CSVFileReader.outCount.addAndGet(m_batchCount);
+            if (currentCount % reportEveryNRows == 0) {
+                m_log.info("Inserted " + currentCount + " rows");
+            }
+        }
+    }
+
+    public static final class MyCallback implements ProcedureCallback {
+
+        private final long m_lineNum;
+        private final CSVLoaderMT.CSVConfig m_config;
+        private final String[] m_rowdata;
+
+        MyCallback(long lineNumber, CSVLoaderMT.CSVConfig cfg, String[] rowdata) {
+            m_lineNum = lineNumber;
+            m_config = cfg;
+            m_rowdata = rowdata;
+        }
+
+        @Override
+        public void clientCallback(ClientResponse response) throws Exception {
+            if (response.getStatus() != ClientResponse.SUCCESS) {
+                m_log.error(response.getStatusString());
+                String[] info = {m_rowdata.toString(), response.getStatusString()};
+                synchronizeErrorInfo(m_lineNum, info);
+                return;
+            }
+
+            long currentCount = CSVFileReader.outCount.incrementAndGet();
+
             if (currentCount % reportEveryNRows == 0) {
                 m_log.info("Inserted " + currentCount + " rows");
             }
@@ -159,8 +193,16 @@ public class CSVLoaderMT {
         String password = "";
         @Option(desc = "port to use when connecting to database (default: 21212)")
         int port = Client.VOLTDB_SERVER_PORT;
+        @Option(desc = "Use Legacy Insert CRUD method.")
+        boolean legacy = true;
+        @Option(desc = "Check CSV Input Data Only.")
+        boolean check = false;
+        @Option(desc = "Use @Ping")
+        boolean ping = false;
         @Option(desc = "Batch Size for processing.")
         public long batch = 200;
+        @Option(desc = "Use Load Table?")
+        public boolean loadTable = false;
         @AdditionalArgs(desc = "insert the data into database by TABLENAME.insert procedure by default")
         public String table = "";
 
@@ -272,7 +314,7 @@ public class CSVLoaderMT {
         }
         assert (csvClient != null);
 
-        int partitionedColumnIndex = 0;
+        int partitionedColumnIndex = -1;
         try {
             int columnCnt = 0;
             ProcedureCallback cb = null;
@@ -305,8 +347,6 @@ public class CSVLoaderMT {
                     m_log.warn("Using a multi-partitioned procedure to load data will be slow. "
                             + "If loading a partitioned table, use a single-partitioned procedure "
                             + "for best performance.");
-                    System.exit(1);
-                } else {
                 }
             } catch (Exception e) {
                 m_log.fatal(e.getMessage(), e);
@@ -347,7 +387,7 @@ public class CSVLoaderMT {
                     numPartitions = Integer.parseInt(procInfo.getString("VALUE"));
                 }
             }
-            if (numPartitions == -1) {
+            if (partitionedColumnIndex != -1 && numPartitions == -1) {
                 System.out.println("Could not figure out number of partitions...exiting..");
                 System.exit(-1);
             }
@@ -357,6 +397,9 @@ public class CSVLoaderMT {
             CSVPartitionProcessor.colNames = colNames;
             CSVPartitionProcessor.columnTypes = columnTypes;
             CSVPartitionProcessor.insertProcedure = insertProcedure;
+            CSVPartitionProcessor.isMP = (partitionedColumnIndex == -1 ? true : false);
+            CSVPartitionProcessor.isLoadTable = config.loadTable;
+            CSVPartitionProcessor.config = config;
 
             CSVFileReader rdr = new CSVFileReader();
             Map<Integer, BlockingQueue<CSVLineWithMetaData>> lineq = new HashMap<Integer, BlockingQueue<CSVLineWithMetaData>>();
@@ -402,8 +445,8 @@ public class CSVLoaderMT {
             }
             csvClient.drain();
             csvClient.close();
-            m_log.info("Inserted " + CSVFileReader.outCount.get() + " and acknowledged "
-                    + CSVFileReader.inCount.get() + " rows (final)");
+            m_log.info("Inserted " + CSVFileReader.inCount.get() + " and acknowledged "
+                    + CSVFileReader.outCount.get() + " rows (final)");
         } catch (Exception ex) {
             ex.printStackTrace();
             if (timer != null) {
