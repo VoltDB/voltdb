@@ -200,7 +200,7 @@ CTX.INPUT['common'] = """
  SegvException.cpp
  SerializableEEException.cpp
  SQLException.cpp
- TimeOutException.cpp
+ InterruptException.cpp
  StringRef.cpp
  tabletuple.cpp
  TupleSchema.cpp

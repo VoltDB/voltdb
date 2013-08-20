@@ -877,6 +877,10 @@ public class ProcedureRunner {
            status = ClientResponse.GRACEFUL_FAILURE;
            msg.append("SQL ERROR\n");
        }
+       else if (e.getClass() == org.voltdb.exceptions.InterruptException.class) {
+           status = ClientResponse.GRACEFUL_FAILURE;
+           msg.append("Interrupt ERROR\n");
+       }
        else if (e.getClass() == org.voltdb.ExpectedProcedureException.class) {
            msg.append("HSQL-BACKEND ERROR\n");
            if (e.getCause() != null)

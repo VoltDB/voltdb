@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include "common/TimeOutException.h"
+#include "common/InterruptException.h"
 #include "common/SerializableEEException.h"
 #include "common/serializeio.h"
 #include <iostream>
@@ -22,9 +22,9 @@
 
 using namespace voltdb;
 
-TimeOutException::TimeOutException(std::string message) :
-    SerializableEEException(VOLT_EE_EXCEPTION_TYPE_TIMEOUT, message) {
+InterruptException::InterruptException(std::string message) :
+    SerializableEEException(VOLT_EE_EXCEPTION_TYPE_INTERRUPT, message) {
 }
 
-void TimeOutException::p_serialize(ReferenceSerializeOutput *output) const {
+void InterruptException::p_serialize(ReferenceSerializeOutput *output) const {
 }
