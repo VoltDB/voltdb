@@ -536,7 +536,6 @@ public abstract class SubPlanAssembler {
                     // initialExpr is set for both cases
                     // but will be used for LTE and only when overflow case of LT
                     retval.initialExpr.addAll(retval.indexExprs);
-                    retval.sortDirection = SortDirectionType.DESC;
                 }
             }
         }
