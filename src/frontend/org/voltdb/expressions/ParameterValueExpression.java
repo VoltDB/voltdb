@@ -126,9 +126,6 @@ public class ParameterValueExpression extends AbstractValueExpression {
 
     @Override
     public void refineOperandType(VoltType columnType) {
-        if (m_valueType != null && m_valueType != VoltType.NUMERIC) {
-            return;
-        }
         if (columnType == null) {
             return;
         }
@@ -204,6 +201,12 @@ public class ParameterValueExpression extends AbstractValueExpression {
 
     public void setOriginalValue(ConstantValueExpression cve) {
         m_originalValue = cve;
+        // only called in AbstractParsedStmt.parseValueExpression()
+        // when needConstant and needParamter are both true
+        // the size of m_originalValue is MAX_LENGTH for STRING
+        // or VARCHAR, and fixed length for other types
+        setValueType(m_originalValue.getValueType());
+        setValueSize(m_originalValue.getValueSize());
     }
 
     public ConstantValueExpression getOriginalValue() {

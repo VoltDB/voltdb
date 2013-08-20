@@ -42,6 +42,7 @@ import java.io.PipedOutputStream;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.zip.GZIPOutputStream;
 
 import org.hsqldb_voltpatches.lib.StringUtil;
 
@@ -180,6 +181,10 @@ public class TarGenerator {
         }
     }
 
+    public TarGenerator(GZIPOutputStream outputStream) throws IOException {
+        archive = new TarFileOutputStream(outputStream);
+    }
+
     public void queueEntry(File file)
     throws FileNotFoundException, TarMalformatException {
         queueEntry(null, file);
@@ -237,6 +242,66 @@ public class TarGenerator {
             }
 
             archive.finish();
+        } catch (IOException ioe) {
+            System.err.println();    // Exception should cause a report
+
+            try {
+
+                // Just release resources from any Entry's input, which may be
+                // left open.
+                for (int i = 0; i < entryQueue.size(); i++) {
+                    ((TarEntrySupplicant) entryQueue.get(i)).close();
+                }
+
+                archive.close();
+            } catch (IOException ne) {
+
+                // Too difficult to report every single error.
+                // More important that the user know about the original Exc.
+            }
+
+            throw ioe;
+        }
+    }
+
+    public void write(boolean outputToStream, boolean verbose) throws IOException, TarMalformatException {
+
+        if (TarFileOutputStream.debug) {
+            System.out.println(RB.singleton.getString(RB.WRITE_QUEUE_REPORT,
+                    entryQueue.size()));
+        }
+
+        TarEntrySupplicant entry;
+
+        try {
+            for (int i = 0; i < entryQueue.size(); i++) {
+                if (verbose) {
+                    System.out.print(Integer.toString(i + 1) + " / "
+                                     + entryQueue.size() + ' ');
+                }
+
+                entry = (TarEntrySupplicant) entryQueue.get(i);
+
+                if (verbose) {
+                    System.out.print(entry.getPath() + "... ");
+                }
+
+                if (entry.getDataSize() >= paxThreshold) {
+                    entry.makeXentry().write();
+                    if (verbose) {
+                        System.out.print("x... ");
+                    }
+                }
+
+                entry.write();
+                archive.assertAtBlockBoundary();
+
+                if (verbose) {
+                    System.out.println();
+                }
+            }
+
+            archive.finish(outputToStream);
         } catch (IOException ioe) {
             System.err.println();    // Exception should cause a report
 

@@ -37,7 +37,7 @@ MaterializedViewMetadata::MaterializedViewMetadata(
         PersistentTable *srcTable, PersistentTable *destTable, catalog::MaterializedViewInfo *metadata)
         : m_target(destTable), m_filterPredicate(NULL)
 {
-DEBUG_STREAM_HERE("New mat view on source table " << srcTable->name() << " @" << srcTable << " view table " << m_target->name() << " @" << m_target);
+// DEBUG_STREAM_HERE("New mat view on source table " << srcTable->name() << " @" << srcTable << " view table " << m_target->name() << " @" << m_target);
     // best not to have to worry about the destination table disappearing out from under the source table that feeds it.
     m_target->incrementRefcount();
     srcTable->addMaterializedView(this);
@@ -83,7 +83,7 @@ DEBUG_STREAM_HERE("New mat view on source table " << srcTable->name() << " @" <<
     allocateBackedTuples();
 
     // Catch up on pre-existing source tuples UNLESS target tuples have already been migrated in.
-    if (srcTable->activeTupleCount() != 0 && m_target->activeTupleCount() == 0) {
+    if (( ! srcTable->isPersistentTableEmpty()) && m_target->isPersistentTableEmpty()) {
         TableTuple scannedTuple(srcTable->schema());
         TableIterator &iterator = srcTable->iterator();
         while (iterator.next(scannedTuple)) {
@@ -93,7 +93,7 @@ DEBUG_STREAM_HERE("New mat view on source table " << srcTable->name() << " @" <<
 }
 
 MaterializedViewMetadata::~MaterializedViewMetadata() {
-DEBUG_STREAM_HERE("Delete mat view " << m_target->name() << " w/ table @" << m_target);
+// DEBUG_STREAM_HERE("Delete mat view " << m_target->name() << " w/ table @" << m_target);
     freeBackedTuples();
     delete[] m_groupByColumns;
     delete[] m_outputColumnSrcTableIndexes;
@@ -166,9 +166,9 @@ void MaterializedViewMetadata::parsePredicate(catalog::MaterializedViewInfo *met
 void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple, bool fallible) {
     // don't change the view if this tuple doesn't match the predicate
     if (m_filterPredicate
-        && (m_filterPredicate->eval(&newTuple, NULL).isFalse()))
+        && (m_filterPredicate->eval(&newTuple, NULL).isFalse())) {
         return;
-
+    }
     bool exists = findExistingTuple(newTuple);
     if (!exists) {
         // create a blank tuple

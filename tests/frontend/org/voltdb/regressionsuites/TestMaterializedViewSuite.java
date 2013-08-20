@@ -33,6 +33,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.AddPerson;
@@ -43,6 +44,7 @@ import org.voltdb_testprocs.regressionsuites.matviewprocs.DeletePerson;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.Eng798Insert;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.OverflowTest;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.SelectAllPeople;
+import org.voltdb_testprocs.regressionsuites.matviewprocs.TruncateMatViewDataMP;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.UpdatePerson;
 
 
@@ -52,55 +54,92 @@ public class TestMaterializedViewSuite extends RegressionSuite {
     static final Class<?>[] PROCEDURES = {
         AddPerson.class, DeletePerson.class, UpdatePerson.class, AggAges.class,
         SelectAllPeople.class, AggThings.class, AddThing.class, OverflowTest.class,
-        Eng798Insert.class
+        Eng798Insert.class, TruncateMatViewDataMP.class
     };
 
     public TestMaterializedViewSuite(String name) {
         super(name);
     }
 
-    public void testInsertSinglePartition() throws IOException, ProcCallException {
+    private void truncateBeforeTest(Client client) {
+        // TODO Auto-generated method stub
+        VoltTable[] results = null;
+        try {
+            results = client.callProcedure("TruncateMatViewDataMP").getResults();
+        } catch (NoConnectionsException e) {
+            e.printStackTrace();
+            fail("Unexpected:" + e);
+        } catch (IOException e) {
+            e.printStackTrace();
+            fail("Unexpected:" + e);
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+            fail("Unexpected:" + e);
+        }
+        int nStatement = 0;
+        for (VoltTable countTable : results) {
+            // System.out.println(countTable);
+            ++nStatement;
+            long count = countTable.asScalarLong();
+            assertEquals("COUNT statement " + nStatement + "/" + results.length + " should have found no undeleted rows.", 0, count);
+        }
+    }
+
+    public void testSinglePartition() throws IOException, ProcCallException
+    {
+        subtestInsertSinglePartition();
+        subtestDeleteSinglePartition();
+        subtestUpdateSinglePartition();
+        subtestSinglePartitionWithPredicates();
+    }
+
+
+    private void subtestInsertSinglePartition() throws IOException, ProcCallException
+    {
         Client client = getClient();
+        truncateBeforeTest(client);
         VoltTable[] results = null;
 
         results = client.callProcedure("AggAges", 1).getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 0);
+        assertEquals(1, results.length);
+        assertEquals(0, results[0].getRowCount());
         assert(results != null);
 
         results = client.callProcedure("AddPerson", 1, 1L, 31L, 27500.20, 7).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddPerson", 1, 2L, 31L, 28920.99, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddPerson", 1, 3L, 32L, 63250.01, -1).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
 
         results = client.callProcedure("AggAges", 1).getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 2);
+        assertEquals(1, results.length);
+        assertEquals(2, results[0].getRowCount());
         assert(results != null);
     }
 
-    public void testDeleteSinglePartition() throws IOException, ProcCallException {
+    private void subtestDeleteSinglePartition() throws IOException, ProcCallException
+    {
         Client client = getClient();
+        truncateBeforeTest(client);
         VoltTable[] results = null;
 
         results = client.callProcedure("AggAges", 1).getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 0);
+        assertEquals(1, results.length);
+        assertEquals(0, results[0].getRowCount());
         assert(results != null);
 
         results = client.callProcedure("AddPerson", 1, 1L, 31L, 27500.20, 7).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddPerson", 1, 2L, 31L, 28920.99, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
 
         results = client.callProcedure("DeletePerson", 1, 1L).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
 
         results = client.callProcedure("AggAges", 1).getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 1);
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
         while (results[0].advanceRow()) {
             assertEquals(31L, results[0].getLong(0));
             assertEquals(1L, results[0].getLong(2));
@@ -110,130 +149,144 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assert(results != null);
 
         results = client.callProcedure("DeletePerson", 1, 2L).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
 
         results = client.callProcedure("AggAges", 1).getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 0);
+        assertEquals(1, results.length);
+        assertEquals(0, results[0].getRowCount());
         assert(results != null);
     }
 
-    public void testUpdateSinglePartition() throws IOException, ProcCallException {
+    private void subtestUpdateSinglePartition() throws IOException, ProcCallException
+    {
         Client client = getClient();
+        truncateBeforeTest(client);
         VoltTable[] results = null;
 
         results = client.callProcedure("AggAges", 1).getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 0);
+        assertEquals(1, results.length);
+        assertEquals(0, results[0].getRowCount());
         assert(results != null);
 
         results = client.callProcedure("AddPerson", 1, 1L, 31L, 27500.20, 7).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddPerson", 1, 2L, 31L, 28920.99, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddPerson", 1, 3L, 33L, 28920.99, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("UpdatePerson", 1, 2L, 31L, 15000.00, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("UpdatePerson", 1, 1L, 31L, 15000.00, 5).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
 
         results = client.callProcedure("AggAges", 1).getResults();
         assert(results != null);
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 2);
+        assertEquals(1, results.length);
+        assertEquals(2, results[0].getRowCount());
         System.out.println(results[0].toString());
         VoltTableRow r1 = results[0].fetchRow(0);
         VoltTableRow r2 = results[0].fetchRow(1);
-        assertEquals(r1.getLong(0), 31L);
-        assertEquals(r1.getLong(2), 2L);
+        assertEquals(31L, r1.getLong(0));
+        assertEquals(2L, r1.getLong(2));
         assertTrue(Math.abs(r1.getDouble(3) - 30000.0) < .01);
-        assertEquals(r1.getLong(4), 8L);
+        assertEquals(8L, r1.getLong(4));
 
-        assertEquals(r2.getLong(0), 33L);
-        assertEquals(r2.getLong(2), 1L);
+        assertEquals(33L, r2.getLong(0));
+        assertEquals(1L, r2.getLong(2));
         assertTrue(Math.abs(r2.getDouble(3) - 28920.99) < .01);
-        assertEquals(r2.getLong(4), 3L);
+        assertEquals(3L, r2.getLong(4));
     }
 
-    public void testSinglePartitionWithPredicates() throws IOException, ProcCallException {
+    private void subtestSinglePartitionWithPredicates() throws IOException, ProcCallException
+    {
         Client client = getClient();
+        truncateBeforeTest(client);
         VoltTable[] results = null;
 
         results = client.callProcedure("AggAges", 1).getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 0);
+        assertEquals(1, results.length);
+        assertEquals(0, results[0].getRowCount());
         assert(results != null);
 
         // expecting the 2yr old won't make it
         results = client.callProcedure("AddPerson", 1, 1L, 31L, 1000.0, 7).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddPerson", 1, 2L, 2L, 2000.0, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
 
         results = client.callProcedure("AggAges", 1).getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 1);
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
         assert(results != null);
 
         results = client.callProcedure("UpdatePerson", 1, 1L, 3L, 1000.0, 6).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
 
         results = client.callProcedure("AggAges", 1).getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 0);
+        assertEquals(1, results.length);
+        assertEquals(0, results[0].getRowCount());
         assert(results != null);
 
         results = client.callProcedure("UpdatePerson", 1, 2L, 50L, 4000.0, 4).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
 
         results = client.callProcedure("AggAges", 1).getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 1);
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
         assert(results != null);
 
         results = client.callProcedure("DeletePerson", 1, 1L).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
 
         results = client.callProcedure("AggAges", 1).getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 1);
+        assertEquals(1, results.length);
+        assertEquals(1, results[0].getRowCount());
         assert(results != null);
     }
 
-    public void testMultiPartitionSimple() throws IOException, ProcCallException {
+    public void testMPAndRegressions() throws IOException, ProcCallException
+    {
+        subtestMultiPartitionSimple();
+        subtestInsertReplicated();
+        subtestInsertAndOverflowSum();
+        subtestENG798();
+    }
+
+    private void subtestMultiPartitionSimple() throws IOException, ProcCallException
+    {
         Client client = getClient();
+        truncateBeforeTest(client);
         VoltTable[] results = null;
 
         results = client.callProcedure("AggAges", 1).getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 0);
+        assertEquals(1, results.length);
+        assertEquals(0, results[0].getRowCount());
         assert(results != null);
 
         results = client.callProcedure("AddPerson", 1, 1L, 31L, 1000.0, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddPerson", 1, 2L, 2L, 1000.0, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddPerson", 2, 3L, 23L, 1000.0, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddPerson", 2, 4L, 23L, 1000.0, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddPerson", 2, 5L, 35L, 1000.0, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddPerson", 2, 6L, 35L, 1000.0, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("UpdatePerson", 1, 2L, 32L, 1000.0, 3).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("DeletePerson", 2, 6L).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
 
         results = client.callProcedure("AggAges", 1).getResults();
         assert(results != null);
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
 
         VoltTable results2[] = client.callProcedure("AggAges", 2).getResults();
         assert(results != null);
-        assertEquals(results2.length, 1);
+        assertEquals(1, results2.length);
 
         int totalRows = results[0].getRowCount() + results2[0].getRowCount();
         // unfortunately they're both 4 in the hsql case, the fact that partitioning
@@ -242,33 +295,37 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                    (results[0].getRowCount() == 4) || (results2[0].getRowCount() == 4));
     }
 
-    public void testInsertReplicated() throws IOException, ProcCallException {
+    private void subtestInsertReplicated() throws IOException, ProcCallException
+    {
         Client client = getClient();
+        truncateBeforeTest(client);
         VoltTable[] results = null;
 
         results = client.callProcedure("AggThings").getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 0);
+        assertEquals(1, results.length);
+        assertEquals(0, results[0].getRowCount());
         assert(results != null);
 
         results = client.callProcedure("AddThing", 1L, 10L).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddThing", 2L, 12L).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
         results = client.callProcedure("AddThing", 3L, 10L).getResults();
-        assertEquals(results.length, 1);
+        assertEquals(1, results.length);
 
         results = client.callProcedure("AggThings").getResults();
-        assertEquals(results.length, 1);
-        assertEquals(results[0].getRowCount(), 2);
+        assertEquals(1, results.length);
+        assertEquals(2, results[0].getRowCount());
         assert(results != null);
     }
 
-    public void testInsertAndOverflowSum() throws IOException, ProcCallException {
+    private void subtestInsertAndOverflowSum() throws IOException, ProcCallException
+    {
         if (isHSQL()) {
             return;
         }
         Client client = getClient();
+        truncateBeforeTest(client);
         int invocationIndex = 0;
         VoltTable[] results = client.callProcedure("OverflowTest", 0, 0, invocationIndex++).getResults();
         results = client.callProcedure("OverflowTest", 2, 0, invocationIndex++).getResults();
@@ -304,13 +361,15 @@ public class TestMaterializedViewSuite extends RegressionSuite {
     }
 
     /** Test a view that re-orders the source table's columns */
-    public void testENG798() throws Exception {
+    private void subtestENG798() throws IOException, ProcCallException
+    {
         if (isHSQL()) {
             return;
         }
 
         // this would throw on a bad cast in the broken case.
         Client client = getClient();
+        truncateBeforeTest(client);
         ClientResponse callProcedure = client.callProcedure("Eng798Insert", "clientname");
         assertTrue(callProcedure.getStatus() == ClientResponse.SUCCESS);
         assertTrue(callProcedure.getResults().length == 1);
@@ -347,9 +406,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
         //project.setBackendTarget(BackendTarget.NATIVE_EE_IPC);
         project.addSchema(schemaPath);
-        project.addPartitionInfo("PEOPLE", "PARTITION");
-        project.addPartitionInfo("OVERFLOWTEST", "COL_1");
-        project.addPartitionInfo("ENG798", "C1");
+
         project.addProcedures(PROCEDURES);
         // build the jarfile
         boolean success = config.compile(project);

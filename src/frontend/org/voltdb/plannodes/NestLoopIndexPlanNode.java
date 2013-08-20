@@ -21,6 +21,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeMap;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
@@ -29,8 +32,15 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SortDirectionType;
 
 public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
+
+    public enum Members {
+        SORT_DIRECTION;
+    }
+
+    private SortDirectionType m_sortDirection = SortDirectionType.INVALID;
 
     public NestLoopIndexPlanNode() {
         super();
@@ -64,6 +74,15 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
             m_children.get(0).getOutputSchema().
             join(inlineScan.getOutputSchema()).copyAndReplaceWithTVE();
         m_hasSignificantOutputSchema = true;
+
+        if (m_children.get(0).getPlanNodeType() == PlanNodeType.MATERIALIZEDSCAN) {
+            assert (((MaterializedScanPlanNode)m_children.get(0)).getSortDirection() == inlineScan.getSortDirection());
+            m_sortDirection = inlineScan.getSortDirection();
+        }
+    }
+
+    public SortDirectionType getSortDirection() {
+        return m_sortDirection;
     }
 
     @Override
@@ -223,5 +242,21 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
     @Override
     protected String explainPlanForNode(String indent) {
         return "NESTLOOP INDEX " + this.m_joinType.toString() + " JOIN" + explainFilters(indent);
+    }
+
+    public void toJSONString(JSONStringer stringer) throws JSONException
+    {
+        super.toJSONString(stringer);
+        if (m_sortDirection != SortDirectionType.INVALID) {
+            stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirection.toString());
+        }
+    }
+
+    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException
+    {
+        super.loadFromJSONObject(jobj, db);
+        if (!jobj.isNull(Members.SORT_DIRECTION.name())) {
+            m_sortDirection = SortDirectionType.get( jobj.getString( Members.SORT_DIRECTION.name() ) );
+        }
     }
 }

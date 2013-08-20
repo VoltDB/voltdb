@@ -14,19 +14,27 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.voltdb.exportclient;
 
-import java.util.Properties;
+package org.voltcore.agreement;
 
-public abstract class ExportClientBase2 extends ExportClientBase {
-    public ExportClientBase2(boolean useAdminPorts, int throughputDisplayPeriod, boolean autodiscoverTopology) {
-        super(useAdminPorts, throughputDisplayPeriod, autodiscoverTopology);
+public enum ArbitrationStrategy {
+    NO_QUARTER {
+        @Override
+        public <R, P> R accept(Visitor<R, P> vtor, P param) {
+            return vtor.visitNoQuarter(param);
+        }
+    },
+    MATCHING_CARDINALITY {
+        @Override
+        public <R, P> R accept(Visitor<R, P> vtor, P param) {
+            return vtor.visitMatchingCardinality(param);
+        }
+    };
+
+    public interface Visitor<R,P> {
+        R visitNoQuarter(P param);
+        R visitMatchingCardinality(P param);
     }
 
-    public ExportClientBase2(boolean useAdminPorts) {
-        super(useAdminPorts);
-    }
-
-    public abstract void configure( Properties config) throws Exception;
-    public abstract void shutdown( );
+    public abstract <R,P> R accept(Visitor<R,P> vtor, P param);
 }

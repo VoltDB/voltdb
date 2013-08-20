@@ -23,6 +23,13 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
@@ -45,8 +52,6 @@ import org.voltcore.utils.Pair;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineJNI;
-
-import static org.junit.Assert.*;
 
 /**
  * This test verifies that the Java Hashinator behaves
@@ -211,8 +216,7 @@ public class TestTheHashinator {
                         "",
                         100,
                         hashinatorType,
-                        configBytes,
-                        null);
+                        configBytes);
 
         int partitionCount = 3;
         long valueToHash = hashinatorType == HashinatorType.ELASTIC ? 41 : 2;
@@ -243,8 +247,7 @@ public class TestTheHashinator {
                         "",
                         100,
                         hashinatorType,
-                        configBytes,
-                        null);
+                        configBytes);
 
         int partitionCount = 2;
         TheHashinator.initialize(getHashinatorClass(), getConfigBytes(partitionCount));
@@ -304,8 +307,7 @@ public class TestTheHashinator {
                         "",
                         100,
                         hashinatorType,
-                        configBytes,
-                        null);
+                        configBytes);
 
         /**
          *  Run with 100k of random values and make sure C++ and Java hash to
@@ -336,7 +338,7 @@ public class TestTheHashinator {
     @Test
     public void testSameLongHash() {
         byte configBytes[] = getConfigBytes(1);
-        ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, 0, "", 100, hashinatorType, configBytes, null);
+        ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, 0, "", 100, hashinatorType, configBytes);
 
         /**
          *  Run with 10k of random values and make sure C++ and Java hash to
@@ -373,8 +375,7 @@ public class TestTheHashinator {
                         "",
                         100,
                         hashinatorType,
-                        configBytes,
-                        null);
+                        configBytes);
 
         for (int i = 0; i < 2500; i++) {
             int partitionCount = r.nextInt(1000) + 1;
@@ -406,8 +407,7 @@ public class TestTheHashinator {
                         "",
                         100,
                         hashinatorType,
-                        getConfigBytes(2),
-                        null);
+                        getConfigBytes(2));
         final byte configBytes[] = getConfigBytes(2);
         TheHashinator.initialize(getHashinatorClass(), configBytes);
         int jHash = TheHashinator.hashToPartition(new Byte(VoltType.NULL_TINYINT));
@@ -472,8 +472,7 @@ public class TestTheHashinator {
                         "",
                         100,
                         hashinatorType,
-                        getConfigBytes(6),
-                        null);
+                        getConfigBytes(6));
         for (int i = 0; i < 2500; i++) {
             int partitionCount = r.nextInt(1000) + 1;
             byte[] valueToHash = new byte[r.nextInt(1000)];
@@ -581,8 +580,7 @@ public class TestTheHashinator {
                 "",
                 100,
                 hashinatorType,
-                holder.configBytes,
-                null);
+                holder.configBytes);
 
         TheHashinator.initialize(getHashinatorClass(), holder.configBytes);
 
@@ -813,6 +811,17 @@ public class TestTheHashinator {
         checkRangesAfterExpansion(/* beforePartitionCount = */ 2, /* afterPartitionCount = */ 6);
         checkRangesAfterExpansion(/* beforePartitionCount = */ 21, /* afterPartitionCount = */ 28);
         checkRangesAfterExpansion(/* beforePartitionCount = */ 24, /* afterPartitionCount = */ 48);
+    }
+
+    @Test
+    public void testGetConfigurationSignature()
+    {
+        final byte configBytes[] = getConfigBytes(2);
+        TheHashinator.initialize(getHashinatorClass(), configBytes);
+
+
+        long expected = TheHashinator.computeConfigurationSignature(configBytes);
+        assertEquals(expected, TheHashinator.getConfigurationSignature());
     }
 }
 

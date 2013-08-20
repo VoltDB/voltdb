@@ -1161,12 +1161,10 @@ final class RangeVariable {
         Index        index;
         Index        primaryIndex;
         int[]        primaryKey;
-        boolean      isSeqScan;
 
         index        = rangeIndex;
         primaryIndex = rangeTable.getPrimaryIndex();
         primaryKey   = rangeTable.getPrimaryKey();
-        isSeqScan    = indexCondition == null;
 
         if (rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
             throw new HSQLParseException("VoltDB does not support subqueries, consider using views instead");
@@ -1176,10 +1174,6 @@ final class RangeVariable {
         // note: ignored if scan if full table scan
         if (index == null)
             index = primaryIndex;
-
-        // check if this is a sequential scan
-        if (index == primaryIndex && primaryKey.length == 0)
-            isSeqScan = true;
 
         // output open tag
         VoltXMLElement scan = new VoltXMLElement("tablescan");

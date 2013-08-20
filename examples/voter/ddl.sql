@@ -19,7 +19,6 @@ CREATE TABLE votes
 );
 
 PARTITION TABLE votes ON COLUMN phone_number;
-CREATE INDEX phonen_number_index ON votes (phone_number);
 
 -- Map of Area Codes and States for geolocation classification of incoming calls
 CREATE TABLE area_code_state

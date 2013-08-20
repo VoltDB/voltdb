@@ -91,7 +91,7 @@ PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetS
     m_partitionColumn(partitionColumn),
     stats_(this),
     m_failedCompactionCount(0),
-    m_tuplesPendingDeleteCount(0),
+    m_invisibleTuplesPendingDeleteCount(0),
     m_surgeon(*this),
     m_bulkDelete(0)
 {
@@ -294,6 +294,7 @@ void PersistentTable::insertTupleForUndo(char *tuple)
     target.move(tuple);
     target.setPendingDeleteOnUndoReleaseFalse();
     m_tuplesPinnedByUndo--;
+    --m_invisibleTuplesPendingDeleteCount;
 
     /*
      * The only thing to do is reinsert the tuple into the indexes. It was never moved,
@@ -538,6 +539,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
         if (uq) {
             target.setPendingDeleteOnUndoReleaseTrue();
             m_tuplesPinnedByUndo++;
+            ++m_invisibleTuplesPendingDeleteCount;
             // Create and register an undo action.
             uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), &m_surgeon), this);
             return true;
@@ -559,6 +561,7 @@ void PersistentTable::deleteTupleRelease(char* tupleData)
     target.move(tupleData);
     target.setPendingDeleteOnUndoReleaseFalse();
     m_tuplesPinnedByUndo--;
+    --m_invisibleTuplesPendingDeleteCount;
     deleteTupleFinalize(target);
 }
 
@@ -589,9 +592,8 @@ void PersistentTable::deleteTupleFinalize(TableTuple &target)
             return;
         }
 
+        ++m_invisibleTuplesPendingDeleteCount;
         target.setPendingDeleteTrue();
-        // This count is a testability feature not intended for use in product logic.
-        ++m_tuplesPendingDeleteCount;
         return;
     }
 
@@ -761,8 +763,6 @@ PersistentTable::segregateMaterializedViews(std::map<std::string, catalog::Mater
                                             std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & end,
                                             std::vector< catalog::MaterializedViewInfo*> &survivingInfosOut,
                                             std::vector<MaterializedViewMetadata*> &survivingViewsOut,
-                                            std::vector<catalog::MaterializedViewInfo*> &changingInfosOut,
-                                            std::vector<MaterializedViewMetadata*> &changingViewsOut,
                                             std::vector<MaterializedViewMetadata*> &obsoleteViewsOut)
 {
     //////////////////////////////////////////////////////////
@@ -902,6 +902,11 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple,
                                              CONSTRAINT_TYPE_UNIQUE);
         }
     }
+    UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+    if (uq) {
+        char* tupleData = uq->allocatePooledCopy(tuple.address(), tuple.tupleLength());
+        uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, &m_surgeon));
+    }
 
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
@@ -991,7 +996,7 @@ int64_t PersistentTable::streamMore(TupleOutputStreamProcessor &outputStreams,
 void PersistentTable::processRecoveryMessage(RecoveryProtoMsg* message, Pool *pool) {
     switch (message->msgType()) {
     case RECOVERY_MSG_TYPE_SCAN_TUPLES: {
-        if (activeTupleCount() == 0) {
+        if (isPersistentTableEmpty()) {
             uint32_t tupleCount = message->totalTupleCount();
             BOOST_FOREACH(TableIndex *index, m_indexes) {
                 index->ensureCapacity(tupleCount);
