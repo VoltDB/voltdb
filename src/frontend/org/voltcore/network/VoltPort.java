@@ -394,9 +394,7 @@ public class VoltPort implements Connection
                 }
             }
         } finally {
-            if ( networkLog.isDebugEnabled() ) {
-            networkLog.info("Closing channel " + m_toString);
-            }
+            networkLog.debug("Closing channel " + m_toString);
             try {
                 m_channel.close();
             } catch (IOException e) {
