@@ -23,6 +23,7 @@
 
 package org.voltcore.network;
 
+import java.net.InetSocketAddress;
 import java.nio.channels.Channel;
 import java.nio.channels.SelectionKey;
 
@@ -46,7 +47,7 @@ public class TestVoltPort extends TestCase {
     // implement abstract run() method.
     private static class MockVoltPort extends VoltPort {
         MockVoltPort(VoltNetwork vn, Channel channel) {
-            super (vn, null, "", vn.m_pool );
+            super (vn, null, InetSocketAddress.createUnresolved("localhost", 21212), vn.m_pool );
         }
     }
 
