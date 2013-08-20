@@ -194,7 +194,7 @@ public class CSVLoaderMT {
         @Option(desc = "port to use when connecting to database (default: 21212)")
         int port = Client.VOLTDB_SERVER_PORT;
         @Option(desc = "Use Legacy Insert CRUD method.")
-        boolean legacy = true;
+        boolean legacy = false;
         @Option(desc = "Check CSV Input Data Only.")
         boolean check = false;
         @Option(desc = "Use @Ping")

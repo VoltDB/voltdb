@@ -29,8 +29,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -40,7 +38,6 @@ import org.supercsv.io.ICsvListReader;
 import org.supercsv.prefs.CsvPreference;
 import org.supercsv_voltpatches.tokenizer.Tokenizer;
 import org.voltcore.logging.VoltLogger;
-
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -48,11 +45,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ClientStats;
-import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ProcedureCallback;
-import static org.voltdb.utils.CSVLoaderMT.printStatistics;
-import static org.voltdb.utils.CSVLoaderMT.schedulePeriodicStats;
 
 /**
  * CSVLoader is a simple utility to load data from a CSV formatted file to a
@@ -186,15 +179,8 @@ public class CSVLoader {
 
         @Option(desc = "port to use when connecting to database (default: 21212)")
         int port = Client.VOLTDB_SERVER_PORT;
-        @Option(desc = "Check CSV Input Data Only.")
-        boolean check = false;
-        @Option(desc = "Use @Ping")
-        boolean ping = false;
-        @Option(desc = "Use DoNothingProcedure which does full round trip but no transaction.")
-        boolean dnp = false;
-            @Option(desc = "Use Multiple Client Threads")
-            boolean mct = false;
-            @AdditionalArgs(desc = "insert the data into database by TABLENAME.insert procedure by default")
+
+        @AdditionalArgs(desc = "insert the data into database by TABLENAME.insert procedure by default")
         String table = "";
 
         @Override
@@ -250,14 +236,8 @@ public class CSVLoader {
     public static void main(String[] args) throws IOException,
             InterruptedException {
         start = System.currentTimeMillis();
-        long parsingTimeStart = start;
-        long parsingTimeEnd = start;
-        long insertTimeStart = start;
-        long insertTimeEnd = start;
         int waits = 0;
         int shortWaits = 0;
-        ClientStatsContext periodicStatsContext = null;
-        Timer timer = null;
 
         CSVConfig cfg = new CSVConfig();
         cfg.parse(CSVLoader.class.getName(), args);
@@ -268,7 +248,6 @@ public class CSVLoader {
         ICsvListReader listReader = null;
 
         try {
-            long st = System.currentTimeMillis();
             if (CSVLoader.standin) {
                 tokenizer = new Tokenizer(new BufferedReader( new InputStreamReader(System.in)), csvPreference,
                         config.strictquotes, config.escape, config.columnsizelimit,
@@ -276,13 +255,11 @@ public class CSVLoader {
                 listReader = new CsvListReader(tokenizer, csvPreference);
             }
             else {
-                tokenizer = new Tokenizer(new BufferedReader(new FileReader(config.file)), csvPreference,
+                tokenizer = new Tokenizer(new FileReader(config.file), csvPreference,
                         config.strictquotes, config.escape, config.columnsizelimit,
                         config.skip) ;
                 listReader = new CsvListReader(tokenizer, csvPreference);
             }
-            long end = System.currentTimeMillis();
-            parsingTimeEnd += (end - st);
         } catch (FileNotFoundException e) {
             m_log.error("CSV file '" + config.file + "' could not be found.");
             System.exit(-1);
@@ -294,66 +271,58 @@ public class CSVLoader {
         // Create connection
         ClientConfig c_config = new ClientConfig(config.user, config.password);
         c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
-            // timeout, see ENG-2670
-            if (config.mct) {
-                c_config.setHeavyweight(true);
-            }
+                                             // timeout, see ENG-2670
         Client csvClient = null;
-        if (!config.check) {
+        try {
+            csvClient = CSVLoader.getClient(c_config, serverlist, config.port);
+        } catch (Exception e) {
+            m_log.error("Error to connect to the servers:"
+                    + config.servers);
+            close_cleanup();
+            System.exit(-1);
+        }
+        assert(csvClient != null);
+
+        try {
+            ProcedureCallback cb = null;
+
+            boolean lastOK = true;
+
+            int columnCnt = 0;
+            VoltTable procInfo = null;
+            boolean isProcExist = false;
             try {
-                csvClient = CSVLoader.getClient(c_config, serverlist, config.port);
-                periodicStatsContext = csvClient.createStatsContext();
-                timer = schedulePeriodicStats(periodicStatsContext, start);
+                procInfo = csvClient.callProcedure("@SystemCatalog",
+                        "PROCEDURECOLUMNS").getResults()[0];
+                while (procInfo.advanceRow()) {
+                    if (insertProcedure.matches((String) procInfo.get(
+                            "PROCEDURE_NAME", VoltType.STRING))) {
+                        columnCnt++;
+                        isProcExist = true;
+                        String typeStr = (String)procInfo.get("TYPE_NAME", VoltType.STRING);
+                        typeList.add(VoltType.typeFromString(typeStr));
+                    }
+                }
             } catch (Exception e) {
-                m_log.error("Error to connect to the servers:"
-                        + config.servers);
+                m_log.error(e.getMessage(), e);
                 close_cleanup();
                 System.exit(-1);
             }
-            assert (csvClient != null);
-        }
-
-        try {
-            int columnCnt = 0;
-            ProcedureCallback cb = null;
-            boolean lastOK = true;
-            if (!cfg.check) {
-
-                VoltTable procInfo = null;
-                boolean isProcExist = false;
-                try {
-                    procInfo = csvClient.callProcedure("@SystemCatalog",
-                            "PROCEDURECOLUMNS").getResults()[0];
-                    while (procInfo.advanceRow()) {
-                        if (insertProcedure.matches((String) procInfo.get(
-                                "PROCEDURE_NAME", VoltType.STRING))) {
-                            columnCnt++;
-                            isProcExist = true;
-                            String typeStr = (String) procInfo.get("TYPE_NAME", VoltType.STRING);
-                            typeList.add(VoltType.typeFromString(typeStr));
-                        }
-                    }
-                } catch (Exception e) {
-                    m_log.error(e.getMessage(), e);
-                    close_cleanup();
-                    System.exit(-1);
+            if (isProcExist == false) {
+                m_log.error("No matching insert procedure available");
+                close_cleanup();
+                System.exit(-1);
+            }
+            try {
+                if (isProcedureMp(csvClient)) {
+                    m_log.warn("Using a multi-partitioned procedure to load data will be slow. " +
+                            "If loading a partitioned table, use a single-partitioned procedure " +
+                            "for best performance.");
                 }
-                if (isProcExist == false) {
-                    m_log.error("No matching insert procedure available");
-                    close_cleanup();
-                    System.exit(-1);
-                }
-                try {
-                    if (isProcedureMp(csvClient)) {
-                        m_log.warn("Using a multi-partitioned procedure to load data will be slow. "
-                                + "If loading a partitioned table, use a single-partitioned procedure "
-                                + "for best performance.");
-                    }
-                } catch (Exception e) {
-                    m_log.fatal(e.getMessage(), e);
-                    close_cleanup();
-                    System.exit(-1);
-                }
+            } catch (Exception e) {
+                m_log.fatal(e.getMessage(), e);
+                close_cleanup();
+                System.exit(-1);
             }
 
             List<String> lineList = new ArrayList<String>();
@@ -365,11 +334,7 @@ public class CSVLoader {
                         totalLineCount.set(cfg.skip);
                     else
                         totalLineCount.set( listReader.getLineNumber() );
-                    long st = System.currentTimeMillis();
                     lineList = listReader.read();
-                    long end = System.currentTimeMillis();
-                    parsingTimeEnd += (end - st);
-
                     //EOF
                     if(lineList == null) {
                         if( totalLineCount.get() > listReader.getLineNumber() )
@@ -380,32 +345,20 @@ public class CSVLoader {
                     boolean queued = false;
                     while (queued == false) {
                         String[] correctedLine = lineList.toArray(new String[0]);
-                        if (!config.check) {
-                            cb = new MyCallback(totalLineCount.get() + 1, config,
-                                    lineList);
-                            String lineCheckResult;
+                        cb = new MyCallback(totalLineCount.get()+1, config,
+                                lineList);
+                        String lineCheckResult;
 
-                            if ((lineCheckResult = checkparams_trimspace(correctedLine,
-                                    columnCnt)) != null) {
-                                String[] info = {lineList.toString(), lineCheckResult};
-                                synchronizeErrorInfo(totalLineCount.get() + 1, info);
-                                break;
-                            }
-
-                            if (config.ping) {
-                                queued = csvClient.callProcedure(cb, "@Ping",
-                                        (Object[]) correctedLine);
-                            } else if (config.dnp) {
-                                queued = csvClient.callProcedure(cb, "DoNothingProcedure",
-                                        (Object[]) correctedLine);
-                            } else {
-                                queued = csvClient.callProcedure(cb, insertProcedure,
-                                        (Object[]) correctedLine);
-                            }
-                            outCount.incrementAndGet();
-                        } else {
-                            queued = true;
+                        if ((lineCheckResult = checkparams_trimspace(correctedLine,
+                                columnCnt)) != null) {
+                            String[] info = { lineList.toString(), lineCheckResult };
+                            synchronizeErrorInfo( totalLineCount.get()+1, info );
+                            break;
                         }
+
+                        queued = csvClient.callProcedure(cb, insertProcedure,
+                                (Object[]) correctedLine);
+                        outCount.incrementAndGet();
 
                         if (queued == false) {
                             ++waits;
@@ -424,22 +377,13 @@ public class CSVLoader {
                     synchronizeErrorInfo( totalLineCount.get()+1, info );
                 }
             }
-            if (csvClient != null) {
-                csvClient.drain();
-            }
-            insertTimeEnd = System.currentTimeMillis();
+            csvClient.drain();
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        m_log.info("Parsing CSV file took " + (parsingTimeEnd - parsingTimeStart) + " milliseconds.");
-        if (!config.check) {
-            m_log.info("Inserting Data took " + ((insertTimeEnd - insertTimeStart) - (parsingTimeEnd - parsingTimeStart)) + " milliseconds.");
-            m_log.info("Inserted " + outCount.get() + " and acknowledged "
-                    + inCount.get() + " rows (final)");
-        } else {
-            m_log.info("Verification of CSV input completed.");
-        }
+        m_log.info("Inserted " + outCount.get() + " and acknowledged "
+                + inCount.get() + " rows (final)");
         if (waits > 0) {
             m_log.info("Waited " + waits + " times");
             if (shortWaits > 0) {
@@ -448,19 +392,10 @@ public class CSVLoader {
             }
         }
 
-        if (!config.check) {
-            produceFiles();
-        }
+        produceFiles();
         close_cleanup();
         listReader.close();
-        if (timer != null) {
-            timer.cancel();
-            //Print stats one last time.
-            printStatistics(periodicStatsContext, start);
-        }
-        if (csvClient != null) {
-            csvClient.close();
-        }
+        csvClient.close();
     }
 
     private static void synchronizeErrorInfo( long errLineNum, String[] info ) throws IOException, InterruptedException {
@@ -476,36 +411,6 @@ public class CSVLoader {
                 System.exit(-1);
             }
         }
-    }
-
-    /**
-     * Create a Timer task to display performance data on the Vote procedure
-     * It calls printStatistics() every displayInterval seconds
-     */
-    public static Timer schedulePeriodicStats(final ClientStatsContext periodicStatsContext, final long startTime) {
-        Timer timer = new Timer();
-        TimerTask statsPrinting = new TimerTask() {
-            @Override
-            public void run() {
-                printStatistics(periodicStatsContext, startTime);
-            }
-        };
-        timer.scheduleAtFixedRate(statsPrinting,
-                2 * 1000,
-                2 * 1000);
-        return timer;
-    }
-
-    /**
-     * Prints a one line update on performance that can be printed
-     * periodically during a benchmark.
-     */
-    public static synchronized void printStatistics(ClientStatsContext periodicStatsContext, long startTime) {
-        ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
-        long time = Math.round((stats.getEndTimestamp() - startTime) / 1000.0);
-
-        m_log.info(String.format("%02d:%02d:%02d Throughput %d/s, Aborts/Failures %d/%d", time / 3600,
-                (time / 60) % 60, time % 60, stats.getTxnThroughput(), stats.getInvocationAborts(), stats.getInvocationErrors()));
     }
 
     private static String checkparams_trimspace(String[] slot, int columnCnt) {
@@ -594,8 +499,8 @@ public class CSVLoader {
 
     private static void produceFiles() {
         latency = System.currentTimeMillis() - start;
-        m_log.info("CSVLoader elapsed: " + latency
-                + " milliseconds");
+        m_log.info("CSVLoader elapsed: " + latency / 1000F
+                + " seconds");
 
         int bulkflush = 300; // by default right now
         try {
@@ -617,7 +522,7 @@ public class CSVLoader {
             }
             // Get elapsed time in seconds
             float elapsedTimeSec = latency / 1000F;
-            out_reportfile.write("CSVLoader elaspsed: " + elapsedTimeSec
+            out_reportfile.write("csvloader elaspsed: " + elapsedTimeSec
                     + " seconds\n");
             long trueSkip = 0;
             //get the actuall number of lines skipped
