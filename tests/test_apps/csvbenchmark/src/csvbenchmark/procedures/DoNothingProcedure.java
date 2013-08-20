@@ -20,50 +20,23 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package org.voltcore.network;
+package csvbenchmark.procedures;
 
-import java.util.concurrent.Future;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
 
-public class MockConnection implements Connection {
+@ProcInfo(
+        partitionInfo = "narrow_long_ix.a:0",
+        singlePartition = true)
 
-    @Override
-    public WriteStream writeStream() {
-        throw new UnsupportedOperationException();
+public class DoNothingProcedure extends VoltProcedure {
+
+    // Inserts an area code/state mapping
+    //public final SQLStmt insertACSStmt = new SQLStmt("INSERT INTO narrow_short_noix (a,b,c,d,e) VALUES (?,?,?,?,?);");
+    public final SQLStmt insertACSStmt = new SQLStmt("INSERT INTO narrow_long_noix (a,b,c,d,e) VALUES (?,?,?,?,?);");
+
+    public long run(int a, int b, int c, long d, String e) {
+        return 0;
     }
-
-    @Override
-    public NIOReadStream readStream() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public void disableReadSelection() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public void enableReadSelection() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public String getHostnameAndIP() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public long connectionId() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public Future<?> unregister() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public void queueTask(Runnable r) {
-        throw new UnsupportedOperationException();
-    }
-
 }

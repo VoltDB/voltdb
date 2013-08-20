@@ -48,10 +48,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListenableFutureTask;
-import com.google.common.util.concurrent.MoreExecutors;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -64,6 +60,7 @@ import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
+import org.voltcore.network.ReverseDNSPolicy;
 import org.voltcore.network.InputHandler;
 import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.QueueMonitor;
@@ -74,7 +71,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
-
 import org.voltdb.ClientInterfaceHandleManager.Iv2InFlight;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
@@ -113,6 +109,11 @@ import org.voltdb.sysprocs.SnapshotRestore;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
+
+import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListenableFutureTask;
+import com.google.common.util.concurrent.MoreExecutors;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -446,7 +447,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                         socket.socket().setKeepAlive(true);
 
                                         if (handler instanceof ClientInputHandler) {
-                                            final Connection c = m_network.registerChannel(socket, handler, 0);
+                                            final Connection c =
+                                                    m_network.registerChannel(
+                                                            socket,
+                                                            handler,
+                                                            0,
+                                                            ReverseDNSPolicy.ASYNCHRONOUS);
                                             /*
                                              * If IV2 is enabled the logic initially enabling read is
                                              * in the started method of the InputHandler
@@ -463,7 +469,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                 }
                                             }
                                         } else {
-                                            m_network.registerChannel(socket, handler, SelectionKey.OP_READ);
+                                            m_network.registerChannel(
+                                                    socket,
+                                                    handler,
+                                                    SelectionKey.OP_READ,
+                                                    ReverseDNSPolicy.ASYNCHRONOUS);
                                         }
                                         success = true;
                                     }
@@ -691,7 +701,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 handler =
                     new ClientInputHandler(
                             username,
-                            socket.socket().getInetAddress().getHostName(),
                             m_isAdmin);
             }
             else {
@@ -758,7 +767,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         public static final int MAX_READ = 8192 * 4;
 
         private Connection m_connection;
-        private final String m_hostname;
         private final boolean m_isAdmin;
 
         /**
@@ -768,11 +776,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          */
         private final String m_username;
 
-        public ClientInputHandler(String username, String hostname,
+        public ClientInputHandler(String username,
                                   boolean isAdmin)
         {
             m_username = username.intern();
-            m_hostname = hostname;
             m_isAdmin = isAdmin;
         }
 
@@ -986,7 +993,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              */
             cihm.m_acg.logTransactionCompleted(
                     cihm.connection.connectionId(),
-                    cihm.connection.getHostnameOrIP(),
+                    cihm.connection.getHostnameAndIP(),
                     clientData.m_procName,
                     delta,
                     clientResponse.getStatus());
@@ -1637,7 +1644,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         AdHocPlannerWork ahpw = new AdHocPlannerWork(
                 m_siteId,
                 false, task.clientHandle, handler.connectionId(),
-                handler.m_hostname, handler.isAdmin(), ccxn,
+                ccxn.getHostnameAndIP(), handler.isAdmin(), ccxn,
                 sql, sqlStatements, partitionParam, null, false, true,
                 task.type, task.originalTxnId, task.originalUniqueId,
                 m_adhocCompletionHandler);
@@ -1673,7 +1680,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         LocalObjectMessage work = new LocalObjectMessage(
                 new CatalogChangeWork(
                     m_siteId,
-                    task.clientHandle, handler.connectionId(), handler.m_hostname,
+                    task.clientHandle, handler.connectionId(), ccxn.getHostnameAndIP(),
                     handler.isAdmin(), ccxn, catalogBytes, deploymentString,
                     task.type, task.originalTxnId, task.originalUniqueId,
                     m_adhocCompletionHandler));
@@ -1705,7 +1712,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                           new VoltTable[0], e.getMessage(), task.clientHandle);
         }
         assert(involvedPartitions != null);
-        createTransaction(handler.connectionId(), handler.m_hostname,
+        createTransaction(handler.connectionId(), ccxn.getHostnameAndIP(),
                           handler.isAdmin(),
                           task,
                           catProc.getReadonly(),
@@ -1826,7 +1833,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // This only happens on one node so we don't need to pick a leader.
         createTransaction(
                 handler.connectionId(),
-                handler.m_hostname,
+                ccxn.getHostnameAndIP(),
                 handler.isAdmin(),
                 task,
                 sysProc.getReadonly(),
@@ -2024,7 +2031,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         }
         boolean success =
-                createTransaction(handler.connectionId(), handler.m_hostname,
+                createTransaction(handler.connectionId(), ccxn.getHostnameAndIP(),
                         handler.isAdmin(),
                         task,
                         catProc.getReadonly(),
@@ -2524,7 +2531,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
-        public String getHostnameOrIP() {
+        public String getHostnameAndIP() {
             return "";
         }
 
@@ -2613,7 +2620,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 long outstandingTxns = e.getValue().getOutstandingTxns();
                 client_stats.put(
                         e.getKey(), new Pair<String, long[]>(
-                            e.getValue().connection.getHostnameOrIP(),
+                            e.getValue().connection.getHostnameAndIP(),
                             new long[] {adminMode, readWait, writeWait, outstandingTxns}));
             }
         }
