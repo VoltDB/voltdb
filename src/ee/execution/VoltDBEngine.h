@@ -175,12 +175,26 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         /** index of the batch piece being executed */
         int m_currentIndexInBatch;
+        long m_tuplesFound;
+        Table* m_lastAccessedTable;
 
         inline void setIndexInBatch(int indexInBatch) {
             m_currentIndexInBatch = indexInBatch;
         }
         inline int getIndexInBatch() {
             return m_currentIndexInBatch;
+        }
+        inline void setTuplesFound(int64_t tuplesFound) {
+            m_tuplesFound = tuplesFound;
+        }
+        inline int64_t getTuplesFound() {
+            return m_tuplesFound;
+        }
+        inline void setLastAccessedTable(Table* table) {
+            m_lastAccessedTable = table;
+        }
+        inline Table* getLastAccessedTable() {
+            return m_lastAccessedTable;
         }
 
         // Created to transition existing unit tests to context abstraction.

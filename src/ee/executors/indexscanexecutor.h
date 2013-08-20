@@ -80,18 +80,6 @@ private:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
-    inline void progressUpdate(int foundTuples) {
-        Table* targetTable = reinterpret_cast<Table*> (m_targetTable);
-        // Update stats in java and let java determine if we should cancel this query.
-        if(m_engine->getTopend()->fragmentProgressUpdate(m_engine->getIndexInBatch(),
-                planNodeToString(m_abstractNode->getPlanNodeType()),
-                targetTable->name(),
-                targetTable->activeTupleCount(),
-                foundTuples)){
-            VOLT_ERROR("Interrupt query.");
-            throw InterruptException("Query interrupted.");
-        }
-    };
 
     // Data in this class is arranged roughly in the order it is read for
     // p_execute(). Please don't reshuffle it only in the name of beauty.
