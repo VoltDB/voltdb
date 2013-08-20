@@ -324,7 +324,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         if(duration > m_logDuration) {
             VoltLogger log = new VoltLogger("CONSOLE");
 
-            log.info("Procedure "+m_rProcContext.m_procedureName+" is taking  a long time to execute -- "+duration/1000.0+" seconds spent accessing "
+            log.info("Procedure "+m_rProcContext.m_procedureName+" is taking a long time to execute -- "+duration/1000.0+" seconds spent accessing "
                     +tuplesFound+" tuples. Current plan fragment "+planNodeName+" in query "+(m_rProcContext.m_batchIndexBase+batchIndex+1)
                     +" of batch "+m_rProcContext.m_voltExecuteSQLIndex+" on site "+CoreUtils.hsIdToString(m_siteId)+".");
 
