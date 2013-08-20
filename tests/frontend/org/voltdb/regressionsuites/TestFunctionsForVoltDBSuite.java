@@ -431,7 +431,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
-    private void checkDecodeNullResult (ClientResponse cr, String[] expected) {
+    private void checkDecodeNullResult (ClientResponse cr, Object[] input) {
         VoltTable result;
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
@@ -439,14 +439,22 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(result.advanceRow());
         System.out.println("testDECODEWithNULL:" + result);
 
-        for (int i = 0; i < expected.length; i++) {
-            if ( (i == 4 || i == 7) && !expected[i].startsWith("null") ) {
-                // Float type, decimal type
-                assertTrue(Math.abs(
-                        Double.valueOf(expected[i]) - Double.valueOf(result.getString(i))
-                        ) < 0.00001);
-            } else {
-                assertEquals(expected[i],result.getString(i));
+        if (input instanceof String[]) {
+            String[] expected = (String[]) input;
+            for (int i = 0; i < expected.length; i++) {
+                if ( (i == 4 || i == 7) && !expected[i].startsWith("null") ) {
+                    // Float type, decimal type
+                    assertTrue(Math.abs(
+                            Double.valueOf(expected[i]) - Double.valueOf(result.getString(i))
+                            ) < 0.00001);
+                } else {
+                    assertEquals(expected[i],result.getString(i));
+                }
+            }
+        } else if  (input instanceof Long[]) {
+            Long[] expected = (Long[]) input;
+            for (int i = 0; i < expected.length; i++) {
+                assertEquals(expected[i],Long.valueOf(result.getLong(i)));
             }
         }
     }
@@ -510,6 +518,33 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             fail();
         } catch (Exception ex) {
             assertTrue(ex.getMessage().contains("TIMESTAMP can't be cast as VARCHAR"));
+        }
+
+        // Test NULL as the second search expression.
+        cr = client.callProcedure("@AdHoc", "select DECODE(tiny, -1, -1, NULL, 0, tiny)," +
+                "DECODE(small, -1, -1, NULL, 0, small), DECODE(num, -1, -1, NULL, 0, num),  " +
+                "DECODE(big, -1, -1, NULL, 0, big) from R3 where id = 1");
+        checkDecodeNullResult(cr, new Long[]{1L,1L,1L,1L});
+        cr = client.callProcedure("@AdHoc", "select DECODE(tiny, -1, -1, NULL, 0, tiny)," +
+                "DECODE(small, -1, -1, NULL, 0, small), DECODE(num, -1, -1, NULL, 0, num),  " +
+                "DECODE(big, -1, -1, NULL, 0, big) from R3 where id = 2");
+        checkDecodeNullResult(cr, new Long[]{0L,0L,0L,0L});
+
+        // Test Null return type
+        cr = client.callProcedure("@AdHoc","select DECODE(tiny, 4, 5, NULL, NULL, tiny) " +
+                " from R3 where id = 2");
+        assertTrue(cr.getResults()[0].getRowCount() == 1);
+        assertTrue(cr.getResults()[0].advanceRow());
+        assertEquals(Integer.MIN_VALUE, cr.getResults()[0].getLong(0));
+
+        try {
+            cr = client.callProcedure("@AdHoc","select DECODE(tiny, 4, 5, NULL, 'null tiny', tiny) " +
+                    " from R3 where id = 2");
+            fail();
+        } catch (Exception ex) {
+            System.out.println(ex.getMessage());
+            assertTrue(ex.getMessage().contains("SQL ERROR"));
+            assertTrue(ex.getMessage().contains("value: 'null tiny'"));
         }
     }
 

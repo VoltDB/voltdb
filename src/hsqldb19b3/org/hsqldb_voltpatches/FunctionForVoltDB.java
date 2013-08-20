@@ -305,7 +305,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                     // that may hint at the result type or require hinting from the other result values.
                     if (resultTypeInferred == null) {
                         resultTypeInferred = argType; // Take the first result type hint.
-                    } else if (resultTypeInferred != argType) {
+                    } else if (!resultTypeInferred.softEquals(argType)) {
                         resultTypeInferred = Type.SQL_VARCHAR; // Discard contradictory hints.
                     }
                 } else {
@@ -313,7 +313,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                     // that may hint at the input type or may require hinting from the other input keys.
                     if (inputTypeInferred == null) {
                         inputTypeInferred = argType; // Take the first input type hint.
-                    } else if (inputTypeInferred != argType) {
+                    } else if (!inputTypeInferred.softEquals(argType)) {
                         inputTypeInferred = Type.SQL_VARCHAR; // Discard contradictory hints, falling back to string type.
                     }
                 }
