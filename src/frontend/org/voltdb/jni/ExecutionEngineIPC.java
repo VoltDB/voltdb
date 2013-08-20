@@ -1087,11 +1087,16 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateTableStream(int tableId, TableStreamType streamType, SnapshotPredicates predicates) {
+    public boolean activateTableStream(
+            int tableId,
+            TableStreamType streamType,
+            long undoQuantumToken,
+            SnapshotPredicates predicates) {
         m_data.clear();
         m_data.putInt(Commands.ActivateTableStream.m_id);
         m_data.putInt(tableId);
         m_data.putInt(streamType.ordinal());
+        m_data.putLong(undoQuantumToken);
         m_data.put(predicates.toBytes()); // predicates
 
         try {

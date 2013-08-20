@@ -141,6 +141,7 @@ typedef struct {
     struct ipc_command cmd;
     voltdb::CatalogId tableId;
     voltdb::TableStreamType streamType;
+    int64_t undoToken;
     int bufferCount;
     char data[0];
 }__attribute__((packed)) tablestream_serialize_more;
@@ -954,6 +955,7 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
     // ptr/offset/length triplets referencing segments of m_tupleBuffer, which
     // is reallocated as needed.
     const int bufferCount = ntohl(tableStreamSerializeMore->bufferCount);
+    int64_t undoToken = ntohll(tableStreamSerializeMore->undoToken);
     try {
 
         if (bufferCount <= 0) {
@@ -1004,6 +1006,7 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
         }
 
         // Perform table stream serialization.
+        m_engine->setUndoToken(undoToken);
         ReferenceSerializeInput out2(m_reusedResultBuffer, MAX_MSG_SZ);
         std::vector<int> positions;
         int64_t remaining = m_engine->tableStreamSerializeMore(tableId, streamType, out2, positions);

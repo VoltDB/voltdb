@@ -19,6 +19,7 @@
 
 #include <string>
 #include <vector>
+#include <boost/shared_ptr.hpp>
 #include "common/types.h"
 #include "storage/ElasticIndex.h"
 #include "storage/TableStreamer.h"
@@ -32,8 +33,11 @@ class TableStreamer;
 class PersistentTableSurgeon;
 class TupleSerializer;
 class TupleOutputStreamProcessor;
+class TupleSchema;
+class TableTuple;
 
-class ElasticIndexReadContext : public TableStreamerContext {
+class ElasticIndexReadContext : public TableStreamerContext
+{
 
     friend bool TableStreamer::activateStream(PersistentTableSurgeon&, TupleSerializer&,
                                               TableStreamType, std::vector<std::string>&);
@@ -48,8 +52,13 @@ public:
     /**
      * Activation handler.
      */
-    virtual bool handleActivation(TableStreamType streamType, bool reactivate);
+    virtual ActivationReturnCode handleActivation(TableStreamType streamType, bool reactivate);
 
+    /**
+     * Deactivation handler.
+     */
+    virtual bool handleDeactivation(TableStreamType streamType);
+    
     /**
      * Mandatory TableStreamContext override.
      */
@@ -70,55 +79,27 @@ private:
                             const std::vector<std::string> &predicateStrings);
 
     /**
-     * Hash range for filtering.
-     * The range specification is exclusive, specifically:
-     *  from < to:
-     *      from..to-1
-     *  from >= to:
-     *      from..max_int and min_int..to-1 (wraps around)
-     * All possible value pairs are valid.
+     * Parse and validate the hash range.
+     * Checks that only one predicate string is provided.
+     * Update rangeOut with parsed hash range.
+     * Return true for success and false for failure.
      */
-    class HashRange
-    {
-    public:
-
-        /**
-         * Full constructor.
-         */
-        HashRange(int64_t from, int64_t to) : m_from(from), m_to(to)
-        {}
-
-        /**
-         * Copy constructor.
-         */
-        HashRange(const HashRange &other) : m_from(other.m_from), m_to(other.m_to)
-        {}
-
-        /**
-         * Return true if the range wraps around.
-         */
-        bool wrapsAround() const
-        {
-            return m_from >= m_to;
-        }
-
-        int64_t m_from;
-        int64_t m_to;
-    };
+    static bool parseHashRange(const std::vector<std::string> &predicateStrings,
+                               ElasticIndexHashRange &rangeOut);
 
     /**
-     * Parse and validate the hash range.
+     * Clean up after consuming indexed tuples.
      */
-    static HashRange parseHashRange(const std::vector<std::string> &predicateStrings);
+    void deleteStreamedTuples();
 
-    /// Active hash range.
-    HashRange m_range;
+    /// Predicate strings (parsed in handleActivation()).
+    const std::vector<std::string> &m_predicateStrings;
 
     /// Elastic index iterator
-    ElasticIndex::const_iterator m_iter;
+    boost::shared_ptr<ElasticIndexTupleRangeIterator> m_iter;
 
-    /// Set to true when iteration continues after wrapping around.
-    bool m_wrappedAround;
+    /// Set to true after index was completely materialized.
+    bool m_materialized;
 };
 
 }

@@ -61,6 +61,7 @@
 #include "storage/TableStreamerInterface.h"
 #include "storage/RecoveryContext.h"
 #include "storage/ElasticIndex.h"
+#include "storage/CopyOnWriteIterator.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
 
@@ -103,10 +104,12 @@ public:
     void updateTupleForUndo(char* targetTupleToUpdate,
                             char* sourceTupleWithNewValues,
                             bool revertIndexes);
+    bool deleteTuple(TableTuple &tuple, bool fallible=true);
     void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
     void deleteTupleRelease(char* tuple);
     void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock);
+    uint32_t getTupleCount() const;
 
     // Elastic index methods. Used by ElasticContext.
     void clearIndex();
@@ -120,11 +123,34 @@ public:
     bool indexRemove(TableTuple &tuple);
     bool hasStreamType(TableStreamType streamType) const;
     ElasticIndex::iterator indexIterator();
-    ElasticIndex::iterator indexIterator(int64_t lowerBound);
+    ElasticIndex::iterator indexIteratorLowerBound(int64_t lowerBound);
+    ElasticIndex::iterator indexIteratorUpperBound(int64_t upperBound);
     ElasticIndex::const_iterator indexIterator() const;
-    ElasticIndex::const_iterator indexIterator(int64_t lowerBound) const;
+    ElasticIndex::const_iterator indexIteratorLowerBound(int64_t lowerBound) const;
+    ElasticIndex::const_iterator indexIteratorUpperBound(int64_t upperBound) const;
     ElasticIndex::iterator indexEnd();
     ElasticIndex::const_iterator indexEnd() const;
+    boost::shared_ptr<ElasticIndexTupleRangeIterator>
+            getIndexTupleRangeIterator(const ElasticIndexHashRange &range);
+    void activateSnapshot();
+
+    /**
+     * Token object that increments and decrements the bulk delete counter.
+     */
+    class BulkDeleteTokenObj {
+    public:
+        BulkDeleteTokenObj(PersistentTableSurgeon &surgeon);
+        virtual ~BulkDeleteTokenObj();
+
+    private:
+        PersistentTableSurgeon &m_surgeon;
+    };
+
+    /**
+     * Provide a token during whose lifespan delete notifications are blocked.
+     */
+    typedef boost::shared_ptr<PersistentTableSurgeon::BulkDeleteTokenObj> BulkDeleteToken;
+    BulkDeleteToken getBulkDeleteToken();
 
 private:
 
@@ -356,16 +382,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                                     std::vector<std::string> &predicateStrings,
                                     bool skipInternalActivation);
 
-    /**
-     * Prepare table for streaming from serialized data (internal).
-     * Assumes m_tableStreamer was previously initialized.
-     * Return true on success or false if it was already active.
-     */
-    bool activateStreamInternal(TupleSerializer &tupleSerializer,
-                                TableStreamType streamType,
-                                CatalogId tableId,
-                                std::vector<std::string> &predicateStrings);
-
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
         if (nextBlock != NULL) {
             assert(m_blocksPendingSnapshot.find(nextBlock) != m_blocksPendingSnapshot.end());
@@ -478,6 +494,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     // Surgeon passed to classes requiring "deep" access to avoid excessive friendship.
     PersistentTableSurgeon m_surgeon;
+
+    // Incremented when a bulk delete starts and decremented when it ends.
+    int m_bulkDelete;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :
@@ -500,6 +519,10 @@ inline void PersistentTableSurgeon::updateTupleForUndo(char* targetTupleToUpdate
                                                        char* sourceTupleWithNewValues,
                                                        bool revertIndexes) {
     m_table.updateTupleForUndo(targetTupleToUpdate, sourceTupleWithNewValues, revertIndexes);
+}
+
+inline bool PersistentTableSurgeon::deleteTuple(TableTuple &tuple, bool fallible) {
+    return m_table.deleteTuple(tuple, fallible);
 }
 
 inline void PersistentTableSurgeon::deleteTupleForUndo(char* tupleData, bool skipLookup) {
@@ -570,9 +593,14 @@ inline ElasticIndex::iterator PersistentTableSurgeon::indexIterator() {
     return m_index->createIterator();
 }
 
-inline ElasticIndex::iterator PersistentTableSurgeon::indexIterator(int64_t lowerBound) {
+inline ElasticIndex::iterator PersistentTableSurgeon::indexIteratorLowerBound(int64_t lowerBound) {
     assert (m_index != NULL);
-    return m_index->createIterator(lowerBound);
+    return m_index->createLowerBoundIterator(lowerBound);
+}
+
+inline ElasticIndex::iterator PersistentTableSurgeon::indexIteratorUpperBound(int64_t upperBound) {
+    assert (m_index != NULL);
+    return m_index->createUpperBoundIterator(upperBound);
 }
 
 inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIterator() const {
@@ -580,9 +608,14 @@ inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIterator() cons
     return m_index->createIterator();
 }
 
-inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIterator(int64_t lowerBound) const {
+inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIteratorLowerBound(int64_t lowerBound) const {
     assert (m_index != NULL);
-    return m_index->createIterator(lowerBound);
+    return m_index->createLowerBoundIterator(lowerBound);
+}
+
+inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIteratorUpperBound(int64_t upperBound) const {
+    assert (m_index != NULL);
+    return m_index->createUpperBoundIterator(upperBound);
 }
 
 inline ElasticIndex::iterator PersistentTableSurgeon::indexEnd() {
@@ -595,8 +628,35 @@ inline ElasticIndex::const_iterator PersistentTableSurgeon::indexEnd() const {
     return m_index->end();
 }
 
+inline uint32_t PersistentTableSurgeon::getTupleCount() const {
+    return m_table.m_tupleCount;
+}
+
 inline bool PersistentTableSurgeon::hasStreamType(TableStreamType streamType) const {
     return m_table.m_tableStreamer->hasStreamType(streamType);
+}
+
+inline boost::shared_ptr<ElasticIndexTupleRangeIterator>
+PersistentTableSurgeon::getIndexTupleRangeIterator(const ElasticIndexHashRange &range) {
+    assert(m_index != NULL);
+    assert(m_table.m_schema != NULL);
+    return boost::shared_ptr<ElasticIndexTupleRangeIterator>(
+            new ElasticIndexTupleRangeIterator(*m_index, *m_table.m_schema, range));
+}
+
+inline boost::shared_ptr<PersistentTableSurgeon::BulkDeleteTokenObj>
+PersistentTableSurgeon::getBulkDeleteToken() {
+    return boost::shared_ptr<PersistentTableSurgeon::BulkDeleteTokenObj>(
+            new PersistentTableSurgeon::BulkDeleteTokenObj(*this));
+}
+
+inline PersistentTableSurgeon::BulkDeleteTokenObj::BulkDeleteTokenObj(
+        PersistentTableSurgeon &surgeon) : m_surgeon(surgeon) {
+    ++m_surgeon.m_table.m_bulkDelete;
+}
+
+inline PersistentTableSurgeon::BulkDeleteTokenObj::~BulkDeleteTokenObj() {
+    --m_surgeon.m_table.m_bulkDelete;
 }
 
 inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {
@@ -630,8 +690,8 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
         --m_tuplesPendingDeleteCount;
     }
 
-    // Let the context handle it as needed.
-    if (m_tableStreamer != NULL) {
+    // Let the context handle it as needed if a bulk delete is not in progress.
+    if (m_tableStreamer != NULL && m_bulkDelete == 0) {
         m_tableStreamer->notifyTupleDelete(tuple);
     }
 

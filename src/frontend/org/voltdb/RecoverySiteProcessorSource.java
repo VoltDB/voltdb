@@ -33,20 +33,19 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.RecoveryMessage;
 import org.voltcore.messaging.RecoveryMessageType;
 import org.voltcore.messaging.VoltMessage;
-import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
-
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.jni.ExecutionEngine;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.rejoin.RejoinDataAckMessage;
 import org.voltdb.rejoin.RejoinDataMessage;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
@@ -442,7 +441,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
         }
         m_onCompletion = onCompletion;
         RecoveryTable table = m_tablesToStream.peek();
-        if (!m_engine.activateTableStream(table.m_tableId, TableStreamType.RECOVERY,
+        if (!m_engine.activateTableStream(table.m_tableId, TableStreamType.RECOVERY, 0,
                                           new SnapshotPredicates(null))) {
             VoltDB.crashLocalVoltDB("Attempted to activate recovery stream for table "
                     + table.m_name + " and failed", false, null);
@@ -629,7 +628,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                     RecoveryTable nextTable = m_tablesToStream.peek();
                     if (nextTable != null) {
                         if (!m_engine.activateTableStream(nextTable.m_tableId,
-                                                          TableStreamType.RECOVERY,
+                                                          TableStreamType.RECOVERY, 0,
                                                           new SnapshotPredicates(null))) {
                             VoltDB.crashLocalVoltDB("Attempted to activate recovery stream for table "
                                     + nextTable.m_name + " and failed", false, null);

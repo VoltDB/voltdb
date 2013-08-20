@@ -66,18 +66,18 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
     bool found = false;
     BOOST_FOREACH(StreamPtr &streamPtr, savedStreams) {
         assert(streamPtr != NULL);
-        found = streamPtr->m_streamType == streamType;
-        if (found) {
-            if (streamPtr->m_context->handleActivation(streamType, true)) {
+        switch (streamPtr->m_context->handleActivation(streamType, true)) {
+            case TableStreamerContext::ACTIVATION_SUCCEEDED:
                 m_streams.push_back(streamPtr);
-            }
-            else {
+                found = true;
+                break;
+            case TableStreamerContext::ACTIVATION_FAILED:
                 failed = true;
-            }
-            break;
-        }
-        else {
-            m_streams.push_back(streamPtr);
+                break;
+            case TableStreamerContext::ACTIVATION_UNSUPPORTED:
+                // Don't get rid of streams that serve a different type of stream.
+                m_streams.push_back(streamPtr);
+                break;
         }
     }
 
@@ -108,17 +108,31 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                                                               serializer, predicateStrings));
                     break;
 
+                case TABLE_STREAM_ELASTIC_INDEX_CLEAR:
+                    VOLT_ERROR("Not allowed to clear the elastic index before materializing it.");
+                    failed = true;
+                    break;
+                    
                 default:
                     assert(false);
             }
-            if (context->handleActivation(streamType, false)) {
-                // Activation was accepted by the new context. Attach it to a stream.
-                m_streams.push_back(StreamPtr(new Stream(streamType, context)));
-            }
-            else {
-                // Activation was rejected by the new context.
-                // Let the context disappear when it goes out of scope.
-                failed = true;
+            if (!failed) {
+                TableStreamerContext::ActivationReturnCode retcode = context->handleActivation(streamType, false);
+                switch (retcode) {
+                    case TableStreamerContext::ACTIVATION_SUCCEEDED:
+                        // Activation was accepted by the new context. Attach it to a stream.
+                        m_streams.push_back(StreamPtr(new Stream(streamType, context)));
+                        break;
+                    case TableStreamerContext::ACTIVATION_FAILED:
+                        // Activation was rejected by the new context.
+                        // Let the context disappear when it goes out of scope.
+                        failed = true;
+                        break;
+                    default:
+                        throwFatalException("Unexpected activation return code from new context handleActivation(): %d",
+                                            static_cast<int>(retcode))
+                        break;
+                }
             }
         }
         catch(SerializableEEException &e) {
@@ -148,7 +162,7 @@ int64_t TableStreamer::streamMore(TupleOutputStreamProcessor &outputStreams,
             remaining = streamPtr->m_context->handleStreamMore(outputStreams, retPositions);
             if (remaining <= 0) {
                 // Drop the stream if it doesn't need to hang around (e.g. elastic).
-                if (streamPtr->m_context->handleDeactivation()) {
+                if (streamPtr->m_context->handleDeactivation(streamType)) {
                     m_streams.push_back(streamPtr);
                 }
             }

@@ -140,7 +140,12 @@ class ElasticIndex : public stx::btree_set<ElasticIndexKey, ElasticIndexComparat
     /**
      * Get partial iterator based on lower bound.
      */
-    iterator createIterator(ElasticHash lowerBound);
+    iterator createLowerBoundIterator(ElasticHash lowerBound);
+
+    /**
+     * Get partial iterator based on upper bound.
+     */
+    iterator createUpperBoundIterator(ElasticHash upperBound);
 
     /**
      * Get full const_iterator.
@@ -150,7 +155,12 @@ class ElasticIndex : public stx::btree_set<ElasticIndexKey, ElasticIndexComparat
     /**
      * Get partial const_iterator based on lower bound.
      */
-    const_iterator createIterator(ElasticHash lowerBound) const;
+    const_iterator createLowerBoundIterator(ElasticHash lowerBound) const;
+
+    /**
+     * Get partial const_iterator based on upper bound.
+     */
+    const_iterator createUpperBoundIterator(ElasticHash upperBound) const;
 
   private:
 
@@ -158,6 +168,100 @@ class ElasticIndex : public stx::btree_set<ElasticIndexKey, ElasticIndexComparat
 
     static ElasticIndexKey generateKey(const PersistentTable &table, const TableTuple &tuple);
 };
+
+/**
+ * Hash range for filtering.
+ * The range specification is exclusive, specifically:
+ *  from < to:
+ *      from..to-1
+ *  from >= to:
+ *      from..max_int and min_int..to-1 (wraps around)
+ * All possible value pairs are valid.
+ */
+class ElasticIndexHashRange
+{
+public:
+
+    /**
+     * Full constructor.
+     */
+    ElasticIndexHashRange(ElasticHash from, ElasticHash to);
+
+    /**
+     * Default constructor.
+     */
+    ElasticIndexHashRange();
+
+    /**
+     * Copy constructor.
+     */
+    ElasticIndexHashRange(const ElasticIndexHashRange &other);
+
+    /**
+     * Return true if the range wraps around.
+     */
+    bool wrapsAround() const;
+
+    /**
+     * From hash accessor.
+     */
+    ElasticHash getLowerBound() const;
+
+    /**
+     * From hash accessor.
+     */
+    ElasticHash getUpperBound() const;
+
+private:
+
+    ElasticHash m_from;
+    ElasticHash m_to;
+};
+
+/**
+ * Special purpose index tuple iterator that is bounded by a hash range.
+ * Handles wrap-around when to <= from.
+ */
+class ElasticIndexTupleRangeIterator
+{
+public:
+
+    /**
+     * Constructor.
+     */
+    ElasticIndexTupleRangeIterator(ElasticIndex &index,
+                                   const TupleSchema &schema,
+                                   const ElasticIndexHashRange &range);
+
+    /**
+     * Move to next tuple, if available.
+     * Update the tuple argument variable to access the current tuple.
+     * Return false when no more are available.
+     */
+    bool next(TableTuple &tuple);
+
+    /**
+     * Reset iteration.
+     */
+    void reset();
+
+    /**
+     * Erase all items in the range.
+     */
+    void erase();
+
+private:
+
+    bool wrap();
+
+    ElasticIndex &m_index;
+    const TupleSchema &m_schema;
+    ElasticIndexHashRange m_range;
+    ElasticIndex::iterator m_iter;
+    ElasticIndex::iterator m_end;
+    bool m_lastIteration;
+};
+
 
 /**
  * Default constructor.
@@ -305,9 +409,17 @@ inline ElasticIndex::iterator ElasticIndex::createIterator()
 /**
  * Get partial iterator based on lower bound.
  */
-inline ElasticIndex::iterator ElasticIndex::createIterator(ElasticHash lowerBound)
+inline ElasticIndex::iterator ElasticIndex::createLowerBoundIterator(ElasticHash lowerBound)
 {
     return lower_bound(ElasticIndexKey(lowerBound, NULL));
+}
+
+/**
+ * Get partial iterator based on upper bound.
+ */
+inline ElasticIndex::iterator ElasticIndex::createUpperBoundIterator(ElasticHash upperBound)
+{
+    return upper_bound(ElasticIndexKey(upperBound, NULL));
 }
 
 /**
@@ -321,9 +433,17 @@ inline ElasticIndex::const_iterator ElasticIndex::createIterator() const
 /**
  * Get partial const_iterator based on lower bound.
  */
-inline ElasticIndex::const_iterator ElasticIndex::createIterator(ElasticHash lowerBound) const
+inline ElasticIndex::const_iterator ElasticIndex::createLowerBoundIterator(ElasticHash lowerBound) const
 {
     return lower_bound(ElasticIndexKey(lowerBound, NULL));
+}
+
+/**
+ * Get partial const_iterator based on upper bound.
+ */
+inline ElasticIndex::const_iterator ElasticIndex::createUpperBoundIterator(ElasticHash upperBound) const
+{
+    return upper_bound(ElasticIndexKey(upperBound, NULL));
 }
 
 /**
@@ -333,6 +453,51 @@ inline std::ostream &operator<<(std::ostream &os, const ElasticIndexKey &key)
 {
     os << std::hex << key.m_hash << ':' << reinterpret_cast<long>(key.m_ptr);
     return os;
+}
+
+/**
+ * Full constructor.
+ */
+inline ElasticIndexHashRange::ElasticIndexHashRange(ElasticHash from, ElasticHash to) :
+    m_from(from), m_to(to)
+{}
+
+/**
+ * Default constructor (full min->max range).
+ */
+inline ElasticIndexHashRange::ElasticIndexHashRange() :
+    m_from(std::numeric_limits<int64_t>::min()), m_to(std::numeric_limits<int64_t>::max())
+{}
+
+/**
+ * Copy constructor.
+ */
+inline ElasticIndexHashRange::ElasticIndexHashRange(const ElasticIndexHashRange &other) :
+    m_from(other.m_from), m_to(other.m_to)
+{}
+
+/**
+ * Return true if the range wraps around.
+ */
+inline bool ElasticIndexHashRange::wrapsAround() const
+{
+    return m_from >= m_to;
+}
+
+/**
+ * From hash accessor.
+ */
+inline ElasticHash ElasticIndexHashRange::getLowerBound() const
+{
+    return m_from;
+}
+
+/**
+ * From hash accessor.
+ */
+inline ElasticHash ElasticIndexHashRange::getUpperBound() const
+{
+    return m_to;
 }
 
 } // namespace voltdb

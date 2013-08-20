@@ -45,7 +45,6 @@ CopyOnWriteContext::CopyOnWriteContext(
                                                                &table, NULL)),
              m_pool(2097152, 320),
              m_blocks(surgeon.getData()),
-             m_iterator(new CopyOnWriteIterator(&table, &surgeon, m_blocks.begin(), m_blocks.end())),
              m_tuple(table.schema()),
              m_finishedTableScan(false),
              m_totalTuples(totalTuples),
@@ -54,7 +53,8 @@ CopyOnWriteContext::CopyOnWriteContext(
              m_serializationBatches(0),
              m_inserts(0),
              m_updates(0)
-{}
+{
+}
 
 /**
  * Destructor.
@@ -66,17 +66,34 @@ CopyOnWriteContext::~CopyOnWriteContext()
 /**
  * Activation handler.
  */
-bool CopyOnWriteContext::handleActivation(TableStreamType streamType, bool reactivate)
+TableStreamerContext::ActivationReturnCode
+CopyOnWriteContext::handleActivation(TableStreamType streamType, bool reactivate)
 {
+    // Only support snapshot streams.
+    if (streamType != TABLE_STREAM_SNAPSHOT) {
+        return ACTIVATION_UNSUPPORTED;
+    }
+    
+    // No tuples - short circuit activation, but pretend it happened.
+    if (m_surgeon.getTupleCount() == 0) {
+        return ACTIVATION_SUCCEEDED;
+    }
+
     // Reactivation is not allowed, but rejecting it isn't a failure.
     if (reactivate) {
-        return false;
+        return ACTIVATION_UNSUPPORTED;
     }
+    
     if (m_surgeon.hasIndex() && !m_surgeon.isIndexingComplete()) {
         VOLT_ERROR("COW context activation is not allowed while elastic indexing is in progress.");
-        return false;
+        return ACTIVATION_FAILED;
     }
-    return true;
+    
+    m_surgeon.activateSnapshot();
+
+    m_iterator.reset(new CopyOnWriteIterator(&getTable(), &m_surgeon, m_blocks.begin(), m_blocks.end()));
+
+    return ACTIVATION_SUCCEEDED;
 }
 
 /*
@@ -85,6 +102,13 @@ bool CopyOnWriteContext::handleActivation(TableStreamType streamType, bool react
  */
 int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputStreams,
                                              std::vector<int> &retPositions) {
+    assert(m_iterator != NULL);
+
+    // Balance the zero tuple count short circuiting done in handleActivation().
+    if (m_surgeon.getTupleCount() == 0) {
+        return 0;
+    }
+
     // Don't expect to be re-called after streaming all the tuples.
     if (m_tuplesRemaining == 0) {
         throwFatalException("serializeMore() was called again after streaming completed.")
@@ -244,6 +268,8 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
 }
 
 bool CopyOnWriteContext::canSafelyFreeTuple(TableTuple tuple) {
+    assert(m_iterator != NULL);
+
     if (tuple.isDirty() || m_finishedTableScan) {
         return true;
     }
@@ -285,6 +311,8 @@ bool CopyOnWriteContext::canSafelyFreeTuple(TableTuple tuple) {
 }
 
 void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
+    assert(m_iterator != NULL);
+
     if (newTuple) {
         m_inserts++;
     }
@@ -358,6 +386,7 @@ void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
 }
 
 void CopyOnWriteContext::notifyBlockWasCompactedAway(TBPtr block) {
+    assert(m_iterator != NULL);
     assert(!m_finishedTableScan);
     m_blocksCompacted++;
     CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
@@ -408,6 +437,7 @@ bool CopyOnWriteContext::notifyTupleUpdate(TableTuple &tuple) {
  * Only call it while m_finishedTableScan==false.
  */
 void CopyOnWriteContext::checkRemainingTuples(const std::string &label) {
+    assert(m_iterator != NULL);
     assert(!m_finishedTableScan);
     intmax_t count1 = static_cast<CopyOnWriteIterator*>(m_iterator.get())->countRemaining();
     TableTuple tuple(getTable().schema());
