@@ -85,7 +85,6 @@ public:
         index = NULL;
         outer_table = NULL;
         m_lookupType = INDEX_LOOKUP_TYPE_INVALID;
-        m_engine = engine;
     }
 
     ~NestLoopIndexExecutor();

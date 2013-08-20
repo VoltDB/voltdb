@@ -48,7 +48,6 @@
 
 #include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
-#include "indexes/tableindex.h"
 
 #include "boost/shared_array.hpp"
 

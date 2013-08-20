@@ -141,7 +141,6 @@ class CompactingHashMultiMapIndex : public TableIndex
         } else {
             m_match.move(const_cast<void*>(m_keyIter.value()));
         }
-        m_foundNextValues++;
         return retval;
     }
 

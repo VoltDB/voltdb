@@ -597,7 +597,6 @@ public class ProcedureRunner {
                     // decide if this sub-batch should be marked final
                     boolean finalSubBatch = isFinalSQL && (subSize == m_batch.size());
 
-                    //m_rProcContext.m_batch = subBatch;
                     // run the sub-batch and copy the sub-results into the list of lists of results
                     // note: executeQueriesInABatch removes items from the batch as it runs.
                     //  this means subBatch will be empty after running and since subBatch is a

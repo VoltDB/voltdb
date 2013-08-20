@@ -199,7 +199,6 @@ class CompactingTreeUniqueIndex : public TableIndex
             }
         }
 
-        m_foundNextValues++;
         return retval;
     }
 
@@ -208,7 +207,6 @@ class CompactingTreeUniqueIndex : public TableIndex
         TableTuple retval = m_match;
         m_match.move(NULL);
 
-        m_foundNextValues++;
         return retval;
     }
 
@@ -225,7 +223,6 @@ class CompactingTreeUniqueIndex : public TableIndex
             return false;
         }
         m_match.move(const_cast<void*>(m_keyIter.value()));
-        m_foundNextValues++;
         return true;
     }
 
