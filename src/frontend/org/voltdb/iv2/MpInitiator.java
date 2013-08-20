@@ -36,6 +36,7 @@ import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 /**
@@ -112,6 +113,21 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     List<Iv2InitiateTaskMessage> restartTxns = ((MpPromoteAlgo)repair).getInterruptedTxns();
                     if (!restartTxns.isEmpty()) {
                         // Should only be one restarting MP txn
+                        if (restartTxns.size() > 1) {
+                            tmLog.fatal("Detected a fatal condition while repairing multipartition transactions " +
+                                    "following a cluster topology change.");
+                            tmLog.fatal("The MPI found multiple transactions requiring restart: ");
+                            for (Iv2InitiateTaskMessage txn : restartTxns) {
+                                tmLog.fatal("Restart candidate: " + txn);
+                            }
+                            tmLog.fatal("This node will fail.  Please contact VoltDB support with your cluster's " +
+                                    "log files.");
+                            m_initiatorMailbox.send(
+                                    com.google.common.primitives.Longs.toArray(m_term.getInterestingHSIds()),
+                                    new DumpMessage());
+                            throw new RuntimeException("Failing promoted MPI node with unresolvable repair condition.");
+                        }
+                        tmLog.debug(m_whoami + " restarting MP transaction: " + restartTxns.get(0));
                         m_initiatorMailbox.repairReplicasWith(null, restartTxns.get(0));
                     }
                     tmLog.info(m_whoami

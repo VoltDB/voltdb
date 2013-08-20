@@ -83,7 +83,7 @@ MaterializedViewMetadata::MaterializedViewMetadata(
     allocateBackedTuples();
 
     // Catch up on pre-existing source tuples UNLESS target tuples have already been migrated in.
-    if (srcTable->activeTupleCount() != 0 && m_target->activeTupleCount() == 0) {
+    if (( ! srcTable->isPersistentTableEmpty()) && m_target->isPersistentTableEmpty()) {
         TableTuple scannedTuple(srcTable->schema());
         TableIterator &iterator = srcTable->iterator();
         while (iterator.next(scannedTuple)) {

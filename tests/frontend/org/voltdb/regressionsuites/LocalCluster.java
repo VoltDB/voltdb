@@ -319,8 +319,8 @@ public class LocalCluster implements VoltServerConfig {
     }
 
     @Override
-    public void restartUp() {
-        startUp(false);
+    public void startUp(boolean clearLocalDataDirectories) {
+        startUp(clearLocalDataDirectories, ReplicationRole.NONE);
     }
 
     void startLocalServer(boolean clearLocalDataDirectories) {
@@ -428,8 +428,7 @@ public class LocalCluster implements VoltServerConfig {
         }
     }
 
-    public void startUp(boolean clearLocalDataDirectories)
-    {
+    public void startUp(boolean clearLocalDataDirectories, ReplicationRole role) {
         assert (!m_running);
         if (m_running) {
             return;
@@ -439,7 +438,7 @@ public class LocalCluster implements VoltServerConfig {
         VoltDB.setDefaultTimezone();
 
         // set 'replica' option -- known here for the first time.
-        templateCmdLine.replicaMode(ReplicationRole.NONE);
+        templateCmdLine.replicaMode(role);
 
         // set to true to spew startup timing data
         boolean logtime = false;
@@ -484,7 +483,7 @@ public class LocalCluster implements VoltServerConfig {
 
         // create all the out-of-process servers
         for (int i = oopStartIndex; i < m_hostCount; i++) {
-            startOne(i, clearLocalDataDirectories, ReplicationRole.NONE, StartAction.CREATE);
+            startOne(i, clearLocalDataDirectories, role, StartAction.CREATE);
         }
 
         printTiming(logtime, "Pre-witness: " + (System.currentTimeMillis() - startTime) + "ms");

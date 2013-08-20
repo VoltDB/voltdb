@@ -422,9 +422,6 @@ public class PartitioningForStatement implements Cloneable{
         m_countOfPartitionedTables = m_partitionColumnByTable.keySet().size();
         // Initial guess -- as if no equality filters.
         m_countOfIndependentlyPartitionedTables = m_countOfPartitionedTables;
-        if (m_partitionColumnByTable.isEmpty() || wasSpecifiedAsSingle()) {
-            return;
-        }
     }
 
 
