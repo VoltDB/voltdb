@@ -129,8 +129,7 @@ public abstract class TheHashinator {
 
     /**
      * Given an object, map it to a partition.
-     * @param obj The object to be mapped to a partition.
-     * @return The id of the partition desired.
+     * DON'T EVER MAKE ME PUBLIC
      */
     private static int hashToPartition(Object obj) {
         HashinatorType type = getConfiguredHashinatorType();
@@ -227,11 +226,13 @@ public abstract class TheHashinator {
     /**
      * Given the type of the targeting partition parameter and an object,
      * coerce the object to the correct type and hash it.
+     * NOTE NOTE NOTE NOTE!  THIS SHOULD BE THE ONLY WAY THAT YOU FIGURE OUT THE PARTITIONING
+     * FOR A PARAMETER!
      * @return The partition best set up to execute the procedure.
-     * @throws Exception
+     * @throws VoltTypeException
      */
     public static int getPartitionForParameter(int partitionType, Object invocationParameter)
-            throws Exception
+        throws VoltTypeException
     {
         final VoltType partitionParamType = VoltType.get((byte)partitionType);
 
@@ -242,12 +243,16 @@ public abstract class TheHashinator {
         // requiring the loader to know precise the schema.
         // 2) For legacy hashinators, if we have a numeric column but the param is in a byte
         // array, convert the byte array back to the numeric value
-        if (invocationParameter != null && partitionParamType.isNumber()) {
+        if (invocationParameter != null && partitionParamType.isPartitionableNumber()) {
             if (invocationParameter.getClass() == String.class) {
                 {
-                    invocationParameter = ParameterConverter.stringToLong(
+                    Object tempParam = ParameterConverter.stringToLong(
                             invocationParameter,
                             partitionParamType.classFromType());
+                    // Just in case someone managed to feed us a non integer
+                    if (tempParam != null) {
+                        invocationParameter = tempParam;
+                    }
                 }
             }
             else if (getConfiguredHashinatorType() == HashinatorType.LEGACY &&

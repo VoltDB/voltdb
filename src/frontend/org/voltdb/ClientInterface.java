@@ -2059,7 +2059,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     void createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch)
-            throws Exception {
+            throws VoltTypeException
+    {
         // create the execution site task
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         // DR stuff
@@ -2205,9 +2206,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             try {
                                 createAdHocTransaction(plannedStmtBatch);
                             }
-                            catch (Exception e) {
+                            catch (VoltTypeException vte) {
                                 String msg = "Unable to hash the partition for adhoc partition value: " +
-                                    plannedStmtBatch.partitionParam + ", msg: " + e.getMessage();
+                                    plannedStmtBatch.partitionParam + ", msg: " + vte.getMessage();
                                 ClientResponseImpl errorResponse =
                                     new ClientResponseImpl(
                                             ClientResponseImpl.GRACEFUL_FAILURE,
