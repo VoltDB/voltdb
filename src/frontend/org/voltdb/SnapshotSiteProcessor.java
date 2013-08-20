@@ -379,7 +379,8 @@ public class SnapshotSiteProcessor {
     }
 
     public void initiateSnapshots(
-            ExecutionEngine ee,
+            SystemProcedureExecutionContext context,
+            SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
             List<SnapshotDataTarget> targets,
             long txnId,
