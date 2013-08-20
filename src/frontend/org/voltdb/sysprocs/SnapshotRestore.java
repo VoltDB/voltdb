@@ -624,6 +624,12 @@ public class SnapshotRestore extends VoltSystemProcedure
                         byte uniqueViolations[] = voltLoadTable(context.getCluster().getTypeName(),
                                 context.getDatabase().getTypeName(),
                                 table_name, table, m_duplicateRowHandler != null);
+                        if (uniqueViolations != null && m_duplicateRowHandler == null) {
+                            VoltDB.crashLocalVoltDB(
+                                    "Shouldn't get unique violations returned when duplicate row handler is null",
+                                    true,
+                                    null);
+                        }
                         if (uniqueViolations != null) {
                             /*
                              * If this is a replicated table that is having unique constraint violations
@@ -738,12 +744,17 @@ public class SnapshotRestore extends VoltSystemProcedure
                         byte uniqueViolations[] = voltLoadTable(context.getCluster().getTypeName(),
                                 context.getDatabase().getTypeName(),
                                 table_name, table, m_duplicateRowHandler != null);
+                        if (uniqueViolations != null && m_duplicateRowHandler == null) {
+                            VoltDB.crashLocalVoltDB(
+                                    "Shouldn't get unique violations returned when duplicate row handler is null",
+                                    true,
+                                    null);
+                        }
                         /*
                          * Only log replicated table unique constraint violations
                          * at the lowest site.
                          */
-                        if (m_duplicateRowHandler != null &&
-                                context.isLowestSiteId() &&
+                        if (context.isLowestSiteId() &&
                                 context.getHostId() == 0) {
                             m_duplicateRowHandler.handleDuplicates(table_name, uniqueViolations);
                         }
