@@ -81,7 +81,7 @@ public class TestTableSaveFile extends TestCase {
         payload.put(b);
         payload.flip();
 
-        target.write(Callables.returning(container), null);
+        target.write(Callables.returning(container), -1);
     }
 
     private Pair<VoltTable, File> generateTestTable(int numberOfItems)
