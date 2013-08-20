@@ -26,10 +26,10 @@ import java.util.List;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
-import org.voltcore.utils.Pair;
 
 import com.google.common.base.Charsets;
 
@@ -355,7 +355,7 @@ public class ExportProtoMessage
 
     @Override
     public String toString() {
-        String s = "ExportProtoMessage: type(" + m_type + ") offset(" +
+        String s = "ExportProtoMessage: type(" + messageTypesAsString() + ") offset(" +
                 m_offset + ") partitionId(" + m_partitionId +
                 ") signature(" + m_signature +")" + " serializableBytes(" +
                 serializableBytes() + ")";

@@ -167,7 +167,11 @@ public class TestPlansOrderBy extends PlannerTestCase {
                      "order by T.T_D0;");
     }
 
-    public void testOrderDescWithEquality() {
-        validatePlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D1 DESC", true, false, true, false);
+    public void testEng5021() {
+        validatePlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D1 DESC", true, false, false, false);
+        validatePlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D1", true, false, false, false);
+        validatePlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D1 DESC LIMIT 1", true, false, false, false);
+        validatePlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D0, T_D1 DESC", true, false, true, false);
+        validatePlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D0, T_D1", true, false, false, false);
     }
 }
