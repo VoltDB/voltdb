@@ -620,34 +620,13 @@ public class SnapshotRestore extends VoltSystemProcedure
                     VoltTable table = PrivateVoltTableFactory.createVoltTableFromBuffer(
                                     ByteBuffer.wrap(CompressionService.decompressBytes(compressedTable)), true);
 
-                    if(m_duplicateRowHandler != null) {
-                        byte uniqueViolations[] = voltLoadTable(context.getCluster().getTypeName(),
-                                context.getDatabase().getTypeName(),
-                                table_name, table, m_duplicateRowHandler != null);
-                        if (uniqueViolations != null && m_duplicateRowHandler == null) {
-                            VoltDB.crashLocalVoltDB(
-                                    "Shouldn't get unique violations returned when duplicate row handler is null",
-                                    true,
-                                    null);
-                        }
-                        if (uniqueViolations != null) {
-                            /*
-                             * If this is a replicated table that is having unique constraint violations
-                             * Only log at the lowest site on the lowest node.
-                             */
-                            if (checkUniqueViolations == K_CHECK_UNIQUE_VIOLATIONS_REPLICATED) {
-                                if (context.isLowestSiteId() &&
-                                        context.getHostId() == 0) {
-                                    m_duplicateRowHandler.handleDuplicates(table_name, uniqueViolations);
-                                }
-                            } else {
-                                m_duplicateRowHandler.handleDuplicates(table_name, uniqueViolations);
-                            }
-                        }
-                    } else {
-                        voltLoadTable(context.getCluster().getTypeName(), context.getDatabase().getTypeName(), table_name, table, false);
-                    }
-
+                    byte uniqueViolations[] =
+                            voltLoadTable(context.getCluster().getTypeName(),
+                                          context.getDatabase().getTypeName(),
+                                          table_name,
+                                          table,
+                                          m_duplicateRowHandler != null);
+                    handleUniqueViolations(table_name, uniqueViolations, checkUniqueViolations, context);
             } catch (Exception e) {
                 result_str = "FAILURE";
                 error_msg = e.getMessage();
@@ -744,23 +723,12 @@ public class SnapshotRestore extends VoltSystemProcedure
                         byte uniqueViolations[] = voltLoadTable(context.getCluster().getTypeName(),
                                 context.getDatabase().getTypeName(),
                                 table_name, table, m_duplicateRowHandler != null);
-                        if (uniqueViolations != null && m_duplicateRowHandler == null) {
-                            VoltDB.crashLocalVoltDB(
-                                    "Shouldn't get unique violations returned when duplicate row handler is null",
-                                    true,
-                                    null);
-                        }
-                        /*
-                         * Only log replicated table unique constraint violations
-                         * at the lowest site.
-                         */
-                        if (uniqueViolations != null &&
-                                context.isLowestSiteId() &&
-                                context.getHostId() == 0) {
-                            m_duplicateRowHandler.handleDuplicates(table_name, uniqueViolations);
-                        }
+                        handleUniqueViolations(table_name,
+                                               uniqueViolations,
+                                               K_CHECK_UNIQUE_VIOLATIONS_REPLICATED,
+                                               context);
                     }
-                    catch (VoltAbortException e)
+                    catch (Exception e)
                     {
                         result_str = "FAILURE";
                         error_msg = e.getMessage();
@@ -871,6 +839,32 @@ public class SnapshotRestore extends VoltSystemProcedure
 
         assert (false);
         return null;
+    }
+
+    private void handleUniqueViolations(String table_name,
+                                        byte[] uniqueViolations,
+                                        int checkUniqueViolations,
+                                        SystemProcedureExecutionContext context) throws Exception {
+        if (uniqueViolations != null && m_duplicateRowHandler == null) {
+            VoltDB.crashLocalVoltDB(
+                    "Shouldn't get unique violations returned when duplicate row handler is null",
+                    true,
+                    null);
+        }
+        if (uniqueViolations != null) {
+            /*
+             * If this is a replicated table that is having unique constraint violations
+             * Only log at the lowest site on the lowest node.
+             */
+            if (checkUniqueViolations == K_CHECK_UNIQUE_VIOLATIONS_REPLICATED) {
+                if (context.isLowestSiteId() &&
+                        context.getHostId() == 0) {
+                    m_duplicateRowHandler.handleDuplicates(table_name, uniqueViolations);
+                }
+            } else {
+                m_duplicateRowHandler.handleDuplicates(table_name, uniqueViolations);
+            }
+        }
     }
 
     public static final String JSON_PATH = "path";
