@@ -112,7 +112,7 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                     VOLT_ERROR("Not allowed to clear the elastic index before materializing it.");
                     failed = true;
                     break;
-                    
+
                 default:
                     assert(false);
             }

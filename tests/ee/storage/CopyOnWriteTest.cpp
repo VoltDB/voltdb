@@ -104,7 +104,7 @@ public:
             std::pair<int64_t, int64_t>(i1, i2),
             m_empty(empty)
     {}
-    
+
     bool inRange(int64_t i) {
         if (first >= second) {
             return i >= first || i < second;
@@ -888,7 +888,7 @@ public:
         Json::FastWriter writer;
         return writer.write(predicateStuff);
     }
-    
+
     void resetTest() {
         m_tuplesInserted = m_tuplesDeleted = 0;
         m_predicateStrings.clear();
@@ -904,11 +904,11 @@ public:
         std::vector<bool> deleteFlags;
         ASSERT_TRUE(predicates.parseStrings(predicateStrings, errmsg, deleteFlags));
     }
-    
+
     void parsePredicates() {
         parsePredicateList(m_predicateStrings, m_predicates);
     }
-    
+
     boost::shared_ptr<ReferenceSerializeInput> getPredicateSerializeInput(const std::vector<std::string> &predicateStrings) {
         ReferenceSerializeOutput predicateOutput(m_predicateBuffer, 1024 * 256);
         predicateOutput.writeInt(1);
@@ -947,11 +947,11 @@ public:
         }
         return false;
     }
-    
+
     void streamElasticIndex() {
         boost::shared_ptr<ReferenceSerializeInput> predicateInput = getPredicateSerializeInput(m_predicateStrings);
         m_table->activateStream(m_serializer, TABLE_STREAM_ELASTIC_INDEX, 0, m_tableId, *predicateInput);
-        
+
         // Force index streaming to need multiple streamMore() calls.
         voltdb::ElasticContext *context = getElasticContext();
         ASSERT_NE(NULL, context);
@@ -966,7 +966,7 @@ public:
         // Make sure we forced more than one streamMore() call.
         ASSERT_LE(2, nCalls);
     }
-    
+
     void streamSnapshot(int numMutationsDuring, int numMutationsAfter, T_ValueSet &COWTuples, int &totalInserted) {
         char config[4];
         ::memset(config, 0, 4);
@@ -974,9 +974,9 @@ public:
         ReferenceSerializeInput predicateInput(config, 4);
 
         totalInserted = 0;
-        
+
         m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, predicateInput);
-        
+
         while (true) {
             TupleOutputStreamProcessor outputStreams(m_serializationBuffer, sizeof(m_serializationBuffer));
             TupleOutputStream &outputStream = outputStreams.at(0);
@@ -1008,13 +1008,13 @@ public:
                 doRandomTableMutation(m_table);
             }
         }
-        
+
         // Do some extra mutations for good luck.
         for (int jj = 0; jj < numMutationsAfter; jj++) {
             doRandomTableMutation(m_table);
         }
     }
-    
+
     boost::shared_ptr<ReferenceSerializeInput> getHashRangePredicateInput(const T_HashRange &testRange) {
         // Set up the hash range predicate.
         ReferenceSerializeOutput hashRangeOutput(m_hashRangeBuffer, 1024 * 256);
@@ -1022,18 +1022,18 @@ public:
         hashRangeString << testRange.first << ':' << testRange.second;
         hashRangeOutput.writeInt(1);
         hashRangeOutput.writeTextString(hashRangeString.str());
-        
+
         return boost::shared_ptr<ReferenceSerializeInput>(
                 new ReferenceSerializeInput(m_hashRangeBuffer, hashRangeOutput.position()));
     }
-    
+
     void materializeIndex(ElasticIndex &index, const T_HashRange &testRange, size_t &totalInserted) {
         boost::shared_ptr<ReferenceSerializeInput> predicateInput = getHashRangePredicateInput(testRange);
 
         bool activated = m_table->activateStream(m_serializer, TABLE_STREAM_ELASTIC_INDEX_READ,
                                                  0, m_tableId, *predicateInput);
         ASSERT_TRUE(activated);
-        
+
         totalInserted = 0;
         while (true) {
             memset(m_serializationBuffer, 0, sizeof(m_serializationBuffer));
@@ -1061,7 +1061,7 @@ public:
             }
         }
     }
-    
+
     void clearIndex(const T_HashRange &testRange) {
         boost::shared_ptr<ReferenceSerializeInput> predicateInput = getHashRangePredicateInput(testRange);
         bool activated = m_table->activateStream(m_serializer, TABLE_STREAM_ELASTIC_INDEX_CLEAR,
@@ -1821,7 +1821,7 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
     const int FREQ_DELETE = 10;
     const int FREQ_UPDATE = 5;
     const int FREQ_COMPACTION = 100;
-    
+
     // These ranges test edge conditions and also that hash range expressions
     // and elastic index predicates filter the same way.
     T_HashRangeVector testRanges;
@@ -1837,29 +1837,29 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
     testRanges.push_back(T_HashRange(+maxint/2, -maxint/2));
     testRanges.push_back(T_HashRange(0, 0));
     testRanges.push_back(T_HashRange(maxint, maxint));
-    
+
     BOOST_FOREACH(T_HashRange &testRange, testRanges) {
         resetTest();
-        
+
         ElasticTableScrambler tableScrambler(*this,
                                              NUM_PARTITIONS, TUPLES_PER_BLOCK, NUM_INITIAL,
                                              FREQ_INSERT, FREQ_DELETE,
                                              FREQ_UPDATE, FREQ_COMPACTION);
-        
+
         tableScrambler.initialize();
-        
+
         // Generate the JSON predicates.
         addHashRangePredicate(testRange);
         parsePredicates();
-        
+
         // Generate the elastic index.
         streamElasticIndex();
-        
+
         // Do some scrambling.
         for (size_t icycle = 0; icycle < NUM_CYCLES; icycle++) {
             tableScrambler.scramble();
         }
-        
+
         // Stream a snapshot, mutate tuples, and check against original tuples.
         T_ValueSet originalTuples;
         getTableValueSet(originalTuples);
@@ -1871,7 +1871,7 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
         std::ostringstream label;
         label << "direct " << testRange.first << ':' << testRange.second;
         checkIndex(label.str(), directIndex, m_predicates, false);
-        
+
         // Materialize the index and compare.
         ElasticIndex streamedIndex;
         size_t totalStreamed;
@@ -1881,7 +1881,7 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
         size_t totalDirect = directIndex.size();
         ASSERT_EQ(totalDirect, totalStreamed);
         checkIndex(label.str(), streamedIndex, m_predicates, true);
-        
+
         // Clear the index and validate.
         size_t indexSizeBefore = directIndex.size();
         size_t tableSizeBefore = m_table->activeTupleCount();

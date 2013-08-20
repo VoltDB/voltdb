@@ -97,7 +97,7 @@ void ElasticIndexTupleRangeIterator::erase()
             toDeleteKeys.push_back(*m_iter++);
         }
     }
-    
+
     BOOST_FOREACH(const ElasticIndexKey &toDeleteKey, toDeleteKeys) {
         m_index.erase(toDeleteKey);
     }

@@ -58,7 +58,7 @@ public:
      * Deactivation handler.
      */
     virtual bool handleDeactivation(TableStreamType streamType);
-    
+
     /**
      * Mandatory TableStreamContext override.
      */

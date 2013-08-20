@@ -45,7 +45,7 @@ ElasticIndexReadContext::ElasticIndexReadContext(
  */
 ElasticIndexReadContext::~ElasticIndexReadContext()
 {}
-    
+
 /**
  * Activation handler.
  */
@@ -57,7 +57,7 @@ ElasticIndexReadContext::handleActivation(TableStreamType streamType, bool react
         VOLT_ERROR("Not allowed to reactivate an index read stream.");
         return ACTIVATION_FAILED;
     }
-    
+
     if (!m_surgeon.hasIndex() || !m_surgeon.isIndexingComplete()) {
         VOLT_ERROR("Elastic index consumption is not allowed until index generation completes.");
         return ACTIVATION_FAILED;
@@ -72,7 +72,7 @@ ElasticIndexReadContext::handleActivation(TableStreamType streamType, bool react
         m_iter = m_surgeon.getIndexTupleRangeIterator(range);
         return ACTIVATION_SUCCEEDED;
     }
-    
+
     // Index dematerialization?
     if (streamType == TABLE_STREAM_ELASTIC_INDEX_CLEAR) {
         // Only allow the index to be cleared if it was fully materialized.
@@ -101,7 +101,7 @@ bool ElasticIndexReadContext::handleDeactivation(TableStreamType streamType)
         // It's okay for the context to go away after dematerializing the index.
         return false;
     }
-    
+
     // Fall through for other unsupported stream types.
     throwFatalException("Unexpected stream type %d in handleDeactivation().", static_cast<int>(streamType))
     return false;

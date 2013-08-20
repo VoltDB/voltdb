@@ -73,7 +73,7 @@ CopyOnWriteContext::handleActivation(TableStreamType streamType, bool reactivate
     if (streamType != TABLE_STREAM_SNAPSHOT) {
         return ACTIVATION_UNSUPPORTED;
     }
-    
+
     // No tuples - short circuit activation, but pretend it happened.
     if (m_surgeon.getTupleCount() == 0) {
         return ACTIVATION_SUCCEEDED;
@@ -83,12 +83,12 @@ CopyOnWriteContext::handleActivation(TableStreamType streamType, bool reactivate
     if (reactivate) {
         return ACTIVATION_UNSUPPORTED;
     }
-    
+
     if (m_surgeon.hasIndex() && !m_surgeon.isIndexingComplete()) {
         VOLT_ERROR("COW context activation is not allowed while elastic indexing is in progress.");
         return ACTIVATION_FAILED;
     }
-    
+
     m_surgeon.activateSnapshot();
 
     m_iterator.reset(new CopyOnWriteIterator(&getTable(), &m_surgeon, m_blocks.begin(), m_blocks.end()));

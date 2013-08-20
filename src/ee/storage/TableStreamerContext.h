@@ -66,7 +66,7 @@ public:
     virtual ActivationReturnCode handleActivation(TableStreamType streamType, bool reactivate) {
         return (reactivate ? ACTIVATION_UNSUPPORTED : ACTIVATION_SUCCEEDED);
     }
-    
+
     /**
      * Mandatory streamMore() handler.
      */
