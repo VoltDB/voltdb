@@ -51,6 +51,7 @@ import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
@@ -687,7 +688,19 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         @Override
         public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config)
         {
-            //To change body of implemented methods use File | Settings | File Templates.
+        }
+
+        @Override
+        public boolean activateTableStream(int tableId, TableStreamType type, long undoToken, byte[] predicates)
+        {
+            return false;
+        }
+
+        @Override
+        public Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
+                                                          List<DBBPool.BBContainer> outputBuffers)
+        {
+            return Pair.of(0l, new int[0]);
         }
     }
 

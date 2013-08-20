@@ -30,6 +30,7 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
@@ -53,6 +54,7 @@ import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStats;
+import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -317,6 +319,19 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config)
         {
             Site.this.updateHashinator(config);
+        }
+
+        @Override
+        public boolean activateTableStream(final int tableId, TableStreamType type, long undoToken, byte[] predicates)
+        {
+            return m_ee.activateTableStream(tableId, type, undoToken, predicates);
+        }
+
+        @Override
+        public Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
+                                                          List<DBBPool.BBContainer> outputBuffers)
+        {
+            return m_ee.tableStreamSerializeMore(tableId, type, outputBuffers);
         }
     };
 
