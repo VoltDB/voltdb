@@ -754,7 +754,8 @@ public class SnapshotRestore extends VoltSystemProcedure
                          * Only log replicated table unique constraint violations
                          * at the lowest site.
                          */
-                        if (context.isLowestSiteId() &&
+                        if (uniqueViolations != null &&
+                                context.isLowestSiteId() &&
                                 context.getHostId() == 0) {
                             m_duplicateRowHandler.handleDuplicates(table_name, uniqueViolations);
                         }
