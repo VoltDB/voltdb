@@ -617,7 +617,7 @@ public class CSVLoader {
             }
             // Get elapsed time in seconds
             float elapsedTimeSec = latency / 1000F;
-            out_reportfile.write("csvloader elaspsed: " + elapsedTimeSec
+            out_reportfile.write("CSVLoader elaspsed: " + elapsedTimeSec
                     + " seconds\n");
             long trueSkip = 0;
             //get the actuall number of lines skipped
