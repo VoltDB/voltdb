@@ -430,21 +430,6 @@ public abstract class Type implements SchemaObject, Cloneable {
         throw Error.runtimeError(ErrorCode.U_S0500, "Type");
     }
 
-    public boolean softEquals(Object other) {
-        if (other == this) {
-            return true;
-        }
-        if (other instanceof Type == false) {
-            return false;
-        }
-        Type otherType = (Type) other;
-
-        if (typeComparisonGroup != otherType.typeComparisonGroup) {
-            return false;
-        }
-        return true;
-    }
-
     @Override
     public boolean equals(Object other) {
 

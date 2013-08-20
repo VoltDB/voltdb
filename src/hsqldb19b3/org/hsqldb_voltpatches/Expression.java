@@ -200,7 +200,7 @@ public class Expression {
 
     //
     int     queryTableColumnIndex = -1;    // >= 0 when it is used for order by
-    protected boolean isParam;
+    boolean isParam;
 
     // index of a session-dependent field
     int parameterIndex = -1;
@@ -1329,6 +1329,10 @@ public class Expression {
         s.resolveTypes(session);
 
         return s;
+    }
+
+    boolean isParam() {
+        return isParam;
     }
 
     void setAttributesAsColumn(ColumnSchema column, boolean isWritable) {

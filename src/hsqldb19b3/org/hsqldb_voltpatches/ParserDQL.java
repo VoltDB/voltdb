@@ -4661,11 +4661,11 @@ public class ParserDQL extends ParserBase {
 
         //
         private int           subQueryDepth;
-        private final HsqlArrayList subQueryList   = new HsqlArrayList(true);
+        private HsqlArrayList subQueryList   = new HsqlArrayList(true);
         HsqlArrayList         parameters     = new HsqlArrayList(true);
-        private final HsqlArrayList usedSequences  = new HsqlArrayList(true);
-        private final HsqlArrayList usedRoutines   = new HsqlArrayList(true);
-        private final HsqlArrayList rangeVariables = new HsqlArrayList(true);
+        private HsqlArrayList usedSequences  = new HsqlArrayList(true);
+        private HsqlArrayList usedRoutines   = new HsqlArrayList(true);
+        private HsqlArrayList rangeVariables = new HsqlArrayList(true);
         Type                  currentDomain;
         boolean               contextuallyTypedExpression;
         final Session         session;

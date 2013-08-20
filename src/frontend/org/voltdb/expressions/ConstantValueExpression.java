@@ -108,7 +108,6 @@ public class ConstantValueExpression extends AbstractValueExpression {
     public int hashCode() {
         // based on implementation of equals
         int result = 0;
-        result += super.hashCode();
         if (m_isNull) {
             result += 1;
         } else {

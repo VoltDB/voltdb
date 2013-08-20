@@ -531,7 +531,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         checkDecodeNullResult(cr, new Long[]{0L,0L,0L,0L});
 
         // Test Null return type
-        cr = client.callProcedure("@AdHoc","select DECODE(tiny, 4, 5, NULL, NULL, tiny) " +
+        cr = client.callProcedure("@AdHoc","select DECODE(tiny, 4, 5, NULL, NULL, 10) " +
                 " from R3 where id = 2");
         assertTrue(cr.getResults()[0].getRowCount() == 1);
         assertTrue(cr.getResults()[0].advanceRow());
