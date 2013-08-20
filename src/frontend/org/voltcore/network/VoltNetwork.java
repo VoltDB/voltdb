@@ -62,6 +62,7 @@
 package org.voltcore.network;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.channels.CancelledKeyException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -146,7 +147,8 @@ class VoltNetwork implements Runnable
     Connection registerChannel(
             final SocketChannel channel,
             final InputHandler handler,
-            final int interestOps) throws IOException {
+            final int interestOps,
+            final ReverseDNSPolicy dns) throws IOException {
         channel.configureBlocking (false);
         channel.socket().setKeepAlive(true);
 
@@ -157,7 +159,7 @@ class VoltNetwork implements Runnable
                         new VoltPort(
                                 VoltNetwork.this,
                                 handler,
-                                channel.socket().getInetAddress().getHostAddress(),
+                                (InetSocketAddress)channel.socket().getRemoteSocketAddress(),
                                 m_pool);
                 port.registering();
 
@@ -165,7 +167,9 @@ class VoltNetwork implements Runnable
                  * This means we are used by a client. No need to wait then, trigger
                  * the reverse DNS lookup now.
                  */
-                port.resolveHostname();
+                if (dns != ReverseDNSPolicy.NONE) {
+                    port.resolveHostname(dns == ReverseDNSPolicy.SYNCHRONOUS);
+                }
 
                 try {
                     SelectionKey key = channel.register (m_selector, interestOps, null);
