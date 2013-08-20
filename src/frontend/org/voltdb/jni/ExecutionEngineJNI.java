@@ -24,6 +24,7 @@ import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
@@ -461,9 +462,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public int[] tableStreamSerializeMore(int tableId,
-                                          TableStreamType streamType,
-                                          List<BBContainer> outputBuffers) {
+    public Pair<Long, int[]> tableStreamSerializeMore(int tableId,
+                                                      TableStreamType streamType,
+                                                      List<BBContainer> outputBuffers) {
         byte[] bytes = outputBuffers != null
                             ? SnapshotUtil.OutputBuffersToBytes(outputBuffers)
                             : null;
@@ -472,14 +473,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                                                         streamType.ordinal(),
                                                         bytes);
         int[] positions = null;
-        // -1 is end of stream.
-        if (remaining == -1) {
-            return new int[] {0};
-        }
-        // -2 is an error.
-        if (remaining == -2) {
-            return new int[] {-1};
-        }
         assert(deserializer != null);
         deserializer.clear();
         int count;
@@ -490,14 +483,14 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 for (int i = 0; i < count; i++) {
                     positions[i] = deserializer.readInt();
                 }
-                return positions;
+                return Pair.of(remaining, positions);
             }
         } catch (final IOException ex) {
             LOG.error("Failed to deserialize position array" + ex);
             throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
         }
 
-        return new int[] {0};
+        return Pair.of(remaining, new int[] {0});
     }
 
     /**

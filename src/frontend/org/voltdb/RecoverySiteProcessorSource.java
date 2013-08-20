@@ -377,7 +377,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
             output.add(container);
             int serialized = m_engine.tableStreamSerializeMore(table.m_tableId,
                                                                TableStreamType.RECOVERY,
-                                                               output)[0];
+                                                               output).getSecond()[0];
 
             if (serialized <= 0) {
                 /*
@@ -593,7 +593,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                 output.add(container);
                 int serialized = m_engine.tableStreamSerializeMore(table.m_tableId,
                                                                    TableStreamType.RECOVERY,
-                                                                   output)[0];
+                                                                   output).getSecond()[0];
                 long endSerializing = System.currentTimeMillis();
                 m_timeSpentSerializing.addAndGet(endSerializing - startSerializing);
 

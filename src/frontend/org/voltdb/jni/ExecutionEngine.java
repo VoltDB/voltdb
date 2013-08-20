@@ -28,6 +28,7 @@ import java.util.Map.Entry;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.Pair;
 import org.voltdb.ExecutionSite;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
@@ -325,13 +326,15 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     /**
      * Serialize more tuples from the specified table that already has a stream enabled
+     *
      * @param tableId Catalog ID of the table to serialize
      * @param outputBuffers Buffers to receive serialized tuple data
-     * @return A positive number indicating the number of bytes serialized or 0 if there is no more data.
-     *        -1 is returned if there is an error (such as the table not having the specified stream type activated).
+     * @return The first number in the pair indicates that there is more data if it's positive,
+     * 0 if it's the end of stream, or -1 if there was an error. The second value of the pair is the serialized bytes
+     * for each output buffer.
      */
-    public abstract int[] tableStreamSerializeMore(int tableId, TableStreamType type,
-                                                   List<DBBPool.BBContainer> outputBuffers);
+    public abstract Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
+                                                               List<DBBPool.BBContainer> outputBuffers);
 
     public abstract void processRecoveryMessage( ByteBuffer buffer, long pointer);
 
