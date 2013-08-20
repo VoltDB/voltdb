@@ -90,7 +90,7 @@ public class ExpressionOrderBy extends Expression {
 
         nodes[LEFT].resolveTypes(session, parent);
 
-        if (nodes[LEFT].isParam()) {
+        if (nodes[LEFT].isParam) {
             throw Error.error(ErrorCode.X_42567);
         }
 

@@ -542,7 +542,7 @@ public class ExpressionLogical extends Expression {
                 break;
             }
             case OpTypes.IS_NULL :
-                if (nodes[LEFT].isParam()) {
+                if (nodes[LEFT].isParam) {
                     throw Error.error(ErrorCode.X_42565);
                 }
 
@@ -552,7 +552,7 @@ public class ExpressionLogical extends Expression {
                 break;
 
             case OpTypes.NOT :
-                if (nodes[LEFT].isParam()) {
+                if (nodes[LEFT].isParam) {
                     nodes[LEFT].dataType = Type.SQL_BOOLEAN;
 
                     break;
@@ -605,11 +605,11 @@ public class ExpressionLogical extends Expression {
 
     private void resolveTypesForLogicalOp() {
 
-        if (nodes[LEFT].isParam()) {
+        if (nodes[LEFT].isParam) {
             nodes[LEFT].dataType = Type.SQL_BOOLEAN;
         }
 
-        if (nodes[RIGHT].isParam()) {
+        if (nodes[RIGHT].isParam) {
             nodes[RIGHT].dataType = Type.SQL_BOOLEAN;
         }
 
@@ -645,9 +645,9 @@ public class ExpressionLogical extends Expression {
 
             resolveRowTypes();
         } else {
-            if (nodes[LEFT].isParam()) {
+            if (nodes[LEFT].isParam) {
                 nodes[LEFT].dataType = nodes[RIGHT].dataType;
-            } else if (nodes[RIGHT].isParam()) {
+            } else if (nodes[RIGHT].isParam) {
                 nodes[RIGHT].dataType = nodes[LEFT].dataType;
             }
 
@@ -734,11 +734,11 @@ public class ExpressionLogical extends Expression {
 
     void resolveTypesForOverlaps() {
 
-        if (nodes[LEFT].nodes[0].isParam()) {
+        if (nodes[LEFT].nodes[0].isParam) {
             nodes[LEFT].nodes[0].dataType = nodes[RIGHT].nodes[0].dataType;
         }
 
-        if (nodes[RIGHT].nodes[0].isParam()) {
+        if (nodes[RIGHT].nodes[0].isParam) {
             nodes[RIGHT].nodes[0].dataType = nodes[LEFT].nodes[0].dataType;
         }
 
@@ -747,11 +747,11 @@ public class ExpressionLogical extends Expression {
                 Type.SQL_TIMESTAMP;
         }
 
-        if (nodes[LEFT].nodes[1].isParam()) {
+        if (nodes[LEFT].nodes[1].isParam) {
             nodes[LEFT].nodes[1].dataType = nodes[RIGHT].nodes[0].dataType;
         }
 
-        if (nodes[RIGHT].nodes[1].isParam()) {
+        if (nodes[RIGHT].nodes[1].isParam) {
             nodes[RIGHT].nodes[1].dataType = nodes[LEFT].nodes[0].dataType;
         }
 

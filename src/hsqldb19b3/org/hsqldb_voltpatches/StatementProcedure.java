@@ -145,7 +145,7 @@ public class StatementProcedure extends StatementDMQL {
             int          mode  = param.getParameterMode();
 
             if (mode != SchemaObject.ParameterModes.PARAM_IN) {
-                if (this.arguments[i].isParam()) {
+                if (this.arguments[i].isParam) {
                     int paramIndex = arguments[i].parameterIndex;
 
                     session.sessionContext.dynamicArguments[paramIndex] =

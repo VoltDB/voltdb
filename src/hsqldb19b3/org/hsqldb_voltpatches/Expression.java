@@ -200,7 +200,7 @@ public class Expression {
 
     //
     int     queryTableColumnIndex = -1;    // >= 0 when it is used for order by
-    private boolean isParam;
+    protected boolean isParam;
 
     // index of a session-dependent field
     int parameterIndex = -1;
@@ -1082,12 +1082,12 @@ public class Expression {
 
             nodeDataTypes[j] = type;
 
-            if (row != null && row.nodes[j].isParam()) {
+            if (row != null && row.nodes[j].isParam) {
                 row.nodes[j].dataType = type;
             }
 
             for (int i = 0; i < nodes.length; i++) {
-                if (nodes[i].nodes[j].isParam()) {
+                if (nodes[i].nodes[j].isParam) {
                     nodes[i].nodes[j].dataType = nodeDataTypes[j];
 
                     continue;
@@ -1329,14 +1329,6 @@ public class Expression {
         s.resolveTypes(session);
 
         return s;
-    }
-
-    boolean isParam() {
-        return isParam;
-    }
-
-    void setParam(boolean param) {
-        isParam = param;
     }
 
     void setAttributesAsColumn(ColumnSchema column, boolean isWritable) {

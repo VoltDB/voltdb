@@ -1595,19 +1595,19 @@ class NValue {
                 return 0;
         }
 
-        // Treat NaN values as equals and also make them smaller than neagtive infinity.
-        // This breaks IEEE754 for expressions slightly.
-        if (std::isnan(lhsValue)) {
-            return std::isnan(rhsValue) ? VALUE_COMPARE_EQUAL : VALUE_COMPARE_LESSTHAN;
-        }
-        else if (std::isnan(rhsValue)) {
-            return VALUE_COMPARE_GREATERTHAN;
-        }
         // Add null type comparison
-        else if (isNull()) {
+        if (isNull()) {
             return rhs.isNull() ? VALUE_COMPARE_EQUAL : VALUE_COMPARE_LESSTHAN;
         }
         else if (rhs.isNull()) {
+            return VALUE_COMPARE_GREATERTHAN;
+        }
+        // Treat NaN values as equals and also make them smaller than neagtive infinity.
+        // This breaks IEEE754 for expressions slightly.
+        else if (std::isnan(lhsValue)) {
+            return std::isnan(rhsValue) ? VALUE_COMPARE_EQUAL : VALUE_COMPARE_LESSTHAN;
+        }
+        else if (std::isnan(rhsValue)) {
             return VALUE_COMPARE_GREATERTHAN;
         }
         else if (lhsValue > rhsValue) {

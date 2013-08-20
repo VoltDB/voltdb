@@ -121,7 +121,7 @@ public class ExpressionColumn extends Expression {
         super(type);
 
         if (type == OpTypes.DYNAMIC_PARAM) {
-            setParam(true);
+            isParam = true;
         }
     }
 

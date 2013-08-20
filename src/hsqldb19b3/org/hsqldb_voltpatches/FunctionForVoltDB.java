@@ -264,10 +264,10 @@ public class FunctionForVoltDB extends FunctionSQL {
          * The types to the FIELD functions parameters are VARCHAR
          */
         case FunctionId.FUNC_VOLT_FIELD:
-            if (nodes[0].dataType == null && nodes[0].isParam()) {
+            if (nodes[0].dataType == null && nodes[0].isParam) {
                 nodes[0].dataType = Type.SQL_VARCHAR;
             }
-            if (nodes[1].dataType == null && nodes[1].isParam()) {
+            if (nodes[1].dataType == null && nodes[1].isParam) {
                 nodes[1].dataType = Type.SQL_VARCHAR;
             }
             break;
@@ -293,7 +293,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                 Type argType = nodes[ii].dataType;
                 if (argType == null) {
                     // A param here means work to do, below.
-                    if (nodes[ii].isParam() || nodes[ii].valueData == null) {
+                    if (nodes[ii].isParam || nodes[ii].valueData == null) {
                         needParamType = true;
                     }
                     continue;
@@ -335,7 +335,7 @@ public class FunctionForVoltDB extends FunctionSQL {
 
             for (int ii = 0; ii < nodes.length; ii++) {
                 Type argType = nodes[ii].dataType;
-                if ((argType != null) || ! (nodes[ii].isParam() || nodes[ii].valueData == null)) {
+                if ((argType != null) || ! (nodes[ii].isParam || nodes[ii].valueData == null)) {
                     continue;
                 }
                 // This is the same test as above for determining that the argument

@@ -388,7 +388,7 @@ public class ExpressionOp extends Expression {
         while (expr.opType == OpTypes.CASEWHEN) {
             expr.nodes[LEFT].resolveTypes(session, expr);
 
-            if (expr.nodes[LEFT].isParam()) {
+            if (expr.nodes[LEFT].isParam) {
                 expr.nodes[LEFT].dataType = Type.SQL_BOOLEAN;
             }
 

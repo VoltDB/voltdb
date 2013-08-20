@@ -130,7 +130,7 @@ public final class ExpressionLike extends ExpressionLogical {
         boolean isEscapeFixedConstant = true;
 
         if (nodes[ESCAPE] != null) {
-            if (nodes[ESCAPE].isParam()) {
+            if (nodes[ESCAPE].isParam) {
                 throw Error.error(ErrorCode.X_42567);
             }
 
@@ -174,9 +174,9 @@ public final class ExpressionLike extends ExpressionLogical {
             }
         }
 
-        if (nodes[LEFT].isParam()) {
+        if (nodes[LEFT].isParam) {
             nodes[LEFT].dataType = nodes[RIGHT].dataType;
-        } else if (nodes[RIGHT].isParam()) {
+        } else if (nodes[RIGHT].isParam) {
             nodes[RIGHT].dataType = nodes[LEFT].dataType;
         }
 

@@ -456,8 +456,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         Client client = getClient();
         ClientResponse cr;
 
-        cr = client.callProcedure("P3.insert", 1, 1, 1, 1, 1, 1.1, "2013-07-18 02:00:00.123457", "IBM", 1);
-        cr = client.callProcedure("P3.insert", 2, null, null, null, null, null, null, null, null);
+        cr = client.callProcedure("R3.insert", 1, 1, 1, 1, 1, 1.1, "2013-07-18 02:00:00.123457", "IBM", 1);
+        cr = client.callProcedure("R3.insert", 2, null, null, null, null, null, null, null, null);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         // Stored procedure tests
@@ -489,14 +489,14 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "DECODE(small, NULL, 'null small', small), DECODE(num, NULL, 'null num', num),  " +
                 "DECODE(big, NULL, 'null big', big), DECODE(ratio, NULL, 'null ratio', ratio),  " +
                 "DECODE(tm, NULL, 'null tm', 'tm'), DECODE(var, NULL, 'null var', var), " +
-                "DECODE(dec, NULL, 'null dec', dec) from P3 where id = 1");
+                "DECODE(dec, NULL, 'null dec', dec) from R3 where id = 1");
         checkDecodeNullResult(cr, new String[]{"1","1","1","1","1.1","tm","IBM","1"});
 
         cr = client.callProcedure("@AdHoc", "select DECODE(tiny, NULL, 'null tiny', tiny)," +
                 "DECODE(small, NULL, 'null small', small), DECODE(num, NULL, 'null num', num),  " +
                 "DECODE(big, NULL, 'null big', big), DECODE(ratio, NULL, 'null ratio', ratio),  " +
                 "DECODE(tm, NULL, 'null tm', 'tm'), DECODE(var, NULL, 'null var', var), " +
-                "DECODE(dec, NULL, 'null dec', dec) from P3 where id = 2");
+                "DECODE(dec, NULL, 'null dec', dec) from R3 where id = 2");
         checkDecodeNullResult(cr, new String[]{"null tiny","null small", "null num", "null big",
                 "null ratio", "null tm", "null var", "null dec"});
 
@@ -1396,7 +1396,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "PRIMARY KEY (ID) ); " +
                 "PARTITION TABLE P2 ON COLUMN ID;\n" +
 
-                "CREATE TABLE P3 ( " +
+                "CREATE TABLE R3 ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
                 "TINY TINYINT, " +
                 "SMALL SMALLINT, " +
@@ -1515,12 +1515,12 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "DECODE(small, NULL, 'null small', small), DECODE(num, NULL, 'null num', num),  " +
                 "DECODE(big, NULL, 'null big', big), DECODE(ratio, NULL, 'null ratio', ratio),  " +
                 "DECODE(tm, NULL, 'null tm', 'tm'), DECODE(var, NULL, 'null var', var), " +
-                "DECODE(dec, NULL, 'null dec', dec) from P3 where id = ?");
+                "DECODE(dec, NULL, 'null dec', dec) from R3 where id = ?");
         project.addStmtProcedure("TestDecodeNullParam", "select DECODE(tiny, ?, 'null tiny', tiny)," +
                 "DECODE(small, ?, 'null small', small), DECODE(num, ?, 'null num', num),  " +
                 "DECODE(big, ?, 'null big', big), DECODE(ratio, ?, 'null ratio', ratio),  " +
                 "DECODE(tm, ?, 'null tm', 'tm'), DECODE(var, ?, 'null var', var), " +
-                "DECODE(dec, ?, 'null dec', dec) from P3 where id = ?");
+                "DECODE(dec, ?, 'null dec', dec) from R3 where id = ?");
 
         project.addStmtProcedure("TestDecodeNullTimestamp", "select DECODE(tm, NULL, 'null tm', tm) from p2 where id = ?");
 

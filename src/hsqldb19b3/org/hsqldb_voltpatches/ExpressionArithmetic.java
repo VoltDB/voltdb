@@ -263,7 +263,7 @@ public class ExpressionArithmetic extends Expression {
                 break;
 
             case OpTypes.NEGATE :
-                if (nodes[LEFT].isParam() || nodes[LEFT].dataType == null) {
+                if (nodes[LEFT].isParam || nodes[LEFT].dataType == null) {
                     throw Error.error(ErrorCode.X_42567);
                 }
 
@@ -311,13 +311,13 @@ public class ExpressionArithmetic extends Expression {
 
     void resolveTypesForArithmetic(Session session) {
 
-        if (nodes[LEFT].isParam() && nodes[RIGHT].isParam()) {
+        if (nodes[LEFT].isParam && nodes[RIGHT].isParam) {
             throw Error.error(ErrorCode.X_42567);
         }
 
-        if (nodes[LEFT].isParam()) {
+        if (nodes[LEFT].isParam) {
             nodes[LEFT].dataType = nodes[RIGHT].dataType;
-        } else if (nodes[RIGHT].isParam()) {
+        } else if (nodes[RIGHT].isParam) {
             nodes[RIGHT].dataType = nodes[LEFT].dataType;
         }
 
@@ -366,9 +366,9 @@ public class ExpressionArithmetic extends Expression {
             return;
         }
 
-        if (nodes[LEFT].isParam()) {
+        if (nodes[LEFT].isParam) {
             nodes[LEFT].dataType = nodes[RIGHT].dataType;
-        } else if (nodes[RIGHT].isParam()) {
+        } else if (nodes[RIGHT].isParam) {
             nodes[RIGHT].dataType = nodes[LEFT].dataType;
         }
 
