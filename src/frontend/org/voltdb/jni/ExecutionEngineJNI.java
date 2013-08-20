@@ -37,7 +37,6 @@ import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FastSerializer.BufferGrowCallback;
-import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 import com.google.common.base.Throwables;
@@ -456,9 +455,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     public boolean activateTableStream(int tableId, TableStreamType streamType,
                                        long undoQuantumToken,
-                                       SnapshotPredicates predicates) {
+                                       byte[] predicates) {
         return nativeActivateTableStream(pointer, tableId, streamType.ordinal(),
-                                         undoQuantumToken, predicates.toBytes());
+                                         undoQuantumToken, predicates);
     }
 
     @Override

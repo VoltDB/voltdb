@@ -42,7 +42,6 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 import com.google.common.base.Charsets;
@@ -1090,13 +1089,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             int tableId,
             TableStreamType streamType,
             long undoQuantumToken,
-            SnapshotPredicates predicates) {
+            byte[] predicates) {
         m_data.clear();
         m_data.putInt(Commands.ActivateTableStream.m_id);
         m_data.putInt(tableId);
         m_data.putInt(streamType.ordinal());
         m_data.putLong(undoQuantumToken);
-        m_data.put(predicates.toBytes()); // predicates
+        m_data.put(predicates); // predicates
 
         try {
             m_data.flip();
