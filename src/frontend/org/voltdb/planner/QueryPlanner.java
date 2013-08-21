@@ -312,10 +312,14 @@ public class QueryPlanner {
             // connect the nodes to build the graph
             sendNode.addAndLinkChild(bestPlan.rootPlanGraph);
             // this plan is final, generate schema and resolve all the column index references
-            sendNode.generateOutputSchema(m_db);
-            sendNode.resolveColumnIndexes();
             bestPlan.rootPlanGraph = sendNode;
         }
+
+        // Execute the generateOutputSchema and resolveColumnIndexes Once from the top plan node for only best plan
+        bestPlan.rootPlanGraph.generateOutputSchema(m_db);
+        bestPlan.rootPlanGraph.resolveColumnIndexes();
+
+
         // Output the best plan debug info
         assembler.finalizeBestCostPlan();
 

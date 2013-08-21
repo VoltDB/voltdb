@@ -366,8 +366,6 @@ public class PlanAssembler {
 
         assert (nextStmt != null);
         retval.parameters = nextStmt.getParameters();
-        // Do a final generateOutputSchema pass.
-        retval.rootPlanGraph.generateOutputSchema(m_catalogDb);
         retval.setPartitioningKey(m_partitioning.effectivePartitioningValue());
         return retval;
     }
@@ -565,7 +563,6 @@ public class PlanAssembler {
         /*
          * Establish the output columns for the sub select plan.
          */
-        root.generateOutputSchema(m_catalogDb);
         root = handleAggregationOperators(root);
 
         if (m_parsedSelect.hasComplexAgg()) {
@@ -586,7 +583,6 @@ public class PlanAssembler {
         {
             root = handleLimitOperator(root);
         }
-        root.generateOutputSchema(m_catalogDb);
 
         return root;
     }
@@ -676,8 +672,6 @@ public class PlanAssembler {
         // When we inline this projection into the scan, we're going
         // to overwrite any original projection that we might have inlined
         // in order to simply cull the columns from the persistent table.
-        // The call here to generateOutputSchema() will recurse down to
-        // the scan node and cause it to update appropriately.
         subSelectRoot.addInlinePlanNode(projectionNode);
         // connect the nodes to build the graph
         deleteNode.addAndLinkChild(subSelectRoot);
@@ -752,8 +746,6 @@ public class PlanAssembler {
         // When we inline this projection into the scan, we're going
         // to overwrite any original projection that we might have inlined
         // in order to simply cull the columns from the persistent table.
-        // The call here to generateOutputSchema() will recurse down to
-        // the scan node and cause it to update appropriately.
         assert(subSelectRoot instanceof AbstractScanPlanNode);
         subSelectRoot.addInlinePlanNode(projectionNode);
 
@@ -850,7 +842,6 @@ public class PlanAssembler {
         materializeNode.setOutputSchema(mat_schema);
         // connect the insert and the materialize nodes together
         insertNode.addAndLinkChild(materializeNode);
-        insertNode.generateOutputSchema(m_catalogDb);
 
         if (m_partitioning.wasSpecifiedAsSingle() ||
             (m_partitioning.effectivePartitioningExpression() != null)) {
@@ -864,7 +855,6 @@ public class PlanAssembler {
         sendNode.addAndLinkChild(insertNode);
         AbstractPlanNode recvNode = new ReceivePlanNode();
         recvNode.addAndLinkChild(sendNode);
-        recvNode.generateOutputSchema(m_catalogDb);
 
         // add a count or a limit and send on top of the union
         return addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
@@ -931,9 +921,7 @@ public class PlanAssembler {
 
         // connect the nodes to build the graph
         sumOrLimitNode.addAndLinkChild(dmlRoot);
-        sumOrLimitNode.generateOutputSchema(m_catalogDb);
         sendNode.addAndLinkChild(sumOrLimitNode);
-        sendNode.generateOutputSchema(m_catalogDb);
 
         return sendNode;
     }
@@ -974,7 +962,6 @@ public class PlanAssembler {
             return rootNode;
         } else {
             projectionNode.addAndLinkChild(rootNode);
-            projectionNode.generateOutputSchema(m_catalogDb);
             return projectionNode;
         }
     }
@@ -1024,9 +1011,7 @@ public class PlanAssembler {
                                 col.ascending ? SortDirectionType.ASC
                                               : SortDirectionType.DESC);
         }
-
         orderByNode.addAndLinkChild(root);
-        orderByNode.generateOutputSchema(m_catalogDb);
 
         // get all of the columns in the sort
         List<AbstractExpression> orderExpressions = orderByNode.getSortExpressions();
@@ -1210,12 +1195,10 @@ public class PlanAssembler {
             child.clearParents();
 
             topLimit.addAndLinkChild(child);
-            topLimit.generateOutputSchema(m_catalogDb);
             projectionNode.addAndLinkChild(topLimit);
             return projectionNode;
         } else {
             topLimit.addAndLinkChild(root);
-            topLimit.generateOutputSchema(m_catalogDb);
             return topLimit;
         }
     }
@@ -1470,7 +1453,6 @@ public class PlanAssembler {
         }
 
         distNode.addAndLinkChild(root);
-        distNode.generateOutputSchema(m_catalogDb);
         root = distNode;
 
         // Put the send/receive pair back into place
@@ -1480,14 +1462,12 @@ public class PlanAssembler {
             root = accessPlanTemp;
             // Add the top node
             coordNode.addAndLinkChild(root);
-            coordNode.generateOutputSchema(m_catalogDb);
             root = coordNode;
         }
         if (needProjectionNode) {
             ProjectionPlanNode proj = new ProjectionPlanNode();
             proj.addAndLinkChild(root);
             proj.setOutputSchema(newSchema);
-            proj.generateOutputSchema(m_catalogDb);
             root = proj;
         }
         return root;
@@ -1646,7 +1626,6 @@ public class PlanAssembler {
         DistinctPlanNode distinctNode = new DistinctPlanNode();
         distinctNode.setDistinctExpression(expr);
         distinctNode.addAndLinkChild(root);
-        distinctNode.generateOutputSchema(m_catalogDb);
         return distinctNode;
     }
 
