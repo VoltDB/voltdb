@@ -85,13 +85,10 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
     // faking an unsuccessful FragmentResponseMessage.
     synchronized void repair(SiteTasker task, List<Long> masters, Map<Integer, Long> partitionMasters)
     {
-        // At the MPI's TransactionTaskQueue, we know that there can only be
-        // one transaction in the SiteTaskerQueue at a time, because the
-        // TransactionTaskQueue will only release one MP transaction to the
-        // SiteTaskerQueue at a time.  So, when we offer this repair task, we
-        // know it will be the next thing to run once we poison the current
-        // TXN.
-        // First, poison all the stuff that is currently running
+        // We know that every Site assigned to the MPI (either the main writer or
+        // any of the MP read pool) will only have one active transaction at a time,
+        // and that we either have active reads or active writes, but never both.
+        // Figure out which we're doing, and then poison all of the appropriate sites.
         Map<Long, TransactionTask> currentSet;
         if (!m_currentReads.isEmpty()) {
             assert(m_currentWrites.isEmpty());
@@ -111,10 +108,6 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                 MpProcedureTask next = (MpProcedureTask)e.getValue();
                 tmLog.debug("MpTTQ: poisoning task: " + next);
                 next.doRestart(masters, partitionMasters);
-                // get head
-                // Only the MPI's TransactionTaskQueue is ever called in this way, so we know
-                // that the TransactionTasks we pull out of it have to be MP transactions, so this
-                // cast is safe
                 MpTransactionState txn = (MpTransactionState)next.getTransactionState();
                 // inject poison pill
                 FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false);
@@ -129,32 +122,35 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                 txn.offerReceivedFragmentResponse(poison);
             }
             else {
-                assert(false);
+                // Don't think that EveryPartitionTasks need to do anything here, since they
+                // don't actually run java, they just exist for sequencing.  Any cleanup should be
+                // to the duplicate counter in MpScheduler for this transaction.
             }
         }
         // Now, iterate through both backlogs and update the partition masters
         // for all MpProcedureTasks not at the head of the TransactionTaskQueue
         Iterator<TransactionTask> iter = m_backlog.iterator();
         while (iter.hasNext()) {
-            // EveryPartition work is just going to cross its fingers here.
             TransactionTask tt = iter.next();
             if (task instanceof MpProcedureTask) {
                 MpProcedureTask next = (MpProcedureTask)tt;
                 next.updateMasters(masters, partitionMasters);
             }
             else {
+                // EveryPartitionTasks need the equivalent of updateMasters().
+                // SMASH for now
                 assert(false);
             }
         }
         iter = m_readBacklog.iterator();
         while (iter.hasNext()) {
-            // EveryPartition work is just going to cross its fingers here.
             TransactionTask tt = iter.next();
             if (task instanceof MpProcedureTask) {
                 MpProcedureTask next = (MpProcedureTask)tt;
                 next.updateMasters(masters, partitionMasters);
             }
             else {
+                // Shouldn't be any EveryPartition read transactions
                 assert(false);
             }
         }
