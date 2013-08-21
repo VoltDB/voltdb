@@ -177,13 +177,11 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         //   if so, are there reads or writes outstanding?
         //     if not, pull it from the write backlog, add it to current write set, and queue it
         //     if so, bail for now
-        //   if not, do we have a read to do?
-        //     if so, are we currently trying to do a write?
-        //       if not, is there more capacity in the pool?
-        //         if so, pull it from the read backlog, add it to current read set, and queue it
-        //         if not, bail for now
-        //       if so, bail for now
-        //     if not, bail for now
+        //   if not, are we currently trying to do a write?
+        //     if not, while we have reads to do and the pool has capacity:
+        //       pull a read from the read backlog, add it to current read set, and queue it
+        //       bail when done
+        //     if so, bail for now
 
         boolean retval = false;
         if (!m_backlog.isEmpty()) {
@@ -195,15 +193,13 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
                 retval = true;
             }
         }
-        else if (!m_readBacklog.isEmpty()) {
-            if (m_currentWrites.isEmpty()) {
-                if (m_sitePool.canAcceptWork()) {
-                    TransactionTask task = m_readBacklog.pollFirst();
-                    assert(task.getTransactionState().isReadOnly());
-                    m_currentReads.put(task.getTxnId(), task);
-                    taskQueueOffer(task);
-                    retval = true;
-                }
+        else if (m_currentWrites.isEmpty()) {
+            while (!m_readBacklog.isEmpty() && m_sitePool.canAcceptWork()) {
+                TransactionTask task = m_readBacklog.pollFirst();
+                assert(task.getTransactionState().isReadOnly());
+                m_currentReads.put(task.getTxnId(), task);
+                taskQueueOffer(task);
+                retval = true;
             }
         }
         return retval;
@@ -238,15 +234,20 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
      */
     synchronized void restart()
     {
-        TransactionTask task;
         if (!m_currentReads.isEmpty()) {
-            task = m_currentReads.entrySet().iterator().next().getValue();
+            // re-submit all the tasks in the current read set to the pool.
+            // the pool will ensure that things submitted with the same
+            // txnID will go to the the MpRoSite which is currently running it
+            for (TransactionTask task : m_currentReads.values()) {
+                taskQueueOffer(task);
+            }
         }
         else {
             assert(!m_currentWrites.isEmpty());
+            TransactionTask task;
             task = m_currentWrites.entrySet().iterator().next().getValue();
+            taskQueueOffer(task);
         }
-        taskQueueOffer(task);
     }
 
     /**
