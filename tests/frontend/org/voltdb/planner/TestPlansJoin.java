@@ -235,8 +235,6 @@ public class TestPlansJoin extends PlannerTestCase {
         assertTrue(n instanceof AbstractScanPlanNode);
         scan = (AbstractScanPlanNode) n;
         assertEquals(ExpressionType.COMPARE_GREATERTHAN, scan.getPredicate().getExpressionType());
-
-
     }
 
     public void testTransitiveValueEquivalenceConditions() {
