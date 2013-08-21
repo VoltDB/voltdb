@@ -162,31 +162,31 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
  * Set up statistics for long running operations thru m_engine if total tuples accessed passes the threshold.
  */
 inline void AbstractExecutor::doLongOpTracking() {
-	if((++m_engine->m_tuplesFound) % LONG_OP_THRESHOLD != 0) {
-		return;
-	}
-	else {
-		Table* targetTable = m_engine->getLastAccessedTable();
-		std::string tableName;
-		int64_t tableSize;
-		if(targetTable == NULL) {
-			tableName = "None";
-			tableSize = 0;
-		}
-		else{
-			tableName = targetTable->name();
-			tableSize = targetTable->activeTupleCount();
-		}
-		//Update stats in java and let java determine if we should cancel this query.
-		if(m_engine->getTopend()->fragmentProgressUpdate(m_engine->getIndexInBatch(),
-				planNodeToString(m_abstractNode->getPlanNodeType()),
-				tableName,
-				tableSize,
-				m_engine->m_tuplesFound)){
-			VOLT_INFO("Interrupt query.");
-			throw InterruptException("Query interrupted.");
-		}
-	}
+        if((++m_engine->m_tuplesFound) % LONG_OP_THRESHOLD != 0) {
+                return;
+        }
+        else {
+                Table* targetTable = m_engine->getLastAccessedTable();
+                std::string tableName;
+                int64_t tableSize;
+                if(targetTable == NULL) {
+                        tableName = "None";
+                        tableSize = 0;
+                }
+                else{
+                        tableName = targetTable->name();
+                        tableSize = targetTable->activeTupleCount();
+                }
+                //Update stats in java and let java determine if we should cancel this query.
+                if(m_engine->getTopend()->fragmentProgressUpdate(m_engine->getIndexInBatch(),
+                                planNodeToString(m_abstractNode->getPlanNodeType()),
+                                tableName,
+                                tableSize,
+                                m_engine->m_tuplesFound)){
+                        VOLT_INFO("Interrupt query.");
+                        throw InterruptException("Query interrupted.");
+                }
+        }
 }
 }
 

@@ -128,12 +128,12 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     byte[] m_procNameInBytes = "".getBytes();
     short m_voltExecuteSQLIndex;
     short m_batchIndexBase;
-    public void setRunningProcedureContext(String procName, 
-    		short voltExecuteSQLIndex, 
-    		short batchIndexBase) {
-    	m_procNameInBytes = procName.getBytes();
-    	m_voltExecuteSQLIndex = voltExecuteSQLIndex;
-    	m_batchIndexBase = batchIndexBase;
+    public void setRunningProcedureContext(String procName,
+                short voltExecuteSQLIndex,
+                short batchIndexBase) {
+        m_procNameInBytes = procName.getBytes();
+        m_voltExecuteSQLIndex = voltExecuteSQLIndex;
+        m_batchIndexBase = batchIndexBase;
     }
     public byte[] getProcNameInBytes() {
         return m_procNameInBytes;
@@ -471,7 +471,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // Procedure name gets an length (2) and the name (.length)
         msgsize += 2;
         if(m_procNameInBytes.length != 0) {
-        	msgsize += m_procNameInBytes.length;
+                msgsize += m_procNameInBytes.length;
         }
 
         // voltDBExecuteSQLIndex gets an length (2)
