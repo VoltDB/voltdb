@@ -111,6 +111,13 @@ public:
         }
         return i >= first && i < second;
     }
+
+    std::string label(const std::string &tag) {
+        std::ostringstream label;
+        label << tag << ' ' << first << ':' << second;
+        return label.str();
+    }
+
     bool m_empty;
 };
 typedef std::vector<T_HashRange> T_HashRangeVector;
@@ -1028,9 +1035,10 @@ public:
                 new ReferenceSerializeInput(m_hashRangeBuffer, hashRangeOutput.position()));
     }
 
-    void materializeIndex(ElasticIndex &index, const T_HashRange &testRange, size_t &totalInserted) {
+    void materializeIndex(ElasticIndex &index, const T_HashRange &testRange, bool undo, size_t &totalInserted) {
         boost::shared_ptr<ReferenceSerializeInput> predicateInput = getHashRangePredicateInput(testRange);
 
+        m_engine->setUndoToken(m_undoToken);
         bool activated = m_table->activateStream(m_serializer, TABLE_STREAM_ELASTIC_INDEX_READ,
                                                  0, m_tableId, *predicateInput);
         ASSERT_TRUE(activated);
@@ -1061,6 +1069,15 @@ public:
                 ii += static_cast<int>(m_tupleWidth + sizeof(int32_t));
             }
         }
+
+        if (undo) {
+            m_engine->undoUndoToken(m_undoToken);
+        }
+        else {
+            m_engine->releaseUndoToken(m_undoToken);
+        }
+        m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0);
+        m_undoToken++;
     }
 
     void clearIndex(const T_HashRange &testRange) {
@@ -1839,6 +1856,7 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
     testRanges.push_back(T_HashRange(0, 0));
     testRanges.push_back(T_HashRange(maxint, maxint));
 
+    int itest = 0;
     BOOST_FOREACH(T_HashRange &testRange, testRanges) {
         resetTest();
 
@@ -1869,34 +1887,39 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
         streamSnapshot(NUM_MUTATIONS, NUM_MUTATIONS, COWTuples, totalSnapped);
         checkTuples(NUM_INITIAL + (m_tuplesInserted - m_tuplesDeleted), originalTuples, COWTuples);
         ElasticIndex *directIndex = getElasticIndex();
-        std::ostringstream label;
-        label << "direct " << testRange.first << ':' << testRange.second;
-        checkIndex(label.str(), directIndex, m_predicates, false);
+        checkIndex(testRange.label("direct"), directIndex, m_predicates, false);
         size_t indexSizeBefore = directIndex->size();
         size_t tableSizeBefore = m_table->activeTupleCount();
 
-        // Materialize the index and validate.
+        // Materialize the index and validate. Undo every other test cycle.
         ElasticIndex streamedIndex;
         size_t totalStreamed;
-        materializeIndex(streamedIndex, testRange, totalStreamed);
-        label.clear();
-        label << "streamed" << ' ' << testRange.first << ':' << testRange.second;
-        checkIndex(label.str(), &streamedIndex, m_predicates, true);
+        bool undo = (itest % 2 == 1);
+        materializeIndex(streamedIndex, testRange, undo, totalStreamed);
+        checkIndex(testRange.label("streamed"), &streamedIndex, m_predicates, true);
         size_t indexSizeAfter = directIndex->size();
         size_t tableSizeAfter = m_table->activeTupleCount();
         if (testRange.m_empty) {
             ASSERT_EQ(indexSizeAfter, indexSizeBefore);
-            ASSERT_EQ(tableSizeAfter, tableSizeBefore);
         }
         else {
             ASSERT_LT(indexSizeAfter, indexSizeBefore);
+        }
+        if (testRange.m_empty || undo) {
+            ASSERT_EQ(tableSizeAfter, tableSizeBefore);
+        }
+        else {
             ASSERT_LT(tableSizeAfter, tableSizeBefore);
         }
-        ASSERT_EQ(indexSizeBefore-indexSizeAfter, tableSizeBefore-tableSizeAfter);
+        if (!undo) {
+            ASSERT_EQ(indexSizeBefore-indexSizeAfter, tableSizeBefore-tableSizeAfter);
+        }
 
         // Clear the index and validate.
         clearIndex(testRange);
         ASSERT_EQ(NULL, getElasticIndex());
+
+        itest++;
     }
 }
 

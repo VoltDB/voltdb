@@ -104,7 +104,7 @@ int64_t ElasticIndexReadContext::handleStreamMore(
         TupleOutputStreamProcessor &outputStreams,
         std::vector<int> &retPositions)
 {
-    // Default to error
+    // Default to success.
     int64_t remaining = 1;
 
     // Check that activation happened.
