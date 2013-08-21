@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
+import org.voltcore.network.ReverseDNSPolicy;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
@@ -124,7 +125,7 @@ public class ForeignHost {
     }
 
     public void register(HostMessenger host) throws IOException {
-        m_connection = host.getNetwork().registerChannel( m_sc, m_handler, 0);
+        m_connection = host.getNetwork().registerChannel( m_sc, m_handler, 0, ReverseDNSPolicy.SYNCHRONOUS);
     }
 
     public void enableRead() {
@@ -247,7 +248,7 @@ public class ForeignHost {
 
 
     String hostname() {
-        return m_connection.getHostnameOrIP();
+        return m_connection.getHostnameAndIP();
     }
 
     /** Deliver a deserialized message from the network to a local mailbox */

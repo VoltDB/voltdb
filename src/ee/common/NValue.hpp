@@ -1595,9 +1595,16 @@ class NValue {
                 return 0;
         }
 
+        // Add null type comparison
+        if (isNull()) {
+            return rhs.isNull() ? VALUE_COMPARE_EQUAL : VALUE_COMPARE_LESSTHAN;
+        }
+        else if (rhs.isNull()) {
+            return VALUE_COMPARE_GREATERTHAN;
+        }
         // Treat NaN values as equals and also make them smaller than neagtive infinity.
         // This breaks IEEE754 for expressions slightly.
-        if (std::isnan(lhsValue)) {
+        else if (std::isnan(lhsValue)) {
             return std::isnan(rhsValue) ? VALUE_COMPARE_EQUAL : VALUE_COMPARE_LESSTHAN;
         }
         else if (std::isnan(rhsValue)) {

@@ -440,6 +440,8 @@ public class CommandLine extends VoltDB.Configuration
         List<String> cmdline = new ArrayList<String>(50);
         cmdline.add(javaExecutable);
         cmdline.add("-XX:+HeapDumpOnOutOfMemoryError");
+        cmdline.add("-Dsun.net.inetaddr.ttl=300");
+        cmdline.add("-Dsun.net.inetaddr.negative.ttl=3600");
         cmdline.add("-Djava.library.path=" + java_library_path);
         if (rmi_host_name != null)
             cmdline.add("-Djava.rmi.server.hostname=" + rmi_host_name);
