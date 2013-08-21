@@ -871,7 +871,7 @@ public class ExportToFileClient extends ExportClientBase {
                     System.exit(-1);
                 }
                 ii++;
-            } else if (args.equals("--timezone")) {
+            } else if (arg.equals("--timezone")) {
                 if (args.length < ii + 1) {
                     System.err.println("Error: Not enough args following --timezone");
                     printHelpAndQuit(-1);

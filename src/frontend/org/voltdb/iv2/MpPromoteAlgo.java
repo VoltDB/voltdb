@@ -163,8 +163,10 @@ public class MpPromoteAlgo implements RepairAlgo
 
             // Step 2: offer to the union
             addToRepairLog(response);
-            tmLog.trace(m_whoami + " collected from " + CoreUtils.hsIdToString(response.m_sourceHSId) +
-                    ", message: " + response.getPayload());
+            if (tmLog.isTraceEnabled()) {
+                tmLog.trace(m_whoami + " collected from " + CoreUtils.hsIdToString(response.m_sourceHSId) +
+                        ", message: " + response.getPayload());
+            }
 
             // Step 3: update the corresponding replica repair struct.
             ReplicaRepairStruct rrs = m_replicaRepairStructs.get(response.m_sourceHSId);
@@ -222,7 +224,9 @@ public class MpPromoteAlgo implements RepairAlgo
             // discover and track them.
             VoltMessage repairMsg = createRepairMessage(li);
             tmLog.debug(m_whoami + "repairing: " + m_survivors + " with: " + TxnEgo.txnIdToString(li.getTxnId()));
-            tmLog.trace(m_whoami + "repairing with message: " + repairMsg);
+            if (tmLog.isTraceEnabled()) {
+                tmLog.trace(m_whoami + "repairing with message: " + repairMsg);
+            }
             m_mailbox.repairReplicasWith(m_survivors, repairMsg);
         }
 

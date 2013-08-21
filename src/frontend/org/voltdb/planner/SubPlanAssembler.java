@@ -558,11 +558,14 @@ public abstract class SubPlanAssembler {
             // unfiltered components -- assuming that any value is considered >= null.
             if (retval.use == IndexUseType.COVERING_UNIQUE_EQUALITY) {
                 retval.use = IndexUseType.INDEX_SCAN;
-                retval.lookupType = IndexLookupType.GTE;
-                // With no prefix key, the ee can do either a forward or reverse scan.
-                // When there is a prefix equality, descending order is not supported.
+                // With no key, the lookup type will be ignored and the sort direction will
+                // determine the scan direction; With prefix key and explicit DESC order by,
+                // tell the EE to do reverse scan.
                 if (retval.sortDirection == SortDirectionType.DESC && retval.indexExprs.size() > 0) {
-                    retval.sortDirection = SortDirectionType.INVALID;
+                    retval.lookupType = IndexLookupType.LTE;
+                    retval.initialExpr.addAll(retval.indexExprs);
+                } else {
+                    retval.lookupType = IndexLookupType.GTE;
                 }
             }
             // GTE scans can have any number of null key components appended without changing

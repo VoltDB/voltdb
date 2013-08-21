@@ -18,14 +18,15 @@
 package org.voltcore.network;
 
 import java.io.IOException;
-import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.net.SocketException;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -48,7 +49,7 @@ public class VoltPort implements Connection
      */
     private static final ThreadPoolExecutor m_es =
             new ThreadPoolExecutor(0, 16, 1, TimeUnit.SECONDS,
-                                   new LinkedBlockingQueue<Runnable>(),
+                                   new SynchronousQueue<Runnable>(),
                                    CoreUtils.getThreadFactory("VoltPort DNS Reverse Lookup"));
 
     /** The currently selected operations on this port. */
@@ -94,53 +95,59 @@ public class VoltPort implements Connection
      * m_remoteIP if you need to identify a host.
      */
     volatile String m_remoteHost = null;
-    final String m_remoteIP;
+    final InetSocketAddress m_remoteSocketAddress;
+    final String m_remoteSocketAddressString;
+
     private String m_toString = null;
 
     /** Wrap a socket with a VoltPort */
     public VoltPort(
             VoltNetwork network,
             InputHandler handler,
-            String remoteIP,
+            InetSocketAddress remoteAddress,
             NetworkDBBPool pool) {
         m_network = network;
         m_handler = handler;
-        m_remoteIP = remoteIP;
+        m_remoteSocketAddress = remoteAddress;
+        m_remoteSocketAddressString = remoteAddress.toString();
         m_pool = pool;
     }
 
     /**
-     * If the port is still alive, start a thread in background to do a reverse
-     * DNS lookup of the remote hostname.
+     * Do a reverse DNS lookup of the remote end. Done in a separate thread unless synchronous is specified.
+     * If asynchronous lookup is requested the task may be dropped and resolution may never occur
      */
-    void resolveHostname() {
-        synchronized (m_lock) {
-            if (!m_running) {
-                return;
+    void resolveHostname(boolean synchronous) {
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                String remoteHost = m_remoteSocketAddress.getHostName();
+                if (!remoteHost.equals(m_remoteSocketAddress.getAddress().getHostAddress())) {
+                    m_remoteHost = remoteHost + "(" + m_remoteSocketAddressString + ")";
+                    m_toString = super.toString() + ":" + m_remoteHost;
+                }
             }
-
+        };
+        if (synchronous) {
+            r.run();
+        } else {
             /*
              * Start the reverse DNS lookup in background because it might be
              * very slow if the hostname is not specified in local /etc/hosts.
              */
-            m_es.submit(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        m_remoteHost = InetAddress.getByName(m_remoteIP).getHostName();
-                    } catch (UnknownHostException e) {
-                        networkLog.warn("Unable to resolve hostname of host "
-                                        + m_remoteIP);
-                    }
-                }
-            });
+            try {
+                m_es.submit(r);
+            } catch (RejectedExecutionException e) {
+                networkLog.debug(
+                        "Reverse DNS lookup for " + m_remoteSocketAddress + " rejected because the queue was full");
+            }
         }
     }
 
     void setKey (SelectionKey key) {
         m_selectionKey = key;
         m_channel = (SocketChannel)key.channel();
-        java.net.SocketAddress remoteAddress = m_channel.socket().getRemoteSocketAddress();
+        SocketAddress remoteAddress = m_channel.socket().getRemoteSocketAddress();
         m_toString = super.toString() + ":" + (remoteAddress == null ? "null" : remoteAddress.toString());
         m_readStream = new NIOReadStream();
         m_writeStream = new NIOWriteStream(
@@ -387,9 +394,7 @@ public class VoltPort implements Connection
                 }
             }
         } finally {
-            if ( networkLog.isDebugEnabled() ) {
             networkLog.debug("Closing channel " + m_toString);
-            }
             try {
                 m_channel.close();
             } catch (IOException e) {
@@ -419,11 +424,11 @@ public class VoltPort implements Connection
     }
 
     @Override
-    public String getHostnameOrIP() {
+    public String getHostnameAndIP() {
         if (m_remoteHost != null) {
             return m_remoteHost;
         } else {
-            return m_remoteIP;
+            return m_remoteSocketAddressString;
         }
     }
 
