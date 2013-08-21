@@ -269,6 +269,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         // checkMaxFsSize();
 
         // Execute the plan, passing a raw pointer to the byte buffers for input and output
+        //Clear is destructive, do it before the native call
         deserializer.clear();
         final int errorCode =
             nativeExecutePlanFragments(
@@ -326,6 +327,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         if (LOG.isTraceEnabled()) {
             LOG.trace("Retrieving VoltTable:" + tableId);
         }
+        //Clear is destructive, do it before the native call
         deserializer.clear();
         final int errorCode = nativeSerializeTable(pointer, tableId, deserializer.buffer(),
                 deserializer.buffer().capacity());
@@ -352,11 +354,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             LOG.trace("passing " + serialized_table.length + " bytes to EE...");
         }
 
+        //Clear is destructive, do it before the native call
+        deserializer.clear();
         final int errorCode = nativeLoadTable(pointer, tableId, serialized_table,
                                               txnId, lastCommittedTxnId, returnUniqueViolations, undoToken);
         checkErrorCode(errorCode);
-
-        deserializer.clear();
 
         try {
             int length = deserializer.readInt();
@@ -404,6 +406,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final boolean interval,
             final Long now)
     {
+        //Clear is destructive, do it before the native call
         deserializer.clear();
         final int numResults = nativeGetStats(pointer, selector.ordinal(), locators, interval, now);
         if (numResults == -1) {
@@ -462,6 +465,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     public int[] tableStreamSerializeMore(int tableId,
                                           TableStreamType streamType,
                                           List<BBContainer> outputBuffers) {
+        //Clear is destructive, do it before the native call
+        deserializer.clear();
         long remaining = nativeTableStreamSerializeMore(pointer,
                                                         tableId,
                                                         streamType.ordinal(),
@@ -476,7 +481,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             return new int[] {-1};
         }
         assert(deserializer != null);
-        deserializer.clear();
         int count;
         try {
             count = deserializer.readInt();
@@ -503,6 +507,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     public ExportProtoMessage exportAction(boolean syncAction,
             long ackTxnId, long seqNo, int partitionId, String tableSignature)
     {
+        //Clear is destructive, do it before the native call
         deserializer.clear();
         ExportProtoMessage result = null;
         long retval = nativeExportAction(pointer,
@@ -584,6 +589,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             fsForParameterSet.writeLong(taskType.taskId);
             fsForParameterSet.write(task);
 
+            //Clear is destructive, do it before the native call
             deserializer.clear();
             nativeExecuteTask(pointer);
             return (byte[])deserializer.readArray(byte.class);

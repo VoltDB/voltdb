@@ -69,9 +69,15 @@ public class FastDeserializer implements DataInput {
         assert(buffer.order() == ByteOrder.BIG_ENDIAN);
     }
 
-    /** Reset this FastDeserializer and make it ready for more reads. */
+    /**
+     *  Reset this FastDeserializer and make it ready for more reads. This will set the first 4 bytes to 0
+     *  so that you can differentiate between no results and the last set of results that were placed
+     *  in the buffer used by this FastDeserializer
+     **/
     public void clear() {
+        //Don't rely on the EE to set the value to 0 when there are no results
         buffer.clear();
+        buffer.putInt(0, 0);
     }
 
     /** @return The byte buffer contained in this object. */

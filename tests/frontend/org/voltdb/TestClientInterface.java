@@ -223,7 +223,7 @@ public class TestClientInterface {
      */
     private StoredProcedureInvocation readAndCheck(ByteBuffer msg, String procName, Object partitionParam,
                                                    boolean isAdmin, boolean isReadonly, boolean isSinglePart,
-                                                   boolean isEverySite) throws IOException {
+                                                   boolean isEverySite) throws Exception {
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, m_cxn);
         assertNull(resp);
 
@@ -240,7 +240,8 @@ public class TestClientInterface {
         //assertEquals(isEverySite, message.g); // every site
         assertEquals(procName, message.getStoredProcedureName());
         if (isSinglePart) {
-            int expected = TheHashinator.hashToPartition(partitionParam);
+            int expected = TheHashinator.getPartitionForParameter(VoltType.typeFromObject(partitionParam).getValue(),
+                    partitionParam);
             assertEquals(new Long(m_cartographer.getHSIdForMaster(expected)), destinationCaptor.getValue());
         } else {
             assertEquals(new Long(m_cartographer.getHSIdForMultiPartitionInitiator()), destinationCaptor.getValue());
@@ -445,7 +446,7 @@ public class TestClientInterface {
     }
 
     @Test
-    public void testUserProc() throws IOException {
+    public void testUserProc() throws Exception {
         ByteBuffer msg = createMsg("hello", 1);
         StoredProcedureInvocation invocation =
                 readAndCheck(msg, "hello", 1, false, true, true, false);
@@ -475,7 +476,7 @@ public class TestClientInterface {
     }
 
     @Test
-    public void testLoadSinglePartTable() throws IOException {
+    public void testLoadSinglePartTable() throws Exception {
         VoltTable table = new VoltTable(new ColumnInfo("i", VoltType.INTEGER));
         table.addRow(1);
 
