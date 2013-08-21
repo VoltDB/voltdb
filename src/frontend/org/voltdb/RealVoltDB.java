@@ -29,6 +29,7 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
@@ -37,6 +38,7 @@ import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -47,6 +49,8 @@ import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
 import java.util.SortedMap;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
@@ -754,6 +758,52 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             m_configLogger = new Thread(new ConfigLogging());
             m_configLogger.start();
+
+            DailyRollingFileAppender dailyAppender = null;
+            Enumeration appenders = Logger.getRootLogger().getAllAppenders();
+            while (appenders.hasMoreElements()) {
+                Appender appender = (Appender) appenders.nextElement();
+                if (appender instanceof DailyRollingFileAppender){
+                    dailyAppender = (DailyRollingFileAppender) appender;
+                }
+            }
+            final DailyRollingFileAppender dailyRollingFileAppender = dailyAppender;
+
+            Field field = null;
+            try {
+                field = dailyRollingFileAppender.getClass().getDeclaredField("nextCheck");
+                field.setAccessible(true);
+            } catch (NoSuchFieldException e) {
+                hostLog.error("Failed to set daily system info logging: " + e.getMessage());
+            }
+            final Field nextCheckField = field;
+
+            final Timer dailyLogTimer = new Timer();
+            class DailyLogTask extends TimerTask {
+                @Override
+                public void run() {
+                    try {
+                        m_myHostId = m_messenger.getHostId();
+                        hostLog.info(String.format("Host id of this node is: %d", m_myHostId));
+                        hostLog.info("URL of deployment info: " + m_config.m_pathToDeployment);
+                        logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
+
+                        long nextCheck = nextCheckField.getLong(dailyRollingFileAppender);
+                        dailyLogTimer.schedule(new DailyLogTask(), new Date(nextCheck));
+                    } catch (IllegalAccessException e) {
+                        hostLog.error("Failed to set daily system info logging: " + e.getMessage());
+                    }
+                }
+            }
+
+            if (dailyRollingFileAppender != null && nextCheckField != null) {
+                try {
+                    long nextCheck = nextCheckField.getLong(dailyRollingFileAppender);
+                    dailyLogTimer.schedule(new DailyLogTask(), new Date(nextCheck));
+                } catch (IllegalAccessException e) {
+                    hostLog.error("Failed to set daily system info logging: " + e.getMessage());
+                }
+            }
         }
     }
 
