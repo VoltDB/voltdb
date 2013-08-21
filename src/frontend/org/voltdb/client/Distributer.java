@@ -620,7 +620,7 @@ class Distributer {
 
         NodeConnection cxn = new NodeConnection(instanceIdWhichIsTimestampAndLeaderIp, address);
         Connection c = m_network.registerChannel( aChannel, cxn);
-        cxn.m_hostname = c.getHostnameOrIP();
+        cxn.m_hostname = c.getHostnameAndIP();
         cxn.m_port = port;
         cxn.m_connection = c;
 

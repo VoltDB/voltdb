@@ -1622,9 +1622,12 @@ public class Expression {
             // Apparently at this stage, all valid non-NULL values must have a type determined by HSQL.
             // I'm not sure why this must be the case --paul.
             // if the actual value is null, make sure the type is null as well
-            if ((dataType == null) || (valueData == null)) {
-                exp.attributes.put("valuetype", "NULL");
-                exp.attributes.put("value", "NULL");
+            if (valueData == null) {
+                if (dataType == null) {
+                    exp.attributes.put("valuetype", "NULL");
+                    return exp;
+                }
+                exp.attributes.put("valuetype", Types.getTypeName(dataType.typeCode));
                 return exp;
             }
 

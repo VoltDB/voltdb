@@ -66,17 +66,6 @@ namespace voltdb
                     TempTableLimits* limits);
         bool p_execute(const NValueArray& params);
         bool needsOutputTableClear();
-        void progressUpdate(int foundTuples, Table* targetTable) {
-            //Update stats in java and let java determine if we should cancel this query.
-            if(m_engine->getTopend()->fragmentProgressUpdate(m_engine->getIndexInBatch(),
-                    planNodeToString(m_abstractNode->getPlanNodeType()),
-                    targetTable->name(),
-                    targetTable->activeTupleCount(),
-                    foundTuples)){
-                VOLT_ERROR("Interrupt query.");
-                throw InterruptException("Query interrupted.");
-            }
-        };
     };
 }
 

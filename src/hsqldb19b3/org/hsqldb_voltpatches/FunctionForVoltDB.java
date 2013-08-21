@@ -293,7 +293,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                 Type argType = nodes[ii].dataType;
                 if (argType == null) {
                     // A param here means work to do, below.
-                    if (nodes[ii].isParam) {
+                    if (nodes[ii].isParam || nodes[ii].valueData == null) {
                         needParamType = true;
                     }
                     continue;
@@ -305,7 +305,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                     // that may hint at the result type or require hinting from the other result values.
                     if (resultTypeInferred == null) {
                         resultTypeInferred = argType; // Take the first result type hint.
-                    } else if (resultTypeInferred != argType) {
+                    } else if (resultTypeInferred.typeComparisonGroup != argType.typeComparisonGroup) {
                         resultTypeInferred = Type.SQL_VARCHAR; // Discard contradictory hints.
                     }
                 } else {
@@ -313,7 +313,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                     // that may hint at the input type or may require hinting from the other input keys.
                     if (inputTypeInferred == null) {
                         inputTypeInferred = argType; // Take the first input type hint.
-                    } else if (inputTypeInferred != argType) {
+                    } else if (inputTypeInferred.typeComparisonGroup != argType.typeComparisonGroup) {
                         inputTypeInferred = Type.SQL_VARCHAR; // Discard contradictory hints, falling back to string type.
                     }
                 }
@@ -335,7 +335,7 @@ public class FunctionForVoltDB extends FunctionSQL {
 
             for (int ii = 0; ii < nodes.length; ii++) {
                 Type argType = nodes[ii].dataType;
-                if ((argType != null) || ! nodes[ii].isParam) {
+                if ((argType != null) || ! (nodes[ii].isParam || nodes[ii].valueData == null)) {
                     continue;
                 }
                 // This is the same test as above for determining that the argument

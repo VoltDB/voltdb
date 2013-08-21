@@ -167,9 +167,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
     int foundTuples = 0;
     while (iterator.next(tuple))
     {
-        if(++foundTuples % LONG_OP_THRESHOLD == 0) {
-            progressUpdate(foundTuples);
-        }
+        doLongOpTracking();
         assert(tuple.isActive());
         xs.push_back(tuple);
     }

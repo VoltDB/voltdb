@@ -46,11 +46,12 @@
 #ifndef VOLTDBNODEABSTRACTEXECUTOR_H
 #define VOLTDBNODEABSTRACTEXECUTOR_H
 
+#include "common/InterruptException.h"
+#include "execution/VoltDBEngine.h"
 #include "plannodes/abstractplannode.h"
 #include "storage/temptable.h"
+
 #include <cassert>
-#include "execution/VoltDBEngine.h"
-#include "common/InterruptException.h"
 
 namespace voltdb {
 
@@ -119,9 +120,10 @@ class AbstractExecutor {
     void setDMLCountOutputTable(TempTableLimits* limits);
 
     /**
-     * Set up statistics for long running operations thru m_engine
+     * Track total tuples accessed for this query.
+     * Set up statistics for long running operations thru m_engine if total tuples accessed passes the threshold.
      */
-    void progressUpdate(int foundTuples);
+    void doLongOpTracking();
 
     // execution engine owns the plannode allocation.
     AbstractPlanNode* m_abstractNode;
@@ -156,20 +158,35 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
 }
 
 /**
- * Set up statistics for long running operations thru m_engine
+ * Track total tuples accessed for this query.
+ * Set up statistics for long running operations thru m_engine if total tuples accessed passes the threshold.
  */
-inline void AbstractExecutor::progressUpdate(int foundTuples) {
-    //Update stats in java and let java determine if we should cancel this query.
-    if(m_engine->getTopend()->fragmentProgressUpdate(m_engine->getIndexInBatch(),
-            planNodeToString(m_abstractNode->getPlanNodeType()),
-            "None",
-            0,
-            foundTuples)){
-        VOLT_ERROR("Interrupt query.");
-        throw InterruptException("Query interrupted.");
+inline void AbstractExecutor::doLongOpTracking() {
+    if(++m_engine->getTuplesFound() % LONG_OP_THRESHOLD != 0) {
+        return;
     }
-}
-
+    else {
+        Talbe* targetTable = m_engine->getLastAccessedTable();
+        std::string tableName;
+        int64_t tableSize;
+        if(targetTable == NULL) {
+            tableName = "None"
+            tableSize = 0;
+        }
+        else{
+            tableName = targetTable->name();
+            tableSize = targetTable->activeTupleCount();
+        }
+        //Update stats in java and let java determine if we should cancel this query.
+        if(m_engine->getTopend()->fragmentProgressUpdate(m_engine->getIndexInBatch(),
+                planNodeToString(m_abstractNode->getPlanNodeType()),
+                tableName,
+                tableSize,
+                m_engine->getTuplesFound())){
+            VOLT_INFO("Interrupt query.");
+            throw InterruptException("Query interrupted.");
+        }
+    }
 }
 
 #endif
