@@ -170,8 +170,10 @@ public class SpPromoteAlgo implements RepairAlgo
             }
             if (response.getPayload() != null) {
                 m_repairLogUnion.add(response);
-                tmLog.trace(m_whoami + " collected from " + CoreUtils.hsIdToString(response.m_sourceHSId) +
-                        ", message: " + response.getPayload());
+                if (tmLog.isTraceEnabled()) {
+                    tmLog.trace(m_whoami + " collected from " + CoreUtils.hsIdToString(response.m_sourceHSId) +
+                            ", message: " + response.getPayload());
+                }
             }
             if (rrs.update(response)) {
                 tmLog.debug(m_whoami + "collected " + rrs.m_receivedResponses
@@ -220,8 +222,10 @@ public class SpPromoteAlgo implements RepairAlgo
                 }
             }
             if (!needsRepair.isEmpty()) {
-                tmLog.trace(m_whoami + "repairing: " + CoreUtils.hsIdCollectionToString(needsRepair) +
-                        " with message: " + li.getPayload());
+                if (tmLog.isTraceEnabled()) {
+                    tmLog.trace(m_whoami + "repairing: " + CoreUtils.hsIdCollectionToString(needsRepair) +
+                            " with message: " + li.getPayload());
+                }
                 m_mailbox.repairReplicasWith(needsRepair, li.getPayload());
             }
         }
