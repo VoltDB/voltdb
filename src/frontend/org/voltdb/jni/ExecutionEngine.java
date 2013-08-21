@@ -93,7 +93,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     private RunningProcedureContext m_rProcContext;
     private boolean m_readOnly;
     private long m_startTime;
-    private static final long m_logDuration = 0;
+    private static final long m_logDuration = 1000;
 
     /** Make the EE clean and ready to do new transactional work. */
     public void resetDirtyStatus() {
