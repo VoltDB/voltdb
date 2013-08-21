@@ -69,7 +69,7 @@ ElasticContext::handleActivation(TableStreamType streamType, bool reactivate)
         m_surgeon.dropIndex();
         return ACTIVATION_SUCCEEDED;
     }
-    
+
     // It wasn't one of the supported stream types.
     return ACTIVATION_UNSUPPORTED;
 }

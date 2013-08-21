@@ -55,7 +55,7 @@ ElasticIndexReadContext::handleActivation(TableStreamType streamType, bool react
     if (streamType != TABLE_STREAM_ELASTIC_INDEX_READ) {
         return ACTIVATION_UNSUPPORTED;
     }
-    
+
     // Reactivation is not supported.
     if (reactivate) {
         VOLT_ERROR("Not allowed to reactivate an index read stream.");
@@ -66,7 +66,7 @@ ElasticIndexReadContext::handleActivation(TableStreamType streamType, bool react
         VOLT_ERROR("There is no index to materialize.");
         return ACTIVATION_FAILED;
     }
-    
+
     if (!m_surgeon.isIndexingComplete()) {
         VOLT_ERROR("Index generation has not completed.");
         return ACTIVATION_FAILED;
@@ -76,7 +76,7 @@ ElasticIndexReadContext::handleActivation(TableStreamType streamType, bool react
     if (!parseHashRange(m_predicateStrings, range)) {
         return ACTIVATION_FAILED;
     }
-    
+
     m_iter = m_surgeon.getIndexTupleRangeIterator(range);
     return ACTIVATION_SUCCEEDED;
 }
