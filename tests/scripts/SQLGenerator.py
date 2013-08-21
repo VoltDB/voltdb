@@ -323,8 +323,9 @@ class BaseGenerator:
 
     def next_param(self):
         for value in self.values:
-            if self.prior_generator and self.prior_generator.__has_reserved(value):
-                continue # To avoid self-join, don't reuse tables.
+            if self.prior_generator:
+                if self.prior_generator.__has_reserved(value):
+                    continue # To avoid self-join and other kinds of redundancy, don't reuse values.
             self.reserved_value = value
             yield value
 
@@ -362,7 +363,7 @@ class ColumnGenerator(BaseGenerator):
 
        The column name is selected from the schema columns of any/all tables in the schema.
        As a result, inclusion of tables that define different column names in a single schema can
-       result in test runs that mostly test error cases when undefined columns are referenced on
+       result in test runs that mostly test error cases that reference undefined columns on
        particular tables.
     """
 

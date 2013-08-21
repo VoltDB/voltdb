@@ -136,6 +136,10 @@
                        "ddl": "index-DDL.sql",
                        "template": "advanced.sql",
                        "normalizer": "normalizer.py"},
+    "advanced-compoundex": {"schema": "schema.py",
+                       "ddl": "compoundex-DDL.sql",
+                       "template": "advanced.sql",
+                       "normalizer": "normalizer.py"},
 # THESE ALL SUCCEED, USE TEMPLATE INPUT
     "advanced-strings": {"schema": "strings-schema.py",
                          "ddl": "strings-DDL.sql",

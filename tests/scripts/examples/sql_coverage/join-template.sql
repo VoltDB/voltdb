@@ -12,8 +12,11 @@ SELECT * FROM _table LHS16 ,              _table RHS WHERE LHS16.@idcol = RHS.@i
 
 SELECT * FROM _table LHS21 @jointype JOIN _table RHS ON                                    LHS21._variable[@columntype] = RHS._variable[@comparabletype]
 SELECT * FROM _table LHS22 @jointype JOIN _table RHS ON    LHS22.@idcol = RHS.@idcol
-SELECT * FROM _table LHS23 @jointype JOIN _table RHS ON    LHS23.@idcol = RHS.@idcol AND     RHS._variable[numeric] = 2 
-SELECT * FROM _table LHS24 @jointype JOIN _table RHS ON    LHS24.@idcol = RHS.@idcol AND   LHS24._variable[numeric] = 2
+-- These STILL need softening
+-- SELECT * FROM _table LHS23 @jointype JOIN _table RHS ON    LHS23.@idcol = RHS.@idcol AND     RHS._variable[numeric] = 2
+-- SELECT * FROM _table LHS24 @jointype JOIN _table RHS ON    LHS24.@idcol = RHS.@idcol AND   LHS24._variable[numeric] = 2
+   SELECT * FROM _table LHS23 @jointype JOIN _table RHS ON    LHS23.@idcol = RHS.@idcol AND     RHS.@numcol = 2
+   SELECT * FROM _table LHS24 @jointype JOIN _table RHS ON    LHS24.@idcol = RHS.@idcol AND   LHS24.@numcol = 2
 SELECT * FROM _table LHS25 @jointype JOIN _table RHS ON    LHS25.@idcol = RHS.@idcol WHERE LHS25._variable[@columntype] < 45 AND LHS25._variable[@columntype] = RHS._variable[@comparabletype]
 
 -- Still triggers wrong answer from mis-partitioning?

@@ -3,5 +3,6 @@
 {@insertvals = "_id, _value[decimal], _value[decimal], _value[float]"}
 {@dmltable = "_table"}
 {@fromtables = "_table"}
+{@optionalfn = "_numfun"}
 
 <numeric-template.sql>
