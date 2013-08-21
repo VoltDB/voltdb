@@ -953,6 +953,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             nljNode.addAndLinkChild(innerPlan);
             // now generate the output schema for this join
             nljNode.generateOutputSchema(m_db);
+            // resolve the sort direction
+            nljNode.resolveSortDirection();
             ajNode = nljNode;
         }
         else if (canHaveNLIJ) {
@@ -966,6 +968,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
             // combine the tails plan graph with the new head node
             nlijNode.addAndLinkChild(outerPlan);
+
+            // resolve the sort direction
+            nlijNode.resolveSortDirection();
+
             ajNode = nlijNode;
         }
         else {

@@ -71,26 +71,14 @@ public class PushdownLimitsIntoScans extends MicroOptimization {
             return plan;
 
         AbstractPlanNode child = plan.getChild(0);
+        if ((child instanceof AbstractScanPlanNode) == false)
+            return plan;
 
-        // for AbstractScanPlanNode, push down the LIMIT to the scan node
-        if (child instanceof AbstractScanPlanNode) {
-            plan.clearChildren();
-            child.clearParents();
-            child.addInlinePlanNode(plan);
-            return child;
-        }
+        plan.clearChildren();
+        child.clearParents();
+        child.addInlinePlanNode(plan);
 
-        // for ENG-4676: Projection + NestLoopIndexPlanNode with sort direction, push down the LIMIT to the join node
-        if ((child instanceof ProjectionPlanNode) &&
-                (child.getChild(0) instanceof NestLoopIndexPlanNode) &&
-                (((NestLoopIndexPlanNode)(child.getChild(0))).getSortDirection() != SortDirectionType.INVALID)) {
-            plan.clearChildren();
-            child.clearParents();
-            child.getChild(0).addInlinePlanNode(plan);
-            return child;
-        }
-
-        return plan;
+        return child;
 
     }
 

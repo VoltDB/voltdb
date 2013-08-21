@@ -557,9 +557,14 @@ public class TestOrderBySuite extends RegressionSuite {
         }
     }
 
-    public void testEng4760() throws Exception
+    public void testEng4676() throws Exception
     {
         Client client = getClient();
+        /*
+         * Column definition for O1 and O3:
+         *   O1 (PKEY, A_INT, A_INLINE_STR, A_POOL_STR)
+         *   O3 (PK1, PK2, I3, I4)
+         */
         for (int i = 0; i < 10; i++)
         {
             client.callProcedure("InsertO1", i, i, "", "");

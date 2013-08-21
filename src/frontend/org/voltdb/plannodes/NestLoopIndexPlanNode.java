@@ -36,12 +36,6 @@ import org.voltdb.types.SortDirectionType;
 
 public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
 
-    public enum Members {
-        SORT_DIRECTION;
-    }
-
-    private SortDirectionType m_sortDirection = SortDirectionType.INVALID;
-
     public NestLoopIndexPlanNode() {
         super();
     }
@@ -74,20 +68,6 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
             m_children.get(0).getOutputSchema().
             join(inlineScan.getOutputSchema()).copyAndReplaceWithTVE();
         m_hasSignificantOutputSchema = true;
-
-        if (m_children.get(0).getPlanNodeType() == PlanNodeType.MATERIALIZEDSCAN) {
-            assert (((MaterializedScanPlanNode)m_children.get(0)).getSortDirection() == inlineScan.getSortDirection());
-            m_sortDirection = inlineScan.getSortDirection();
-        }
-        if (m_children.get(0).getPlanNodeType() == PlanNodeType.INDEXSCAN) {
-            // sortDirection is only used in handleOrderBy(),
-            // and the sortDirection used in EE is from inlined IndexScan node
-            m_sortDirection = ((IndexScanPlanNode)m_children.get(0)).getSortDirection();
-        }
-    }
-
-    public SortDirectionType getSortDirection() {
-        return m_sortDirection;
     }
 
     @Override
@@ -253,7 +233,9 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
 
     @Override
     protected String explainPlanForNode(String indent) {
-        return "NESTLOOP INDEX " + this.m_joinType.toString() + " JOIN" + explainFilters(indent);
+        return "NESTLOOP INDEX " + this.m_joinType.toString() + " JOIN" +
+                (m_sortDirection == SortDirectionType.INVALID ? "" : " (" + m_sortDirection + ")") +
+                explainFilters(indent);
     }
 
     public void toJSONString(JSONStringer stringer) throws JSONException
