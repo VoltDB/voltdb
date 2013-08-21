@@ -129,4 +129,4 @@ create table generic_ix (
 PARTITION TABLE generic_ix ON COLUMN a;
 CREATE INDEX IX_generic_ix on generic_ix (a);
 
-CREATE PROCEDURE FROM CLASS csvbenchmark.procedures.DoNothingProcedure;
+--CREATE PROCEDURE FROM CLASS csvbenchmark.procedures.DoNothingProcedure;
