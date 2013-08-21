@@ -171,7 +171,7 @@ public class Collector {
         m_deploymentPath = configLogDirPath + "deployment.xml";
     }
 
-    private static JSONObject parseJSONFile(String configInfoPath) {
+    public static JSONObject parseJSONFile(String configInfoPath) {
         JSONObject jsonObject = null;
 
         try {
