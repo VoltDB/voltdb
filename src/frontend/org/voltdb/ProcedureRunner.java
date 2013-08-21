@@ -597,7 +597,6 @@ public class ProcedureRunner {
                     // decide if this sub-batch should be marked final
                     boolean finalSubBatch = isFinalSQL && (subSize == m_batch.size());
 
-                    //m_rProcContext.m_batch = subBatch;
                     // run the sub-batch and copy the sub-results into the list of lists of results
                     // note: executeQueriesInABatch removes items from the batch as it runs.
                     //  this means subBatch will be empty after running and since subBatch is a
@@ -877,6 +876,10 @@ public class ProcedureRunner {
        else if (e.getClass() == org.voltdb.exceptions.SQLException.class) {
            status = ClientResponse.GRACEFUL_FAILURE;
            msg.append("SQL ERROR\n");
+       }
+       else if (e.getClass() == org.voltdb.exceptions.InterruptException.class) {
+           status = ClientResponse.GRACEFUL_FAILURE;
+           msg.append("Interrupt ERROR\n");
        }
        else if (e.getClass() == org.voltdb.ExpectedProcedureException.class) {
            msg.append("HSQL-BACKEND ERROR\n");

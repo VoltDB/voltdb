@@ -73,8 +73,8 @@ namespace voltdb
                     targetTable->name(),
                     targetTable->activeTupleCount(),
                     foundTuples)){
-                VOLT_ERROR("Time out read only query.");
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "Time out read only query.");
+                VOLT_ERROR("Interrupt query.");
+                throw InterruptException("Query interrupted.");
             }
         };
     };

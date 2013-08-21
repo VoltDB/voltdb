@@ -204,7 +204,6 @@ class CompactingTreeMultiMapIndex : public TableIndex
             }
         }
 
-        m_foundNextValues++;
         return retval;
     }
 
@@ -220,7 +219,6 @@ class CompactingTreeMultiMapIndex : public TableIndex
         } else {
             m_match.move(const_cast<void*>(m_keyIter.value()));
         }
-        m_foundNextValues++;
         return retval;
     }
 
@@ -239,7 +237,6 @@ class CompactingTreeMultiMapIndex : public TableIndex
             return false;
         }
         m_match.move(const_cast<void*>(m_keyIter.value()));
-        m_foundNextValues++;
         return true;
     }
 

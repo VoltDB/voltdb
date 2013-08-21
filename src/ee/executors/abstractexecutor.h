@@ -50,6 +50,7 @@
 #include "storage/temptable.h"
 #include <cassert>
 #include "execution/VoltDBEngine.h"
+#include "common/InterruptException.h"
 
 namespace voltdb {
 
@@ -164,8 +165,8 @@ inline void AbstractExecutor::progressUpdate(int foundTuples) {
             "None",
             0,
             foundTuples)){
-        VOLT_ERROR("Time out read only query.");
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "Time out read only query.");
+        VOLT_ERROR("Interrupt query.");
+        throw InterruptException("Query interrupted.");
     }
 }
 

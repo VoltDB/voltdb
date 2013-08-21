@@ -15,24 +15,32 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef TIMEOUTEXCEPTION_H_
-#define TIMEOUTEXCEPTION_H_
+package org.voltdb.exceptions;
 
-#include "common/SerializableEEException.h"
+import java.nio.ByteBuffer;
 
-namespace voltdb {
-class ReferenceSerializeOutput;
+public class InterruptException extends SerializableException {
+    public static final long serialVersionUID = 0L;
 
-class TimeOutException : public SerializableEEException {
-public:
+    public InterruptException(int errorCode) {
+        super();
+    }
 
-    TimeOutException(std::string message);
-    virtual ~TimeOutException() {}
+    public InterruptException(ByteBuffer b) {
+        super(b);
+    }
 
-protected:
-    void p_serialize(ReferenceSerializeOutput *output) const;
-private:
-};
+    @Override
+    protected SerializableExceptions getExceptionType() {
+        return SerializableExceptions.InterruptException;
+    }
+
+    @Override
+    protected int p_getSerializedSize() {
+        return 0;
+    }
+
+    @Override
+    protected void p_serializeToBuffer(ByteBuffer b) {
+    }
 }
-
-#endif /* TIMEOUTEXCEPTION_H_ */
