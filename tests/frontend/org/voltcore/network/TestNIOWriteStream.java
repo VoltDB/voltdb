@@ -51,6 +51,7 @@
 package org.voltcore.network;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.SelectionKey;
@@ -70,7 +71,7 @@ public class TestNIOWriteStream extends TestCase {
         }
 
         public MockPort() {
-            super(null, null, "", pool);
+            super(null, null, InetSocketAddress.createUnresolved("localhost", 21212), pool);
         }
 
         @Override

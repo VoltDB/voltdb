@@ -14,27 +14,22 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+package org.voltcore.network;
 
-namespace voltdb {
-
-/** implement the 2n/2n+1-argument DECODE function */
-template<> inline NValue NValue::call<FUNC_DECODE>(const std::vector<NValue>& arguments) {
-    int size = (int)arguments.size();
-    assert(size>=3);
-    NValue condval;
-    int loopnum = ( size - 1 )/2;
-    NValue baseval = arguments[0];
-    for( int i = 0; i < loopnum; i++ ) {
-        condval = arguments[2*i+1];
-        if( condval.compare(baseval) == VALUE_COMPARE_EQUAL ) {
-            return arguments[2*i+2];
-        }
-    }
-    bool hasDefault = ( size % 2 == 0 );
-    if( hasDefault ) {
-        return arguments[size-1];
-    }
-    return getNullValue();
-}
-
+/*
+ * Enum for specifying how DNS should be handled
+ */
+public enum ReverseDNSPolicy {
+    /*
+     * Don't do a reverse DNS lookup
+     */
+    NONE,
+    /*
+     * Do the lookup synchronously
+     */
+    SYNCHRONOUS,
+    /*
+     * Do it in the background, it may fail or be rejected and never occur
+     */
+    ASYNCHRONOUS
 }
