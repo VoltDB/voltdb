@@ -367,6 +367,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
     // children are positioned before it in this list, therefore
     // dependency tracking is not needed here.
     size_t ttl = execsForFrag->list.size();
+    m_tuplesFound = 0;
     for (int ctr = 0; ctr < ttl; ++ctr) {
         AbstractExecutor *executor = execsForFrag->list[ctr];
         assert (executor);

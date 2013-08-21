@@ -877,9 +877,10 @@ public class ProcedureRunner {
            status = ClientResponse.GRACEFUL_FAILURE;
            msg.append("SQL ERROR\n");
        }
+       // Interrupt exception will be thrown when @Cancel uniqueId is called. 
        else if (e.getClass() == org.voltdb.exceptions.InterruptException.class) {
            status = ClientResponse.GRACEFUL_FAILURE;
-           msg.append("Interrupt ERROR\n");
+           msg.append("Transaction Interrupted\n");
        }
        else if (e.getClass() == org.voltdb.ExpectedProcedureException.class) {
            msg.append("HSQL-BACKEND ERROR\n");

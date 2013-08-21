@@ -114,7 +114,7 @@ class RecoveryProtoMsg;
 
 const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
 const size_t PLAN_CACHE_SIZE = 1024 * 10;
-const int64_t LONG_OP_THRESHOLD = 100000;
+const int64_t LONG_OP_THRESHOLD = 5000;
 
 /**
  * Represents an Execution Engine which holds catalog objects (i.e. table) and executes
@@ -183,12 +183,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         }
         inline int getIndexInBatch() {
             return m_currentIndexInBatch;
-        }
-        inline void setTuplesFound(int64_t tuplesFound) {
-            m_tuplesFound = tuplesFound;
-        }
-        inline int64_t getTuplesFound() {
-            return m_tuplesFound;
         }
         inline void setLastAccessedTable(Table* table) {
             m_lastAccessedTable = table;
