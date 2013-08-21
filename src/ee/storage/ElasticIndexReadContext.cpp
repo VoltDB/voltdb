@@ -87,8 +87,8 @@ ElasticIndexReadContext::handleActivation(TableStreamType streamType, bool react
 bool ElasticIndexReadContext::handleDeactivation(TableStreamType streamType)
 {
     if (streamType == TABLE_STREAM_ELASTIC_INDEX_READ) {
-        // Keep this context around after materializing until it's cleared.
-        return true;
+        // This context is no longer needed.
+        return false;
     }
 
     // Fall through for other unsupported stream types.

@@ -132,6 +132,7 @@ typedef struct {
     struct ipc_command cmd;
     voltdb::CatalogId tableId;
     voltdb::TableStreamType streamType;
+    int64_t undoToken;
     char data[0];
 }__attribute__((packed)) activate_tablestream;
 
@@ -142,7 +143,6 @@ typedef struct {
     struct ipc_command cmd;
     voltdb::CatalogId tableId;
     voltdb::TableStreamType streamType;
-    int64_t undoToken;
     int bufferCount;
     char data[0];
 }__attribute__((packed)) tablestream_serialize_more;
@@ -933,10 +933,11 @@ int8_t VoltDBIPC::activateTableStream(struct ipc_command *cmd) {
     // Provide access to the serialized message data, i.e. the predicates.
     void* offset = activateTableStreamCommand->data;
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(activate_tablestream));
+    int64_t undoToken = ntohll(activateTableStreamCommand->undoToken);
     ReferenceSerializeInput serialize_in(offset, sz);
 
     try {
-        if (m_engine->activateTableStream(tableId, streamType, serialize_in)) {
+        if (m_engine->activateTableStream(tableId, streamType, undoToken, serialize_in)) {
             return kErrorCode_Success;
         } else {
             return kErrorCode_Error;
@@ -958,7 +959,6 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
     // ptr/offset/length triplets referencing segments of m_tupleBuffer, which
     // is reallocated as needed.
     const int bufferCount = ntohl(tableStreamSerializeMore->bufferCount);
-    int64_t undoToken = ntohll(tableStreamSerializeMore->undoToken);
     try {
 
         if (bufferCount <= 0) {
@@ -1009,7 +1009,6 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
         }
 
         // Perform table stream serialization.
-        m_engine->setUndoToken(undoToken);
         ReferenceSerializeInput out2(m_reusedResultBuffer, MAX_MSG_SZ);
         std::vector<int> positions;
         int64_t remaining = m_engine->tableStreamSerializeMore(tableId, streamType, out2, positions);

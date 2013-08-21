@@ -1367,6 +1367,7 @@ ExecutorContext * VoltDBEngine::getExecutorContext() {
 bool VoltDBEngine::activateTableStream(
         const CatalogId tableId,
         TableStreamType streamType,
+        int64_t undoToken,
         ReferenceSerializeInput &serializeIn) {
     Table* found = getTable(tableId);
     if (! found) {
@@ -1378,6 +1379,8 @@ bool VoltDBEngine::activateTableStream(
         assert(table != NULL);
         return false;
     }
+
+    setUndoToken(undoToken);
 
     // Crank up the necessary persistent table streaming mechanism(s).
     if (!table->activateStream(m_tupleSerializer, streamType, m_partitionId, tableId, serializeIn)) {

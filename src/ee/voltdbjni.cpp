@@ -980,9 +980,8 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeA
     ReferenceSerializeInput serialize_in(bytes, length);
     try {
         try {
-            engine->setUndoToken(undoToken);
             voltdb::TableStreamType tableStreamType = static_cast<voltdb::TableStreamType>(streamType);
-            bool success = engine->activateTableStream(tableId, tableStreamType, serialize_in);
+            bool success = engine->activateTableStream(tableId, tableStreamType, undoToken, serialize_in);
             env->ReleaseByteArrayElements(serialized_predicates, bytes, JNI_ABORT);
             VOLT_DEBUG("deserialized predicates (success=%d)", (int)success);
             return success;

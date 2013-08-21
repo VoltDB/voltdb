@@ -338,6 +338,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         bool activateTableStream(
                 const CatalogId tableId,
                 const TableStreamType streamType,
+                int64_t undoToken,
                 ReferenceSerializeInput &serializeIn);
 
         /**
