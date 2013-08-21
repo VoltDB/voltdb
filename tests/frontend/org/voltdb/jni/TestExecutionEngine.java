@@ -186,9 +186,9 @@ public class TestExecutionEngine extends TestCase {
 
         loadTestTables( sourceEngine, m_catalog);
 
-        sourceEngine.activateTableStream( WAREHOUSE_TABLEID, TableStreamType.RECOVERY, 0,
+        sourceEngine.activateTableStream( WAREHOUSE_TABLEID, TableStreamType.RECOVERY, Long.MAX_VALUE,
                                           new SnapshotPredicates(null));
-        sourceEngine.activateTableStream( STOCK_TABLEID, TableStreamType.RECOVERY, 0,
+        sourceEngine.activateTableStream( STOCK_TABLEID, TableStreamType.RECOVERY, Long.MAX_VALUE,
                                           new SnapshotPredicates(null));
 
         BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
@@ -465,7 +465,7 @@ public class TestExecutionEngine extends TestCase {
                                 true);
 
         // Build the index
-        sourceEngine.activateTableStream(STOCK_TABLEID, TableStreamType.ELASTIC_INDEX, 0, predicates);
+        sourceEngine.activateTableStream(STOCK_TABLEID, TableStreamType.ELASTIC_INDEX, Long.MAX_VALUE, predicates);
 
         // Humor serializeMore() by providing a buffer, even though it's not used.
         BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);

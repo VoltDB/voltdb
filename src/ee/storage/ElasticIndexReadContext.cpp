@@ -52,40 +52,33 @@ ElasticIndexReadContext::~ElasticIndexReadContext()
 TableStreamerContext::ActivationReturnCode
 ElasticIndexReadContext::handleActivation(TableStreamType streamType, bool reactivate)
 {
+    if (streamType != TABLE_STREAM_ELASTIC_INDEX_READ) {
+        return ACTIVATION_UNSUPPORTED;
+    }
+    
     // Reactivation is not supported.
-    if (reactivate && streamType == TABLE_STREAM_ELASTIC_INDEX_READ) {
+    if (reactivate) {
         VOLT_ERROR("Not allowed to reactivate an index read stream.");
         return ACTIVATION_FAILED;
     }
 
-    if (!m_surgeon.hasIndex() || !m_surgeon.isIndexingComplete()) {
-        VOLT_ERROR("Elastic index consumption is not allowed until index generation completes.");
+    if (!m_surgeon.hasIndex()) {
+        VOLT_ERROR("There is no index to materialize.");
+        return ACTIVATION_FAILED;
+    }
+    
+    if (!m_surgeon.isIndexingComplete()) {
+        VOLT_ERROR("Index generation has not completed.");
         return ACTIVATION_FAILED;
     }
 
-    // Index materialization?
-    if (streamType == TABLE_STREAM_ELASTIC_INDEX_READ) {
-        ElasticIndexHashRange range;
-        if (!parseHashRange(m_predicateStrings, range)) {
-            return ACTIVATION_FAILED;
-        }
-        m_iter = m_surgeon.getIndexTupleRangeIterator(range);
-        return ACTIVATION_SUCCEEDED;
+    ElasticIndexHashRange range;
+    if (!parseHashRange(m_predicateStrings, range)) {
+        return ACTIVATION_FAILED;
     }
-
-    // Index dematerialization?
-    if (streamType == TABLE_STREAM_ELASTIC_INDEX_CLEAR) {
-        // Only allow the index to be cleared if it was fully materialized.
-        if (!m_materialized) {
-            VOLT_ERROR("Not allowed to dematerialize the index until it was fully materialized.");
-            return ACTIVATION_FAILED;
-        }
-        deleteStreamedTuples();
-        return ACTIVATION_SUCCEEDED;
-    }
-
-    // Fall through for other unsupported stream types.
-    return ACTIVATION_UNSUPPORTED;
+    
+    m_iter = m_surgeon.getIndexTupleRangeIterator(range);
+    return ACTIVATION_SUCCEEDED;
 }
 
 /**
@@ -96,10 +89,6 @@ bool ElasticIndexReadContext::handleDeactivation(TableStreamType streamType)
     if (streamType == TABLE_STREAM_ELASTIC_INDEX_READ) {
         // Keep this context around after materializing until it's cleared.
         return true;
-    }
-    else if (streamType == TABLE_STREAM_ELASTIC_INDEX_CLEAR) {
-        // It's okay for the context to go away after dematerializing the index.
-        return false;
     }
 
     // Fall through for other unsupported stream types.
@@ -170,6 +159,7 @@ int64_t ElasticIndexReadContext::handleStreamMore(
         // After the index is completely consumed delete index entries and referenced tuples.
         if (remaining <= 0) {
             m_materialized = true;
+            deleteStreamedTuples();
         }
     }
 

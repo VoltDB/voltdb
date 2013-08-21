@@ -727,7 +727,8 @@ public:
 
     }
 
-    void checkIndex(const std::string &tag, ElasticIndex &index, StreamPredicateList &predicates, bool directKey) {
+    void checkIndex(const std::string &tag, ElasticIndex *index, StreamPredicateList &predicates, bool directKey) {
+        ASSERT_NE(NULL, index);
         voltdb::TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         T_ValueSet accepted;
@@ -750,10 +751,10 @@ public:
                 int64_t hash[2];
                 MurmurHash3_x64_128(tuple.address()+1, sizeof(int32_t), 0, hash);
                 ElasticIndexKey key(hash[0], NULL);
-                isIndexed = index.exists(key);
+                isIndexed = index->exists(key);
             }
             else {
-                isIndexed = index.has(*m_table, tuple);
+                isIndexed = index->has(*m_table, tuple);
             }
             if (isAccepted) {
                 accepted.insert(value);
@@ -809,7 +810,7 @@ public:
             size_t nactive = (size_t)m_table->activeTupleCount();
             size_t nrejected = rejected.size();
             size_t nexpected = nactive - nrejected;
-            size_t nindexed = index.size();
+            size_t nindexed = index->size();
             size_t nmissing = missing.size();
             size_t nextra = extra.size();
             size_t nmoved = m_moved.size();
@@ -935,8 +936,8 @@ public:
         return NULL;
     }
 
-    voltdb::ElasticIndex &getElasticIndex() {
-        return *m_table->m_surgeon.m_index;
+    voltdb::ElasticIndex *getElasticIndex() {
+        return m_table->m_surgeon.m_index.get();
     }
 
     bool setElasticIndexTuplesPerCall(size_t nTuplesPerCall) {
@@ -1724,7 +1725,7 @@ public:
                                 std::vector<std::string> &predicateStrings) {
         m_context.reset(new ElasticContext(*m_test.m_table, surgeon, m_partitionId,
                                            tupleSerializer, m_predicateStrings));
-        return m_context->handleActivation(streamType, false) != TableStreamerContext::ACTIVATION_FAILED;
+        return m_context->handleActivation(streamType, false) == TableStreamerContext::ACTIVATION_SUCCEEDED;
     }
 
     virtual int64_t streamMore(TupleOutputStreamProcessor &outputStreams,
@@ -1867,26 +1868,21 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
         int totalSnapped;
         streamSnapshot(NUM_MUTATIONS, NUM_MUTATIONS, COWTuples, totalSnapped);
         checkTuples(NUM_INITIAL + (m_tuplesInserted - m_tuplesDeleted), originalTuples, COWTuples);
-        ElasticIndex &directIndex = getElasticIndex();
+        ElasticIndex *directIndex = getElasticIndex();
         std::ostringstream label;
         label << "direct " << testRange.first << ':' << testRange.second;
         checkIndex(label.str(), directIndex, m_predicates, false);
+        size_t indexSizeBefore = directIndex->size();
+        size_t tableSizeBefore = m_table->activeTupleCount();
 
-        // Materialize the index and compare.
+        // Materialize the index and validate.
         ElasticIndex streamedIndex;
         size_t totalStreamed;
         materializeIndex(streamedIndex, testRange, totalStreamed);
         label.clear();
         label << "streamed" << ' ' << testRange.first << ':' << testRange.second;
-        size_t totalDirect = directIndex.size();
-        ASSERT_EQ(totalDirect, totalStreamed);
-        checkIndex(label.str(), streamedIndex, m_predicates, true);
-
-        // Clear the index and validate.
-        size_t indexSizeBefore = directIndex.size();
-        size_t tableSizeBefore = m_table->activeTupleCount();
-        clearIndex(testRange);
-        size_t indexSizeAfter = directIndex.size();
+        checkIndex(label.str(), &streamedIndex, m_predicates, true);
+        size_t indexSizeAfter = directIndex->size();
         size_t tableSizeAfter = m_table->activeTupleCount();
         if (testRange.m_empty) {
             ASSERT_EQ(indexSizeAfter, indexSizeBefore);
@@ -1897,6 +1893,10 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
             ASSERT_LT(tableSizeAfter, tableSizeBefore);
         }
         ASSERT_EQ(indexSizeBefore-indexSizeAfter, tableSizeBefore-tableSizeAfter);
+
+        // Clear the index and validate.
+        clearIndex(testRange);
+        ASSERT_EQ(NULL, getElasticIndex());
     }
 }
 
