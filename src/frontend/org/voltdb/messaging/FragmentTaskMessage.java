@@ -323,7 +323,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         catch (IOException ioe) {
             // Shouldn't ever happen, just bail out to not-obviously equivalent behavior
             mt = ByteBuffer.allocate(2);
-            mt.putLong(0);
+            mt.putShort((short)0);
         }
         addFragment(EMPTY_HASH, outputDepId, mt);
     }
