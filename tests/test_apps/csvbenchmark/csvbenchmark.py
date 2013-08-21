@@ -172,7 +172,7 @@ def run_csvloader(schema, data_file):
         if m is None or int(m.group(1)) != rowcount or m.group(1) != m.group(2):
             raise RuntimeError ("CSV Loader failed to load all rows")
         stats = csvloader_getstatistics(stdout)
-        print "try %d %s elapsed: %f parsing: %f inserting: %f" % ((I, schema)+stats)
+        print "try %d %s elapsed: %f parsing: %f inserting: %f" % ((I+1, schema)+stats)
         elapsed_results.append(stats[0])
         parsing_results.append(stats[1])
         loading_results.append(stats[2])
@@ -183,18 +183,18 @@ def run_csvloader(schema, data_file):
         pr = sorted(perf_results)[1:-1]
         if len(pr) == 0:
             pr = perf_results
-        avg = average(perf_results)
-        stddev = std(perf_results)
-        return (average(perf_results), std(perf_results))
+        return (average(pr), std(pr))
+
     avg, stddev = analyze_results(elapsed_results)
     parsing, foo = analyze_results(parsing_results)
     loading, foo = analyze_results(loading_results)
     print "statistics for %s execution time avg: %f stddev: %f rows/sec: %f rows: %d file size: %d tries: %d parsing: %f inserting: %f" %\
-                 (schema, avg, stddev, rowcount/avg*1000.0, rowcount, os.path.getsize(data_file), options.TRIES, parsing, loading)
+                 (schema, avg, stddev, rowcount/avg, rowcount, os.path.getsize(data_file), options.TRIES, parsing, loading)
     if options.statsfile:
         with open(options.statsfile, "a") as sf:
-            print "%s,%d,%d,0,0,0,0" % (schema, int(round(avg)), rowcount)
-            print >>sf, "%s,%d,%d,0,0,0,0" % (schema, int(round(avg)), rowcount)
+            # report duration in milliseconds for stats collector
+            print "%s,%d,%d,0,0,0,0" % (schema, int(round(avg*1000.0)), rowcount)
+            print >>sf, "%s,%d,%d,0,0,0,0" % (schema, int(round(avg*1000.0)), rowcount)
     return (rowcount, avg, stddev)
 
 def csvloader_getstatistics(lines):
@@ -204,23 +204,23 @@ def csvloader_getstatistics(lines):
             return float("nan")
         v = float(value) if '.' in value else int(value)
         if scale == 'seconds':
-            return v*1000.0
-        if scale == 'milliseconds':
             return v
-        elif scale == 'microseconds':
+        if scale == 'milliseconds':
             return v/1000.0
+        elif scale == 'microseconds':
+            return v/1000000.0
         else:
             raise Runtimeerror ("unknown scale factor")
     elapsed = float("nan")
     parsing = float("nan")
     inserting = float("nan")
-    m = re.search(r'^CSVLoader elapsed: (\d+\.*\d*)\s+(\w+seconds)$', lines, flags=re.M)
+    m = re.search(r'^CSVLoader elapsed: (\d+\.*\d*)\s+(\w*seconds)$', lines, flags=re.M)
     if m and m.lastindex > 0:
         elapsed = setscale(m.groups())
-    m = re.search(r'Parsing CSV file took (\d+\.*\d)\s+(\w+seconds).$', lines, flags=re.M)
+    m = re.search(r'Parsing CSV file took (\d+\.*\d)\s+(\w*seconds).$', lines, flags=re.M)
     if m and m.lastindex > 0:
         parsing = setscale(m.groups())
-    m = re.search(r'Inserting Data took (\d+\.*\d)\s+(\w+seconds).$', lines, flags=re.M)
+    m = re.search(r'Inserting Data took (\d+\.*\d)\s+(\w*seconds).$', lines, flags=re.M)
     if m and m.lastindex > 0:
         inserting = setscale(m.groups())
     return (elapsed, parsing, inserting)
@@ -248,6 +248,7 @@ def parse_cmdline():
                             default=["localhost"],
                             help ="list of servers")
 
+    # WNG Don't run more than one case at a time in apprunner if collecting stats
     parser.add_option ("-c", "--case",
                             type = "string",
                             action = "callback", callback = list_callback,
@@ -268,7 +269,7 @@ def parse_cmdline():
     parser.add_option ("-t", "--tries",
                             type = "int",
                             dest = "TRIES",
-                            default = 10,
+                            default = 1,
                             help ="number of time to run the test case and average the performance results")
 
     parser.add_option ("-o", "--csvoptions",
