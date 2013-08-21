@@ -320,8 +320,6 @@ public class TestIndexLimitSuite extends RegressionSuite {
         callWithExpectedResult(client, 3, "@AdHoc", "SELECT POINTS FROM TU2 WHERE UNAME = 'jim' ORDER BY POINTS DESC LIMIT 1;");
         callWithExpectedResult(client, true, "@Explain", "SELECT POINTS FROM TU2 WHERE UNAME = 'jim' ORDER BY POINTS DESC LIMIT 1;");
 
-
-
     }
 
     /**
