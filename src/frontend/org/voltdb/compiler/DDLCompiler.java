@@ -1467,7 +1467,8 @@ public class DDLCompiler {
             // throw an error if the view isn't within voltdb's limited worldview
             checkViewMeetsSpec(viewName, stmt);
 
-            // Allow only non-unique indexes other than the primary key index to be generated next.
+            // Allow only non-unique indexes other than the primary key index.
+            // The primary key index is yet to be defined (below).
             for (Index destIndex : destTable.getIndexes()) {
                 if (destIndex.getUnique()) {
                     String msg = "A UNIQUE index is not allowed on a materialized view. " +

@@ -237,8 +237,7 @@ void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple, bool fal
     // update or insert the row
     if (exists) {
         // Shouldn't need to update group-key-only indexes such as the primary key
-        // since their keys shouldn't ever change the key,
-        // but do update other indexes.
+        // since their keys shouldn't ever change, but do update other indexes.
         m_target->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
                                                  m_updatableIndexList, fallible);
     }
@@ -307,8 +306,7 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
 
     // update the row
     // Shouldn't need to update group-key-only indexes such as the primary key
-    // since their keys shouldn't ever change the key,
-    // but do update other indexes.
+    // since their keys shouldn't ever change, but do update other indexes.
     m_target->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
                                              m_updatableIndexList, fallible);
 }
