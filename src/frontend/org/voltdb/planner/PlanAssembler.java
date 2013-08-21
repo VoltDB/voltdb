@@ -41,7 +41,6 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
@@ -328,8 +327,8 @@ public class PlanAssembler {
             retval.readOnly = true;
             if (retval.rootPlanGraph != null)
             {
-                // only add the output columns if we actually have a plan
-                // avoid PlanColumn resource leakage
+                // Check PlanColumn resource leakage later by recording the select stmt.
+                retval.selectStmt = m_parsedSelect;
                 boolean orderIsDeterministic = m_parsedSelect.isOrderDeterministic();
                 boolean contentIsDeterministic = (m_parsedSelect.hasLimitOrOffset() == false) || orderIsDeterministic;
                 retval.statementGuaranteesDeterminism(contentIsDeterministic, orderIsDeterministic);
@@ -486,29 +485,6 @@ public class PlanAssembler {
             retval.cost += bestChildPlan.cost;
         }
         return retval;
-    }
-
-    private void addColumns(CompiledPlan plan, ParsedSelectStmt stmt) {
-        plan.rootPlanGraph.generateOutputSchema(m_catalogDb);
-        NodeSchema output_schema = plan.rootPlanGraph.getOutputSchema();
-        // Sanity-check the output NodeSchema columns against the display columns
-        if (stmt.displayColumns.size() != output_schema.size())
-        {
-            throw new PlanningErrorException("Mismatched plan output cols " +
-            "to parsed display columns");
-        }
-        for (ParsedColInfo display_col : stmt.displayColumns)
-        {
-            SchemaColumn col = output_schema.find(display_col.tableName,
-                                                  display_col.columnName,
-                                                  display_col.alias);
-            if (col == null)
-            {
-                throw new PlanningErrorException("Mismatched plan output cols " +
-                                                 "to parsed display columns");
-            }
-        }
-        plan.columns = output_schema;
     }
 
     private AbstractPlanNode getNextSelectPlan() {
