@@ -319,7 +319,6 @@ public class QueryPlanner {
         bestPlan.rootPlanGraph.generateOutputSchema(m_db);
         bestPlan.rootPlanGraph.resolveColumnIndexes();
 
-
         // Output the best plan debug info
         assembler.finalizeBestCostPlan();
 

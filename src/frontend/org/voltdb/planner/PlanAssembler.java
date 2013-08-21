@@ -330,7 +330,6 @@ public class PlanAssembler {
             {
                 // only add the output columns if we actually have a plan
                 // avoid PlanColumn resource leakage
-                addColumns(retval, m_parsedSelect);
                 boolean orderIsDeterministic = m_parsedSelect.isOrderDeterministic();
                 boolean contentIsDeterministic = (m_parsedSelect.hasLimitOrOffset() == false) || orderIsDeterministic;
                 retval.statementGuaranteesDeterminism(contentIsDeterministic, orderIsDeterministic);
@@ -490,6 +489,7 @@ public class PlanAssembler {
     }
 
     private void addColumns(CompiledPlan plan, ParsedSelectStmt stmt) {
+        plan.rootPlanGraph.generateOutputSchema(m_catalogDb);
         NodeSchema output_schema = plan.rootPlanGraph.getOutputSchema();
         // Sanity-check the output NodeSchema columns against the display columns
         if (stmt.displayColumns.size() != output_schema.size())
