@@ -228,9 +228,13 @@ public class TestPlansJoin extends PlannerTestCase {
 
         pn = compile("select * FROM R1 JOIN R2 ON R1.A = R2.A JOIN R3 ON R1.C = R3.C WHERE R1.A > 0");
         n = pn.getChild(0).getChild(0);
-        assertTrue(n instanceof AbstractJoinPlanNode);
-        p = ((AbstractJoinPlanNode) n).getJoinPredicate();
+        assertTrue(n instanceof NestLoopPlanNode);
+        p = ((NestLoopPlanNode) n).getJoinPredicate();
         assertEquals(ExpressionType.COMPARE_EQUAL, p.getExpressionType());
+        n = n.getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        NestLoopPlanNode nlj = (NestLoopPlanNode) n;
+        assertEquals(ExpressionType.COMPARE_EQUAL, nlj.getJoinPredicate().getExpressionType());
         n = n.getChild(0);
         assertTrue(n instanceof AbstractScanPlanNode);
         scan = (AbstractScanPlanNode) n;
