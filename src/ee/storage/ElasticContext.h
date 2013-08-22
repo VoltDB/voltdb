@@ -49,12 +49,12 @@ public:
     /**
      * Activation/reactivation handler.
      */
-    virtual bool handleActivation(TableStreamType streamType, bool reactivate);
+    virtual ActivationReturnCode handleActivation(TableStreamType streamType, bool reactivate);
 
     /**
      * Deactivation handler.
      */
-    virtual bool handleDeactivation();
+    virtual bool handleDeactivation(TableStreamType streamType);
 
     /**
      * Mandatory streamMore() handler.

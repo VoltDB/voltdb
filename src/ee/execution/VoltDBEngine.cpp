@@ -1367,6 +1367,7 @@ ExecutorContext * VoltDBEngine::getExecutorContext() {
 bool VoltDBEngine::activateTableStream(
         const CatalogId tableId,
         TableStreamType streamType,
+        int64_t undoToken,
         ReferenceSerializeInput &serializeIn) {
     Table* found = getTable(tableId);
     if (! found) {
@@ -1378,6 +1379,8 @@ bool VoltDBEngine::activateTableStream(
         assert(table != NULL);
         return false;
     }
+
+    setUndoToken(undoToken);
 
     // Crank up the necessary persistent table streaming mechanism(s).
     if (!table->activateStream(m_tupleSerializer, streamType, m_partitionId, tableId, serializeIn)) {
@@ -1402,18 +1405,13 @@ bool VoltDBEngine::activateTableStream(
 /**
  * Serialize tuples to output streams from a table in COW mode.
  * Overload that serializes a stream position array.
- * Returns:
- *  0-n: remaining tuple count
- *  -1: streaming was completed by the previous call
- *  -2: error, e.g. when no longer in COW mode.
- * Note that -1 is only returned once after the previous call serialized all
- * remaining tuples. Further calls are considered errors and will return -2.
+ * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
  */
 int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
                                                const TableStreamType streamType,
                                                ReferenceSerializeInput &serialize_in)
 {
-    int64_t remaining = -2;
+    int64_t remaining = TABLE_STREAM_SERIALIZATION_ERROR;
     try {
         std::vector<int> positions;
         remaining = tableStreamSerializeMore(tableId, streamType, serialize_in, positions);
@@ -1440,7 +1438,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
     catch (SerializableEEException &e) {
         resetReusedResultOutputBuffer();
         e.serialize(getExceptionOutputSerializer());
-        remaining = -2; // error
+        remaining = TABLE_STREAM_SERIALIZATION_ERROR;
     }
 
     return remaining;
@@ -1449,12 +1447,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
 /**
  * Serialize tuples to output streams from a table in COW mode.
  * Overload that populates a position vector provided by the caller.
- * Returns:
- *  0-n: remaining tuple count
- *  -1: streaming was completed by the previous call
- *  -2: error, e.g. when no longer in COW mode.
- * Note that -1 is only returned once after the previous call serialized all
- * remaining tuples. Further calls are considered errors and will return -2.
+ * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
  */
 int64_t VoltDBEngine::tableStreamSerializeMore(
         const CatalogId tableId,
@@ -1499,7 +1492,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(
     }
     else {
         // Failure.
-        return -2;
+        return -1;
     }
 
     // Perform the streaming.

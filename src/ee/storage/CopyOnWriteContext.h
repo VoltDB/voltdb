@@ -57,7 +57,7 @@ public:
     /**
      * Activation handler.
      */
-    virtual bool handleActivation(TableStreamType streamType, bool reactivate);
+    virtual ActivationReturnCode handleActivation(TableStreamType streamType, bool reactivate);
 
     /**
      * Mandatory TableStreamContext override.

@@ -98,7 +98,7 @@ void TupleOutputStreamProcessor::close()
  */
 bool TupleOutputStreamProcessor::writeRow(TupleSerializer &tupleSerializer,
                                           TableTuple &tuple,
-                                          bool &deleteRow)
+                                          bool *deleteRow)
 {
     if (m_table == NULL) {
         throwFatalException("TupleOutputStreamProcessor::writeRow() was called before open().");
@@ -126,8 +126,8 @@ bool TupleOutputStreamProcessor::writeRow(TupleSerializer &tupleSerializer,
             // As with first() we expect a predicate to be available for each and every stream.
             // It was already checked, so just assert here.
             assert(ipredicate != m_predicates->end());
-            if (accepted) {
-                deleteRow = deleteRow || *iDeleteFlag;
+            if (accepted && deleteRow != NULL) {
+                (*deleteRow) = (*deleteRow) || *iDeleteFlag;
             }
             ++ipredicate;
             ++iDeleteFlag;

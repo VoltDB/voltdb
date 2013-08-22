@@ -51,6 +51,7 @@
 #include <cassert>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
+#include "common/types.h"
 #include "common/ids.h"
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
@@ -61,6 +62,7 @@
 #include "storage/TableStreamerInterface.h"
 #include "storage/RecoveryContext.h"
 #include "storage/ElasticIndex.h"
+#include "storage/CopyOnWriteIterator.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
 
@@ -103,10 +105,12 @@ public:
     void updateTupleForUndo(char* targetTupleToUpdate,
                             char* sourceTupleWithNewValues,
                             bool revertIndexes);
+    bool deleteTuple(TableTuple &tuple, bool fallible=true);
     void deleteTupleForUndo(char* tupleData, bool skipLookup = false);
     void deleteTupleRelease(char* tuple);
     void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock);
+    uint32_t getTupleCount() const;
 
     // Elastic index methods. Used by ElasticContext.
     void clearIndex();
@@ -120,11 +124,16 @@ public:
     bool indexRemove(TableTuple &tuple);
     bool hasStreamType(TableStreamType streamType) const;
     ElasticIndex::iterator indexIterator();
-    ElasticIndex::iterator indexIterator(int64_t lowerBound);
+    ElasticIndex::iterator indexIteratorLowerBound(int64_t lowerBound);
+    ElasticIndex::iterator indexIteratorUpperBound(int64_t upperBound);
     ElasticIndex::const_iterator indexIterator() const;
-    ElasticIndex::const_iterator indexIterator(int64_t lowerBound) const;
+    ElasticIndex::const_iterator indexIteratorLowerBound(int64_t lowerBound) const;
+    ElasticIndex::const_iterator indexIteratorUpperBound(int64_t upperBound) const;
     ElasticIndex::iterator indexEnd();
     ElasticIndex::const_iterator indexEnd() const;
+    boost::shared_ptr<ElasticIndexTupleRangeIterator>
+            getIndexTupleRangeIterator(const ElasticIndexHashRange &range);
+    void activateSnapshot();
 
 private:
 
@@ -294,7 +303,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     /**
      * Attempt to stream more tuples from the table to the provided
      * output stream.
-     * Return remaining tuple count, 0 if done, or -1 on error.
+     * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
      */
     int64_t streamMore(TupleOutputStreamProcessor &outputStreams,
                        TableStreamType streamType,
@@ -365,16 +374,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                                     CatalogId tableId,
                                     std::vector<std::string> &predicateStrings,
                                     bool skipInternalActivation);
-
-    /**
-     * Prepare table for streaming from serialized data (internal).
-     * Assumes m_tableStreamer was previously initialized.
-     * Return true on success or false if it was already active.
-     */
-    bool activateStreamInternal(TupleSerializer &tupleSerializer,
-                                TableStreamType streamType,
-                                CatalogId tableId,
-                                std::vector<std::string> &predicateStrings);
 
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
         if (nextBlock != NULL) {
@@ -513,6 +512,10 @@ inline void PersistentTableSurgeon::updateTupleForUndo(char* targetTupleToUpdate
     m_table.updateTupleForUndo(targetTupleToUpdate, sourceTupleWithNewValues, revertIndexes);
 }
 
+inline bool PersistentTableSurgeon::deleteTuple(TableTuple &tuple, bool fallible) {
+    return m_table.deleteTuple(tuple, fallible);
+}
+
 inline void PersistentTableSurgeon::deleteTupleForUndo(char* tupleData, bool skipLookup) {
     m_table.deleteTupleForUndo(tupleData, skipLookup);
 }
@@ -581,9 +584,14 @@ inline ElasticIndex::iterator PersistentTableSurgeon::indexIterator() {
     return m_index->createIterator();
 }
 
-inline ElasticIndex::iterator PersistentTableSurgeon::indexIterator(int64_t lowerBound) {
+inline ElasticIndex::iterator PersistentTableSurgeon::indexIteratorLowerBound(int64_t lowerBound) {
     assert (m_index != NULL);
-    return m_index->createIterator(lowerBound);
+    return m_index->createLowerBoundIterator(lowerBound);
+}
+
+inline ElasticIndex::iterator PersistentTableSurgeon::indexIteratorUpperBound(int64_t upperBound) {
+    assert (m_index != NULL);
+    return m_index->createUpperBoundIterator(upperBound);
 }
 
 inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIterator() const {
@@ -591,9 +599,14 @@ inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIterator() cons
     return m_index->createIterator();
 }
 
-inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIterator(int64_t lowerBound) const {
+inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIteratorLowerBound(int64_t lowerBound) const {
     assert (m_index != NULL);
-    return m_index->createIterator(lowerBound);
+    return m_index->createLowerBoundIterator(lowerBound);
+}
+
+inline ElasticIndex::const_iterator PersistentTableSurgeon::indexIteratorUpperBound(int64_t upperBound) const {
+    assert (m_index != NULL);
+    return m_index->createUpperBoundIterator(upperBound);
 }
 
 inline ElasticIndex::iterator PersistentTableSurgeon::indexEnd() {
@@ -606,8 +619,20 @@ inline ElasticIndex::const_iterator PersistentTableSurgeon::indexEnd() const {
     return m_index->end();
 }
 
+inline uint32_t PersistentTableSurgeon::getTupleCount() const {
+    return m_table.m_tupleCount;
+}
+
 inline bool PersistentTableSurgeon::hasStreamType(TableStreamType streamType) const {
     return m_table.m_tableStreamer->hasStreamType(streamType);
+}
+
+inline boost::shared_ptr<ElasticIndexTupleRangeIterator>
+PersistentTableSurgeon::getIndexTupleRangeIterator(const ElasticIndexHashRange &range) {
+    assert(m_index != NULL);
+    assert(m_table.m_schema != NULL);
+    return boost::shared_ptr<ElasticIndexTupleRangeIterator>(
+            new ElasticIndexTupleRangeIterator(*m_index, *m_table.m_schema, range));
 }
 
 inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {

@@ -319,7 +319,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Interface frontend invokes to communicate to CPP execution engine.
      */
 
-    abstract public boolean activateTableStream(final int tableId, TableStreamType type, SnapshotPredicates predicates);
+    abstract public boolean activateTableStream(
+            final int tableId, TableStreamType type,
+            long undoQuantumToken,
+            SnapshotPredicates predicates);
 
     /**
      * Serialize more tuples from the specified table that already has a stream enabled
@@ -695,10 +698,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param pointer Pointer to an engine instance
      * @param tableId Catalog ID of the table
      * @param streamType type of stream to activate
+     * @param undoQuantumToken Undo quantum allowing destructive index clearing to be undone
      * @param data serialized predicates
      * @return <code>true</code> on success and <code>false</code> on failure
      */
-    protected native boolean nativeActivateTableStream(long pointer, int tableId, int streamType, byte[] data);
+    protected native boolean nativeActivateTableStream(long pointer, int tableId, int streamType, long undoQuantumToken, byte[] data);
 
     /**
      * Serialize more tuples from the specified table that has an active stream of the specified type
