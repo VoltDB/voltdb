@@ -1600,10 +1600,6 @@ public:
         m_test.m_shuffles.insert(*reinterpret_cast<int64_t*>(sourceTuple.address() + 1));
     }
 
-    virtual void incrementNotificationBarrier(TableStreamType streamType) {}
-
-    virtual void decrementNotificationBarrier(TableStreamType streamType) {}
-
     CopyOnWriteTest &m_test;
     int32_t m_partitionId;
     TableStreamType m_type;
@@ -1903,16 +1899,12 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
         checkIndex(testRange.label("streamed"), &streamedIndex, m_predicates, true);
         size_t indexSizeAfter = directIndex->size();
         size_t tableSizeAfter = m_table->activeTupleCount();
-        if (testRange.m_empty) {
-            ASSERT_EQ(indexSizeAfter, indexSizeBefore);
-        }
-        else {
-            ASSERT_LT(indexSizeAfter, indexSizeBefore);
-        }
         if (testRange.m_empty || undo) {
+            ASSERT_EQ(indexSizeAfter, indexSizeBefore);
             ASSERT_EQ(tableSizeAfter, tableSizeBefore);
         }
         else {
+            ASSERT_LT(indexSizeAfter, indexSizeBefore);
             ASSERT_LT(tableSizeAfter, tableSizeBefore);
         }
         if (!undo) {

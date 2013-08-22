@@ -135,25 +135,6 @@ public:
             getIndexTupleRangeIterator(const ElasticIndexHashRange &range);
     void activateSnapshot();
 
-    /**
-     * Object that increments and decrements the per-stream type notification barriers.
-     */
-    class NotificationBarrierObj {
-    public:
-        NotificationBarrierObj(PersistentTableSurgeon &surgeon, TableStreamType streamType);
-        virtual ~NotificationBarrierObj();
-
-    private:
-        PersistentTableSurgeon &m_surgeon;
-        TableStreamType m_streamType;
-    };
-
-    /**
-     * Provide a token during whose lifespan notifications are blocked to a particular stream type.
-     */
-    typedef boost::shared_ptr<PersistentTableSurgeon::NotificationBarrierObj> NotificationBarrier;
-    NotificationBarrier getNotificationBarrier(TableStreamType streamType);
-
 private:
 
     /**
@@ -652,28 +633,6 @@ PersistentTableSurgeon::getIndexTupleRangeIterator(const ElasticIndexHashRange &
     assert(m_table.m_schema != NULL);
     return boost::shared_ptr<ElasticIndexTupleRangeIterator>(
             new ElasticIndexTupleRangeIterator(*m_index, *m_table.m_schema, range));
-}
-
-inline boost::shared_ptr<PersistentTableSurgeon::NotificationBarrierObj>
-PersistentTableSurgeon::getNotificationBarrier(TableStreamType streamType) {
-    return boost::shared_ptr<PersistentTableSurgeon::NotificationBarrierObj>(
-            new PersistentTableSurgeon::NotificationBarrierObj(*this, streamType));
-}
-
-inline PersistentTableSurgeon::NotificationBarrierObj::NotificationBarrierObj(
-    PersistentTableSurgeon &surgeon, TableStreamType streamType) :
-        m_surgeon(surgeon),
-        m_streamType(streamType)
-{
-    if (m_surgeon.m_table.m_tableStreamer != NULL) {
-        m_surgeon.m_table.m_tableStreamer->incrementNotificationBarrier(m_streamType);
-    }
-}
-
-inline PersistentTableSurgeon::NotificationBarrierObj::~NotificationBarrierObj() {
-    if (m_surgeon.m_table.m_tableStreamer != NULL) {
-        m_surgeon.m_table.m_tableStreamer->decrementNotificationBarrier(m_streamType);
-    }
 }
 
 inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {

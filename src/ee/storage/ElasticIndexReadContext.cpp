@@ -139,8 +139,7 @@ int64_t ElasticIndexReadContext::handleStreamMore(
             bool yield = false;
             while (!yield) {
                 // Write the tuple.
-                bool deleteTuple = false;
-                yield = outputStreams.writeRow(getSerializer(), tuple, deleteTuple);
+                yield = outputStreams.writeRow(getSerializer(), tuple);
                 if (!yield) {
                     if (!m_iter->next(tuple)) {
                         yield = true;
@@ -200,20 +199,14 @@ bool ElasticIndexReadContext::parseHashRange(
  */
 void ElasticIndexReadContext::deleteStreamedTuples()
 {
-    // Block ElasticContext notifications while this barrier is in scope to avoid
-    // extra maintainance of index items that will be erased in one swell foop.
-    PersistentTableSurgeon::NotificationBarrier bulkDeleteToken(
-            m_surgeon.getNotificationBarrier(TABLE_STREAM_ELASTIC_INDEX));
-
     // Delete the indexed tuples that were streamed.
+    // Undo token release will cause the index to delete the corresponding items
+    // via notifications.
     m_iter->reset();
     TableTuple tuple;
     while (m_iter->next(tuple)) {
         m_surgeon.deleteTuple(tuple);
     }
-
-    // Remove them from the index.
-    m_iter->erase();
 }
 
 } // namespace voltdb

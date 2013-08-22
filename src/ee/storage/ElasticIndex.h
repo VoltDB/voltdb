@@ -463,10 +463,11 @@ inline ElasticIndexHashRange::ElasticIndexHashRange(ElasticHash from, ElasticHas
 {}
 
 /**
- * Default constructor (full min->max range).
+ * Default constructor (full range).
  */
 inline ElasticIndexHashRange::ElasticIndexHashRange() :
-    m_from(std::numeric_limits<int64_t>::min()), m_to(std::numeric_limits<int64_t>::max())
+    // min->min covers all possible values, min->max would not.
+    m_from(std::numeric_limits<int64_t>::min()), m_to(std::numeric_limits<int64_t>::min())
 {}
 
 /**

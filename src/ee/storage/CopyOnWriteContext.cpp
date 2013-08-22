@@ -74,14 +74,13 @@ CopyOnWriteContext::handleActivation(TableStreamType streamType, bool reactivate
         return ACTIVATION_UNSUPPORTED;
     }
 
-    // No tuples - short circuit activation, but pretend it happened.
-    if (m_surgeon.getTupleCount() == 0) {
-        return ACTIVATION_SUCCEEDED;
-    }
-
     // Reactivation is not allowed, but rejecting it isn't a failure.
     if (reactivate) {
         return ACTIVATION_UNSUPPORTED;
+    }
+
+    if (m_totalTuples == 0) {
+        return ACTIVATION_SUCCEEDED;
     }
 
     if (m_surgeon.hasIndex() && !m_surgeon.isIndexingComplete()) {
@@ -104,8 +103,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
                                              std::vector<int> &retPositions) {
     assert(m_iterator != NULL);
 
-    // Balance the zero tuple count short circuiting done in handleActivation().
-    if (m_surgeon.getTupleCount() == 0) {
+    if (m_totalTuples == 0) {
         return 0;
     }
 
@@ -149,7 +147,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
              * The returned copy count helps decide when to delete if m_doDelete is true.
              */
             bool deleteTuple = false;
-            yield = outputStreams.writeRow(getSerializer(), tuple, deleteTuple);
+            yield = outputStreams.writeRow(getSerializer(), tuple, &deleteTuple);
             /*
              * May want to delete tuple if processing the actual table.
              */

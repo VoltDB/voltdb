@@ -34,8 +34,7 @@ typedef std::pair<CatalogId, Table*> TIDPair;
 TableStreamer::Stream::Stream(TableStreamType streamType,
                               boost::shared_ptr<TableStreamerContext> context) :
     m_streamType(streamType),
-    m_context(context),
-    m_notificationBarrier(0)
+    m_context(context)
 {}
 
 /**
