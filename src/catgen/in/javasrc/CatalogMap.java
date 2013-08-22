@@ -25,6 +25,8 @@ import java.util.Iterator;
 import java.util.TreeMap;
 import java.util.Map.Entry;
 
+import org.apache.commons.lang3.StringUtils;
+
 /**
  * A safe interface to a generic map of CatalogType instances. It is safe
  * because it is mostly read-only. All operations that modify the map are
@@ -55,6 +57,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      * @return The item found in the map, or null if not found
      */
     public T get(String name) {
+        name = name.toLowerCase();
         return m_items.get(name);
     }
 
@@ -64,11 +67,8 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      * @return The item found in the map, or null if not found
      */
     public T getIgnoreCase(String name) {
-        for (Entry<String, T> e : m_items.entrySet()) {
-            if (e.getKey().equalsIgnoreCase(name))
-                return e.getValue();
-        }
-        return null;
+        name = name.toLowerCase();
+        return m_items.get(name);
     }
 
     /**
@@ -104,15 +104,16 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      */
     public T add(String name) {
         try {
+            String mapKey = name.toLowerCase();
             if (m_items.containsKey(name))
                 throw new CatalogException("Catalog item '" + name + "' already exists for " + m_parent);
 
             T x = m_cls.newInstance();
-            String childPath = m_path + "[" + name + "]";
+            String childPath = m_path + "[" + mapKey + "]";
             x.setBaseValues(m_catalog, m_parent, childPath, name);
             x.m_parentMap = this;
 
-            m_items.put(name, x);
+            m_items.put(mapKey, x);
 
             // assign a relative index to every child item
             int index = 1;
@@ -132,10 +133,11 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
      */
     public void delete(String name) {
         try {
-            if (m_items.containsKey(name) == false)
-                throw new CatalogException("Catalog item '" + name + "' doesn't exists in " + m_parent);
+            String mapKey = name.toLowerCase();
+            if (m_items.containsKey(mapKey) == false)
+                throw new CatalogException("Catalog item '" + mapKey + "' doesn't exists in " + m_parent);
 
-            m_items.remove(name);
+            m_items.remove(mapKey);
 
             // assign a relative index to every child item
             int index = 1;
