@@ -1600,6 +1600,10 @@ public:
         m_test.m_shuffles.insert(*reinterpret_cast<int64_t*>(sourceTuple.address() + 1));
     }
 
+    virtual void incrementNotificationBarrier(TableStreamType streamType) {}
+
+    virtual void decrementNotificationBarrier(TableStreamType streamType) {}
+
     CopyOnWriteTest &m_test;
     int32_t m_partitionId;
     TableStreamType m_type;

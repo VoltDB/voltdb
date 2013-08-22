@@ -200,8 +200,10 @@ bool ElasticIndexReadContext::parseHashRange(
  */
 void ElasticIndexReadContext::deleteStreamedTuples()
 {
-    // Delete notifications are blocked while this token is in scope.
-    PersistentTableSurgeon::BulkDeleteToken bulkDeleteToken(m_surgeon.getBulkDeleteToken());
+    // Block ElasticContext notifications while this barrier is in scope to avoid
+    // extra maintainance of index items that will be erased in one swell foop.
+    PersistentTableSurgeon::NotificationBarrier bulkDeleteToken(
+            m_surgeon.getNotificationBarrier(TABLE_STREAM_ELASTIC_INDEX));
 
     // Delete the indexed tuples that were streamed.
     m_iter->reset();

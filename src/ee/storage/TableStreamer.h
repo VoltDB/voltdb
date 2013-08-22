@@ -82,7 +82,9 @@ public:
         // If any stream handles the notification, it's "handled".
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
             assert(streamPtr != NULL);
-            handled |= streamPtr->m_context->notifyTupleInsert(tuple);
+            if (streamPtr->m_notificationBarrier == 0) {
+                handled |= streamPtr->m_context->notifyTupleInsert(tuple);
+            }
         }
         return handled;
     }
@@ -96,7 +98,9 @@ public:
         // If any context handles the notification, it's "handled".
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
             assert(streamPtr != NULL);
-            handled |= streamPtr->m_context->notifyTupleUpdate(tuple);
+            if (streamPtr->m_notificationBarrier == 0) {
+                handled |= streamPtr->m_context->notifyTupleUpdate(tuple);
+            }
         }
         return handled;
     }
@@ -110,7 +114,9 @@ public:
         // If any context handles the notification, it's "handled".
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
             assert(streamPtr != NULL);
-            handled |= streamPtr->m_context->notifyTupleDelete(tuple);
+            if (streamPtr->m_notificationBarrier == 0) {
+                handled |= streamPtr->m_context->notifyTupleDelete(tuple);
+            }
         }
         return handled;
     }
@@ -121,7 +127,9 @@ public:
     virtual void notifyBlockWasCompactedAway(TBPtr block) {
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
             assert(streamPtr != NULL);
-            streamPtr->m_context->notifyBlockWasCompactedAway(block);
+            if (streamPtr->m_notificationBarrier == 0) {
+                streamPtr->m_context->notifyBlockWasCompactedAway(block);
+            }
         }
     }
 
@@ -132,7 +140,9 @@ public:
                                      TableTuple &sourceTuple, TableTuple &targetTuple) {
         BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
             assert(streamPtr != NULL);
-            streamPtr->m_context->notifyTupleMovement(sourceBlock, targetBlock, sourceTuple, targetTuple);
+            if (streamPtr->m_notificationBarrier == 0) {
+                streamPtr->m_context->notifyTupleMovement(sourceBlock, targetBlock, sourceTuple, targetTuple);
+            }
         }
     }
 
@@ -163,6 +173,32 @@ public:
         return context;
     }
 
+    /**
+     * Increment the notification barrier for a stream type, i.e. disable notifications.
+     */
+    virtual void incrementNotificationBarrier(TableStreamType streamType) {
+        BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+            assert(streamPtr != NULL);
+            if (streamPtr->m_streamType == streamType) {
+                streamPtr->m_notificationBarrier++;
+            }
+        }
+    }
+
+    /**
+     * Decrement the notification barrier for a stream type, i.e. enable notifications.
+     */
+    virtual void decrementNotificationBarrier(TableStreamType streamType) {
+        BOOST_FOREACH(StreamPtr &streamPtr, m_streams) {
+            assert(streamPtr != NULL);
+            if (streamPtr->m_streamType == streamType) {
+                streamPtr->m_notificationBarrier--;
+                // Shouldn't drop below zero.
+                assert(streamPtr->m_notificationBarrier >= 0);
+            }
+        }
+    }
+
 private:
 
     class Stream
@@ -180,6 +216,9 @@ private:
 
         /// The stream context.
         boost::shared_ptr<TableStreamerContext> m_context;
+
+        /// Notification barrier blocks notifications if m_notificationBarrier!=0.
+        int m_notificationBarrier;
     };
 
     /// Current partition ID.

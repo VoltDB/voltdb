@@ -51,6 +51,7 @@
 #include <cassert>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
+#include "common/types.h"
 #include "common/ids.h"
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
@@ -135,22 +136,23 @@ public:
     void activateSnapshot();
 
     /**
-     * Token object that increments and decrements the bulk delete counter.
+     * Object that increments and decrements the per-stream type notification barriers.
      */
-    class BulkDeleteTokenObj {
+    class NotificationBarrierObj {
     public:
-        BulkDeleteTokenObj(PersistentTableSurgeon &surgeon);
-        virtual ~BulkDeleteTokenObj();
+        NotificationBarrierObj(PersistentTableSurgeon &surgeon, TableStreamType streamType);
+        virtual ~NotificationBarrierObj();
 
     private:
         PersistentTableSurgeon &m_surgeon;
+        TableStreamType m_streamType;
     };
 
     /**
-     * Provide a token during whose lifespan delete notifications are blocked.
+     * Provide a token during whose lifespan notifications are blocked to a particular stream type.
      */
-    typedef boost::shared_ptr<PersistentTableSurgeon::BulkDeleteTokenObj> BulkDeleteToken;
-    BulkDeleteToken getBulkDeleteToken();
+    typedef boost::shared_ptr<PersistentTableSurgeon::NotificationBarrierObj> NotificationBarrier;
+    NotificationBarrier getNotificationBarrier(TableStreamType streamType);
 
 private:
 
@@ -505,9 +507,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     // Surgeon passed to classes requiring "deep" access to avoid excessive friendship.
     PersistentTableSurgeon m_surgeon;
-
-    // Incremented when a bulk delete starts and decremented when it ends.
-    int m_bulkDelete;
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :
@@ -655,19 +654,26 @@ PersistentTableSurgeon::getIndexTupleRangeIterator(const ElasticIndexHashRange &
             new ElasticIndexTupleRangeIterator(*m_index, *m_table.m_schema, range));
 }
 
-inline boost::shared_ptr<PersistentTableSurgeon::BulkDeleteTokenObj>
-PersistentTableSurgeon::getBulkDeleteToken() {
-    return boost::shared_ptr<PersistentTableSurgeon::BulkDeleteTokenObj>(
-            new PersistentTableSurgeon::BulkDeleteTokenObj(*this));
+inline boost::shared_ptr<PersistentTableSurgeon::NotificationBarrierObj>
+PersistentTableSurgeon::getNotificationBarrier(TableStreamType streamType) {
+    return boost::shared_ptr<PersistentTableSurgeon::NotificationBarrierObj>(
+            new PersistentTableSurgeon::NotificationBarrierObj(*this, streamType));
 }
 
-inline PersistentTableSurgeon::BulkDeleteTokenObj::BulkDeleteTokenObj(
-        PersistentTableSurgeon &surgeon) : m_surgeon(surgeon) {
-    ++m_surgeon.m_table.m_bulkDelete;
+inline PersistentTableSurgeon::NotificationBarrierObj::NotificationBarrierObj(
+    PersistentTableSurgeon &surgeon, TableStreamType streamType) :
+        m_surgeon(surgeon),
+        m_streamType(streamType)
+{
+    if (m_surgeon.m_table.m_tableStreamer != NULL) {
+        m_surgeon.m_table.m_tableStreamer->incrementNotificationBarrier(m_streamType);
+    }
 }
 
-inline PersistentTableSurgeon::BulkDeleteTokenObj::~BulkDeleteTokenObj() {
-    --m_surgeon.m_table.m_bulkDelete;
+inline PersistentTableSurgeon::NotificationBarrierObj::~NotificationBarrierObj() {
+    if (m_surgeon.m_table.m_tableStreamer != NULL) {
+        m_surgeon.m_table.m_tableStreamer->decrementNotificationBarrier(m_streamType);
+    }
 }
 
 inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {
@@ -700,8 +706,8 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
         --m_invisibleTuplesPendingDeleteCount;
     }
 
-    // Let the context handle it as needed if a bulk delete is not in progress.
-    if (m_tableStreamer != NULL && m_bulkDelete == 0) {
+    // Let the context handle it as needed.
+    if (m_tableStreamer != NULL) {
         m_tableStreamer->notifyTupleDelete(tuple);
     }
 

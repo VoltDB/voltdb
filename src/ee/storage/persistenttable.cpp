@@ -92,8 +92,7 @@ PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetS
     stats_(this),
     m_failedCompactionCount(0),
     m_invisibleTuplesPendingDeleteCount(0),
-    m_surgeon(*this),
-    m_bulkDelete(0)
+    m_surgeon(*this)
 {
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));

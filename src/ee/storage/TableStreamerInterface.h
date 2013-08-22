@@ -99,6 +99,16 @@ namespace voltdb
         virtual TableStreamerContextPtr findStreamContext(TableStreamType streamType) = 0;
 
         /**
+         * Increment the notification barrier for a stream type, i.e. disable notifications.
+         */
+        virtual void incrementNotificationBarrier(TableStreamType streamType) = 0;
+
+        /**
+         * Decrement the notification barrier for a stream type, i.e. enable notifications.
+         */
+        virtual void decrementNotificationBarrier(TableStreamType streamType) = 0;
+
+        /**
          * Return context or null for specified type (const flavor).
          */
         TableStreamerContextPtr findStreamContext(TableStreamType streamType) const
