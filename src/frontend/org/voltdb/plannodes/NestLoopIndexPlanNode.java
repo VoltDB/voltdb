@@ -198,6 +198,11 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         }
         m_outputSchema = new_output_schema;
         m_hasSignificantOutputSchema = true;
+
+        // resolve other predicates
+        resolvePredicate(m_preJoinPredicate, outer_schema, index_schema);
+        resolvePredicate(m_joinPredicate, outer_schema, index_schema);
+        resolvePredicate(m_wherePredicate, outer_schema, index_schema);
     }
 
     @Override

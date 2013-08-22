@@ -62,7 +62,7 @@ class TupleValueExpression : public AbstractExpression {
     TupleValueExpression(int value_idx, std::string tableName, int table_idx)
         : AbstractExpression(EXPRESSION_TYPE_VALUE_TUPLE)
     {
-        VOLT_TRACE("OptimizedTupleValueExpression %d %d", m_type, value_idx);
+        VOLT_TRACE("OptimizedTupleValueExpression %d using tupleIdx %d valueIdx", m_type, table_idx, value_idx);
         this->tuple_idx = table_idx;
         this->value_idx = value_idx;
         this->table_name = tableName;
@@ -93,7 +93,7 @@ class TupleValueExpression : public AbstractExpression {
 
     std::string debugInfo(const std::string &spacer) const {
         std::ostringstream buffer;
-        buffer << spacer << "Optimized Column Reference[" << this->value_idx << "]\n";
+        buffer << spacer << "Optimized Column Reference[" << this->tuple_idx << ", " << this->value_idx << "]\n";
         return (buffer.str());
     }
 

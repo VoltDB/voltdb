@@ -240,7 +240,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     /**
      * @param predicate the predicate to set
      */
-    private void resolvePredicate(AbstractExpression predicate, NodeSchema outer_schema, NodeSchema inner_schema)
+    protected void resolvePredicate(AbstractExpression predicate, NodeSchema outer_schema, NodeSchema inner_schema)
     {
         // Finally, resolve m_predicate
         List<TupleValueExpression> predicate_tves =

@@ -196,7 +196,10 @@ public class TupleValueExpression extends AbstractValueExpression {
         // needed to support type resolution of indexed expressions in the planner
         // after they get round-tripped through the catalog's index definition.
         stringer.key(Members.COLUMN_NAME.name()).value(m_columnName);
-        stringer.key(Members.TABLE_IDX.name()).value(m_tableIdx);
+        if (m_tableIdx > 0) {
+            stringer.key(Members.TABLE_IDX.name()).value(m_tableIdx);
+            System.out.println("TVE: toJSONString(), tableIdx = " + m_tableIdx);
+        }
     }
 
     @Override
@@ -204,7 +207,10 @@ public class TupleValueExpression extends AbstractValueExpression {
         m_columnIndex = obj.getInt(Members.COLUMN_IDX.name());
         m_tableName = obj.getString(Members.TABLE_NAME.name());
         m_columnName = obj.getString(Members.COLUMN_NAME.name());
-        m_tableIdx = obj.getInt(Members.TABLE_IDX.name());
+        if (obj.has(Members.TABLE_IDX.name())) {
+            m_tableIdx = obj.getInt(Members.TABLE_IDX.name());
+            System.out.println("TVE: loadFromJSONObject(), tableIdx = " + m_tableIdx);
+        }
     }
 
     @Override

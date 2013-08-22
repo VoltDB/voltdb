@@ -406,7 +406,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                     if (end_expression != NULL &&
                         end_expression->eval(&outer_tuple, &inner_tuple).isFalse())
                     {
-                        VOLT_TRACE("End Expression evaluated to false, stopping scan");
+                        VOLT_TRACE("End Expression evaluated to false, stopping scan\n");
                         break;
                     }
                     //
@@ -431,7 +431,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                                 join_tuple.
                                 setNValue(col_ctr,
                                           m_outputExpressions[col_ctr]->
-                                          eval(&inner_tuple, NULL));
+                                          eval(&outer_tuple, &inner_tuple));
                             }
                             VOLT_TRACE("join_tuple tuple: %s",
                                        join_tuple.debug(output_table->name()).c_str());

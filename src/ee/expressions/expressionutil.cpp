@@ -326,7 +326,10 @@ tupleValueFactory(PlannerDomValue obj, ExpressionType et,
     // read the tuple value expression specific data
     int columnIndex = obj.valueForKey("COLUMN_IDX").asInt();
     std::string tableName = obj.valueForKey("TABLE_NAME").asStr();
-    int tableIdx = obj.valueForKey("TABLE_IDX").asInt();
+    int tableIdx = 0;
+    if (obj.hasNonNullKey("TABLE_IDX")) {
+        tableIdx = obj.valueForKey("TABLE_IDX").asInt();
+    }
 
     // verify input
     if (columnIndex < 0) {
