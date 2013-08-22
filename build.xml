@@ -165,6 +165,8 @@
     <include name='org/voltdb/regressionsuites/TestX*.class' />
     <include name='org/voltdb/regressionsuites/TestY*.class' />
     <include name='org/voltdb/regressionsuites/TestZ*.class' />
+    <!-- Exclude tests -->
+    <exclude name="**/*$*.class"/>
 </patternset>
 
 <patternset id='junit.other.path'>
@@ -179,10 +181,12 @@
     <include name='org/voltdb/export/Test*.class'/>
     <include name='org/voltdb/export/**/Test.class'/>
     <include name='org/voltdb/exportclient/Test.class'/>
+    <include name='org/voltdb/expressions/Test.class'/>
     <include name='org/voltdb/iv2/Test*.class'/>
     <include name='org/voltdb/jdbc/Test*.class'/>
     <include name='org/voltdb/jni/Test*.class'/>
     <include name='org/voltdb/messaging/Test*.class'/>
+    <!-- Can not find following 3 dir, but was in old set, so keep them -->
     <include name='org/voltdb/messaging/**/*Test.class'/>
     <include name='org/voltdb/network/**/Test*.class'/>
     <include name='org/voltdb/network/**/*Test.class'/>
