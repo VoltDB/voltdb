@@ -50,13 +50,21 @@ public class SchemaColumn
      *        without affecting other nodes/columns/plan iterations, so
      *        it clones this expression.
      */
+    SchemaColumn(String tableName, String columnName, String columnAlias) {
+        m_tableName = tableName;
+        m_columnName = columnName;
+        m_columnAlias = columnAlias;
+    }
+
     public SchemaColumn(String tableName, String columnName,
                         String columnAlias, AbstractExpression expression)
     {
         m_tableName = tableName;
         m_columnName = columnName;
         m_columnAlias = columnAlias;
-        m_expression = (AbstractExpression) expression.clone();
+        if (expression != null) {
+            m_expression = (AbstractExpression) expression.clone();
+        }
     }
 
     /**
@@ -68,6 +76,45 @@ public class SchemaColumn
         return new SchemaColumn(m_tableName, m_columnName, m_columnAlias,
                                 m_expression);
     }
+
+    @Override
+    public boolean equals (Object obj) {
+        if (obj == null) return false;
+        if (obj == this) return true;
+        if (obj instanceof SchemaColumn == false) return false;
+
+        SchemaColumn sc = (SchemaColumn) obj;
+        String tableName = sc.getTableName();
+        String columnName = sc.getColumnName();
+        String columnAlias = sc.getColumnAlias();
+
+        if (m_tableName.equals(tableName)) {
+            if (columnName != null && !columnName.equals("")) {
+                if (columnName.equals(m_columnName)) {
+                    assert(m_columnAlias.equals(columnAlias));
+                    return true;
+                }
+            }
+            else if (columnAlias != null && !columnAlias.equals("")) {
+                if (columnAlias.equals(m_columnAlias)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    @Override
+    public int hashCode () {
+        int result = m_tableName.hashCode();
+        result += m_columnName.hashCode();
+        if (m_columnAlias != null) {
+            result += m_columnAlias.hashCode();
+        }
+        return result;
+    }
+
 
     /**
      * Return a copy of this SchemaColumn, but with the input expression

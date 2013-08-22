@@ -20,6 +20,7 @@ package org.voltdb.plannodes;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 
 import org.voltdb.expressions.TupleValueExpression;
 
@@ -32,6 +33,7 @@ public class NodeSchema
     public NodeSchema()
     {
         m_columns = new ArrayList<SchemaColumn>();
+        m_columnsMapHelper = new HashMap<SchemaColumn, Integer>();
     }
 
     /**
@@ -42,6 +44,8 @@ public class NodeSchema
      */
     public void addColumn(SchemaColumn column)
     {
+        int size = m_columns.size();
+        m_columnsMapHelper.put(column, size);
         m_columns.add(column);
     }
 
@@ -69,38 +73,12 @@ public class NodeSchema
      */
     public SchemaColumn find(String tableName, String columnName, String columnAlias)
     {
-        SchemaColumn retval = null;
-        for (SchemaColumn col : m_columns)
-        {
-            if (col.matches(tableName, columnName, columnAlias))
-            {
-                retval = col;
-                break;
-            }
+        SchemaColumn col = new SchemaColumn(tableName, columnName, columnAlias);
+        Integer index = m_columnsMapHelper.get(col);
+        if (index != null) {
+            return m_columns.get(index.intValue());
         }
-        return retval;
-    }
-
-    /**
-     * Get the offset into the schema of the column specified by the provided
-     * arguments.
-     * @param tableName
-     * @param columnName
-     * @param columnAlias
-     * @return The offset of the specified column.  Returns -1 if the column
-     *         wasn't found.
-     */
-    int getIndexOf(String tableName, String columnName, String columnAlias)
-    {
-        for (int i = 0; i < m_columns.size(); i++)
-        {
-            SchemaColumn col = m_columns.get(i);
-            if (col.matches(tableName, columnName, columnAlias))
-            {
-                return i;
-            }
-        }
-        return -1;
+        return null;
     }
 
     /** Convenience method for looking up the column offset for a TVE using
@@ -110,8 +88,14 @@ public class NodeSchema
      */
     int getIndexOfTve(TupleValueExpression tve)
     {
-        return getIndexOf(tve.getTableName(), tve.getColumnName(),
-                          tve.getColumnAlias());
+        SchemaColumn col = new SchemaColumn(tve.getTableName(),
+                tve.getColumnName(), tve.getColumnAlias());
+
+        Integer index = m_columnsMapHelper.get(col);
+        if (index != null) {
+            return index.intValue();
+        }
+        return -1;
     }
 
     /** Convenience method to sort the SchemaColumns.  Only applies if they
@@ -204,5 +188,6 @@ public class NodeSchema
     }
 
     private ArrayList<SchemaColumn> m_columns;
+    private HashMap <SchemaColumn, Integer> m_columnsMapHelper;
 }
 
