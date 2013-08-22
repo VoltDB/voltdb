@@ -978,13 +978,13 @@ bool PersistentTable::activateWithCustomStreamer(
 
 /**
  * Attempt to serialize more tuples from the table to the provided output streams.
- * Return remaining tuple count, 0 if done, or -1 on error.
+ * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
  */
 int64_t PersistentTable::streamMore(TupleOutputStreamProcessor &outputStreams,
                                     TableStreamType streamType,
                                     std::vector<int> &retPositions) {
     if (m_tableStreamer.get() == NULL) {
-        return -1;
+        return TABLE_STREAM_SERIALIZATION_ERROR;
     }
     return m_tableStreamer->streamMore(outputStreams, streamType, retPositions);
 }

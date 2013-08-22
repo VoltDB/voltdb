@@ -98,7 +98,7 @@ bool ElasticIndexReadContext::handleDeactivation(TableStreamType streamType)
 
 /*
  * Serialize to output stream. Receive a list of streams, but expect only 1.
- * Return 1 if tuples remain, 0 if done, or -1 on error.
+ * Return 1 if tuples remain, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
  */
 int64_t ElasticIndexReadContext::handleStreamMore(
         TupleOutputStreamProcessor &outputStreams,
@@ -110,13 +110,13 @@ int64_t ElasticIndexReadContext::handleStreamMore(
     // Check that activation happened.
     if (m_iter == NULL) {
         VOLT_ERROR("Attempted to begin serialization without activating the context.");
-        remaining = -1;
+        remaining = TABLE_STREAM_SERIALIZATION_ERROR;
     }
 
     // Need to initialize the output stream list.
     else if (outputStreams.size() != 1) {
         VOLT_ERROR("serializeMore() expects exactly one output stream.");
-        remaining = -1;
+        remaining = TABLE_STREAM_SERIALIZATION_ERROR;
     }
 
     else {

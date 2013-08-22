@@ -148,7 +148,7 @@ int64_t TableStreamer::streamMore(TupleOutputStreamProcessor &outputStreams,
                                   TableStreamType streamType,
                                   std::vector<int> &retPositions)
 {
-    int64_t remaining = -1;
+    int64_t remaining = TABLE_STREAM_SERIALIZATION_ERROR;
 
     // Rebuild the stream list as dictated by context semantics.
     StreamList savedStreams(m_streams);
@@ -158,7 +158,7 @@ int64_t TableStreamer::streamMore(TupleOutputStreamProcessor &outputStreams,
         assert(streamPtr->m_context != NULL);
         if (streamPtr->m_streamType == streamType) {
             // Assert that we didn't find the stream type twice.
-            assert(remaining == -1);
+            assert(remaining == TABLE_STREAM_SERIALIZATION_ERROR);
             remaining = streamPtr->m_context->handleStreamMore(outputStreams, retPositions);
             if (remaining <= 0) {
                 // Drop the stream if it doesn't need to hang around (e.g. elastic).

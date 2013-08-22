@@ -1071,8 +1071,8 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTabl
     } catch (const FatalException &e) {
         topend->crashVoltDB(e);
     }
-    // Won't get here, but -1 is an error.
-    return -1;
+    // Won't get here.
+    return TABLE_STREAM_SERIALIZATION_ERROR;
 }
 
 /*

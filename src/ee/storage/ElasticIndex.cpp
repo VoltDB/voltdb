@@ -82,25 +82,4 @@ bool ElasticIndexTupleRangeIterator::next(TableTuple &tuple)
     return true;
 }
 
-void ElasticIndexTupleRangeIterator::erase()
-{
-    reset();
-
-    // stx::btree is missing the documented erase(iterFrom, iterTo) method.
-    // Avoid mutating while iterating.
-    std::vector<ElasticIndexKey> toDeleteKeys;
-    while (m_iter != m_end) {
-        toDeleteKeys.push_back(*m_iter++);
-    }
-    if (wrap()) {
-        while (m_iter != m_end) {
-            toDeleteKeys.push_back(*m_iter++);
-        }
-    }
-
-    BOOST_FOREACH(const ElasticIndexKey &toDeleteKey, toDeleteKeys) {
-        m_index.erase(toDeleteKey);
-    }
-}
-
 } // namespace voltdb

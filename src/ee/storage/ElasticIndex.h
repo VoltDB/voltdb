@@ -245,11 +245,6 @@ public:
      */
     void reset();
 
-    /**
-     * Erase all items in the range.
-     */
-    void erase();
-
 private:
 
     bool wrap();

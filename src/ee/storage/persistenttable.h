@@ -303,7 +303,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     /**
      * Attempt to stream more tuples from the table to the provided
      * output stream.
-     * Return remaining tuple count, 0 if done, or -1 on error.
+     * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
      */
     int64_t streamMore(TupleOutputStreamProcessor &outputStreams,
                        TableStreamType streamType,

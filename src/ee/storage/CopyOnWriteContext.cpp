@@ -79,10 +79,6 @@ CopyOnWriteContext::handleActivation(TableStreamType streamType, bool reactivate
         return ACTIVATION_UNSUPPORTED;
     }
 
-    if (m_totalTuples == 0) {
-        return ACTIVATION_SUCCEEDED;
-    }
-
     if (m_surgeon.hasIndex() && !m_surgeon.isIndexingComplete()) {
         VOLT_ERROR("COW context activation is not allowed while elastic indexing is in progress.");
         return ACTIVATION_FAILED;
@@ -97,18 +93,14 @@ CopyOnWriteContext::handleActivation(TableStreamType streamType, bool reactivate
 
 /*
  * Serialize to multiple output streams.
- * Return remaining tuple count, 0 if done, or -1 on error.
+ * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
  */
 int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputStreams,
                                              std::vector<int> &retPositions) {
     assert(m_iterator != NULL);
 
-    if (m_totalTuples == 0) {
-        return 0;
-    }
-
     // Don't expect to be re-called after streaming all the tuples.
-    if (m_tuplesRemaining == 0) {
+    if (m_totalTuples != 0 && m_tuplesRemaining == 0) {
         throwFatalException("serializeMore() was called again after streaming completed.")
     }
 

@@ -30,12 +30,14 @@ CopyOnWriteIterator::CopyOnWriteIterator(
         m_blockOffset(0),
         m_currentBlock(NULL) {
     //Prime the pump
-    m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, m_blockIterator.data());
-    m_location = m_blockIterator.key();
-    m_currentBlock = m_blockIterator.data();
-    m_blockIterator.data() = TBPtr();
+    if (m_blockIterator != m_end) {
+        m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, m_blockIterator.data());
+        m_location = m_blockIterator.key();
+        m_currentBlock = m_blockIterator.data();
+        m_blockIterator.data() = TBPtr();
+        m_blockIterator++;
+    }
     m_blockOffset = 0;
-    m_blockIterator++;
 }
 
 /**
@@ -43,7 +45,9 @@ CopyOnWriteIterator::CopyOnWriteIterator(
  * and mark them as clean so that they can be copied during the next snapshot.
  */
 bool CopyOnWriteIterator::next(TableTuple &out) {
-    assert(m_currentBlock != NULL);
+    if (m_currentBlock == NULL) {
+        return false;
+    }
     while (true) {
         if (m_blockOffset >= m_currentBlock->unusedTupleBoundry()) {
             if (m_blockIterator == m_end) {
@@ -79,6 +83,9 @@ bool CopyOnWriteIterator::next(TableTuple &out) {
 }
 
 int64_t CopyOnWriteIterator::countRemaining() const {
+    if (m_currentBlock == NULL) {
+        return 0;
+    }
     TableTuple out(m_table->schema());
     uint32_t blockOffset = m_blockOffset;
     char *location = m_location;

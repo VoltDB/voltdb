@@ -344,7 +344,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /**
          * Serialize tuples to output streams from a table in COW mode.
          * Overload that serializes a stream position array.
-         * Return remaining tuple count, 0 if done, or -1 on error.
+         * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
          */
         int64_t tableStreamSerializeMore(const CatalogId tableId,
                                          const TableStreamType streamType,
@@ -353,7 +353,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /**
          * Serialize tuples to output streams from a table in COW mode.
          * Overload that populates a position vector provided by the caller.
-         * Return remaining tuple count, 0 if done, or -1 on error.
+         * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
          */
         int64_t tableStreamSerializeMore(const CatalogId tableId,
                                          const TableStreamType streamType,

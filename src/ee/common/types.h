@@ -367,6 +367,12 @@ enum TableStreamType {
     TABLE_STREAM_NONE = -1
 };
 
+// Serialization special values returned by serializeMore(), etc. instead
+// of the normal count. There's only one possible value for now.
+enum TableStreamSerializationError {
+    TABLE_STREAM_SERIALIZATION_ERROR = -1
+};
+
 /**
  * Return true if the table stream type uses predicates.
  */

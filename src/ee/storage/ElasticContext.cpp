@@ -85,18 +85,18 @@ bool ElasticContext::handleDeactivation(TableStreamType streamType)
 
 /*
  * Serialize to output stream.
- * Return remaining tuple count, 0 if done, or -1 on error.
+ * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
  */
 int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStreams,
                                          std::vector<int> &retPositions)
 {
     if (!m_surgeon.hasIndex()) {
         VOLT_ERROR("Elastic streaming was invoked without proper activation.");
-        return -1;
+        return TABLE_STREAM_SERIALIZATION_ERROR;
     }
     if (m_surgeon.isIndexingComplete()) {
         VOLT_ERROR("Elastic streaming was called after indexing had already completed.");
-        return -1;
+        return TABLE_STREAM_SERIALIZATION_ERROR;
     }
 
     // Populate index with current tuples.
