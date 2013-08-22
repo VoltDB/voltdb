@@ -90,10 +90,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     private int m_eeCacheSize = 0;
 
     /** Context information of the current running procedure*/
-    private RunningProcedureContext m_rProcContext;
+    private RunningProcedureContext m_rProcContext = new RunningProcedureContext();
     private boolean m_readOnly;
     private long m_startTime;
     private static final long m_logDuration = 1000;
+
+    /** information about EE calls back to JAVA. For test.*/
+    public int m_callsFromEE = 0;
+    public long m_lastTuplesAccessed = 0;
 
     /** Make the EE clean and ready to do new transactional work. */
     public void resetDirtyStatus() {
@@ -320,19 +324,24 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             String lastAccessedTable,
             long lastAccessedTableSize,
             long tuplesFound) {
+        ++m_callsFromEE;
+        m_lastTuplesAccessed = tuplesFound;
+
         long currentTime = System.currentTimeMillis();
         long duration = currentTime - m_startTime;
         long logDuration = m_logDuration;
-        if(duration > m_logDuration) {
-            VoltLogger log = new VoltLogger("CONSOLE");
 
+        if(duration > m_logDuration) {
+            if(m_rProcContext==null) {
+                m_rProcContext = new RunningProcedureContext();
+            }
+            VoltLogger log = new VoltLogger("CONSOLE");
             log.info("Procedure "+m_rProcContext.m_procedureName+" is taking a long time to execute -- "+duration/1000.0+" seconds spent accessing "
                     +tuplesFound+" tuples. Current plan fragment "+planNodeName+" in query "+(m_rProcContext.m_batchIndexBase+batchIndex+1)
                     +" of batch "+m_rProcContext.m_voltExecuteSQLIndex+" on site "+CoreUtils.hsIdToString(m_siteId)+".");
-
             logDuration = (logDuration < 30000) ? 2*logDuration : 30000;
         }
-        //Set timer and time out read only queries.
+        // Set a timer and time out read only queries.
         //        if(m_readOnly && currentTime - m_startTime > Long.MAX_VALUE)
         //            return true;
         //        else
