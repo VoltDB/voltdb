@@ -467,6 +467,63 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             return retval;
         }
 
+        /**
+         * Read and deserialize a int from the wire.
+         */
+        public int readInt() throws IOException {
+            final ByteBuffer intBytes = ByteBuffer.allocate(4);
+
+            //resultTablesLengthBytes.order(ByteOrder.LITTLE_ENDIAN);
+            while (intBytes.hasRemaining()) {
+                int read = m_socketChannel.read(intBytes);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            intBytes.flip();
+
+            final int retval = intBytes.getInt();
+            return retval;
+        }
+
+        /**
+         * Read and deserialize a int from the wire.
+         */
+        public short readShort() throws IOException {
+            final ByteBuffer shortBytes = ByteBuffer.allocate(2);
+
+            //resultTablesLengthBytes.order(ByteOrder.LITTLE_ENDIAN);
+            while (shortBytes.hasRemaining()) {
+                int read = m_socketChannel.read(shortBytes);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            shortBytes.flip();
+
+            final short retval = shortBytes.getShort();
+            return retval;
+        }
+
+        /**
+         * Read and deserialize a int from the wire.
+         */
+        public String readString(int size) throws IOException {
+            final ByteBuffer stringBytes = ByteBuffer.allocate(size);
+
+            //resultTablesLengthBytes.order(ByteOrder.LITTLE_ENDIAN);
+            while (stringBytes.hasRemaining()) {
+                int read = m_socketChannel.read(stringBytes);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            stringBytes.flip();
+
+            final String retval = new String(stringBytes.array());
+            return retval;
+        }
+
         public void throwException(final int errorCode) throws IOException {
             final ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
             while (lengthBuffer.hasRemaining()) {
@@ -791,6 +848,21 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     byte[] plan = planForFragmentId(fragmentId);
                     m_data.clear();
                     m_data.put(plan);
+                    m_data.flip();
+                    m_connection.write();
+                }
+                else if (result == ExecutionEngine.ERRORCODE_PROGRESS_UPDATE) {
+                    int batchIndex = m_connection.readInt();
+                    short size = m_connection.readShort();
+                    String planNodeName = m_connection.readString(size);
+                    size = m_connection.readShort();
+                    String lastAccessedTable = m_connection.readString(size);
+                    long lastAccessedTableSize = m_connection.readLong();
+                    long tuplesFound = m_connection.readLong();
+                    boolean isCancel = fragmentProgressUpdate(batchIndex, planNodeName, lastAccessedTable, lastAccessedTableSize, tuplesFound);
+                    short isCancelInt = isCancel ? (short)1 : 0;
+                    m_data.clear();
+                    m_data.putShort(isCancelInt);
                     m_data.flip();
                     m_connection.write();
                 }

@@ -144,6 +144,7 @@ public class ProcedureRunner {
         m_systemProcedureContext = sysprocContext;
         m_csp = csp;
         m_rProcContext = new RunningProcedureContext();
+        m_rProcContext.m_procedureName = this.m_procedureName;
 
         m_procedure.init(this);
 
@@ -575,8 +576,6 @@ public class ProcedureRunner {
             // memo-ize the original batch size here
             int batchSize = m_batch.size();
             m_rProcContext.m_voltExecuteSQLIndex++;
-
-            m_rProcContext.m_procedureName = this.m_procedureName;
 
             // if batch is small (or reasonable size), do it in one go
             if (batchSize <= MAX_BATCH_SIZE) {

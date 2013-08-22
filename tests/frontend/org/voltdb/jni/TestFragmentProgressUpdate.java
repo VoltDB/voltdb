@@ -25,9 +25,11 @@ package org.voltdb.jni;
 
 import junit.framework.TestCase;
 
+import org.voltdb.BackendTarget;
 import org.voltdb.LegacyHashinator;
 import org.voltdb.ParameterSet;
 import org.voltdb.RunningProcedureContext;
+import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -44,6 +46,33 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
 public class TestFragmentProgressUpdate extends TestCase {
+    public void testJNIFragmentProgressUpdate() throws Exception {
+        m_ee = new ExecutionEngineJNI(
+                CLUSTER_ID,
+                NODE_ID,
+                0,
+                0,
+                "",
+                100,
+                HashinatorType.LEGACY,
+                LegacyHashinator.getConfigureBytes(1));
+        testFragmentProgressUpdate();
+    }
+
+//    public void testIPCFragmentProgressUpdate() throws Exception {
+//        m_ee = new ExecutionEngineIPC(
+//                CLUSTER_ID,
+//                NODE_ID,
+//                0,
+//                0,
+//                "",
+//                100,
+//                BackendTarget.NATIVE_EE_IPC,
+//                10000,
+//                HashinatorType.LEGACY,
+//                LegacyHashinator.getConfigureBytes(1));
+//        testFragmentProgressUpdate();
+//    }
 
     public void testFragmentProgressUpdate() throws Exception {
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
@@ -113,15 +142,6 @@ public class TestFragmentProgressUpdate extends TestCase {
     protected void setUp() throws Exception {
         super.setUp();
         VoltDB.instance().readBuildInfo("Test");
-        m_ee = new ExecutionEngineJNI(
-                        CLUSTER_ID,
-                        NODE_ID,
-                        0,
-                        0,
-                        "",
-                        100,
-                        HashinatorType.LEGACY,
-                        LegacyHashinator.getConfigureBytes(1));
     }
 
     @Override

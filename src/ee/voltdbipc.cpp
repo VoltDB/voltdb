@@ -770,7 +770,51 @@ bool VoltDBIPC::fragmentProgressUpdate(int32_t batchIndex,
         std::string targetTableName,
         int64_t targetTableSize,
         int64_t tuplesFound) {
-    return false;
+    char message[sizeof(int8_t) + sizeof(int32_t) + sizeof(planNodeName) + sizeof(targetTableName) +
+                 sizeof(targetTableSize) + sizeof(tuplesFound)];
+    message[0] = static_cast<int8_t>(kErrorCode_progressUpdate);
+    *reinterpret_cast<int32_t*>(&message[1]) = htonl(batchIndex);
+
+    int16_t strSize = static_cast<int16_t>(planNodeName.size());
+    *reinterpret_cast<int16_t*>(&message[5]) = htons(strSize);
+    ::memcpy( &message[7], planNodeName.c_str(), strSize);
+    int offset = 7 + strSize;
+
+    strSize = static_cast<int16_t>(targetTableName.size());
+    *reinterpret_cast<int16_t*>(&message[offset]) = htons(strSize);
+    offset += 2;
+    ::memcpy( &message[offset], targetTableName.c_str(), strSize);
+    offset += strSize;
+
+    *reinterpret_cast<int64_t*>(&message[offset]) = htonll(targetTableSize);
+    offset += 8;
+
+    *reinterpret_cast<int64_t*>(&message[offset]) = htonll(tuplesFound);
+
+    int32_t length;
+    ssize_t bytes = read(m_fd, &length, sizeof(int32_t));
+    if (bytes != sizeof(int32_t)) {
+        printf("Error - blocking read failed. %jd read %jd attempted",
+                (intmax_t)bytes, (intmax_t)sizeof(int32_t));
+        fflush(stdout);
+        assert(false);
+        exit(-1);
+    }
+    length = static_cast<int32_t>(ntohl(length) - sizeof(int32_t));
+    assert(length > 0);
+
+    int16_t isCancel;
+    bytes = read(m_fd, &isCancel, sizeof(int16_t));
+    if (bytes != sizeof(int16_t)) {
+        printf("Error - blocking read failed. %jd read %jd attempted",
+                (intmax_t)bytes, (intmax_t)sizeof(int16_t));
+        fflush(stdout);
+        assert(false);
+        exit(-1);
+    }
+    isCancel = static_cast<int16_t>(ntohs(isCancel));
+
+    return (isCancel == 1);
 }
 
 std::string VoltDBIPC::planForFragmentId(int64_t fragmentId) {
@@ -1274,8 +1318,6 @@ int main(int argc, char **argv) {
     int fd = -1;
     /* max message size that can be read from java */
     int max_ipc_message_size = (1024 * 1024 * 2);
-
-    int port = 0;
 
     // allow called to override port with the first argument
     if (argc == 2) {

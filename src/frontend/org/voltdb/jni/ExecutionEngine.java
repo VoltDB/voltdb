@@ -72,6 +72,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public static final int ERRORCODE_ERROR = 1; // just error or not so far.
     public static final int ERRORCODE_WRONG_SERIALIZED_BYTES = 101;
     public static final int ERRORCODE_NEED_PLAN = 110;
+    public static final int ERRORCODE_PROGRESS_UPDATE = 111;
 
     /** For now sync this value with the value in the EE C++ code to get good stats. */
     public static final int EE_PLAN_CACHE_SIZE = 1000;
@@ -93,7 +94,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     private RunningProcedureContext m_rProcContext = new RunningProcedureContext();
     private boolean m_readOnly;
     private long m_startTime;
-    private static final long m_logDuration = 1000;
+    private static final long m_logDuration = 0;
 
     /** information about EE calls back to JAVA. For test.*/
     public int m_callsFromEE = 0;
@@ -401,9 +402,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     {
         try {
             m_rProcContext = rProcContext;
-            //For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
+            // For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
             m_readOnly = (undoQuantumToken == Long.MAX_VALUE) ? true : false;
-            //Consider put the following line in EEJNI.coreExecutePlanFrag... before where the native method is called?
+            // Consider put the following line in EEJNI.coreExecutePlanFrag... before where the native method is called?
             m_startTime = System.currentTimeMillis();
             VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
                     parameterSets, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
