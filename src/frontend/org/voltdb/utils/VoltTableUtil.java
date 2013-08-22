@@ -118,6 +118,14 @@ public class VoltTableUtil {
         return table;
     }
 
+    /**
+     * Add rows data to VoltTable.
+     *
+     * @param table
+     * @param fields
+     * @param columnTypes
+     * @return
+     */
     public static VoltTable toVoltTableFromLine(VoltTable table, String fields[], ArrayList<VoltType> columnTypes) {
 
         if (fields == null || fields.length <= 0) {
