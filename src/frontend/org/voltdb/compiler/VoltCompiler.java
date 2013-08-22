@@ -888,8 +888,46 @@ public class VoltCompiler {
             Collection<ProcedureDescriptor> allProcs = voltDdlTracker.getProcedureDescriptors();
             compileProcedures(db, hsql, allProcs, classDependencies, whichProcs);
         }
+
+        // add extra classes from the DDL
+        addExtraClasses(voltDdlTracker.m_extraClassses);
     }
 
+    /**
+     * Once the DDL file is over, take all of the extra classes found and add them to the jar.
+     */
+    private void addExtraClasses(String[] extraClassses) throws VoltCompilerException {
+
+        List<String> addedClasses = new ArrayList<String>();
+
+        for (String className : extraClassses) {
+            try {
+                Class<?> clz = Class.forName(className);
+
+                if (addClassToJar(clz)) {
+                    addedClasses.add(className);
+                }
+
+            } catch (Exception e) {
+                String msg = "Class %s could not be loaded/found/added to the jar. " +
+                             "";
+                msg = String.format(msg, className);
+                throw new VoltCompilerException(msg);
+            }
+        }
+
+        if (addedClasses.size() > 10) {
+            addInfo(String.format("Added %d additional classes to the catalog jar.",
+                    addedClasses.size()));
+        }
+        else {
+            String logMsg = "Added the following additional classes to the catalog jar:";
+            for (String className : addedClasses) {
+                logMsg += className + "\n";
+            }
+            addInfo(logMsg);
+        }
+    }
 
     /**
      * @param db the database entry in the catalog
@@ -1836,11 +1874,15 @@ public class VoltCompiler {
     // this needs to be reset in the main compile func
     private static final HashSet<Class<?>> cachedAddedClasses = new HashSet<Class<?>>();
 
-    public void addClassToJar(final Class<?> cls)
+    /**
+     * Return true if the class was added. Return false if the class was already in the
+     * jar. Throw and exception if the class can't be added for another reason.
+     */
+    public boolean addClassToJar(final Class<?> cls)
     throws VoltCompiler.VoltCompilerException {
 
         if (cachedAddedClasses.contains(cls)) {
-            return;
+            return false;
         } else {
             cachedAddedClasses.add(cls);
         }
@@ -1883,7 +1925,7 @@ public class VoltCompiler {
             e.printStackTrace();
             System.exit(-1);
             // Prevent warning  about fis possibly being null below.
-            return;
+            return false;
         }
 
         assert(fileSize > 0);
@@ -1901,6 +1943,7 @@ public class VoltCompiler {
         }
 
         m_jarOutput.put(packagePath, fileBytes);
+        return true;
     }
 
     /**

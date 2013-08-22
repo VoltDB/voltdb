@@ -79,12 +79,12 @@ public class TestDDLCompiler extends TestCase {
         fail();
     }
 
-    /**
-     * Note, this should succeed as HSQL doesn't have a hard limit
-     * on the number of columns. The test in TestVoltCompiler will
-     * fail on 1025 columns.
-     * @throws HSQLParseException
-     */
+    //
+    // Note, this should succeed as HSQL doesn't have a hard limit
+    // on the number of columns. The test in TestVoltCompiler will
+    // fail on 1025 columns.
+    // @throws HSQLParseException
+    //
     public void testTooManyColumnTable() throws IOException, HSQLParseException {
         String schemaPath = "";
         URL url = TestVoltCompiler.class.getResource("toowidetable-ddl.sql");
@@ -107,14 +107,14 @@ public class TestDDLCompiler extends TestCase {
 
     }
 
-    /**
-     * Before the fix for ENG-912, the following schema would work:
-     *  create table tmc (name varchar(32), user varchar(32));
-     * but this wouldn't:
-     *  create table tmc (name varchar(32), user varchar(32), primary key (name, user));
-     *
-     * Changes in HSQL's ParserDQL and ParserBase make this more consistent
-     */
+    //
+    // Before the fix for ENG-912, the following schema would work:
+    //  create table tmc (name varchar(32), user varchar(32));
+    // but this wouldn't:
+    //  create table tmc (name varchar(32), user varchar(32), primary key (name, user));
+    //
+    // Changes in HSQL's ParserDQL and ParserBase make this more consistent
+    //
     public void testENG_912() throws HSQLParseException {
         String schema = "create table tmc (name varchar(32), user varchar(32), primary key (name, user));";
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
@@ -126,10 +126,10 @@ public class TestDDLCompiler extends TestCase {
 
     }
 
-    /**
-     * Before fixing ENG-2345, the VIEW definition wouldn't compile if it were
-     * containing single quote characters.
-     */
+    //
+    // Before fixing ENG-2345, the VIEW definition wouldn't compile if it were
+    // containing single quote characters.
+    //
     public void testENG_2345() throws HSQLParseException {
         String table = "create table tmc (name varchar(32), user varchar(32), primary key (name, user));";
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
@@ -144,10 +144,10 @@ public class TestDDLCompiler extends TestCase {
 
     }
 
-    /**
-     * ENG-4865
-     * @throws HSQLParseException
-     */
+    //
+    // ENG-4865
+    // @throws HSQLParseException
+    //
     public void testUniqueIndexGiveWarnings() throws HSQLParseException {
         // ensure the test cleans up
         File jarOut = new File("checkCompilerWarnings.jar");
@@ -248,11 +248,11 @@ public class TestDDLCompiler extends TestCase {
         }
     }
 
-    /**
-     * ENG-2643: Ensure VoltDB can compile DDL with check and fk constrants,
-     * but warn the user, rather than silently ignoring the stuff VoltDB
-     * doesn't support.
-     */
+    //
+    // ENG-2643: Ensure VoltDB can compile DDL with check and fk constrants,
+    // but warn the user, rather than silently ignoring the stuff VoltDB
+    // doesn't support.
+    //
     public void testFKsAndChecksGiveWarnings() throws HSQLParseException {
         // ensure the test cleans up
         File jarOut = new File("checkCompilerWarnings.jar");
@@ -320,6 +320,24 @@ public class TestDDLCompiler extends TestCase {
 
         // verify no warnings
         assertEquals(0, compiler.m_warnings.size());
+
+        // cleanup after the test
+        jarOut.delete();
+    }
+
+    public void testExtraClasses() {
+        // ensure the test cleans up
+        File jarOut = new File("checkCompilerWarnings.jar");
+        jarOut.deleteOnExit();
+
+        String schema1 = "IMPORT CLASS from org.voltdb.**;";
+
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema1);
+
+        // compile successfully
+        VoltCompiler compiler = new VoltCompiler();
+        boolean success =compiler.compileFromDDL(jarOut.getPath(), schemaFile.getPath());
+        assertTrue(success);
 
         // cleanup after the test
         jarOut.delete();
