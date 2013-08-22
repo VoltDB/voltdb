@@ -20,19 +20,23 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+package csvbenchmark.procedures;
 
-package scans.procedures;
-
+import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
 
-public class MinIndexScan extends VoltProcedure
-{
-    public final SQLStmt sql = new SQLStmt("select * from narrow_index_p where val >= 0 and p < 0;");
+@ProcInfo(
+        partitionInfo = "narrow_long_ix.a:0",
+        singlePartition = true)
 
-    public VoltTable[] run() {
-        voltQueueSQL(sql);
-        return voltExecuteSQL();
+public class DoNothingProcedure extends VoltProcedure {
+
+    // Inserts an area code/state mapping
+    //public final SQLStmt insertACSStmt = new SQLStmt("INSERT INTO narrow_short_noix (a,b,c,d,e) VALUES (?,?,?,?,?);");
+    public final SQLStmt insertACSStmt = new SQLStmt("INSERT INTO narrow_long_noix (a,b,c,d,e) VALUES (?,?,?,?,?);");
+
+    public long run(int a, int b, int c, long d, String e) {
+        return 0;
     }
 }

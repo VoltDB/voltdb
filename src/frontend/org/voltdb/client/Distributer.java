@@ -90,10 +90,15 @@ class Distributer {
         private final boolean multiPart;
         private final boolean readOnly;
         private final int partitionParameter;
-        private Procedure(boolean multiPart,boolean readOnly, int partitionParameter) {
+        private final int partitionParameterType;
+        private Procedure(boolean multiPart,
+                boolean readOnly,
+                int partitionParameter,
+                int partitionParameterType) {
             this.multiPart = multiPart;
             this.readOnly = readOnly;
             this.partitionParameter = multiPart? PARAMETER_NONE : partitionParameter;
+            this.partitionParameterType = multiPart ? PARAMETER_NONE : partitionParameterType;
         }
     }
 
@@ -620,7 +625,7 @@ class Distributer {
 
         NodeConnection cxn = new NodeConnection(instanceIdWhichIsTimestampAndLeaderIp, address);
         Connection c = m_network.registerChannel( aChannel, cxn);
-        cxn.m_hostname = c.getHostnameOrIP();
+        cxn.m_hostname = c.getHostnameAndIP();
         cxn.m_port = port;
         cxn.m_connection = c;
 
@@ -708,7 +713,9 @@ class Distributer {
                 if (procedureInfo != null) {
                     Integer hashedPartition = MpInitiator.MP_INIT_PID;
                     if (!procedureInfo.multiPart) {
-                        hashedPartition = invocation.getHashinatedParam(procedureInfo.partitionParameter);
+                        hashedPartition =
+                            invocation.getHashinatedParam(procedureInfo.partitionParameterType,
+                                procedureInfo.partitionParameter);
                     }
                     /*
                      * If the procedure is read only and single part, load balance across replicas
@@ -951,10 +958,14 @@ class Distributer {
                 boolean readOnly = jsObj.getBoolean(JdbcDatabaseMetaDataGenerator.JSON_READ_ONLY);
                 if (jsObj.getBoolean(JdbcDatabaseMetaDataGenerator.JSON_SINGLE_PARTITION)) {
                     int partitionParameter = jsObj.getInt(JdbcDatabaseMetaDataGenerator.JSON_PARTITION_PARAMETER);
-                    m_procedureInfo.put(procedureName, new Procedure(false,readOnly, partitionParameter));
+                    int partitionParameterType =
+                        jsObj.getInt(JdbcDatabaseMetaDataGenerator.JSON_PARTITION_PARAMETER_TYPE);
+                    m_procedureInfo.put(procedureName,
+                            new Procedure(false,readOnly, partitionParameter, partitionParameterType));
                 } else {
                     // Multi Part procedure JSON descriptors omit the partitionParameter
-                    m_procedureInfo.put(procedureName, new Procedure(true, readOnly, Procedure.PARAMETER_NONE));
+                    m_procedureInfo.put(procedureName, new Procedure(true, readOnly, Procedure.PARAMETER_NONE,
+                                Procedure.PARAMETER_NONE));
                 }
 
             } catch (JSONException e) {

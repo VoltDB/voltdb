@@ -1119,7 +1119,7 @@ public class SnapshotUtil {
             }
 
             @Override
-            public String getHostnameOrIP() {
+            public String getHostnameAndIP() {
                 throw new UnsupportedOperationException();
             }
 
