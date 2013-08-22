@@ -101,6 +101,9 @@ public class SchemaColumn
                     return true;
                 }
             }
+            else if (tableName.equals("VOLT_TEMP_TABLE")) {
+                return true;
+            }
         }
 
         return false;
@@ -108,6 +111,7 @@ public class SchemaColumn
 
     @Override
     public int hashCode () {
+        // based on implementation of equals
         int result = m_tableName.hashCode();
         if (m_columnName != null && !m_columnName.equals("")) {
             result += m_columnName.hashCode();
