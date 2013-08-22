@@ -397,16 +397,16 @@ public class JoinNode implements Cloneable {
      * @param tree - The join tree
      * @return the list of sub-trees from the input tree
      */
-    public static List<JoinNode> extractSubTrees(JoinNode tree) {
+    public List<JoinNode> extractSubTrees() {
         List<JoinNode> subTrees = new ArrayList<JoinNode>();
         // Extract the first sub-tree starting at the root
         List<JoinNode> leafNodes = new ArrayList<JoinNode>();
-        extractSubTree(tree, leafNodes);
-        subTrees.add(tree);
+        extractSubTree(leafNodes);
+        subTrees.add(this);
 
         // Continue with the leafs
         for (JoinNode leaf : leafNodes) {
-            subTrees.addAll(extractSubTrees(leaf));
+            subTrees.addAll(leaf.extractSubTrees());
         }
         return subTrees;
     }
@@ -419,11 +419,11 @@ public class JoinNode implements Cloneable {
      * @param root - The root of the join tree
      * @param leafNodes - the list of the root nodes of the next sub-trees
      */
-    private static void extractSubTree(JoinNode root, List<JoinNode> leafNodes) {
-        if (root.m_table != null) {
+    private void extractSubTree(List<JoinNode> leafNodes) {
+        if (m_table != null) {
             return;
         }
-        JoinNode[] children = {root.m_leftNode, root.m_rightNode};
+        JoinNode[] children = {m_leftNode, m_rightNode};
         for (JoinNode child : children) {
 
             // Leaf nodes don't have a significant join type,
@@ -432,10 +432,10 @@ public class JoinNode implements Cloneable {
                 continue;
             }
 
-            if (child.m_joinType == root.m_joinType) {
+            if (child.m_joinType == m_joinType) {
                 // The join type for this node is the same as the root's one
                 // Keep walking down the tree
-                extractSubTree(child, leafNodes);
+                child.extractSubTree(leafNodes);
             } else {
                 // The join type for this join differs from the root's one
                 // Terminate the sub-tree
@@ -444,10 +444,10 @@ public class JoinNode implements Cloneable {
                 // This will help to distinguish it from a real node and to reassemble the tree at the later stage
                 JoinNode tempNode = new JoinNode(
                         -child.m_id, child.m_joinType, new Table(), child.m_joinExpr, child.m_whereExpr);
-                if (child == root.m_leftNode) {
-                    root.m_leftNode = tempNode;
+                if (child == m_leftNode) {
+                    m_leftNode = tempNode;
                 } else {
-                    root.m_rightNode = tempNode;
+                    m_rightNode = tempNode;
                 }
             }
         }

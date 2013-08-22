@@ -206,7 +206,7 @@ public class TestPlansJoin extends PlannerTestCase {
         p = ((AbstractScanPlanNode) n).getPredicate();
         assertEquals(ExpressionType.COMPARE_GREATERTHAN, p.getExpressionType());
 
-        pn = compile("select A,C FROM R1 JOIN R2 USING (A, C) WHERE A > 0");
+        pn = compile("select A,C FROM R1 JOIN R2 USING (A, C)");
         n = pn.getChild(0).getChild(0);
         assertTrue(n instanceof AbstractJoinPlanNode);
         p = ((AbstractJoinPlanNode) n).getJoinPredicate();
@@ -232,11 +232,13 @@ public class TestPlansJoin extends PlannerTestCase {
         p = ((AbstractJoinPlanNode) n).getJoinPredicate();
         assertEquals(ExpressionType.COMPARE_EQUAL, p.getExpressionType());
         n = n.getChild(0);
-        assertTrue(n instanceof AbstractScanPlanNode);
-        s = (AbstractScanPlanNode) n;
-        assertEquals(ExpressionType.COMPARE_GREATERTHAN, s.getPredicate().getExpressionType());
-
-
+        assertTrue(n instanceof AbstractJoinPlanNode);
+        p = ((AbstractJoinPlanNode) n).getJoinPredicate();
+        assertEquals(ExpressionType.COMPARE_EQUAL, p.getExpressionType());
+        n = n.getChild(0);
+        assertTrue(((AbstractScanPlanNode) n).getTargetTableName().equalsIgnoreCase("R1"));
+        p = ((AbstractScanPlanNode) n).getPredicate();
+        assertEquals(ExpressionType.COMPARE_GREATERTHAN, p.getExpressionType());
     }
 
     public void testTransitiveValueEquivalenceConditions() {

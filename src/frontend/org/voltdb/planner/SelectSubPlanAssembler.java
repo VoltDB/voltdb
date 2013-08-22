@@ -141,7 +141,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         assert(m_parsedStmt.joinTree != null);
 
         // Split the original tree into the sub-trees having the same join type for all nodes
-        List<JoinNode> subTrees = JoinNode.extractSubTrees(m_parsedStmt.joinTree);
+        List<JoinNode> subTrees = m_parsedStmt.joinTree.extractSubTrees();
 
         // For a sub-tree with inner joins only any join order is valid. The only requirement is that
         // each and every table from that sub-tree constitute an uninterrupted sequence in the specified join order
@@ -232,7 +232,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         // Clone the original
         JoinNode clonedTree = (JoinNode) simplifiedJoinTree.clone();
         // Split join tree into a set of subtrees. The join type for all nodes in a subtree is the same
-        List<JoinNode> subTrees = JoinNode.extractSubTrees(clonedTree);
+        List<JoinNode> subTrees = clonedTree.extractSubTrees();
         assert(!subTrees.isEmpty());
         // Generate possible join orders for each sub-tree separately
         ArrayList<ArrayList<JoinNode>> joinOrderList = generateJoinOrders(subTrees);
