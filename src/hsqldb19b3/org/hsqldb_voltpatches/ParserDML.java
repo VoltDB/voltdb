@@ -229,7 +229,7 @@ public class ParserDML extends ParserDQL {
                             }
                         }
 
-                        if (e.isParam()) {
+                        if (e.isParam) {
                             e.setAttributesAsColumn(
                                 table.getColumn(columnMap[i]), true);
                         } else if (e.getType() == OpTypes.DEFAULT) {
@@ -317,7 +317,7 @@ public class ParserDML extends ParserDQL {
             Expression[] list = tableExpression.nodes[i].nodes;
 
             for (int j = 0; j < list.length; j++) {
-                if (list[j].isParam()) {
+                if (list[j].isParam) {
                     list[j].setAttributesAsColumn(
                         table.getColumn(columnMap[j]), true);
                 }
@@ -406,7 +406,7 @@ public class ParserDML extends ParserDQL {
             ExpressionColumn.checkColumnsResolved(unresolved);
             condition.resolveTypes(session, null);
 
-            if (condition.isParam()) {
+            if (condition.isParam) {
                 condition.dataType = Type.SQL_BOOLEAN;
             }
 
@@ -488,7 +488,7 @@ public class ParserDML extends ParserDQL {
             ExpressionColumn.checkColumnsResolved(unresolved);
             condition.resolveTypes(session, null);
 
-            if (condition.isParam()) {
+            if (condition.isParam) {
                 condition.dataType = Type.SQL_BOOLEAN;
             } else if (condition.getDataType() != Type.SQL_BOOLEAN) {
                 throw Error.error(ErrorCode.X_42568);
@@ -569,7 +569,7 @@ public class ParserDML extends ParserDQL {
                         }
                     }
 
-                    if (e.isParam()) {
+                    if (e.isParam) {
                         e.setAttributesAsColumn(
                             targetTable.getColumn(columnMap[i]), true);
                     } else if (e.getType() == OpTypes.DEFAULT) {
@@ -616,7 +616,7 @@ public class ParserDML extends ParserDQL {
                     }
                 }
 
-                if (e.isParam()) {
+                if (e.isParam) {
                     e.setAttributesAsColumn(
                         targetTable.getColumn(columnMap[i]), true);
                 } else if (e.getType() == OpTypes.DEFAULT) {
@@ -840,7 +840,7 @@ public class ParserDML extends ParserDQL {
         ExpressionColumn.checkColumnsResolved(unresolved);
         mergeCondition.resolveTypes(session, null);
 
-        if (mergeCondition.isParam()) {
+        if (mergeCondition.isParam) {
             mergeCondition.dataType = Type.SQL_BOOLEAN;
         }
 
@@ -1002,7 +1002,7 @@ public class ParserDML extends ParserDQL {
                 for (int i = 0; i < arguments.length; i++) {
                     Expression e = arguments[i];
 
-                    if (e.isParam()) {
+                    if (e.isParam) {
                         e.setAttributesAsColumn(
                             routine.getParameter(i),
                             routine.getParameter(i).isWriteable());

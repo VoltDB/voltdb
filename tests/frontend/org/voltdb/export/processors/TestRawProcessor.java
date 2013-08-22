@@ -30,6 +30,7 @@ import java.util.concurrent.LinkedBlockingDeque;
 
 import junit.framework.TestCase;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
@@ -49,6 +50,7 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 
 public class TestRawProcessor extends TestCase {
+    private static final VoltLogger exportLog = new VoltLogger("EXPORT");
 
     static class MockWriteStream extends org.voltcore.network.MockWriteStream {
         DBBPool pool = new DBBPool();
@@ -158,6 +160,7 @@ public class TestRawProcessor extends TestCase {
         }
 
         rp = new RawProcessor();
+        rp.addLogger(exportLog);
         ds = new MockExportDataSource("db", "table", 1, 3, "foo");
         ExportGeneration generation = new ExportGeneration( 0, null, directory);
         generation.addDataSource(ds);
