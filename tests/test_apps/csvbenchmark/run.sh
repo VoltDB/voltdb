@@ -42,6 +42,7 @@ function clean() {
 
 # compile the source code for procedures and the client
 function srccompile() {
+    return
     mkdir -p obj
     javac -classpath $CLASSPATH -d obj \
         src/${APPNAME}/procedures/*.java

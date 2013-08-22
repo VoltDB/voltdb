@@ -23,7 +23,6 @@ import java.io.StringWriter;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
@@ -1703,8 +1702,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         int[] involvedPartitions = null;
         try {
             CatalogMap<Table> tables = m_catalogContext.get().database.getTables();
-            Object valueToHash = getLoadSinglePartitionTablePartitionParam(tables, task);
-            involvedPartitions = new int[]{TheHashinator.hashToPartition(valueToHash)};
+            int partitionParamType = getLoadSinglePartitionTablePartitionParamType(tables, task);
+            byte[] valueToHash = (byte[])task.getParameterAtIndex(0);
+            involvedPartitions =
+                new int[]{ TheHashinator.getPartitionForParameter(partitionParamType, valueToHash)};
         }
         catch (Exception e) {
             authLog.warn(e.getMessage());
@@ -1727,11 +1728,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     /**
      * XXX: This should go away when we get rid of the legacy hashinator.
      */
-    private static Object getLoadSinglePartitionTablePartitionParam(CatalogMap<Table> tables,
-                                                                    StoredProcedureInvocation spi)
+    private static int getLoadSinglePartitionTablePartitionParamType(CatalogMap<Table> tables,
+                                                                     StoredProcedureInvocation spi)
         throws Exception
     {
-        byte[] paramBytes = (byte[]) spi.getParameterAtIndex(0);
         String tableName = (String) spi.getParameterAtIndex(1);
 
         // get the table from the catalog
@@ -1742,15 +1742,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         Column pCol = catTable.getPartitioncolumn();
-        VoltType paramType = VoltType.get((byte) pCol.getType());
-        ByteBuffer paramBuf = ByteBuffer.wrap(paramBytes);
-        paramBuf.order(ByteOrder.LITTLE_ENDIAN);
-
-        if (paramType.isNumber()) {
-            return paramBuf.getLong();
-        } else {
-            return paramBytes;
-        }
+        return pCol.getType();
     }
 
     /**
@@ -2073,7 +2065,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return isNonDeterministic;
     }
 
-    void createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch) {
+    void createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch)
+            throws VoltTypeException
+    {
         // create the execution site task
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         // DR stuff
@@ -2092,7 +2086,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             else {
                 task.procName = "@AdHoc_RW_SP";
             }
-            partitions = new int[] { TheHashinator.hashToPartition(plannedStmtBatch.partitionParam) };
+            int type = VoltType.NULL.getValue();
+            // replicated table read is single-part without a partitioning param
+            // I copied this from below, but I'm not convinced that the above statement is correct
+            // or that the null behavior here either (a) ever actually happens or (b) has the
+            // desired intent
+            if (plannedStmtBatch.partitionParam != null) {
+                type = VoltType.typeFromObject(plannedStmtBatch.partitionParam).getValue();
+            }
+            partitions = new int[] { TheHashinator.getPartitionForParameter(type, plannedStmtBatch.partitionParam) };
         }
         else {
             if (plannedStmtBatch.isReadOnly()) {
@@ -2208,7 +2210,23 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             processExplainPlannedStmtBatch( plannedStmtBatch );
                         }
                         else {
-                            createAdHocTransaction(plannedStmtBatch);
+                            try {
+                                createAdHocTransaction(plannedStmtBatch);
+                            }
+                            catch (VoltTypeException vte) {
+                                String msg = "Unable to hash the partition for adhoc partition value: " +
+                                    plannedStmtBatch.partitionParam + ", msg: " + vte.getMessage();
+                                ClientResponseImpl errorResponse =
+                                    new ClientResponseImpl(
+                                            ClientResponseImpl.GRACEFUL_FAILURE,
+                                            new VoltTable[0], msg,
+                                            result.clientHandle);
+                                ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+                                buf.putInt(buf.capacity() - 4);
+                                errorResponse.flattenToBuffer(buf);
+                                buf.flip();
+                                c.writeStream().enqueue(buf);
+                            }
                         }
                     }
                     else if (result instanceof CatalogChangeResult) {
