@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.StringTokenizer;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.TreeMap;
@@ -117,8 +118,8 @@ public class CSVLoaderMT {
         public void clientCallback(ClientResponse response) throws Exception {
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 m_log.error(response.getStatusString());
-//                String[] info = {m_rowdata.toString(), response.getStatusString()};
-//                synchronizeErrorInfo(m_lineNum, info);
+                String[] info = {m_rowdata.toString(), response.getStatusString()};
+                synchronizeErrorInfo(m_lineNum, info);
                 return;
             }
             long currentCount = CSVFileReader.outCount.addAndGet(m_batchCount);
@@ -199,6 +200,8 @@ public class CSVLoaderMT {
         boolean check = false;
         @Option(desc = "Use @Ping")
         boolean ping = false;
+        @Option(desc = "Use Per Partition Client")
+        boolean ppc = true;
         @Option(desc = "Batch Size for processing.")
         public long batch = 200;
         @Option(desc = "Use Load Table?")
@@ -275,20 +278,25 @@ public class CSVLoaderMT {
         config = cfg;
         configuration();
         Tokenizer tokenizer = null;
-        ICsvListReader listReader = null;
-
+        Map<String, ICsvListReader> readerMap = new HashMap<String, ICsvListReader>();
         try {
             long st = System.currentTimeMillis();
             if (CSVLoaderMT.standin) {
                 tokenizer = new Tokenizer(new BufferedReader(new InputStreamReader(System.in)), csvPreference,
                         config.strictquotes, config.escape, config.columnsizelimit,
                         config.skip);
-                listReader = new CsvListReader(tokenizer, csvPreference);
+                ICsvListReader listReader = new CsvListReader(tokenizer, csvPreference);
+                readerMap.put("stdin", listReader);
             } else {
-                tokenizer = new Tokenizer(new BufferedReader(new FileReader(config.file)), csvPreference,
-                        config.strictquotes, config.escape, config.columnsizelimit,
-                        config.skip);
-                listReader = new CsvListReader(tokenizer, csvPreference);
+                StringTokenizer tokens = new StringTokenizer(config.file, ",");
+                while (tokens.hasMoreTokens()) {
+                    String fname = tokens.nextToken();
+                    tokenizer = new Tokenizer(new FileReader(fname), csvPreference,
+                            config.strictquotes, config.escape, config.columnsizelimit,
+                            config.skip);
+                    ICsvListReader listReader = new CsvListReader(tokenizer, csvPreference);
+                    readerMap.put(fname, listReader);
+                }
             }
         } catch (FileNotFoundException e) {
             m_log.error("CSV file '" + config.file + "' could not be found.");
@@ -304,8 +312,6 @@ public class CSVLoaderMT {
         Client csvClient = null;
         try {
             csvClient = CSVLoaderMT.getClient(c_config, serverlist, config.port);
-            periodicStatsContext = csvClient.createStatsContext();
-            timer = schedulePeriodicStats(periodicStatsContext, start);
         } catch (Exception e) {
             m_log.error("Error to connect to the servers:"
                     + config.servers);
@@ -401,56 +407,67 @@ public class CSVLoaderMT {
                 System.out.println("Could not figure out number of partitions...exiting..");
                 System.exit(-1);
             }
-            long batch_sz = config.batch / numPartitions;
             System.out.println("Number of Partitions: " + numPartitions);
-            System.out.println("Batch Size is: " + batch_sz);
-            config.batch = batch_sz;
+            System.out.println("Batch Size is: " + config.batch);
 
             TheHashinator.initialize(LegacyHashinator.class, LegacyHashinator.getConfigureBytes(numPartitions));
 
             CSVPartitionProcessor.colInfo = colInfo;
-            CSVPartitionProcessor.colNames = colNames;
             CSVPartitionProcessor.columnTypes = columnTypes;
             CSVPartitionProcessor.insertProcedure = insertProcedure;
             CSVPartitionProcessor.isMP = (partitionedColumnIndex == -1 ? true : false);
             CSVPartitionProcessor.isLoadTable = config.loadTable;
             CSVPartitionProcessor.config = config;
+            List<Thread> rthreads = new ArrayList<Thread>();
+            List<CSVFileReader> readers = new ArrayList<CSVFileReader>();
+            int tnum = 0;
+            for (String readerFile : readerMap.keySet()) {
+                CSVFileReader rdr = new CSVFileReader();
+                readers.add(rdr);
+                Map<Integer, BlockingQueue<CSVLineWithMetaData>> lineq = new HashMap<Integer, BlockingQueue<CSVLineWithMetaData>>();
+                rdr.config = config;
+                rdr.columnCnt = columnCnt;
+                rdr.lineq = lineq;
+                rdr.listReader = readerMap.get(readerFile);
+                rdr.fileName = readerFile;
+                rdr.csvClient = csvClient;
+                rdr.partitionedColumnIndex = partitionedColumnIndex;
+                rdr.tableName = config.table;
+                rdr.typeList = typeList;
 
-            CSVFileReader rdr = new CSVFileReader();
-            Map<Integer, BlockingQueue<CSVLineWithMetaData>> lineq = new HashMap<Integer, BlockingQueue<CSVLineWithMetaData>>();
-            rdr.config = config;
-            rdr.columnCnt = columnCnt;
-            rdr.lineq = lineq;
-            rdr.listReader = listReader;
-            rdr.csvClient = csvClient;
-            rdr.partitionedColumnIndex = partitionedColumnIndex;
-            rdr.tableName = config.table;
+                List<Thread> spawned = new ArrayList<Thread>();
+                CSVLineWithMetaData dummy = new CSVLineWithMetaData();
+                rdr.dummy = dummy;
+                rdr.spawned = spawned;
+                Thread th = new Thread(rdr);
+                th.setName("CSVReader-" + tnum++);
+                th.setDaemon(true);
+                rthreads.add(th);
+                th.start();
+            }
 
-            List<Thread> spawned = new ArrayList<Thread>();
-            CSVLineWithMetaData dummy = new CSVLineWithMetaData();
-            rdr.dummy = dummy;
-            rdr.spawned = spawned;
-            Thread th = new Thread(rdr);
-            th.setName("CSVReader");
-            th.setDaemon(true);
+            //Wait for CSVParser to finish
+            for (Thread th : rthreads) {
+                th.join();
+            }
+            long readerTime = 0;
+            for (CSVFileReader rdr : readers) {
+                readerTime += (rdr.parsingTimeEnd - rdr.parsingTimeSt);
+            }
+            readerTime = readerTime / 1000000;
+            m_log.info("Parsing CSV file took " + readerTime + " milliseconds.");
 
-
-            th.start();
-
-            th.join();
-
-            System.out.println("Done file reading");
-            System.out.println("Processor count: " + spawned.size());
-            for (Thread th2 : spawned) {
-                try {
-                    th2.join();
-                } catch (InterruptedException ex) {
+            for (CSVFileReader rdr : readers) {
+                for (Thread th2 : rdr.spawned) {
+                    try {
+                        th2.join();
+                    } catch (InterruptedException ex) {
+                    }
                 }
             }
             insertTimeEnd = System.currentTimeMillis();
-            m_log.info("Parsing CSV file took " + (rdr.parsingTimeEnd - rdr.parsingTimeSt) / 1000000 + " milliseconds.");
-            m_log.info("Inserting Data took " + ((insertTimeEnd - insertTimeStart) - ((rdr.parsingTimeEnd - rdr.parsingTimeSt) / 1000000)) + " milliseconds.");
-            System.out.println("Done Inserting");
+            m_log.info("Inserting Data took " + ((insertTimeEnd - insertTimeStart) - readerTime) + " milliseconds.");
+
             produceFiles();
             close_cleanup();
             if (timer != null) {
@@ -521,39 +538,6 @@ public class CSVLoaderMT {
                 System.exit(-1);
             }
         }
-    }
-
-    public static String checkparams_trimspace(String[] slot, int columnCnt) {
-        if (slot.length != columnCnt) {
-            return "Error: Incorrect number of columns. " + slot.length
-                    + " found, " + columnCnt + " expected.";
-        }
-        for (int i = 0; i < slot.length; i++) {
-            //supercsv read "" to null
-            if (slot[i] == null) {
-                if (config.blank.equalsIgnoreCase("error")) {
-                    return "Error: blank item";
-                } else if (config.blank.equalsIgnoreCase("empty")) {
-                    slot[i] = blankValues.get(typeList.get(i));
-                }
-                //else config.blank == null which is already the case
-            } // trim white space in this line. SuperCSV preserves all the whitespace by default
-            else {
-                if (config.nowhitespace
-                        && (slot[i].charAt(0) == ' ' || slot[i].charAt(slot[i].length() - 1) == ' ')) {
-                    return "Error: White Space Detected in nowhitespace mode.";
-                } else {
-                    slot[i] = ((String) slot[i]).trim();
-                }
-                // treat NULL, \N and "\N" as actual null value
-                if (slot[i].equals("NULL")
-                        || slot[i].equals(VoltTable.CSV_NULL)
-                        || slot[i].equals(VoltTable.QUOTED_CSV_NULL)) {
-                    slot[i] = null;
-                }
-            }
-        }
-        return null;
     }
 
     private static void configuration() {

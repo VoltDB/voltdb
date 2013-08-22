@@ -18,16 +18,18 @@ package org.voltdb.utils;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.supercsv.exception.SuperCsvException;
 import org.supercsv.io.ICsvListReader;
 import org.voltdb.TheHashinator;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import static org.voltdb.utils.CSVLoaderMT.m_log;
@@ -35,6 +37,7 @@ import static org.voltdb.utils.CSVLoaderMT.m_log;
 class CSVFileReader implements Runnable {
 
     public CSVLoaderMT.CSVConfig config;
+    public String fileName = null;
     public ICsvListReader listReader;
     Client csvClient;
     public Map<Integer, BlockingQueue<CSVLineWithMetaData>> lineq;
@@ -44,7 +47,7 @@ class CSVFileReader implements Runnable {
     int columnCnt = 0;
     int partitionedColumnIndex;
     String parColumnName;
-    CSVLineWithMetaData dummy = new CSVLineWithMetaData();
+    CSVLineWithMetaData dummy;
     int pcnt = 0;
     int batchmax = 200;
     int cur_sz = 0;
@@ -54,9 +57,25 @@ class CSVFileReader implements Runnable {
     public static AtomicLong totalLineCount = new AtomicLong(0);
     public static AtomicLong totalRowCount = new AtomicLong(0);
     public String tableName;
+    private static Map<VoltType, String> blankValues = new HashMap<VoltType, String>();
+
+    static {
+        blankValues.put(VoltType.NUMERIC, "0");
+        blankValues.put(VoltType.TINYINT, "0");
+        blankValues.put(VoltType.SMALLINT, "0");
+        blankValues.put(VoltType.INTEGER, "0");
+        blankValues.put(VoltType.BIGINT, "0");
+        blankValues.put(VoltType.FLOAT, "0.0");
+        blankValues.put(VoltType.TIMESTAMP, "0");
+        blankValues.put(VoltType.STRING, "");
+        blankValues.put(VoltType.DECIMAL, "0");
+        blankValues.put(VoltType.VARBINARY, "");
+    }
+    public List<VoltType> typeList = new ArrayList<VoltType>();
 
     @Override
     public void run() {
+
         List<String> lineList = new ArrayList<String>();
         long ecnt = 0;
         while ((config.limitrows-- > 0)) {
@@ -82,7 +101,7 @@ class CSVFileReader implements Runnable {
                 String lineCheckResult;
                 String[] correctedLine = lineList.toArray(new String[0]);
 
-                if ((lineCheckResult = CSVLoaderMT.checkparams_trimspace(correctedLine,
+                if ((lineCheckResult = checkparams_trimspace(correctedLine,
                         columnCnt)) != null) {
                     String[] info = {lineList.toString(), lineCheckResult};
                     CSVLoaderMT.synchronizeErrorInfoForFuture(totalLineCount.get() + 1, info);
@@ -102,8 +121,8 @@ class CSVFileReader implements Runnable {
                         partitionId = TheHashinator.getPartitionForParameter(VoltType.BIGINT.getValue(), (Object) lineData.line[partitionedColumnIndex - 1]);
                     }
                     if (lineq.get(partitionId) == null) {
-                        ArrayBlockingQueue<CSVLineWithMetaData> q = new ArrayBlockingQueue<CSVLineWithMetaData>(2000);
-                        q.put(lineData);
+                        BlockingQueue<CSVLineWithMetaData> q = new LinkedBlockingQueue<CSVLineWithMetaData>();
+                        q.offer(lineData);
                         lineq.put(partitionId, q);
                         CSVPartitionProcessor pp = new CSVPartitionProcessor();
                         pp.csvClient = csvClient;
@@ -120,7 +139,7 @@ class CSVFileReader implements Runnable {
                         spawned.add(th);
                     } else {
                         BlockingQueue<CSVLineWithMetaData> q = lineq.get(partitionId);
-                        q.put(lineData);
+                        q.offer(lineData);
                     }
                 }
                 totalRowCount.getAndIncrement();
@@ -152,15 +171,49 @@ class CSVFileReader implements Runnable {
             listReader.close();
         } catch (IOException ex) {
             m_log.error("Error cloging Reader: " + ex);
+        } finally {
+            done = true;
+            for (BlockingQueue<CSVLineWithMetaData> q : lineq.values()) {
+                try {
+                    q.put(dummy);
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(CSVLoaderMT.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+            m_log.info("Rows Queued by Reader: " + totalRowCount.get());
         }
-        done = true;
-        for (BlockingQueue<CSVLineWithMetaData> q : lineq.values()) {
-            try {
-                q.put(dummy);
-            } catch (InterruptedException ex) {
-                Logger.getLogger(CSVLoaderMT.class.getName()).log(Level.SEVERE, null, ex);
+    }
+
+    private String checkparams_trimspace(String[] slot, int columnCnt) {
+        if (slot.length != columnCnt) {
+            return "Error: Incorrect number of columns. " + slot.length
+                    + " found, " + columnCnt + " expected.";
+        }
+        for (int i = 0; i < slot.length; i++) {
+            //supercsv read "" to null
+            if (slot[i] == null) {
+                if (config.blank.equalsIgnoreCase("error")) {
+                    return "Error: blank item";
+                } else if (config.blank.equalsIgnoreCase("empty")) {
+                    slot[i] = blankValues.get(typeList.get(i));
+                }
+                //else config.blank == null which is already the case
+            } // trim white space in this line. SuperCSV preserves all the whitespace by default
+            else {
+                if (config.nowhitespace
+                        && (slot[i].charAt(0) == ' ' || slot[i].charAt(slot[i].length() - 1) == ' ')) {
+                    return "Error: White Space Detected in nowhitespace mode.";
+                } else {
+                    slot[i] = ((String) slot[i]).trim();
+                }
+                // treat NULL, \N and "\N" as actual null value
+                if (slot[i].equals("NULL")
+                        || slot[i].equals(VoltTable.CSV_NULL)
+                        || slot[i].equals(VoltTable.QUOTED_CSV_NULL)) {
+                    slot[i] = null;
+                }
             }
         }
-        m_log.info("Rows Queued by Reader: " + totalRowCount.get());
+        return null;
     }
 }

@@ -118,7 +118,7 @@ public class VoltTableUtil {
         return table;
     }
 
-    public static VoltTable toVoltTableFromLine(VoltTable table, String fields[], ArrayList<String> columnNames, ArrayList<VoltType> columnTypes) {
+    public static VoltTable toVoltTableFromLine(VoltTable table, String fields[], ArrayList<VoltType> columnTypes) {
 
         if (fields == null || fields.length <= 0) {
             return table;
