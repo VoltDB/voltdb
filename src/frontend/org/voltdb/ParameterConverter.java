@@ -455,7 +455,7 @@ public class ParameterConverter {
      * @throws Exception if a parse error occurs (consistent with above).
      */
     public static Object stringToLong(Object param, Class<?> slot)
-    throws Exception
+        throws VoltTypeException
     {
         try {
             if (slot == byte.class ||
@@ -468,13 +468,11 @@ public class ParameterConverter {
             return null;
         }
         catch (NumberFormatException nfe) {
-            throw new Exception(
+            throw new VoltTypeException(
                     "tryToMakeCompatible: Unable to convert string "
                     + (String)param + " to "  + slot.getName()
                     + " value for target parameter " + slot.getName());
         }
     }
-
-
 }
 
