@@ -38,7 +38,6 @@ import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -49,8 +48,6 @@ import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
 import java.util.SortedMap;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
@@ -770,16 +767,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             final DailyRollingFileAppender dailyRollingFileAppender = dailyAppender;
 
             Field field = null;
-            try {
-                field = dailyRollingFileAppender.getClass().getDeclaredField("nextCheck");
-                field.setAccessible(true);
-            } catch (NoSuchFieldException e) {
-                hostLog.error("Failed to set daily system info logging: " + e.getMessage());
+            if (dailyRollingFileAppender != null) {
+                try {
+                    field = dailyRollingFileAppender.getClass().getDeclaredField("nextCheck");
+                    field.setAccessible(true);
+                } catch (NoSuchFieldException e) {
+                    hostLog.error("Failed to set daily system info logging: " + e.getMessage());
+                }
             }
             final Field nextCheckField = field;
 
-            final Timer dailyLogTimer = new Timer();
-            class DailyLogTask extends TimerTask {
+            class DailyLogTask implements Runnable {
                 @Override
                 public void run() {
                     try {
@@ -789,7 +787,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
 
                         long nextCheck = nextCheckField.getLong(dailyRollingFileAppender);
-                        dailyLogTimer.schedule(new DailyLogTask(), new Date(nextCheck));
+                        scheduleWork(new DailyLogTask(),
+                                nextCheck - System.currentTimeMillis() + 30 * 1000, 0, TimeUnit.MILLISECONDS);
                     } catch (IllegalAccessException e) {
                         hostLog.error("Failed to set daily system info logging: " + e.getMessage());
                     }
@@ -799,7 +798,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             if (dailyRollingFileAppender != null && nextCheckField != null) {
                 try {
                     long nextCheck = nextCheckField.getLong(dailyRollingFileAppender);
-                    dailyLogTimer.schedule(new DailyLogTask(), new Date(nextCheck));
+                    scheduleWork(new DailyLogTask(),
+                            nextCheck - System.currentTimeMillis() + 30 * 1000, 0, TimeUnit.MILLISECONDS);
                 } catch (IllegalAccessException e) {
                     hostLog.error("Failed to set daily system info logging: " + e.getMessage());
                 }
