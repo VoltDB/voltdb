@@ -26,125 +26,109 @@ package org.voltdb.utils;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.PrintWriter;
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.List;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.log4j.DailyRollingFileAppender;
-import org.apache.log4j.Logger;
-import org.apache.log4j.PatternLayout;
 import org.hsqldb_voltpatches.lib.tar.TarReader;
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.Before;
 import org.junit.Test;
 import org.voltdb.BackendTarget;
-import org.voltdb.CatalogContext;
-import org.voltdb.ServerThread;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltZK;
-import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
-import org.voltdb.types.TimestampType;
-import org.voltdb_testprocs.regressionsuites.failureprocs.CrashVoltDBProc;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CrashJVM;
-
-import com.google.common.io.ByteStreams;
+import org.voltdb_testprocs.regressionsuites.failureprocs.CrashVoltDBProc;
 
 public class TestCollector {
-    private static File voltDbRoot;
-    private static String voltDbRootPath;
+    VoltProjectBuilder builder;
+    LocalCluster cluster;
+    String listener;
+    Client client;
 
-    private static String prefix = "voltdb_logs";
+    String voltDbRootPath;
+    String prefix = "voltdb_logs";
 
-    private static File collectionTgz;
-    private static File collectionFileDecompressed;
+    @Before
+    public void setUp() throws Exception {
+        String simpleSchema =
+                "create table blah (" +
+                "ival bigint default 0 not null, " +
+                "PRIMARY KEY(ival));";
 
-    private static int pid;
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(simpleSchema);
+        builder.addProcedures(CrashJVM.class);
+        builder.addProcedures(CrashVoltDBProc.class);
 
-    @BeforeClass
-    public static void setUp() throws Exception {
-        // configure log4j
-        PatternLayout layout = new PatternLayout("%d   %-5p [%t] %c: %m%n");
-        DailyRollingFileAppender appender = new DailyRollingFileAppender(layout, "log/volt.log", "'.'yyyy-MM-dd");
-        Logger.getRootLogger().addAppender(appender);
+        cluster = new LocalCluster("collect.jar",
+                2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        cluster.setHasLocalServer(false);
+        boolean success = cluster.compile(builder);
+        assert (success);
+        cluster.startUp(true);
 
-        String ddl =
-                "CREATE TABLE WAREHOUSE (" +
-                "W_ID INTEGER DEFAULT '0' NOT NULL, " +
-                "W_NAME VARCHAR(16) DEFAULT NULL, " +
-                "PRIMARY KEY (W_ID)" +
-                ");";
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(ddl);
-
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("collector.jar"));
-        assertTrue(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("collector.xml"));
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("collector.jar");
-        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("collector.xml");
-
-        ServerThread localServer = new ServerThread(config);
-        localServer.start();
-        localServer.waitForInitialization();
-
-        voltDbRoot = builder.getPathToVoltRoot();
+        String voltDbFilePrefix = cluster.getSubRoots().get(0).getCanonicalPath();
+        File voltDbRoot = new File(voltDbFilePrefix, builder.getPathToVoltRoot().getCanonicalPath());
         voltDbRootPath = voltDbRoot.getCanonicalPath();
 
-        // generate heap dump
-        pid = CLibrary.getpid();
-        String[] cmd = {"jmap", "-dump:file=/tmp/java_pid" + pid + ".hprof", Integer.toString(pid)};
-        Process p = Runtime.getRuntime().exec(cmd);
-        p.waitFor();
+        listener = cluster.getListenerAddresses().get(0);
+        client = ClientFactory.createClient();
+        client.createConnection(listener);
+    }
 
-        /*
-         * fake voltdb_crash file
-         * copied from VoltDB.crashLocalVoltDB()
-         * it would probably be nicer to actually force database to crash, but for now every attempt to call
-         * VoltDB.crashLocalVoltDB() causes system to exit
-         */
-        TimestampType ts = new TimestampType(new java.util.Date());
-        CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
-        String root = catalogContext != null ? catalogContext.cluster.getVoltroot() + File.separator : "";
-        PrintWriter writer = new PrintWriter(root + "voltdb_crash" + ts.toString().replace(' ', '-') + ".txt");
-        writer.println("Time: " + ts);
-        writer.close();
-
-        // fake jvm crash file
-        writer = new PrintWriter(System.getProperty("user.dir") + File.separator + "hs_err_pid" + pid + ".log");
-        writer.println("#");
-        writer.println("# A fatal error has been detected by the Java Runtime Environment:");
-        writer.println("#");
-        writer.close();
-
-        collectionTgz = new File(voltDbRoot, prefix + ".tgz");
+    private File collect(String voltDbRootPath, boolean skipHeapDump) throws Exception {
+        File collectionTgz = new File(voltDbRootPath, prefix + ".tgz");
         Collector.main(new String[]{voltDbRootPath, prefix,
                                     "", "", "", // host, username, password
                                     "true",  // noPrompt
                                     "false", // dryRun
-                                    "false", // skipHeapDump
+                                    String.valueOf(skipHeapDump),
                                     "true",  // calledFromVem (set to true so that resulting collection can be easily located)
                                     "false"  // fileInfoOnly
                                     });
         assertTrue(collectionTgz.exists());
 
-        collectionFileDecompressed = new File(voltDbRoot, prefix);
-        TarReader tarReader = new TarReader(collectionTgz, TarReader.OVERWRITE_MODE, null, null, collectionFileDecompressed);
+        File collectionDecompressed = new File(voltDbRootPath, prefix);
+        TarReader tarReader = new TarReader(collectionTgz, TarReader.OVERWRITE_MODE, null, null, collectionDecompressed);
         tarReader.read();
-        assertTrue(collectionFileDecompressed.exists());
+        assertTrue(collectionDecompressed.exists());
+
+        return collectionDecompressed;
     }
 
-    @AfterClass
-    public static void teardown() throws Exception {
-        collectionTgz.delete();
-        FileUtils.deleteDirectory(collectionFileDecompressed);
+    private int getpid(String voltDbRootPath) throws Exception {
+        File configLogDir = new File(voltDbRootPath, "config_log");
+        File configInfo = new File(configLogDir, "config.json");
+
+        JSONObject jsonObject = Collector.parseJSONFile(configInfo.getCanonicalPath());
+        int pid = jsonObject.getInt("pid");
+
+        return pid;
+    }
+    private String getWorkingDir(String voltDbRootPath) throws Exception {
+        File configLogDir = new File(voltDbRootPath, "config_log");
+        File configInfo = new File(configLogDir, "config.json");
+
+        JSONObject jsonObject = Collector.parseJSONFile(configInfo.getCanonicalPath());
+        String workingDir = jsonObject.getString("workingDir");
+
+        return workingDir;
+    }
+
+    private List<String> getLogPaths(String voltDbRootPath) throws Exception {
+        File configLogDir = new File(voltDbRootPath, "config_log");
+        File configInfo = new File(configLogDir, "config.json");
+        JSONObject jsonObject = Collector.parseJSONFile(configInfo.getCanonicalPath());
+        List<String> logPaths = new ArrayList<String>();
+        JSONArray jsonArray = jsonObject.getJSONArray("log4jDst");
+        for (int i = 0; i < jsonArray.length(); i++) {
+            String path = jsonArray.getJSONObject(i).getString("path");
+            logPaths.add(path);
+        }
+        return logPaths;
     }
 
     /*
@@ -155,70 +139,81 @@ public class TestCollector {
 
     @Test
     public void testCatalog() throws Exception {
-        File catalogJar = new File(voltDbRoot + File.separator + prefix, "catalog.jar");
+        client.close();
+        cluster.shutDown();
+
+        File collectionDecompressed = collect(voltDbRootPath, true);
+
+        File catalogJar = new File(collectionDecompressed, "catalog.jar");
         assertTrue(catalogJar.exists());
     }
 
     @Test
     public void testDeployment() throws Exception {
-        File deploymentXml = new File(voltDbRoot + File.separator + prefix, "deployment.xml");
+        client.close();
+        cluster.shutDown();
+
+        File collectionDecompressed = collect(voltDbRootPath, true);
+
+        File deploymentXml = new File(collectionDecompressed, "deployment.xml");
         assertTrue(deploymentXml.exists());
-
-        // check file content
-        byte[] deploymentXmlBytes = VoltDB.instance().getHostMessenger().getZK().getData(VoltZK.deploymentBytes, false, null);
-        byte[] deploymentXmlBytesInCollection = ByteStreams.toByteArray(new FileInputStream(deploymentXml));
-        assertTrue(Arrays.equals(deploymentXmlBytesInCollection, deploymentXmlBytes));
     }
 
     @Test
-    public void testHeapdump() {
-        File heapdumpFile = new File(collectionFileDecompressed, "java_pid" + pid + ".hprof");
-        assertTrue(heapdumpFile.exists());
-    }
+    public void testDmesg() throws Exception {
+        client.close();
+        cluster.shutDown();
 
-    @Test
-    public void testLogFiles() {
-        File logDir = new File(collectionFileDecompressed, "log");
-        assertTrue(logDir.exists());
-        assertTrue(logDir.listFiles().length > 0);
+        File collectionDecompressed = collect(voltDbRootPath, true);
 
-        for (File file: logDir.listFiles()) {
-            assertTrue(file.getName().startsWith("volt.log"));
-        }
-    }
-
-    @Test
-    public void testDmesg() {
-        File dmesgdata = new File(collectionFileDecompressed, "dmesgdata");
+        File dmesgdata = new File(collectionDecompressed, "dmesgdata");
         assertTrue(dmesgdata.exists());
     }
 
     @Test
+    public void testHeapdump() throws Exception {
+        // generate heap dump
+        int pid = getpid(voltDbRootPath);
+        File heapdumpGenerated = new File("/tmp", "java_pid" + pid + ".hprof");
+        heapdumpGenerated.deleteOnExit();
+        String[] cmd = {"jmap", "-dump:file=/tmp/java_pid" + pid + ".hprof", Integer.toString(pid)};
+        Process p = Runtime.getRuntime().exec(cmd);
+        p.waitFor();
+
+        client.close();
+        cluster.shutDown();
+
+        File collectionDecompressed = collect(voltDbRootPath, false);
+
+        File heapdumpFile = new File(collectionDecompressed, "java_pid" + pid + ".hprof");
+        assertTrue(heapdumpFile.exists());
+    }
+    @Test
+    public void testLogFiles() throws Exception {
+        client.close();
+        cluster.shutDown();
+
+        File collectionDecompressed = collect(voltDbRootPath, false);
+
+        File logDir = new File(collectionDecompressed, "log");
+        assertTrue(logDir.exists());
+        assertTrue(logDir.listFiles().length > 0);
+        List<String> logPaths = getLogPaths(voltDbRootPath);
+
+        for (File file: logDir.listFiles()) {
+            boolean match = false;
+            for (String path: logPaths) {
+                if (file.getName().startsWith(new File(path).getName())) {
+                    match = true;
+                    break;
+                }
+            }
+            assertTrue(match);
+        }
+    }
+
+    @Test
     public void testVoltdbCrash() throws Exception {
-        String simpleSchema =
-                "create table blah (" +
-                "ival bigint default 0 not null, " +
-                "PRIMARY KEY(ival));";
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(simpleSchema);
-        builder.addProcedures(CrashVoltDBProc.class);
-
-        LocalCluster cluster = new LocalCluster("crash.jar",
-                2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        cluster.setHasLocalServer(false);
-        boolean success = cluster.compile(builder);
-        assert (success);
-        cluster.startUp(true);
-
-        String voltDbFilePrefix = cluster.getSubRoots().get(0).getCanonicalPath();
-        File voltDbRoot = new File(voltDbFilePrefix, builder.getPathToVoltRoot().getCanonicalPath());
-        String voltDbRootPath = voltDbRoot.getCanonicalPath();
-
-        final String listener = cluster.getListenerAddresses().get(0);
-        final Client client = ClientFactory.createClient();
-        client.createConnection(listener);
-
         try {
             client.callProcedure("CrashVoltDBProc");
         }
@@ -226,26 +221,12 @@ public class TestCollector {
 
         }
 
-        collectionTgz = new File(voltDbRoot, prefix + ".tgz");
-        Collector.main(new String[]{voltDbRootPath, prefix,
-                                    "", "", "", // host, username, password
-                                    "true",  // noPrompt
-                                    "false", // dryRun
-                                    "false", // skipHeapDump
-                                    "true",  // calledFromVem (set to true so that resulting collection can be easily located)
-                                    "false"  // fileInfoOnly
-                                    });
-        assertTrue(collectionTgz.exists());
-
         client.close();
         cluster.shutDown();
 
-        collectionFileDecompressed = new File(voltDbRoot, prefix);
-        TarReader tarReader = new TarReader(collectionTgz, TarReader.OVERWRITE_MODE, null, null, collectionFileDecompressed);
-        tarReader.read();
-        assertTrue(collectionFileDecompressed.exists());
+        File collectionDecompressed = collect(voltDbRootPath, true);
 
-        File voltdbCrashDir = new File(collectionFileDecompressed, "voltdb_crash");
+        File voltdbCrashDir = new File(collectionDecompressed, "voltdb_crash");
         assertTrue(voltdbCrashDir.exists());
         assertTrue(voltdbCrashDir.listFiles().length > 0);
 
@@ -256,30 +237,6 @@ public class TestCollector {
 
     @Test
     public void testJvmCrash() throws Exception {
-        String simpleSchema =
-                "create table blah (" +
-                "ival bigint default 0 not null, " +
-                "PRIMARY KEY(ival));";
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(simpleSchema);
-        builder.addProcedures(CrashJVM.class);
-
-        LocalCluster cluster = new LocalCluster("crash.jar",
-                2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        cluster.setHasLocalServer(false);
-        boolean success = cluster.compile(builder);
-        assert (success);
-        cluster.startUp(true);
-
-        String voltDbFilePrefix = cluster.getSubRoots().get(0).getCanonicalPath();
-        File voltDbRoot = new File(voltDbFilePrefix, builder.getPathToVoltRoot().getCanonicalPath());
-        String voltDbRootPath = voltDbRoot.getCanonicalPath();
-
-        final String listener = cluster.getListenerAddresses().get(0);
-        final Client client = ClientFactory.createClient();
-        client.createConnection(listener);
-
         try {
             client.callProcedure("CrashJVM");
         }
@@ -287,31 +244,17 @@ public class TestCollector {
 
         }
 
-        collectionTgz = new File(voltDbRoot, prefix + ".tgz");
-        Collector.main(new String[]{voltDbRootPath, prefix,
-                                    "", "", "", // host, username, password
-                                    "true",  // noPrompt
-                                    "false", // dryRun
-                                    "false", // skipHeapDump
-                                    "true",  // calledFromVem (set to true so that resulting collection can be easily located)
-                                    "false"  // fileInfoOnly
-                                    });
-        assertTrue(collectionTgz.exists());
-
         client.close();
         cluster.shutDown();
 
-        collectionFileDecompressed = new File(voltDbRoot, prefix);
-        TarReader tarReader = new TarReader(collectionTgz, TarReader.OVERWRITE_MODE, null, null, collectionFileDecompressed);
-        tarReader.read();
-        assertTrue(collectionFileDecompressed.exists());
+        File collectionDecompressed = collect(voltDbRootPath, true);
 
-        File configLogDir = new File(voltDbRoot, "config_log");
-        File configInfo = new File(configLogDir, "config.json");
-        JSONObject jsonObject = Collector.parseJSONFile(configInfo.getCanonicalPath());
-        int pid = jsonObject.getInt("pid");
+        int pid = getpid(voltDbRootPath);
+        String workingDir = getWorkingDir(voltDbRootPath);
+        File jvmCrashGenerated = new File(workingDir, "hs_err_pid" + pid + ".log");
+        jvmCrashGenerated.deleteOnExit();
 
-        File jvmCrashFile = new File(collectionFileDecompressed, "hs_err_pid" + pid + ".log");
+        File jvmCrashFile = new File(collectionDecompressed, "hs_err_pid" + pid + ".log");
         assertTrue(jvmCrashFile.exists());
     }
 }
