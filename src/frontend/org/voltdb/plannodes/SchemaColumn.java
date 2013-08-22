@@ -91,7 +91,8 @@ public class SchemaColumn
         if (m_tableName.equals(tableName)) {
             if (columnName != null && !columnName.equals("")) {
                 if (columnName.equals(m_columnName)) {
-                    assert(m_columnAlias.equals(columnAlias));
+                    // Next line is not true according to current VoltDB's logic
+                    //assert(m_columnAlias.equals(columnAlias));
                     return true;
                 }
             }
@@ -108,8 +109,9 @@ public class SchemaColumn
     @Override
     public int hashCode () {
         int result = m_tableName.hashCode();
-        result += m_columnName.hashCode();
-        if (m_columnAlias != null) {
+        if (m_columnName != null && !m_columnName.equals("")) {
+            result += m_columnName.hashCode();
+        } else if (m_columnAlias != null && !m_columnAlias.equals("")) {
             result += m_columnAlias.hashCode();
         }
         return result;

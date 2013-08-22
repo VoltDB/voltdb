@@ -228,7 +228,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
     /**
      * Add all valid join orders (permutations) for the input join tree.
-     *
+     * TODO(XIN): takes at least 3.3% cpu of planner. Optimize it when possible.
      */
     private void queueSubJoinOrders() {
         assert(m_parsedStmt.joinTree != null);

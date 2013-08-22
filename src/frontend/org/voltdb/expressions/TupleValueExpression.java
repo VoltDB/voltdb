@@ -205,6 +205,7 @@ public class TupleValueExpression extends AbstractValueExpression {
             assert(false);
             return;
         }
+        // TODO(XIN): getIgnoreCase takes 2% of Planner CPU, Optimize it later
         Table table = db.getTables().getIgnoreCase(m_tableName);
         resolveForTable(table);
     }
