@@ -31,7 +31,7 @@ import java.util.concurrent.Future;
  * A very simple adapter that deserializes bytes into client responses. It calls
  * crashLocalVoltDB() if the deserialization fails, which should only happen if there's a bug.
  */
-public class SimpleAdapter implements Connection, WriteStream {
+public class SimpleClientResponseAdapter implements Connection, WriteStream {
     public static interface Callback {
         public void handleResponse(ClientResponse response);
     }
@@ -44,7 +44,7 @@ public class SimpleAdapter implements Connection, WriteStream {
      *                        node.
      * @param callback        A callback to take the client response, null is accepted.
      */
-    public SimpleAdapter(long connectionId, Callback callback) {
+    public SimpleClientResponseAdapter(long connectionId, Callback callback) {
         m_connectionId = connectionId;
         m_callback = callback;
     }
@@ -74,7 +74,7 @@ public class SimpleAdapter implements Connection, WriteStream {
             }
             enqueue(serialized[0]);
         } catch (IOException e) {
-            VoltDB.crashLocalVoltDB("enqueue() in SimpleAdapter throw an exception", true, e);
+            VoltDB.crashLocalVoltDB("enqueue() in SimpleClientResponseAdapter throw an exception", true, e);
         }
     }
 
@@ -91,7 +91,7 @@ public class SimpleAdapter implements Connection, WriteStream {
         }
         catch (IOException e)
         {
-            throw new RuntimeException("Unable to deserialize ClientResponse in SimpleAdapter", e);
+            throw new RuntimeException("Unable to deserialize ClientResponse in SimpleClientResponseAdapter", e);
         }
     }
 
