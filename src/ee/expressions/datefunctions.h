@@ -227,7 +227,7 @@ template<> inline NValue NValue::callUnary<FUNC_TO_TIMESTAMP_SECOND>() const {
     if (isNull()) {
         return *this;
     }
-    int64_t seconds = getBigInt();
+    int64_t seconds = castAsBigIntAndGetValue();
     int64_t epoch_micros = seconds * 1000000;
     return getTimestampValue(epoch_micros);
 }
@@ -237,7 +237,7 @@ template<> inline NValue NValue::callUnary<FUNC_TO_TIMESTAMP_MILLISECOND>() cons
     if (isNull()) {
         return *this;
     }
-    int64_t millis = getBigInt();
+    int64_t millis = castAsBigIntAndGetValue();
     int64_t epoch_micros = millis * 1000;
     return getTimestampValue(epoch_micros);
 }
@@ -247,7 +247,7 @@ template<> inline NValue NValue::callUnary<FUNC_TO_TIMESTAMP_MICROSECOND>() cons
     if (isNull()) {
         return *this;
     }
-    int64_t epoch_micros = getBigInt();
+    int64_t epoch_micros = castAsBigIntAndGetValue();
     return getTimestampValue(epoch_micros);
 }
 

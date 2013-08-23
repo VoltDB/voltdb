@@ -69,15 +69,15 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     }
 
     /**
-     * Get the parent of this CatalogType instance
-     * @return The parent of this CatalogType instance
+     * Get the full catalog path of this CatalogType instance
+     * @return The full catalog path of this CatalogType instance
      */
     public String getPath() {
         return m_path;
     }
 
     /**
-     * Get the parent of this CatalogType instance
+     * Get the name of this CatalogType instance
      * @return The name of this CatalogType instance
      */
     public String getTypeName() {

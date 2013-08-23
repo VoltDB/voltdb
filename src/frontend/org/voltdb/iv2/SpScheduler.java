@@ -412,7 +412,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
              */
             if (message.isForReplay()) {
                 uniqueId = message.getUniqueId();
-                m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(uniqueId);
+                try {
+                    m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(uniqueId);
+                }
+                catch (Exception e) {
+                    hostLog.fatal(e.getMessage());
+                    hostLog.fatal("Invocation: " + message);
+                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                }
             } else if (message.isForDR()) {
                 uniqueId = message.getStoredProcedureInvocation().getOriginalUniqueId();
                 // @LoadSinglepartitionTable does not have a valid uid

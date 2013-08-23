@@ -70,9 +70,10 @@ public class ExportTestClient extends ExportClientBase
         return verifier;
     }
 
-    public void addRow(String tableName, Object partitionHash, Object[] data)
+    public void addRow(String tableName, Object partitionHash, Object[] data) throws Exception
     {
-        int partition = TheHashinator.hashToPartition(partitionHash);
+        int partition = TheHashinator.getPartitionForParameter(VoltType.typeFromObject(partitionHash).getValue(),
+                partitionHash);
 
         ExportTestVerifier verifier = m_verifiers.get(tableName + partition);
         if (verifier == null)

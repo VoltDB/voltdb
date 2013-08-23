@@ -42,9 +42,11 @@ import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.zip.GZIPInputStream;
 
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.zk.ZKUtil;
 import org.voltdb.BackendTarget;
 import org.voltdb.DefaultSnapshotDataTarget;
 import org.voltdb.VoltDB;
@@ -73,6 +75,8 @@ import org.voltdb.utils.VoltFile;
 import org.voltdb_testprocs.regressionsuites.SaveRestoreBase;
 import org.voltdb_testprocs.regressionsuites.saverestore.CatalogChangeSingleProcessServer;
 import org.voltdb_testprocs.regressionsuites.saverestore.SaveRestoreTestProjectBuilder;
+
+import com.google.common.collect.ImmutableSet;
 
 /**
  * Test the SnapshotSave and SnapshotRestore system procedures
@@ -516,6 +520,20 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
                 checkTable(client, "REPLICATED_TESTER", "RT_ID", num_replicated_items);
                 checkTable(client, "PARTITION_TESTER", "PT_ID", num_partitioned_items);
+
+                /*
+                 * Test that the cluster goes down if you do a restore with dups
+                 */
+                ZooKeeper zk = ZKUtil.getClient(lc.zkinterface(0), 5000, ImmutableSet.<Long>of());
+                doDupRestore(client, false, zk);
+                long start = System.currentTimeMillis();
+                while(!lc.areAllNonLocalProcessesDead()) {
+                    Thread.sleep(1);
+                    long now = System.currentTimeMillis();
+                    long delta = now - start;
+                    if (delta > 10000) break;
+                }
+                assertTrue(lc.areAllNonLocalProcessesDead());
             } finally {
                 client.close();
             }
@@ -1543,6 +1561,24 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             }
         }
 
+        doDupRestore(client);
+
+        /*
+         * Assert a non-empty CSV file containing duplicates was created
+         */
+        boolean havePartitionedCSVFile = false;
+        for (File f : new File(TMPDIR).listFiles()) {
+          final String name = f.getName();
+          if (name.startsWith("PARTITION_TESTER") && name.endsWith(".csv")) {
+              havePartitionedCSVFile = true;
+              if (!(f.length() > 30000)) {
+                  //It should be about 37k, make sure it isn't unusually small
+                  fail("Duplicates file is not as large as expected " + f.length());
+              }
+          }
+        }
+        assertTrue(havePartitionedCSVFile);
+
         config.revertCompile();
     }
 
@@ -1668,11 +1704,17 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         System.out.println("Starting testSaveAndRestorePartitionedTable");
         int num_partitioned_items_per_chunk = 120; // divisible by 3
         int num_partitioned_chunks = 10;
+        int num_replicated_items_per_chunk = 200;
+        int num_replicated_chunks = 10;
         Client client = getClient();
 
         loadLargePartitionedTable(client, "PARTITION_TESTER",
                                   num_partitioned_items_per_chunk,
                                   num_partitioned_chunks);
+        loadLargeReplicatedTable(client, "REPLICATED_TESTER",
+                                 num_replicated_items_per_chunk,
+                                 num_replicated_chunks);
+
         VoltTable[] results = null;
 
         // hacky, need to sleep long enough so the internal server tick
@@ -1765,50 +1807,32 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         }
         assertTrue(threwException);
 
-        /*
-         * Now check that doing a restore and logging duplicates works.
-         * Delete the ZK nodes created by the restore already done and
-         * it will go again.
-         */
-        VoltDB.instance().getHostMessenger().getZK().delete(VoltZK.restoreMarker, -1);
-        VoltDB.instance().getHostMessenger().getZK().delete(VoltZK.perPartitionTxnIds, -1);
-        threwException = false;
-        try
-        {
-            JSONObject jsObj = new JSONObject();
-            jsObj.put(SnapshotRestore.JSON_NONCE, TESTNONCE);
-            jsObj.put(SnapshotRestore.JSON_PATH, TMPDIR);
-            jsObj.put(SnapshotRestore.JSON_DUPLICATES_PATH, TMPDIR);
-
-            results = client.callProcedure("@SnapshotRestore", jsObj.toString()).getResults();
-
-            while (results[0].advanceRow()) {
-                if (results[0].getString("RESULT").equals("FAILURE")) {
-                    fail(results[0].getString("ERR_MSG"));
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            threwException = true;
-        }
-        assertFalse(threwException);
+        doDupRestore(client);
 
         /*
          * Assert a non-empty CSV file containing duplicates was created
          */
-        boolean haveCSVFile = false;
+        boolean havePartitionedCSVFile = false;
+        boolean haveReplicatedCSVFile = false;
         for (File f : new File(TMPDIR).listFiles()) {
           final String name = f.getName();
           if (name.startsWith("PARTITION_TESTER") && name.endsWith(".csv")) {
-              haveCSVFile = true;
+              havePartitionedCSVFile = true;
               if (!(f.length() > 30000)) {
                   //It should be about 37k, make sure it isn't unusually small
-                  fail("Duplicates file is not as large as expected");
+                  fail("Duplicates file is not as large as expected " + f.length());
+              }
+          }
+          if (name.startsWith("REPLICATED_TESTER") && name.endsWith(".csv")) {
+              haveReplicatedCSVFile = true;
+              if (!(f.length() > 60000)) {
+                  //It should be about 37k, make sure it isn't unusually small
+                  fail("Duplicates file is not as large as expected " + f.length());
               }
           }
         }
-        assertTrue(haveCSVFile);
+        assertTrue(havePartitionedCSVFile);
+        assertTrue(haveReplicatedCSVFile);
 
         checkTable(client, "PARTITION_TESTER", "PT_ID",
                    num_partitioned_items_per_chunk * num_partitioned_chunks);
@@ -1945,6 +1969,46 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                         results[0].getLong("TUPLE_COUNT"));
             }
         }
+    }
+
+    private void doDupRestore(Client client) throws Exception {
+        doDupRestore(client, true, VoltDB.instance().getHostMessenger().getZK());
+    }
+
+    private void doDupRestore(Client client, boolean allowDupes, ZooKeeper zk) throws Exception {
+        VoltTable[] results;
+        boolean threwException;
+
+        /*
+         * Now check that doing a restore and logging duplicates works.
+         * Delete the ZK nodes created by the restore already done and
+         * it will go again.
+         */
+        zk.delete(VoltZK.restoreMarker, -1);
+        zk.delete(VoltZK.perPartitionTxnIds, -1);
+        threwException = false;
+        try
+        {
+            JSONObject jsObj = new JSONObject();
+            jsObj.put(SnapshotRestore.JSON_NONCE, TESTNONCE);
+            jsObj.put(SnapshotRestore.JSON_PATH, TMPDIR);
+            if (allowDupes) {
+                jsObj.put(SnapshotRestore.JSON_DUPLICATES_PATH, TMPDIR);
+            }
+
+            results = client.callProcedure("@SnapshotRestore", jsObj.toString()).getResults();
+
+            while (results[0].advanceRow()) {
+                if (results[0].getString("RESULT").equals("FAILURE")) {
+                    fail(results[0].getString("ERR_MSG"));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            threwException = true;
+        }
+        assertTrue(allowDupes == !threwException);
     }
 
     // Test that we fail properly when there are no savefiles available

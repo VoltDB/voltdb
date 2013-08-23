@@ -1236,6 +1236,94 @@ public class TestSQLTypesSuite extends RegressionSuite {
         helper_testInvalidParameterSerializations(client, params);
     }
 
+    public void testEng5013() throws NoConnectionsException, ProcCallException, IOException {
+        Client client = this.getClient();
+
+        client.callProcedure("InsertDecimal", 1, 3.4f);
+        client.callProcedure("InsertDecimal", 2, 3.4d);
+        client.callProcedure("InsertDecimal", 3, 1f);
+        client.callProcedure("InsertDecimal", 4, 1d);
+        client.callProcedure("InsertDecimal", 5, 0.25f);
+        client.callProcedure("InsertDecimal", 6, 0.25d);
+        client.callProcedure("InsertDecimal", 7, 3.3f);
+        client.callProcedure("InsertDecimal", 8, 3.3d);
+
+        try {
+            client.callProcedure("InsertDecimal", 9, Double.MAX_VALUE);
+            fail();
+        } catch (ProcCallException e) {
+            // should give out of precision range error
+            assertTrue(e.getMessage().contains("has more than  38 digits of precision"));
+        } catch (Exception e) {
+            fail();
+        }
+        try {
+            client.callProcedure("InsertDecimal", 9, -Double.MAX_VALUE);
+            fail();
+        } catch (ProcCallException e) {
+            // should give out of precision range error
+            assertTrue(e.getMessage().contains("has more than  38 digits of precision"));
+        } catch (Exception e) {
+            fail();
+        }
+        try {
+            client.callProcedure("InsertDecimal", 9, Float.MAX_VALUE);
+            fail();
+        } catch (ProcCallException e) {
+            // should give out of precision range error
+            assertTrue(e.getMessage().contains("has more than  38 digits of precision"));
+        } catch (Exception e) {
+            fail();
+        }
+        try {
+            client.callProcedure("InsertDecimal", 9, -Float.MAX_VALUE);
+            fail();
+        } catch (ProcCallException e) {
+            // should give out of precision range error
+            assertTrue(e.getMessage().contains("has more than  38 digits of precision"));
+        } catch (Exception e) {
+            fail();
+        }
+        double nand = 0.0d / 0.0d;
+        float nanf = 0.0f / 0.0f;
+        try {
+            client.callProcedure("InsertDecimal", 9, nand);
+        } catch (ProcCallException e) {
+            // passing a NaN value will cause NumberFormatException, and fail the proceudre call
+            assertTrue(e.getMessage().contains("NumberFormatException"));
+        } catch (Exception e) {
+            fail();
+        }
+        try {
+            client.callProcedure("InsertDecimal", 9, nanf);
+            fail();
+        } catch (ProcCallException e) {
+            // passing a NaN value will cause NumberFormatException, and fail the proceudre call
+            assertTrue(e.getMessage().contains("NumberFormatException"));
+        } catch (Exception e) {
+            fail();
+        }
+
+        client.callProcedure("InsertDecimal", 9, Double.MIN_VALUE);
+        client.callProcedure("InsertDecimal", 10, Float.MIN_VALUE);
+
+        // will lose some precision by truncated to .12f
+        client.callProcedure("InsertDecimal", 11, 123456789.01234567890123456789f);
+        VoltTable table;
+        table = client.callProcedure("@AdHoc", "SELECT A_DECIMAL FROM WITH_DEFAULTS WHERE PKEY = 11").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        table.advanceRow();
+        float f = table.getDecimalAsBigDecimal(0).floatValue();
+        assertEquals(123456789.01234567890123456789f, f, 0.000000000001);
+        // will lose some precision by truncated to .12f
+        client.callProcedure("InsertDecimal", 12, 123456789.01234567890123456789d);
+        table = client.callProcedure("@AdHoc", "SELECT A_DECIMAL FROM WITH_DEFAULTS WHERE PKEY = 12").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        table.advanceRow();
+        double d = table.getDecimalAsBigDecimal(0).doubleValue();
+        assertEquals(123456789.01234567890123456789d, d, 0.000000000001);
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -1266,6 +1354,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
                 "PassObjectNull",
                 "insert into ALLOW_NULLS values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
                 "NO_NULLS.PKEY: 0");
+        project.addStmtProcedure("InsertDecimal", "INSERT INTO WITH_DEFAULTS (PKEY, A_DECIMAL) VALUES (?, ?);");
 
         boolean success;
 

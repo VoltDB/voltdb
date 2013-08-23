@@ -47,7 +47,7 @@ public class MockConnection implements Connection {
     }
 
     @Override
-    public String getHostnameOrIP() {
+    public String getHostnameAndIP() {
         throw new UnsupportedOperationException();
     }
 

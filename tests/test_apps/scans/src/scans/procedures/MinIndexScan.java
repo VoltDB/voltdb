@@ -29,7 +29,7 @@ import org.voltdb.VoltTable;
 
 public class MinIndexScan extends VoltProcedure
 {
-    public final SQLStmt sql = new SQLStmt("select * from narrow_p where val >= 0 and p < 0;");
+    public final SQLStmt sql = new SQLStmt("select * from narrow_index_p where val >= 0 and p < 0;");
 
     public VoltTable[] run() {
         voltQueueSQL(sql);
