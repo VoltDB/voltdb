@@ -42,6 +42,11 @@ package scans;
 
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
+import java.util.List;
+import java.util.Arrays;
+import java.io.FileWriter;
+import java.io.PrintWriter;
+import java.lang.Math;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
@@ -67,16 +72,16 @@ public class ScanBenchmark {
     // Reference to the database connection we will use
     final Client client;
     // Benchmark start time
-    long benchmark1StartTS;
-    long benchmark1EndTS;
-    long benchmark2StartTS;
-    long benchmark2EndTS;
+    long benchmarkStartTS;
+    long benchmarkEndTS;
 
     // Statistics manager objects from the client
     final ClientStatsContext periodicStatsContext;
     final ClientStatsContext fullStatsContext;
 
     final Random rand = new Random();
+
+    static final List<String> tests = Arrays.asList(new String[]{"sequential", "index"});
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -102,8 +107,17 @@ public class ScanBenchmark {
         @Option(desc = "Password for connection.")
         String password = "";
 
+        @Option(desc = "Test to run.")
+        String test = "";
+
         @Override
         public void validate() {
+            boolean testIsValid = false;
+            for (String t : tests) {
+              if (test.equals(t))
+                  testIsValid = true;
+            }
+            if (!testIsValid) exitWithMessageAndUsage("test is invalid");
             if (runs <= 0) exitWithMessageAndUsage("runs must be > 0");
             if (rows < 0) exitWithMessageAndUsage("rows must be >= 0");
         }
@@ -196,18 +210,27 @@ public class ScanBenchmark {
         System.out.println(" Client Workload Statistics");
         System.out.println(HORIZONTAL_RULE);
 
-        //
-        double averageTimePerScan = (benchmark1EndTS - benchmark1StartTS) / (double) config.runs;
+        double averageTimePerScan = (benchmarkEndTS - benchmarkStartTS) / (double) config.runs;
         double tuplesPerSecond = (config.rows / averageTimePerScan) * 1000.0;
 
-        System.out.printf("Each of %d sequential scans of %d tuples took %.2fms for a throughput of %.2f tuples/second.\n",
-                config.runs, config.rows, averageTimePerScan, tuplesPerSecond);
+        System.out.printf("Each of %d %s scans of %d tuples took %.2fms for a throughput of %.2f tuples/second.\n",
+                config.runs, config.test, config.rows, averageTimePerScan, tuplesPerSecond);
 
-        averageTimePerScan = (benchmark2EndTS - benchmark2StartTS) / (double) config.runs;
-        tuplesPerSecond = (config.rows / averageTimePerScan) * 1000.0;
+        PrintWriter outputStream = null;
 
-        System.out.printf("Each of %d index scans of %d tuples took %.2fms for a throughput of %.2f tuples/second.\n",
-                config.runs, config.rows, averageTimePerScan, tuplesPerSecond);
+        if (config.statsfile != "") {
+            try {
+                outputStream = new PrintWriter(new FileWriter(config.statsfile));
+                // for stats: duration in milliseconds, # iterations (# rows in this case)
+                outputStream.printf("0,%d,%d,0,0,0,0\n", (long)Math.round(averageTimePerScan), config.rows);
+            } catch (Exception e) {
+                System.err.println("ERROR unable to write stats file");
+                System.err.println(e);
+                System.exit(1);
+            } finally {
+                outputStream.close();
+            }
+        }
     }
 
     /**
@@ -228,19 +251,37 @@ public class ScanBenchmark {
         System.out.println("Loading Tuples");
         System.out.println(HORIZONTAL_RULE);
 
+        String loadproc = null;
+        String tablename = null;
+        String scanproc = null;
+
+        if (config.test.equals("sequential")) {
+
+            loadproc = "NARROW_P.insert";
+            tablename = "narrow_p";
+            scanproc = "MinSeqScan";
+
+        } else if (config.test.equals("index")) {
+
+            loadproc = "NARROW_INDEX_P.insert";
+            tablename = "narrow_index_p";
+            scanproc = "MinIndexScan";
+        }
+
         for (long i = 0; i < config.rows; i++) {
-            client.callProcedure(new NullCallback(), "NARROW_P.insert", i % 509 /* radom prime */, i);
-            client.callProcedure(new NullCallback(), "NARROW_INDEX_P.insert", i % 509 /* radom prime */, i);
+            client.callProcedure(new NullCallback(), loadproc, i % 509 /* radom prime */, i);
             if ((i % 100000) == 0) {
                 System.out.printf("Loading row at index %d.\n", i);
             }
         }
         client.drain();
-        ClientResponse cr = client.callProcedure("@AdHoc", "select count(*) from narrow_p;");
-        long rows1 = cr.getResults()[0].asScalarLong();
-        cr = client.callProcedure("@AdHoc", "select count(*) from narrow_index_p;");
-        long rows2 = cr.getResults()[0].asScalarLong();
-        System.out.printf("Loaded %d,%d rows.\n", rows1, rows2);
+
+        ClientResponse cr = client.callProcedure("@AdHoc", "select count(*) from " + tablename + ";");
+        long rows = cr.getResults()[0].asScalarLong();
+
+        System.out.printf("Loaded %d rows.\n", rows);
+
+        assert (rows == config.rows);
 
         System.out.print(HORIZONTAL_RULE);
         System.out.println("Starting Benchmark");
@@ -250,25 +291,15 @@ public class ScanBenchmark {
         fullStatsContext.fetchAndResetBaseline();
         periodicStatsContext.fetchAndResetBaseline();
 
-        benchmark1StartTS = System.currentTimeMillis();
+        benchmarkStartTS = System.currentTimeMillis();
 
-        System.out.println("\nRunning seq scan benchmark...");
-
-        for (int i = 0; i < config.runs; i++) {
-            client.callProcedure("MinSeqScan");
-        }
-
-        benchmark1EndTS = System.currentTimeMillis();
-
-        benchmark2StartTS = System.currentTimeMillis();
-
-        System.out.println("\nRunning index scan benchmark...");
+        System.out.printf("\nRunning %s scan benchmark...\n", config.test);
 
         for (int i = 0; i < config.runs; i++) {
-            client.callProcedure("MinIndexScan");
+            client.callProcedure(scanproc);
         }
 
-        benchmark2EndTS = System.currentTimeMillis();
+        benchmarkEndTS = System.currentTimeMillis();
 
         // print the summary results
         printResults();
