@@ -56,7 +56,9 @@ public class TestReverseIndexScan extends PlannerTestCase {
         assertEquals(2, ispn.getSearchKeyExpressions().size());
         assertEquals(1, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
         assertEquals(2, ExpressionUtil.uncombine(ispn.getPredicate()).size());
-        assertEquals(SortDirectionType.DESC, ispn.getSortDirection());
+        // SortDirection is still INVALID because in EE, we use LookupType to determine
+        // index scan direction
+        assertEquals(SortDirectionType.INVALID, ispn.getSortDirection());
     }
 
     public void test002()
@@ -73,7 +75,9 @@ public class TestReverseIndexScan extends PlannerTestCase {
         assertEquals(3, ispn.getSearchKeyExpressions().size());
         assertEquals(2, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
         assertEquals(2, ExpressionUtil.uncombine(ispn.getPredicate()).size());
-        assertEquals(SortDirectionType.DESC, ispn.getSortDirection());
+        // SortDirection is still INVALID because in EE, we use LookupType to determine
+        // index scan direction
+        assertEquals(SortDirectionType.INVALID, ispn.getSortDirection());
     }
 
     // ORDER BY: do not do reverse scan optimization
@@ -126,7 +130,9 @@ public class TestReverseIndexScan extends PlannerTestCase {
         assertEquals(1, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
         assertEquals(2, ExpressionUtil.uncombine(ispn.getPredicate()).size());
         assertEquals(2, ExpressionUtil.uncombine(ispn.getInitialExpression()).size());
-        assertEquals(SortDirectionType.DESC, ispn.getSortDirection());
+        // SortDirection is still INVALID because in EE, we use LookupType to determine
+        // index scan direction
+        assertEquals(SortDirectionType.INVALID, ispn.getSortDirection());
     }
 
     public void test005()
@@ -144,7 +150,9 @@ public class TestReverseIndexScan extends PlannerTestCase {
         assertEquals(2, ExpressionUtil.uncombine(ispn.getEndExpression()).size());
         assertEquals(2, ExpressionUtil.uncombine(ispn.getPredicate()).size());
         assertEquals(3, ExpressionUtil.uncombine(ispn.getInitialExpression()).size());
-        assertEquals(SortDirectionType.DESC, ispn.getSortDirection());
+        // SortDirection is still INVALID because in EE, we use LookupType to determine
+        // index scan direction
+        assertEquals(SortDirectionType.INVALID, ispn.getSortDirection());
     }
 
     // ORDER BY: do not do reverse scan optimization

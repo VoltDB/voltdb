@@ -98,6 +98,8 @@ public class TestPlansOrderBy extends PlannerTestCase {
         validateOptimalPlan("SELECT * from Tmanykeys WHERE T_D1 = ? ORDER BY T_D0, T_D2");
         validateOptimalPlan("SELECT * from Tmanykeys WHERE T_D2 = ? ORDER BY T_D0, T_D1");
         validateOptimalPlan("SELECT * from Tmanykeys                ORDER BY T_D0, T_D1");
+        validateIndexedBruteForcePlan("SELECT * FROM Tmanykeys WHERE T_D0 <= ? ORDER BY T_D1, T_D2");
+        validateIndexedBruteForcePlan("SELECT * FROM Tmanykeys WHERE T_D0 <= ? ORDER BY T_D1 DESC, T_D2 DESC");
     }
 
     public void testOrderByOneOfThreeIndexKeys()
@@ -109,6 +111,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
         validateOptimalPlan("SELECT * from Tmanykeys WHERE T_D1 = ?              ORDER BY T_D0");
         validateOptimalPlan("SELECT * from Tmanykeys WHERE T_D2 = ?              ORDER BY T_D0");
         validateOptimalPlan("SELECT * from Tmanykeys                             ORDER BY T_D0");
+        validateIndexedBruteForcePlan("SELECT * FROM Tmanykeys WHERE T_D0 = ? AND T_D1 < ? ORDER BY T_D2");
+        validateIndexedBruteForcePlan("SELECT * FROM Tmanykeys WHERE T_D0 = ? AND T_D1 < ? ORDER BY T_D2 DESC");
+        validateIndexedBruteForcePlan("SELECT * FROM Tmanykeys WHERE T_D0 = ? ORDER BY T_D2");
+        validateIndexedBruteForcePlan("SELECT * FROM Tmanykeys WHERE T_D0 = ? ORDER BY T_D2 DESC");
     }
 
     public void testOrderByWrongPermutation()
@@ -167,11 +173,8 @@ public class TestPlansOrderBy extends PlannerTestCase {
                      "order by T.T_D0;");
     }
 
-    public void testEng5021() {
-        validatePlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D1 DESC", true, false, false, false);
+    public void testOrderDescWithEquality() {
         validatePlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D1", true, false, false, false);
-        validatePlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D1 DESC LIMIT 1", true, false, false, false);
-        validatePlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D0, T_D1 DESC", true, false, true, false);
-        validatePlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D0, T_D1", true, false, false, false);
+        validatePlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D1 DESC", true, false, false, false);
     }
 }
