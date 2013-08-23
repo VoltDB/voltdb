@@ -497,7 +497,7 @@ public class SnapshotSiteProcessor {
     {
         for (SnapshotPredicates predicates : tablesAndPredicates.values()) {
             if (!ee.activateTableStream(predicates.m_table.getRelativeIndex(),
-                                        TableStreamType.SNAPSHOT,
+                                        TableStreamType.SNAPSHOT, Long.MAX_VALUE,
                                         predicates)) {
                 VoltDB.crashLocalVoltDB("Attempted to activate copy on write mode for table "
                                         + predicates.m_table.getTypeName() + " and failed", false, null);

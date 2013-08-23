@@ -180,7 +180,7 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public boolean activateTableStream(int tableId, TableStreamType type, SnapshotPredicates predicates) {
+    public boolean activateTableStream(int tableId, TableStreamType type, long undoQuantumToken, SnapshotPredicates predicates) {
         return false;
     }
 

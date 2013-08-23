@@ -43,26 +43,41 @@ ElasticContext::~ElasticContext()
 /**
  * Activation/reactivation handler.
  */
-bool ElasticContext::handleActivation(TableStreamType streamType, bool reactivate)
+TableStreamerContext::ActivationReturnCode
+ElasticContext::handleActivation(TableStreamType streamType, bool reactivate)
 {
+    // Can't activate an indexing stream during a snapshot.
     if (m_surgeon.hasStreamType(TABLE_STREAM_SNAPSHOT)) {
         VOLT_ERROR("Elastic context activation is not allowed while a snapshot is in progress.");
-        return false;
+        return ACTIVATION_FAILED;
     }
-    // Don't allow activation if there's an existing index.
-    if (m_surgeon.hasIndex()) {
-        VOLT_ERROR("Elastic context activation is not allowed while an index is "
-                   "present that has not been completely consumed.");
-        return false;
+
+    // Create the index?
+    if (streamType == TABLE_STREAM_ELASTIC_INDEX) {
+        // Don't allow activation if there's an existing index.
+        if (m_surgeon.hasIndex()) {
+            VOLT_ERROR("Elastic context activation is not allowed while an index is "
+                       "present that has not been completely consumed.");
+            return ACTIVATION_FAILED;
+        }
+        m_surgeon.createIndex();
+        return ACTIVATION_SUCCEEDED;
     }
-    m_surgeon.createIndex();
-    return true;
+
+    // Clear the index?
+    if (streamType == TABLE_STREAM_ELASTIC_INDEX_CLEAR) {
+        m_surgeon.dropIndex();
+        return ACTIVATION_SUCCEEDED;
+    }
+
+    // It wasn't one of the supported stream types.
+    return ACTIVATION_UNSUPPORTED;
 }
 
 /**
  * Deactivation handler.
  */
-bool ElasticContext::handleDeactivation()
+bool ElasticContext::handleDeactivation(TableStreamType streamType)
 {
     // Keep this context around to maintain the index.
     return true;
@@ -70,18 +85,18 @@ bool ElasticContext::handleDeactivation()
 
 /*
  * Serialize to output stream.
- * Return remaining tuple count, 0 if done, or -1 on error.
+ * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
  */
 int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStreams,
                                          std::vector<int> &retPositions)
 {
     if (!m_surgeon.hasIndex()) {
         VOLT_ERROR("Elastic streaming was invoked without proper activation.");
-        return -1;
+        return TABLE_STREAM_SERIALIZATION_ERROR;
     }
     if (m_surgeon.isIndexingComplete()) {
         VOLT_ERROR("Elastic streaming was called after indexing had already completed.");
-        return -1;
+        return TABLE_STREAM_SERIALIZATION_ERROR;
     }
 
     // Populate index with current tuples.

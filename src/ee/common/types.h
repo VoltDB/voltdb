@@ -354,6 +354,10 @@ enum TableStreamType {
     // Materialize previously-captured index.
     TABLE_STREAM_ELASTIC_INDEX_READ,
 
+    // Clear previously-captured index using the same range predicate that
+    // was used for TABLE_STREAM_ELASTIC_INDEX_READ.
+    TABLE_STREAM_ELASTIC_INDEX_CLEAR,
+
     // Table stream types that don't use predicates.
     // Add new non-predicate types below TABLE_STREAM_RECOVERY so
     // that tableStreamTypeHasPredicates() doesn't have to change.
@@ -361,6 +365,12 @@ enum TableStreamType {
 
     // Table stream type provided when no stream is active.
     TABLE_STREAM_NONE = -1
+};
+
+// Serialization special values returned by serializeMore(), etc. instead
+// of the normal count. There's only one possible value for now.
+enum TableStreamSerializationError {
+    TABLE_STREAM_SERIALIZATION_ERROR = -1
 };
 
 /**

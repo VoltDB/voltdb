@@ -42,7 +42,30 @@ class TableStreamerContext {
 
 public:
 
+    /**
+     * handleActivation() return codes.
+     */
+    enum ActivationReturnCode {
+        // (Re)Activation is not supported for this stream type by this context.
+        ACTIVATION_UNSUPPORTED = -1,
+        // (Re)Activation is supported for this stream type and succeeded.
+        ACTIVATION_SUCCEEDED = 0,
+        // (Re)Activation is supported for this stream type, but the attempt failed.
+        ACTIVATION_FAILED = 1,
+    };
+
     virtual ~TableStreamerContext() {}
+
+    /**
+     * Optional activation handler.
+     *  Called after creating the context to see if activation is allowed.
+     *  Return ACTIVATION_SUCCEEDED if (re)activation is allowed and succeeded.
+     *  Return ACTIVATION_FAILED if (re)activation is allowed but failed.
+     *  Return ACTIVATION_UNSUPPORTED if (re)activation is not supported for the stream type.
+     */
+    virtual ActivationReturnCode handleActivation(TableStreamType streamType, bool reactivate) {
+        return (reactivate ? ACTIVATION_UNSUPPORTED : ACTIVATION_SUCCEEDED);
+    }
 
     /**
      * Mandatory streamMore() handler.
@@ -51,21 +74,11 @@ public:
                                      std::vector<int> &retPositions) = 0;
 
     /**
-     * Optional activation handler.
-     *  Called after creating the context to see if activation is allowed.
-     *  Return true if (re)activation is allowed.
-     *      default is true for activation and false for reactivation.
-     */
-    virtual bool handleActivation(TableStreamType streamType, bool reactivate) {
-        return !reactivate;
-    }
-
-    /**
      * Optional deactivation handler.
      *  Called when the stream is shutting down.
      *  Return true to keep it around and listening to updates. (default=false)
      */
-    virtual bool handleDeactivation() {return false;}
+    virtual bool handleDeactivation(TableStreamType streamType) {return false;}
 
     /**
      * Optional tuple insert handler.

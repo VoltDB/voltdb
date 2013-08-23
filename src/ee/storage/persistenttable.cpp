@@ -947,7 +947,7 @@ bool PersistentTable::activateStream(
         }
     }
 
-    return activateStreamInternal(tupleSerializer, streamType, tableId, predicateStrings);
+    return m_tableStreamer->activateStream(m_surgeon, tupleSerializer, streamType, predicateStrings);
 }
 
 /**
@@ -968,55 +968,23 @@ bool PersistentTable::activateWithCustomStreamer(
     m_tableStreamer = tableStreamer;
     bool success = !skipInternalActivation;
     if (!skipInternalActivation) {
-        success = activateStreamInternal(tupleSerializer, streamType, tableId, predicateStrings);
+        success = m_tableStreamer->activateStream(m_surgeon,
+                                                  tupleSerializer,
+                                                  streamType,
+                                                  predicateStrings);
     }
     return success;
 }
 
-/** Prepare table for streaming. */
-bool PersistentTable::activateStreamInternal(TupleSerializer &tupleSerializer,
-                                             TableStreamType streamType,
-                                             CatalogId tableId,
-                                             std::vector<std::string> &predicateStrings) {
-    assert(m_tableStreamer != NULL);
-
-    // true => no tuples.
-    if (m_tupleCount == 0) {
-        return true;
-    }
-
-    //TODO: Move this special case snapshot code into the COW context.
-    // Probably want to move all of the snapshot-related stuff there.
-    if (tableStreamTypeIsSnapshot(streamType)) {
-        //All blocks are now pending snapshot
-        m_blocksPendingSnapshot.swap(m_blocksNotPendingSnapshot);
-        m_blocksPendingSnapshotLoad.swap(m_blocksNotPendingSnapshotLoad);
-        assert(m_blocksNotPendingSnapshot.empty());
-        for (int ii = 0; ii < m_blocksNotPendingSnapshotLoad.size(); ii++) {
-            assert(m_blocksNotPendingSnapshotLoad[ii]->empty());
-        }
-    }
-
-    return m_tableStreamer->activateStream(m_surgeon,
-                                           tupleSerializer,
-                                           streamType,
-                                           predicateStrings);
-}
-
 /**
  * Attempt to serialize more tuples from the table to the provided output streams.
- * Return remaining tuple count, 0 if done, or -1 on error.
+ * Return remaining tuple count, 0 if done, or TABLE_STREAM_SERIALIZATION_ERROR on error.
  */
 int64_t PersistentTable::streamMore(TupleOutputStreamProcessor &outputStreams,
                                     TableStreamType streamType,
                                     std::vector<int> &retPositions) {
     if (m_tableStreamer.get() == NULL) {
-        return -1;
-    }
-    // Balance the zero tuple count short circuiting done in activateStream().
-    //TODO: Improve or eliminate this special logic in both places.
-    if (m_tupleCount == 0) {
-        return 0;
+        return TABLE_STREAM_SERIALIZATION_ERROR;
     }
     return m_tableStreamer->streamMore(outputStreams, streamType, retPositions);
 }
@@ -1361,6 +1329,16 @@ int64_t PersistentTable::validatePartitioning(TheHashinator *hashinator, int32_t
         }
     }
     return mispartitionedRows;
+}
+
+void PersistentTableSurgeon::activateSnapshot() {
+    //All blocks are now pending snapshot
+    m_table.m_blocksPendingSnapshot.swap(m_table.m_blocksNotPendingSnapshot);
+    m_table.m_blocksPendingSnapshotLoad.swap(m_table.m_blocksNotPendingSnapshotLoad);
+    assert(m_table.m_blocksNotPendingSnapshot.empty());
+    for (int ii = 0; ii < m_table.m_blocksNotPendingSnapshotLoad.size(); ii++) {
+        assert(m_table.m_blocksNotPendingSnapshotLoad[ii]->empty());
+    }
 }
 
 } // namespace voltdb
