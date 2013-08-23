@@ -59,12 +59,10 @@ class SerializeOutput;
 
 class TupleValueExpression : public AbstractExpression {
   public:
-    TupleValueExpression(int table_idx, int value_idx)
-        : AbstractExpression(EXPRESSION_TYPE_VALUE_TUPLE)
+    TupleValueExpression(const int tableIdx, const int valueIdx)
+        : AbstractExpression(EXPRESSION_TYPE_VALUE_TUPLE), tuple_idx(tableIdx), value_idx(valueIdx)
     {
-        VOLT_TRACE("OptimizedTupleValueExpression %d using tupleIdx %d valueIdx", m_type, table_idx, value_idx);
-        this->tuple_idx = table_idx;
-        this->value_idx = value_idx;
+        VOLT_TRACE("OptimizedTupleValueExpression %d using tupleIdx %d valueIdx", m_type, tableIdx, valueIdx);
     };
 
     virtual voltdb::NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
@@ -76,7 +74,7 @@ class TupleValueExpression : public AbstractExpression {
                                               "eval:"
                                               " Couldn't find tuple 1 (possible index scan planning error)");
             }
-            return tuple1->getNValue(this->value_idx);
+            return tuple1->getNValue(value_idx);
         }
         else {
             assert(tuple2);
@@ -86,13 +84,13 @@ class TupleValueExpression : public AbstractExpression {
                                               "eval:"
                                               " Couldn't find tuple 2 (possible index scan planning error)");
             }
-            return tuple2->getNValue(this->value_idx);
+            return tuple2->getNValue(value_idx);
         }
     }
 
     std::string debugInfo(const std::string &spacer) const {
         std::ostringstream buffer;
-        buffer << spacer << "Optimized Column Reference[" << this->tuple_idx << ", " << this->value_idx << "]\n";
+        buffer << spacer << "Optimized Column Reference[" << tuple_idx << ", " << value_idx << "]\n";
         return (buffer.str());
     }
 
@@ -100,8 +98,8 @@ class TupleValueExpression : public AbstractExpression {
 
   protected:
 
-    int tuple_idx;           // which tuple. defaults to tuple1
-    int value_idx;           // which (offset) column of the tuple
+    const int tuple_idx;           // which tuple. defaults to tuple1
+    const int value_idx;           // which (offset) column of the tuple
 };
 
 }
