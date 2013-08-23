@@ -92,7 +92,6 @@ public class MiscUtils {
     /**
      * Instantiate the license api impl based on enterprise/community editions
      * @return a valid API for community and pro editions, or null on error.
-     * @throws LicenseException
      */
     public static LicenseApi licenseApiFactory(String pathToLicense) {
 
