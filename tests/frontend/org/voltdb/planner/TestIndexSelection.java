@@ -27,6 +27,9 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.LimitPlanNode;
+import org.voltdb.plannodes.OrderByPlanNode;
+import org.voltdb.plannodes.ProjectionPlanNode;
 
 public class TestIndexSelection extends PlannerTestCase {
 
@@ -82,6 +85,13 @@ public class TestIndexSelection extends PlannerTestCase {
     public void testEng4792PlanWithCompoundEQLTEOrderedByPK() throws JSONException
     {
         AbstractPlanNode pn = compile("select id from a where deleted=? and updated_date <= ? order by id limit ?;");
+        // System.out.println("DEBUG: " + pn.toExplainPlanString());
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof LimitPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof OrderByPlanNode);
         pn = pn.getChild(0);
         assertTrue(pn instanceof IndexScanPlanNode);
         assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"DELETED_SINCE_IDX\""));
