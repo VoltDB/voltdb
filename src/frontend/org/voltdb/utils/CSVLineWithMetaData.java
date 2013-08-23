@@ -19,6 +19,5 @@ package org.voltdb.utils;
 public class CSVLineWithMetaData {
 
     public String[] line;
-    public String parColumnName;
-    public int partitionId;
+    public int lineNumber;
 }

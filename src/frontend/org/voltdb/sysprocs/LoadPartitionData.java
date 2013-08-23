@@ -83,7 +83,7 @@ public class LoadPartitionData extends VoltSystemProcedure
         // fix any case problems
         tableName = catTable.getTypeName();
 
-        byte num[] = m_runner.voltLoadTable("cluster", "database", tableName, table, false);
-        return num.length;
+        m_runner.voltLoadTable("cluster", "database", tableName, table, false);
+        return 0L;
     }
 }

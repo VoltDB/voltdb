@@ -18,7 +18,12 @@ package org.voltdb.utils;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.voltcore.logging.VoltLogger;
@@ -26,8 +31,10 @@ import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcedureCallback;
+import static org.voltdb.utils.CSVFileReader.synchronizeErrorInfo;
 
 class CSVPartitionProcessor implements Runnable {
 
@@ -41,132 +48,163 @@ class CSVPartitionProcessor implements Runnable {
     CSVLineWithMetaData dummy;
     int partitionId;
     public static String insertProcedure = "";
-    public CSVFileReader rdr;
     public String tableName;
     public static ArrayList<VoltType> columnTypes;
     public static VoltTable.ColumnInfo colInfo[];
     public static boolean isMP = false;
     public static boolean isLoadTable = false;
     long partitionProcessedCount = 0;
-    long processBatchEveryMilliseconds = 100;
-    protected final VoltLogger m_log = new VoltLogger("CONSOLE");
+    AtomicLong partitionAcknowledgedCount = new AtomicLong(0);
+    protected static final VoltLogger m_log = new VoltLogger("CONSOLE");
+    static Map<Long, String[]> errorInfo = new HashMap<Long, String[]>();
+    static CountDownLatch pcount;
+    boolean errored = false;
 
+    public static boolean synchronizeErrorInfo(long errLineNum, String[] info) {
+        errorInfo.put(errLineNum, info);
+        if (errorInfo.size() >= config.maxerrors) {
+            m_log.error("The number of Failure row data exceeds "
+                    + config.maxerrors);
+            return true;
+        }
+        return false;
+    }
+
+    public static final class PartitionProcedureCallback implements ProcedureCallback {
+
+        private int m_batchCount;
+        private final long m_lineNum = 0;
+        private final String[] m_rowdata;
+        private static int lastMultiple = 0;
+        protected static final VoltLogger m_log = new VoltLogger("CONSOLE");
+        protected CSVPartitionProcessor pprocessor;
+
+        public PartitionProcedureCallback(int batchCount, String[] rowData, CSVPartitionProcessor pp) {
+            m_batchCount = batchCount;
+            m_rowdata = rowData;
+            pprocessor = pp;
+        }
+
+        @Override
+        public void clientCallback(ClientResponse response) throws Exception {
+            int reportEveryNRows = 10000;
+            if (response.getStatus() != ClientResponse.SUCCESS) {
+                m_log.error(response.getStatusString());
+                String[] info = {m_rowdata.toString(), response.getStatusString()};
+                if (synchronizeErrorInfo(m_lineNum, info)) {
+                    pprocessor.errored = true;
+                }
+                return;
+            }
+            long currentCount = pprocessor.partitionAcknowledgedCount.addAndGet(m_batchCount);
+            int newMultiple = (int) currentCount / reportEveryNRows;
+            if (newMultiple != lastMultiple) {
+                lastMultiple = newMultiple;
+                m_log.info("Inserted " + currentCount + " rows");
+            }
+        }
+    }
 
     @Override
     public void run() {
 
         Client lcsvClient = csvClient;
-        if (config.ppc) {
-            System.out.println("Using per partition client connection.");
-            String[] serverlist = config.servers.split(",");
-
-            ClientConfig c_config = new ClientConfig(config.user, config.password);
-            c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
-            try {
-                lcsvClient = CSVLoaderMT.getClient(c_config, serverlist, config.port);
-            } catch (Exception e) {
-                m_log.error("Error to connect to the servers:"
-                        + config.servers);
-            }
-            assert (lcsvClient != null);
-        }
-
         VoltTable table = new VoltTable(colInfo);
         String procName = (isMP ? "@LoadMultipartitionTable" : (isLoadTable ? "@LoadPartitionData" : "@LoadSinglepartitionTable"));
         if (config.ping) {
             procName = "@Ping";
         } else if (config.legacy) {
             procName = insertProcedure;
-            table = null; // We are using legacy insert method.
         }
 
-        System.out.println("Using Procedure: " + procName);
-        long batch_start = System.currentTimeMillis();
-        long batch_process_time = batch_start + processBatchEveryMilliseconds;
+        m_log.info("Using Procedure: " + procName);
+        Object partitionParam;
+        if (isLoadTable) {
+            partitionParam = partitionId;
+        } else {
+            partitionParam = TheHashinator.valueToBytes(partitionId);
+        }
+        String lastLine[] = null;
         while (true) {
-            CSVLineWithMetaData lineList = null;
-            try {
-                lineList = lineq.take();
-            } catch (InterruptedException ex) {
-                Logger.getLogger(CSVLoaderMT.class.getName()).log(Level.SEVERE, null, ex);
-            }
-            if (lineList == dummy) {
-                if (config.legacy) {
-                    System.out.println("Done Processing partition: " + partitionId + " Processed: " + partitionProcessedCount);
+            List<CSVLineWithMetaData> mlineList = new ArrayList<CSVLineWithMetaData>();
+            lineq.drainTo(mlineList);
+            boolean end = false;
+            for (CSVLineWithMetaData lineList : mlineList) {
+                if (errored) {
+                    end = true;
                     break;
                 }
-                //Process anything that we didnt process.
-                if (table.getRowCount() > 0) {
-                    CSVLoaderMT.MyMTCallback cbmt = new CSVLoaderMT.MyMTCallback(table.getRowCount(), lineList.line);
-                    try {
-                        if (!isMP) {
-                            Object param1;
-                            if (isLoadTable) {
-                                param1 = partitionId;
+                if (lineList == dummy) {
+                    if (config.legacy) {
+                        end = true;
+                        break;
+                    }
+                    //Process anything that we didnt process.
+                    if (table.getRowCount() > 0) {
+                        PartitionProcedureCallback cbmt = new PartitionProcedureCallback(table.getRowCount(), lastLine, this);
+                        try {
+                            if (!isMP) {
+                                lcsvClient.callProcedure(cbmt, procName, partitionParam, tableName, table);
                             } else {
-                                param1 = TheHashinator.valueToBytes(partitionId);
+                                lcsvClient.callProcedure(cbmt, procName, tableName, table);
                             }
-                            lcsvClient.callProcedure(cbmt, procName, param1, tableName, table);
-                        } else {
-                            lcsvClient.callProcedure(cbmt, procName, tableName, table);
+                            partitionProcessedCount += table.getRowCount();
+                        } catch (IOException ex) {
+                            errored = synchronizeErrorInfo(lineList.lineNumber, lineList.line);
+                            break;
                         }
-                        CSVFileReader.inCount.addAndGet(table.getRowCount());
-                        partitionProcessedCount += table.getRowCount();
+                    }
+                    end = true;
+                    break;
+                }
+                lastLine = lineList.line;
+                if (!config.legacy) {
+                    try {
+                        VoltTableUtil.toVoltTableFromLine(table, lineList.line, columnTypes);
+                    } catch (Exception ex) {
+                        //Failed to add row....
+                        errored = synchronizeErrorInfo(lineList.lineNumber, lineList.line);
+                        continue;
+                    }
+                    if (table.getRowCount() > config.batch) {
+                        try {
+                            PartitionProcedureCallback cbmt = new PartitionProcedureCallback(table.getRowCount(), lineList.line, this);
+                            if (!isMP) {
+                                lcsvClient.callProcedure(cbmt, procName, partitionParam, tableName, table);
+                            } else {
+                                lcsvClient.callProcedure(cbmt, procName, tableName, table);
+                            }
+                            partitionProcessedCount += table.getRowCount();
+                            table.clearRowData();
+                        } catch (IOException ex) {
+                            table.clearRowData();
+                            errored = synchronizeErrorInfo(lineList.lineNumber, lineList.line);
+                            break;
+                        }
+                    }
+                } else {
+                    try {
+                        PartitionProcedureCallback cbmt = new PartitionProcedureCallback(1, lineList.line, this);
+                        csvClient.callProcedure(cbmt, procName, (Object[]) lineList.line);
+                        partitionProcessedCount++;
                     } catch (IOException ex) {
-                        Logger.getLogger(CSVPartitionProcessor.class.getName()).log(Level.SEVERE, null, ex);
+                        errored = synchronizeErrorInfo(lineList.lineNumber, lineList.line);
+                        break;
                     }
                 }
-                System.out.println("Done Processing partition: " + partitionId + " Processed: " + partitionProcessedCount);
+            }
+            if (end) {
                 break;
             }
-            if (lineList == null) {
-                continue;
-            }
-            if (!config.legacy) {
-                VoltTableUtil.toVoltTableFromLine(table, lineList.line, columnTypes);
-                if (table.getRowCount() > config.batch) {
-                    try {
-                        CSVLoaderMT.MyMTCallback cbmt = new CSVLoaderMT.MyMTCallback(table.getRowCount(), lineList.line);
-                        if (!isMP) {
-                            Object param1;
-                            if (isLoadTable) {
-                                param1 = partitionId;
-                            } else {
-                                param1 = TheHashinator.valueToBytes(partitionId);
-                            }
-                            lcsvClient.callProcedure(cbmt, procName, param1, tableName, table);
-                        } else {
-                            lcsvClient.callProcedure(cbmt, procName, tableName, table);
-                        }
-                        CSVFileReader.inCount.addAndGet(table.getRowCount());
-                        partitionProcessedCount += table.getRowCount();
-                        table.clearRowData();
-                    } catch (IOException ex) {
-                        Logger.getLogger(CSVPartitionProcessor.class.getName()).log(Level.SEVERE, null, ex);
-                    }
-                    batch_start = System.currentTimeMillis();;
-                    batch_process_time = batch_start + processBatchEveryMilliseconds;
-                    //System.out.println("Batch Processing Time: " + (batch_end - batch_start));
-                }
-            } else {
-                try {
-                    CSVLoaderMT.MyCallback cbmt = new CSVLoaderMT.MyCallback(0, config, lineList.line);
-                    csvClient.callProcedure(cbmt, procName, (Object[]) lineList.line);
-                    CSVFileReader.inCount.incrementAndGet();
-                } catch (IOException ex) {
-                    Logger.getLogger(CSVPartitionProcessor.class.getName()).log(Level.SEVERE, null, ex);
-                }
-            }
         }
-        if (config.ppc) {
-            try {
-                lcsvClient.drain();
-                lcsvClient.close();
-            } catch (NoConnectionsException ex) {
-                Logger.getLogger(CSVPartitionProcessor.class.getName()).log(Level.SEVERE, null, ex);
-            } catch (InterruptedException ex) {
-                Logger.getLogger(CSVPartitionProcessor.class.getName()).log(Level.SEVERE, null, ex);
-            }
+        try {
+            lcsvClient.drain();
+        } catch (NoConnectionsException ex) {
+            Logger.getLogger(CSVPartitionProcessor.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (InterruptedException ex) {
+            Logger.getLogger(CSVPartitionProcessor.class.getName()).log(Level.SEVERE, null, ex);
         }
+        CSVPartitionProcessor.pcount.countDown();
+        System.out.println("Done Processing partition: " + partitionId + " Processed: " + partitionProcessedCount);
     }
 }

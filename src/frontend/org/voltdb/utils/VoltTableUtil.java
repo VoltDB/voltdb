@@ -134,28 +134,27 @@ public class VoltTableUtil {
         Object row_args[] = new Object[fields.length];
 
         for (int i = 0; i < fields.length; i++) {
-            String field = fields[i];
             final VoltType type = columnTypes.get(i);
             Object obj;
             if (type == VoltType.BIGINT
                     || type == VoltType.INTEGER
                     || type == VoltType.SMALLINT
                     || type == VoltType.TINYINT) {
-                Long l = Long.parseLong(field);
+                Long l = Long.parseLong(fields[i]);
                 obj = l;
             } else if (type == VoltType.FLOAT) {
-                Double l = Double.parseDouble(field);
+                Double l = Double.parseDouble(fields[i]);
                 obj = l;
             } else if (type == VoltType.DECIMAL) {
-                BigDecimal l = new BigDecimal(field);
+                BigDecimal l = new BigDecimal(fields[i]);
                 obj = l;
             } else if (type == VoltType.STRING) {
-                obj = field;
+                obj = fields[i];
             } else if (type == VoltType.TIMESTAMP) {
-                TimestampType ts = new TimestampType(field);
+                TimestampType ts = new TimestampType(fields[i]);
                 obj = ts;
             } else if (type == VoltType.VARBINARY) {
-                obj = field.getBytes();
+                obj = fields[i].getBytes();
             } else {
                 obj = null;
             }
