@@ -362,8 +362,8 @@ bool Table::equals(voltdb::Table *other) {
     if (!(name() == other->name())) return false;
     if (!(tableType() == other->tableType())) return false;
 
-    std::vector<voltdb::TableIndex*> indexes = allIndexes();
-    std::vector<voltdb::TableIndex*> otherIndexes = other->allIndexes();
+    const std::vector<voltdb::TableIndex*>& indexes = allIndexes();
+    const std::vector<voltdb::TableIndex*>& otherIndexes = other->allIndexes();
     if (!(indexes.size() == indexes.size())) return false;
     for (std::size_t ii = 0; ii < indexes.size(); ii++) {
         if (!(indexes[ii]->equals(otherIndexes[ii]))) return false;

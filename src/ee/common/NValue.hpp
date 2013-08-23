@@ -304,7 +304,6 @@ class NValue {
     bool isFalse() const;
 
     /* For number values, check the number line. */
-    bool isNegative() const;
     bool isZero() const;
 
     /* For boolean NValues only, logical operators */
@@ -1578,9 +1577,6 @@ class NValue {
                 break;
             case VALUE_TYPE_DECIMAL:
                 rhsValue = rhs.castAsDoubleAndGetValue();
-                if (rhs.isNegative()) {
-                    rhsValue *= -1;
-                }
                 break;
             default:
                 char message[128];
@@ -1595,9 +1591,16 @@ class NValue {
                 return 0;
         }
 
+        // Add null type comparison
+        if (isNull()) {
+            return rhs.isNull() ? VALUE_COMPARE_EQUAL : VALUE_COMPARE_LESSTHAN;
+        }
+        else if (rhs.isNull()) {
+            return VALUE_COMPARE_GREATERTHAN;
+        }
         // Treat NaN values as equals and also make them smaller than neagtive infinity.
         // This breaks IEEE754 for expressions slightly.
-        if (std::isnan(lhsValue)) {
+        else if (std::isnan(lhsValue)) {
             return std::isnan(rhsValue) ? VALUE_COMPARE_EQUAL : VALUE_COMPARE_LESSTHAN;
         }
         else if (std::isnan(rhsValue)) {
@@ -2108,29 +2111,6 @@ inline bool NValue::isFalse() const {
     assert(getValueType() == VALUE_TYPE_BOOLEAN);
     return !getBoolean();
 }
-
-inline bool NValue::isNegative() const {
-        const ValueType type = getValueType();
-        switch (type) {
-        case VALUE_TYPE_TINYINT:
-            return getTinyInt() < 0;
-        case VALUE_TYPE_SMALLINT:
-            return getSmallInt() < 0;
-        case VALUE_TYPE_INTEGER:
-            return getInteger() < 0;
-        case VALUE_TYPE_BIGINT:
-            return getBigInt() < 0;
-        case VALUE_TYPE_TIMESTAMP:
-            return getTimestamp() < 0;
-        case VALUE_TYPE_DOUBLE:
-            return getDouble() < 0;
-        case VALUE_TYPE_DECIMAL:
-            return getDecimal().IsSign();
-        default: {
-            throwDynamicSQLException( "Invalid value type '%s' for checking negativity", getValueTypeString().c_str());
-        }
-        }
-    }
 
 /**
  * Logical and operation for NValues

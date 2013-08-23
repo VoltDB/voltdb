@@ -219,7 +219,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (hasComplexAgg()) {
                 tmpNodeSchema = newAggSchema;
             }
-            
+
             aggregationList = new ArrayList<AbstractExpression>();
             assert(displayElement != null);
             parseDisplayColumns(displayElement, true);

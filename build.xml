@@ -129,6 +129,88 @@
     <fileset refid="voltpro.classpath"/>
 </path>
 
+<patternset id='junit.regression.h1.path'>
+    <!-- Standard junit fileset -->
+    <include name='org/voltdb/regressionsuites/TestA*.class' />
+    <include name='org/voltdb/regressionsuites/TestB*.class' />
+    <include name='org/voltdb/regressionsuites/TestC*.class' />
+    <include name='org/voltdb/regressionsuites/TestD*.class' />
+    <include name='org/voltdb/regressionsuites/TestE*.class' />
+    <include name='org/voltdb/regressionsuites/TestF*.class' />
+    <include name='org/voltdb/regressionsuites/TestG*.class' />
+    <include name='org/voltdb/regressionsuites/TestH*.class' />
+    <include name='org/voltdb/regressionsuites/TestI*.class' />
+    <include name='org/voltdb/regressionsuites/TestJ*.class' />
+    <include name='org/voltdb/regressionsuites/TestK*.class' />
+    <include name='org/voltdb/regressionsuites/TestL*.class' />
+    <include name='org/voltdb/regressionsuites/TestM*.class' />
+    <include name='org/voltdb/regressionsuites/TestN*.class' />
+    <include name='org/voltdb/regressionsuites/TestO*.class' />
+    <include name='org/voltdb/regressionsuites/TestP*.class' />
+    <!-- Exclude tests -->
+    <exclude name="**/*$*.class"/>
+    <exclude name="**/TestIV2BlacklistSaveRestoreSysprocSuite.class" />
+    <exclude name="**/TestMaliciousClientSuite.class" /> <!-- fails legacy -->
+</patternset>
+
+<patternset id='junit.regression.h2.path'>
+    <!-- Standard junit fileset -->
+    <include name='org/voltdb/regressionsuites/TestQ*.class' />
+    <include name='org/voltdb/regressionsuites/TestR*.class' />
+    <include name='org/voltdb/regressionsuites/TestS*.class' />
+    <include name='org/voltdb/regressionsuites/TestT*.class' />
+    <include name='org/voltdb/regressionsuites/TestU*.class' />
+    <include name='org/voltdb/regressionsuites/TestV*.class' />
+    <include name='org/voltdb/regressionsuites/TestW*.class' />
+    <include name='org/voltdb/regressionsuites/TestX*.class' />
+    <include name='org/voltdb/regressionsuites/TestY*.class' />
+    <include name='org/voltdb/regressionsuites/TestZ*.class' />
+    <!-- Exclude tests -->
+    <exclude name="**/*$*.class"/>
+</patternset>
+
+<patternset id='junit.other.path'>
+    <!-- Standard junit fileset -->
+    <include name='org/hsqldb_voltpatches/**/Test*.class'/>
+    <include name='org/voltcore/**/Test*.class' />
+    <include name='org/voltdb/Test*.class'/>
+    <include name='org/voltdb/catalog/Test*.class'/>
+    <include name='org/voltdb/client/Test*.class'/>
+    <include name='org/voltdb/compiler/Test*.class'/>
+    <include name='org/voltdb/dtxn/Test*.class'/>
+    <include name='org/voltdb/export/Test*.class'/>
+    <include name='org/voltdb/export/**/Test.class'/>
+    <include name='org/voltdb/exportclient/Test.class'/>
+    <include name='org/voltdb/expressions/Test.class'/>
+    <include name='org/voltdb/iv2/Test*.class'/>
+    <include name='org/voltdb/jdbc/Test*.class'/>
+    <include name='org/voltdb/jni/Test*.class'/>
+    <include name='org/voltdb/messaging/Test*.class'/>
+    <!-- Can not find following 3 dir, but was in old set, so keep them -->
+    <include name='org/voltdb/messaging/**/*Test.class'/>
+    <include name='org/voltdb/network/**/Test*.class'/>
+    <include name='org/voltdb/network/**/*Test.class'/>
+    <include name='org/voltdb/planner/Test*.class'/>
+    <include name='org/voltdb/plannodes/Test*.class'/>
+    <include name='org/voltdb/rejoin/Test*.class'/>
+    <include name='org/voltdb/sysprocs/saverestore/Test*.class'/>
+    <include name='org/voltdb/types/Test*.class'/>
+    <include name='org/voltdb/utils/**/*Test.class'/>
+    <exclude name="**/*$*.class"/>
+    <exclude name="org/voltdb/quarantine/**/*.class"/>
+    <exclude name="**/TestExportBase.class"/>
+    <!-- Excluded pro tests -->
+    <exclude name="**/TestCommandLogServer.class" />
+    <exclude name="**/TestCommandLog.class"/>
+    <exclude name="**/TestPauselessRejoinFuzz.class" /> <!-- fails legacy -->
+    <!-- Exclude community tests -->
+    <!-- Recorded as ENG-4423 -->
+    <exclude name="**/TestRejoinFuzz.class" />
+    <exclude name="**/TestRejoinFuzz2.class" />
+    <!-- Recorded as ENG-3038 -->
+    <exclude name="**/TestMultipleOuterJoinPlans.class" />
+</patternset>
+
 <!-- Workload Tracer Properties -->
 <condition property="workload.trace.class" value="">
     <not><isset property="workload.trace.class"/></not>
@@ -1309,32 +1391,9 @@ TEST CASES
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
-                <!-- Standard junit fileset -->
-                <include name='org/hsqldb_voltpatches/**/Test*.class'/>
-                <include name='org/voltcore/**/Test*.class' />
-                <include name='org/voltdb/**/Test*.class'/>
-                <include name='org/voltdb/network/**/Test*.class'/>
-                <include name='org/voltdb/messaging/**/*Test.class'/>
-                <include name='org/voltdb/network/**/*Test.class'/>
-                <include name='org/voltdb/utils/**/*Test.class'/>
-                <exclude name="**/*$*.class"/>
-                <exclude name="org/voltdb/quarantine/**/*.class"/>
-                <exclude name="**/TestExportBase.class"/>
-                <!-- Excluded pro tests -->
-                <exclude name="**/TestCommandLogServer.class" />
-                <exclude name="**/TestCommandLogReinitiator.class"/>
-                <exclude name="**/TestCommandLog.class"/>
-                <exclude name="**/TestLogReader.class"/>
-                <exclude name="**/TestRestoreWithReplay.class" />
-                <exclude name="**/TestPauselessRejoinFuzz.class" /> <!-- fails legacy -->
-                <!-- Exclude community tests -->
-                <!-- Recorded as ENG-4423 -->
-                <exclude name="**/TestIV2BlacklistSaveRestoreSysprocSuite.class" />
-                <exclude name="**/TestRejoinFuzz.class" />
-                <exclude name="**/TestRejoinFuzz2.class" />
-                <exclude name="**/TestMaliciousClientSuite.class" /> <!-- fails legacy -->
-                <!-- Recorded as ENG-3038 -->
-                <exclude name="**/TestMultipleOuterJoinPlans.class" />
+                <patternset refid="junit.other.path" />
+                <patternset refid="junit.regression.h1.path" />
+                <patternset refid="junit.regression.h2.path" />
             </fileset>
         </tests>
     </run_junit>
@@ -1369,6 +1428,51 @@ TEST CASES
                 <exclude name="**/Test*Restore*.class" />
                 <exclude name="**/Test*Snapshot*.class" />
                 <exclude name="**/TestMultipleOuterJoinPlans.class" />
+            </fileset>
+        </tests>
+    </run_junit>
+</target>
+
+<target name="junit_regression"
+    description="Execute JUnit regression test suites.">
+    <run_junit>
+        <tests>
+            <fileset dir='${build.test.dir}'>
+                <patternset refid="junit.regression.h1.path" />
+                <patternset refid="junit.regression.h2.path" />
+            </fileset>
+        </tests>
+    </run_junit>
+</target>
+
+<target name="junit_regression_h1"
+    description="Execute first half of JUnit regression test suites.">
+    <run_junit>
+        <tests>
+            <fileset dir='${build.test.dir}'>
+                <patternset refid="junit.regression.h1.path" />
+            </fileset>
+        </tests>
+    </run_junit>
+</target>
+
+<target name="junit_regression_h2"
+    description="Execute second half of JUnit regression test suites.">
+    <run_junit>
+        <tests>
+            <fileset dir='${build.test.dir}'>
+                <patternset refid="junit.regression.h2.path" />
+            </fileset>
+        </tests>
+    </run_junit>
+</target>
+
+<target name="junit_other"
+    description="Execute JUnit test suites except regression tests.">
+    <run_junit>
+        <tests>
+            <fileset dir='${build.test.dir}'>
+                <patternset refid="junit.other.path" />
             </fileset>
         </tests>
     </run_junit>
