@@ -1030,9 +1030,6 @@ class NValue {
             fractional %= kMaxScaleFactor;
             retval = static_cast<double>(whole.ToInt()) +
                     (static_cast<double>(fractional.ToInt())/static_cast<double>(kMaxScaleFactor));
-            if (isNegative()) {
-                return -retval;
-            }
             return retval;
           }
           case VALUE_TYPE_VARCHAR:
@@ -1137,11 +1134,7 @@ class NValue {
             TTInt scaledValue = getDecimal();
             TTInt whole(scaledValue);
             whole /= NValue::kMaxScaleFactor;
-            long value = whole.ToInt();
-            if (isNegative()) {
-                retval.getBigInt() = -value; break;
-            }
-            retval.getBigInt() = value; break;
+            retval.getBigInt() = whole.ToInt(); break;
         }
         case VALUE_TYPE_VARCHAR:
             retval.getBigInt() = static_cast<int64_t>(getNumberFromString()); break;
@@ -1193,11 +1186,7 @@ class NValue {
             TTInt scaledValue = getDecimal();
             TTInt whole(scaledValue);
             whole /= NValue::kMaxScaleFactor;
-            long value = whole.ToInt();
-            if (isNegative()) {
-                retval.getTimestamp() = -value; break;
-            }
-            retval.getTimestamp() = value; break;
+            retval.getTimestamp() = whole.ToInt(); break;
         }
         case VALUE_TYPE_VARCHAR:
             //TODO: Seems like we want to also allow actual date formatting OR? a numeric value, here? See ENG-4284.
@@ -1243,9 +1232,6 @@ class NValue {
             TTInt whole(scaledValue);
             whole /= NValue::kMaxScaleFactor;
             int64_t value = whole.ToInt();
-            if (isNegative()) {
-                retval.narrowToInteger( -value, type); break;
-            }
             retval.narrowToInteger(value, type); break;
         }
         case VALUE_TYPE_VARCHAR:
@@ -1291,9 +1277,6 @@ class NValue {
             TTInt whole(scaledValue);
             whole /= NValue::kMaxScaleFactor;
             int64_t value = whole.ToInt();
-            if (isNegative()) {
-                retval.narrowToSmallInt( -value, type); break;
-            }
             retval.narrowToSmallInt(value, type); break;
         }
         case VALUE_TYPE_VARCHAR:
@@ -1339,9 +1322,6 @@ class NValue {
             TTInt whole(scaledValue);
             whole /= NValue::kMaxScaleFactor;
             int64_t value = whole.ToInt();
-            if (isNegative()) {
-                retval.narrowToTinyInt( -value, type); break;
-            }
             retval.narrowToTinyInt(value, type); break;
         }
         case VALUE_TYPE_VARCHAR:
