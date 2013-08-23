@@ -23,12 +23,14 @@
 
 package org.voltdb;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
+import org.junit.AfterClass;
 import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
@@ -39,11 +41,21 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.VoltFile;
 
 public class TestAdHocQueries extends AdHocQueryTester {
 
     Client m_client;
     private final static boolean m_debug = false;
+
+    @AfterClass
+    public static void tearDownClass()
+    {
+        try {
+            VoltFile.recursivelyDelete(new File("/tmp/" + System.getProperty("user.name")));
+        }
+        catch (IOException e) {};
+    }
 
     @Test
     public void testProcedureAdhoc() throws Exception {
