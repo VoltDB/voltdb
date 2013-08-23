@@ -229,6 +229,7 @@ public class SnapshotSaveAPI
                     }
                     else {
                         context.getSiteSnapshotConnection().initiateSnapshots(
+                                format,
                                 taskList,
                                 targetList,
                                 multiPartTxnId,

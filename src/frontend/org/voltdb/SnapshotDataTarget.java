@@ -37,9 +37,9 @@ public interface SnapshotDataTarget {
      * Write a block of tuple data to this target
      * @param tupleData Tuple data in a <code>ByteBuffer</code> with the required number of bytes available
      * for a header
-     * @param context A context that contains some information about the table
+     * @param tableId   The catalog tableId
      */
-    public ListenableFuture<?> write(Callable<BBContainer> tupleData, SnapshotTableTask context);
+    public ListenableFuture<?> write(Callable<BBContainer> tupleData, int tableId);
 
     /**
      * Does this target need to be closed by the last site to finish snapshotting?

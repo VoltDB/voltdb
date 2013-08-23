@@ -377,7 +377,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
             output.add(container);
             int serialized = m_engine.tableStreamSerializeMore(table.m_tableId,
                                                                TableStreamType.RECOVERY,
-                                                               output)[0];
+                                                               output).getSecond()[0];
 
             if (serialized <= 0) {
                 /*
@@ -442,7 +442,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
         m_onCompletion = onCompletion;
         RecoveryTable table = m_tablesToStream.peek();
         if (!m_engine.activateTableStream(table.m_tableId, TableStreamType.RECOVERY, Long.MAX_VALUE,
-                                          new SnapshotPredicates(null))) {
+                                          new SnapshotPredicates(-1).toBytes())) {
             VoltDB.crashLocalVoltDB("Attempted to activate recovery stream for table "
                     + table.m_name + " and failed", false, null);
         }
@@ -593,7 +593,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                 output.add(container);
                 int serialized = m_engine.tableStreamSerializeMore(table.m_tableId,
                                                                    TableStreamType.RECOVERY,
-                                                                   output)[0];
+                                                                   output).getSecond()[0];
                 long endSerializing = System.currentTimeMillis();
                 m_timeSpentSerializing.addAndGet(endSerializing - startSerializing);
 
@@ -628,8 +628,9 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                     RecoveryTable nextTable = m_tablesToStream.peek();
                     if (nextTable != null) {
                         if (!m_engine.activateTableStream(nextTable.m_tableId,
-                                                          TableStreamType.RECOVERY, Long.MAX_VALUE,
-                                                          new SnapshotPredicates(null))) {
+                                                          TableStreamType.RECOVERY,
+                                                          Long.MAX_VALUE,
+                                                          new SnapshotPredicates(-1).toBytes())) {
                             VoltDB.crashLocalVoltDB("Attempted to activate recovery stream for table "
                                     + nextTable.m_name + " and failed", false, null);
                         }

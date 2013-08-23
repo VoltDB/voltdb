@@ -38,7 +38,7 @@ public class DevNullSnapshotTarget implements SnapshotDataTarget {
 
     @Override
     public ListenableFuture<?> write(Callable<BBContainer> tupleData,
-            SnapshotTableTask context) {
+            int tableId) {
         try {
             BBContainer container = tupleData.call();
             if (container != null) {

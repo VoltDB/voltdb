@@ -185,7 +185,7 @@ fi
 export CMDVAL="$JAVA -server -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp "
 export CMDVAL=$CMDVAL"-XX:+UseConcMarkSweepGC -XX:+CMSParallelRemarkEnabled "
 # note: bash evals '1.7.x' as > '1.7' so this is really a >= 1.7 jvm check
-if [ "$JVM_VERSION" \> "1.7" ] ; then
+if [ "$JVM_VERSION" \> "1.7" -a "$JVM_VENDOR" == "Oracle" ] ; then
     export CMDVAL=$CMDVAL"-XX:+UseCondCardMark "
 fi
 export CMDVAL=$CMDVAL"-XX:+UseTLAB -XX:CMSInitiatingOccupancyFraction=75 -XX:+UseCMSInitiatingOccupancyOnly "

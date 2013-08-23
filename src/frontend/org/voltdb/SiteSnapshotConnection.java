@@ -31,6 +31,7 @@ import org.voltcore.utils.Pair;
 public interface SiteSnapshotConnection
 {
     public void initiateSnapshots(
+            SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
             List<SnapshotDataTarget> targets,
             long txnId,

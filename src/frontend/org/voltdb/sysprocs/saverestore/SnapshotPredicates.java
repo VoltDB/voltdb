@@ -33,13 +33,13 @@ import com.google.common.base.Charsets;
  * A helper class to encapsulate the serialization of snapshot predicates.
  */
 public class SnapshotPredicates {
-    public final Table m_table;
+    public final int m_tableId;
     private final List<Pair<AbstractExpression, Boolean>> m_predicates =
             new ArrayList<Pair<AbstractExpression, Boolean>>();
 
-    public SnapshotPredicates(Table table)
+    public SnapshotPredicates(int tableId)
     {
-        m_table = table;
+        m_tableId = tableId;
     }
 
     public void addPredicate(AbstractExpression predicate, boolean deleteTuples)

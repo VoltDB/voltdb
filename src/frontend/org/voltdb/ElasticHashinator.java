@@ -148,13 +148,8 @@ public class ElasticHashinator extends TheHashinator {
             long token = entry.getKey();
             int pid = entry.getValue();
 
-            if (existingPartitions.contains(pid)) {
-                throw new RuntimeException("Partition " + pid + " already exists in the " +
-                                               "hashinator");
-            }
-
             Integer oldPartition = newConfig.put(token, pid);
-            if (oldPartition != null) {
+            if (oldPartition != null && oldPartition != pid) {
                 throw new RuntimeException("Token " + token + " used to map to partition " +
                                                oldPartition + " but now maps to " + pid);
             }

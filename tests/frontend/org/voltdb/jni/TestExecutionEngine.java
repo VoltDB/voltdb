@@ -187,9 +187,9 @@ public class TestExecutionEngine extends TestCase {
         loadTestTables( sourceEngine, m_catalog);
 
         sourceEngine.activateTableStream( WAREHOUSE_TABLEID, TableStreamType.RECOVERY, Long.MAX_VALUE,
-                                          new SnapshotPredicates(null));
+                                          new SnapshotPredicates(-1).toBytes());
         sourceEngine.activateTableStream( STOCK_TABLEID, TableStreamType.RECOVERY, Long.MAX_VALUE,
-                                          new SnapshotPredicates(null));
+                                          new SnapshotPredicates(-1).toBytes());
 
         BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
         try {
@@ -205,7 +205,7 @@ public class TestExecutionEngine extends TestCase {
             output.add(container);
             int serialized = sourceEngine.tableStreamSerializeMore(WAREHOUSE_TABLEID,
                                                                    TableStreamType.RECOVERY,
-                                                                   output)[0];
+                                                                   output).getSecond()[0];
             assertTrue(serialized > 0);
             container.b.limit(serialized);
             destinationEngine.get().processRecoveryMessage( container.b, container.address);
@@ -213,7 +213,7 @@ public class TestExecutionEngine extends TestCase {
 
             serialized = sourceEngine.tableStreamSerializeMore(WAREHOUSE_TABLEID,
                                                                TableStreamType.RECOVERY,
-                                                               output)[0];
+                                                               output).getSecond()[0];
             assertEquals( 5, serialized);
             assertEquals( RecoveryMessageType.Complete.ordinal(), container.b.get());
 
@@ -222,7 +222,7 @@ public class TestExecutionEngine extends TestCase {
             container.b.clear();
             serialized = sourceEngine.tableStreamSerializeMore(STOCK_TABLEID,
                                                                TableStreamType.RECOVERY,
-                                                               output)[0];
+                                                               output).getSecond()[0];
             assertTrue(serialized > 0);
             container.b.limit(serialized);
             destinationEngine.get().processRecoveryMessage( container.b, container.address);
@@ -230,7 +230,7 @@ public class TestExecutionEngine extends TestCase {
 
             serialized = sourceEngine.tableStreamSerializeMore(STOCK_TABLEID,
                                                                TableStreamType.RECOVERY,
-                                                               output)[0];
+                                                               output).getSecond()[0];
             assertEquals( 5, serialized);
             assertEquals( RecoveryMessageType.Complete.ordinal(), container.b.get());
             assertEquals( STOCK_TABLEID, container.b.getInt());
@@ -458,14 +458,14 @@ public class TestExecutionEngine extends TestCase {
 
         loadTestTables( sourceEngine, m_catalog);
 
-        SnapshotPredicates predicates = new SnapshotPredicates(null);
+        SnapshotPredicates predicates = new SnapshotPredicates(-1);
         predicates.addPredicate(new HashRangeExpressionBuilder()
                                         .put(0x0000000000000000L, 0x7fffffffffffffffL)
                                         .build(0),
                                 true);
 
         // Build the index
-        sourceEngine.activateTableStream(STOCK_TABLEID, TableStreamType.ELASTIC_INDEX, Long.MAX_VALUE, predicates);
+        sourceEngine.activateTableStream(STOCK_TABLEID, TableStreamType.ELASTIC_INDEX, Long.MAX_VALUE, predicates.toBytes());
 
         // Humor serializeMore() by providing a buffer, even though it's not used.
         BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
@@ -478,9 +478,8 @@ public class TestExecutionEngine extends TestCase {
             };
             List<BBContainer> output = new ArrayList<BBContainer>();
             output.add(container);
-            assertEquals(0, sourceEngine.tableStreamSerializeMore(STOCK_TABLEID, TableStreamType.ELASTIC_INDEX, output)[0]);
-        }
-        finally {
+            assertEquals(0, sourceEngine.tableStreamSerializeMore(STOCK_TABLEID, TableStreamType.ELASTIC_INDEX, output).getSecond()[0]);
+        } finally {
             origin.discard();
         }
     }
