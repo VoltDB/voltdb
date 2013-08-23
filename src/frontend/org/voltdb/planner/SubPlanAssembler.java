@@ -490,7 +490,21 @@ public abstract class SubPlanAssembler {
             retval.use = IndexUseType.INDEX_SCAN;
         }
 
-        if (endingBoundExpr != null) {
+        if (endingBoundExpr == null) {
+            if (retval.sortDirection == SortDirectionType.DESC) {
+                if (retval.endExprs.size() == 0) { // no prefix equality filters
+                    if (startingBoundExpr != null) {
+                        retval.indexExprs.clear();
+                        AbstractExpression comparator = startingBoundExpr.getFilter();
+                        retval.endExprs.add(comparator);
+                    }
+                }
+                else { // there are prefix equality filters -- settle for a forward scan?
+                    retval.sortDirection = SortDirectionType.INVALID;
+                }
+            }            
+        }
+        else {
             AbstractExpression comparator = endingBoundExpr.getFilter();
             retval.use = IndexUseType.INDEX_SCAN;
             retval.bindings.addAll(endingBoundExpr.getBindings());
@@ -530,7 +544,7 @@ public abstract class SubPlanAssembler {
                     retval.otherExprs.add(newComparator);
                 } else {
                     AbstractExpression startComparator = startingBoundExpr.getFilter();
-                    retval.endExprs.add(comparator);
+                    retval.endExprs.add(startComparator);
                 }
 
                 // initialExpr is set for both cases
