@@ -502,7 +502,7 @@ public abstract class SubPlanAssembler {
                 else { // there are prefix equality filters -- settle for a forward scan?
                     retval.sortDirection = SortDirectionType.INVALID;
                 }
-            }            
+            }
         }
         else {
             AbstractExpression comparator = endingBoundExpr.getFilter();
