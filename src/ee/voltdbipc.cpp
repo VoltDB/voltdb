@@ -1319,6 +1319,8 @@ int main(int argc, char **argv) {
     /* max message size that can be read from java */
     int max_ipc_message_size = (1024 * 1024 * 2);
 
+    int port = 0;
+
     // allow called to override port with the first argument
     if (argc == 2) {
         char *portStr = argv[1];

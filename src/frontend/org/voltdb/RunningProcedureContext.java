@@ -21,7 +21,6 @@ public class RunningProcedureContext {
     public String m_procedureName;
     public short m_voltExecuteSQLIndex;
     public short m_batchIndexBase;
-    //public List<QueuedSQL> m_batch;
 
     public RunningProcedureContext() {
         m_procedureName = "";

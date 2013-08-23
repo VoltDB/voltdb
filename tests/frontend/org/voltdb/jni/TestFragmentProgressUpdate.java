@@ -29,7 +29,6 @@ import org.voltdb.BackendTarget;
 import org.voltdb.LegacyHashinator;
 import org.voltdb.ParameterSet;
 import org.voltdb.RunningProcedureContext;
-import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -71,7 +70,7 @@ public class TestFragmentProgressUpdate extends TestCase {
 //                10000,
 //                HashinatorType.LEGACY,
 //                LegacyHashinator.getConfigureBytes(1));
-//        testFragmentProgressUpdate();
+//        testFragmentProgressUpdate(m_ee);
 //    }
 
     public void testFragmentProgressUpdate(ExecutionEngine ee) throws Exception {
