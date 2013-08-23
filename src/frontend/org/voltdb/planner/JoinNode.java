@@ -207,19 +207,21 @@ public class JoinNode implements Cloneable {
         joinNodes.add(this);
         while ( ! joinNodes.isEmpty()) {
             JoinNode joinNode = joinNodes.poll();
-            if (joinNode.m_table != null) {
-                if (joinNode.m_whereExpr != null) {
-                    ExpressionUtil.collectPartitioningFilters(joinNode.m_whereExpr, equivalenceSet);
-                }
-                if (joinNode.m_joinExpr != null) {
-                    ExpressionUtil.collectPartitioningFilters(joinNode.m_joinExpr, equivalenceSet);
-                }
-                assert joinNode.m_leftNode == null && joinNode.m_rightNode == null;
-                continue;
-            }
             if ( ! joinNode.m_whereInnerList.isEmpty()) {
                 ExpressionUtil.collectPartitioningFilters(joinNode.m_whereInnerList,
                                                           equivalenceSet);
+            }
+            if (joinNode.m_table != null) {
+                assert joinNode.m_leftNode == null && joinNode.m_rightNode == null;
+                // HSQL sometimes tags single-table filters in inner joins as join clauses
+                // rather than where clauses? OR does analyzeJoinExpressions correct for this?
+                // If so, these CAN contain constant equivalences that get used as the basis for equivalence
+                // conditions that determine partitioning, so process them as where clauses.
+                if ( ! joinNode.m_joinInnerList.isEmpty()) {
+                    ExpressionUtil.collectPartitioningFilters(joinNode.m_joinInnerList,
+                                                              equivalenceSet);
+                }
+                continue;
             }
             if ( ! joinNode.m_whereOuterList.isEmpty()) {
                 ExpressionUtil.collectPartitioningFilters(joinNode.m_whereOuterList,
@@ -232,6 +234,20 @@ public class JoinNode implements Cloneable {
             if ( ! joinNode.m_joinInnerOuterList.isEmpty()) {
                 ExpressionUtil.collectPartitioningFilters(joinNode.m_joinInnerOuterList,
                                                           equivalenceSet);
+            }
+            if (joinNode.m_joinType == JoinType.INNER) {
+                // HSQL sometimes tags single-table filters in inner joins as join clauses
+                // rather than where clauses? OR does analyzeJoinExpressions correct for this?
+                // If so, these CAN contain constant equivalences that get used as the basis for equivalence
+                // conditions that determine partitioning, so process them as where clauses.
+                if ( ! joinNode.m_joinInnerList.isEmpty()) {
+                    ExpressionUtil.collectPartitioningFilters(joinNode.m_joinInnerList,
+                                                              equivalenceSet);
+                }
+                if ( ! joinNode.m_joinOuterList.isEmpty()) {
+                    ExpressionUtil.collectPartitioningFilters(joinNode.m_joinOuterList,
+                                                              equivalenceSet);
+                }
             }
             if (joinNode.m_leftNode != null) {
                 joinNodes.add(joinNode.m_leftNode);
