@@ -235,15 +235,13 @@ public class TestPlansJoin extends PlannerTestCase {
         assertTrue(n instanceof NestLoopPlanNode);
         NestLoopPlanNode nlj = (NestLoopPlanNode) n;
         assertEquals(ExpressionType.COMPARE_EQUAL, nlj.getJoinPredicate().getExpressionType());
-        n = n.getChild(0);
-        assertTrue(n instanceof AbstractJoinPlanNode);
-        p = ((AbstractJoinPlanNode) n).getJoinPredicate();
-        assertEquals(ExpressionType.COMPARE_EQUAL, p.getExpressionType());
-        n = n.getChild(0);
+        n = nlj.getChild(0);
         assertTrue(n instanceof AbstractScanPlanNode);
-        assertTrue(((AbstractScanPlanNode) n).getTargetTableName().equalsIgnoreCase("R1"));
         p = ((AbstractScanPlanNode) n).getPredicate();
         assertEquals(ExpressionType.COMPARE_GREATERTHAN, p.getExpressionType());
+        n = nlj.getChild(1);
+        assertTrue(n instanceof AbstractScanPlanNode);
+        assertTrue(((AbstractScanPlanNode) n).getTargetTableName().equalsIgnoreCase("R2"));
     }
 
     public void testTransitiveValueEquivalenceConditions() {
