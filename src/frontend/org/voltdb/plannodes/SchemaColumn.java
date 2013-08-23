@@ -90,10 +90,10 @@ public class SchemaColumn
 
         SchemaColumn sc = (SchemaColumn) obj;
         String tableName = sc.getTableName();
-        String columnName = sc.getColumnName();
-        String columnAlias = sc.getColumnAlias();
-
         if (m_tableName.equals(tableName)) {
+            String columnName = sc.getColumnName();
+            String columnAlias = sc.getColumnAlias();
+
             if (columnName != null && !columnName.equals("")) {
                 if (columnName.equals(m_columnName)) {
                     // Next line is not true according to current VoltDB's logic

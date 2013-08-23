@@ -30,6 +30,9 @@ import org.voltdb.expressions.TupleValueExpression;
  */
 public class NodeSchema
 {
+    private ArrayList<SchemaColumn> m_columns;
+    private HashMap <SchemaColumn, Integer> m_columnsMapHelper;
+
     public NodeSchema()
     {
         m_columns = new ArrayList<SchemaColumn>();
@@ -186,8 +189,5 @@ public class NodeSchema
         }
         return sb.toString();
     }
-
-    private ArrayList<SchemaColumn> m_columns;
-    private HashMap <SchemaColumn, Integer> m_columnsMapHelper;
 }
 
