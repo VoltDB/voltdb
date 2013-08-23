@@ -325,21 +325,32 @@ public class TestDDLCompiler extends TestCase {
         jarOut.delete();
     }
 
-    public void testExtraClasses() {
-        // ensure the test cleans up
-        File jarOut = new File("checkCompilerWarnings.jar");
+    boolean checkImportValidity(String importStmt) {
+        File jarOut = new File("checkImportValidity.jar");
         jarOut.deleteOnExit();
 
-        String schema1 = "IMPORT CLASS from org.voltdb.**;";
+        String schema = String.format("IMPORT CLASS %s;", importStmt);
 
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema1);
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
+        schemaFile.deleteOnExit();
 
-        // compile successfully
+        // compile and fail on bad import
         VoltCompiler compiler = new VoltCompiler();
-        boolean success =compiler.compileFromDDL(jarOut.getPath(), schemaFile.getPath());
-        assertTrue(success);
+        return compiler.compileFromDDL(jarOut.getPath(), schemaFile.getPath());
+    }
 
-        // cleanup after the test
-        jarOut.delete();
+    public void testExtraClasses() {
+        assertFalse(checkImportValidity("org.1oltdb.**"));
+        assertTrue(checkImportValidity("org.voltdb.V**"));
+        assertFalse(checkImportValidity("$.1oltdb.**"));
+        assertFalse(checkImportValidity("org.voltdb.** org.bolt"));
+        assertTrue(checkImportValidity("org.voltdb.V*"));
+        assertTrue(checkImportValidity("你rg.voltdb.V*"));
+        assertTrue(checkImportValidity("org.我不爱你.V*"));
+        assertFalse(checkImportValidity("org.1我不爱你.V*"));
+        assertTrue(checkImportValidity("org"));
+        assertTrue(checkImportValidity("*org"));
+        assertTrue(checkImportValidity("org.**.RealVoltDB"));
+        assertTrue(checkImportValidity("org.vol*db.RealVoltDB"));
     }
 }
