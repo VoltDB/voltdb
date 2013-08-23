@@ -42,6 +42,8 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     }
 
     protected JoinType m_joinType = JoinType.INNER;
+    // sortDirection is only used in handleOrderBy(),
+    // and the sortDirection used in EE is from inlined IndexScan node for NLIJ
     protected SortDirectionType m_sortDirection = SortDirectionType.INVALID;
     protected AbstractExpression m_preJoinPredicate;
     protected AbstractExpression m_joinPredicate;
@@ -221,21 +223,8 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     // TODO: need to extend the sort direction for join from one table to the other table if possible
     // right now, only consider the sort direction on the outer table
     public void resolveSortDirection() {
-        // special treatment for NLIJ, when the outer table is a materialized scan node
-        // the sort direction from the outer table should be the same as the that in the inner table
-        // (because we set when building this NLIJ)
         AbstractPlanNode outerTable = m_children.get(0);
-        if (outerTable.getPlanNodeType() == PlanNodeType.MATERIALIZEDSCAN) {
-            IndexScanPlanNode ispn = (IndexScanPlanNode) m_inlineNodes.get(PlanNodeType.INDEXSCAN);
-            if (ispn != null) {
-                assert (((MaterializedScanPlanNode)outerTable).getSortDirection() == ispn.getSortDirection());
-                m_sortDirection = ispn.getSortDirection();
-            }
-            return;
-        }
         if (outerTable.getPlanNodeType() == PlanNodeType.INDEXSCAN) {
-            // sortDirection is only used in handleOrderBy(),
-            // and the sortDirection used in EE is from inlined IndexScan node
             m_sortDirection = ((IndexScanPlanNode)outerTable).getSortDirection();
             return;
         }

@@ -25,9 +25,6 @@ import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
-import org.voltdb.plannodes.NestLoopIndexPlanNode;
-import org.voltdb.plannodes.ProjectionPlanNode;
-import org.voltdb.types.SortDirectionType;
 
 public class PushdownLimitsIntoScans extends MicroOptimization {
 
@@ -77,7 +74,6 @@ public class PushdownLimitsIntoScans extends MicroOptimization {
         plan.clearChildren();
         child.clearParents();
         child.addInlinePlanNode(plan);
-
         return child;
 
     }
