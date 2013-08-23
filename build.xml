@@ -165,22 +165,40 @@
     <include name='org/voltdb/regressionsuites/TestX*.class' />
     <include name='org/voltdb/regressionsuites/TestY*.class' />
     <include name='org/voltdb/regressionsuites/TestZ*.class' />
+    <!-- Exclude tests -->
+    <exclude name="**/*$*.class"/>
 </patternset>
 
 <patternset id='junit.other.path'>
     <!-- Standard junit fileset -->
     <include name='org/hsqldb_voltpatches/**/Test*.class'/>
     <include name='org/voltcore/**/Test*.class' />
-    <include name='org/voltdb/**/Test*.class'/>
-    <include name='org/voltdb/network/**/Test*.class'/>
+    <include name='org/voltdb/Test*.class'/>
+    <include name='org/voltdb/catalog/Test*.class'/>
+    <include name='org/voltdb/client/Test*.class'/>
+    <include name='org/voltdb/compiler/Test*.class'/>
+    <include name='org/voltdb/dtxn/Test*.class'/>
+    <include name='org/voltdb/export/Test*.class'/>
+    <include name='org/voltdb/export/**/Test.class'/>
+    <include name='org/voltdb/exportclient/Test.class'/>
+    <include name='org/voltdb/expressions/Test.class'/>
+    <include name='org/voltdb/iv2/Test*.class'/>
+    <include name='org/voltdb/jdbc/Test*.class'/>
+    <include name='org/voltdb/jni/Test*.class'/>
+    <include name='org/voltdb/messaging/Test*.class'/>
+    <!-- Can not find following 3 dir, but was in old set, so keep them -->
     <include name='org/voltdb/messaging/**/*Test.class'/>
+    <include name='org/voltdb/network/**/Test*.class'/>
     <include name='org/voltdb/network/**/*Test.class'/>
+    <include name='org/voltdb/planner/Test*.class'/>
+    <include name='org/voltdb/plannodes/Test*.class'/>
+    <include name='org/voltdb/rejoin/Test*.class'/>
+    <include name='org/voltdb/sysprocs/saverestore/Test*.class'/>
+    <include name='org/voltdb/types/Test*.class'/>
     <include name='org/voltdb/utils/**/*Test.class'/>
     <exclude name="**/*$*.class"/>
     <exclude name="org/voltdb/quarantine/**/*.class"/>
     <exclude name="**/TestExportBase.class"/>
-    <!-- Excluded regression tests -->
-    <exclude name="org/voltdb/regressionsuites/*.class" />
     <!-- Excluded pro tests -->
     <exclude name="**/TestCommandLogServer.class" />
     <exclude name="**/TestCommandLog.class"/>
