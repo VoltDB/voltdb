@@ -37,68 +37,116 @@
 using namespace std;
 using namespace voltdb;
 
+static const int64_t scale = 1000000000000;
+static const double floatDelta = 0.000000000001;
+
 class NValueTest : public Test {
     ThreadLocalPool m_pool;
-};
-
-void deserDecHelper(NValue nv, ValueType &vt,
-                    TTInt &value, string &str) {
-    vt    = ValuePeeker::peekValueType(nv);
-    value = ValuePeeker::peekDecimal(nv);
-    str   = ValuePeeker::peekDecimalString(nv);
-}
-
-TEST_F(NValueTest, DeserializeDecimal)
-{
-    int64_t scale = 1000000000000;
+public:
     string str;
-
     ValueType vt;
     TTInt value;
     NValue nv;
+    int64_t scaledValue;
+    int64_t scaledDirect;
+    NValue viaDouble;
+    NValue lower;
+    NValue upper;
+
+    void deserDecHelper()
+    {
+        vt    = ValuePeeker::peekValueType(nv);
+        value = ValuePeeker::peekDecimal(nv);
+        str   = ValuePeeker::peekDecimalString(nv);
+    }
+
+    void deserDecValidator(const char* textValue)
+    {
+        nv = ValueFactory::getDecimalValueFromString(textValue);
+        deserDecHelper();
+        NValue floatEquivalent = nv.castAs(VALUE_TYPE_DOUBLE);
+        double floatValue = ValuePeeker::peekDouble(floatEquivalent);
+        floatValue *= scale;
+        scaledValue = (int64_t)floatValue;
+        double floatDirect = atof(textValue);
+        viaDouble = ValueFactory::getDoubleValue(floatDirect).castAs(VALUE_TYPE_DECIMAL);
+        lower = ValueFactory::getDoubleValue(floatDirect - floatDelta);
+        upper = ValueFactory::getDoubleValue(floatDirect + floatDelta);
+        scaledDirect = (int64_t)(floatDirect * scale);
+    }
 
 
-    nv = ValueFactory::getDecimalValueFromString("6.0000000");
-    deserDecHelper(nv, vt, value, str);
+};
+
+TEST_F(NValueTest, DeserializeDecimal)
+{
+    deserDecValidator("6.0000000");
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_TRUE(viaDouble.compare(nv) == 0);
+    ASSERT_TRUE(lower.compare(nv) < 0);
+    ASSERT_TRUE(nv.compare(lower) > 0);
+    ASSERT_TRUE(upper.compare(nv) > 0);
+    ASSERT_TRUE(nv.compare(upper) < 0);
+    ASSERT_EQ(scaledValue, scaledDirect);
     ASSERT_EQ(value, TTInt("6000000000000"));
     ASSERT_EQ(str, "6.000000000000");
 
-    nv = ValueFactory::getDecimalValueFromString("-0");
-    deserDecHelper(nv, vt, value, str);
+    deserDecValidator("-0");
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_TRUE(viaDouble.compare(nv) == 0);
+    ASSERT_TRUE(lower.compare(nv) < 0);
+    ASSERT_TRUE(nv.compare(lower) > 0);
+    ASSERT_TRUE(upper.compare(nv) > 0);
+    ASSERT_TRUE(nv.compare(upper) < 0);
+    ASSERT_EQ(scaledValue, scaledDirect);
     ASSERT_EQ(value, TTInt(0));
     // Decimals in Volt are currently hardwired with 12 fractional
     // decimal places.
     ASSERT_EQ(str, "0.000000000000");
 
-    nv = ValueFactory::getDecimalValueFromString("0");
-    deserDecHelper(nv, vt, value, str);
+    deserDecValidator("0");
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_TRUE(viaDouble.compare(nv) == 0);
+    ASSERT_TRUE(lower.compare(nv) < 0);
+    ASSERT_TRUE(nv.compare(lower) > 0);
+    ASSERT_TRUE(upper.compare(nv) > 0);
+    ASSERT_TRUE(nv.compare(upper) < 0);
     ASSERT_EQ(value, TTInt(0));
     ASSERT_EQ(str, "0.000000000000");
 
-    nv = ValueFactory::getDecimalValueFromString("0.0");
-    deserDecHelper(nv, vt, value, str);
+    deserDecValidator("0.0");
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_TRUE(viaDouble.compare(nv) == 0);
+    ASSERT_TRUE(lower.compare(nv) < 0);
+    ASSERT_TRUE(nv.compare(lower) > 0);
+    ASSERT_TRUE(upper.compare(nv) > 0);
+    ASSERT_TRUE(nv.compare(upper) < 0);
     ASSERT_EQ(value, TTInt(0));
     ASSERT_EQ(str, "0.000000000000");
 
-    nv = ValueFactory::getDecimalValueFromString("1");
-    deserDecHelper(nv, vt, value, str);
+    deserDecValidator("1");
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_TRUE(viaDouble.compare(nv) == 0);
+    ASSERT_TRUE(lower.compare(nv) < 0);
+    ASSERT_TRUE(nv.compare(lower) > 0);
+    ASSERT_TRUE(upper.compare(nv) > 0);
+    ASSERT_TRUE(nv.compare(upper) < 0);
     ASSERT_EQ(value, TTInt("1000000000000"));
     ASSERT_EQ(str, "1.000000000000");
 
-    nv = ValueFactory::getDecimalValueFromString("-1");
-    deserDecHelper(nv, vt, value, str);
+    deserDecValidator("-1");
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_TRUE(viaDouble.compare(nv) == 0);
+    ASSERT_TRUE(lower.compare(nv) < 0);
+    ASSERT_TRUE(nv.compare(lower) > 0);
+    ASSERT_TRUE(upper.compare(nv) > 0);
+    ASSERT_TRUE(nv.compare(upper) < 0);
     ASSERT_EQ(value, TTInt("-1000000000000"));
     ASSERT_EQ(str, "-1.000000000000");
 
@@ -107,7 +155,7 @@ TEST_F(NValueTest, DeserializeDecimal)
                                        "9999999999"   //20 digits
                                        "999999.9999"   //30 digits
                                        "99999999");   //38 digits
-    deserDecHelper(nv, vt, value, str);
+    deserDecHelper();
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
     ASSERT_EQ(value, TTInt("-9999999999"  //10 digits
@@ -124,7 +172,7 @@ TEST_F(NValueTest, DeserializeDecimal)
             "9999999999"   //20 digits
             "999999.9999"   //30 digits
             "99999999");
-    deserDecHelper(nv, vt, value, str);
+    deserDecHelper();
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
     ASSERT_EQ(value, TTInt("9999999999"  //10 digits
@@ -136,31 +184,47 @@ TEST_F(NValueTest, DeserializeDecimal)
             "999999.9999"   //30 digits
             "99999999"));
 
-    nv = ValueFactory::getDecimalValueFromString("1234");
-    deserDecHelper(nv, vt, value, str);
+    deserDecValidator("1234");
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_TRUE(viaDouble.compare(nv) == 0);
+    ASSERT_TRUE(lower.compare(nv) < 0);
+    ASSERT_TRUE(nv.compare(lower) > 0);
+    ASSERT_TRUE(upper.compare(nv) > 0);
+    ASSERT_TRUE(nv.compare(upper) < 0);
     ASSERT_EQ(value, TTInt(1234 * scale));
     ASSERT_EQ(str, "1234.000000000000");
 
-    nv = ValueFactory::getDecimalValueFromString("12.34");
-    deserDecHelper(nv, vt, value, str);
+    deserDecValidator("12.34");
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_TRUE(viaDouble.compare(nv) == 0);
+    ASSERT_TRUE(lower.compare(nv) < 0);
+    ASSERT_TRUE(nv.compare(lower) > 0);
+    ASSERT_TRUE(upper.compare(nv) > 0);
+    ASSERT_TRUE(nv.compare(upper) < 0);
     ASSERT_EQ(value, TTInt(static_cast<int64_t>(12340000000000)));
     ASSERT_EQ(str, "12.340000000000");
 
-    nv = ValueFactory::getDecimalValueFromString("-1234");
-    deserDecHelper(nv, vt, value, str);
+    deserDecValidator("-1234");
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_TRUE(viaDouble.compare(nv) == 0);
+    ASSERT_TRUE(lower.compare(nv) < 0);
+    ASSERT_TRUE(nv.compare(lower) > 0);
+    ASSERT_TRUE(upper.compare(nv) > 0);
+    ASSERT_TRUE(nv.compare(upper) < 0);
     ASSERT_EQ(value, TTInt(-1234 * scale));
     ASSERT_EQ(str, "-1234.000000000000");
 
-    nv = ValueFactory::getDecimalValueFromString("-12.34");
-    deserDecHelper(nv, vt, value, str);
+    deserDecValidator("-12.34");
     ASSERT_FALSE(nv.isNull());
     ASSERT_EQ(vt, VALUE_TYPE_DECIMAL);
+    ASSERT_TRUE(viaDouble.compare(nv) == 0);
+    ASSERT_TRUE(lower.compare(nv) < 0);
+    ASSERT_TRUE(nv.compare(lower) > 0);
+    ASSERT_TRUE(upper.compare(nv) > 0);
+    ASSERT_TRUE(nv.compare(upper) < 0);
     ASSERT_EQ(value, TTInt(static_cast<int64_t>(-12340000000000)));
     ASSERT_EQ(str, "-12.340000000000");
 
@@ -212,8 +276,6 @@ TEST_F(NValueTest, DeserializeDecimal)
     }
     catch (SerializableEEException &e) {
     }
-
-    ASSERT_EQ(1,1);
 }
 
 TEST_F(NValueTest, TestCastToBigInt) {

@@ -90,4 +90,48 @@ public class TestPlansMatView extends PlannerTestCase {
         assertEquals(1, pns.size());
     }
 
+    public void testIndexedMatViews()
+    {
+        System.out.println("Running testIndexedMatViews:");
+        List<AbstractPlanNode> pns;
+        String explainedFragment;
+        pns = compileToFragments("SELECT * FROM VR WHERE V_D1 = 1 " +
+                                 "ORDER BY CNT DESC LIMIT 10;");
+        assertEquals(1, pns.size());
+        explainedFragment = pns.get(0).toExplainPlanString();
+        assertTrue(explainedFragment.contains(" using \"ENG4826_VR_COUNT\""));
+
+        pns = compileToFragments("SELECT * FROM VR WHERE V_D2 = 1 " +
+                                 "ORDER BY CNT DESC LIMIT 10;");
+        assertEquals(1, pns.size());
+        explainedFragment = pns.get(0).toExplainPlanString();
+        assertTrue(explainedFragment.contains(" using \"ENG4826_VR_COUNT\""));
+
+        pns = compileToFragments("SELECT * FROM VR WHERE V_D3 = 1 " +
+                                 "ORDER BY V_D2 LIMIT 10;");
+        assertEquals(1, pns.size());
+        explainedFragment = pns.get(0).toExplainPlanString();
+        assertTrue(explainedFragment.contains(" using \"ENG4826_VR_ALT_ORDER\""));
+
+        pns = compileToFragments("SELECT * FROM VP WHERE V_PARTKEY = 1 AND V_D1 = 1 " +
+                                 "ORDER BY CNT DESC LIMIT 10;");
+        assertEquals(1, pns.size());
+        explainedFragment = pns.get(0).toExplainPlanString();
+        assertTrue(explainedFragment.contains(" using \"ENG4826_VP_COUNT\""));
+
+        pns = compileToFragments("SELECT * FROM VP WHERE V_PARTKEY = 1 AND V_D2 = 1 " +
+                                 "ORDER BY CNT DESC LIMIT 10;");
+        assertEquals(1, pns.size());
+        explainedFragment = pns.get(0).toExplainPlanString();
+        assertTrue(explainedFragment.contains(" using \"ENG4826_VP_COUNT\""));
+
+        pns = compileToFragments("SELECT * FROM VP WHERE V_PARTKEY = 1 AND V_D3 = 1 " +
+                                 "ORDER BY V_D2 LIMIT 10;");
+        assertEquals(1, pns.size());
+        explainedFragment = pns.get(0).toExplainPlanString();
+        assertTrue(explainedFragment.contains(" using \"ENG4826_VP_ALT_ORDER\""));
+
+        // TODO: gloves-off MP testing of VP
+    }
+
 }

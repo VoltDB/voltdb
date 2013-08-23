@@ -1097,6 +1097,9 @@ public class DDLCompiler {
             defaultvalue = null;
         if (defaulttype != null) {
             // fyi: Historically, VoltType class initialization errors get reported on this line (?).
+            if (defaultvalue == null) {
+                defaulttype = "NULL";
+            }
             defaulttype = Integer.toString(VoltType.typeFromString(defaulttype).getValue());
         }
 
@@ -1460,12 +1463,24 @@ public class DDLCompiler {
             }
             assert(stmt != null);
 
+            String viewName = destTable.getTypeName();
             // throw an error if the view isn't within voltdb's limited worldview
-            checkViewMeetsSpec(destTable.getTypeName(), stmt);
+            checkViewMeetsSpec(viewName, stmt);
+
+            // Allow only non-unique indexes other than the primary key index.
+            // The primary key index is yet to be defined (below).
+            for (Index destIndex : destTable.getIndexes()) {
+                if (destIndex.getUnique()) {
+                    String msg = "A UNIQUE index is not allowed on a materialized view. " +
+                            "Remove the qualifier \"UNIQUE\" from the index " + destIndex.getTypeName() +
+                            "defined on the materialized view \"" + viewName + "\".";
+                    throw m_compiler.new VoltCompilerException(msg);
+                }
+            }
 
             // create the materializedviewinfo catalog node for the source table
             Table srcTable = stmt.tableList.get(0);
-            MaterializedViewInfo matviewinfo = srcTable.getViews().add(destTable.getTypeName());
+            MaterializedViewInfo matviewinfo = srcTable.getViews().add(viewName);
             matviewinfo.setDest(destTable);
             AbstractExpression where = stmt.getSingleTableFilterExpression();
             if (where != null) {
@@ -1495,7 +1510,8 @@ public class DDLCompiler {
             ParsedSelectStmt.ParsedColInfo countCol = stmt.displayColumns.get(stmt.groupByColumns.size());
             assert(countCol.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR);
             assert(countCol.expression.getLeft() == null);
-            processMaterializedViewColumn(matviewinfo, srcTable, destTable, destColumnArray.get(stmt.groupByColumns.size()),
+            processMaterializedViewColumn(matviewinfo, srcTable, destTable,
+                    destColumnArray.get(stmt.groupByColumns.size()),
                     ExpressionType.AGGREGATE_COUNT_STAR, null);
 
             // create an index and constraint for the table

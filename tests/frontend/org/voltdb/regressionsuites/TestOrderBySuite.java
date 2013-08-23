@@ -131,6 +131,42 @@ public class TestOrderBySuite extends RegressionSuite {
         client.drain();
     }
 
+    private void loadO3(Client client) throws NoConnectionsException, ProcCallException, IOException, InterruptedException {
+        int pkey = 0;
+        a_int.clear();
+
+        // if you want to test synchronous latency, this
+        //  is a good variable to change
+        boolean async = true;
+
+        for (int i=0; i < 20; i++) {
+            a_int.add(i);
+            a_inline_str.add("a_" + i);
+            a_pool_str.add(bigString + i);
+        }
+
+        Collections.shuffle(a_int);
+
+        for (int i=0; i < 20; i++) {
+            SyncCallback cb = new SyncCallback();
+            client.callProcedure(cb,
+                    "InsertO3",
+                    pkey,
+                    a_int.get(i),
+                    a_int.get(i),
+                    a_int.get(i)
+                    );
+
+            if (!async) {
+                cb.waitForResponse();
+                VoltTable vt = cb.getResponse().getResults()[0];
+                assertTrue(vt.getRowCount() == 1);
+            }
+        }
+
+        client.drain();
+    }
+
     private void loadInOrder(Client client) throws NoConnectionsException,
                                            ProcCallException,
                                            IOException, InterruptedException {
@@ -250,6 +286,29 @@ public class TestOrderBySuite extends RegressionSuite {
             assertEquals(a, a_int.get(pos));     // retrieved value matches at index in unsorted data
             assertEquals(b, a_inline_str.get(pos));
         }
+
+        loadO3(client);
+        Integer lastPk2 = -1;
+        // sort indexed column ascending with equality filter on prefix indexed key
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM O3 WHERE PK1 = 0 ORDER BY PK2").getResults()[0];
+        assertTrue(vt.getRowCount() == 20);
+        while(vt.advanceRow()) {
+            assertEquals(0, vt.getLong(0));
+            Integer pk2 = (Integer) vt.get(1, VoltType.INTEGER);
+            assertTrue(lastPk2.compareTo(pk2) < 0);
+            lastPk2 = pk2;
+        }
+        lastPk2 = -1;
+        // sort indexed column ascending with upper bound filter on prefix indexed key
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM O3 WHERE PK1 < 1 ORDER BY PK2").getResults()[0];
+        assertTrue(vt.getRowCount() == 20);
+        while(vt.advanceRow()) {
+            assertEquals(0, vt.getLong(0));
+            Integer pk2 = (Integer) vt.get(1, VoltType.INTEGER);
+            assertTrue(lastPk2.compareTo(pk2) < 0);
+            lastPk2 = pk2;
+        }
+
     }
 
     public void testOrderBySingleColumnDescending() throws NoConnectionsException, ProcCallException, IOException, InterruptedException {
@@ -297,7 +356,7 @@ public class TestOrderBySuite extends RegressionSuite {
         }
 
 
-        // sort column of non-inlined strings ascending
+        // sort column of non-inlined strings descending
         vt = client.callProcedure("@AdHoc", "select * from O1 order by A_POOL_STR DESC").getResults()[0];
         assertTrue(vt.getRowCount() == 20);
         lastString = bigString + "99";
@@ -314,6 +373,30 @@ public class TestOrderBySuite extends RegressionSuite {
             assertEquals(pos, key.intValue());   // side-effect of insertion method
             assertEquals(a, a_int.get(pos));     // retrieved value matches at index in unsorted data
             assertEquals(b, a_inline_str.get(pos));
+        }
+
+        loadO3(client);
+        Integer lastPk2 = 20;
+        // sort indexed column descending with equality filter on prefix indexed key
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM O3 WHERE PK1 = 0 ORDER BY PK2 DESC").getResults()[0];
+        assertTrue(vt.getRowCount() == 20);
+        System.out.println(vt.toString());
+        while(vt.advanceRow()) {
+            assertEquals(0, vt.getLong(0));
+            Integer pk2 = (Integer) vt.get(1, VoltType.INTEGER);
+            assertTrue(lastPk2.compareTo(pk2) > 0);
+            lastPk2 = pk2;
+        }
+        lastPk2 = 20;
+        // desc sort indexed column descending with upper bound filter on prefix indexed key
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM O3 WHERE PK1 < 1 ORDER BY PK2 DESC").getResults()[0];
+        assertTrue(vt.getRowCount() == 20);
+        System.out.println(vt.toString());
+        while(vt.advanceRow()) {
+            assertEquals(0, vt.getLong(0));
+            Integer pk2 = (Integer) vt.get(1, VoltType.INTEGER);
+            assertTrue(lastPk2.compareTo(pk2) > 0);
+            lastPk2 = pk2;
         }
     }
 
@@ -591,7 +674,6 @@ public class TestOrderBySuite extends RegressionSuite {
     //
     // Suite builder boilerplate
     //
-
     public TestOrderBySuite(String name) {
         super(name);
     }
