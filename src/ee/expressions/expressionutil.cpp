@@ -341,7 +341,7 @@ tupleValueFactory(PlannerDomValue obj, ExpressionType et,
                 std::string(message));
     }
 
-    return new TupleValueExpression(columnIndex, tableName, tableIdx);
+    return new TupleValueExpression(tableIdx, columnIndex);
 }
 
 AbstractExpression *
