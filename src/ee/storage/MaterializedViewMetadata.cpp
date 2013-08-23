@@ -17,7 +17,6 @@
 
 #include <cassert>
 #include <cstdio>
-#include "boost/shared_array.hpp"
 #include "common/types.h"
 #include "common/PlannerDomValue.h"
 #include "common/FatalException.hpp"
@@ -30,6 +29,8 @@
 #include "indexes/tableindex.h"
 #include "storage/persistenttable.h"
 #include "storage/MaterializedViewMetadata.h"
+#include "boost/foreach.hpp"
+#include "boost/shared_array.hpp"
 
 namespace voltdb {
 
@@ -79,6 +80,19 @@ MaterializedViewMetadata::MaterializedViewMetadata(
     }
 
     m_index = m_target->primaryKeyIndex();
+
+    // When updateTupleWithSpecificIndexes needs to be called,
+    // the context is lost that identifies which base table columns potentially changed.
+    // So the minimal set of indexes that MIGHT need to be updated must include
+    // any that are not solely based on primary key components.
+    // Until the DDL compiler does this analysis and marks the indexes accordingly,
+    // include all target table indexes except the actual primary key index on the group by columns.
+    const std::vector<TableIndex*>& targetIndexes = m_target->allIndexes();
+    BOOST_FOREACH(TableIndex *index, targetIndexes) {
+        if (index != m_index) {
+            m_updatableIndexList.push_back(index);
+        }
+    }
 
     allocateBackedTuples();
 
@@ -222,9 +236,10 @@ void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple, bool fal
 
     // update or insert the row
     if (exists) {
-        // shouldn't need to update indexes as this shouldn't ever change the
-        // key
-        m_target->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple, m_emptyIndexUpdateList, fallible);
+        // Shouldn't need to update group-key-only indexes such as the primary key
+        // since their keys shouldn't ever change, but do update other indexes.
+        m_target->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
+                                                 m_updatableIndexList, fallible);
     }
     else {
         m_target->insertPersistentTuple(m_updatedTuple, fallible);
@@ -290,8 +305,10 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
     }
 
     // update the row
-    // shouldn't need to update indexes as this shouldn't ever change the key
-    m_target->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple, m_emptyIndexUpdateList, fallible);
+    // Shouldn't need to update group-key-only indexes such as the primary key
+    // since their keys shouldn't ever change, but do update other indexes.
+    m_target->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
+                                             m_updatableIndexList, fallible);
 }
 
 bool MaterializedViewMetadata::findExistingTuple(TableTuple &oldTuple, bool expected) {

@@ -416,7 +416,8 @@ public class TableBase {
                                      boolean constraint, boolean forward) {
 
         if (primaryKeyCols == null) {
-            throw Error.runtimeError(ErrorCode.U_S0500, "createIndex");
+            //VOLTDB changed ... throw Error.runtimeError(ErrorCode.U_S0500, "createIndex");
+            primaryKeyCols = new int[0]; // ... VOLTDB changed to support matview-based indexes
         }
 
         int    s     = columns.length;
@@ -440,7 +441,8 @@ public class TableBase {
     final Index createExprIndexStructure(HsqlName name, int[] columns, Expression[] expressions, boolean unique, boolean constraint) {
         // TODO: DEFinitely implement for indexExprs
         if (primaryKeyCols == null) {
-            throw Error.runtimeError(ErrorCode.U_S0500, "createIndex");
+            //VOLTDB changed ... throw Error.runtimeError(ErrorCode.U_S0500, "createIndex");
+            primaryKeyCols = new int[0]; // ... VOLTDB changed to support matview-based indexes
         }
 
         int    s     = columns.length;
