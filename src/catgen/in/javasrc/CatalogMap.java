@@ -25,8 +25,6 @@ import java.util.Iterator;
 import java.util.TreeMap;
 import java.util.Map.Entry;
 
-import org.apache.commons.lang3.StringUtils;
-
 /**
  * A safe interface to a generic map of CatalogType instances. It is safe
  * because it is mostly read-only. All operations that modify the map are
