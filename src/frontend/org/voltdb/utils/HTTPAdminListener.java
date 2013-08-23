@@ -274,6 +274,7 @@ public class HTTPAdminListener {
             // just print voltdb version for now
             Map<String,String> params = new HashMap<String,String>();
 
+            params.put("mode", VoltDB.instance().getMode().toString());
             params.put("hostname", hostname);
             params.put("version", VoltDB.instance().getVersionString());
             params.put("buildstring", VoltDB.instance().getBuildString());
