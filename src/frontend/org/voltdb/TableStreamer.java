@@ -37,6 +37,9 @@ import java.util.concurrent.Callable;
  * errors related to table data streaming using the table stream API.
  */
 public class TableStreamer {
+    // Error code returned by EE.tableStreamSerializeMore().
+    private static byte SERIALIZATION_ERROR = -1;
+
     private final int m_tableId;
     private final TableStreamType m_type;
     private final ImmutableList<SnapshotTableTask> m_tableTasks;
@@ -87,10 +90,8 @@ public class TableStreamer {
         prepareBuffers(outputBuffers);
 
         Pair<Long, int[]> serializeResult = context.tableStreamSerializeMore(m_tableId, m_type, outputBuffers);
-        for (int serializedBytes : serializeResult.getSecond()) {
-            if (serializedBytes < 0) {
-                VoltDB.crashLocalVoltDB("Failure while serialize data from a table for COW snapshot", false, null);
-            }
+        if (serializeResult.getFirst() == SERIALIZATION_ERROR) {
+            VoltDB.crashLocalVoltDB("Failure while serializing data from table " + m_tableId, false, null);
         }
 
         if (serializeResult.getSecond()[0] > 0) {
