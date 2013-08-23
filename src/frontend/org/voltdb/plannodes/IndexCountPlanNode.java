@@ -108,7 +108,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_outputSchema = apn.getOutputSchema().clone();
         m_hasSignificantOutputSchema = true;
 
-        if (isp.getSortDirection() != SortDirectionType.DESC) {
+        if (!isp.isReverseScan()) {
             m_lookupType = isp.m_lookupType;
             m_searchkeyExpressions = isp.m_searchkeyExpressions;
 
@@ -182,7 +182,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
         // decide whether to pad last endKey to solve
         // SELECT COUNT(*) FROM T WHERE C1 = ? AND C2 > / >= ?
-        if (isp.getSortDirection() != SortDirectionType.DESC &&
+        if (!isp.isReverseScan() &&
                 endType == IndexLookupType.EQ &&
                 endKeys.size() > 0 &&
                 endKeys.size() == indexSize - 1 &&
@@ -232,7 +232,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
         // Avoid the cases that would cause undercounts for prefix matches.
         // A prefix-only key exists and does not use LT.
-        if (isp.getSortDirection() != SortDirectionType.DESC &&
+        if (!isp.isReverseScan() &&
             (endType != IndexLookupType.LT) &&
             (endKeys.size() > 0) &&
             (endKeys.size() < indexSize)) {
