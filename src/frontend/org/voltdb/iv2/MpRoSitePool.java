@@ -22,8 +22,10 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.ThreadFactory;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
@@ -54,7 +56,9 @@ class MpRoSitePool {
 
         MpRoSiteContext(long siteId, BackendTarget backend,
                 CatalogContext context, int partitionId,
-                InitiatorMailbox initiatorMailbox, CatalogSpecificPlanner csp) {
+                InitiatorMailbox initiatorMailbox, CatalogSpecificPlanner csp,
+                ThreadFactory threadFactory)
+        {
             m_backend = backend;
             m_catalogContext = context;
             m_queue = new SiteTaskerQueue();
@@ -68,7 +72,7 @@ class MpRoSitePool {
                     initiatorMailbox.getHSId(), 0); // Stale constructor arg, fill with bleh
             m_loadedProcedures.loadProcedures(m_catalogContext, m_backend, csp);
             m_site.setLoadedProcedures(m_loadedProcedures);
-            m_siteThread = new Thread(m_site);
+            m_siteThread = threadFactory.newThread(m_site);
             m_siteThread.start();
         }
 
@@ -97,6 +101,7 @@ class MpRoSitePool {
     private final InitiatorMailbox m_initiatorMailbox;
     private CatalogContext m_catalogContext;
     private CatalogSpecificPlanner m_csp;
+    private ThreadFactory m_poolThreadFactory;
 
     MpRoSitePool(
             long siteId,
@@ -112,6 +117,11 @@ class MpRoSitePool {
         m_partitionId = partitionId;
         m_initiatorMailbox = initiatorMailbox;
         m_csp = csp;
+        m_poolThreadFactory =
+            CoreUtils.getThreadFactory("RO MP Iv2ExecutionSite - " + CoreUtils.hsIdToString(m_siteId),
+                    CoreUtils.MEDIUM_STACK_SIZE);
+
+
         // Construct the initial pool
         for (int i = 0; i < INITIAL_POOL_SIZE; i++) {
             m_idleSites.push(new MpRoSiteContext(m_siteId,
@@ -119,7 +129,8 @@ class MpRoSitePool {
                         m_catalogContext,
                         m_partitionId,
                         m_initiatorMailbox,
-                        m_csp));
+                        m_csp,
+                        m_poolThreadFactory));
         }
 
     }
@@ -188,7 +199,8 @@ class MpRoSitePool {
                             m_catalogContext,
                             m_partitionId,
                             m_initiatorMailbox,
-                            m_csp));
+                            m_csp,
+                            m_poolThreadFactory));
             }
             site = m_idleSites.pop();
             m_busySites.put(txnId, site);
