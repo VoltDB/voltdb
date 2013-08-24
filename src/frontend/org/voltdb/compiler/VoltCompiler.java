@@ -125,6 +125,7 @@ public class VoltCompiler {
     String m_jarOutputPath = null;
     String m_currentFilename = null;
     Map<String, String> m_ddlFilePaths = new HashMap<String, String>();
+    String[] m_addedClasses = null;
 
     // generated html text for catalog report
     String m_report = null;
@@ -890,17 +891,18 @@ public class VoltCompiler {
         }
 
         // add extra classes from the DDL
-        addExtraClasses(voltDdlTracker.m_extraClassses);
+        m_addedClasses = voltDdlTracker.m_extraClassses;
+        addExtraClasses();
     }
 
     /**
      * Once the DDL file is over, take all of the extra classes found and add them to the jar.
      */
-    private void addExtraClasses(String[] extraClassses) throws VoltCompilerException {
+    private void addExtraClasses() throws VoltCompilerException {
 
         List<String> addedClasses = new ArrayList<String>();
 
-        for (String className : extraClassses) {
+        for (String className : m_addedClasses) {
             try {
                 Class<?> clz = Class.forName(className);
 
@@ -914,18 +916,6 @@ public class VoltCompiler {
                 msg = String.format(msg, className);
                 throw new VoltCompilerException(msg);
             }
-        }
-
-        if (addedClasses.size() > 10) {
-            addInfo(String.format("Added %d additional classes to the catalog jar.",
-                    addedClasses.size()));
-        }
-        else {
-            String logMsg = "Added the following additional classes to the catalog jar:";
-            for (String className : addedClasses) {
-                logMsg += className + "\n";
-            }
-            addInfo(logMsg);
         }
     }
 
@@ -1776,6 +1766,23 @@ public class VoltCompiler {
                 outputStream.println();
             }
             outputStream.println("------------------------------------------\n");
+
+            if (m_addedClasses.length > 0) {
+
+                if (m_addedClasses.length > 10) {
+                    outputStream.printf("Added %d additional classes to the catalog jar.\n\n",
+                            m_addedClasses.length);
+                }
+                else {
+                    String logMsg = "Added the following additional classes to the catalog jar:\n";
+                    for (String className : m_addedClasses) {
+                        logMsg += "  " + className + "\n";
+                    }
+                    outputStream.println(logMsg);
+                }
+
+                outputStream.println("------------------------------------------\n");
+            }
 
             //
             // post-compile summary and legend.
