@@ -35,17 +35,43 @@ public class TestClassMatcher extends TestCase {
                                 "org.voltdb.utils.CSVLoader\n";
 
 
+    boolean strContains(String[] list, String pattern) {
+        for (String s : list) {
+            if (s.equals(pattern)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public void testSimple() {
-
-
         ClassMatcher cm = new ClassMatcher();
         cm.m_classList = testClasses;
-
         cm.addPattern("org.**.B*");
-
         String[] out = cm.getMatchedClassList();
-        for (String className : out) {
-            System.out.println(className);
-        }
+        assertEquals(3, out.length);
+        assertTrue(strContains(out, "org.voltdb.utils.BinaryDeque"));
+        assertTrue(strContains(out, "org.voltdb.utils.BuildDirectoryUtils"));
+        assertTrue(strContains(out, "org.voltdb.utils.ByteArrayUtils"));
+
+        cm = new ClassMatcher();
+        cm.m_classList = testClasses;
+        cm.addPattern("**BinaryDeque");
+        out = cm.getMatchedClassList();
+        assertEquals(1, out.length);
+        assertTrue(strContains(out, "org.voltdb.utils.BinaryDeque"));
+
+        cm = new ClassMatcher();
+        cm.m_classList = testClasses;
+        cm.addPattern("*.voltdb.*.CLibrary");
+        out = cm.getMatchedClassList();
+        assertEquals(1, out.length);
+        assertTrue(strContains(out, "org.voltdb.utils.CLibrary"));
+
+        cm = new ClassMatcher();
+        cm.m_classList = testClasses;
+        cm.addPattern("*.voltdb.*CLibrary");
+        out = cm.getMatchedClassList();
+        assertEquals(0, out.length);
     }
 }

@@ -53,7 +53,15 @@ public class ClassMatcher {
 
         String preppedName = classNamePattern.trim();
 
-        preppedName = preppedName.replace("$",  "\\$");
+        // include only full classes
+        // for nested classes, include the parent pattern
+        int indexOfDollarSign = classNamePattern.indexOf('$');
+        if (indexOfDollarSign >= 0) {
+            classNamePattern = classNamePattern.substring(0, indexOfDollarSign);
+        }
+
+        System.err.println(classNamePattern);
+
         preppedName = preppedName.replace("**", "[\\w.\\$]+");
         preppedName = preppedName.replace("*",  "[\\w\\$]+");
 
@@ -65,7 +73,12 @@ public class ClassMatcher {
 
         Matcher matcher = pattern.matcher(m_classList);
         while (matcher.find()) {
-            m_classNameMatches.add(matcher.group());
+            String match = matcher.group();
+            // skip nested classes; the base class will include them
+            if (match.contains("$")) {
+                continue;
+            }
+            m_classNameMatches.add(match);
         }
     }
 
