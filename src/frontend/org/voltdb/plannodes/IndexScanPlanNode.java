@@ -335,7 +335,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     public boolean isReverseScan() {
-        return m_sortDirection == SortDirectionType.DESC || (m_lookupType == IndexLookupType.LT || m_lookupType == IndexLookupType.LTE);
+        return m_sortDirection == SortDirectionType.DESC ||
+                m_lookupType == IndexLookupType.LT || m_lookupType == IndexLookupType.LTE;
     }
 
 
