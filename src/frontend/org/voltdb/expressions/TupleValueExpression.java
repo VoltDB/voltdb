@@ -198,7 +198,7 @@ public class TupleValueExpression extends AbstractValueExpression {
         stringer.key(Members.COLUMN_NAME.name()).value(m_columnName);
         if (m_tableIdx > 0) {
             stringer.key(Members.TABLE_IDX.name()).value(m_tableIdx);
-            System.out.println("TVE: toJSONString(), tableIdx = " + m_tableIdx);
+            //System.out.println("TVE: toJSONString(), tableIdx = " + m_tableIdx);
         }
     }
 
@@ -209,7 +209,7 @@ public class TupleValueExpression extends AbstractValueExpression {
         m_columnName = obj.getString(Members.COLUMN_NAME.name());
         if (obj.has(Members.TABLE_IDX.name())) {
             m_tableIdx = obj.getInt(Members.TABLE_IDX.name());
-            System.out.println("TVE: loadFromJSONObject(), tableIdx = " + m_tableIdx);
+            //System.out.println("TVE: loadFromJSONObject(), tableIdx = " + m_tableIdx);
         }
     }
 
