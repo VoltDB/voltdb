@@ -158,7 +158,7 @@ public class RestoreAdapter implements Connection, WriteStream {
     }
 
     @Override
-    public String getHostnameOrIP() {
+    public String getHostnameAndIP() {
         return "";
     }
 

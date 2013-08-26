@@ -24,6 +24,7 @@
 package org.voltcore.network;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
@@ -39,7 +40,7 @@ public class TestVoltNetwork extends TestCase {
 
     private static class MockVoltPort extends VoltPort {
         MockVoltPort(VoltNetwork vn, InputHandler handler) {
-            super (vn, handler, "", vn.m_pool);
+            super (vn, handler, InetSocketAddress.createUnresolved("localhost", 21212), vn.m_pool);
         }
 
         @Override

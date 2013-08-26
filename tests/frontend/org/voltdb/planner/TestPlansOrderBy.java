@@ -38,7 +38,8 @@ public class TestPlansOrderBy extends PlannerTestCase {
         super.tearDown();
     }
 
-    private void validatePlan(String sql, boolean expectIndexScan, boolean expectSeqScan, boolean expectOrderBy, boolean expectHashAggregate)
+    private void validatePlan(String sql, boolean expectIndexScan,
+            boolean expectSeqScan, boolean expectOrderBy, boolean expectHashAggregate)
     {
         AbstractPlanNode pn = compile(sql);
         //System.out.println(pn.getChild(0).toJSONString());
@@ -98,6 +99,8 @@ public class TestPlansOrderBy extends PlannerTestCase {
         validateOptimalPlan("SELECT * from Tmanykeys WHERE T_D1 = ? ORDER BY T_D0, T_D2");
         validateOptimalPlan("SELECT * from Tmanykeys WHERE T_D2 = ? ORDER BY T_D0, T_D1");
         validateOptimalPlan("SELECT * from Tmanykeys                ORDER BY T_D0, T_D1");
+        validateIndexedBruteForcePlan("SELECT * FROM Tmanykeys WHERE T_D0 <= ? ORDER BY T_D1, T_D2");
+        validateIndexedBruteForcePlan("SELECT * FROM Tmanykeys WHERE T_D0 <= ? ORDER BY T_D1 DESC, T_D2 DESC");
     }
 
     public void testOrderByOneOfThreeIndexKeys()
@@ -109,6 +112,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
         validateOptimalPlan("SELECT * from Tmanykeys WHERE T_D1 = ?              ORDER BY T_D0");
         validateOptimalPlan("SELECT * from Tmanykeys WHERE T_D2 = ?              ORDER BY T_D0");
         validateOptimalPlan("SELECT * from Tmanykeys                             ORDER BY T_D0");
+        validateIndexedBruteForcePlan("SELECT * FROM Tmanykeys WHERE T_D0 = ? AND T_D1 < ? ORDER BY T_D2");
+        validateIndexedBruteForcePlan("SELECT * FROM Tmanykeys WHERE T_D0 = ? AND T_D1 < ? ORDER BY T_D2 DESC");
+        validateIndexedBruteForcePlan("SELECT * FROM Tmanykeys WHERE T_D0 = ? ORDER BY T_D2");
+        validateIndexedBruteForcePlan("SELECT * FROM Tmanykeys WHERE T_D0 = ? ORDER BY T_D2 DESC");
     }
 
     public void testOrderByWrongPermutation()
@@ -168,6 +175,8 @@ public class TestPlansOrderBy extends PlannerTestCase {
     }
 
     public void testOrderDescWithEquality() {
-        validatePlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D1 DESC", true, false, true, false);
+        validateOptimalPlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D1");
+        // See ENG-5084 to optimize this query to use inverse scan in future.
+        validateIndexedBruteForcePlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D1 DESC");
     }
 }

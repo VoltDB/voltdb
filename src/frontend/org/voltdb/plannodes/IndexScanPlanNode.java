@@ -333,6 +333,13 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     public AbstractExpression getInitialExpression() {
         return m_initialExpression;
     }
+
+    public boolean isReverseScan() {
+        return m_sortDirection == SortDirectionType.DESC ||
+                m_lookupType == IndexLookupType.LT || m_lookupType == IndexLookupType.LTE;
+    }
+
+
     @Override
     public void resolveColumnIndexes()
     {
