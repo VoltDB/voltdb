@@ -451,6 +451,7 @@ SnapshotCompletionInterest
 
     public void setInitiator(TransactionCreator initiator) {
         m_initiator = initiator;
+        m_initiator.bindAdapter(m_restoreAdapter);
         if (m_replayAgent != null) {
             m_replayAgent.setInitiator(initiator);
         }
