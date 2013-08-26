@@ -49,6 +49,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
@@ -497,6 +498,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
     @Before
     public void setUp() throws Exception {
+        RestoreAdapter.m_testConnectionIdGenerator = new AtomicLong(Long.MIN_VALUE);
         m_count.set(0);
         m_done = false;
         snapshotted = false;

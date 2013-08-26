@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
@@ -36,9 +37,17 @@ import org.voltdb.client.ClientResponse;
 public class RestoreAdapter implements Connection, WriteStream {
     private final static VoltLogger LOG = new VoltLogger("HOST");
 
+    public static volatile AtomicLong m_testConnectionIdGenerator;
+
     private final Runnable m_doneNotifier;
+    private final long m_connectionId;
     public RestoreAdapter(Runnable doneNotfifier) {
         m_doneNotifier = doneNotfifier;
+        if (m_testConnectionIdGenerator != null) {
+            m_connectionId = m_testConnectionIdGenerator.incrementAndGet();
+        } else {
+            m_connectionId = Long.MIN_VALUE + 1;
+        }
     }
 
     @Override
@@ -180,7 +189,7 @@ public class RestoreAdapter implements Connection, WriteStream {
 
     @Override
     public long connectionId() {
-        return Long.MIN_VALUE + 1;
+        return m_connectionId;
     }
 
     @Override
