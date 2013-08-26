@@ -271,7 +271,7 @@ if __name__ == "__main__":
     #If we have 1 arg, see if it is a tarfile
     if len(args) == 1 and tarfile.is_tarfile(args[0]):
         ts_date = '\d{4}-\d{2}-\d{2}'
-        ts_time = '\d{2}:\d{2}:\d{2}\.\d{6}'
+        ts_time = '\d{2}:\d{2}:\d{2}'
 
         if re.match('.*' + ts_date + '-' + ts_time + '\.tgz', f):
             try:
