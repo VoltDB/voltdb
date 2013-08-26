@@ -30,6 +30,7 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltdb.BackendTarget;
@@ -46,6 +47,7 @@ import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
 import org.voltdb.SnapshotDataTarget;
+import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.StartAction;
@@ -53,6 +55,7 @@ import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TableStats;
+import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -317,6 +320,19 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         public void updateHashinator(Pair<TheHashinator.HashinatorType, byte[]> config)
         {
             Site.this.updateHashinator(config);
+        }
+
+        @Override
+        public boolean activateTableStream(final int tableId, TableStreamType type, long undoToken, byte[] predicates)
+        {
+            return m_ee.activateTableStream(tableId, type, undoToken, predicates);
+        }
+
+        @Override
+        public Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
+                                                          List<DBBPool.BBContainer> outputBuffers)
+        {
+            return m_ee.tableStreamSerializeMore(tableId, type, outputBuffers);
         }
     };
 
@@ -636,12 +652,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     //
     @Override
     public void initiateSnapshots(
+            SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
             List<SnapshotDataTarget> targets,
             long txnId,
             int numLiveHosts,
             Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers) {
-        m_snapshotter.initiateSnapshots(m_ee, tasks, targets, txnId, numLiveHosts, exportSequenceNumbers);
+        m_snapshotter.initiateSnapshots(m_sysprocContext, format, tasks, targets, txnId, numLiveHosts,
+                                        exportSequenceNumbers);
     }
 
     /*
@@ -650,7 +668,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
      */
     @Override
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException {
-        return m_snapshotter.completeSnapshotWork(m_sysprocContext, m_ee);
+        return m_snapshotter.completeSnapshotWork(m_sysprocContext);
     }
 
     //
@@ -897,7 +915,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public Future<?> doSnapshotWork()
     {
-        return m_snapshotter.doSnapshotWork(m_sysprocContext, m_ee);
+        return m_snapshotter.doSnapshotWork(m_sysprocContext);
     }
 
     @Override
@@ -994,7 +1012,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             hostLog.info(String.format("Site %d performing schema change operation must block until snapshot is locally complete.",
                     CoreUtils.getSiteIdFromHSId(m_siteId)));
             try {
-                m_snapshotter.completeSnapshotWork(m_sysprocContext, m_ee);
+                m_snapshotter.completeSnapshotWork(m_sysprocContext);
                 hostLog.info(String.format("Site %d locally finished snapshot. Will update catalog now.",
                         CoreUtils.getSiteIdFromHSId(m_siteId)));
             }

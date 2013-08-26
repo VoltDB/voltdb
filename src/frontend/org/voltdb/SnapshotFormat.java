@@ -21,16 +21,18 @@ package org.voltdb;
  * Supported snapshot formats
  */
 public enum SnapshotFormat {
-    NATIVE (true,  true),
-    CSV    (true,  true),
-    STREAM (false, false),
-    INDEX  (false, false);
+    NATIVE (true,  true,  TableStreamType.SNAPSHOT),
+    CSV    (true,  true,  TableStreamType.SNAPSHOT),
+    STREAM (false, false, TableStreamType.SNAPSHOT),
+    INDEX  (false, false, TableStreamType.ELASTIC_INDEX);
 
     private final boolean m_isFileBased;
     private final boolean m_canCloseEarly;
-    private SnapshotFormat(boolean isFileBased, boolean canCloseEarly) {
+    private final TableStreamType m_streamType;
+    private SnapshotFormat(boolean isFileBased, boolean canCloseEarly, TableStreamType streamType) {
         m_isFileBased = isFileBased;
         m_canCloseEarly = canCloseEarly;
+        m_streamType = streamType;
     }
 
     /**
@@ -50,6 +52,10 @@ public enum SnapshotFormat {
      */
     public boolean canCloseEarly() {
         return m_canCloseEarly;
+    }
+
+    public TableStreamType getStreamType() {
+        return m_streamType;
     }
 
     /**

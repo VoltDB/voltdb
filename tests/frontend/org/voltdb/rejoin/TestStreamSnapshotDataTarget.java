@@ -97,13 +97,6 @@ public class TestStreamSnapshotDataTarget {
         return dut;
     }
 
-    private SnapshotTableTask makeTask(int tableId)
-    {
-        SnapshotTableTask task = mock(SnapshotTableTask.class);
-        doReturn(tableId).when(task).getTableId();
-        return task;
-    }
-
     private Callable<DBBPool.BBContainer> makeTuples()
     {
         DBBPool.BBContainer container =
@@ -135,7 +128,7 @@ public class TestStreamSnapshotDataTarget {
     private void writeAndVerify(StreamSnapshotDataTarget dut, int tableId, boolean hasSchema)
         throws IOException
     {
-        dut.write(makeTuples(), makeTask(tableId));
+        dut.write(makeTuples(), tableId);
 
         // verify data is sent
         if (hasSchema) {

@@ -41,7 +41,6 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotFormat;
-import org.voltdb.SnapshotTableTask;
 import org.voltdb.VoltDB;
 import org.voltdb.utils.CompressionService;
 
@@ -339,7 +338,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             rejoinLog.trace("Starting stream sender thread");
 
             while (true) {
-                SendWork work = null;
+                SendWork work;
 
                 try {
                     rejoinLog.trace("Blocking on sending work queue");
@@ -378,14 +377,11 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     }
 
     @Override
-    public ListenableFuture<?> write(Callable<BBContainer> tupleData,
-                                     SnapshotTableTask context) {
-        assert(context != null);
-
+    public ListenableFuture<?> write(Callable<BBContainer> tupleData, int tableId) {
         rejoinLog.trace("Starting write");
 
         try {
-            BBContainer chunk = null;
+            BBContainer chunk;
             try {
                 chunk = tupleData.call();
             } catch (Exception e) {
@@ -404,9 +400,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             // cleanup and exit immediately if in failure mode
             // but here, throw an exception because this isn't supposed to happen
             if (m_closed.get()) {
-                if (chunk != null) {
-                    chunk.discard();
-                }
+                chunk.discard();
 
                 m_writeFailed.set(true);
                 IOException e = new IOException("Trying to write snapshot data " +
@@ -417,15 +411,15 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             BBContainer schemaContainer = null;
 
             // Have we seen this table before, if not, send schema
-            if (m_schemas.containsKey(context.getTableId())) {
+            if (m_schemas.containsKey(tableId)) {
                 // remove the schema once sent
-                byte[] schema = m_schemas.remove(context.getTableId());
-                rejoinLog.debug("Sending schema for table " + context.getTableId());
+                byte[] schema = m_schemas.remove(tableId);
+                rejoinLog.debug("Sending schema for table " + tableId);
 
                 // 1 byte for the type, 4 bytes for table Id
                 ByteBuffer buf = ByteBuffer.allocate(schema.length + 1 + 4);
                 buf.put((byte) StreamSnapshotMessageType.SCHEMA.ordinal());
-                buf.putInt(context.getTableId());
+                buf.putInt(tableId);
                 buf.put(schema);
                 buf.flip();
                 schemaContainer = DBBPool.wrapBB(buf);
@@ -434,7 +428,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             }
 
             chunk.b.put((byte) StreamSnapshotMessageType.DATA.ordinal());
-            chunk.b.putInt(context.getTableId()); // put table ID
+            chunk.b.putInt(tableId); // put table ID
             chunk.b.putInt(m_blockIndex); // put chunk index
             chunk.b.position(0);
 
