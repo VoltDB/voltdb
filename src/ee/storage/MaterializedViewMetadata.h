@@ -105,8 +105,11 @@ private:
     // what are the aggregates for each column in the view table
     ExpressionType *m_outputColumnAggTypes;
 
-    // empty vector to tell the target table not to update indexes
-    std::vector<TableIndex*> m_emptyIndexUpdateList;
+    // vector of target table indexes to update.
+    // Ideally, these should be a subset of the target table indexes that depend on the count and/or
+    // aggregated columns, but there might be some other mostly harmless ones in there that are based
+    // solely on the immutable primary key (GROUP BY columns).
+    std::vector<TableIndex*> m_updatableIndexList;
 };
 
 } // namespace voltdb

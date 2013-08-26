@@ -304,7 +304,6 @@ class NValue {
     bool isFalse() const;
 
     /* For number values, check the number line. */
-    bool isNegative() const;
     bool isZero() const;
 
     /* For boolean NValues only, logical operators */
@@ -1578,9 +1577,6 @@ class NValue {
                 break;
             case VALUE_TYPE_DECIMAL:
                 rhsValue = rhs.castAsDoubleAndGetValue();
-                if (rhs.isNegative()) {
-                    rhsValue *= -1;
-                }
                 break;
             default:
                 char message[128];
@@ -2116,29 +2112,6 @@ inline bool NValue::isFalse() const {
     return !getBoolean();
 }
 
-inline bool NValue::isNegative() const {
-        const ValueType type = getValueType();
-        switch (type) {
-        case VALUE_TYPE_TINYINT:
-            return getTinyInt() < 0;
-        case VALUE_TYPE_SMALLINT:
-            return getSmallInt() < 0;
-        case VALUE_TYPE_INTEGER:
-            return getInteger() < 0;
-        case VALUE_TYPE_BIGINT:
-            return getBigInt() < 0;
-        case VALUE_TYPE_TIMESTAMP:
-            return getTimestamp() < 0;
-        case VALUE_TYPE_DOUBLE:
-            return getDouble() < 0;
-        case VALUE_TYPE_DECIMAL:
-            return getDecimal().IsSign();
-        default: {
-            throwDynamicSQLException( "Invalid value type '%s' for checking negativity", getValueTypeString().c_str());
-        }
-        }
-    }
-
 /**
  * Logical and operation for NValues
  */
@@ -2373,7 +2346,7 @@ inline const NValue NValue::deserializeFromTupleStorage(const void *storage,
     }
     default:
         throwDynamicSQLException(
-                "NValue::getLength() unrecognized type '%s'",
+                "NValue::deserializeFromTupleStorage() unrecognized type '%s'",
                 getTypeName(type).c_str());
     }
     return retval;

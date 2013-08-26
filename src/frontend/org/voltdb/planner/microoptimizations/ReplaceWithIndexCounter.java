@@ -20,12 +20,8 @@ package org.voltdb.planner.microoptimizations;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.json_voltpatches.JSONException;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
-import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ExpressionUtil;
-import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -34,8 +30,6 @@ import org.voltdb.plannodes.IndexCountPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.TableCountPlanNode;
-import org.voltdb.types.ExpressionType;
-import org.voltdb.utils.CatalogUtil;
 
 public class ReplaceWithIndexCounter extends MicroOptimization {
 
