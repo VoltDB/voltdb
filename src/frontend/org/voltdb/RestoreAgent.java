@@ -1135,21 +1135,21 @@ SnapshotCompletionInterest
         }
 
         if (txnId == null) {
-            m_initiator.createTransaction(m_restoreAdapter.connectionId(), "CommandLog", true, spi,
+            m_initiator.createTransaction(m_restoreAdapter.connectionId(), spi,
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
                                           restoreProc.getEverysite(),
                                           m_allPartitions,
-                                          m_restoreAdapter, 0,
+                                          0,
                                           EstTime.currentTimeMillis());
         } else {
-            m_initiator.createTransaction(m_restoreAdapter.connectionId(), "CommandLog", true,
+            m_initiator.createTransaction(m_restoreAdapter.connectionId(),
                                           txnId, System.currentTimeMillis(), spi,
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
                                           restoreProc.getEverysite(),
                                           m_allPartitions,
-                                          m_restoreAdapter, 0,
+                                          0,
                                           EstTime.currentTimeMillis());
         }
     }

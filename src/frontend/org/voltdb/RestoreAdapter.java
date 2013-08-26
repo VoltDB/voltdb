@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Future;
 
@@ -158,8 +159,23 @@ public class RestoreAdapter implements Connection, WriteStream {
     }
 
     @Override
-    public String getHostnameAndIP() {
-        return "";
+    public String getHostnameAndIPAndPort() {
+        return "RestoreAdapter";
+    }
+
+    @Override
+    public String getHostnameOrIP() {
+        return "RestoreAdapter";
+    }
+
+    @Override
+    public int getRemotePort() {
+        return -1;
+    }
+
+    @Override
+    public InetSocketAddress getRemoteSocketAddress() {
+        return null;
     }
 
     @Override
