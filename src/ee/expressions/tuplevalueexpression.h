@@ -59,14 +59,10 @@ class SerializeOutput;
 
 class TupleValueExpression : public AbstractExpression {
   public:
-    TupleValueExpression(int value_idx, std::string tableName, std::string colName)
-        : AbstractExpression(EXPRESSION_TYPE_VALUE_TUPLE)
+    TupleValueExpression(const int tableIdx, const int valueIdx)
+        : AbstractExpression(EXPRESSION_TYPE_VALUE_TUPLE), tuple_idx(tableIdx), value_idx(valueIdx)
     {
-        VOLT_TRACE("OptimizedTupleValueExpression %d %d", m_type, value_idx);
-        this->tuple_idx = 0;
-        this->value_idx = value_idx;
-        this->table_name = tableName;
-        this->column_name = colName;
+        VOLT_TRACE("OptimizedTupleValueExpression %d using tupleIdx %d valueIdx", m_type, tableIdx, valueIdx);
     };
 
     virtual voltdb::NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
@@ -78,7 +74,7 @@ class TupleValueExpression : public AbstractExpression {
                                               "eval:"
                                               " Couldn't find tuple 1 (possible index scan planning error)");
             }
-            return tuple1->getNValue(this->value_idx);
+            return tuple1->getNValue(value_idx);
         }
         else {
             assert(tuple2);
@@ -88,33 +84,22 @@ class TupleValueExpression : public AbstractExpression {
                                               "eval:"
                                               " Couldn't find tuple 2 (possible index scan planning error)");
             }
-            return tuple2->getNValue(this->value_idx);
+            return tuple2->getNValue(value_idx);
         }
     }
 
     std::string debugInfo(const std::string &spacer) const {
         std::ostringstream buffer;
-        buffer << spacer << "Optimized Column Reference[" << this->value_idx << "]\n";
+        buffer << spacer << "Optimized Column Reference[" << tuple_idx << ", " << value_idx << "]\n";
         return (buffer.str());
     }
 
     int getColumnId() const {return this->value_idx;}
 
-    std::string getTableName() {
-        return table_name;
-    }
-
-    // Don't know this index until the executor examines the expression.
-    void setTupleIndex(int idx) {
-        tuple_idx = idx;
-    }
-
   protected:
 
-    int tuple_idx;           // which tuple. defaults to tuple1
-    int value_idx;           // which (offset) column of the tuple
-    std::string table_name;
-    std::string column_name;
+    const int tuple_idx;           // which tuple. defaults to tuple1
+    const int value_idx;           // which (offset) column of the tuple
 };
 
 }

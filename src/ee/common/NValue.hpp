@@ -2346,7 +2346,7 @@ inline const NValue NValue::deserializeFromTupleStorage(const void *storage,
     }
     default:
         throwDynamicSQLException(
-                "NValue::getLength() unrecognized type '%s'",
+                "NValue::deserializeFromTupleStorage() unrecognized type '%s'",
                 getTypeName(type).c_str());
     }
     return retval;
