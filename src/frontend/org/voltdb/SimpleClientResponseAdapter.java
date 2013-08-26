@@ -141,7 +141,7 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
     }
 
     @Override
-    public String getHostnameOrIP() {
+    public String getHostnameAndIP() {
         return "";
     }
 
