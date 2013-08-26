@@ -29,8 +29,7 @@ While the "Volt Cache" application is designed with benchmarking in mind, it is 
 For a better feel for the type of performance VoltDB is capable of on your hardware, check out the "Voter" application sample.
 
 For more on benchmarking and tips on application tuning, make sure you visit the VoltDB blog:
- - http://voltdb.com/search/node/benchmark
- - http://voltdb.com/search/node/tuning
+    http://blog.voltdb.com/category/blog/voltdb-benchmarks/
 
 run.sh actions described
 ---------------------
