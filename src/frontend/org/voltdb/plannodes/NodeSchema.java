@@ -146,6 +146,36 @@ public class NodeSchema
         return copy;
     }
 
+    @Override
+    public boolean equals (Object obj) {
+        if (obj == null) return false;
+        if (obj == this) return true;
+        if (obj instanceof NodeSchema == false) return false;
+
+        NodeSchema schema = (NodeSchema) obj;
+
+        if (schema.size() != size()) return false;
+
+        ArrayList<SchemaColumn> columns = schema.getColumns();
+
+        for (int i =0; i < size(); i++ ) {
+            SchemaColumn col1 = columns.get(i);
+            if (!col1.equals(m_columns.get(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public int hashCode () {
+        int result = 0;
+        for (SchemaColumn col: m_columns) {
+            result += col.hashCode();
+        }
+        return result;
+    }
+
     /**
      * Returns a copy of this NodeSchema but with all non-TVE expressions
      * replaced with an appropriate TVE.  This is used primarily when generating
