@@ -64,105 +64,6 @@
 using namespace std;
 using namespace voltdb;
 
-namespace
-{
-    // FUTURE: the planner should be able to make this decision and
-    // add that info to TupleValueExpression rather than having to
-    // play the name game here.  These two methods are currently duped
-    // in nestloopexecutor because (a) there wasn't an obvious
-    // common locale to put them and (b) I hope to make them go away
-    // soon.
-    bool
-    assignTupleValueIndex(AbstractExpression *ae,
-                          const std::string &oname,
-                          const std::string &iname)
-    {
-        VOLT_TRACE("assignTupleValueIndex with tables:\n outer: %s, inner %s", oname.c_str(), iname.c_str());
-
-        // if an exact table name match is found, do the obvious
-        // thing. Otherwise, assign to the table named "temp".
-        // If both tables are named temp, barf; planner purports
-        // not accept joins of two temp tables.
-
-        // tuple index 0 is always the outer table.
-        // tuple index 1 is always the inner table.
-        TupleValueExpression *tve = dynamic_cast<TupleValueExpression*>(ae);
-        std::string tname = tve->getTableName();
-
-        if (oname == "temp" && iname == "temp") {
-            VOLT_ERROR("Unsuported join on two temp tables.");
-            return false;
-        }
-
-        VOLT_TRACE("TupleValueExpression: %s", tve->debug().c_str());
-        VOLT_TRACE("TVE table name: %s\n", tname.c_str());
-        if (tname == oname)
-            tve->setTupleIndex(0);
-        else if (tname == iname)
-            tve->setTupleIndex(1);
-        else if (oname == "temp")
-            tve->setTupleIndex(0);
-        else if (iname == "temp")
-            tve->setTupleIndex(1);
-        else {
-            VOLT_ERROR("TableTupleValue in join with unknown table name:\n outer: %s, inner %s", oname.c_str(), iname.c_str());
-            return false;
-        }
-
-        return true;
-    }
-
-    bool
-    assignTupleValueIndexes(AbstractExpression* expression,
-                            const string& outer_name,
-                            const string& inner_name)
-    {
-        // for each tuple value expression in the expression, determine
-        // which tuple is being represented. Tuple could come from outer
-        // table or inner table. Configure the predicate to use the correct
-        // eval() tuple parameter. By convention, eval's first parameter
-        // will always be the outer table and its second parameter the inner
-        const AbstractExpression* predicate = expression;
-
-        VOLT_TRACE("expression: %s", predicate->debug().c_str());
-        std::stack<const AbstractExpression*> stack;
-        while (predicate != NULL) {
-            const AbstractExpression *left = predicate->getLeft();
-            const AbstractExpression *right = predicate->getRight();
-
-            if (right != NULL) {
-                if (right->getExpressionType() == EXPRESSION_TYPE_VALUE_TUPLE) {
-                    if (!assignTupleValueIndex(const_cast<AbstractExpression*>(right),
-                                               outer_name,
-                                               inner_name))
-                    {
-                        return false;
-                    }
-                }
-                // remember the right node - must visit its children
-                stack.push(right);
-            }
-            if (left != NULL) {
-                if (left->getExpressionType() == EXPRESSION_TYPE_VALUE_TUPLE) {
-                    if (!assignTupleValueIndex(const_cast<AbstractExpression*>(left),
-                                               outer_name,
-                                               inner_name))
-                    {
-                        return false;
-                    }
-                }
-            }
-
-            predicate = left;
-            if (!predicate && !stack.empty()) {
-                predicate = stack.top();
-                stack.pop();
-            }
-        }
-        return true;
-    }
-}
-
 bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
                                    TempTableLimits* limits)
 {
@@ -252,39 +153,7 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     index_values.move( index_values_backing_store - TUPLE_HEADER_SIZE);
     index_values.setAllNulls();
 
-    // for each tuple value expression in the predicate, determine
-    // which tuple is being represented. Tuple could come from outer
-    // table or inner table. Configure the predicate to use the correct
-    // eval() tuple parameter. By convention, eval's first parameter
-    // will always be the outer table and its second parameter the inner
-
-    // NOTE: the output expressions are not currently scanned to
-    // determine how to take tuples from the outer and inner tables,
-    // since the way the execute loop is currently written prevents
-    // the contribution to the schema from the outer table from being
-    // used with a valid tuple from the inner table.
-
-    bool retval =
-        assignTupleValueIndexes(inline_node->getPredicate(),
-                                node->getInputTables()[0]->name(),
-                                inline_node->getTargetTable()->name());
-
-    if (retval) {
-        retval = assignTupleValueIndexes(inline_node->getEndExpression(),
-                                node->getInputTables()[0]->name(),
-                                inline_node->getTargetTable()->name());
-    }
-    if (retval) {
-        retval = assignTupleValueIndexes(node->getPreJoinPredicate(),
-                                node->getInputTables()[0]->name(),
-                                inline_node->getTargetTable()->name());
-    }
-    if (retval) {
-        retval = assignTupleValueIndexes(node->getWherePredicate(),
-                                node->getInputTables()[0]->name(),
-                                inline_node->getTargetTable()->name());
-    }
-    return retval;
+    return true;
 }
 
 bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
@@ -341,14 +210,14 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     AbstractExpression* prejoin_expression = node->getPreJoinPredicate();
     if (prejoin_expression != NULL) {
         prejoin_expression->substitute(params);
-        VOLT_TRACE("Post Expression:\n%s", prejoin_expression->debug(true).c_str());
+        VOLT_TRACE("Prejoin Expression:\n%s", prejoin_expression->debug(true).c_str());
     }
 
     // where expression
     AbstractExpression* where_expression = node->getWherePredicate();
     if (where_expression != NULL) {
         where_expression->substitute(params);
-        VOLT_TRACE("Post Expression:\n%s", where_expression->debug(true).c_str());
+        VOLT_TRACE("Where Expression:\n%s", where_expression->debug(true).c_str());
     }
     AbstractExpression* initial_expression = inline_node->getInitialExpression();
     if (initial_expression != NULL) {
@@ -537,7 +406,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                     if (end_expression != NULL &&
                         end_expression->eval(&outer_tuple, &inner_tuple).isFalse())
                     {
-                        VOLT_TRACE("End Expression evaluated to false, stopping scan");
+                        VOLT_TRACE("End Expression evaluated to false, stopping scan\n");
                         break;
                     }
                     //
@@ -562,7 +431,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                                 join_tuple.
                                 setNValue(col_ctr,
                                           m_outputExpressions[col_ctr]->
-                                          eval(&inner_tuple, NULL));
+                                          eval(&outer_tuple, &inner_tuple));
                             }
                             VOLT_TRACE("join_tuple tuple: %s",
                                        join_tuple.debug(output_table->name()).c_str());
