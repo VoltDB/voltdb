@@ -130,6 +130,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public static final byte AUTHENTICATION_FAILURE_DUE_TO_REJOIN = 4;
     public static final byte EXPORT_DISABLED_REJECTION = 5;
 
+    // connection IDs used by internal adapters
+    public static final long RESTORE_AGENT_CID          = Long.MIN_VALUE + 1;
+    public static final long SNAPSHOT_UTIL_CID          = Long.MIN_VALUE + 2;
+    public static final long CL_REPLAY_BASE_CID         = Long.MIN_VALUE + 3;
+    public static final long ELASTIC_NODE_PING_CID      = Long.MIN_VALUE + 4;
+    public static final long ELASTIC_DATA_MIGRATION_CID = Long.MIN_VALUE + 5;
+
     private static final VoltLogger log = new VoltLogger(ClientInterface.class.getName());
     private static final VoltLogger authLog = new VoltLogger("AUTH");
     private static final VoltLogger hostLog = new VoltLogger("HOST");

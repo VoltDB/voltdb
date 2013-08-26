@@ -53,6 +53,7 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
 import org.voltdb.dtxn.TransactionCreator;
 import org.voltdb.sysprocs.SnapshotRestore;
@@ -93,7 +94,7 @@ SnapshotCompletionInterest
     private String m_generatedRestoreBarrier2;
 
     // Different states the restore process can be in
-    private enum State { RESTORE, REPLAY, TRUNCATE };
+    private enum State { RESTORE, REPLAY, TRUNCATE }
 
     // Current state of the restore agent
     private volatile State m_state = State.RESTORE;
@@ -112,10 +113,48 @@ SnapshotCompletionInterest
         }
     };
 
-    private final RestoreAdapter m_restoreAdapter = new RestoreAdapter(m_changeStateFunctor);
+    private final SimpleClientResponseAdapter m_restoreAdapter =
+        new SimpleClientResponseAdapter(ClientInterface.RESTORE_AGENT_CID, new SimpleClientResponseAdapter.Callback() {
+        @Override
+        public void handleResponse(ClientResponse res)
+        {
+            boolean failure = false;
+            if (res.getStatus() != ClientResponse.SUCCESS) {
+                failure = true;
+            }
+
+            VoltTable[] results = res.getResults();
+            if (results == null || results.length != 1) {
+                failure = true;
+            }
+
+            while (!failure && results[0].advanceRow()) {
+                String resultStatus = results[0].getString("RESULT");
+                if (!resultStatus.equalsIgnoreCase("success")) {
+                    failure = true;
+                }
+            }
+
+            if (failure) {
+                for (VoltTable result : results) {
+                    LOG.fatal(result);
+                }
+                VoltDB.crashGlobalVoltDB("Failed to restore from snapshot: " +
+                                         res.getStatusString(), false, null);
+            } else {
+                Thread networkHandoff = new Thread() {
+                    @Override
+                    public void run() {
+                        m_changeStateFunctor.run();
+                    }
+                };
+                networkHandoff.start();
+            }
+        }
+    });
 
     // RealVoltDB needs this to connect the ClientInterface and the Adapter.
-    RestoreAdapter getAdapter() {
+    SimpleClientResponseAdapter getAdapter() {
         return m_restoreAdapter;
     }
 
