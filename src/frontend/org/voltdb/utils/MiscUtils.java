@@ -49,6 +49,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.licensetool.LicenseException;
 
 import com.google.common.net.HostAndPort;
 
@@ -171,8 +172,16 @@ public class MiscUtils {
         }
 
         // Perform signature verification - detect modified files
-        if (licenseApi.verify() == false) {
-            hostLog.fatal("Unable to load license file: could not verify license signature.");
+        try
+        {
+            if (licenseApi.verify() == false) {
+                hostLog.fatal("Unable to load license file: could not verify license signature.");
+                return null;
+            }
+        }
+        catch (LicenseException lex)
+        {
+            hostLog.fatal(lex.getMessage());
             return null;
         }
 

@@ -152,26 +152,6 @@ class Table {
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     // -- Most callers should be using TempTable::insertTempTuple, anyway.
     virtual bool insertTuple(TableTuple &tuple) = 0;
-    // Optimized version of update that only updates specific indexes.
-    // The caller knows which indexes MAY need to be updated.
-    // The fallible flag is used to denote a change to a persistent table
-    // which is part of a long transaction that has been vetted and can
-    // never fail (e.g. violate a constraint).
-    // The initial use case is a live catalog update that adds a materialized view.
-    // Constraint checks are bypassed and the change does not make use of "undo" support.
-    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
-    virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
-                                                TableTuple &sourceTupleWithNewValues,
-                                                std::vector<TableIndex*> const &indexesToUpdate,
-                                                bool fallible=true) = 0;
-
-    /// This is not used in any production code path
-    /// -- it has been DEPRECATED to a convenient wrapper until tests can be weaned off it.
-    bool updateTuple(TableTuple &targetTupleToUpdate, TableTuple &sourceTupleWithNewValues)
-    {
-        updateTupleWithSpecificIndexes(targetTupleToUpdate, sourceTupleWithNewValues, m_indexes, true);
-        return true;
-    }
 
     // ------------------------------------------------------------------
     // TUPLES AND MEMORY USAGE
@@ -241,7 +221,7 @@ class Table {
     }
 
     // returned via shallow vector copy -- seems good enough.
-    std::vector<TableIndex*> allIndexes() const { return m_indexes; }
+    const std::vector<TableIndex*>& allIndexes() const { return m_indexes; }
 
     virtual TableIndex *index(std::string name);
 

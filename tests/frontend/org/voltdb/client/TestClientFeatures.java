@@ -185,6 +185,28 @@ public class TestClientFeatures extends TestCase {
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
     }
 
+    /**
+     * Verify a client can reconnect to a cluster that has been restarted.
+     */
+    public void testReconnect() throws Exception {
+        ClientConfig config = new ClientConfig();
+        Client client = ClientFactory.createClient(config);
+        client.createConnection("localhost");
+
+        tearDown();
+
+        for (int i = 0; (i < 40) && (client.getConnectedHostList().size() > 0); i++) {
+            Thread.sleep(500);
+        }
+        assertTrue(client.getConnectedHostList().isEmpty());
+
+        setUp();
+
+        client.createConnection("localhost");
+
+        assertFalse(client.getConnectedHostList().isEmpty());
+    }
+
     public void testGetAddressList() throws UnknownHostException, IOException, InterruptedException {
         CSL csl = new CSL();
 

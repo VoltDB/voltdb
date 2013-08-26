@@ -24,6 +24,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.iv2.TxnEgo;
+import org.voltdb.iv2.UniqueIdGenerator;
 
 /**
  * Message from a client interface to an initiator, instructing the
@@ -184,8 +186,9 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         sb.append(" TO ");
         sb.append(CoreUtils.hsIdToString(getCoordinatorHSId()));
         sb.append(") FOR TXN ");
-        sb.append(m_txnId).append("\n");
-        sb.append(" UNIQUE ID ").append(m_uniqueId).append("\n");
+        sb.append(m_txnId).append(" (").append(TxnEgo.txnIdToString(m_txnId)).append(")").append("\n");
+        sb.append(" UNIQUE ID ").append(m_uniqueId).append(" (").append(UniqueIdGenerator.toString(m_uniqueId));
+        sb.append(")").append("\n");
         sb.append(") TRUNC HANDLE ");
         sb.append(getTruncationHandle()).append("\n");
         sb.append("SP HANDLE: ").append(getSpHandle()).append("\n");
