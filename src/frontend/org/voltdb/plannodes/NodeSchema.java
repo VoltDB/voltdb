@@ -163,16 +163,15 @@ public class NodeSchema
     }
 
     /**
-     * Combine the provided schema to this schema and return the result
-     * as a new schema.
+     * Append the provided schema to this schema and return the result
+     * as a new schema. Columns order: [this][provided schema columns].
      */
     NodeSchema join(NodeSchema schema)
     {
-        NodeSchema copy = null;
-        copy = schema.clone();
-        for (int i = 0; i < m_columns.size(); ++i)
+        NodeSchema copy = this.clone();
+        for (SchemaColumn col: schema.getColumns())
         {
-            copy.addColumn(m_columns.get(i).clone());
+            copy.addColumn(col.clone());
         }
         return copy;
     }
