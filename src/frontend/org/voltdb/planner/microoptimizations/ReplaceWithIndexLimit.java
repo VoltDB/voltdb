@@ -21,7 +21,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.json_voltpatches.JSONException;
-import org.voltdb.catalog.*;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ExpressionUtil;
@@ -156,7 +159,6 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
                 lpn.setOffset(0);
 
                 ispn.addInlinePlanNode(lpn);
-                ispn.generateOutputSchema(db);
 
                 // remove old SeqScan node and link the new generated IndexScan node
                 plan.clearChildren();
@@ -289,7 +291,6 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
                 aggplan.setPredicate(newPredicate);
             }
 
-            plan.generateOutputSchema(db);
             return plan;
         }
     }

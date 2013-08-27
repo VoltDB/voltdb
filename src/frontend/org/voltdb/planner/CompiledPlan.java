@@ -75,6 +75,8 @@ public class CompiledPlan {
     /** A list of output column ids, indexes and types */
     public NodeSchema columns = new NodeSchema();
 
+    public ParsedSelectStmt  selectStmt = null;
+
     /**
      * If true, divide the number of tuples changed
      * by the number of partitions, as the number will
