@@ -74,6 +74,7 @@ public class Collector {
     public static String[] cmdFilenames = {"sardata", "dmesgdata"};
 
     public static void main(String[] args) {
+        // get rid of log4j "no appenders could be found for logger" warning when called from VEM
         Logger.getRootLogger().addAppender(new NullAppender());
 
         m_voltDbRootPath = args[0];
