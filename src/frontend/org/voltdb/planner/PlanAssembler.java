@@ -41,6 +41,7 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
@@ -51,7 +52,6 @@ import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.MaterializePlanNode;
-import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
@@ -974,8 +974,8 @@ public class PlanAssembler {
         }
         // Optimization for NestLoopIndex on IN list
         // skip the explicit ORDER BY plan step if NestLoopIndex is providing the equivalent ordering
-        if (root.getPlanNodeType() == PlanNodeType.NESTLOOPINDEX) {
-            sortDirection = ((NestLoopIndexPlanNode)root).getSortDirection();
+        if (root instanceof AbstractJoinPlanNode) {
+            sortDirection = ((AbstractJoinPlanNode)root).getSortDirection();
             if (sortDirection != SortDirectionType.INVALID) {
                 return root;
             }
