@@ -216,11 +216,11 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
     /**
      * Compute every permutation of the list of involved tables and put them in a deque.
+     * TODO(XIN): takes at least 3.3% cpu of planner. Optimize it when possible.
      */
     private void queueAllJoinOrders() {
         // these just shouldn't happen right?
         assert(m_parsedStmt.noTableSelectionList.size() == 0);
-
         assert(m_parsedStmt.joinTree != null);
 
         // Simplify the outer join if possible
@@ -830,6 +830,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
             // combine the tails plan graph with the new head node
             nlijNode.addAndLinkChild(outerPlan);
+
             ajNode = nlijNode;
         }
         else {
@@ -840,6 +841,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         ajNode.setJoinType(joinNode.m_joinType);
         ajNode.setPreJoinPredicate(ExpressionUtil.combine(joinNode.m_joinOuterList));
         ajNode.setWherePredicate(ExpressionUtil.combine(whereClauses));
+        ajNode.resolveSortDirection();
         return ajNode;
     }
 

@@ -26,7 +26,6 @@ package org.voltdb.planner;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
-import java.util.ArrayList;
 import java.util.Map.Entry;
 
 import junit.framework.TestCase;
@@ -38,8 +37,6 @@ import org.voltdb.AllTpccSQL;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
-import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.utils.BuildDirectoryUtils;
 
 public class TestParsedStatements extends TestCase {
