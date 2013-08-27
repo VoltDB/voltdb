@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.TreeMap;
 
+import com.google.common.base.Throwables;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 
@@ -85,6 +86,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
         //Once this == the number of entries the segment can close and delete itself
         private int m_discardsUntilDeletion = 0;
 
+        private int m_lastReadNumEntries = -1;
         public DequeSegment(Long index, File file) {
             m_index = index;
             m_file = file;
@@ -105,7 +107,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     }
                 }
                 m_bufferForNumEntries.flip();
-                return m_bufferForNumEntries.getInt();
+                int numEntries = m_bufferForNumEntries.getInt();
+                m_lastReadNumEntries = numEntries;
+                return numEntries;
             } else {
                 return 0;
             }
@@ -190,13 +194,18 @@ public class PersistentBinaryDeque implements BinaryDeque {
             m_syncedSinceLastEdit = true;
         }
 
+        private boolean hasMoreEntries() throws IOException {
+            return m_objectReadIndex < getNumEntries();
+        }
+
         private BBContainer poll() throws IOException {
             if (m_fc == null) {
                 open();
             }
 
             //No more entries to read
-            if (m_objectReadIndex >= getNumEntries()) {
+            int numEntries = getNumEntries();
+            if (m_objectReadIndex >= numEntries) {
                 return null;
             }
 
@@ -205,8 +214,30 @@ public class PersistentBinaryDeque implements BinaryDeque {
             //If this is the last object to read from this segment
             //increment the poll segment index so that the next poll
             //selects the correct segment
-            if (m_objectReadIndex >= getNumEntries()) {
+            if (m_objectReadIndex >= numEntries) {
                 m_currentPollSegmentIndex++;
+                /*
+                 * Check that the poll segment index we are pointing to
+                 * actually contains more entries to be polled.
+                 * If someone pushes entries into the deque after they have polled
+                 * entries from the head segment you can end up in a scenario where
+                 * the next segment is actually empty and not the place to poll from
+                 * next. It's a pretty messed up scenario and it is up to the caller to
+                 * make sense of it.
+                 *
+                 */
+                while (m_finishedSegments.containsKey(m_currentPollSegmentIndex)) {
+                    DequeSegment ds = m_finishedSegments.get(m_currentPollSegmentIndex);
+                    if (ds.hasMoreEntries()) break;
+                    //The deque segment that follows has no more entries, check the next one
+                    //or point to the current write segment
+                    m_currentPollSegmentIndex++;
+                    //If this is going to point to the write segment, sanity check the indexes match
+                    if (!m_finishedSegments.containsKey(m_currentPollSegmentIndex) && m_writeSegment != null) {
+                        assert(m_writeSegment.m_index.intValue() == m_currentPollSegmentIndex);
+                    }
+                }
+
             }
 
             //Get the length prefix and then read the object
@@ -408,10 +439,12 @@ public class PersistentBinaryDeque implements BinaryDeque {
                     new VoltFile(m_path, m_nonce + "." + writeSegmentIndex + ".pbd"));
         m_writeSegment.open();
         m_writeSegment.initNumEntries();
+        assert(postconditions());
     }
 
     @Override
     public synchronized void offer(BBContainer[] objects) throws IOException {
+        assert(preconditions());
         if (m_writeSegment == null) {
             throw new IOException("Closed");
         }
@@ -429,15 +462,14 @@ public class PersistentBinaryDeque implements BinaryDeque {
         }
 
         m_writeSegment.offer(objects);
+        assert(postconditions());
     }
 
     @Override
     public synchronized void push(BBContainer[][] objects) throws IOException {
+        assert(preconditions());
         if (m_writeSegment == null) {
             throw new IOException("Closed");
-        }
-        if (!m_finishedSegments.isEmpty()) {
-            assert(m_finishedSegments.firstKey().equals(m_currentPollSegmentIndex));
         }
         ArrayDeque<ArrayDeque<BBContainer[]>> segments = new ArrayDeque<ArrayDeque<BBContainer[]>>();
         ArrayDeque<BBContainer[]> currentSegment = new ArrayDeque<BBContainer[]>();
@@ -494,6 +526,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             writeSegment.m_fc.position(4);
             m_finishedSegments.put(writeSegment.m_index, writeSegment);
         }
+        assert(postconditions());
     }
 
     private void openNewWriteSegment() throws IOException {
@@ -513,11 +546,17 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
     @Override
     public synchronized BBContainer poll() throws IOException {
+        assert(preconditions());
         if (m_writeSegment == null) {
             throw new IOException("Closed");
         }
+
         DequeSegment segment = m_finishedSegments.get(m_currentPollSegmentIndex);
+
         if (segment == null) {
+            if (!m_writeSegment.m_index.equals(m_currentPollSegmentIndex)) {
+                System.out.println("oops");
+            }
             assert(m_writeSegment.m_index.equals(m_currentPollSegmentIndex));
             //See if we can steal the write segment, otherwise return null
             if (m_writeSegment.getNumEntries() > 0) {
@@ -527,7 +566,9 @@ public class PersistentBinaryDeque implements BinaryDeque {
                 return null;
             }
         }
-        return segment.poll();
+        BBContainer retval = segment.poll();
+        assert(postconditions());
+        return retval;
     }
 
     @Override
@@ -560,6 +601,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
     @Override
     public synchronized boolean isEmpty() throws IOException {
+        assert(preconditions());
         if (m_writeSegment == null) {
             throw new IOException("Closed");
         }
@@ -578,6 +620,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
     @Override
     public long sizeInBytes() {
+        assert(preconditions());
         return m_sizeInBytes.get();
     }
 
@@ -591,6 +634,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
 
     @Override
     public synchronized void parseAndTruncate(BinaryDequeTruncator truncator) throws IOException {
+        assert(preconditions());
         if (m_finishedSegments.isEmpty()) {
             exportLog.debug("PBD " + m_nonce + " has no finished segments");
             return;
@@ -747,5 +791,34 @@ public class PersistentBinaryDeque implements BinaryDeque {
         if (m_finishedSegments.isEmpty()) {
             assert(m_writeSegment.m_index.equals(m_currentPollSegmentIndex));
         }
+        assert(postconditions());
+    }
+
+    private boolean preconditions() {
+        return postconditions();
+    }
+
+    private boolean postconditions() {
+        //Closed
+        if (m_writeSegment == null) return true;
+        try  {
+            if (!m_finishedSegments.isEmpty()) {
+                for (Map.Entry<Long, DequeSegment> e : m_finishedSegments.entrySet()) {
+                    if (e.getValue().hasMoreEntries() && !e.getKey().equals(m_currentPollSegmentIndex)) {
+                        return false;
+                    } else if (e.getValue().hasMoreEntries()) {
+                        //Break because the current poll segment index obviously only matches
+                        //up to the first buffer with remaining entries
+                        break;
+                    }
+                }
+            } else if (m_currentPollSegmentIndex != m_writeSegment.m_index.intValue()) {
+                return false;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+        return true;
     }
 }
