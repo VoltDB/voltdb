@@ -1434,7 +1434,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
                 results.writeInt(*ipos);
             }
         }
-        VOLT_DEBUG("tableStreamSerializeMore: deserialized %d buffers, %lld remaining",
+        VOLT_DEBUG("tableStreamSerializeMore: deserialized %d buffers, %ld remaining",
                    (int)positions.size(), remaining);
     }
     catch (SerializableEEException &e) {

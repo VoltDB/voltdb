@@ -490,14 +490,29 @@ public abstract class SubPlanAssembler {
             retval.use = IndexUseType.INDEX_SCAN;
         }
 
-        if (endingBoundExpr != null) {
+        if (endingBoundExpr == null) {
+            if (retval.sortDirection == SortDirectionType.DESC) {
+                if (retval.endExprs.size() == 0) { // no prefix equality filters
+                    if (startingBoundExpr != null) {
+                        retval.indexExprs.clear();
+                        AbstractExpression comparator = startingBoundExpr.getFilter();
+                        retval.endExprs.add(comparator);
+                    }
+                }
+                else { // there are prefix equality filters -- settle for a forward scan?
+                    retval.sortDirection = SortDirectionType.INVALID;
+                }
+            }
+        }
+        else {
             AbstractExpression comparator = endingBoundExpr.getFilter();
             retval.use = IndexUseType.INDEX_SCAN;
             retval.bindings.addAll(endingBoundExpr.getBindings());
 
             // if we already have a lower bound, or the sorting direction is already determined
             // do not do the reverse scan optimization
-            if (startingBoundExpr != null || retval.sortDirection == SortDirectionType.ASC) {
+            if (retval.sortDirection != SortDirectionType.DESC &&
+                (startingBoundExpr != null || retval.sortDirection == SortDirectionType.ASC)) {
                 retval.endExprs.add(comparator);
                 if (retval.lookupType == IndexLookupType.EQ) {
                     retval.lookupType = IndexLookupType.GTE;
@@ -507,36 +522,34 @@ public abstract class SubPlanAssembler {
                 // either < or <=, so do not optimize BETWEEN.
                 if (comparator.getExpressionType() == ExpressionType.COMPARE_LESSTHAN) {
                     retval.lookupType = IndexLookupType.LT;
-                } else if (comparator.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO) {
+                } else {
+                    assert comparator.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO;
                     retval.lookupType = IndexLookupType.LTE;
                 }
-                if (retval.lookupType == IndexLookupType.EQ) {
-                    // This does not need to be that accurate;
-                    // anything OTHER than IndexLookupType.EQ is enough to enable a multi-key scan.
-                    //TODO: work out whether there is any possible use for more precise settings of
-                    // retval.lookupType, including for descending order cases ???
-                    retval.lookupType = IndexLookupType.GTE;
-                    retval.endExprs.add(comparator);
-                } else {
-                    // optimizable
-                    // add to indexExprs because it will be used as part of searchKey
-                    retval.indexExprs.add(comparator);
-                    // put it to post-filter as well
-                    retval.otherExprs.add(comparator);
-                    // Unlike a lower bound, an upper bound does not automatically filter out nulls
-                    // as required by the comparison filter, so construct a NOT NULL comparator and
-                    // add to post-filter
-                    // TODO: Implement an abstract isNullable() method on AbstractExpression and use
-                    // that here to optimize out the "NOT NULL" comparator for NOT NULL columns
+                // optimizable
+                // add to indexExprs because it will be used as part of searchKey
+                retval.indexExprs.add(comparator);
+                // put it to post-filter as well
+                retval.otherExprs.add(comparator);
+                // Unlike a lower bound, an upper bound does not automatically filter out nulls
+                // as required by the comparison filter, so construct a NOT NULL comparator and
+                // add to post-filter
+                // TODO: Implement an abstract isNullable() method on AbstractExpression and use
+                // that here to optimize out the "NOT NULL" comparator for NOT NULL columns
+                if (startingBoundExpr == null) {
                     AbstractExpression newComparator = new OperatorExpression(ExpressionType.OPERATOR_NOT,
                             new OperatorExpression(ExpressionType.OPERATOR_IS_NULL), null);
                     newComparator.getLeft().setLeft(comparator.getLeft());
                     newComparator.finalizeValueTypes();
                     retval.otherExprs.add(newComparator);
-                    // initialExpr is set for both cases
-                    // but will be used for LTE and only when overflow case of LT
-                    retval.initialExpr.addAll(retval.indexExprs);
+                } else {
+                    AbstractExpression startComparator = startingBoundExpr.getFilter();
+                    retval.endExprs.add(startComparator);
                 }
+
+                // initialExpr is set for both cases
+                // but will be used for LTE and only when overflow case of LT
+                retval.initialExpr.addAll(retval.indexExprs);
             }
         }
 

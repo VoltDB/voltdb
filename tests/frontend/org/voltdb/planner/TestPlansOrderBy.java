@@ -38,7 +38,8 @@ public class TestPlansOrderBy extends PlannerTestCase {
         super.tearDown();
     }
 
-    private void validatePlan(String sql, boolean expectIndexScan, boolean expectSeqScan, boolean expectOrderBy, boolean expectHashAggregate)
+    private void validatePlan(String sql, boolean expectIndexScan,
+            boolean expectSeqScan, boolean expectOrderBy, boolean expectHashAggregate)
     {
         AbstractPlanNode pn = compile(sql);
         //System.out.println(pn.getChild(0).toJSONString());
@@ -174,8 +175,9 @@ public class TestPlansOrderBy extends PlannerTestCase {
     }
 
     public void testOrderDescWithEquality() {
-        validatePlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D1", true, false, false, false);
-        validatePlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D1 DESC", true, false, false, false);
+        validateOptimalPlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D1");
+        // See ENG-5084 to optimize this query to use inverse scan in future.
+        validateIndexedBruteForcePlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D1 DESC");
     }
 
     // Indexes on T (T_D0, T_D1), T2 (T_D0, T_D1), and Tmanykeys (T_D0, T_D1, T_D2)
