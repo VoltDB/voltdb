@@ -199,7 +199,7 @@ public class ElasticHashinator extends TheHashinator {
      * be the first token <= the value hash, or if the value hash is < the first token in the ring,
      * it wraps around to the last token in the ring closest to Long.MAX_VALUE
      */
-    int partitionForToken(long hash) {
+    public int partitionForToken(long hash) {
         Map.Entry<Long, Integer> entry = tokens.floorEntry(hash);
         //System.out.println("Finding partition for token " + token);
         /*
@@ -214,6 +214,14 @@ public class ElasticHashinator extends TheHashinator {
             //System.out.println("Last entry token " + tokens.lastEntry().getKey());
             return tokens.lastEntry().getValue();
         }
+    }
+
+    /**
+     * Get all the tokens on the ring.
+     */
+    public ImmutableSortedMap<Long, Integer> getTokens()
+    {
+        return tokens;
     }
 
     @Override
