@@ -1115,8 +1115,6 @@ public abstract class SubPlanAssembler {
         ReceivePlanNode recvNode = new ReceivePlanNode();
         recvNode.addAndLinkChild(sendNode);
 
-        // receive node requires the schema of its output table
-        recvNode.generateOutputSchema(m_db);
         return recvNode;
     }
 
@@ -1142,7 +1140,6 @@ public abstract class SubPlanAssembler {
         {
             scanNode = getIndexAccessPlanForTable(table, path);
         }
-        scanNode.generateOutputSchema(m_db);
         return scanNode;
     }
 
