@@ -207,19 +207,21 @@ public class JoinNode implements Cloneable {
         joinNodes.add(this);
         while ( ! joinNodes.isEmpty()) {
             JoinNode joinNode = joinNodes.poll();
-            if (joinNode.m_table != null) {
-                if (joinNode.m_whereExpr != null) {
-                    ExpressionUtil.collectPartitioningFilters(joinNode.m_whereExpr, equivalenceSet);
-                }
-                if (joinNode.m_joinExpr != null) {
-                    ExpressionUtil.collectPartitioningFilters(joinNode.m_joinExpr, equivalenceSet);
-                }
-                assert joinNode.m_leftNode == null && joinNode.m_rightNode == null;
-                continue;
-            }
             if ( ! joinNode.m_whereInnerList.isEmpty()) {
                 ExpressionUtil.collectPartitioningFilters(joinNode.m_whereInnerList,
                                                           equivalenceSet);
+            }
+            if (joinNode.m_table != null) {
+                assert joinNode.m_leftNode == null && joinNode.m_rightNode == null;
+                // HSQL sometimes tags single-table filters in inner joins as join clauses
+                // rather than where clauses? OR does analyzeJoinExpressions correct for this?
+                // If so, these CAN contain constant equivalences that get used as the basis for equivalence
+                // conditions that determine partitioning, so process them as where clauses.
+                if ( ! joinNode.m_joinInnerList.isEmpty()) {
+                    ExpressionUtil.collectPartitioningFilters(joinNode.m_joinInnerList,
+                                                              equivalenceSet);
+                }
+                continue;
             }
             if ( ! joinNode.m_whereOuterList.isEmpty()) {
                 ExpressionUtil.collectPartitioningFilters(joinNode.m_whereOuterList,
@@ -232,6 +234,20 @@ public class JoinNode implements Cloneable {
             if ( ! joinNode.m_joinInnerOuterList.isEmpty()) {
                 ExpressionUtil.collectPartitioningFilters(joinNode.m_joinInnerOuterList,
                                                           equivalenceSet);
+            }
+            if (joinNode.m_joinType == JoinType.INNER) {
+                // HSQL sometimes tags single-table filters in inner joins as join clauses
+                // rather than where clauses? OR does analyzeJoinExpressions correct for this?
+                // If so, these CAN contain constant equivalences that get used as the basis for equivalence
+                // conditions that determine partitioning, so process them as where clauses.
+                if ( ! joinNode.m_joinInnerList.isEmpty()) {
+                    ExpressionUtil.collectPartitioningFilters(joinNode.m_joinInnerList,
+                                                              equivalenceSet);
+                }
+                if ( ! joinNode.m_joinOuterList.isEmpty()) {
+                    ExpressionUtil.collectPartitioningFilters(joinNode.m_joinOuterList,
+                                                              equivalenceSet);
+                }
             }
             if (joinNode.m_leftNode != null) {
                 joinNodes.add(joinNode.m_leftNode);
@@ -389,5 +405,135 @@ public class JoinNode implements Cloneable {
         return m_joinType != JoinType.INNER ||
                 m_leftNode.hasOuterJoin() || m_rightNode.hasOuterJoin();
     }
+
+    /**
+     * Split a join tree into one or more sub-trees. Each sub-tree has the same join type
+     * for all join nodes. The root of the child tree in the parent tree is replaced with a 'dummy' node
+     * which id is negated id of the child root node.
+     * @param tree - The join tree
+     * @return the list of sub-trees from the input tree
+     */
+    public List<JoinNode> extractSubTrees() {
+        List<JoinNode> subTrees = new ArrayList<JoinNode>();
+        // Extract the first sub-tree starting at the root
+        List<JoinNode> leafNodes = new ArrayList<JoinNode>();
+        extractSubTree(leafNodes);
+        subTrees.add(this);
+
+        // Continue with the leafs
+        for (JoinNode leaf : leafNodes) {
+            subTrees.addAll(leaf.extractSubTrees());
+        }
+        return subTrees;
+    }
+
+    /**
+     * Starting from the root recurse to its children stopping at the first join node
+     * of the different type and discontinue the tree at this point by replacing the join node with
+     * the temporary node which id matches the join node id. This join node is the root of the next
+     * sub-tree.
+     * @param root - The root of the join tree
+     * @param leafNodes - the list of the root nodes of the next sub-trees
+     */
+    private void extractSubTree(List<JoinNode> leafNodes) {
+        if (m_table != null) {
+            return;
+        }
+        JoinNode[] children = {m_leftNode, m_rightNode};
+        for (JoinNode child : children) {
+
+            // Leaf nodes don't have a significant join type,
+            // test for them first and never attempt to start a new tree at a leaf.
+            if (child.m_table != null) {
+                continue;
+            }
+
+            if (child.m_joinType == m_joinType) {
+                // The join type for this node is the same as the root's one
+                // Keep walking down the tree
+                child.extractSubTree(leafNodes);
+            } else {
+                // The join type for this join differs from the root's one
+                // Terminate the sub-tree
+                leafNodes.add(child);
+                // Replace the join node with the temporary node having the id negated
+                // This will help to distinguish it from a real node and to reassemble the tree at the later stage
+                JoinNode tempNode = new JoinNode(
+                        -child.m_id, child.m_joinType, new Table(), child.m_joinExpr, child.m_whereExpr);
+                if (child == m_leftNode) {
+                    m_leftNode = tempNode;
+                } else {
+                    m_rightNode = tempNode;
+                }
+            }
+        }
+    }
+
+    /**
+     * Reconstruct a join tree from the list of tables always appending the next node to the right.
+     *
+     * @param tableNodes the list of tables to build the tree from.
+     * @return The reconstructed tree
+     */
+    public static JoinNode reconstructJoinTreeFromTableNodes(List<JoinNode> tableNodes) {
+        JoinNode root = null;
+        for (JoinNode leafNode : tableNodes) {
+            assert(leafNode.m_table != null);
+            JoinNode node = new JoinNode(leafNode.m_id, leafNode.m_joinType, leafNode.m_table, null, null);
+            if (root == null) {
+                root = node;
+            } else {
+                // We only care about the root node id to be able to reconnect the sub-trees
+                // The intermediate node id can be anything. For the final root node its id
+                // will be set later to the original tree's root id
+                root = new JoinNode(-node.m_id, JoinType.INNER, root, node);
+            }
+        }
+        return root;
+    }
+
+    /**
+     * Reconstruct a join tree from the list of sub-trees connecting the sub-trees in the order
+     * they appear in the list. The list of sub-trees must be initially obtained by calling the extractSubTrees
+     * method on the original tree.
+     *
+     * @param subTrees the list of sub trees.
+     * @return The reconstructed tree
+     */
+    public static JoinNode reconstructJoinTreeFromSubTrees(List<JoinNode> subTrees) {
+        if (subTrees == null || subTrees.isEmpty()) {
+            return null;
+        }
+        // Reconstruct the tree. The first element is the first sub-tree and so on
+        JoinNode joinNode = subTrees.get(0);
+        for (int i = 1; i < subTrees.size(); ++i) {
+            JoinNode nextNode = subTrees.get(i);
+            boolean replaced = replaceChild(joinNode, nextNode);
+            // There must be a node in the current tree to be replaced
+            assert(replaced == true);
+        }
+        return joinNode;
+    }
+
+    private static boolean replaceChild(JoinNode root, JoinNode node) {
+        // can't replace self
+        assert (root != null && Math.abs(root.m_id) != Math.abs(node.m_id));
+        if (root.m_table != null) {
+            return false;
+        } else if (Math.abs(root.m_leftNode.m_id) == Math.abs(node.m_id)) {
+            root.m_leftNode  = node;
+            return true;
+        } else if (Math.abs(root.m_rightNode.m_id) == Math.abs(node.m_id)) {
+            root.m_rightNode  = node;
+            return true;
+        } else if (replaceChild(root.m_leftNode, node) == true) {
+            return true;
+        } else if (replaceChild(root.m_rightNode, node) == true) {
+            return true;
+        }
+
+        return false;
+    }
+
 
 }
