@@ -44,10 +44,12 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
@@ -63,6 +65,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.network.Connection;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.InstanceId;
@@ -181,6 +184,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     class MockInitiator extends TransactionInitiator {
         private final Map<String, Long> procCounts = new HashMap<String, Long>();
         private final Map<String, ParameterSet> procParams = new HashMap<String, ParameterSet>();
+        private final Map<Long, Connection> m_adapters = new ConcurrentHashMap<Long, Connection>();
 
         public MockInitiator(Set<String> procNames) {
             if (procNames != null) {
@@ -201,27 +205,22 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
         @Override
         public boolean createTransaction(long connectionId,
-                                      String connectionHostname,
-                                      boolean adminConnection,
                                       StoredProcedureInvocation invocation,
                                       boolean isReadOnly,
                                       boolean isSinglePartition,
                                       boolean isEverySite,
                                       int[] partitions,
-                                      Object clientData,
                                       int messageSize,
                                       long now) {
-            createTransaction(connectionId, connectionHostname, adminConnection,
+            createTransaction(connectionId,
                               0, 0, invocation, isReadOnly, isSinglePartition,
                               isEverySite, partitions,
-                              clientData, messageSize, now);
+                              messageSize, now);
             return true;
         }
 
         @Override
         public boolean createTransaction(long connectionId,
-                                      String connectionHostname,
-                                      boolean adminConnection,
                                       long txnId,
                                       long timestamp,
                                       StoredProcedureInvocation invocation,
@@ -229,7 +228,6 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                       boolean isSinglePartition,
                                       boolean isEverySite,
                                       int[] partitions,
-                                      Object clientData,
                                       int messageSize,
                                       long now) {
             String procName = invocation.procName;
@@ -251,7 +249,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             buf.putInt(buf.capacity() - 4);
             response.flattenToBuffer(buf);
             buf.flip();
-            ((WriteStream) clientData).enqueue(buf);
+            Connection c = m_adapters.get(connectionId);
+            c.writeStream().enqueue(buf);
             return true;
         }
 
@@ -310,6 +309,12 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
         @Override
         public void sendEOLMessage(int partitionId) {}
+
+        @Override
+        public void bindAdapter(Connection adapter) {
+            m_adapters.put(adapter.connectionId(), adapter);
+        }
+
     }
 
     void buildCatalog(int hostCount, int sitesPerHost, int kfactor, String voltroot,
@@ -493,6 +498,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
     @Before
     public void setUp() throws Exception {
+        RestoreAdapter.m_testConnectionIdGenerator = new AtomicLong(Long.MIN_VALUE);
         m_count.set(0);
         m_done = false;
         snapshotted = false;

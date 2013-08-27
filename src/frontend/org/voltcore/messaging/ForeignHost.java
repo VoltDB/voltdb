@@ -80,8 +80,8 @@ public class ForeignHost {
             m_isUp = false;
             if (!m_closing)
             {
-                VoltDB.dropStackTrace("Received remote hangup from foreign host " + hostname());
-                hostLog.warn("Received remote hangup from foreign host " + hostname());
+                VoltDB.dropStackTrace("Received remote hangup from foreign host " + hostnameAndIPAndPort());
+                hostLog.warn("Received remote hangup from foreign host " + hostnameAndIPAndPort());
                 m_hostMessenger.reportForeignHostFailed(m_hostId);
             }
         }
@@ -225,7 +225,7 @@ public class ForeignHost {
         if (current_delta > 10 * 1000) {
             rateLimitedLogger.log(
                     "Have not received a message from host "
-                        + hostname() + " for " + (current_delta / 1000.0) + " seconds",
+                        + hostnameAndIPAndPort() + " for " + (current_delta / 1000.0) + " seconds",
                         current_time);
         }
         // NodeFailureFault no longer immediately trips FHInputHandler to
@@ -235,20 +235,24 @@ public class ForeignHost {
             (current_delta > m_deadHostTimeout))
         {
             if (m_deadReportsCount.getAndIncrement() == 0) {
-                hostLog.error("DEAD HOST DETECTED, hostname: " + hostname());
+                hostLog.error("DEAD HOST DETECTED, hostname: " + hostnameAndIPAndPort());
                 hostLog.info("\tcurrent time: " + current_time);
                 hostLog.info("\tlast message: " + m_lastMessageMillis);
                 hostLog.info("\tdelta (millis): " + current_delta);
                 hostLog.info("\ttimeout value (millis): " + m_deadHostTimeout);
-                VoltDB.dropStackTrace("Timed out foreign host " + hostname() + " with delta " + current_delta);
+                VoltDB.dropStackTrace("Timed out foreign host " + hostnameAndIPAndPort() + " with delta " + current_delta);
             }
             m_hostMessenger.reportForeignHostFailed(m_hostId);
         }
     }
 
 
+    String hostnameAndIPAndPort() {
+        return m_connection.getHostnameAndIPAndPort();
+    }
+
     String hostname() {
-        return m_connection.getHostnameAndIP();
+        return m_connection.getHostnameOrIP();
     }
 
     /** Deliver a deserialized message from the network to a local mailbox */
@@ -300,7 +304,7 @@ public class ForeignHost {
             in.get(messageBytes);
             String message = new String(messageBytes, "UTF-8");
             message = String.format("Fatal error from id,hostname(%d,%s): %s",
-                    m_hostId, hostname(), message);
+                    m_hostId, hostnameAndIPAndPort(), message);
             org.voltdb.VoltDB.crashLocalVoltDB(message, false, null);
         }
 
