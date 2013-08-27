@@ -291,7 +291,7 @@ class NValue {
     void serializeToExport(ExportSerializeOutput&) const;
 
     // See comment with inlined body, below.
-    void allocatePersistentObjectFromInlineValue();
+    void allocateObjectFromInlinedValue(Pool* stringPool = NULL);
 
     /* Check if the value represents SQL NULL */
     bool isNull() const;
@@ -2749,8 +2749,8 @@ inline void NValue::serializeToExport(ExportSerializeOutput &io) const
 }
 
 /** Reformat an object-typed value from its inlined form to its allocated out-of-line form,
- *  for use with a widened tuple column. **/
-inline void NValue::allocatePersistentObjectFromInlineValue()
+ *  for use with a wider/widened tuple column, either persistent (stringPool==NULL) or temp **/
+inline void NValue::allocateObjectFromInlinedValue(Pool* stringPool)
 {
     if (m_valueType == VALUE_TYPE_NULL || m_valueType == VALUE_TYPE_INVALID) {
         return;
@@ -2772,11 +2772,6 @@ inline void NValue::allocatePersistentObjectFromInlineValue()
         setSourceInlined(false);
         return;
     }
-
-    // A future version/variant of this function may take an optional Pool argument,
-    // so that it could be used for temp values/tables.
-    // The default persistent string pool specified by NULL works fine here and now.
-    Pool* stringPool = NULL;
 
     // When an object is inlined, m_data is a direct pointer into a tuple's inline storage area.
     char* source = *reinterpret_cast<char**>(m_data);
