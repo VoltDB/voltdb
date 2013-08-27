@@ -195,22 +195,6 @@ SnapshotCompletionInterest
 
     private CommandLogReinitiator m_replayAgent = new DefaultCommandLogReinitiator();
 
-    /*
-     * A thread to keep on sending fake heartbeats until the restore is
-     * complete, or otherwise the RPQ is gonna be clogged.
-     */
-    private final Thread m_restoreHeartbeatThread = new Thread(new Runnable() {
-        @Override
-        public void run() {
-            while (m_state == State.RESTORE) {
-                m_initiator.sendHeartbeat(RESTORE_TXNID + 1);
-                try {
-                    Thread.sleep(500);
-                } catch (InterruptedException e) {}
-            }
-        }
-    }, "Restore heartbeat thread");
-
     private final Runnable m_restorePlanner = new Runnable() {
         @Override
         public void run() {
@@ -227,7 +211,6 @@ SnapshotCompletionInterest
                     while (m_zk.exists(VoltZK.restore_snapshot_id, null) == null) {
                         Thread.sleep(200);
                     }
-                    m_restoreHeartbeatThread.start();
                     changeState();
                 }
                 else {
@@ -247,7 +230,6 @@ SnapshotCompletionInterest
                         initSnapshotWork(RESTORE_TXNID,
                                 Pair.of("@SnapshotRestore", params));
                     }
-                    m_restoreHeartbeatThread.start();
 
                     // if no snapshot to restore, transition immediately.
                     if (m_snapshotToRestore == null) {
@@ -1201,10 +1183,6 @@ SnapshotCompletionInterest
             fetchSnapshotTxnId();
             exitRestore();
             m_state = State.REPLAY;
-
-            try {
-                m_restoreHeartbeatThread.join();
-            } catch (InterruptedException e) {}
 
             /*
              * Add the interest here so that we can use the barriers in replay
