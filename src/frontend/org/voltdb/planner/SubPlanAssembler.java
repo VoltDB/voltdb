@@ -1244,6 +1244,8 @@ public abstract class SubPlanAssembler {
         nlijNode.setJoinType(JoinType.INNER);
         nlijNode.addInlinePlanNode(scanNode);
         nlijNode.addAndLinkChild(matScan);
+        // resolve the sort direction
+        nlijNode.resolveSortDirection();
         return nlijNode;
     }
 

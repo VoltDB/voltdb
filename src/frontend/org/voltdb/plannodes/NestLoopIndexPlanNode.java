@@ -36,12 +36,6 @@ import org.voltdb.types.SortDirectionType;
 
 public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
 
-    public enum Members {
-        SORT_DIRECTION;
-    }
-
-    private SortDirectionType m_sortDirection = SortDirectionType.INVALID;
-
     public NestLoopIndexPlanNode() {
         super();
     }
@@ -74,15 +68,6 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
             m_children.get(0).getOutputSchema().
             join(inlineScan.getOutputSchema()).copyAndReplaceWithTVE();
         m_hasSignificantOutputSchema = true;
-
-        if (m_children.get(0).getPlanNodeType() == PlanNodeType.MATERIALIZEDSCAN) {
-            assert (((MaterializedScanPlanNode)m_children.get(0)).getSortDirection() == inlineScan.getSortDirection());
-            m_sortDirection = inlineScan.getSortDirection();
-        }
-    }
-
-    public SortDirectionType getSortDirection() {
-        return m_sortDirection;
     }
 
     @Override
@@ -205,6 +190,18 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         resolvePredicate(m_wherePredicate, outer_schema, index_schema);
     }
 
+    public void resolveSortDirection() {
+        super.resolveSortDirection();
+        // special treatment for NLIJ, when the outer table is a materialized scan node
+        // the sort direction from the outer table should be the same as the that in the inner table
+        // (because we set when building this NLIJ)
+        if (m_children.get(0).getPlanNodeType() == PlanNodeType.MATERIALIZEDSCAN) {
+            IndexScanPlanNode ispn = (IndexScanPlanNode) m_inlineNodes.get(PlanNodeType.INDEXSCAN);
+            assert (((MaterializedScanPlanNode)(m_children.get(0))).getSortDirection() == ispn.getSortDirection());
+            m_sortDirection = ispn.getSortDirection();
+        }
+    }
+
     @Override
     public void validate() throws Exception {
         super.validate();
@@ -255,7 +252,9 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
 
     @Override
     protected String explainPlanForNode(String indent) {
-        return "NESTLOOP INDEX " + this.m_joinType.toString() + " JOIN" + explainFilters(indent);
+        return "NESTLOOP INDEX " + this.m_joinType.toString() + " JOIN" +
+                (m_sortDirection == SortDirectionType.INVALID ? "" : " (" + m_sortDirection + ")") +
+                explainFilters(indent);
     }
 
     public void toJSONString(JSONStringer stringer) throws JSONException

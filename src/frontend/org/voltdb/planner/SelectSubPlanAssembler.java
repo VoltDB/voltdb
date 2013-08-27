@@ -964,6 +964,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
             // combine the tails plan graph with the new head node
             nlijNode.addAndLinkChild(outerPlan);
+
             ajNode = nlijNode;
         }
         else {
@@ -974,6 +975,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         ajNode.setJoinType(joinNode.m_joinType);
         ajNode.setPreJoinPredicate(ExpressionUtil.combine(joinNode.m_joinOuterList));
         ajNode.setWherePredicate(ExpressionUtil.combine(whereClauses));
+        ajNode.resolveSortDirection();
         return ajNode;
     }
 
