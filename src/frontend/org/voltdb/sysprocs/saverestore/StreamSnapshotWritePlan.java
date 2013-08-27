@@ -18,48 +18,40 @@
 package org.voltdb.sysprocs.saverestore;
 
 import java.io.IOException;
-
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.json_voltpatches.JSONObject;
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
+import org.voltdb.PostSnapshotTask;
+import org.voltdb.SnapshotDataFilter;
+import org.voltdb.SnapshotFormat;
+import org.voltdb.SnapshotSiteProcessor;
+import org.voltdb.SnapshotTableTask;
+import org.voltdb.SystemProcedureExecutionContext;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
+import org.voltdb.catalog.Table;
+import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.rejoin.StreamSnapshotAckReceiver;
+import org.voltdb.rejoin.StreamSnapshotDataTarget;
+import org.voltdb.sysprocs.SnapshotRegistry;
+import org.voltdb.utils.CatalogUtil;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.google.common.primitives.Longs;
-import org.json_voltpatches.JSONObject;
-
-import org.voltcore.messaging.Mailbox;
-import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
-
-import org.voltdb.PostSnapshotTask;
-import org.voltdb.VoltDB;
-import org.voltdb.catalog.Table;
-
-import org.voltdb.dtxn.SiteTracker;
-
-import org.voltdb.rejoin.StreamSnapshotAckReceiver;
-import org.voltdb.rejoin.StreamSnapshotDataTarget;
-
-import org.voltdb.SnapshotDataFilter;
-import org.voltdb.SnapshotFormat;
-import org.voltdb.SnapshotSiteProcessor;
-import org.voltdb.SnapshotTableTask;
-
-import org.voltdb.sysprocs.SnapshotRegistry;
-import org.voltdb.SystemProcedureExecutionContext;
-
-import org.voltdb.utils.CatalogUtil;
-import org.voltdb.VoltTable;
 
 /**
  * Create a snapshot write plan for snapshots streamed to other sites
@@ -69,13 +61,16 @@ import org.voltdb.VoltTable;
  */
 public class StreamSnapshotWritePlan extends SnapshotWritePlan
 {
+    @Override
     protected boolean createSetupInternal(
             String file_path, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
             JSONObject jsData, SystemProcedureExecutionContext context,
             String hostname, final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            SiteTracker tracker, long timestamp) throws IOException
+            SiteTracker tracker,
+            HashinatorSnapshotData hashinatorData,
+            long timestamp) throws IOException
     {
         assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty());
 
@@ -197,7 +192,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         NativeSnapshotWritePlan plan = new NativeSnapshotWritePlan();
         plan.createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds,
                                  jsData, context, hostname, result, exportSequenceNumbers,
-                                 tracker, timestamp, newPartitionCount);
+                                 tracker, null, timestamp, newPartitionCount);
         m_targets.addAll(plan.m_targets);
         m_taskListsForHSIds.putAll(plan.m_taskListsForHSIds);
     }
@@ -324,8 +319,10 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
      * table target, we can create the predicate associated with it.
      */
     private static class DataTargetInfo {
+        @SuppressWarnings("unused")
         public final StreamSnapshotRequestConfig.Stream stream;
         public final long srcHSId;
+        @SuppressWarnings("unused")
         public final long dstHSId;
         public final StreamSnapshotDataTarget dataTarget;
 

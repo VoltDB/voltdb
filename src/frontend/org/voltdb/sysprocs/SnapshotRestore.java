@@ -56,6 +56,8 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.InstanceId;
+import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil.StringCallback;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.DependencyPair;
@@ -82,6 +84,7 @@ import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.sysprocs.saverestore.ClusterSaveFileState;
 import org.voltdb.sysprocs.saverestore.DuplicateRowHandler;
+import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
 import org.voltdb.sysprocs.saverestore.SavedTableConverter;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
@@ -131,6 +134,28 @@ public class SnapshotRestore extends VoltSystemProcedure
             SysProcFragmentId.PF_restoreDigestScanResults;
 
     /*
+     * Plan fragments for retrieving the hashinator data
+     * for the snapshot visible at every node. Can't be combined
+     * with the other scan because only one result table can be returned
+     * by a plan fragment.
+     */
+    private static final int DEP_restoreHashinatorScan = (int)
+            SysProcFragmentId.PF_restoreHashinatorScan | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+    private static final int DEP_restoreHashinatorScanResults = (int)
+            SysProcFragmentId.PF_restoreHashinatorScanResults;
+
+    /*
+     * Plan fragments for retrieving the hashinator data
+     * for the snapshot visible at every node. Can't be combined
+     * with the other scan because only one result table can be returned
+     * by a plan fragment.
+     */
+    private static final int DEP_restoreDistributeHashinator = (int)
+            SysProcFragmentId.PF_restoreDistributeHashinator | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+    private static final int DEP_restoreDistributeHashinatorResults = (int)
+            SysProcFragmentId.PF_restoreDistributeHashinatorResults;
+
+    /*
      * Plan fragments for distributing the full set of export sequence numbers
      * to every partition where the relevant ones can be selected
      * and forwarded to the EE. Also distributes the txnId of the snapshot
@@ -157,6 +182,8 @@ public class SnapshotRestore extends VoltSystemProcedure
     private static ArrayDeque<TableSaveFile> m_saveFiles = new ArrayDeque<TableSaveFile>();
 
     private static volatile DuplicateRowHandler m_duplicateRowHandler = null;
+
+    private final static String HASHINATOR_ALL_BAD = "All hashinator snapshots are bad (%s).";
 
     private static synchronized void initializeTableSaveFiles(
             String filePath,
@@ -248,6 +275,10 @@ public class SnapshotRestore extends VoltSystemProcedure
         registerPlanFragment(SysProcFragmentId.PF_restoreScanResults);
         registerPlanFragment(SysProcFragmentId.PF_restoreDigestScan);
         registerPlanFragment(SysProcFragmentId.PF_restoreDigestScanResults);
+        registerPlanFragment(SysProcFragmentId.PF_restoreHashinatorScan);
+        registerPlanFragment(SysProcFragmentId.PF_restoreHashinatorScanResults);
+        registerPlanFragment(SysProcFragmentId.PF_restoreDistributeHashinator);
+        registerPlanFragment(SysProcFragmentId.PF_restoreDistributeHashinatorResults);
         registerPlanFragment(SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbers);
         registerPlanFragment(SysProcFragmentId.PF_restoreDistributeExportAndPartitionSequenceNumbersResults);
         registerPlanFragment(SysProcFragmentId.PF_restoreAsyncRunLoop);
@@ -404,10 +435,74 @@ public class SnapshotRestore extends VoltSystemProcedure
             VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_restoreDigestScan));
             return new DependencyPair(DEP_restoreDigestScanResults, result);
         }
+        else if (fragmentId == SysProcFragmentId.PF_restoreHashinatorScan)
+        {
+            VoltTable result = new VoltTable(
+                    new VoltTable.ColumnInfo("HASH", VoltType.VARBINARY),
+                    new VoltTable.ColumnInfo("RESULT", VoltType.STRING),
+                    new VoltTable.ColumnInfo("ERR_MSG", VoltType.STRING));
+
+            // Choose the lowest site ID on this host to do the file scan
+            // All other sites should just return empty results tables.
+            if (context.isLowestSiteId())
+            {
+                TRACE_LOG.trace("Checking saved hashinator state for restore of: "
+                        + m_filePath + ", " + m_fileNonce);
+                List<ByteBuffer> configs;
+                try {
+                    configs = SnapshotUtil.retrieveHashinatorConfigs(
+                                    m_filePath, m_fileNonce, 1, SNAP_LOG);
+                    if (configs.size() == 0) {
+                        String errMsg = String.format(HASHINATOR_ALL_BAD, "fragment");
+                        SNAP_LOG.error(errMsg);
+                        result.addRow(null, "FAILURE", errMsg);
+                    }
+                    else {
+                        for (ByteBuffer config : configs) {
+                            assert(config.hasArray());
+                            result.addRow(config.array(), "SUCCESS", null);
+                        }
+                    }
+                } catch (IOException e) {
+                }
+            }
+            return new DependencyPair(DEP_restoreHashinatorScan, result);
+        }
+        else if (fragmentId == SysProcFragmentId.PF_restoreHashinatorScanResults)
+        {
+            TRACE_LOG.trace("Aggregating hashinator state");
+            assert(dependencies.size() > 0);
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_restoreHashinatorScan));
+            return new DependencyPair(DEP_restoreHashinatorScanResults, result);
+        }
+        else if (fragmentId == SysProcFragmentId.PF_restoreDistributeHashinator)
+        {
+            Object paramsArray[] = params.toArray();
+            assert(paramsArray.length == 1);
+            assert(paramsArray[0] != null);
+            assert(paramsArray[0] instanceof byte[]);
+            VoltTable result = new VoltTable(new VoltTable.ColumnInfo("RESULT", VoltType.STRING));
+            // The config is serialized in a more compressible format.
+            // Need to convert to the standard format for internal and EE use.
+            byte[] hashConfig = (byte[])paramsArray[0];
+            TheHashinator.deserializeConfiguredHashinator(context.getCurrentTxnId(), hashConfig);
+            // Update C++ hashinator.
+            Pair<TheHashinator.HashinatorType, byte[]> updateData = TheHashinator.getCurrentConfig();
+            context.updateHashinator(updateData);
+            return new DependencyPair(DEP_restoreDistributeHashinator, result);
+        }
+        else if (fragmentId == SysProcFragmentId.PF_restoreDistributeHashinatorResults)
+        {
+            TRACE_LOG.trace("Aggregating hashinator distribution state");
+            assert(dependencies.size() > 0);
+            VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_restoreDistributeHashinator));
+            return new DependencyPair(DEP_restoreDistributeHashinatorResults, result);
+        }
         else if (fragmentId == SysProcFragmentId.PF_restoreScan)
         {
-            assert(params.toArray()[0] != null);
-            assert(params.toArray()[1] != null);
+            Object paramsArray[] = params.toArray();
+            assert(paramsArray[0] != null);
+            assert(paramsArray[1] != null);
             String hostname = CoreUtils.getHostnameOrAddress();
             VoltTable result = ClusterSaveFileState.constructEmptySaveFileStateVoltTable();
             // Choose the lowest site ID on this host to do the file scan
@@ -495,6 +590,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                     }
                 }
             }
+
             return new DependencyPair(DEP_restoreScan, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_restoreScanResults)
@@ -870,14 +966,20 @@ public class SnapshotRestore extends VoltSystemProcedure
     public static final String JSON_PATH = "path";
     public static final String JSON_NONCE = "nonce";
     public static final String JSON_DUPLICATES_PATH = "duplicatesPath";
+    public static final String JSON_HASHINATOR = "hashinator";
+
+    private static final String RESTORE_FAILED = "Restore failed to complete. See response table for additional info.";
 
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
                            String json) throws Exception
-            {
+    {
         JSONObject jsObj = new JSONObject(json);
         final String path = jsObj.getString(JSON_PATH);
         final String nonce = jsObj.getString(JSON_NONCE);
         final String dupsPath = jsObj.optString(JSON_DUPLICATES_PATH, null);
+        final byte useHashinatorData = (byte)(   jsObj.has(JSON_HASHINATOR)
+                                              && jsObj.getBoolean(JSON_HASHINATOR)
+                                                  ? 1 : 0);
         final long startTime = System.currentTimeMillis();
         if (dupsPath != null) {
             CONSOLE_LOG.info("Restoring from path: " + path + " with nonce: " +
@@ -894,6 +996,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         Map<String, Map<Integer, Long>> exportSequenceNumbers;
         long perPartitionTxnIds[];
         try {
+            // Digest scan.
             DigestScanResult digestScanResult =
                     performRestoreDigestScanWork();
             digests = digestScanResult.digests;
@@ -902,14 +1005,34 @@ public class SnapshotRestore extends VoltSystemProcedure
             if (perPartitionTxnIds.length == 0) {
                 perPartitionTxnIds = new long[] {ctx.getCurrentTxnId()};
             }
-        } catch (VoltAbortException e) {
+
+            // Hashinator scan and distribution.
+            // Missing digests will be officially handled later.
+            if (useHashinatorData != 0 && !digests.isEmpty()) {
+                // Need the instance ID for sanity checks.
+                InstanceId iid = null;
+                if (digests.get(0).has("instanceId")) {
+                    iid = new InstanceId(digests.get(0).getJSONObject("instanceId"));
+                }
+                byte[] hashConfig = performRestoreHashinatorScanWork(iid);
+                if (useHashinatorData != 0 && hashConfig != null) {
+                     VoltTable[] hashinatorResults = performRestoreHashinatorDistributeWork(hashConfig);
+                    while (hashinatorResults[0].advanceRow()) {
+                        if (hashinatorResults[0].getString("RESULT").equals("FAILURE")) {
+                            throw new VoltAbortException("Error distributing hashinator.");
+                        }
+                    }
+                }
+            }
+        }
+        catch (VoltAbortException e) {
             ColumnInfo[] result_columns = new ColumnInfo[2];
             int ii = 0;
             result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
             result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
             VoltTable results[] = new VoltTable[] { new VoltTable(result_columns) };
             results[0].addRow("FAILURE", e.toString());
-            noteOperationalFailure("Restore failed to complete. See response table for additional info.");
+            noteOperationalFailure(RESTORE_FAILED);
             return results;
         }
 
@@ -941,7 +1064,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
             VoltTable results[] = new VoltTable[] { new VoltTable(result_columns) };
             results[0].addRow("FAILURE", e.toString());
-            noteOperationalFailure("Restore failed to complete. See response table for additional info.");
+            noteOperationalFailure(RESTORE_FAILED);
             return results;
         }
         assert(relevantTableNames != null);
@@ -995,7 +1118,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             }
         }
         if (results != null) {
-            noteOperationalFailure("Restore failed to complete. See response table for additional info.");
+            noteOperationalFailure(RESTORE_FAILED);
             return results;
         }
 
@@ -1042,7 +1165,8 @@ public class SnapshotRestore extends VoltSystemProcedure
         /*
          * Serialize all the export sequence numbers and then distribute them in a
          * plan fragment and each receiver will pull the relevant information for
-         * itself
+         * itself.
+         * Also distribute the restored hashinator config.
          */
         try {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -1396,6 +1520,114 @@ public class SnapshotRestore extends VoltSystemProcedure
         return result;
     }
 
+    private final byte[] performRestoreHashinatorScanWork(InstanceId iid)
+    {
+        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
+
+        // This fragment causes each execution site to confirm the likely
+        // success of writing tables to disk
+        pfs[0] = new SynthesizedPlanFragment();
+        pfs[0].fragmentId = SysProcFragmentId.PF_restoreHashinatorScan;
+        pfs[0].outputDepId = DEP_restoreHashinatorScan;
+        pfs[0].inputDepIds = new int[] {};
+        pfs[0].multipartition = true;
+        pfs[0].parameters = ParameterSet.emptyParameterSet();
+
+        // This fragment aggregates the save-to-disk sanity check results
+        pfs[1] = new SynthesizedPlanFragment();
+        pfs[1].fragmentId = SysProcFragmentId.PF_restoreHashinatorScanResults;
+        pfs[1].outputDepId = DEP_restoreHashinatorScanResults;
+        pfs[1].inputDepIds = new int[] { DEP_restoreHashinatorScan };
+        pfs[1].multipartition = false;
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
+
+        /*
+         *  Use the first one.
+         *  Sanity checks:
+         *      - The CRC matches - done by restoreFromBuffer() call.
+         *      - All versions are identical.
+         *      - The instance IDs match the digest.
+         */
+        VoltTable[] results = executeSysProcPlanFragments(pfs, DEP_restoreHashinatorScanResults);
+        byte[] result = null;
+        int ioErrors = 0;
+        int iidErrors = 0;
+        Set<Long> versions = new HashSet<Long>();
+        while (results[0].advanceRow()) {
+            if (results[0].getString("RESULT").equals("FAILURE")) {
+                throw new VoltAbortException(results[0].getString("ERR_MSG"));
+            }
+            ByteBuffer buf = ByteBuffer.wrap(results[0].getVarbinary("HASH"));
+            HashinatorSnapshotData hashData = new HashinatorSnapshotData();
+            try {
+                InstanceId iidSnap = hashData.restoreFromBuffer(buf);
+                assert(iidSnap != null);
+                buf.clear();
+                versions.add(hashData.m_version);
+                if (!iidSnap.equals(iid)) {
+                    iidErrors++;
+                }
+                // Use the first one we find and read successfully.
+                if (result == null) {
+                    result = hashData.m_serData;
+                }
+            }
+            catch (IOException e) {
+                // Skip it and count the failures.
+                ioErrors++;
+            }
+        }
+        if (result == null) {
+            throw new VoltAbortException(String.format(HASHINATOR_ALL_BAD, "final"));
+        }
+        if (ioErrors > 0) {
+            // Tolerate load failures as long as we have a good one to use.
+            SNAP_LOG.warn(String.format("Failed to load %d of %d hashinator snapshot data files.",
+                                        ioErrors, results[0].getRowCount()));
+        }
+        boolean abort = false;
+        if (iidErrors > 0) {
+            SNAP_LOG.error(String.format("%d hashinator snapshot files have the wrong instance ID.",
+                                         iidErrors));
+            abort = true;
+        }
+        if (versions.size() > 1) {
+            SNAP_LOG.error(String.format("Expect one version across all hashinator snapshots. "
+                                         + "Found %d.",
+                                         versions.size()));
+            abort = true;
+        }
+        if (abort) {
+            throw new VoltAbortException("Failed to load hashinator snapshot data.");
+        }
+        return result;
+    }
+
+    private final VoltTable[]  performRestoreHashinatorDistributeWork(byte[] hashConfig)
+    {
+        SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
+
+        // This fragment causes each execution site to confirm the likely
+        // success of writing tables to disk
+        pfs[0] = new SynthesizedPlanFragment();
+        pfs[0].fragmentId = SysProcFragmentId.PF_restoreDistributeHashinator;
+        pfs[0].outputDepId = DEP_restoreDistributeHashinator;
+        pfs[0].inputDepIds = new int[] {};
+        pfs[0].multipartition = true;
+
+        pfs[0].parameters = ParameterSet.fromArrayNoCopy(new Object[]{hashConfig});
+
+        // This fragment aggregates the save-to-disk sanity check results
+        pfs[1] = new SynthesizedPlanFragment();
+        pfs[1].fragmentId = SysProcFragmentId.PF_restoreDistributeHashinatorResults;
+        pfs[1].outputDepId = DEP_restoreDistributeHashinatorResults;
+        pfs[1].inputDepIds = new int[] { DEP_restoreDistributeHashinator };
+        pfs[1].multipartition = false;
+        pfs[1].parameters = ParameterSet.emptyParameterSet();
+
+        return executeSysProcPlanFragments(pfs, DEP_restoreDistributeHashinatorResults);
+    }
+
     private Set<Table> getTablesToRestore(Set<String> savedTableNames)
     {
         Set<Table> tables_to_restore = new HashSet<Table>();
@@ -1538,7 +1770,7 @@ public class SnapshotRestore extends VoltSystemProcedure
 
                         // if any table at any site fails... then the whole proc fails
                         if (results[0].getString("RESULT").equalsIgnoreCase("FAILURE")) {
-                            noteOperationalFailure("Restore failed to complete. See response table for additional info.");
+                            noteOperationalFailure(RESTORE_FAILED);
                         }
                     }
                 }

@@ -35,6 +35,7 @@ import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSaveAPI;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SystemProcedureExecutionContext;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -43,6 +44,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
+import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.VoltTableUtil;
 
@@ -141,7 +143,7 @@ public class SnapshotSave extends VoltSystemProcedure
             assert(params.toArray()[4] != null);
             assert(params.toArray()[5] != null);
             assert(params.toArray()[6] != null);
-            assert(params.toArray()[7] != null);
+            assert(params.toArray()[9] != null);
             final String file_path = (String) params.toArray()[0];
             final String file_nonce = (String) params.toArray()[1];
             final long txnId = (Long)params.toArray()[2];
@@ -165,13 +167,15 @@ public class SnapshotSave extends VoltSystemProcedure
             }
 
             String data = (String) params.toArray()[6];
-            final long timestamp = (Long)params.toArray()[7];
+            HashinatorSnapshotData hashinatorData =
+                    new HashinatorSnapshotData((byte[]) params.toArray()[7], (Long) params.toArray()[8]);
+            final long timestamp = (Long)params.toArray()[9];
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
             VoltTable result = saveAPI.startSnapshotting(file_path, file_nonce,
                                                          format, block, txnId,
                                                          context.getLastCommittedSpHandle(),
                                                          Longs.toArray(perPartitionTransactionIdsToKeep),
-                                                         data, context, hostname, timestamp);
+                                                         data, context, hostname, hashinatorData, timestamp);
             return new DependencyPair(SnapshotSave.DEP_createSnapshotTargets, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_createSnapshotTargetsResults)
@@ -357,8 +361,19 @@ public class SnapshotSave extends VoltSystemProcedure
 
         performQuiesce();
 
+        HashinatorSnapshotData serializationData;
+        try {
+            serializationData = TheHashinator.serializeConfiguredHashinator();
+        }
+        catch (IOException e) {
+            VoltTable errorResults[] = new VoltTable[] { new VoltTable(error_result_columns) };
+            errorResults[0].addRow("FAILURE", "I/O exception accessing hashinator config.");
+            return errorResults;
+        }
+
         results = performSnapshotCreationWork(path, nonce, ctx.getCurrentTxnId(), perPartitionTxnIds,
-                                              (byte)(block ? 1 : 0), format, data);
+                                              (byte)(block ? 1 : 0), format, data,
+                                              serializationData);
         SnapshotSaveAPI.logParticipatingHostCount(ctx.getCurrentTxnId());
 
         try {
@@ -412,19 +427,24 @@ public class SnapshotSave extends VoltSystemProcedure
             long perPartitionTxnIds[],
             byte block,
             SnapshotFormat format,
-            String data)
+            String data,
+            HashinatorSnapshotData hashinatorData)
     {
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
 
         // This fragment causes each execution node to create the files
         // that will be written to during the snapshot
+        byte[] hashinatorBytes = (hashinatorData != null ? hashinatorData.m_serData : null);
+        long hashinatorVersion = (hashinatorData != null ? hashinatorData.m_version : 0);
         pfs[0] = new SynthesizedPlanFragment();
         pfs[0].fragmentId = SysProcFragmentId.PF_createSnapshotTargets;
         pfs[0].outputDepId = DEP_createSnapshotTargets;
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
         pfs[0].parameters = ParameterSet.fromArrayNoCopy(
-                filePath, fileNonce, txnId, perPartitionTxnIds, block, format.name(), data, System.currentTimeMillis());
+                filePath, fileNonce, txnId, perPartitionTxnIds, block, format.name(), data,
+                hashinatorBytes, hashinatorVersion,
+                System.currentTimeMillis());
 
         // This fragment aggregates the results of creating those files
         pfs[1] = new SynthesizedPlanFragment();

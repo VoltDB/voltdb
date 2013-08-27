@@ -17,9 +17,14 @@
 
 package org.voltdb.sysprocs.saverestore;
 
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
-import com.google.common.primitives.Longs;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.Pair;
 import org.voltdb.DevNullSnapshotTarget;
@@ -35,13 +40,9 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.HashRangeExpression;
 import org.voltdb.sysprocs.SnapshotRegistry;
 
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
+import com.google.common.primitives.Longs;
 
 public class IndexSnapshotWritePlan extends SnapshotWritePlan {
     @Override
@@ -51,7 +52,9 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
                                           SystemProcedureExecutionContext context, String hostname,
                                           VoltTable result,
                                           Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-                                          SiteTracker tracker, long timestamp) throws IOException
+                                          SiteTracker tracker,
+                                          HashinatorSnapshotData hashinatorData,
+                                          long timestamp) throws IOException
     {
         assert SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty();
 

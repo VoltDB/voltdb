@@ -48,10 +48,12 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
+import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineJNI;
+import org.voltdb.sysprocs.saverestore.HashinatorSnapshotData;
 
 /**
  * This test verifies that the Java Hashinator behaves
@@ -164,7 +166,8 @@ public class TestTheHashinator {
     {
         ElasticHashinator hashinator =
             new ElasticHashinator(ElasticHashinator.getConfigureBytes(partitionCount,
-                                                                      ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION));
+                                                                      ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION),
+                                                                      false);
         Map<Long, Long> range1 = hashinator.pGetRanges(partitionToCheck);
         assertEquals(ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION, range1.size());
 
@@ -677,7 +680,7 @@ public class TestTheHashinator {
         buf.putLong(Long.MAX_VALUE);
         buf.putInt(2);
 
-        ElasticHashinator hashinator = new ElasticHashinator(buf.array());
+        ElasticHashinator hashinator = new ElasticHashinator(buf.array(), false);
 
         assertEquals( 0, hashinator.partitionForToken(Long.MIN_VALUE));
         assertEquals( 0, hashinator.partitionForToken(Long.MIN_VALUE + 1));
@@ -697,7 +700,7 @@ public class TestTheHashinator {
         buf.putLong(Long.MAX_VALUE - 1);
         buf.putInt(2);
 
-        hashinator = new ElasticHashinator(buf.array());
+        hashinator = new ElasticHashinator(buf.array(), false);
 
         assertEquals( 2, hashinator.partitionForToken(Long.MIN_VALUE));
         assertEquals( 0, hashinator.partitionForToken(Long.MIN_VALUE + 1));
@@ -714,7 +717,7 @@ public class TestTheHashinator {
         if (hashinatorType == HashinatorType.LEGACY) return;
 
         ElasticHashinator hashinator = new ElasticHashinator(ElasticHashinator.getConfigureBytes(3,
-                ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION));
+                ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION), false);
 
         byte[] newConfig = ElasticHashinator.addPartitions(hashinator, Arrays.asList(3, 4, 5),
                 ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
@@ -752,7 +755,8 @@ public class TestTheHashinator {
 
         byte[] config = ElasticHashinator.getConfigureBytes(3,
                                                             ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
-        byte[] newConfig = ElasticHashinator.addPartitions(new ElasticHashinator(config), Arrays.asList(3, 4, 5),
+        byte[] newConfig = ElasticHashinator.addPartitions(new ElasticHashinator(config, false),
+                                                           Arrays.asList(3, 4, 5),
                                                            ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
         TheHashinator.initialize(HashinatorType.ELASTIC.hashinatorClass, newConfig);
         Map<Long, Integer> newTokens = deserializeElasticConfig(newConfig);
@@ -772,7 +776,7 @@ public class TestTheHashinator {
         }
         assertEquals(ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION, tokensForP4.size());
 
-        ElasticHashinator hashinator = new ElasticHashinator(TheHashinator.getCurrentConfig().getSecond());
+        ElasticHashinator hashinator = new ElasticHashinator(TheHashinator.getCurrentConfig().getSecond(), false);
         for (long token : tokensForP4) {
             int pid;
             if (token != Long.MIN_VALUE) {
@@ -791,7 +795,8 @@ public class TestTheHashinator {
 
         byte[] config = ElasticHashinator.getConfigureBytes(3,
                                                             ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
-        byte[] newConfig = ElasticHashinator.addPartitions(new ElasticHashinator(config), Arrays.asList(3, 4, 5),
+        byte[] newConfig = ElasticHashinator.addPartitions(new ElasticHashinator(config, false),
+                                                           Arrays.asList(3, 4, 5),
                                                            ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
         TheHashinator.initialize(HashinatorType.ELASTIC.hashinatorClass, newConfig);
         Map<Long, Integer> predecessors = TheHashinator.predecessors(4);
@@ -806,7 +811,7 @@ public class TestTheHashinator {
         Pair<Long, Integer> prevPredecessor = TheHashinator.predecessor(predecessor.getValue(), predecessor.getKey());
         assertNotNull(prevPredecessor);
 
-        ElasticHashinator hashinator = new ElasticHashinator(TheHashinator.getCurrentConfig().getSecond());
+        ElasticHashinator hashinator = new ElasticHashinator(TheHashinator.getCurrentConfig().getSecond(), false);
         assertEquals(prevPredecessor.getSecond().intValue(), hashinator.partitionForToken(prevPredecessor.getFirst()));
         // check if predecessor's token - 1 belongs to the previous predecessor
         if (predecessor.getKey() != Long.MIN_VALUE) {
@@ -821,7 +826,7 @@ public class TestTheHashinator {
         if (hashinatorType == HashinatorType.LEGACY) return;
 
         ElasticHashinator hashinator = new ElasticHashinator(ElasticHashinator.getConfigureBytes(3,
-                ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION));
+                ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION), false);
 
         // Add 3 partitions in a batch to the original hashinator
         byte[] batchAddConfig = ElasticHashinator.addPartitions(hashinator, Arrays.asList(3, 4, 5),
@@ -831,10 +836,10 @@ public class TestTheHashinator {
         // Add the same 3 partitions one at a time to the original hashinator
         byte[] add3Config = ElasticHashinator.addPartitions(hashinator, Arrays.asList(3),
                                                             ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
-        ElasticHashinator add3Hashinator = new ElasticHashinator(add3Config);
+        ElasticHashinator add3Hashinator = new ElasticHashinator(add3Config, false);
         byte[] add4Config = ElasticHashinator.addPartitions(add3Hashinator, Arrays.asList(4),
                                                             ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
-        ElasticHashinator add4Hashinator = new ElasticHashinator(add4Config);
+        ElasticHashinator add4Hashinator = new ElasticHashinator(add4Config, false);
         byte[] seqAddConfig = ElasticHashinator.addPartitions(add4Hashinator, Arrays.asList(5),
                                                               ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION);
         Map<Long, Integer> seqAddTokens = deserializeElasticConfig(seqAddConfig);
@@ -875,6 +880,40 @@ public class TestTheHashinator {
         long expected = TheHashinator.computeConfigurationSignature(configBytes);
         assertEquals(expected, TheHashinator.getConfigurationSignature());
     }
+
+    @Test
+    public void testSaveRestoreRaw() throws Exception
+    {
+        if (hashinatorType == HashinatorType.LEGACY) return;
+
+        ElasticHashinator h1 = new ElasticHashinator(
+                ElasticHashinator.getConfigureBytes(3,
+                ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION), false);
+        byte[] bytes = h1.getConfigBytes();
+        HashinatorSnapshotData d1 = new HashinatorSnapshotData(bytes, 1234);
+        InstanceId iid1 = new InstanceId(111, 222);
+        ByteBuffer b1 = d1.saveToBuffer(iid1);
+        ByteBuffer b2 = ByteBuffer.wrap(b1.array());
+        HashinatorSnapshotData d2 = new HashinatorSnapshotData();
+        InstanceId iid2 = d2.restoreFromBuffer(b2);
+        assertEquals(iid1, iid2);
+        assertTrue(Arrays.equals(d1.m_serData, d2.m_serData));
+        ElasticHashinator h2 = new ElasticHashinator(d2.m_serData, false);
+        assertEquals(h1.getTokens(), h2.getTokens());
+    }
+
+    @Test
+    public void testSaveRestoreCooked() throws Exception
+    {
+        if (hashinatorType == HashinatorType.LEGACY) return;
+
+        ElasticHashinator h1 = new ElasticHashinator(
+                ElasticHashinator.getConfigureBytes(3,
+                ElasticHashinator.DEFAULT_TOKENS_PER_PARTITION), false);
+        byte[] b1 = h1.serializeCooked();
+        ElasticHashinator h2 = new ElasticHashinator(b1, true);
+        byte[] b2 = h2.serializeCooked();
+        assertTrue(Arrays.equals(b1, b2));
+        assertEquals(h1.getTokens(), h2.getTokens());
+    }
 }
-
-

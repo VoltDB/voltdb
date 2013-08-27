@@ -19,6 +19,7 @@ package org.voltdb.sysprocs.saverestore;
 
 import java.io.BufferedInputStream;
 import java.io.CharArrayWriter;
+import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
@@ -45,8 +46,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Exchanger;
 import java.util.concurrent.ThreadFactory;
 
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.SettableFuture;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -65,6 +64,8 @@ import org.voltdb.SnapshotDaemon;
 import org.voltdb.SnapshotDaemon.ForwardClientException;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotInitiationInfo;
+import org.voltdb.TheHashinator;
+import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.CatalogMap;
@@ -74,7 +75,12 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
+
 public class SnapshotUtil {
+
+    public final static String HASH_EXTENSION = ".hash";
 
     /**
      * Create a digest for a snapshot
@@ -191,6 +197,66 @@ public class SnapshotUtil {
     }
 
     /**
+     * Write the hashinator config file for a snapshot
+     * @param instId    instance ID
+     * @param path      path to which snapshot files will be written
+     * @param nonce     nonce used to distinguish this snapshot
+     * @param hostId    host ID where this is happening
+     * @param hashData  serialized hash configuration data
+     * @return  Runnable object for asynchronous write flushing
+     * @throws IOException
+     */
+    public static Runnable writeHashinatorConfig(
+        InstanceId instId,
+        String path,
+        String nonce,
+        int hostId,
+        HashinatorSnapshotData hashData)
+    throws IOException
+    {
+        final File file = new VoltFile(path, constructHashinatorConfigFilenameForNonce(nonce, hostId));
+        if (file.exists()) {
+            if (!file.delete()) {
+                throw new IOException("Unable to replace existing hashinator config " + file);
+            }
+        }
+
+        boolean success = false;
+        try {
+            final FileOutputStream fos = new FileOutputStream(file);
+            ByteBuffer fileBuffer = hashData.saveToBuffer(instId);
+            fos.getChannel().write(fileBuffer);
+            success = true;
+            return new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    try {
+                        fos.getChannel().force(true);
+                    }
+                    catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                    finally {
+                        try {
+                            fos.close();
+                        }
+                        catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                }
+            };
+        }
+        finally {
+            if (!success) {
+                file.delete();
+            }
+        }
+    }
+
+    /**
      * Get the nonce from the filename of the digest file.
      * @param filename The filename of the digest file
      * @return The nonce
@@ -198,6 +264,19 @@ public class SnapshotUtil {
     public static String parseNonceFromDigestFilename(String filename) {
         if (filename == null || !filename.endsWith(".digest")) {
             throw new IllegalArgumentException("Bad digest filename: " + filename);
+        }
+
+        return parseNonceFromSnapshotFilename(filename);
+    }
+
+    /**
+     * Get the nonce from the filename of the hashinator config file.
+     * @param filename The filename of the hashinator config file
+     * @return The nonce
+     */
+    public static String parseNonceFromHashinatorConfigFilename(String filename) {
+        if (filename == null || !filename.endsWith(HASH_EXTENSION)) {
+            throw new IllegalArgumentException("Bad hashinator config filename: " + filename);
         }
 
         return parseNonceFromSnapshotFilename(filename);
@@ -224,6 +303,10 @@ public class SnapshotUtil {
         else if (filename.endsWith(".digest")) {
             return filename.substring(0, filename.indexOf(".digest"));
         }
+        // Hashinator config filename.
+        else if (filename.endsWith(HASH_EXTENSION)) {
+            return filename.substring(0, filename.indexOf(HASH_EXTENSION));
+        }
 
         throw new IllegalArgumentException("Bad snapshot filename: " + filename);
     }
@@ -245,6 +328,50 @@ public class SnapshotUtil {
             }
         }
         return digests;
+    }
+
+    /**
+     * Read hashinator snapshots into byte buffers.
+     * @param path base snapshot path
+     * @param nonce unique snapshot name
+     * @param maxConfigs max number of good configs to return (0 for all)
+     * @param logger log writer
+     * @return byte buffers for each host
+     * @throws IOException
+     */
+    public static List<ByteBuffer> retrieveHashinatorConfigs(
+        String path,
+        String nonce,
+        int maxConfigs,
+        VoltLogger logger) throws IOException
+   {
+        VoltFile directory = new VoltFile(path);
+        ArrayList<ByteBuffer> configs = new ArrayList<ByteBuffer>();
+        if (directory.listFiles() == null) {
+            return configs;
+        }
+        for (File file : directory.listFiles()) {
+            if (file.getName().startsWith(nonce + "-host_") && file.getName().endsWith(HASH_EXTENSION)) {
+                byte[] rawData = new byte[(int) file.length()];
+                FileInputStream fis = null;
+                DataInputStream dis = null;
+                try {
+                    fis = new FileInputStream(file);
+                    dis = new DataInputStream(fis);
+                    dis.readFully(rawData);
+                    configs.add(ByteBuffer.wrap(rawData));
+                }
+                finally {
+                    if (dis != null) {
+                        dis.close();
+                    }
+                    if (fis != null) {
+                        fis.close();
+                    }
+                }
+            }
+        }
+        return configs;
     }
 
     /**
@@ -420,11 +547,12 @@ public class SnapshotUtil {
         }
 
         public final List<File> m_digests = new ArrayList<File>();
+        public File m_hashConfig = null;
         public final List<Set<String>> m_digestTables = new ArrayList<Set<String>>();
         public final Map<String, TableFiles> m_tableFiles = new TreeMap<String, TableFiles>();
         public File m_catalogFile = null;
 
-        private String m_nonce;
+        private final String m_nonce;
         private InstanceId m_instanceId = null;
         private long m_txnId;
     }
@@ -460,6 +588,9 @@ public class SnapshotUtil {
             if (pathname.getName().endsWith(".jar")) {
                 return true;
             }
+            if (pathname.getName().endsWith(HASH_EXTENSION)) {
+                return true;
+            }
             return false;
         }
     };
@@ -488,6 +619,7 @@ public class SnapshotUtil {
                 // izzy: change this to use parseNonceFromSnapshotFilename at some point
                 if (pathname.getName().startsWith(snapshotName + "-")  ||
                     pathname.getName().equals(snapshotName + ".digest") ||
+                    pathname.getName().equals(snapshotName + HASH_EXTENSION) ||
                     pathname.getName().equals(snapshotName + ".jar")) {
                     return true;
                 }
@@ -498,25 +630,58 @@ public class SnapshotUtil {
     }
 
     /**
+     * Convenience class to manage the named snapshot map for retrieveSnapshotFiles().
+     */
+    private static class NamedSnapshots {
+
+        private final Map<String, Snapshot> m_map;
+
+        public NamedSnapshots(Map<String, Snapshot> map) {
+            m_map = map;
+        }
+
+        public Snapshot get(String nonce) {
+            Snapshot named_s = m_map.get(nonce);
+            if (named_s == null) {
+                named_s = new Snapshot(nonce);
+                m_map.put(nonce, named_s);
+            }
+            return named_s;
+        }
+    }
+
+    /**
      * Spider the provided directory applying the provided FileFilter. Optionally validate snapshot
      * files. Return a summary of partition counts, partition information, files, digests etc.
      * that can be used to determine if a valid restore plan exists.
      * @param directory
      * @param snapshots
      * @param filter
-     * @param recursion
      * @param validate
      */
     public static void retrieveSnapshotFiles(
             File directory,
-            Map<String, Snapshot> namedSnapshots,
+            Map<String, Snapshot> namedSnapshotMap,
             FileFilter filter,
-            int recursion,
             boolean validate,
             VoltLogger logger) {
+
+        NamedSnapshots namedSnapshots = new NamedSnapshots(namedSnapshotMap);
+        retrieveSnapshotFilesInternal(directory, namedSnapshots, filter, validate, logger, 0);
+    }
+
+    private static void retrieveSnapshotFilesInternal(
+            File directory,
+            NamedSnapshots namedSnapshots,
+            FileFilter filter,
+            boolean validate,
+            VoltLogger logger,
+            int recursion) {
+
         if (recursion == 32) {
             return;
         }
+
         if (!directory.exists()) {
             System.err.println("Error: Directory " + directory.getPath() + " doesn't exist");
             return;
@@ -536,7 +701,7 @@ public class SnapshotUtil {
                     System.err.println("Warning: Skipping directory " + f.getPath()
                             + " due to lack of read permission");
                 } else {
-                    retrieveSnapshotFiles( f, namedSnapshots, filter, recursion++, validate, logger);
+                    retrieveSnapshotFilesInternal(f, namedSnapshots, filter, validate, logger, recursion++);
                 }
                 continue;
             }
@@ -560,10 +725,6 @@ public class SnapshotUtil {
                     Long snapshotTxnId = digest.getLong("txnId");
                     String nonce = parseNonceFromSnapshotFilename(f.getName());
                     Snapshot named_s = namedSnapshots.get(nonce);
-                    if (named_s == null) {
-                        named_s = new Snapshot(nonce);
-                        namedSnapshots.put(nonce, named_s);
-                    }
                     named_s.setTxnId(snapshotTxnId);
                     InstanceId iid = new InstanceId(0,0);
                     if (digest.has("instanceId")) {
@@ -580,11 +741,25 @@ public class SnapshotUtil {
                 } else if (f.getName().endsWith(".jar")) {
                     String nonce = parseNonceFromSnapshotFilename(f.getName());
                     Snapshot named_s = namedSnapshots.get(nonce);
-                    if (named_s == null) {
-                        named_s = new Snapshot(nonce);
-                        namedSnapshots.put(nonce, named_s);
-                    }
                     named_s.m_catalogFile = f;
+                } else if (f.getName().endsWith(HASH_EXTENSION)) {
+                    String nonce = parseNonceFromSnapshotFilename(f.getName());
+                    Snapshot named_s = namedSnapshots.get(nonce);
+                    if (validate) {
+                        try {
+                            // Retrieve hashinator config data for validation only.
+                            // Throws IOException when the CRC check fails.
+                            HashinatorSnapshotData hashData = new HashinatorSnapshotData();
+                            hashData.restoreFromFile(f);
+                            named_s.m_hashConfig = f;
+                        }
+                        catch (IOException e) {
+                            logger.warn(String.format("Skipping bad hashinator snapshot file '%s'",
+                                                      f.getPath()));
+                            // Skip bad hashinator files.
+                            continue;
+                        }
+                    }
                 } else {
                     HashSet<Integer> partitionIds = new HashSet<Integer>();
                     TableSaveFile saveFile = new TableSaveFile(fis.getChannel(), 1, null, true);
@@ -603,10 +778,6 @@ public class SnapshotUtil {
                         partitionIds.removeAll(saveFile.getCorruptedPartitionIds());
                         String nonce = parseNonceFromSnapshotFilename(f.getName());
                         Snapshot named_s = namedSnapshots.get(nonce);
-                        if (named_s == null) {
-                            named_s = new Snapshot(nonce);
-                            namedSnapshots.put(nonce, named_s);
-                        }
                         named_s.setTxnId(saveFile.getTxnId());
                         TableFiles namedTableFiles = named_s.m_tableFiles.get(saveFile.getTableName());
                         if (namedTableFiles == null) {
@@ -646,6 +817,18 @@ public class SnapshotUtil {
      * @param snapshot
      */
     public static Pair<Boolean, String> generateSnapshotReport(Long snapshotTxnId, Snapshot snapshot) {
+        return generateSnapshotReport(snapshotTxnId, snapshot, true);
+    }
+
+    /**
+     * Returns a detailed report and a boolean indicating whether the snapshot can be successfully loaded
+     * The implementation supports disabling the hashinator check, e.g. for old snapshots in tests.
+     * @param snapshotTime
+     * @param snapshot
+     * @param expectHashinator
+     */
+    public static Pair<Boolean, String> generateSnapshotReport(
+            Long snapshotTxnId, Snapshot snapshot, boolean expectHashinator) {
         CharArrayWriter caw = new CharArrayWriter();
         PrintWriter pw = new PrintWriter(caw);
         boolean snapshotConsistent = true;
@@ -654,6 +837,7 @@ public class SnapshotUtil {
         pw.println(indentString + "Date: " +
                 new Date(
                         org.voltdb.TransactionIdManager.getTimestampFromTransactionId(snapshotTxnId)));
+
         pw.println(indentString + "Digests:");
         indentString = "\t";
         TreeSet<String> digestTablesSeen = new TreeSet<String>();
@@ -726,6 +910,19 @@ public class SnapshotUtil {
                 pw.print(table);
             }
             pw.print("\n");
+        }
+
+        /*
+         * Check the hash data (if expected).
+         */
+        if (expectHashinator) {
+            pw.print(indentString + "Hash configuration: ");
+            if (snapshot.m_hashConfig != null) {
+                pw.println(indentString + "present");
+            } else {
+                pw.println(indentString + "not present");
+                snapshotConsistent = false;
+            }
         }
 
         /*
@@ -916,6 +1113,15 @@ public class SnapshotUtil {
      */
     public static final String constructDigestFilenameForNonce(String nonce, int hostId) {
         return (nonce + "-host_" + hostId + ".digest");
+    }
+
+    /**
+     * Generates the hashinator config filename for the given nonce.
+     * @param nonce
+     * @param hostId
+     */
+    public static final String constructHashinatorConfigFilenameForNonce(String nonce, int hostId) {
+        return (nonce + "-host_" + hostId + HASH_EXTENSION);
     }
 
     /**
@@ -1164,5 +1370,33 @@ public class SnapshotUtil {
         VoltDB.instance().getSnapshotCompletionMonitor().addInterest(interest);
 
         return result;
+    }
+
+    /**
+     * Retrieve hashinator config for restore.
+     * @param path snapshot base directory
+     * @param nonce unique snapshot ID
+     * @param hostId host ID
+     * @return hashinator shapshot data
+     * @throws Exception
+     */
+    public static HashinatorSnapshotData retrieveHashinatorConfig(
+            String path, String nonce, int hostId, VoltLogger logger) throws IOException {
+        HashinatorSnapshotData hashData = null;
+        String expectedFileName = constructHashinatorConfigFilenameForNonce(nonce, hostId);
+        File[] files = new VoltFile(path).listFiles();
+        if (files != null) {
+            for (File file : files) {
+                if (file.getName().equals(expectedFileName)) {
+                    hashData = new HashinatorSnapshotData();
+                    hashData.restoreFromFile(file);
+                    break;
+                }
+            }
+        }
+        if (hashData == null && TheHashinator.getConfiguredHashinatorType() == HashinatorType.ELASTIC) {
+            throw new IOException("Missing hashinator data in snapshot");
+        }
+        return hashData;
     }
 }

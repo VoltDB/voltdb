@@ -16,6 +16,7 @@
  */
 package org.voltdb;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Map;
@@ -27,6 +28,7 @@ public class LegacyHashinator extends TheHashinator {
     private final int catalogPartitionCount;
     private final byte m_configBytes[];
     private final long m_signature;
+    @SuppressWarnings("unused")
     private static final VoltLogger hostLogger = new VoltLogger("HOST");
 
     @Override
@@ -49,9 +51,14 @@ public class LegacyHashinator extends TheHashinator {
         return java.lang.Math.abs(hashCode % catalogPartitionCount);
     }
 
-    public LegacyHashinator(byte config[]) {
-        catalogPartitionCount = ByteBuffer.wrap(config).getInt();
-        m_configBytes = Arrays.copyOf(config, config.length);
+    /**
+     * Constructor
+     * @param configBytes  config data
+     * @param cooked       (ignored by legacy)
+     */
+    public LegacyHashinator(byte configBytes[], boolean cooked) {
+        catalogPartitionCount = ByteBuffer.wrap(configBytes).getInt();
+        m_configBytes = Arrays.copyOf(configBytes, configBytes.length);
         m_signature = TheHashinator.computeConfigurationSignature(m_configBytes);
     }
 
@@ -62,7 +69,7 @@ public class LegacyHashinator extends TheHashinator {
     }
 
     @Override
-    public Pair<HashinatorType, byte[]> pGetCurrentConfig() {
+    protected Pair<HashinatorType, byte[]> pGetCurrentConfig() {
         return Pair.of(HashinatorType.LEGACY, m_configBytes);
     }
 
@@ -89,4 +96,26 @@ public class LegacyHashinator extends TheHashinator {
         return m_signature;
     }
 
+
+    /**
+     * Returns straight config bytes (not for serialization).
+     * @return config bytes
+     */
+    @Override
+    public byte[] getConfigBytes()
+    {
+        return m_configBytes;
+    }
+
+    /**
+     * Returns compressed config bytes (for serialization).
+     * @return config bytes
+     * @throws IOException
+     */
+    @Override
+    public byte[] serializeCooked() throws IOException
+    {
+        // The legacy hashinator because isn't saved in snapshots.
+        return null;
+    }
 }

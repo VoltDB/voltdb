@@ -1850,8 +1850,7 @@ TEST_F(CopyOnWriteTest, SnapshotAndIndex) {
     testRanges.push_back(T_HashRange(minint, 0));
     testRanges.push_back(T_HashRange(0, minint));
     testRanges.push_back(T_HashRange(minint, maxint));
-    testRanges.push_back(T_HashRange(maxint, minint, true));    // empty range
-    testRanges.push_back(T_HashRange(-maxint/2, +maxint/2));
+    testRanges.push_back(T_HashRange(maxint, minint, true));    // empty range     testRanges.push_back(T_HashRange(-maxint/2, +maxint/2));
     testRanges.push_back(T_HashRange(+maxint/2, -maxint/2));
     testRanges.push_back(T_HashRange(0, 0));
     testRanges.push_back(T_HashRange(maxint, maxint));

@@ -323,6 +323,12 @@ public class LocalCluster implements VoltServerConfig {
         startUp(clearLocalDataDirectories, ReplicationRole.NONE);
     }
 
+    public void setSiteCount(int siteCount) {
+        m_siteCount = siteCount;
+        // Force recompilation
+        m_compiled = false;
+    }
+
     void startLocalServer(boolean clearLocalDataDirectories) {
         // Generate a new root for the in-process server if clearing directories.
         File subroot = null;

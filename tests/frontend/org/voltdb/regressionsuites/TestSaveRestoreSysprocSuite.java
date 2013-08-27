@@ -37,6 +37,7 @@ import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
@@ -339,21 +340,25 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
     }
 
     private void validateSnapshot(boolean expectSuccess) {
-        validateSnapshot(expectSuccess, false,  TESTNONCE);
+        validateSnapshot(expectSuccess, false, true, TESTNONCE);
     }
 
-    private boolean validateSnapshot(boolean expectSuccess, boolean onlyReportSuccess, String nonce) {
+    private void validateSnapshot(boolean expectSuccess, boolean expectHashinator) {
+        validateSnapshot(expectSuccess, false, expectHashinator, TESTNONCE);
+    }
+
+    private boolean validateSnapshot(boolean expectSuccess,
+            boolean onlyReportSuccess, boolean expectHashinator, String nonce) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PrintStream ps = new PrintStream(baos);
         PrintStream original = System.out;
         try {
             System.setOut(ps);
-            String args[] = new String[] {
-                    nonce,
-                    "--dir",
-                    TMPDIR
-            };
-            SnapshotVerifier.main(args);
+            List<String> directories = new ArrayList<String>();
+            directories.add(TMPDIR);
+            Set<String> snapshotNames = new HashSet<String>();
+            snapshotNames.add(nonce);
+            SnapshotVerifier.verifySnapshots(directories, snapshotNames, expectHashinator);
             ps.flush();
             String reportString = baos.toString("UTF-8");
             boolean success = false;
@@ -373,6 +378,19 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
             System.setOut(original);
         }
           return false;
+    }
+
+    private String getRestoreParamsJSON(boolean useHashinator)
+    {
+        JSONObject jsObj = new JSONObject();
+        try {
+            jsObj.put(SnapshotRestore.JSON_PATH, TMPDIR);
+            jsObj.put(SnapshotRestore.JSON_NONCE, TESTNONCE);
+            jsObj.put(SnapshotRestore.JSON_HASHINATOR, useHashinator);
+        } catch (JSONException e) {
+            fail("JSON exception" + e.getMessage());
+        }
+        return jsObj.toString();
     }
 
     /*
@@ -607,7 +625,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         boolean hadSuccess = false;
         for (int ii = 0; ii < 5; ii++) {
             Thread.sleep(2000);
-            hadSuccess = validateSnapshot(true, true, TESTNONCE + "2");
+            hadSuccess = validateSnapshot(true, true, true, TESTNONCE + "2");
             if (hadSuccess) break;
         }
         assertTrue(hadSuccess);
@@ -692,7 +710,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         while (result.advanceRow()) {
             assertTrue(result.getString("RESULT").equals("SUCCESS"));
         }
-        validateSnapshot(true, false, TESTNONCE + "2");
+        validateSnapshot(true, false, true, TESTNONCE + "2");
     }
 
     public void testRestore12Snapshot()
@@ -724,7 +742,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         os.write(snapshotTarBytes, 0, totalRead);
         os.close();
         assertEquals(0, proc.waitFor());
-        validateSnapshot(true);
+        validateSnapshot(true, false);
 
         byte firstStringBytes[] = new byte[1048576];
         java.util.Arrays.fill(firstStringBytes, (byte)'c');
@@ -769,7 +787,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         os.write(snapshotTarBytes, 0, totalRead);
         os.close();
         assertEquals(0, proc.waitFor());
-        validateSnapshot(true);
+        validateSnapshot(true, false);
 
         byte firstStringBytes[] = new byte[1048576];
         java.util.Arrays.fill(firstStringBytes, (byte)'c');
@@ -1837,33 +1855,21 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         checkTable(client, "PARTITION_TESTER", "PT_ID",
                    num_partitioned_items_per_chunk * num_partitioned_chunks);
 
-        boolean ok = false;
-        int foundItem = 0;
-        while (!ok) {
-            ok = true;
-            foundItem = 0;
+        long tend = System.currentTimeMillis() + 60000;
+        long tupleCount = 0;
+        while (tupleCount < num_partitioned_items_per_chunk * num_partitioned_chunks) {
+            tupleCount = 0;
             results = client.callProcedure("@Statistics", "table", 0).getResults();
             while (results[0].advanceRow())
             {
                 if (results[0].getString("TABLE_NAME").equals("PARTITION_TESTER"))
                 {
-                    long tupleCount = results[0].getLong("TUPLE_COUNT");
-                    ok = (ok & (tupleCount == ((num_partitioned_items_per_chunk * num_partitioned_chunks) / 3)));
-                    ++foundItem;
+                    tupleCount += results[0].getLong("TUPLE_COUNT");
                 }
             }
-            ok = ok & (foundItem == 3);
+            assertTrue(System.currentTimeMillis() < tend);
         }
-
-        results = client.callProcedure("@Statistics", "table", 0).getResults();
-        while (results[0].advanceRow())
-        {
-            if (results[0].getString("TABLE_NAME").equals("PARTITION_TESTER"))
-            {
-                assertEquals((num_partitioned_items_per_chunk * num_partitioned_chunks) / 3,
-                        results[0].getLong("TUPLE_COUNT"));
-            }
-        }
+        assertEquals(num_partitioned_items_per_chunk * num_partitioned_chunks, tupleCount);
 
         // Kill and restart all the execution sites.
         m_config.shutDown();
@@ -1941,34 +1947,21 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
         results = client.callProcedure("@Statistics", "table", 0).getResults();
 
-        ok = false;
-        foundItem = 0;
-        while (!ok) {
-            ok = true;
-            foundItem = 0;
+        tend = System.currentTimeMillis() + 60000;
+        tupleCount = 0;
+        while (tupleCount < num_partitioned_items_per_chunk * num_partitioned_chunks) {
+            tupleCount = 0;
             results = client.callProcedure("@Statistics", "table", 0).getResults();
             while (results[0].advanceRow())
             {
                 if (results[0].getString("TABLE_NAME").equals("PARTITION_TESTER"))
                 {
-                    long tupleCount = results[0].getLong("TUPLE_COUNT");
-                    ok = (ok & (tupleCount == ((num_partitioned_items_per_chunk * num_partitioned_chunks) / 3)));
-                    ++foundItem;
+                    tupleCount += results[0].getLong("TUPLE_COUNT");
                 }
             }
-            ok = ok & (foundItem == 3);
+            assertTrue(System.currentTimeMillis() < tend);
         }
-        assertEquals(3, foundItem);
-
-        results = client.callProcedure("@Statistics", "table", 0).getResults();
-        while (results[0].advanceRow())
-        {
-            if (results[0].getString("TABLE_NAME").equals("PARTITION_TESTER"))
-            {
-                assertEquals((num_partitioned_items_per_chunk * num_partitioned_chunks) / 3,
-                        results[0].getLong("TUPLE_COUNT"));
-            }
-        }
+        assertEquals(num_partitioned_items_per_chunk * num_partitioned_chunks, tupleCount);
     }
 
     private void doDupRestore(Client client) throws Exception {
@@ -2042,7 +2035,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         client = getClient();
 
         try {
-            client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE);
+            client.callProcedure("@SnapshotRestore", getRestoreParamsJSON(false));
         }
         catch (Exception e) {
             assertTrue(e.getMessage().contains("No savefile state to restore"));
@@ -2155,7 +2148,7 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
 
             VoltTable results[] = null;
             try {
-                client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults();
+                client.callProcedure("@SnapshotRestore", getRestoreParamsJSON(true)).getResults();
                 fail(); // expect fail
             }
             catch (ProcCallException e) {
@@ -2277,32 +2270,21 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
                    num_replicated_items_per_chunk * num_replicated_chunks);
 
         // Spin until the stats look complete
-        boolean ok = false;
-        int foundItem = 0;
-        while (!ok) {
-            ok = true;
-            foundItem = 0;
+        long tend = System.currentTimeMillis() + 60000;
+        long tupleCount = 0;
+        while (tupleCount < num_partitioned_items_per_chunk * num_partitioned_chunks) {
+            tupleCount = 0;
             results = client.callProcedure("@Statistics", "table", 0).getResults();
             while (results[0].advanceRow())
             {
                 if (results[0].getString("TABLE_NAME").equals("PARTITION_TESTER"))
                 {
-                    long tupleCount = results[0].getLong("TUPLE_COUNT");
-                    ok = (ok & (tupleCount == ((num_partitioned_items_per_chunk * num_partitioned_chunks) / 4)));
-                    ++foundItem;
+                    tupleCount += results[0].getLong("TUPLE_COUNT");
                 }
             }
-            ok = ok & (foundItem == 4);
+            assertTrue(System.currentTimeMillis() < tend);
         }
-
-        while (results[0].advanceRow())
-        {
-            if (results[0].getString("TABLE_NAME").equals("PARTITION_TESTER"))
-            {
-                assertEquals((num_partitioned_items_per_chunk * num_partitioned_chunks) / 4,
-                        results[0].getLong("TUPLE_COUNT"));
-            }
-        }
+        assertEquals(num_partitioned_items_per_chunk * num_partitioned_chunks, tupleCount);
 
         config.revertCompile();
     }
@@ -2547,6 +2529,106 @@ public class TestSaveRestoreSysprocSuite extends SaveRestoreBase {
         assertTrue(type_failure);
 
         config.revertCompile();
+    }
+
+    public void testRestoreHashinatorWithAddedPartition()
+            throws IOException, InterruptedException, ProcCallException
+    {
+        if (isValgrind()) return; // snapshot doesn't run in valgrind ENG-4034
+
+        System.out.println("Starting testDistributeReplicatedTable");
+        m_config.shutDown();
+
+        int num_replicated_items = 1000;
+        int num_partitioned_items = 126;
+
+        SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
+        project.addAllDefaults();
+        LocalCluster lc = new LocalCluster(JAR_NAME, 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        // Fails if local server flag is true. Collides with m_config.
+        lc.setHasLocalServer(false);
+
+        // Save snapshot for 1 site/host cluster.
+        {
+            lc.compile(project);
+            lc.startUp();
+            try {
+                Client client = ClientFactory.createClient();
+                client.createConnection(lc.getListenerAddresses().get(0));
+                try {
+                    VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
+                    VoltTable partition_table = createPartitionedTable(num_partitioned_items, 0);
+
+                    loadTable(client, "REPLICATED_TESTER", true, repl_table);
+                    loadTable(client, "PARTITION_TESTER", false, partition_table);
+                    saveTablesWithDefaultOptions(client);
+                }
+                finally {
+                    client.close();
+                }
+            }
+            finally {
+                lc.shutDown();
+            }
+        }
+
+        // Restore snapshot to 2 sites/host cluster.
+        {
+            lc.setSiteCount(2);
+            lc.compile(project);
+            lc.startUp(false);
+            try {
+                Client client = ClientFactory.createClient();
+                client.createConnection(lc.getListenerAddresses().get(0));
+                try {
+                    ClientResponse cr;
+                    try {
+                    cr = client.callProcedure("@SnapshotRestore", getRestoreParamsJSON(true));
+                    } catch(ProcCallException e) {
+                        System.err.println(e.toString());
+                        cr = e.getClientResponse();
+                        System.err.printf("%d '%s' %s\n", cr.getStatus(), cr.getStatusString(), cr.getResults()[0].toString());
+                    }
+                    assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+                    // Poll statistics until they appear.
+                    VoltTable results = null;
+                    int attempts = 0;
+                    while ((results == null || results.getRowCount() == 0) && attempts < 60) {
+                        if (attempts++ > 0) {
+                            Thread.sleep(1000);
+                        }
+                        results = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+                    }
+                    assertTrue(results.getRowCount() > 0);
+                    long maxPartitionId = -1;
+                    while (results.advanceRow()) {
+                        String tableName = results.getString("TABLE_NAME");
+                        long partitionId = results.getLong("PARTITION_ID");
+                        long tupleCount = results.getLong("TUPLE_COUNT");
+                        maxPartitionId = Math.max(partitionId, maxPartitionId);
+                        if (tableName.equals("REPLICATED_TESTER")) {
+                            assertTrue(tupleCount > 0);
+                        }
+                        else if (tableName.equals("PARTITION_TESTER")) {
+                            // The second partition should have no rows.
+                            if (partitionId == 0) {
+                                assertTrue(tupleCount > 0);
+                            }
+                            else {
+                                assertTrue(tupleCount == 0);
+                            }
+                        }
+                    }
+                    assertTrue(maxPartitionId == 1);
+                }
+                finally {
+                    client.close();
+                }
+            }
+            finally {
+                lc.shutDown();
+            }
+        }
     }
 
     public static class SnapshotResult {

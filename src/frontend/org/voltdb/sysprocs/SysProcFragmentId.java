@@ -109,9 +109,13 @@ public class SysProcFragmentId
     public static final long PF_restoreDistributePartitionedTableAsPartitioned = 74;    // partitioned to partitioned
     public static final long PF_restoreDistributePartitionedTableAsReplicated = 75;     // partitioned to replicated
     public static final long PF_restoreDistributeReplicatedTableAsPartitioned = 76;     // replicated to replicated
+    public static final long PF_restoreHashinatorScan = 77;
+    public static final long PF_restoreHashinatorScanResults = 78;
+    public static final long PF_restoreDistributeHashinator = 79;
+    public static final long PF_restoreDistributeHashinatorResults = 80;
 
     // @StartSampler
-    public static final long PF_startSampler = 80;
+    public static final long PF_startSampler = 90;
 
     // @Quiesce
     public static final long PF_quiesce_sites = 100;
