@@ -25,12 +25,14 @@ package org.voltdb.planner;
 
 import java.util.List;
 
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 
 public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
@@ -97,6 +99,17 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
         nlj = (NestLoopPlanNode) n;
         assertTrue(JoinType.LEFT == nlj.getJoinType());
         assertTrue(nlj.getJoinPredicate() != null);
+    }
+
+    public void testMultiTableJoinExpressions() {
+        AbstractPlanNode pn = compile("select * FROM R1, R2 LEFT JOIN R3 ON R3.A = R2.C OR R3.A = R1.A WHERE R1.C = R2.C");
+        AbstractPlanNode n = pn.getChild(0).getChild(0);
+        assertTrue(n instanceof NestLoopPlanNode);
+        NestLoopPlanNode nlj = (NestLoopPlanNode) n;
+        assertTrue(JoinType.LEFT == nlj.getJoinType());
+        assertTrue(nlj.getJoinPredicate() != null);
+        AbstractExpression p = nlj.getJoinPredicate();
+        assertEquals(ExpressionType.CONJUNCTION_OR, p.getExpressionType());
     }
 
     public void testPushDownExprJoin() {
@@ -229,12 +242,26 @@ public class TestMultipleOuterJoinPlans  extends PlannerTestCase {
       lpn = compileToFragments("select *  FROM P2,R1 LEFT JOIN R3 ON R3.A = P2.A WHERE P2.A=R1.A ");
       assertTrue(lpn.size() == 2);
       n = lpn.get(0).getChild(0).getChild(0);
+      assertTrue(n instanceof ReceivePlanNode);
+      n = lpn.get(1).getChild(0);
       assertTrue(n instanceof NestLoopIndexPlanNode);
       assertTrue(JoinType.LEFT == ((NestLoopIndexPlanNode) n).getJoinType());
       c = n.getChild(0);
+      assertTrue(c instanceof NestLoopIndexPlanNode);
+
+      // R3.A and P2.A have an index. P2,R1 is NLJ/IndexScan because it's an outer join and P2 is distributed
+      lpn = compileToFragments("select *  FROM R3,R1 LEFT JOIN P2 ON R3.A = P2.A WHERE R3.A=R1.A ");
+      assertTrue(lpn.size() == 2);
+      n = lpn.get(0).getChild(0).getChild(0);
+      assertTrue(n instanceof NestLoopPlanNode);
+      assertTrue(JoinType.LEFT == ((NestLoopPlanNode) n).getJoinType());
+      c = n.getChild(0);
+      assertTrue(c instanceof NestLoopIndexPlanNode);
+      assertTrue(JoinType.INNER == ((NestLoopIndexPlanNode) c).getJoinType());
+      c = n.getChild(1);
       assertTrue(c instanceof ReceivePlanNode);
       n = lpn.get(1).getChild(0);
-      assertTrue(n instanceof NestLoopIndexPlanNode);
+      assertTrue(n instanceof IndexScanPlanNode);
 
       // R3.A and P2.A have an index. P2,R1 is NLJ/IndexScan because P2 is distributed and it's an outer join
       lpn = compileToFragments("select *  FROM R1 LEFT JOIN P2 ON R1.A = P2.A, R3 WHERE R1.A=R3.A ");
