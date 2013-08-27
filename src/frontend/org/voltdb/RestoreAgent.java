@@ -114,11 +114,6 @@ SnapshotCompletionInterest
 
     private final RestoreAdapter m_restoreAdapter = new RestoreAdapter(m_changeStateFunctor);
 
-    // RealVoltDB needs this to connect the ClientInterface and the Adapter.
-    RestoreAdapter getAdapter() {
-        return m_restoreAdapter;
-    }
-
     private final ZooKeeper m_zk;
     private final SnapshotCompletionMonitor m_snapshotMonitor;
     private final Callback m_callback;
