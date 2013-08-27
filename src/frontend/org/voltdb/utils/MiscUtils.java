@@ -34,13 +34,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.google.common.base.Supplier;
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.ListMultimap;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
@@ -49,7 +42,15 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.licensetool.LicenseApi;
+import org.voltdb.licensetool.LicenseException;
 
+import com.google.common.base.Supplier;
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ListMultimap;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 import com.google.common.net.HostAndPort;
 
 public class MiscUtils {
@@ -171,8 +172,16 @@ public class MiscUtils {
         }
 
         // Perform signature verification - detect modified files
-        if (licenseApi.verify() == false) {
-            hostLog.fatal("Unable to load license file: could not verify license signature.");
+        try
+        {
+            if (licenseApi.verify() == false) {
+                hostLog.fatal("Unable to load license file: could not verify license signature.");
+                return null;
+            }
+        }
+        catch (LicenseException lex)
+        {
+            hostLog.fatal(lex.getMessage());
             return null;
         }
 

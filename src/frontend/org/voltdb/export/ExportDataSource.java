@@ -558,7 +558,9 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                     m_onDrain.run();
                 }
             } else {
-                exportLog.info("EOS for " + m_tableName + " partition " + m_partitionId);
+                exportLog.info("EOS for " + m_tableName + " partition " + m_partitionId +
+                        " with first unpolled uso " + m_firstUnpolledUso + " and remaining bytes " +
+                        m_committedBuffers.sizeInBytes());
             }
             return;
         }

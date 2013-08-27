@@ -27,6 +27,9 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.LimitPlanNode;
+import org.voltdb.plannodes.OrderByPlanNode;
+import org.voltdb.plannodes.ProjectionPlanNode;
 
 public class TestIndexSelection extends PlannerTestCase {
 
@@ -76,5 +79,28 @@ public class TestIndexSelection extends PlannerTestCase {
             System.out.println(pn.toExplainPlanString());
         }
     }
-}
 
+    // This tests recognition of a prefix parameter and upper bound to prefer an index that would
+    // use a greater number of key components even though another index would give the desired ordering.
+    public void testEng4792PlanWithCompoundEQLTEOrderedByPK() throws JSONException
+    {
+        AbstractPlanNode pn = compile("select id from a where deleted=? and updated_date <= ? order by id limit ?;");
+        // System.out.println("DEBUG: " + pn.toExplainPlanString());
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof LimitPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof OrderByPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof IndexScanPlanNode);
+        assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"DELETED_SINCE_IDX\""));
+
+        if (pn != null) {
+            JSONObject j = new JSONObject(pn.toJSONString());
+            System.out.println(j.toString(2));
+            System.out.println();
+            System.out.println(pn.toExplainPlanString());
+        }
+    }
+}

@@ -104,6 +104,16 @@ public class SnapshotRestore extends VoltSystemProcedure
     private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
     private static final VoltLogger CONSOLE_LOG = new VoltLogger("CONSOLE");
 
+    /*
+     * Data is being loaded as a partitioned table, log all duplicates
+     */
+    public static final int K_CHECK_UNIQUE_VIOLATIONS_PARTITIONED = 0;
+
+    /*
+     * Data is being loaded as a replicated table, only log duplicates at 1 node/site
+     */
+    public static final int K_CHECK_UNIQUE_VIOLATIONS_REPLICATED = 1;
+
     private static final int DEP_restoreScan = (int)
             SysProcFragmentId.PF_restoreScan | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     private static final int DEP_restoreScanResults = (int)
@@ -597,7 +607,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             int checkUniqueViolations = (Integer) params.toArray()[3];
             int[] partition_ids = (int[]) params.toArray()[4];
 
-            if(checkUniqueViolations > 0) {
+            if(checkUniqueViolations == K_CHECK_UNIQUE_VIOLATIONS_PARTITIONED) {
                 assert(partition_ids != null && partition_ids.length == 1);
             }
 
@@ -610,24 +620,21 @@ public class SnapshotRestore extends VoltSystemProcedure
                     VoltTable table = PrivateVoltTableFactory.createVoltTableFromBuffer(
                                     ByteBuffer.wrap(CompressionService.decompressBytes(compressedTable)), true);
 
-                    if(checkUniqueViolations > 0) {
-                        byte uniqueViolations[] = voltLoadTable(context.getCluster().getTypeName(),
-                                context.getDatabase().getTypeName(),
-                                table_name, table, m_duplicateRowHandler != null);
-                        if (uniqueViolations != null && m_duplicateRowHandler != null) {
-                            m_duplicateRowHandler.handleDuplicates(table_name, uniqueViolations);
-                        }
-                    } else {
-                        voltLoadTable(context.getCluster().getTypeName(), context.getDatabase().getTypeName(), table_name, table, false);
-                    }
-
+                    byte uniqueViolations[] =
+                            voltLoadTable(context.getCluster().getTypeName(),
+                                          context.getDatabase().getTypeName(),
+                                          table_name,
+                                          table,
+                                          m_duplicateRowHandler != null);
+                    handleUniqueViolations(table_name, uniqueViolations, checkUniqueViolations, context);
             } catch (Exception e) {
                 result_str = "FAILURE";
                 error_msg = e.getMessage();
             }
             VoltTable result = constructResultsTable();
             result.addRow(m_hostId, CoreUtils.getHostnameOrAddress(), CoreUtils.getSiteIdFromHSId(m_siteId), table_name,
-                            ((checkUniqueViolations > 0) ? partition_ids[0] : -1), result_str, error_msg);
+                            ((checkUniqueViolations == K_CHECK_UNIQUE_VIOLATIONS_PARTITIONED) ? partition_ids[0] : -1),
+                            result_str, error_msg);
             return new DependencyPair(dependency_id, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_restoreReceiveResultTables) {
@@ -713,11 +720,15 @@ public class SnapshotRestore extends VoltSystemProcedure
 
                     try
                     {
-                        voltLoadTable(context.getCluster().getTypeName(),
+                        byte uniqueViolations[] = voltLoadTable(context.getCluster().getTypeName(),
                                 context.getDatabase().getTypeName(),
-                                table_name, table, false);
+                                table_name, table, m_duplicateRowHandler != null);
+                        handleUniqueViolations(table_name,
+                                               uniqueViolations,
+                                               K_CHECK_UNIQUE_VIOLATIONS_REPLICATED,
+                                               context);
                     }
-                    catch (VoltAbortException e)
+                    catch (Exception e)
                     {
                         result_str = "FAILURE";
                         error_msg = e.getMessage();
@@ -828,6 +839,32 @@ public class SnapshotRestore extends VoltSystemProcedure
 
         assert (false);
         return null;
+    }
+
+    private void handleUniqueViolations(String table_name,
+                                        byte[] uniqueViolations,
+                                        int checkUniqueViolations,
+                                        SystemProcedureExecutionContext context) throws Exception {
+        if (uniqueViolations != null && m_duplicateRowHandler == null) {
+            VoltDB.crashLocalVoltDB(
+                    "Shouldn't get unique violations returned when duplicate row handler is null",
+                    true,
+                    null);
+        }
+        if (uniqueViolations != null) {
+            /*
+             * If this is a replicated table that is having unique constraint violations
+             * Only log at the lowest site on the lowest node.
+             */
+            if (checkUniqueViolations == K_CHECK_UNIQUE_VIOLATIONS_REPLICATED) {
+                if (context.isLowestSiteId() &&
+                        context.getHostId() == 0) {
+                    m_duplicateRowHandler.handleDuplicates(table_name, uniqueViolations);
+                }
+            } else {
+                m_duplicateRowHandler.handleDuplicates(table_name, uniqueViolations);
+            }
+        }
     }
 
     public static final String JSON_PATH = "path";
@@ -1618,7 +1655,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                                 tableName,
                                 dependencyIds[pfs_index],
                                 partitioned_tables[partition_id],
-                                1,
+                                K_CHECK_UNIQUE_VIOLATIONS_PARTITIONED,
                                 new int[] {partition_id});
 
                         pfs[pfs_index++] = loadFragment;
@@ -1647,7 +1684,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                     pfs[0].multipartition = false;
                     pfs[0].parameters = ParameterSet.fromArrayNoCopy(
                             tableName, result_dependency_id, compressedTable,
-                            0, null);
+                            K_CHECK_UNIQUE_VIOLATIONS_REPLICATED, null);
 
                     int final_dependency_id = TableSaveFileState.getNextDependencyId();
                     pfs[1] = new SynthesizedPlanFragment();
@@ -1773,7 +1810,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                                 tableName,
                                 dependencyIds[pfs_index],
                                 compressedTable,
-                                0,
+                                K_CHECK_UNIQUE_VIOLATIONS_REPLICATED,
                                 relevantPartitionIds);
                     } else {
                         int partition_id = sites_to_partitions.get(site_id);
@@ -1781,7 +1818,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                                 tableName,
                                 dependencyIds[pfs_index],
                                 partitioned_tables[partition_id],
-                                1,
+                                K_CHECK_UNIQUE_VIOLATIONS_PARTITIONED,
                                 new int[] {partition_id});
                     }
                     pfs[pfs_index++] = loadFragment;
@@ -1843,8 +1880,8 @@ public class SnapshotRestore extends VoltSystemProcedure
             try
             {
                 partition =
-                        TheHashinator.hashToPartition(loadedTable.get(partition_col,
-                                partition_type));
+                    TheHashinator.getPartitionForParameter(partition_type.getValue(),
+                            loadedTable.get(partition_col, partition_type));
             }
             catch (Exception e)
             {

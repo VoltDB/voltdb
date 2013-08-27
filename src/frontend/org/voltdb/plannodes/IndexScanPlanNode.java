@@ -18,9 +18,9 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.SortedSet;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -126,10 +126,15 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    protected void getThisNodesTablesAndIndexes(SortedSet<String> tablesRead, SortedSet<String> tablesUpdated, SortedSet<String> indexes) {
-        super.getThisNodesTablesAndIndexes(tablesRead, tablesUpdated, indexes);
+    public void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tableUpdated,
+                                    Collection<String> indexes)
+    {
+        super.getTablesAndIndexes(tablesRead, tableUpdated, indexes);
         assert(m_targetIndexName.length() > 0);
-        indexes.add(m_targetIndexName);
+        if (indexes != null) {
+            assert(m_targetIndexName.length() > 0);
+            indexes.add(m_targetIndexName);
+        }
     }
 
     @Override
@@ -328,6 +333,13 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     public AbstractExpression getInitialExpression() {
         return m_initialExpression;
     }
+
+    public boolean isReverseScan() {
+        return m_sortDirection == SortDirectionType.DESC ||
+                m_lookupType == IndexLookupType.LT || m_lookupType == IndexLookupType.LTE;
+    }
+
+
     @Override
     public void resolveColumnIndexes()
     {

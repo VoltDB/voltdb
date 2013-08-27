@@ -46,18 +46,18 @@
 #ifndef HSTORETABLEUTIL_H
 #define HSTORETABLEUTIL_H
 
-#include "storage/persistenttable.h"
+namespace voltdb {
+class PersistentTable;
+class Table;
+class TableTuple;
 
-namespace tableutil {
+struct tableutil {
 
-bool getRandomTuple(const voltdb::PersistentTable* table, voltdb::TableTuple &out);
-bool setRandomTupleValues(voltdb::Table* table, voltdb::TableTuple *tuple);
-bool addRandomTuples(voltdb::Table* table, int num_of_tuples);
+    static bool getRandomTuple(const voltdb::PersistentTable* table, voltdb::TableTuple &out);
+    static bool setRandomTupleValues(voltdb::Table* table, voltdb::TableTuple *tuple);
+    static bool addRandomTuples(voltdb::Table* table, int num_of_tuples);
 
-bool copy(const voltdb::Table* from_table, voltdb::Table* to_table);
-bool equals(const voltdb::Table* table, voltdb::TableTuple *tuple0, voltdb::TableTuple *tuple1);
-bool getTupleAt(const voltdb::Table* table, int64_t position, voltdb::TableTuple &out);
+};
 
 }
-
 #endif

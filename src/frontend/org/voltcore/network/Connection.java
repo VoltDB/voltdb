@@ -36,12 +36,15 @@ public interface Connection {
     void enableReadSelection();
 
     /**
-     * Get the hostname of a host if it's available, otherwise return the IP
-     * address.
+     * If the hostname has been resolved this will return the hostname and the IP + port of the remote connection.
+     * If the hostname was not resolved this will return just the IP + port.
+     * The format is something like localhost(/127.0.0.1:21212) if resolution is done
+     * When logged from the server the remote port # will allow you to identify individual connections to the server
+     * by the ephemeral port number.
      *
-     * @return hostname or IP as a string
+     * @return hostname and IP as a string
      */
-    String getHostnameOrIP();
+    String getHostnameAndIP();
     long connectionId();
 
     void queueTask(Runnable r);

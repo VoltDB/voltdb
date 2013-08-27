@@ -598,6 +598,51 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         return this;
     }
 
+    /**
+     * Replace avg expression with sum/count for optimization.
+     * @return
+     */
+    public AbstractExpression replaceAVG () {
+        if (getExpressionType() == ExpressionType.AGGREGATE_AVG) {
+            AbstractExpression child = getLeft();
+            AbstractExpression left = new AggregateExpression(ExpressionType.AGGREGATE_SUM);
+            left.setLeft((AbstractExpression) child.clone());
+            AbstractExpression right = new AggregateExpression(ExpressionType.AGGREGATE_COUNT);
+            right.setLeft((AbstractExpression) child.clone());
+
+            return new OperatorExpression(ExpressionType.OPERATOR_DIVIDE, left, right);
+        }
+
+        AbstractExpression lnode = null, rnode = null;
+        ArrayList<AbstractExpression> newArgs = null;
+        if (m_left != null) {
+            lnode = m_left.replaceAVG();
+        }
+        if (m_right != null) {
+            rnode = m_right.replaceAVG();
+        }
+        boolean changed = false;
+        if (m_args != null) {
+            newArgs = new ArrayList<AbstractExpression>();
+            for (AbstractExpression expr: m_args) {
+                AbstractExpression ex = expr.replaceAVG();
+                newArgs.add(ex);
+                if (ex != expr) {
+                    changed = true;
+                }
+            }
+        }
+        if (m_left != lnode || m_right != rnode || changed) {
+            AbstractExpression resExpr = (AbstractExpression) this.clone();
+            resExpr.setLeft(lnode);
+            resExpr.setRight(rnode);
+            resExpr.setArgs(newArgs);
+            return resExpr;
+        }
+
+        return this;
+    }
+
     public ArrayList<AbstractExpression> findBaseTVEs() {
         return findAllSubexpressionsOfType(ExpressionType.VALUE_TUPLE);
     }

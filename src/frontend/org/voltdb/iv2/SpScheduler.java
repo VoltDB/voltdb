@@ -412,7 +412,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
              */
             if (message.isForReplay()) {
                 uniqueId = message.getUniqueId();
-                m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(uniqueId);
+                try {
+                    m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(uniqueId);
+                }
+                catch (Exception e) {
+                    hostLog.fatal(e.getMessage());
+                    hostLog.fatal("Invocation: " + message);
+                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                }
             } else if (message.isForDR()) {
                 uniqueId = message.getStoredProcedureInvocation().getOriginalUniqueId();
                 // @LoadSinglepartitionTable does not have a valid uid
@@ -493,10 +500,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             msg.isForReplay());
                 // Update the handle in the copy since the constructor doesn't set it
                 replmsg.setSpHandle(newSpHandle);
-                for (long hsId : m_sendToHSIds) {
-                    m_mailbox.send(hsId,
-                            replmsg);
-                }
+                m_mailbox.send(m_sendToHSIds, replmsg);
                 DuplicateCounter counter = new DuplicateCounter(
                         msg.getInitiatorHSId(),
                         msg.getTxnId(), m_replicaHSIds, msg.getStoredProcedureName());
@@ -900,6 +904,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             CompleteTransactionMessage replmsg = new CompleteTransactionMessage(message);
             // Set the spHandle so that on repair the new master will set the max seen spHandle
             // correctly
+            advanceTxnEgo();
             replmsg.setSpHandle(getCurrentTxnId());
             if (m_sendToHSIds.length > 0) {
                 m_mailbox.send(m_sendToHSIds, replmsg);

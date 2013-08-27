@@ -75,6 +75,8 @@ public class CompiledPlan {
     /** A list of output column ids, indexes and types */
     public NodeSchema columns = new NodeSchema();
 
+    public ParsedSelectStmt  selectStmt = null;
+
     /**
      * If true, divide the number of tuples changed
      * by the number of partitions, as the number will
@@ -84,26 +86,6 @@ public class CompiledPlan {
 
     /** Does the statment write? */
     public boolean readOnly = false;
-
-    /**
-     * The tree representing the full where clause of the SQL
-     * statement that generated this plan. This is not used for
-     * execution, but is of interest to the database designer.
-     * Ultimately, this will end up serialized in the catalog.
-     * Note: this is not serialized when the parent CompiledPlan
-     * instance is serialized (only used for ad hoc sql).
-     */
-    public AbstractExpression fullWhereClause = null;
-
-    /**
-     * The plangraph representing the full generated plan with
-     * the lowest cost for this sql statement. This is not used for
-     * execution, but is of interest to the database designer.
-     * Ultimately, this will end up serialized in the catalog.
-     * Note: this is not serialized when the parent CompiledPlan
-     * instance is serialized (only used for ad hoc sql).
-     */
-    public AbstractPlanNode fullWinnerPlan = null;
 
     /**
      * Whether the plan's statement mandates a result with deterministic content;

@@ -90,10 +90,15 @@ class Distributer {
         private final boolean multiPart;
         private final boolean readOnly;
         private final int partitionParameter;
-        private Procedure(boolean multiPart,boolean readOnly, int partitionParameter) {
+        private final int partitionParameterType;
+        private Procedure(boolean multiPart,
+                boolean readOnly,
+                int partitionParameter,
+                int partitionParameterType) {
             this.multiPart = multiPart;
             this.readOnly = readOnly;
             this.partitionParameter = multiPart? PARAMETER_NONE : partitionParameter;
+            this.partitionParameterType = multiPart ? PARAMETER_NONE : partitionParameterType;
         }
     }
 
@@ -617,7 +622,22 @@ class Distributer {
         final SocketChannel aChannel = (SocketChannel)socketChannelAndInstanceIdAndBuildString[0];
         final long instanceIdWhichIsTimestampAndLeaderIp[] = (long[])socketChannelAndInstanceIdAndBuildString[1];
         final int hostId = (int)instanceIdWhichIsTimestampAndLeaderIp[0];
+
+        NodeConnection cxn = new NodeConnection(instanceIdWhichIsTimestampAndLeaderIp, address);
+        Connection c = m_network.registerChannel( aChannel, cxn);
+        cxn.m_hostname = c.getHostnameAndIP();
+        cxn.m_port = port;
+        cxn.m_connection = c;
+
         synchronized (this) {
+
+            // If there are no connections, discard any previous connection ids and allow the client
+            // to connect to a new cluster.
+            // Careful, this is slightly less safe than the previous behavior.
+            if (m_connections.size() == 0) {
+                m_clusterInstanceId = null;
+            }
+
             if (m_clusterInstanceId == null) {
                 long timestamp = instanceIdWhichIsTimestampAndLeaderIp[2];
                 int addr = (int)instanceIdWhichIsTimestampAndLeaderIp[3];
@@ -625,21 +645,17 @@ class Distributer {
             } else {
                 if (!(((Long)m_clusterInstanceId[0]).longValue() == instanceIdWhichIsTimestampAndLeaderIp[2]) ||
                         !(((Integer)m_clusterInstanceId[1]).longValue() == instanceIdWhichIsTimestampAndLeaderIp[3])) {
-                    aChannel.close();
+                    // clean up the pre-registered voltnetwork connection/channel
+                    c.unregister();
                     throw new IOException(
-                            "Cluster instance id mismatch. Current is " + m_clusterInstanceId[0] + "," + m_clusterInstanceId[1]
-                                                                                                                             + " and server's was " + instanceIdWhichIsTimestampAndLeaderIp[2] + "," + instanceIdWhichIsTimestampAndLeaderIp[3]);
+                            "Cluster instance id mismatch. Current is " + m_clusterInstanceId[0] + "," + m_clusterInstanceId[1] +
+                            " and server's was " + instanceIdWhichIsTimestampAndLeaderIp[2] + "," + instanceIdWhichIsTimestampAndLeaderIp[3]);
                 }
             }
             m_buildString = (String)socketChannelAndInstanceIdAndBuildString[2];
-        }
-        NodeConnection cxn = new NodeConnection(instanceIdWhichIsTimestampAndLeaderIp, address);
 
-        Connection c = m_network.registerChannel( aChannel, cxn);
-        cxn.m_hostname = c.getHostnameOrIP();
-        cxn.m_port = port;
-        cxn.m_connection = c;
-        m_connections.add(cxn);
+            m_connections.add(cxn);
+        }
 
         if (m_useClientAffinity) {
             synchronized (this) {
@@ -697,7 +713,9 @@ class Distributer {
                 if (procedureInfo != null) {
                     Integer hashedPartition = MpInitiator.MP_INIT_PID;
                     if (!procedureInfo.multiPart) {
-                        hashedPartition = invocation.getHashinatedParam(procedureInfo.partitionParameter);
+                        hashedPartition =
+                            invocation.getHashinatedParam(procedureInfo.partitionParameterType,
+                                procedureInfo.partitionParameter);
                     }
                     /*
                      * If the procedure is read only and single part, load balance across replicas
@@ -940,10 +958,14 @@ class Distributer {
                 boolean readOnly = jsObj.getBoolean(JdbcDatabaseMetaDataGenerator.JSON_READ_ONLY);
                 if (jsObj.getBoolean(JdbcDatabaseMetaDataGenerator.JSON_SINGLE_PARTITION)) {
                     int partitionParameter = jsObj.getInt(JdbcDatabaseMetaDataGenerator.JSON_PARTITION_PARAMETER);
-                    m_procedureInfo.put(procedureName, new Procedure(false,readOnly, partitionParameter));
+                    int partitionParameterType =
+                        jsObj.getInt(JdbcDatabaseMetaDataGenerator.JSON_PARTITION_PARAMETER_TYPE);
+                    m_procedureInfo.put(procedureName,
+                            new Procedure(false,readOnly, partitionParameter, partitionParameterType));
                 } else {
                     // Multi Part procedure JSON descriptors omit the partitionParameter
-                    m_procedureInfo.put(procedureName, new Procedure(true, readOnly, Procedure.PARAMETER_NONE));
+                    m_procedureInfo.put(procedureName, new Procedure(true, readOnly, Procedure.PARAMETER_NONE,
+                                Procedure.PARAMETER_NONE));
                 }
 
             } catch (JSONException e) {

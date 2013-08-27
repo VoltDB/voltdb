@@ -17,6 +17,8 @@
 
 package org.voltdb.plannodes;
 
+import java.util.Collection;
+
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -58,6 +60,7 @@ public class ReceivePlanNode extends AbstractPlanNode {
         assert(m_children.size() == 1);
         m_children.get(0).resolveColumnIndexes();
         NodeSchema input_schema = m_children.get(0).getOutputSchema();
+        assert (input_schema.equals(m_outputSchema));
         for (SchemaColumn col : m_outputSchema.getColumns())
         {
             // At this point, they'd better all be TVEs.
@@ -82,6 +85,14 @@ public class ReceivePlanNode extends AbstractPlanNode {
     @Override
     protected String explainPlanForNode(String indent) {
         return "RECEIVE FROM ALL PARTITIONS";
+    }
+
+    @Override
+    public void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tableUpdated,
+                                    Collection<String> indexes)
+    {
+        // ReceiveNode is a dead end. This method is not intended to cross fragments
+        // even within a pre-fragmented plan tree.
     }
 
     /**

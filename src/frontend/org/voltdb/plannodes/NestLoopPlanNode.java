@@ -22,6 +22,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SortDirectionType;
 
 public class NestLoopPlanNode extends AbstractJoinPlanNode {
 
@@ -52,7 +53,9 @@ public class NestLoopPlanNode extends AbstractJoinPlanNode {
 
     @Override
     protected String explainPlanForNode(String indent) {
-        return "NEST LOOP " + this.m_joinType.toString() + " JOIN" + explainFilters(indent);
+        return "NEST LOOP " + this.m_joinType.toString() + " JOIN" +
+                (m_sortDirection == SortDirectionType.INVALID ? "" : " (" + m_sortDirection + ")") +
+                explainFilters(indent);
     }
 
 }
