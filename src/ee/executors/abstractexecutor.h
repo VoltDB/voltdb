@@ -162,7 +162,7 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
  * Set up statistics for long running operations thru m_engine if total tuples accessed passes the threshold.
  */
 inline void AbstractExecutor::doLongOpTracking() {
-    if((++m_engine->m_tuplesFound) % LONG_OP_THRESHOLD != 0) {
+    if((++m_engine->m_allTuplesScanned) % LONG_OP_THRESHOLD != 0) {
         return;
     }
     else {
@@ -182,7 +182,7 @@ inline void AbstractExecutor::doLongOpTracking() {
                 planNodeToString(m_abstractNode->getPlanNodeType()),
                 tableName,
                 tableSize,
-                m_engine->m_tuplesFound)){
+                m_engine->m_allTuplesScanned - m_engine->m_tuplesScannedAtFragmentStart)){
             VOLT_INFO("Interrupt query.");
             throw InterruptException("Query interrupted.");
         }

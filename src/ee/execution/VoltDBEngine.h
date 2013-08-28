@@ -114,6 +114,7 @@ class RecoveryProtoMsg;
 
 const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
 const size_t PLAN_CACHE_SIZE = 1024 * 10;
+// how many tuples to scan before calling into java
 const int64_t LONG_OP_THRESHOLD = 10000;
 
 /**
@@ -132,7 +133,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
           m_currentUndoQuantum(NULL),
           m_hashinator(NULL),
           m_staticParams(MAX_PARAM_COUNT),
-          m_currentOutputDepId(-1),
           m_currentInputDepId(-1),
           m_isELEnabled(false),
           m_numResultDependencies(0),
@@ -167,20 +167,32 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         // Execution Functions
         // -------------------------------------------------
-        int executeQuery(int64_t planfragmentId, int32_t outputDependencyId, int32_t inputDependencyId,
-                         const NValueArray &params, int64_t spHandle, int64_t lastCommittedSpHandle, int64_t uniqueId, bool first, bool last);
+        int executePlanFragments(int32_t numFragments,
+                                 int64_t planfragmentIds[],
+                                 int64_t intputDependencyIds[],
+                                 ReferenceSerializeInput &serialize_in,
+                                 int64_t spHandle,
+                                 int64_t lastCommittedSpHandle,
+                                 int64_t uniqueId,
+                                 int64_t undoToken);
+
+        int executePlanFragment(int64_t planfragmentId,
+                                int64_t inputDependencyId,
+                                const NValueArray &params,
+                                int64_t spHandle,
+                                int64_t lastCommittedSpHandle,
+                                int64_t uniqueId,
+                                bool first,
+                                bool last);
 
         inline int getUsedParamcnt() const { return m_usedParamcnt;}
-        inline void setUsedParamcnt(int usedParamcnt) { m_usedParamcnt = usedParamcnt;}
 
         /** index of the batch piece being executed */
         int m_currentIndexInBatch;
-        long m_tuplesFound;
+        int64_t m_allTuplesScanned;
+        int64_t m_tuplesScannedAtFragmentStart;
         Table* m_lastAccessedTable;
 
-        inline void setIndexInBatch(int indexInBatch) {
-            m_currentIndexInBatch = indexInBatch;
-        }
         inline int getIndexInBatch() {
             return m_currentIndexInBatch;
         }
@@ -219,7 +231,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                        bool returnUniqueViolations);
 
         void resetReusedResultOutputBuffer(const size_t headerSize = 0);
-        inline ReferenceSerializeOutput* getResultOutputSerializer() { return &m_resultOutput; }
         inline ReferenceSerializeOutput* getExceptionOutputSerializer() { return &m_exceptionOutput; }
         void setBuffers(char *parameter_buffer, int m_parameterBuffercapacity,
                 char *resultBuffer, int resultBufferCapacity,
@@ -240,6 +251,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         NValueArray& getParameterContainer() { return m_staticParams; }
         int64_t* getBatchFragmentIdsContainer() { return m_batchFragmentIdsContainer; }
+        int64_t* getBatchDepIdsContainer() { return m_batchDepIdsContainer; }
 
         /** are we sending tuples to another database? */
         bool isELEnabled() { return m_isELEnabled; }
@@ -562,14 +574,16 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /** size of reused_result_buffer. */
         int m_reusedResultCapacity;
 
+        // arrays to hold fragmentsid and dep ids from java
+        // n.b. these are 8k each, should be boost shared arrays?
         int64_t m_batchFragmentIdsContainer[MAX_BATCH_COUNT];
+        int64_t m_batchDepIdsContainer[MAX_BATCH_COUNT];
 
         /** number of plan fragments executed so far */
         int m_pfCount;
 
         // used for sending and recieving deps
         // set by the executeQuery / executeFrag type methods
-        int m_currentOutputDepId;
         int m_currentInputDepId;
 
         /** EL subsystem on/off, pulled from catalog */
