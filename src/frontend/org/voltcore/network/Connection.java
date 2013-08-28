@@ -18,6 +18,7 @@
 package org.voltcore.network;
 
 import java.util.concurrent.Future;
+import java.net.InetSocketAddress;
 
 public interface Connection {
     /**
@@ -38,13 +39,21 @@ public interface Connection {
     /**
      * If the hostname has been resolved this will return the hostname and the IP + port of the remote connection.
      * If the hostname was not resolved this will return just the IP + port.
-     * The format is something like localhost(/127.0.0.1:21212) if resolution is done
+     * The format is hostname/127.0.0.1:21212 if resolution is done, /127.0.0.1:21212 otherwise
      * When logged from the server the remote port # will allow you to identify individual connections to the server
      * by the ephemeral port number.
      *
-     * @return hostname and IP as a string
+     * @return hostname and IP and port as a string
      */
-    String getHostnameAndIP();
+    String getHostnameAndIPAndPort();
+
+    /**
+     * Returns the hostname if it was resolved, otherwise it returns the IP. Doesn't do a reverse DNS lookup
+     */
+    String getHostnameOrIP();
+    int getRemotePort();
+    InetSocketAddress getRemoteSocketAddress();
+
     long connectionId();
 
     void queueTask(Runnable r);
