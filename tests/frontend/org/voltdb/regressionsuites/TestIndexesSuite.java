@@ -336,6 +336,7 @@ public class TestIndexesSuite extends RegressionSuite {
 
     private void compareTable(VoltTable vt, Object [][] expected) {
         int len = expected.length;
+        assertEquals(len, vt.getRowCount());
         for (int i=0; i < len; i++) {
             compareRow(vt, expected[i]);
         }
@@ -374,22 +375,18 @@ public class TestIndexesSuite extends RegressionSuite {
 
             query = String.format("select * from %s T where T.NUM IN (200, 300) ORDER BY T.ID", table);
             results = client.callProcedure("@AdHoc", query).getResults();
-            assertEquals(4, results[0].getRowCount());
             compareTable(results[0], new Object [][] {line3,line6,line7,line8});
 
             query = String.format("select * from %s T where T.NUM IN (10, 200, 300, -1) ORDER BY T.ID", table);
             results = client.callProcedure("@AdHoc", query).getResults();
-            assertEquals(4, results[0].getRowCount());
             compareTable(results[0], new Object [][] {line3,line6,line7,line8});
 
             query = String.format("select * from %s T where T.NUM IN (10, 200, 300, -1, 200) ORDER BY T.ID", table);
             results = client.callProcedure("@AdHoc", query).getResults();
-            assertEquals(4, results[0].getRowCount());
             compareTable(results[0], new Object [][] {line3,line6,line7,line8});
 
             query = String.format("select * from %s T where T.NUM IN (200) ORDER BY T.ID", table);
             results = client.callProcedure("@AdHoc", query).getResults();
-            assertEquals(2, results[0].getRowCount());
             compareTable(results[0], new Object [][] {line3,line6});
 
             query = String.format("select * from %s T where T.NUM IN (10)", table);
@@ -402,21 +399,18 @@ public class TestIndexesSuite extends RegressionSuite {
 
             query = String.format("select * from %s T where T.DESC IN ('c', 'f', 'g', 'h') ORDER BY T.ID", table);
             results = client.callProcedure("@AdHoc", query).getResults();
-            assertEquals(4, results[0].getRowCount());
             compareTable(results[0], new Object [][] {line3,line6,line7,line8});
 
             query = String.format("select * from %s T where T.DESC IN ('', 'c', 'f', 'g', 'h', " +
                 "'a value with some length to it in case there are object allocation issues'" +
                 ") ORDER BY T.ID", table);
             results = client.callProcedure("@AdHoc", query).getResults();
-            assertEquals(4, results[0].getRowCount());
             compareTable(results[0], new Object [][] {line3,line6,line7,line8});
 
 
             query = String.format("select * from %s T where T.DESC " +
                     "IN ('', 'c', 'f', 'g', 'h', 'f') ORDER BY T.ID", table);
             results = client.callProcedure("@AdHoc", query).getResults();
-            assertEquals(4, results[0].getRowCount());
             compareTable(results[0], new Object [][] {line3,line6,line7,line8});
 
             query = String.format("select * from %s T where T.DESC IN ('a')", table);
@@ -437,7 +431,6 @@ public class TestIndexesSuite extends RegressionSuite {
             query = String.format("select * from %s T where T.DESC IN ('c', 'f', 'g', 'h')" +
                 " and T.NUM IN (200, 300) ORDER BY T.ID", table);
             results = client.callProcedure("@AdHoc", query).getResults();
-            assertEquals(4, results[0].getRowCount());
             compareTable(results[0], new Object [][] {line3,line6,line7,line8});
 
             query = String.format("select * from %s T where T.DESC IN ('', 'c', 'f', 'g', 'h', " +
@@ -445,13 +438,11 @@ public class TestIndexesSuite extends RegressionSuite {
                 ")" +
                 " and T.NUM IN (10, 200, 300, -1) ORDER BY T.ID", table);
             results = client.callProcedure("@AdHoc", query).getResults();
-            assertEquals(4, results[0].getRowCount());
             compareTable(results[0], new Object [][] {line3,line6,line7,line8});
 
             query = String.format("select * from %s T where T.DESC IN ('', 'c', 'f', 'g', 'h', 'f')" +
                 " and T.NUM IN (10, 200, 300, -1, 200) ORDER BY T.ID", table);
             results = client.callProcedure("@AdHoc", query).getResults();
-            assertEquals(4, results[0].getRowCount());
             compareTable(results[0], new Object [][] {line3,line6,line7,line8});
 
             query = String.format("select * from %s T where T.DESC IN ('a')" +
@@ -495,7 +486,6 @@ public class TestIndexesSuite extends RegressionSuite {
 
             query = String.format("select * from %s T ORDER BY T.ID", table);
             results = client.callProcedure("@AdHoc", query).getResults();
-            assertEquals(6, results[0].getRowCount());
             compareTable(results[0], new Object [][] {line1,line2,line3,line6,line7,line8});
 
             // Try delete with in
@@ -538,7 +528,6 @@ public class TestIndexesSuite extends RegressionSuite {
 
             query = String.format("select * from %s T ORDER BY T.ID", table);
             results = client.callProcedure("@AdHoc", query).getResults();
-            assertEquals(6, results[0].getRowCount());
             compareTable(results[0], new Object [][] {line1,line2,line3,line6,line7,line8});
 
         }
