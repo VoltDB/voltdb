@@ -368,7 +368,7 @@ class VoltNetwork implements Runnable
         } catch (java.nio.channels.CancelledKeyException e) {
             networkLog.warn(
                     "Had a cancelled key exception while processing queued runnables for port "
-                    + port.m_remoteHost, e);
+                    + port, e);
         }
     }
 
@@ -437,7 +437,7 @@ class VoltNetwork implements Runnable
                 retval.put(
                         p.connectionId(),
                         Pair.of(
-                                p.m_remoteHost,
+                                p.getHostnameOrIP(),
                                 new long[] {
                                         read,
                                         messagesRead,

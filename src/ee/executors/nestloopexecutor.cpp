@@ -66,99 +66,6 @@
 using namespace std;
 using namespace voltdb;
 
-namespace
-{
-    // FUTURE: the planner should be able to make this decision and
-    // add that info to TupleValueExpression rather than having to
-    // play the name game here.  These two methods are currently duped
-    // in nestloopindexexecutor because (a) there wasn't an obvious
-    // common locale to put them and (b) I hope to make them go away
-    // soon.
-    bool
-    assignTupleValueIndex(AbstractExpression *ae,
-                          const string &oname,
-                          const string &iname)
-    {
-        // if an exact table name match is found, do the obvious
-        // thing. Otherwise, assign to the table named "temp".
-        // If both tables are named temp, barf; planner purports
-        // not accept joins of two temp tables.
-
-        // tuple index 0 is always the outer table.
-        // tuple index 1 is always the inner table.
-        TupleValueExpression *tve = dynamic_cast<TupleValueExpression*>(ae);
-        string tname = tve->getTableName();
-
-        if (oname == "temp" && iname == "temp") {
-            VOLT_ERROR("Unsupported join on two temp tables.");
-            return false;
-        }
-
-        if (tname == oname)
-            tve->setTupleIndex(0);
-        else if (tname == iname)
-            tve->setTupleIndex(1);
-        else if (oname == "temp")
-            tve->setTupleIndex(0);
-        else if (iname == "temp")
-            tve->setTupleIndex(1);
-        else {
-            VOLT_ERROR("TableTupleValue in join with unknown table name.");
-            return false;
-        }
-
-        return true;
-    }
-
-    bool
-    assignTupleValueIndexes(AbstractExpression* expression,
-                            const string& outer_name,
-                            const string& inner_name)
-    {
-        // for each tuple value expression in the expression, determine
-        // which tuple is being represented. Tuple could come from outer
-        // table or inner table. Configure the predicate to use the correct
-        // eval() tuple parameter. By convention, eval's first parameter
-        // will always be the outer table and its second parameter the inner
-        const AbstractExpression* predicate = expression;
-        stack<const AbstractExpression*> stack;
-        while (predicate != NULL) {
-            const AbstractExpression *left = predicate->getLeft();
-            const AbstractExpression *right = predicate->getRight();
-
-            if (right != NULL) {
-                if (right->getExpressionType() == EXPRESSION_TYPE_VALUE_TUPLE) {
-                    if (!assignTupleValueIndex(const_cast<AbstractExpression*>(right),
-                                               outer_name,
-                                               inner_name))
-                    {
-                        return false;
-                    }
-                }
-                // remember the right node - must visit its children
-                stack.push(right);
-            }
-            if (left != NULL) {
-                if (left->getExpressionType() == EXPRESSION_TYPE_VALUE_TUPLE) {
-                    if (!assignTupleValueIndex(const_cast<AbstractExpression*>(left),
-                                               outer_name,
-                                               inner_name))
-                    {
-                        return false;
-                    }
-                }
-            }
-
-            predicate = left;
-            if (!predicate && !stack.empty()) {
-                predicate = stack.top();
-                stack.pop();
-            }
-        }
-        return true;
-    }
-}
-
 bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node,
                               TempTableLimits* limits)
 {
@@ -177,25 +84,7 @@ bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node,
         m_null_tuple.init(inner_table->schema());
     }
 
-    // for each tuple value expression in the predicate, determine
-    // which tuple is being represented. Tuple could come from outer
-    // table or inner table. Configure the predicate to use the correct
-    // eval() tuple parameter. By convention, eval's first parameter
-    // will always be the outer table and its second parameter the inner
-    bool retval = assignTupleValueIndexes(node->getPreJoinPredicate(),
-                                          node->getInputTables()[0]->name(),
-                                          node->getInputTables()[1]->name());
-    if (retval) {
-        retval = assignTupleValueIndexes(node->getJoinPredicate(),
-                                          node->getInputTables()[0]->name(),
-                                          node->getInputTables()[1]->name());
-    }
-    if (retval) {
-        retval = assignTupleValueIndexes(node->getWherePredicate(),
-                                          node->getInputTables()[0]->name(),
-                                          node->getInputTables()[1]->name());
-    }
-    return retval;
+    return true;
 }
 
 

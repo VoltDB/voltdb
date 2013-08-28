@@ -160,10 +160,10 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         TableTuple tuple(target_table->schema());
         TableIterator iterator = target_table->iterator();
         AbstractExpression *predicate = node->getPredicate();
-        VOLT_TRACE("SCAN PREDICATE A:\n%s\n", predicate->debug(true).c_str());
 
         if (predicate)
         {
+            VOLT_TRACE("SCAN PREDICATE A:\n%s\n", predicate->debug(true).c_str());
             predicate->substitute(params);
             assert(predicate != NULL);
             VOLT_DEBUG("SCAN PREDICATE B:\n%s\n",

@@ -228,7 +228,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
     /**
      * Add all valid join orders (permutations) for the input join tree.
-     *
+     * TODO(XIN): takes at least 3.3% cpu of planner. Optimize it when possible.
      */
     private void queueSubJoinOrders() {
         assert(m_parsedStmt.joinTree != null);
@@ -951,8 +951,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             }
 
             nljNode.addAndLinkChild(innerPlan);
-            // now generate the output schema for this join
-            nljNode.generateOutputSchema(m_db);
             ajNode = nljNode;
         }
         else if (canHaveNLIJ) {
@@ -966,6 +964,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
             // combine the tails plan graph with the new head node
             nlijNode.addAndLinkChild(outerPlan);
+
             ajNode = nlijNode;
         }
         else {
@@ -976,7 +975,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         ajNode.setJoinType(joinNode.m_joinType);
         ajNode.setPreJoinPredicate(ExpressionUtil.combine(joinNode.m_joinOuterList));
         ajNode.setWherePredicate(ExpressionUtil.combine(whereClauses));
-        ajNode.generateOutputSchema(m_db);
+        ajNode.resolveSortDirection();
         return ajNode;
     }
 
