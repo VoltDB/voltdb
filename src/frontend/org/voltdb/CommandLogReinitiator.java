@@ -20,6 +20,7 @@ package org.voltdb;
 import java.util.Map;
 
 import org.voltcore.utils.InstanceId;
+import org.voltdb.catalog.Database;
 import org.voltdb.dtxn.TransactionCreator;
 
 public interface CommandLogReinitiator {
@@ -113,4 +114,6 @@ public interface CommandLogReinitiator {
      * discards the command log.
      */
     public void returnAllSegments();
+
+    public boolean requestIndexSnapshot();
 }

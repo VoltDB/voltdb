@@ -1181,6 +1181,13 @@ SnapshotCompletionInterest
     private void changeState() {
         if (m_state == State.RESTORE) {
             fetchSnapshotTxnId();
+
+            if (m_isLeader) {
+                if (!m_replayAgent.requestIndexSnapshot()) {
+                    VoltDB.crashLocalVoltDB("Failed to request index snapshot", false, null);
+                }
+            }
+
             exitRestore();
             m_state = State.REPLAY;
 
