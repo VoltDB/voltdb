@@ -44,24 +44,19 @@ public abstract class TransactionInitiator implements TransactionCreator {
      *
      * @param connectionId A unique integer identifying which TCP/IP connection
      * spawned this transaction.
-     * @param connectionHostname hostname associated with this connection
      * @param invocation The data describing the work to be done.
      * @param partitions The partitions (from the catalog) involved in this
      * transaction (Errs on the side of too many).
-     * @param clientData Client data returned with the completed transaction
      * @param messageSize Size in bytes of the message that created this invocation
      */
     @Override
     public abstract boolean createTransaction(
             long connectionId,
-            final String connectionHostname,
-            boolean adminConnection,
             StoredProcedureInvocation invocation,
             boolean isReadOnly,
             boolean isSinglePartition,
             boolean isEverySite,
             int partitions[],
-            Object clientData,
             int messageSize,
             long now);
 
@@ -80,8 +75,6 @@ public abstract class TransactionInitiator implements TransactionCreator {
      * @param connectionId
      *            A unique integer identifying which TCP/IP connection spawned
      *            this transaction.
-     * @param connectionHostname
-     *            hostname associated with this connection
      * @param txnId
      *            The transaction ID to assign to this initiation
      * @param invocation
@@ -89,16 +82,12 @@ public abstract class TransactionInitiator implements TransactionCreator {
      * @param partitions
      *            The partitions (from the catalog) involved in this transaction
      *            (Errs on the side of too many).
-     * @param clientData
-     *            Client data returned with the completed transaction
      * @param messageSize
      *            Size in bytes of the message that created this invocation
      */
     @Override
     public abstract boolean createTransaction(
             long connectionId,
-            final String connectionHostname,
-            boolean adminConnection,
             long txnId,
             long timestamp,
             StoredProcedureInvocation invocation,
@@ -106,7 +95,6 @@ public abstract class TransactionInitiator implements TransactionCreator {
             boolean isSinglePartition,
             boolean isEverySite,
             int partitions[],
-            Object clientData,
             int messageSize,
             long now);
 

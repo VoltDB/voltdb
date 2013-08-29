@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import org.voltcore.network.Connection;
 import org.voltdb.dtxn.TransactionCreator;
 
 /**
@@ -34,35 +35,27 @@ public class Iv2TransactionCreator implements TransactionCreator
 
     @Override
     public final boolean createTransaction(long connectionId,
-            String connectionHostname, boolean adminConnection,
             StoredProcedureInvocation invocation, boolean isReadOnly,
-            boolean isSinglePartition, boolean isEverySite, int[] partitions,
-            Object clientData, int messageSize, long now)
+            boolean isSinglePartition, boolean isEverySite, int[] partitions, int messageSize, long now)
     {
         return m_ci.createTransaction(connectionId,
-                connectionHostname,
-                adminConnection,
                 invocation,
                 isReadOnly,
                 isSinglePartition,
                 isEverySite,
                 partitions,
-                clientData,
                 messageSize,
                 now);
     }
 
     @Override
     public final boolean createTransaction(long connectionId,
-            String connectionHostname, boolean adminConnection, long txnId,
+            long txnId,
             long uniqueId,
             StoredProcedureInvocation invocation, boolean isReadOnly,
-            boolean isSinglePartition, boolean isEverySite, int[] partitions,
-            Object clientData, int messageSize, long now)
+            boolean isSinglePartition, boolean isEverySite, int[] partitions, int messageSize, long now)
     {
         return m_ci.createTransaction(connectionId,
-                connectionHostname,
-                adminConnection,
                 txnId,
                 uniqueId,
                 invocation,
@@ -70,7 +63,6 @@ public class Iv2TransactionCreator implements TransactionCreator
                 isSinglePartition,
                 isEverySite,
                 partitions,
-                clientData,
                 messageSize,
                 now,
                 true);
@@ -105,6 +97,10 @@ public class Iv2TransactionCreator implements TransactionCreator
         return false;
     }
 
+    @Override
+    public void bindAdapter(Connection adapter) {
+        m_ci.bindAdapter(adapter);
+    }
 
 }
 
