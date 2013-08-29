@@ -17,6 +17,7 @@
 package org.voltdb.export;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Iterator;
 
 import org.voltcore.logging.VoltLogger;
@@ -220,22 +221,24 @@ public class StreamBlockQueue {
     public void sync(boolean nofsync) throws IOException {
         if (m_memoryDeque.peek() != null && !m_memoryDeque.peek().isPersisted()) {
             ArrayDeque<BBContainer[]> buffersToPush = new ArrayDeque<BBContainer[]>();
-            Iterator<StreamBlock> iter = m_memoryDeque.iterator();
-            while (iter.hasNext()) {
-                StreamBlock sb = iter.next();
+            while (m_memoryDeque.peek() != null) {
+                StreamBlock sb = m_memoryDeque.peek();
                 if (sb.isPersisted()) {
-                    exportLog.error("Found a persisted export buffer after a memory buffer." +
-                            " This shouldn't happen. Will make a best effort to return all the data " +
-                            " and not leak memory");
                     break;
                 }
-
-                buffersToPush.offer( sb.asBufferChain() );
-                iter.remove();
+                m_memoryDeque.poll();
+                buffersToPush.offer(sb.asBufferChain());
             }
-            m_memoryDeque.clear();
+
             if (!buffersToPush.isEmpty()) {
                 m_persistentDeque.push(buffersToPush.toArray(new BBContainer[0][0]));
+            }
+            ArrayList<StreamBlock> blocks = new ArrayList<StreamBlock>();
+            for (int ii = 0; ii < buffersToPush.size(); ii++) {
+                blocks.add(pollPersistentDeque(true));
+            }
+            for (int ii = blocks.size() - 1; ii >= 0; ii--) {
+                m_memoryDeque.offerFirst(blocks.get(ii));
             }
         }
 
