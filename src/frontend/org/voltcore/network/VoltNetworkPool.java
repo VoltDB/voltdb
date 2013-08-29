@@ -46,7 +46,7 @@ public class VoltNetworkPool {
 
     public VoltNetworkPool(int numThreads, Queue<String> coreBindIds) {
         if (numThreads < 1) {
-            throw new IllegalArgumentException("Must specify a postive number of threads");
+            throw new IllegalArgumentException("Must specify a positive number of threads");
         }
         if (coreBindIds == null || coreBindIds.isEmpty()) {
             m_networks = new VoltNetwork[numThreads];
