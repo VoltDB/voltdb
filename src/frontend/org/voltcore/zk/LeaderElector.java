@@ -37,6 +37,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltZK;
 
 import com.google.common.collect.ImmutableSet;
+import org.voltcore.zk.ZKUtil.CancellableWatcher;
 
 public class LeaderElector {
     // The root is always created as INITIALIZING until the first participant is added,
@@ -54,7 +55,7 @@ public class LeaderElector {
 
     private volatile String leader = null;
     private volatile boolean isLeader = false;
-    private final ExecutorService es;
+    private ExecutorService es = null;
     private final AtomicBoolean m_done = new AtomicBoolean(false);
 
     private final Runnable electionEventHandler = new Runnable() {
@@ -113,14 +114,16 @@ public class LeaderElector {
         }
     };
 
-    private final Watcher childWatcher = new Watcher() {
-        @Override
-        public void process(WatchedEvent event) {
+    private final Watcher childWatcher = new CancellableWatcher(es) {
+        protected void pProcess(WatchedEvent event) {
             try {
                 if (!m_done.get()) {
-                    es.submit(childrenEventHandler);
+                    if (es != null) {
+                        es.submit(childrenEventHandler);
+                    }
                 }
-            } catch (RejectedExecutionException e) {}
+            } catch (RejectedExecutionException e) {
+            }
         }
     };
 
