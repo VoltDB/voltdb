@@ -236,10 +236,6 @@ public class TestPlansJoin extends PlannerTestCase {
         NestLoopPlanNode nlj = (NestLoopPlanNode) n;
         assertEquals(ExpressionType.COMPARE_EQUAL, nlj.getJoinPredicate().getExpressionType());
         n = n.getChild(0);
-        assertTrue(n instanceof AbstractJoinPlanNode);
-        p = ((AbstractJoinPlanNode) n).getJoinPredicate();
-        assertEquals(ExpressionType.COMPARE_EQUAL, p.getExpressionType());
-        n = n.getChild(0);
         assertTrue(n instanceof AbstractScanPlanNode);
         assertTrue(((AbstractScanPlanNode) n).getTargetTableName().equalsIgnoreCase("R1"));
         p = ((AbstractScanPlanNode) n).getPredicate();
@@ -950,11 +946,6 @@ public class TestPlansJoin extends PlannerTestCase {
        assertEquals(((NestLoopPlanNode) n).getJoinType(), JoinType.INNER);
 
        pn = compile("select * FROM R1 LEFT JOIN R2 ON R1.C = R2.C WHERE R2.C > 0");
-       n = pn.getChild(0).getChild(0);
-       assertTrue(n instanceof NestLoopPlanNode);
-       assertEquals(((NestLoopPlanNode) n).getJoinType(), JoinType.INNER);
-
-       pn = compile("select * FROM R1 RIGHT JOIN R2 ON R1.C = R2.C WHERE R1.C > 0");
        n = pn.getChild(0).getChild(0);
        assertTrue(n instanceof NestLoopPlanNode);
        assertEquals(((NestLoopPlanNode) n).getJoinType(), JoinType.INNER);
