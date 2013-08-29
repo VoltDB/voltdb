@@ -564,13 +564,13 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(Integer.MIN_VALUE, cr.getResults()[0].getLong(0));
 
         try {
-            cr = client.callProcedure("@AdHoc","select DECODE(tiny, 4, 5, NULL, 'null tiny', tiny) " +
+            cr = client.callProcedure("@AdHoc","select DECODE(tiny, 4, 5, NULL, 'tiny null', tiny) " +
                     " from R3 where id = 2");
             fail();
         } catch (Exception ex) {
             System.out.println(ex.getMessage());
             assertTrue(ex.getMessage().contains("SQL ERROR"));
-            assertTrue(ex.getMessage().contains("value: 'null tiny'"));
+            assertTrue(ex.getMessage().contains("value: 'tiny null'"));
         }
     }
 
