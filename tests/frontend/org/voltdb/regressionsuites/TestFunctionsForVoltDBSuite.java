@@ -385,6 +385,32 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals("where",result.getString(1));
     }
 
+    public void testDECODEInlineVarcharColumn_ENG5078()
+    throws NoConnectionsException, IOException, ProcCallException
+    {
+        System.out.println("STARTING DECODE inline varchar column pass-through");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P3_INLINE_DESC.insert", 1, "zheng", 10, 1.1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // null case
+        try {
+            cr = client.callProcedure("@AdHoc",
+                                      "select DECODE(id, -1, 'INVALID', desc) from P3_INLINE_DESC");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals("zheng",result.getString(0));
+        } catch (ProcCallException pce) {
+            System.out.println(pce);
+            fail("Looks like a regression of ENG-5078 inline varchar column pass-through by decode");
+        }
+    }
+
     public void testDECODEAsInput() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING DECODE No Default");
         Client client = getClient();
@@ -1430,6 +1456,14 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "TM TIMESTAMP DEFAULT NULL, " +
                 "PRIMARY KEY (ID) ); " +
                 "PARTITION TABLE P2 ON COLUMN ID;\n" +
+
+                "CREATE TABLE P3_INLINE_DESC ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "DESC VARCHAR(30), " +
+                "NUM INTEGER, " +
+                "RATIO FLOAT, " +
+                "PRIMARY KEY (ID) ); " +
+                "PARTITION TABLE P3_INLINE_DESC ON COLUMN ID;" +
 
                 "CREATE TABLE R3 ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
