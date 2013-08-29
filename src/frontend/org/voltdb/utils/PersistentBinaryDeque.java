@@ -213,6 +213,8 @@ public class PersistentBinaryDeque implements BinaryDeque {
             //increment the poll segment index so that the next poll
             //selects the correct segment
             if (m_objectReadIndex >= numEntries) {
+                m_currentPollSegmentIndex++;
+
                 /*
                  * Check that the poll segment index we are pointing to
                  * actually contains more entries to be polled.
