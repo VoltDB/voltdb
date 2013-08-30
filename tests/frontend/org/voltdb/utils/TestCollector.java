@@ -26,6 +26,7 @@ package org.voltdb.utils;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -174,11 +175,13 @@ public class TestCollector {
     public void testHeapdump() throws Exception {
         // generate heap dump
         int pid = getpid(voltDbRootPath);
+
         File heapdumpGenerated = new File("/tmp", "java_pid" + pid + ".hprof");
         heapdumpGenerated.deleteOnExit();
-        String[] cmd = {"jmap", "-dump:file=/tmp/java_pid" + pid + ".hprof", Integer.toString(pid)};
-        Process p = Runtime.getRuntime().exec(cmd);
-        p.waitFor();
+
+        PrintWriter writer = new PrintWriter(heapdumpGenerated.getPath());
+        writer.println("fake heapdump file");
+        writer.close();
 
         client.close();
         cluster.shutDown();
@@ -188,6 +191,7 @@ public class TestCollector {
         File heapdumpFile = new File(collectionDecompressed, "java_pid" + pid + ".hprof");
         assertTrue(heapdumpFile.exists());
     }
+
     @Test
     public void testLogFiles() throws Exception {
         client.close();
