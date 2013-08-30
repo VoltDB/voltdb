@@ -127,7 +127,7 @@ public class LeaderElector {
         }
     };
 
-    private final CancellableWatcher watcher = new CancellableWatcher(es) {
+    private final CancellableWatcher electionWatcher = new CancellableWatcher(es) {
         @Override
         public void pProcess(WatchedEvent event) {
             try {
@@ -147,7 +147,7 @@ public class LeaderElector {
         this.data = data;
         this.cb = cb;
         es = CoreUtils.getCachedSingleThreadExecutor("Leader elector-" + dir, 15000);
-        watcher.setExecutorService(es);
+        electionWatcher.setExecutorService(es);
     }
 
     /**
@@ -251,7 +251,7 @@ public class LeaderElector {
     private String watchNextLowerNode() throws KeeperException, InterruptedException {
         /*
          * Iterate through the sorted list of children and find the given node,
-         * then setup a watcher on the previous node if it exists, otherwise the
+         * then setup a electionWatcher on the previous node if it exists, otherwise the
          * previous of the previous...until we reach the beginning, then we are
          * the lowest node.
          */
@@ -270,7 +270,7 @@ public class LeaderElector {
             }
 
             if (child.equals(node)) {
-                while (zk.exists(previous, watcher) == null) {
+                while (zk.exists(previous, electionWatcher) == null) {
                     if (previous.equals(lowest)) {
                         /*
                          * If the leader disappeared, and we follow the leader, we
@@ -297,7 +297,7 @@ public class LeaderElector {
     private void checkForChildChanges() throws KeeperException, InterruptedException {
         /*
          * Iterate through the sorted list of children and find the given node,
-         * then setup a watcher on the previous node if it exists, otherwise the
+         * then setup a electionWatcher on the previous node if it exists, otherwise the
          * previous of the previous...until we reach the beginning, then we are
          * the lowest node.
          */
