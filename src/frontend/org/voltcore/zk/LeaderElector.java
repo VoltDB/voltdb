@@ -246,8 +246,8 @@ public class LeaderElector {
      */
     synchronized public void shutdown() throws InterruptedException, KeeperException {
         m_done.set(true);
-        childWatcher.canceled = true;
-        electionWatcher.canceled = true;
+        childWatcher.cancel();
+        electionWatcher.cancel();
         es.shutdown();
         zk.delete(node, -1);
     }
