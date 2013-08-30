@@ -90,7 +90,6 @@ public class TestParsedStatements extends TestCase {
         BuildDirectoryUtils.writeFile("statement-hsql-parsed", stmtName + ".txt", parsedStmt.toString(), true);
 
         assertTrue(parsedStmt.noTableSelectionList.isEmpty());
-        assertTrue(parsedStmt.multiTableSelectionList.isEmpty());
 
         System.out.println(parsedStmt.toString());
     }
