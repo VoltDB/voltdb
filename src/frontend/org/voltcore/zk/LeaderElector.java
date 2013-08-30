@@ -29,7 +29,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
-import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
@@ -114,16 +113,13 @@ public class LeaderElector {
         }
     };
 
-    private final Watcher childWatcher = new CancellableWatcher(es) {
+    private final CancellableWatcher childWatcher = new CancellableWatcher(es) {
         protected void pProcess(WatchedEvent event) {
             try {
                 if (!m_done.get()) {
-                    if (getExecutorService() != null) {
-                        getExecutorService().submit(childrenEventHandler);
-                    }
+                    es.submit(electionEventHandler);
                 }
-            } catch (RejectedExecutionException e) {
-            }
+            } catch (RejectedExecutionException e) {}
         }
     };
 
@@ -147,7 +143,9 @@ public class LeaderElector {
         this.data = data;
         this.cb = cb;
         es = CoreUtils.getCachedSingleThreadExecutor("Leader elector-" + dir, 15000);
+        //Set the executor service for watchers who submit handlers.
         electionWatcher.setExecutorService(es);
+        childWatcher.setExecutorService(es);
     }
 
     /**

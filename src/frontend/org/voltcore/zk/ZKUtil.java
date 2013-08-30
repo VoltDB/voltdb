@@ -484,7 +484,7 @@ public class ZKUtil {
 
         @Override
         public void process(final WatchedEvent event) {
-            getExecutorService().execute(new Runnable() {
+            es.execute(new Runnable() {
                @Override
                public void run() {
                    if (canceled) return;
@@ -495,16 +495,6 @@ public class ZKUtil {
 
         abstract protected void pProcess(final WatchedEvent event);
 
-        /**
-         * @return the es
-         */
-        public ExecutorService getExecutorService() {
-            return es;
-        }
-
-        /**
-         * @param es the es to set
-         */
         public void setExecutorService(ExecutorService es) {
             this.es = es;
         }
