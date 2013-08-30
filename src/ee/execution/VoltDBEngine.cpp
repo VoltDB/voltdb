@@ -485,6 +485,8 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
 
     assert(m_catalog != NULL);
     VOLT_DEBUG("Loading catalog...");
+
+    VOLT_DEBUG("Catalog string contents:\n%s\n",catalogPayload.c_str());
     m_catalog->execute(catalogPayload);
 
 
@@ -1434,7 +1436,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
                 results.writeInt(*ipos);
             }
         }
-        VOLT_DEBUG("tableStreamSerializeMore: deserialized %d buffers, %ld remaining",
+        VOLT_DEBUG("tableStreamSerializeMore: deserialized %d buffers, %lld remaining",
                    (int)positions.size(), remaining);
     }
     catch (SerializableEEException &e) {

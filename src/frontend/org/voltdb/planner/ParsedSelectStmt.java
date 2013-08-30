@@ -48,7 +48,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         public String tableName = null;
         public AbstractExpression expression = null;
         public boolean finalOutput = true;
-        public int index = 0;
+        public int index = -1;
         public int size = 0;
 
         // orderby stuff

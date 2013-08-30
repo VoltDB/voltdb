@@ -65,6 +65,8 @@ private:
     /** load a predicate from the catalog structure if it's there */
     void parsePredicate(catalog::MaterializedViewInfo *metadata);
 
+    void parseComplexGroupby(catalog::MaterializedViewInfo *metadata);
+
     /**
      * build a search key based on the src table value
      * and use an index to find 0 or 1 rows in the view table
@@ -91,6 +93,9 @@ private:
     // predicate to include or exclude rows from being
     // part of the aggregation in the materialized view
     AbstractExpression *m_filterPredicate;
+
+    bool m_hasComplexGroupby;
+    std::vector<AbstractExpression *> m_groupbyExprs;
 
     // how many columns is the view aggregated on
     int32_t m_groupByColumnCount;
