@@ -472,7 +472,7 @@ public class ZKUtil {
      */
     public static abstract class CancellableWatcher implements Watcher {
         volatile boolean canceled = false;
-        private ExecutorService es;
+        final private ExecutorService es;
 
         public CancellableWatcher(ExecutorService es) {
             this.es = es;
@@ -494,9 +494,5 @@ public class ZKUtil {
         }
 
         abstract protected void pProcess(final WatchedEvent event);
-
-        public void setExecutorService(ExecutorService es) {
-            this.es = es;
-        }
     }
 }

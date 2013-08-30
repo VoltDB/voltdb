@@ -31,7 +31,6 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltZK;
 
@@ -113,27 +112,43 @@ public class LeaderElector {
         }
     };
 
-    private final CancellableWatcher childWatcher = new CancellableWatcher(es) {
+    //Cancellable Children watcher cancelled at shutdown time
+    private class ChildrenCancellableWatcher extends CancellableWatcher {
+
+        public ChildrenCancellableWatcher(ExecutorService es) {
+            super(es);
+        }
+
+        @Override
         protected void pProcess(WatchedEvent event) {
             try {
                 if (!m_done.get()) {
                     es.submit(childrenEventHandler);
                 }
-            } catch (RejectedExecutionException e) {}
+            } catch (RejectedExecutionException e) {
+            }
         }
-    };
+    }
+    private final ChildrenCancellableWatcher childWatcher;
 
-    private final CancellableWatcher electionWatcher = new CancellableWatcher(es) {
+    //Cancellable Election watcher cancelled at shutdown time
+    private class ElectionCancellableWatcher extends CancellableWatcher {
+
+        public ElectionCancellableWatcher(ExecutorService es) {
+            super(es);
+        }
+
         @Override
-        public void pProcess(WatchedEvent event) {
+        protected void pProcess(WatchedEvent event) {
             try {
                 if (!m_done.get()) {
                     es.submit(electionEventHandler);
                 }
-            } catch (RejectedExecutionException e) {}
+            } catch (RejectedExecutionException e) {
+            }
         }
-
-    };
+    }
+    private final ElectionCancellableWatcher electionWatcher;
 
     public LeaderElector(ZooKeeper zk, String dir, String prefix, byte[] data,
                          LeaderNoticeHandler cb) {
@@ -143,9 +158,8 @@ public class LeaderElector {
         this.data = data;
         this.cb = cb;
         es = CoreUtils.getCachedSingleThreadExecutor("Leader elector-" + dir, 15000);
-        //Set the executor service for watchers who submit handlers.
-        electionWatcher.setExecutorService(es);
-        childWatcher.setExecutorService(es);
+        electionWatcher = new ElectionCancellableWatcher(es);
+        childWatcher = new ChildrenCancellableWatcher(es);
     }
 
     /**
@@ -232,11 +246,11 @@ public class LeaderElector {
      */
     synchronized public void shutdown() throws InterruptedException, KeeperException {
         m_done.set(true);
+        childWatcher.canceled = true;
+        electionWatcher.canceled = true;
         es.shutdown();
         zk.delete(node, -1);
     }
-
-    private final static VoltLogger LOG = new VoltLogger("HOST");
 
 
     /**
