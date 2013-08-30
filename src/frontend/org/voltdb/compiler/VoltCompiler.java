@@ -916,6 +916,9 @@ public class VoltCompiler {
                 msg = String.format(msg, className);
                 throw new VoltCompilerException(msg);
             }
+
+            // reset the added classes to the actual added classes
+            m_addedClasses = addedClasses.toArray(new String[0]);
         }
     }
 

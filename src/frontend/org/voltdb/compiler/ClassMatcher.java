@@ -48,7 +48,7 @@ public class ClassMatcher {
      */
     public void addPattern(String classNamePattern) {
         if (m_classList == null) {
-            m_classList = getAllClassFileNames();
+            m_classList = getClasspathClassFileNames();
         }
 
         String preppedName = classNamePattern.trim();
@@ -59,8 +59,6 @@ public class ClassMatcher {
         if (indexOfDollarSign >= 0) {
             classNamePattern = classNamePattern.substring(0, indexOfDollarSign);
         }
-
-        System.err.println(classNamePattern);
 
         preppedName = preppedName.replace("**", "[\\w.\\$]+");
         preppedName = preppedName.replace("*",  "[\\w\\$]+");
@@ -159,7 +157,10 @@ public class ClassMatcher {
         for (File f : files) {
             // classes in the anonymous package
             if (f.getName().endsWith(".class")) {
-                classes.add(f.getName());
+                String className = f.getName();
+                // trim the trailing .class from the end
+                className = className.substring(0, className.length() - ".class".length());
+                classes.add(className);
             }
             if (f.isDirectory()) {
                 Package p = new Package(null, f);
@@ -174,7 +175,7 @@ public class ClassMatcher {
      * newlines. Classfiles are represented by their Java
      * "dot" names, not filenames.
      */
-    static String getAllClassFileNames() {
+    static String getClasspathClassFileNames() {
         String classpath = System.getProperty("java.class.path");
         String[] pathParts = classpath.split(File.pathSeparator);
 
