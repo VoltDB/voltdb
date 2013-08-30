@@ -477,6 +477,20 @@ public class TestFunctionsSuite extends RegressionSuite {
         resultB = r.asScalarLong();
         assertEquals(resultA, resultB);
 
+        // Here's the ENG-3196 case, all better now
+        cr = client.callProcedure("@AdHoc", "SELECT ABS(ID) AS ENG3196 FROM R1 ORDER BY (ID) LIMIT 5;");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.out.println("DEBUG ENG-3196: " + r);
+        long resultCount = r.getRowCount();
+        assertEquals(5, resultCount);
+        r.advanceRow();
+        resultB = r.getLong(0);
+        assertEquals(14, resultB);
+        r.advanceToRow(4);
+        resultB = r.getLong(0);
+        assertEquals(10, resultB);
+
         boolean caught = false;
 
         caught = false;
