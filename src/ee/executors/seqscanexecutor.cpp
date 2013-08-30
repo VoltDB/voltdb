@@ -184,7 +184,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
                        tuple.debug(target_table->name()).c_str(), tuple_ctr,
                        (int)target_table->activeTupleCount());
-            doLongOpTracking();
+            m_engine->noteTuplesProcessedForProgressMonitoring(1);
             //
             // For each tuple we need to evaluate it against our predicate
             //

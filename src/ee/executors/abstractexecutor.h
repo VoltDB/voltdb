@@ -119,12 +119,6 @@ class AbstractExecutor {
      */
     void setDMLCountOutputTable(TempTableLimits* limits);
 
-    /**
-     * Track total tuples accessed for this query.
-     * Set up statistics for long running operations thru m_engine if total tuples accessed passes the threshold.
-     */
-    void doLongOpTracking();
-
     // execution engine owns the plannode allocation.
     AbstractPlanNode* m_abstractNode;
     TempTable* m_tmpOutputTable;
@@ -134,6 +128,9 @@ class AbstractExecutor {
 
     /** reference to the engine to call up to the top end */
     VoltDBEngine* m_engine;
+
+    // useful for debugging/logging/progress reporting
+    std::string m_planNodeName;
 };
 
 inline bool AbstractExecutor::execute(const NValueArray& params)
@@ -141,6 +138,9 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
     assert(m_abstractNode);
     VOLT_TRACE("Starting execution of plannode(id=%d)...",
                m_abstractNode->getPlanNodeId());
+
+    // useful for debugging/logging/progress reporting
+    m_engine->setLastAccessedPlanNodeName(&m_planNodeName);
 
     if (m_tmpOutputTable)
     {
@@ -155,38 +155,6 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
 
     // run the executor
     return p_execute(params);
-}
-
-/**
- * Track total tuples accessed for this query.
- * Set up statistics for long running operations thru m_engine if total tuples accessed passes the threshold.
- */
-inline void AbstractExecutor::doLongOpTracking() {
-    if((++m_engine->m_allTuplesScanned) % LONG_OP_THRESHOLD != 0) {
-        return;
-    }
-    else {
-        Table* targetTable = m_engine->getLastAccessedTable();
-        std::string tableName;
-        int64_t tableSize;
-        if(targetTable == NULL) {
-            tableName = "None";
-            tableSize = 0;
-        }
-        else{
-            tableName = targetTable->name();
-            tableSize = targetTable->activeTupleCount();
-        }
-        //Update stats in java and let java determine if we should cancel this query.
-        if(m_engine->getTopend()->fragmentProgressUpdate(m_engine->getIndexInBatch(),
-                planNodeToString(m_abstractNode->getPlanNodeType()),
-                tableName,
-                tableSize,
-                m_engine->m_allTuplesScanned - m_engine->m_tuplesScannedAtFragmentStart)){
-            VOLT_INFO("Interrupt query.");
-            throw InterruptException("Query interrupted.");
-        }
-    }
 }
 
 }

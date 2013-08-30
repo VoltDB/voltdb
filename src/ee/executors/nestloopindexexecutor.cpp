@@ -242,7 +242,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     while (outer_iterator.next(outer_tuple)) {
         VOLT_TRACE("outer_tuple:%s",
                    outer_tuple.debug(outer_table->name()).c_str());
-        doLongOpTracking();
+        m_engine->noteTuplesProcessedForProgressMonitoring(1);
         // Set the outer tuple columns. Must be outside the inner loop
         // in case of the empty inner table
         join_tuple.setNValues(0, outer_tuple, 0, num_of_outer_cols);
@@ -379,7 +379,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                         // start point to do reverse scan
                         index->moveToGreaterThanKey(&index_values);
                         while (!(inner_tuple = index->nextValue()).isNullTuple()) {
-                            doLongOpTracking();
+                            m_engine->noteTuplesProcessedForProgressMonitoring(1);
                             if (initial_expression != NULL && initial_expression->eval(&inner_tuple, NULL).isFalse()) {
                                 break;
                             }
@@ -402,7 +402,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                 {
                     VOLT_TRACE("inner_tuple:%s",
                                inner_tuple.debug(inner_table->name()).c_str());
-                    doLongOpTracking();
+                    m_engine->noteTuplesProcessedForProgressMonitoring(1);
                     //
                     // First check whether the end_expression is now false
                     //

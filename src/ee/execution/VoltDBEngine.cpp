@@ -313,6 +313,10 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
 
     setUndoToken(undoToken);
 
+    // reset these at the start of each batch
+    m_tuplesProcessedInBatch = 0;
+    m_tuplesProcessedInFragment = 0;
+
     for (m_currentIndexInBatch = 0; m_currentIndexInBatch < numFragments; ++m_currentIndexInBatch) {
 
         m_usedParamcnt = serialize_in.readShort();
@@ -337,6 +341,10 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         {
             ++failures;
         }
+
+        // at the end of each frag, rollup and reset counters
+        m_tuplesProcessedInBatch += m_tuplesProcessedInFragment;
+        m_tuplesProcessedInFragment = 0;
     }
 
     m_stringPool.purge();
@@ -411,9 +419,6 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     // children are positioned before it in this list, therefore
     // dependency tracking is not needed here.
     size_t ttl = execsForFrag->list.size();
-
-    // reset the offset into the tuple scan count for each fragment
-    m_tuplesScannedAtFragmentStart = m_allTuplesScanned;
 
     for (int ctr = 0; ctr < ttl; ++ctr) {
         AbstractExecutor *executor = execsForFrag->list[ctr];
@@ -1706,5 +1711,26 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
     }
 }
 
+void VoltDBEngine::reportProgessToTopend() {
+    std::string tableName;
+    int64_t tableSize;
+    if (m_lastAccessedTable == NULL) {
+        tableName = "None";
+        tableSize = 0;
+    }
+    else {
+        tableName = m_lastAccessedTable->name();
+        tableSize = m_lastAccessedTable->activeTupleCount();
+    }
+    //Update stats in java and let java determine if we should cancel this query.
+    if(m_topend->fragmentProgressUpdate(m_currentIndexInBatch,
+                                        *m_lastAccessedPlanNodeName,
+                                        tableName,
+                                        tableSize,
+                                        m_tuplesProcessedInBatch + m_tuplesProcessedInFragment)){
+        VOLT_INFO("Interrupt query.");
+        throw InterruptException("Query interrupted.");
+    }
+}
 
 }

@@ -397,7 +397,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             m_index->moveToGreaterThanKey(&m_searchKey);
 
             while (!(m_tuple = m_index->nextValue()).isNullTuple()) {
-                doLongOpTracking();
+                m_engine->noteTuplesProcessedForProgressMonitoring(1);
                 if (initial_expression != NULL && initial_expression->eval(&m_tuple, NULL).isFalse()) {
                     break;
                 }
@@ -431,7 +431,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             !(m_tuple = m_index->nextValue()).isNullTuple()))) {
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", m_tuple.debug("tablename").c_str());
 
-        doLongOpTracking();
+        m_engine->noteTuplesProcessedForProgressMonitoring(1);
         //
         // First check whether the end_expression is now false
         //

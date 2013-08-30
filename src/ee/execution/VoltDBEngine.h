@@ -190,22 +190,26 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /** index of the batch piece being executed */
         int m_currentIndexInBatch;
         int64_t m_allTuplesScanned;
-        int64_t m_tuplesScannedAtFragmentStart;
-        Table* m_lastAccessedTable;
+        int64_t m_tuplesProcessedInBatch;
+        int64_t m_tuplesProcessedInFragment;
+        Table *m_lastAccessedTable;
+        std::string *m_lastAccessedPlanNodeName;
 
         inline int getIndexInBatch() {
             return m_currentIndexInBatch;
         }
-        inline void setLastAccessedTable(Table* table) {
+        inline void setLastAccessedTable(Table *table) {
             m_lastAccessedTable = table;
         }
-        inline Table* getLastAccessedTable() {
-            return m_lastAccessedTable;
+        inline void setLastAccessedPlanNodeName(std::string *name) {
+            m_lastAccessedPlanNodeName = name;
         }
 
         // Created to transition existing unit tests to context abstraction.
         // If using this somewhere new, consider if you're being lazy.
         ExecutorContext *getExecutorContext();
+
+        inline void noteTuplesProcessedForProgressMonitoring(int tuplesProcessed);
 
         // -------------------------------------------------
         // Dependency Transfer Functions
@@ -457,6 +461,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void printReport();
 
+        void reportProgessToTopend();
+
         /**
          * Keep a list of executors for runtime - intentionally near the top of VoltDBEngine
          */
@@ -627,7 +633,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         DefaultTupleSerializer m_tupleSerializer;
 
-    private:
         ThreadLocalPool m_tlPool;
 };
 
@@ -635,6 +640,17 @@ inline void VoltDBEngine::resetReusedResultOutputBuffer(const size_t headerSize)
     m_resultOutput.initializeWithPosition(m_reusedResultBuffer, m_reusedResultCapacity, headerSize);
     m_exceptionOutput.initializeWithPosition(m_exceptionBuffer, m_exceptionBufferCapacity, headerSize);
     *reinterpret_cast<int32_t*>(m_exceptionBuffer) = voltdb::VOLT_EE_EXCEPTION_TYPE_NONE;
+}
+
+/**
+ * Track total tuples accessed for this query.
+ * Set up statistics for long running operations thru m_engine if total tuples accessed passes the threshold.
+ */
+inline void VoltDBEngine::noteTuplesProcessedForProgressMonitoring(int tuplesProcessed) {
+    m_tuplesProcessedInFragment += tuplesProcessed;
+    if((m_tuplesProcessedInFragment % LONG_OP_THRESHOLD) == 0) {
+        reportProgessToTopend();
+    }
 }
 
 } // namespace voltdb
