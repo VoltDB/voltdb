@@ -86,25 +86,5 @@ public class Iv2TransactionCreator implements TransactionCreator
     {
         m_ci.sendEOLMessage(partitionId);
     }
-
-    @Override
-    public void setSendHeartbeats(boolean val)
-    {
-        // Iv2 does not require heartbeating.
-    }
-
-    @Override
-    public void sendHeartbeat(long txnId)
-    {
-        // Iv2 does not require heartbeating.
-    }
-
-    @Override
-    public boolean isOnBackPressure()
-    {
-        return false;
-    }
-
-
 }
 

@@ -286,21 +286,6 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         }
 
         @Override
-        public void setSendHeartbeats(boolean val) {
-
-        }
-
-        @Override
-        public void sendHeartbeat(long txnId) {
-
-        }
-
-        @Override
-        public boolean isOnBackPressure() {
-            return false;
-        }
-
-        @Override
         public void removeConnectionStats(long connectionId) {
 
         }

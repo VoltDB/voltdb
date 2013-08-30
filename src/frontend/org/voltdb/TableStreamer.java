@@ -38,7 +38,7 @@ import java.util.concurrent.Callable;
  */
 public class TableStreamer {
     // Error code returned by EE.tableStreamSerializeMore().
-    private static byte SERIALIZATION_ERROR = -1;
+    private static final byte SERIALIZATION_ERROR = -1;
 
     private final int m_tableId;
     private final TableStreamType m_type;
