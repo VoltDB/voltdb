@@ -748,7 +748,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // set additional restore agent stuff
             if (m_restoreAgent != null) {
-                ci.bindAdapter(m_restoreAgent.getAdapter());
                 m_restoreAgent.setCatalogContext(m_catalogContext);
                 m_restoreAgent.setInitiator(new Iv2TransactionCreator(m_clientInterfaces.get(0)));
             }

@@ -532,6 +532,7 @@ public class PlanAssembler {
             }
         }
 
+
         if (root instanceof ReceivePlanNode && m_parsedSelect.mayNeedAvgPushdown()) {
             m_parsedSelect.switchOptimalSuite();
         }

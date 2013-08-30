@@ -67,7 +67,6 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
             // Analyze join conditions
             m_parsedStmt.analyzeJoinExpressions(m_parsedStmt.joinTree);
             // these just shouldn't happen right?
-            assert(m_parsedStmt.multiTableSelectionList.size() == 0);
             assert(m_parsedStmt.noTableSelectionList.size() == 0);
 
             m_generatedPlans = true;
