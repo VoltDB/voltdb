@@ -52,10 +52,12 @@ MaterializedViewMetadata::MaterializedViewMetadata(
     if (m_hasComplexGroupby) {
         VOLT_TRACE("Start to parse complex group by");
         parseComplexGroupby(metadata);
+        m_groupByColumnCount = m_groupbyExprs.size();
+    } else {
+        m_groupByColumnCount = metadata->groupbycols().size();
     }
 
     // set up the group by columns from the catalog info
-    m_groupByColumnCount = metadata->groupbycols().size();
     m_groupByColumns = new int32_t[m_groupByColumnCount];
 
     if (!m_hasComplexGroupby) {

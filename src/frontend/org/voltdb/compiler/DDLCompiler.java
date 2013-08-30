@@ -26,6 +26,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -53,9 +54,11 @@ import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
+import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
@@ -1491,44 +1494,23 @@ public class DDLCompiler {
 
             List<Column> srcColumnArray = CatalogUtil.getSortedCatalogItems(srcTable.getColumns(), "index");
             List<Column> destColumnArray = CatalogUtil.getSortedCatalogItems(destTable.getColumns(), "index");
-            List<AbstractExpression> groupbyExprs = new ArrayList<AbstractExpression>();
+            List<AbstractExpression> groupbyExprs = null;
 
-            matviewinfo.setHascomplexgroupby(false);
-
-            // add the group by columns from the src table
-            for (int i = 0; i < stmt.groupByColumns.size(); i++) {
-                ParsedSelectStmt.ParsedColInfo gbcol = stmt.groupByColumns.get(i);
-                if (gbcol.index >= 0) {
-                    Column srcCol = srcColumnArray.get(gbcol.index);
-                    ColumnRef cref = matviewinfo.getGroupbycols().add(srcCol.getTypeName());
-                    // groupByColumns is iterating in order of groups. Store that grouping order
-                    // in the column ref index. When the catalog is serialized, it will, naturally,
-                    // scramble this order like a two year playing dominos, presenting the data
-                    // in a meaningless sequence.
-                    cref.setIndex(i);           // the column offset in the view's grouping order
-                    cref.setColumn(srcCol);     // the source column from the base (non-view) table
-                } else {
-                    matviewinfo.getGroupbycols().add("ComplexGroupbyColumn_" + String.valueOf(i));
-                }
-            }
-
-            // parse out the group by columns into the dest table
-            for (int i = 0; i < stmt.groupByColumns.size(); i++) {
-                ParsedSelectStmt.ParsedColInfo col = stmt.displayColumns.get(i);
-                Column destColumn = destColumnArray.get(i);
-                groupbyExprs.add(col.expression);
-
-                if (col.expression instanceof TupleValueExpression) {
-                    processMaterializedViewColumn(matviewinfo, srcTable, destTable, destColumn,
-                            ExpressionType.VALUE_TUPLE, (TupleValueExpression)col.expression);
-                } else {
-                    processMaterializedViewColumn(matviewinfo, srcTable, destTable, destColumn,
-                            ExpressionType.INVALID, null);
-                }
-            }
-            // Parse group by expressions to json string
             if (stmt.hasComplexGroupby()) {
                 matviewinfo.setHascomplexgroupby(true);
+
+                groupbyExprs = new ArrayList<AbstractExpression>();
+                HashSet<TupleValueExpression> tves = new HashSet<TupleValueExpression>();
+                for (ParsedColInfo col: stmt.groupByColumns) {
+                    groupbyExprs.add(col.expression);
+                    tves.addAll(ExpressionUtil.getTupleValueExpressions(col.expression));
+                }
+                // Record these column info to optimize base table update operation in future.
+                for (TupleValueExpression tve: tves) {
+                    matviewinfo.getGroupbycols().add(tve.getColumnName());
+                }
+
+                // Parse group by expressions to json string
                 String groupbyExprsJson = null;
                 try {
                     groupbyExprsJson = convertToJSONArray(groupbyExprs);
@@ -1537,6 +1519,29 @@ public class DDLCompiler {
                     e.printStackTrace();
                 }
                 matviewinfo.setGroupbyexpressionsjson(groupbyExprsJson);
+
+            } else {
+                matviewinfo.setHascomplexgroupby(false);
+                // add the group by columns from the src table
+                for (int i = 0; i < stmt.groupByColumns.size(); i++) {
+                    ParsedSelectStmt.ParsedColInfo gbcol = stmt.groupByColumns.get(i);
+                    Column srcCol = srcColumnArray.get(gbcol.index);
+                    ColumnRef cref = matviewinfo.getGroupbycols().add(srcCol.getTypeName());
+                    // groupByColumns is iterating in order of groups. Store that grouping order
+                    // in the column ref index. When the catalog is serialized, it will, naturally,
+                    // scramble this order like a two year playing dominos, presenting the data
+                    // in a meaningless sequence.
+                    cref.setIndex(i);           // the column offset in the view's grouping order
+                    cref.setColumn(srcCol);     // the source column from the base (non-view) table
+                }
+
+                // parse out the group by columns into the dest table
+                for (int i = 0; i < stmt.groupByColumns.size(); i++) {
+                    ParsedSelectStmt.ParsedColInfo col = stmt.displayColumns.get(i);
+                    Column destColumn = destColumnArray.get(i);
+                    processMaterializedViewColumn(matviewinfo, srcTable, destTable, destColumn,
+                            ExpressionType.VALUE_TUPLE, (TupleValueExpression)col.expression);
+                }
             }
 
             // Set up COUNT(*) column
