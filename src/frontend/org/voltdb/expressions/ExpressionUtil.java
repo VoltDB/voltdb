@@ -222,20 +222,6 @@ public abstract class ExpressionUtil {
     }
 
     /**
-     * "Uncombine" a potentially AND-ed set of one or more filters, typically from a single table,
-     * and add any equivalence expressions to the statement's collection.
-     * @param compoundFilter a clause that may be or contain (ANDed) an equivalence expression
-     * @param the running result collecting the statement's equivalence filters
-     */
-    public static void
-    collectPartitioningFilters(AbstractExpression compoundFilter,
-                               HashMap<AbstractExpression, Set<AbstractExpression> > equivalenceSet)
-    {
-        Collection<AbstractExpression> filterList = uncombineAny(compoundFilter);
-        collectPartitioningFilters(filterList, equivalenceSet);
-    }
-
-    /**
      *
      * @param left
      * @param right

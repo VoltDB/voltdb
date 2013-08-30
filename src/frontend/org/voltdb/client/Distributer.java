@@ -597,7 +597,7 @@ class Distributer {
             boolean useClientAffinity) {
         m_useMultipleThreads = useMultipleThreads;
         m_network = new VoltNetworkPool(
-                m_useMultipleThreads ? Math.max(2, CoreUtils.availableProcessors()) / 4 : 1, null);
+            m_useMultipleThreads ? Math.max(1, (int)(CoreUtils.availableProcessors() / 4) ) : 1, null);
         m_network.start();
         m_procedureCallTimeoutMS = procedureCallTimeoutMS;
         m_connectionResponseTimeoutMS = connectionResponseTimeoutMS;

@@ -59,15 +59,15 @@ def make_delete_branches_script(branch_infos, dry_run):
     for bi in branch_infos:
         b = bi['name']
         cmd = 'git push origin --delete %s%s' % \
-            (b.split('origin/')[1], other_args)
+            (b, other_args)
         comment = make_comment(bi)
         print
         print comment
         print cmd
 
 def make_comment(bi):
-    comment = '#last checkin %s %s by %s' % \
-        (bi['datetime'],bi['humantime'],bi['email'])
+    comment = '#%-20s last checkin %s %s by %s' % \
+        (bi['name'],bi['datetime'],bi['humantime'],bi['email'])
     if options.use_jira:
         ticket_summary = get_jira_info(bi['name'])
         if ticket_summary:
@@ -82,14 +82,17 @@ def get_jira_info(b):
     if m:
         issue = m.group(1) + '-' + m.group(2)
         #print "##Getting %s" % issue
-        ticket = jiratools.get_jira_issue(jira_url, user, password, issue, 'summary,assignee')
+        ticket = jiratools.get_jira_issue(jira_url, user, password, issue, 'summary,assignee,status,resolution')
         if ticket:
             assignee = 'Unassigned'
             if ticket['fields']['assignee']:
                 assignee = ticket['fields']['assignee']['name']
             summary = ticket['fields']['summary']
             #issue_url = jira_url +  'browse/' + issue_key
-            comment = "#%s %s: %s" % (issue, assignee, summary)
+            status_resolution = ticket['fields']['status']['name']
+            if status_resolution in ('Closed','Resolved'):
+                status_resolution += '/' + ticket['fields']['resolution']['name']
+            comment = "#%s %s %s: %s" % (issue, status_resolution.upper(), assignee, summary)
 
     return comment
 
@@ -98,16 +101,14 @@ def make_archive_branches_script(branch_infos, dry_run):
     if dry_run:
         other_args = ' --dry-run'
     for bi in branch_infos:
-        b = bi['name']
         comment = make_comment(bi)
-        shortname = b.split('origin/')[1]
-        tagname = "archive/" + shortname
+        tagname = "archive/" + bi['name']
         print
         print comment
-        print 'git tag -m "archiving branch %s" %s %s' % \
-            (shortname, tagname, b)
+        print 'git tag -m "archiving branch %s" %s origin/%s' % \
+            (bi['name'], tagname, bi['name'])
         print 'git push origin %s' % (tagname)
-        print 'git push origin --delete %s %s' % (other_args, shortname)
+        print 'git push origin --delete %s %s' % (other_args, bi['name'])
 
 if __name__ == "__main__":
 
@@ -140,7 +141,7 @@ if __name__ == "__main__":
     branch_infos = []
     for b in branch_names:
         branch_info = {}
-        branch_info['name'] = b
+        branch_info['name'] = b.split('/')[1]
 
         #Get the git log info and pack it into a branch_info dictionary
         cmd = 'git log -1 --format=%s %s' % (format_string, b)
