@@ -38,7 +38,8 @@ public class TestPlansOrderBy extends PlannerTestCase {
         super.tearDown();
     }
 
-    private void validatePlan(String sql, boolean expectIndexScan, boolean expectSeqScan, boolean expectOrderBy, boolean expectHashAggregate)
+    private void validatePlan(String sql, boolean expectIndexScan,
+            boolean expectSeqScan, boolean expectOrderBy, boolean expectHashAggregate)
     {
         AbstractPlanNode pn = compile(sql);
         //System.out.println(pn.getChild(0).toJSONString());
@@ -98,6 +99,8 @@ public class TestPlansOrderBy extends PlannerTestCase {
         validateOptimalPlan("SELECT * from Tmanykeys WHERE T_D1 = ? ORDER BY T_D0, T_D2");
         validateOptimalPlan("SELECT * from Tmanykeys WHERE T_D2 = ? ORDER BY T_D0, T_D1");
         validateOptimalPlan("SELECT * from Tmanykeys                ORDER BY T_D0, T_D1");
+        validateIndexedBruteForcePlan("SELECT * FROM Tmanykeys WHERE T_D0 <= ? ORDER BY T_D1, T_D2");
+        validateIndexedBruteForcePlan("SELECT * FROM Tmanykeys WHERE T_D0 <= ? ORDER BY T_D1 DESC, T_D2 DESC");
     }
 
     public void testOrderByOneOfThreeIndexKeys()
@@ -109,6 +112,10 @@ public class TestPlansOrderBy extends PlannerTestCase {
         validateOptimalPlan("SELECT * from Tmanykeys WHERE T_D1 = ?              ORDER BY T_D0");
         validateOptimalPlan("SELECT * from Tmanykeys WHERE T_D2 = ?              ORDER BY T_D0");
         validateOptimalPlan("SELECT * from Tmanykeys                             ORDER BY T_D0");
+        validateIndexedBruteForcePlan("SELECT * FROM Tmanykeys WHERE T_D0 = ? AND T_D1 < ? ORDER BY T_D2");
+        validateIndexedBruteForcePlan("SELECT * FROM Tmanykeys WHERE T_D0 = ? AND T_D1 < ? ORDER BY T_D2 DESC");
+        validateIndexedBruteForcePlan("SELECT * FROM Tmanykeys WHERE T_D0 = ? ORDER BY T_D2");
+        validateIndexedBruteForcePlan("SELECT * FROM Tmanykeys WHERE T_D0 = ? ORDER BY T_D2 DESC");
     }
 
     public void testOrderByWrongPermutation()
@@ -168,6 +175,54 @@ public class TestPlansOrderBy extends PlannerTestCase {
     }
 
     public void testOrderDescWithEquality() {
-        validatePlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D1 DESC", true, false, true, false);
+        validateOptimalPlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D1");
+        // See ENG-5084 to optimize this query to use inverse scan in future.
+        validateIndexedBruteForcePlan("SELECT * FROM T WHERE T_D0 = 2 ORDER BY T_D1 DESC");
+    }
+
+    // Indexes on T (T_D0, T_D1), T2 (T_D0, T_D1), and Tmanykeys (T_D0, T_D1, T_D2)
+    // no index on Tnokey and Tnokey2
+    public void testENG4676() {
+        // single column ORDER BY
+        // ORDER BY on indexed key ascending, JOIN on indexed key from one table and
+        // unindexed key from the other table -> no ORDER BY node
+        validateOptimalPlan("SELECT * FROM T, Tmanykeys WHERE Tmanykeys.T_D0 = T.T_D2 " +
+                "ORDER BY T.T_D0 LIMIT ?");
+        // ORDER BY on indexed key descending, JOIN on indexed key from one table
+        // and unindexed key from the other table -> no ORDER BY node
+        validateOptimalPlan("SELECT * FROM T, Tmanykeys WHERE Tmanykeys.T_D0 = T.T_D2 " +
+                "ORDER BY T.T_D0 DESC LIMIT ?");
+
+        // multiple columns ORDER BY
+        // ORDER BY on indexed key ascending, JOIN on indexed key from one table and
+        // unindexed key from the other table -> no ORDER BY node
+        validateOptimalPlan("SELECT * FROM T, Tmanykeys WHERE Tmanykeys.T_D0 = T.T_D2 " +
+                "ORDER BY T.T_D0, T.T_D1 LIMIT ?");
+        // ORDER BY on indexed key descending, JOIN on indexed key from one table and
+        // unindexed key from the other table -> no ORDER BY node
+        validateOptimalPlan("SELECT * FROM T, Tmanykeys WHERE Tmanykeys.T_D0 = T.T_D2 " +
+                "ORDER BY T.T_D0 DESC, T.T_D1 DESC LIMIT ?");
+
+        // filter on indexed column on one table, prefix join constraint,
+        // ORDER BY looking for 1 recovered spoiler -> no ORDER BY node
+        validateOptimalPlan("SELECT * FROM T, Tmanykeys WHERE Tmanykeys.T_D0 = T.T_D2 AND T.T_D0 = ?  " +
+                "ORDER BY Tmanykeys.T_D1 LIMIT ?");
+        // ORDER BY is not recovered, but index is chosen for sorting purpose --> no ORDER BY node
+        validateOptimalPlan("SELECT * FROM T, Tmanykeys WHERE Tmanykeys.T_D1 = T.T_D2 AND T.T_D0 = ?  " +
+                "ORDER BY Tmanykeys.T_D0 LIMIT ?");
+
+        // test NLJ --> need ORDER BY node
+        validateBruteForcePlan("SELECT * FROM Tnokey, Tnokey2 WHERE Tnokey.T_D0 = Tnokey2.T_D0 " +
+                "ORDER BY Tnokey.T_D1 LIMIT ?");
+
+        // test nested NLIJ
+        validateIndexedBruteForcePlan("SELECT * FROM T, T2, Tmanykeys " +
+                "WHERE T.T_D0 = T2.T_D0 AND T2.T_D1 = Tmanykeys.T_D0 ORDER BY Tmanykeys.T_D1 LIMIT ?");
+        validateIndexedBruteForcePlan("SELECT * FROM T, T2, Tmanykeys " +
+                "WHERE T.T_D0 = T2.T_D0 AND T2.T_D1 = Tmanykeys.T_D0 ORDER BY T.T_D1 LIMIT ?");
+        validateIndexedBruteForcePlan("SELECT * FROM T, T2, Tmanykeys " +
+                "WHERE T.T_D0 = T2.T_D0 AND T2.T_D1 = Tmanykeys.T_D0 ORDER BY T2.T_D1 LIMIT ?");
+        validateOptimalPlan("SELECT * FROM T, T2, Tmanykeys " +
+                "WHERE T.T_D0 = T2.T_D0 AND T2.T_D1 = Tmanykeys.T_D0 ORDER BY T.T_D0, T.T_D1 LIMIT ?");
     }
 }

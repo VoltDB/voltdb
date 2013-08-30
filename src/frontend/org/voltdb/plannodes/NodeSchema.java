@@ -20,6 +20,7 @@ package org.voltdb.plannodes;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 
 import org.voltdb.expressions.TupleValueExpression;
 
@@ -29,9 +30,13 @@ import org.voltdb.expressions.TupleValueExpression;
  */
 public class NodeSchema
 {
+    private ArrayList<SchemaColumn> m_columns;
+    private HashMap <SchemaColumn, Integer> m_columnsMapHelper;
+
     public NodeSchema()
     {
         m_columns = new ArrayList<SchemaColumn>();
+        m_columnsMapHelper = new HashMap<SchemaColumn, Integer>();
     }
 
     /**
@@ -42,6 +47,8 @@ public class NodeSchema
      */
     public void addColumn(SchemaColumn column)
     {
+        int size = m_columns.size();
+        m_columnsMapHelper.put(column, size);
         m_columns.add(column);
     }
 
@@ -69,38 +76,12 @@ public class NodeSchema
      */
     public SchemaColumn find(String tableName, String columnName, String columnAlias)
     {
-        SchemaColumn retval = null;
-        for (SchemaColumn col : m_columns)
-        {
-            if (col.matches(tableName, columnName, columnAlias))
-            {
-                retval = col;
-                break;
-            }
+        SchemaColumn col = new SchemaColumn(tableName, columnName, columnAlias);
+        Integer index = m_columnsMapHelper.get(col);
+        if (index != null) {
+            return m_columns.get(index.intValue());
         }
-        return retval;
-    }
-
-    /**
-     * Get the offset into the schema of the column specified by the provided
-     * arguments.
-     * @param tableName
-     * @param columnName
-     * @param columnAlias
-     * @return The offset of the specified column.  Returns -1 if the column
-     *         wasn't found.
-     */
-    int getIndexOf(String tableName, String columnName, String columnAlias)
-    {
-        for (int i = 0; i < m_columns.size(); i++)
-        {
-            SchemaColumn col = m_columns.get(i);
-            if (col.matches(tableName, columnName, columnAlias))
-            {
-                return i;
-            }
-        }
-        return -1;
+        return null;
     }
 
     /** Convenience method for looking up the column offset for a TVE using
@@ -110,8 +91,14 @@ public class NodeSchema
      */
     int getIndexOfTve(TupleValueExpression tve)
     {
-        return getIndexOf(tve.getTableName(), tve.getColumnName(),
-                          tve.getColumnAlias());
+        SchemaColumn col = new SchemaColumn(tve.getTableName(),
+                tve.getColumnName(), tve.getColumnAlias());
+
+        Integer index = m_columnsMapHelper.get(col);
+        if (index != null) {
+            return index.intValue();
+        }
+        return -1;
     }
 
     /** Convenience method to sort the SchemaColumns.  Only applies if they
@@ -159,6 +146,36 @@ public class NodeSchema
         return copy;
     }
 
+    @Override
+    public boolean equals (Object obj) {
+        if (obj == null) return false;
+        if (obj == this) return true;
+        if (obj instanceof NodeSchema == false) return false;
+
+        NodeSchema schema = (NodeSchema) obj;
+
+        if (schema.size() != size()) return false;
+
+        ArrayList<SchemaColumn> columns = schema.getColumns();
+
+        for (int i =0; i < size(); i++ ) {
+            SchemaColumn col1 = columns.get(i);
+            if (!col1.equals(m_columns.get(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public int hashCode () {
+        int result = 0;
+        for (SchemaColumn col: m_columns) {
+            result += col.hashCode();
+        }
+        return result;
+    }
+
     /**
      * Returns a copy of this NodeSchema but with all non-TVE expressions
      * replaced with an appropriate TVE.  This is used primarily when generating
@@ -176,16 +193,15 @@ public class NodeSchema
     }
 
     /**
-     * Combine the provided schema to this schema and return the result
-     * as a new schema.
+     * Append the provided schema to this schema and return the result
+     * as a new schema. Columns order: [this][provided schema columns].
      */
     NodeSchema join(NodeSchema schema)
     {
-        NodeSchema copy = null;
-        copy = schema.clone();
-        for (int i = 0; i < m_columns.size(); ++i)
+        NodeSchema copy = this.clone();
+        for (SchemaColumn col: schema.getColumns())
         {
-            copy.addColumn(m_columns.get(i).clone());
+            copy.addColumn(col.clone());
         }
         return copy;
     }
@@ -202,7 +218,5 @@ public class NodeSchema
         }
         return sb.toString();
     }
-
-    private ArrayList<SchemaColumn> m_columns;
 }
 

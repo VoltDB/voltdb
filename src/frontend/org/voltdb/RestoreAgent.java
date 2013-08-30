@@ -114,11 +114,6 @@ SnapshotCompletionInterest
 
     private final RestoreAdapter m_restoreAdapter = new RestoreAdapter(m_changeStateFunctor);
 
-    // RealVoltDB needs this to connect the ClientInterface and the Adapter.
-    RestoreAdapter getAdapter() {
-        return m_restoreAdapter;
-    }
-
     private final ZooKeeper m_zk;
     private final SnapshotCompletionMonitor m_snapshotMonitor;
     private final Callback m_callback;
@@ -451,6 +446,7 @@ SnapshotCompletionInterest
 
     public void setInitiator(TransactionCreator initiator) {
         m_initiator = initiator;
+        m_initiator.bindAdapter(m_restoreAdapter);
         if (m_replayAgent != null) {
             m_replayAgent.setInitiator(initiator);
         }
@@ -1135,21 +1131,21 @@ SnapshotCompletionInterest
         }
 
         if (txnId == null) {
-            m_initiator.createTransaction(m_restoreAdapter.connectionId(), "CommandLog", true, spi,
+            m_initiator.createTransaction(m_restoreAdapter.connectionId(), spi,
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
                                           restoreProc.getEverysite(),
                                           m_allPartitions,
-                                          m_restoreAdapter, 0,
+                                          0,
                                           EstTime.currentTimeMillis());
         } else {
-            m_initiator.createTransaction(m_restoreAdapter.connectionId(), "CommandLog", true,
+            m_initiator.createTransaction(m_restoreAdapter.connectionId(),
                                           txnId, System.currentTimeMillis(), spi,
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
                                           restoreProc.getEverysite(),
                                           m_allPartitions,
-                                          m_restoreAdapter, 0,
+                                          0,
                                           EstTime.currentTimeMillis());
         }
     }

@@ -29,7 +29,7 @@ public interface LicenseApi {
     public boolean isTrial();
     public int maxHostcount();
     public Calendar expires();
-    public boolean verify();
+    public boolean verify() throws LicenseException;
     public boolean isDrReplicationAllowed();
     public boolean isCommandLoggingAllowed();
 }

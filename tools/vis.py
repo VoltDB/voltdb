@@ -223,7 +223,7 @@ def main():
 
     prefix = sys.argv[2]
     path = os.path.join(sys.argv[1], sys.argv[2])
-    ndays = 1000
+    ndays = 2000
     if len(sys.argv) >=4:
         ndays = int(sys.argv[3])
     width = None

@@ -79,8 +79,8 @@ public class ProcedureInvocation {
         return size;
     }
 
-    public Integer getHashinatedParam(int index) {
-        return m_parameters.getHashinatedParam(index);
+    public Integer getHashinatedParam(int type, int index) {
+        return m_parameters.getHashinatedParam(type, index);
     }
 
     public ByteBuffer flattenToBuffer(ByteBuffer buf) throws IOException {

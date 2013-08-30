@@ -20,12 +20,10 @@ package org.voltdb.planner;
 import java.util.LinkedHashMap;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
-import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ExpressionUtil;
 
 /**
  *

@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -82,8 +83,6 @@ public class RawProcessor implements ExportDataProcessor {
 
     private final Map<Integer, String> m_clusterMetadata = new HashMap<Integer, String>();
 
-
-
     /**
      * As long as m_shouldContinue is true, the service will listen for new
      * TCP/IP connections on LISTENER_PORT. At the moment, multiple client
@@ -93,7 +92,7 @@ public class RawProcessor implements ExportDataProcessor {
      */
     final AtomicBoolean m_shouldContinue = new AtomicBoolean(true);
 
-    private volatile Connection m_currentConnection = null;
+    private CopyOnWriteArrayList<Connection> m_knownConnections = new CopyOnWriteArrayList<Connection>();
 
     // this run loop can almost be eliminated.  the InputHandler can
     // call the sb.event() function directly. event() never blocks.
@@ -190,6 +189,9 @@ public class RawProcessor implements ExportDataProcessor {
         @Override
         public void event(final ExportProtoMessage m)
         {
+            if (m_logger.isTraceEnabled()) {
+                m_logger.trace(m);
+            }
             if (m.isError()) {
                 protocolError(m, "Internal error message. May indicate that an invalid ack offset was requested.");
                 return;
@@ -253,7 +255,10 @@ public class RawProcessor implements ExportDataProcessor {
                     stringer.endArray();
                     stringer.endObject();
 
-                    jsonBytes = new JSONObject(stringer.toString()).toString(4).getBytes(Charsets.UTF_8);
+                    JSONObject jsObj = new JSONObject(stringer.toString());
+                    String msg = jsObj.toString(4);
+                    m_logger.trace(msg);
+                    jsonBytes = msg.getBytes(Charsets.UTF_8);
 //                    else {
 //                        // for test code
 //                        fs.writeInt(0);
@@ -303,6 +308,9 @@ public class RawProcessor implements ExportDataProcessor {
             }
 
             else if (m.isPollResponse()) {
+                if (m_logger.isTraceEnabled()) {
+                    m_logger.trace(m);
+                }
                 // Forward this response to the IO system. It originated at an
                 // ExecutionSite that processed an exportAction.
                 m_c.writeStream().enqueue(
@@ -370,7 +378,7 @@ public class RawProcessor implements ExportDataProcessor {
          */
         @Override
         public void starting(Connection c) {
-            m_currentConnection = c;
+            m_knownConnections.add(c);
             m_sb = new ProtoStateBlock(c, m_isAdminPort);
         }
 
@@ -385,11 +393,12 @@ public class RawProcessor implements ExportDataProcessor {
          * Called by VoltNetwork when the port is unregistered.
          */
         @Override
-        public void stopping(Connection c) {
+        public void stopping(final Connection c) {
             m_mailbox.add(new Runnable() {
                 @Override
                 public void run() {
-                    m_currentConnection = null;
+                    m_logger.trace("Nulling out m_currentConnection");
+                    m_knownConnections.remove(c);
                     m_sb.closeConnection();
                 }
             });
@@ -498,6 +507,7 @@ public class RawProcessor implements ExportDataProcessor {
 
     @Override
     public void shutdown() {
+        m_logger.trace("Shutting down old processor");
         m_shouldContinue.set(false);
         if (m_thread != null) {
             //Don't interrupt me while I'm talking
@@ -509,10 +519,12 @@ public class RawProcessor implements ExportDataProcessor {
                 catch (InterruptedException e) {
                     m_logger.error("Interruption not expected", e);
                 }
+            } else {
+                m_logger.trace("Current thread calling shutdown is processor thread");
             }
         }
-        if (m_currentConnection != null) {
-            m_currentConnection.unregister();
+        for (Connection c : m_knownConnections) {
+            c.unregister();
         }
     }
 
@@ -536,9 +548,8 @@ public class RawProcessor implements ExportDataProcessor {
 
     @Override
     public void bootClient() {
-        final Connection c = m_currentConnection;
-        if (c != null) {
-            m_logger.info("There was an export connection to boot.");
+        for (Connection c : m_knownConnections) {
+            m_logger.info("Booting export connection " + c.getHostnameAndIPAndPort());
             c.unregister();
         }
     }

@@ -23,6 +23,9 @@
 
 package org.voltcore.network;
 
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.channels.Channel;
 import java.nio.channels.SelectionKey;
 
@@ -45,13 +48,13 @@ public class TestVoltPort extends TestCase {
 
     // implement abstract run() method.
     private static class MockVoltPort extends VoltPort {
-        MockVoltPort(VoltNetwork vn, Channel channel) {
-            super (vn, null, "", vn.m_pool );
+        MockVoltPort(VoltNetwork vn, Channel channel) throws UnknownHostException {
+            super (vn, null, new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 21212), vn.m_pool );
         }
     }
 
 
-    public void testSetInterests() {
+    public void testSetInterests() throws Exception {
         MockVoltNetwork vn = new MockVoltNetwork();
         MockVoltPort vp = new MockVoltPort(vn, null);
 

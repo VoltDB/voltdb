@@ -500,7 +500,7 @@ TableCatalogDelegate::migrateChangedTuples(catalog::Table const &catalogTable,
     int64_t existingTupleCount = existingTable->activeTupleCount();
 
     // remove all indexes from the existing table
-    vector<TableIndex*> currentIndexes = existingTable->allIndexes();
+    const vector<TableIndex*> currentIndexes = existingTable->allIndexes();
     for (int i = 0; i < currentIndexes.size(); i++) {
         existingTable->removeIndex(currentIndexes[i]);
     }
@@ -584,7 +584,7 @@ TableCatalogDelegate::migrateChangedTuples(catalog::Table const &catalogTable,
                 if (columnSourceMap[i] >= 0) {
                     NValue value = scannedTuple.getNValue(columnSourceMap[i]);
                     if (columnExploded[i]) {
-                        value.allocatePersistentObjectFromInlineValue();
+                        value.allocateObjectFromInlinedValue();
                     }
                     tupleToInsert.setNValue(i, value);
                 }
