@@ -118,8 +118,8 @@ public class LeaderElector {
         protected void pProcess(WatchedEvent event) {
             try {
                 if (!m_done.get()) {
-                    if (es != null) {
-                        es.submit(childrenEventHandler);
+                    if (getExecutorService() != null) {
+                        getExecutorService().submit(childrenEventHandler);
                     }
                 }
             } catch (RejectedExecutionException e) {
@@ -127,15 +127,16 @@ public class LeaderElector {
         }
     };
 
-    private final Watcher watcher = new Watcher() {
+    private final CancellableWatcher watcher = new CancellableWatcher(es) {
         @Override
-        public void process(WatchedEvent event) {
+        public void pProcess(WatchedEvent event) {
             try {
                 if (!m_done.get()) {
                     es.submit(electionEventHandler);
                 }
             } catch (RejectedExecutionException e) {}
         }
+
     };
 
     public LeaderElector(ZooKeeper zk, String dir, String prefix, byte[] data,
@@ -146,6 +147,7 @@ public class LeaderElector {
         this.data = data;
         this.cb = cb;
         es = CoreUtils.getCachedSingleThreadExecutor("Leader elector-" + dir, 15000);
+        watcher.setExecutorService(es);
     }
 
     /**
