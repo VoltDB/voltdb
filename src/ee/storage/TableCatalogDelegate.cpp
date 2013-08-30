@@ -584,7 +584,7 @@ TableCatalogDelegate::migrateChangedTuples(catalog::Table const &catalogTable,
                 if (columnSourceMap[i] >= 0) {
                     NValue value = scannedTuple.getNValue(columnSourceMap[i]);
                     if (columnExploded[i]) {
-                        value.allocatePersistentObjectFromInlineValue();
+                        value.allocateObjectFromInlinedValue();
                     }
                     tupleToInsert.setNValue(i, value);
                 }

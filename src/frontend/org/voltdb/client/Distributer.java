@@ -272,20 +272,14 @@ class Distributer {
         private final HashMap<Long, CallbackBookeeping> m_callbacks;
         private final HashMap<String, ClientStats> m_stats = new HashMap<String, ClientStats>();
         private Connection m_connection;
-        private final InetSocketAddress m_socketAddress;
-        private String m_hostname;
-        private int m_port;
         private boolean m_isConnected = true;
 
         long m_lastResponseTime = System.currentTimeMillis();
         boolean m_outstandingPing = false;
         ClientStatusListenerExt.DisconnectCause m_closeCause = DisconnectCause.CONNECTION_CLOSED;
 
-        public NodeConnection(long ids[], InetSocketAddress socketAddress) {
-            assert(socketAddress != null);
-
+        public NodeConnection(long ids[]) {
             m_callbacks = new HashMap<Long, CallbackBookeeping>();
-            m_socketAddress = socketAddress;
         }
 
         public void createWork(long handle, String name, ByteBuffer c,
@@ -298,7 +292,7 @@ class Distributer {
                 if (!m_isConnected) {
                     final ClientResponse r = new ClientResponseImpl(
                             ClientResponse.CONNECTION_LOST, new VoltTable[0],
-                            "Connection to database host (" + m_hostname +
+                            "Connection to database host (" + m_connection.getHostnameAndIPAndPort() +
                     ") was lost before a response was received");
                     try {
                         callback.clientCallback(r);
@@ -349,8 +343,8 @@ class Distributer {
             if (stats == null) {
                 stats = new ClientStats();
                 stats.m_connectionId = connectionId();
-                stats.m_hostname = m_hostname;
-                stats.m_port = m_port;
+                stats.m_hostname = m_connection.getHostnameOrIP();
+                stats.m_port = m_connection.getRemotePort();
                 stats.m_procName = procName;
                 stats.m_startTS = System.currentTimeMillis();
                 stats.m_endTS = Long.MIN_VALUE;
@@ -390,7 +384,10 @@ class Distributer {
                     if (handle >= 0) {
                         // notify any listeners of the late response
                         for (ClientStatusListenerExt listener : m_listeners) {
-                            listener.lateProcedureResponse(response, m_hostname, m_port);
+                            listener.lateProcedureResponse(
+                                    response,
+                                    m_connection.getHostnameOrIP(),
+                                    m_connection.getRemotePort());
                         }
                     }
                 }
@@ -490,7 +487,11 @@ class Distributer {
                     m_connections.remove(this);
                     //Notify listeners that a connection has been lost
                     for (ClientStatusListenerExt s : m_listeners) {
-                        s.connectionLost(m_hostname, m_port, m_connections.size(), m_closeCause);
+                        s.connectionLost(
+                                m_connection.getHostnameOrIP(),
+                                m_connection.getRemotePort(),
+                                m_connections.size(),
+                                m_closeCause);
                     }
                 }
                 m_isConnected = false;
@@ -499,7 +500,7 @@ class Distributer {
                 final ClientResponse r =
                     new ClientResponseImpl(
                             ClientResponse.CONNECTION_LOST, new VoltTable[0],
-                            "Connection to database host (" + m_socketAddress +
+                            "Connection to database host (" + m_connection.getHostnameAndIPAndPort() +
                     ") was lost before a response was received");
                 for (final CallbackBookeeping callBk : m_callbacks.values()) {
                     try {
@@ -557,7 +558,7 @@ class Distributer {
         }
 
         public InetSocketAddress getSocketAddress() {
-            return m_socketAddress;
+            return m_connection.getRemoteSocketAddress();
         }
     }
 
@@ -596,7 +597,7 @@ class Distributer {
             boolean useClientAffinity) {
         m_useMultipleThreads = useMultipleThreads;
         m_network = new VoltNetworkPool(
-                m_useMultipleThreads ? Math.max(2, CoreUtils.availableProcessors()) / 4 : 1, null);
+            m_useMultipleThreads ? Math.max(1, (int)(CoreUtils.availableProcessors() / 4) ) : 1, null);
         m_network.start();
         m_procedureCallTimeoutMS = procedureCallTimeoutMS;
         m_connectionResponseTimeoutMS = connectionResponseTimeoutMS;
@@ -623,10 +624,8 @@ class Distributer {
         final long instanceIdWhichIsTimestampAndLeaderIp[] = (long[])socketChannelAndInstanceIdAndBuildString[1];
         final int hostId = (int)instanceIdWhichIsTimestampAndLeaderIp[0];
 
-        NodeConnection cxn = new NodeConnection(instanceIdWhichIsTimestampAndLeaderIp, address);
+        NodeConnection cxn = new NodeConnection(instanceIdWhichIsTimestampAndLeaderIp);
         Connection c = m_network.registerChannel( aChannel, cxn);
-        cxn.m_hostname = c.getHostnameAndIP();
-        cxn.m_port = port;
         cxn.m_connection = c;
 
         synchronized (this) {
@@ -677,7 +676,7 @@ class Distributer {
      * then return false and don't queue the invocation
      * @param invocation
      * @param cb
-     * @param ignoreBackPressure If true the invocation will be queued even if there is backpressure
+     * @param ignoreBackpressure If true the invocation will be queued even if there is backpressure
      * @return True if the message was queued and false if the message was not queued due to backpressure
      * @throws NoConnectionsException
      */
