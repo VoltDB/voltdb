@@ -33,7 +33,7 @@
                     "normalizer": "normalizer.py"},
     "basic-compoundex": {"schema": "schema.py",
                          "ddl": "compoundex-DDL.sql",
-                         "template": "basic.sql",
+                         "template": "compound.sql",
                          "normalizer": "normalizer.py"},
     "basic-strings": {"schema": "strings-schema.py",
                       "ddl": "strings-DDL.sql",

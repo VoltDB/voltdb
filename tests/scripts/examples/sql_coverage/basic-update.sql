@@ -12,9 +12,7 @@
 -- Required preprocessor macros (with example values):
 -- {@aftermath = " _math _value[int:1,3]"}
 -- {@col_type = "decimal"}
--- watered down {@columnpredicate = "_numericcolumnpredicate"}
--- to dmlcolumnpredicate until ENG-4909 stops hanging
--- {@dmlcolumnpredicate = "_numericcolumnpredicate"}
+-- {@columnpredicate = "_numericcolumnpredicate"}
 -- {@comparableconstant = "42.42"}
 -- {@comparabletype = "numeric"}
 -- {@updatecolumn = "CASH"}
@@ -32,9 +30,9 @@
 -- test simple update
 UPDATE _table SET @updatecolumn = @updatevalue
 --- test comparison ops (<, <=, =, >=, >)
-UPDATE _table SET @updatecolumn = @updatevalue WHERE @dmlcolumnpredicate
+UPDATE _table SET @updatecolumn = @updatevalue WHERE @columnpredicate
 --- test logic operators (AND) with comparison ops
-UPDATE _table SET @updatecolumn = @updatevalue WHERE (@updatecolumn _cmp @comparablevalue) _logicop @dmlcolumnpredicate
+UPDATE _table SET @updatecolumn = @updatevalue WHERE (@updatecolumn _cmp @comparablevalue) _logicop @columnpredicate
 --- test arithmetic operators (+, -, *, /) with comparison ops
 UPDATE _table SET @updatecolumn = @updatevalue WHERE (_variable[@comparabletype] @aftermath) _cmp @comparableconstant
 -- test set expression

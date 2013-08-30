@@ -26,12 +26,12 @@ INSERT INTO @dmltable VALUES (@insertvals)
 INSERT INTO @dmltable VALUES (@insertvals)
 -- test where expressions
 --- test comparison ops (<, <=, =, >=, >)
-DELETE FROM @dmltable WHERE @dmlcolumnpredicate
+DELETE FROM @dmltable WHERE @columnpredicate
 INSERT INTO @dmltable VALUES (@insertvals)
 INSERT INTO @dmltable VALUES (@insertvals)
 INSERT INTO @dmltable VALUES (@insertvals)
 --- test logic operators (AND) with comparison ops
-DELETE FROM @dmltable WHERE (_variable[@columntype] _cmp @comparableconstant) _logicop @dmlcolumnpredicate
+DELETE FROM @dmltable WHERE (_variable[@columntype] _cmp @comparableconstant) _logicop @columnpredicate
 INSERT INTO @dmltable VALUES (@insertvals)
 INSERT INTO @dmltable VALUES (@insertvals)
 INSERT INTO @dmltable VALUES (@insertvals)

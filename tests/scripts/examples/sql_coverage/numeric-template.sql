@@ -35,9 +35,9 @@ SELECT -3, _variable[#arg numeric] FROM @fromtables WHERE _numfun(__[#arg]      
 SELECT -2, _numfun(_variable[numeric] + 5.25)        NUMSUM FROM @fromtables ORDER BY NUMSUM
 SELECT -1, _numfun(_variable[numeric]       ) + 5.25 NUMSUM FROM @fromtables ORDER BY NUMSUM
 
--- Found ENG-3191 crash (fixed, since then) with this statement:
 -- SELECT 3, * FROM @fromtables WHERE _numfun(_variable[numeric]) _cmp (_numfun(_variable[numeric]) _math _value[int:0,1000])
 -- Substituting these two statements to cut down on the number of generated combinations and limit math range errors:
+-- Found eng-3191 crash (fixed, since then) with statements like these:
 {_somecmps |= " = "}
 {_somecmps |= " > "}
 {_somecmps |= " <= "}
@@ -58,9 +58,7 @@ SELECT _numagg(_variable[#VA numeric]) AS Q20, _numagg(_numfun(__[#VA]) _mostmat
 {_plusorminus |= "-"}
   SELECT SUM(DISTINCT _numfun(_variable[numeric] _plusorminus _numfun(_variable[numeric])) AS Q22 FROM @fromtables
 
--- ENG-199.  Purposely avoiding identical expressions.
---SELECT _numagg(_numfun(_variable[numeric])),   _numagg(_numfun(_variable[numeric])) AS Q23 FROM @fromtables
-  SELECT _numagg(_numfun(_variable[numeric])), 0+_numagg(_numfun(_variable[numeric])) AS Q23 FROM @fromtables
+SELECT _numagg(_numfun(_variable[numeric])),   _numagg(_numfun(_variable[numeric])) AS Q23 FROM @fromtables
 
 -- additional select expression math
 SELECT _variable[#A numeric], _numfun(__[#A]) _math _variable[numeric]  AS Q27 FROM @fromtables

@@ -41,23 +41,23 @@ SELECT 1, * FROM @fromtables WHERE @columnpredicate
 SELECT 2, * FROM @fromtables WHERE @optionalfn(_variable[#some numeric]) _somecmp (            _variable[#other numeric]  _math 2)
 SELECT 3, * FROM @fromtables WHERE             _variable[#some numeric]  _somecmp (@optionalfn(_variable[#other numeric]) _math 3)
 
--- ENG-3196 "SELECT ABS(ID) AS Q4 FROM R1 ORDER BY (ID) LIMIT 10;" gets UNEXPECTED FAILURE tupleValueFactory: invalid column_idx.
+-- eng-3196 "SELECT ABS(ID) AS Q4 FROM R1 ORDER BY (ID) LIMIT 10;" got UNEXPECTED FAILURE tupleValueFactory: invalid column_idx.
 -- SELECT @optionalfn(_variable[#picked @columntype]) AS Q4 FROM @fromtables ORDER BY @optionalfn(__[#picked]) LIMIT _value[int:1,10]
 -- so, simplify as:
    SELECT            (_variable[#picked @columntype]) AS Q4 FROM @fromtables ORDER BY @optionalfn(__[#picked]) LIMIT _value[int:1,10]
 
--- Found ENG-3191 (or similar, anyway) crashes (fixed, since?) with these statements:
+-- Found eng-3191 (or similar, anyway) crashed (fixed, since?) with these statements:
 -- -- combine where and limit
 -- SELECT @optionalfn(_variable[#picked @columntype]) AS Q5 FROM @fromtables WHERE  @optionalfn(_variable[@comparabletype]) _somecmp @optionalfn(_variable[@comparabletype]) ORDER BY @optionalfn(__[#picked]) LIMIT _value[int:1,100]
 -- -- combine where and offset
 -- SELECT @optionalfn(_variable[#picked @columntype]) AS Q6 FROM @fromtables WHERE  @optionalfn(_variable[@comparabletype]) _somecmp @optionalfn(_variable[@comparabletype]) ORDER BY @optionalfn(__[#picked]) LIMIT _value[int:1,100] OFFSET _value[int:1,100]
 -- -- compare more columns
 -- SELECT @optionalfn(_variable[@comparabletype]    ) AS Q7 FROM @fromtables WHERE (@optionalfn(_variable[@comparabletype]) _somecmp @optionalfn(_variable[@comparabletype])) _logicop (@optionalfn(_variable[@comparabletype]) _somecmp @optionalfn(_variable[@comparabletype]))
--- Now that ENG-3191 is fixed, we keep them watered down to reduce the number of generated combinations:
--- combine where and limit
+-- Now that eng-3191 is fixed, we keep them watered down to reduce the number of generated combinations:
 -- Even simplified like this, it crashes (or DID, anyway):
 -- SELECT @optionalfn(_variable[#picked            ]) AS Q5 FROM @fromtables WHERE             (_variable[@comparabletype]) _somecmp @optionalfn(_variable[@comparabletype]) ORDER BY @optionalfn(__[#picked]) LIMIT _value[int:1,100]
 -- so, it was simplified even further
+-- combine where and limit
    SELECT @optionalfn(_variable[#picked @columntype]) AS Q5 FROM @fromtables WHERE             (__[#picked]               ) _somecmp            (_variable[@comparabletype]) ORDER BY 1                        LIMIT _value[int:1,100]
 -- combine where and offset
    SELECT @optionalfn(_variable[#picked @columntype]) AS Q6 FROM @fromtables WHERE             (_variable[@comparabletype]) _somecmp            (__[#picked]               ) ORDER BY 1                        LIMIT _value[int:1,100] OFFSET _value[int:1,100]
@@ -65,36 +65,30 @@ SELECT 3, * FROM @fromtables WHERE             _variable[#some numeric]  _somecm
    SELECT @optionalfn(_variable[#picked @columntype]) AS Q7 FROM @fromtables WHERE (           (__[#picked]               ) _somecmp            (_variable[@comparabletype])) _logicop ( @columnpredicate )
 
 -- order by with projection
-SELECT 11, @optionalfn(_variable[@columntype]), ID FROM @fromtables ORDER BY ID _sortorder
+SELECT 8, @optionalfn(_variable[@columntype]), ID FROM @fromtables ORDER BY ID _sortorder
 -- order by on two columns
--- ENG-631
--- With multiple columns named the same thing and multiple order by columns using the same column and different
--- sort directions, this statement fails.  Commenting it out and going with one that forces the sort orders for now
---SELECT @optionalfn(_variable[#order1 @columntype]), @optionalfn(_variable[#order2 @columntype]), _variable FROM @fromtables ORDER BY @optionalfn(__[#order1]) _sortorder, @optionalfn(__[#order2])
-SELECT 12, @optionalfn(_variable[#order1 @columntype]), @optionalfn(_variable[#order2 @columntype]), _variable FROM @fromtables ORDER BY 2 DESC, 3 DESC
+-- eng-631 With multiple columns named the same thing and multiple order by columns using the same
+-- column and different sort directions, this statement failed.
+-- First explicitly isolate a test for eng-631 where DESC and ASC order are non-sensically combined on
+-- the same column.
+-- TO avoid too much explosion, separate out SELECT function options from sort order options.
+SELECT            (_variable[#order1 @columntype]),            (_variable[#order2 @columntype]), _variable FROM @fromtables Q12 ORDER BY @optionalfn(__[#order1]) _sortorder, @optionalfn(__[#order2])
+SELECT @optionalfn(_variable[#order1 @columntype]), @optionalfn(_variable[#order2 @columntype]), _variable FROM @fromtables Q13 ORDER BY 1 DESC, 2 DESC
 
--- two _sortorder templates have some issue I'm not figuring out right now
--- We get non-deterministic sort order on the non-orderby columns so leaving it out for now
--- This also appears to fail due to ENG-631 if the variables are the same.  Using
--- a less generic version
---SELECT * from @fromtables ORDER BY @optionalfn(_variable[@columntype]), @optionalfn(_variable[@columntype]) _sortorder
-SELECT 14, * from @fromtables ORDER BY @optionalfn(_variable[@columntype]), @optionalfn(_variable[@columntype])
+SELECT @optionalfn(_variable[@columntype]), @optionalfn(_variable[@columntype]), * FROM @fromtables AS Q14 ORDER BY 1 _sortorder, 2 _sortorder
 
 -- additional aggregation fun
 SELECT 15, @agg(DISTINCT(@optionalfn(_variable[@columntype]))) FROM @fromtables
 SELECT 16, @agg(         @optionalfn(_variable[@columntype]) ) FROM @fromtables WHERE @columnpredicate
--- These test that the fixed issue ENG-909 -- combining DISTINCT and non-DSTINCT aggs has not regressed.
+-- These test that the fixed issue eng-909 -- combining DISTINCT and non-DISTINCT aggs has not regressed.
 SELECT 18, @agg(DISTINCT(@optionalfn(_variable[@columntype]))), @agg(            _variable[@columntype] ) FROM @fromtables
 SELECT 19, @agg(DISTINCT(            _variable[@columntype] )), @agg(@optionalfn(_variable[@columntype])) FROM @fromtables
 SELECT 20,             _variable[#GB @columntype] , @agg(@optionalfn(_variable[@columntype])) FROM @fromtables GROUP BY             __[#GB]
 -- TODO: migrate likely-to-error-out cases like this to their own template/suite
 SELECT 21, @optionalfn(_variable[#GB @columntype]), @agg(            _variable[@columntype] ) FROM @fromtables GROUP BY @optionalfn(__[#GB])
 
--- ENG-199.  Substituting this generic version
--- with a few specific dual aggregates that will be different
---SELECT _numagg(@optionalfn(_variable[@columntype])), _numagg(@optionalfn(_variable[@columntype])) FROM @fromtables
-  SELECT @agg(@optionalfn(_variable[#picked @columntype])), @agg(@optionalfn(_variable[@comparabletype]))                     AS Q22 FROM @fromtables
-  SELECT @agg(@optionalfn(_variable[#picked @columntype])),                                                COUNT(*)           AS Q23 FROM @fromtables
+SELECT @agg(@optionalfn(_variable[@columntype])), @agg(@optionalfn(_variable[@columntype]))           AS Q22 FROM @fromtables
+SELECT @agg(@optionalfn(_variable[@columntype])),                                           COUNT(*)  AS Q23 FROM @fromtables
 
 -- update
 -- compare two cols
