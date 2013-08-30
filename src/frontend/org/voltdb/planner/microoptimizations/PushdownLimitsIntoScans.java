@@ -74,8 +74,8 @@ public class PushdownLimitsIntoScans extends MicroOptimization {
         plan.clearChildren();
         child.clearParents();
         child.addInlinePlanNode(plan);
-
         return child;
+
     }
 
 }

@@ -141,8 +141,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         assert(m_parsedStmt.joinTree != null);
 
         // Split the original tree into the sub-trees having the same join type for all nodes
-        List<JoinNode> subTrees = new ArrayList<JoinNode>();
-        extractSubTrees(m_parsedStmt.joinTree, subTrees);
+        List<JoinNode> subTrees = m_parsedStmt.joinTree.extractSubTrees();
 
         // For a sub-tree with inner joins only any join order is valid. The only requirement is that
         // each and every table from that sub-tree constitute an uninterrupted sequence in the specified join order
@@ -187,7 +186,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                         joinOrderSubNodes.add(subTableNodes.get(j));
                     }
                 }
-                JoinNode joinOrderSubTree = reconstructJoinTreeFromTableNodes(joinOrderSubNodes);
+                JoinNode joinOrderSubTree = JoinNode.reconstructJoinTreeFromTableNodes(joinOrderSubNodes);
                 //Collect all the join/where conditions to reassign them later
                 AbstractExpression combinedWhereExpr = subTree.getAllInnerJoinFilters();
                 if (combinedWhereExpr != null) {
@@ -211,26 +210,17 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             }
         }
         // if we got there the join order is OK. Rebuild the whole tree
-        m_parsedStmt.joinTree = reconstructJoinTreeFromSubTrees(finalSubTrees);
+        m_parsedStmt.joinTree = JoinNode.reconstructJoinTreeFromSubTrees(finalSubTrees);
         return true;
     }
 
     /**
      * Compute every permutation of the list of involved tables and put them in a deque.
+     * TODO(XIN): takes at least 3.3% cpu of planner. Optimize it when possible.
      */
     private void queueAllJoinOrders() {
         // these just shouldn't happen right?
-        assert(m_parsedStmt.multiTableSelectionList.size() == 0);
         assert(m_parsedStmt.noTableSelectionList.size() == 0);
-
-        queueSubJoinOrders();
-    }
-
-    /**
-     * Add all valid join orders (permutations) for the input join tree.
-     *
-     */
-    private void queueSubJoinOrders() {
         assert(m_parsedStmt.joinTree != null);
 
         // Simplify the outer join if possible
@@ -242,8 +232,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         // Clone the original
         JoinNode clonedTree = (JoinNode) simplifiedJoinTree.clone();
         // Split join tree into a set of subtrees. The join type for all nodes in a subtree is the same
-        List<JoinNode> subTrees = new ArrayList<JoinNode>();
-        extractSubTrees(clonedTree, subTrees);
+        List<JoinNode> subTrees = clonedTree.extractSubTrees();
         assert(!subTrees.isEmpty());
         // Generate possible join orders for each sub-tree separately
         ArrayList<ArrayList<JoinNode>> joinOrderList = generateJoinOrders(subTrees);
@@ -251,71 +240,11 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         queueSubJoinOrders(joinOrderList, 0, new ArrayList<JoinNode>());
 }
 
-    /**
-     * Split a join tree into one or more sub-trees. Each sub-tree has the same join type
-     * for all join nodes.
-     * @param root - The root of the join tree
-     * @param subTrees - the list of sub-trees from the input tree
-     */
-    private void extractSubTrees(JoinNode root, List<JoinNode> subTrees) {
-        // Extract the first sub-tree starting at the root
-        List<JoinNode> leafNodes = new ArrayList<JoinNode>();
-        extractSubTree(root, leafNodes);
-        subTrees.add(root);
-
-        // Continue with the leafs
-        for (JoinNode leaf : leafNodes) {
-            extractSubTrees(leaf, subTrees);
-        }
-    }
-
-    /**
-     * Starting from the root recurse to its children stopping at the first join node
-     * of the different type and discontinue the tree at this point by replacing the join node with
-     * the temporary node which id matches the join node id. This join node is the root of the next
-     * sub-tree.
-     * @param root - The root of the join tree
-     * @param leafNodes - the list of the root nodes of the next sub-trees
-     */
-    private void extractSubTree(JoinNode root, List<JoinNode> leafNodes) {
-        if (root.m_table != null) {
-            return;
-        }
-        JoinNode[] children = {root.m_leftNode, root.m_rightNode};
-        for (JoinNode child : children) {
-
-            // Leaf nodes don't have a significant join type,
-            // test for them first and never attempt to start a new tree at a leaf.
-            if (child.m_table != null) {
-                continue;
-            }
-
-            if (child.m_joinType == root.m_joinType) {
-                // The join type for this node is the same as the root's one
-                // Keep walking down the tree
-                extractSubTree(child, leafNodes);
-            } else {
-                // The join type for this join differs from the root's one
-                // Terminate the sub-tree
-                leafNodes.add(child);
-                // Replace the join node with the temporary node having the id negated
-                // This will help to distinguish it from a real node and to reassemble the tree at the later stage
-                JoinNode tempNode = new JoinNode(
-                        -child.m_id, child.m_joinType, new Table(), child.m_joinExpr, child.m_whereExpr);
-                if (child == root.m_leftNode) {
-                    root.m_leftNode = tempNode;
-                } else {
-                    root.m_rightNode = tempNode;
-                }
-            }
-        }
-    }
-
     private void queueSubJoinOrders(List<ArrayList<JoinNode>> joinOrderList, int joinOrderListIdx, ArrayList<JoinNode> currentJoinOrder) {
         if (joinOrderListIdx == joinOrderList.size()) {
             // End of recursion
             assert(!currentJoinOrder.isEmpty());
-            JoinNode joinTree = reconstructJoinTreeFromSubTrees(currentJoinOrder);
+            JoinNode joinTree = JoinNode.reconstructJoinTreeFromSubTrees(currentJoinOrder);
             m_joinOrders.add(joinTree);
             return;
         }
@@ -353,7 +282,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 List<List<JoinNode>> joinOrders = PermutationGenerator.generatePurmutations(tableNodes);
                 List<JoinNode> newTrees = new ArrayList<JoinNode>();
                 for (List<JoinNode> joinOrder: joinOrders) {
-                    newTrees.add(reconstructJoinTreeFromTableNodes(joinOrder));
+                    newTrees.add(JoinNode.reconstructJoinTreeFromTableNodes(joinOrder));
                 }
                 //Collect all the join/where conditions to reassign them later
                 AbstractExpression combinedWhereExpr = subTree.getAllInnerJoinFilters();
@@ -370,68 +299,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             permutations.add(treePermutations);
         }
         return permutations;
-    }
-
-    /**
-     * Reconstruct a join tree from the list of tables always appending the next node to the right.
-     *
-     * @param tableNodes the list of tables to build the tree from.
-     * @return The reconstructed tree
-     */
-    private JoinNode reconstructJoinTreeFromTableNodes(List<JoinNode> tableNodes) {
-        JoinNode root = null;
-        for (JoinNode leafNode : tableNodes) {
-            assert(leafNode.m_table != null);
-            JoinNode node = new JoinNode(leafNode.m_id, leafNode.m_joinType, leafNode.m_table, null, null);
-            if (root == null) {
-                root = node;
-            } else {
-                // We only care about the root node id to be able to reconnect the sub-trees
-                // The intermediate node id can be anything. For the final root node its id
-                // will be set later to the original tree's root id
-                root = new JoinNode(-node.m_id, JoinType.INNER, root, node);
-            }
-        }
-        return root;
-    }
-
-    /**
-     * Reconstruct a join tree from the list of sub-trees by replacing the nodes with the negative ids with
-     * the root of the next sub-tree.
-     *
-     * @param subTrees the list of sub trees.
-     * @return The reconstructed tree
-     */
-    JoinNode reconstructJoinTreeFromSubTrees(List<JoinNode> subTrees) {
-        // Reconstruct the tree. The first element is the first sub-tree and so on
-        JoinNode joinNode = subTrees.get(0);
-        for (int i = 1; i < subTrees.size(); ++i) {
-            JoinNode nextNode = subTrees.get(i);
-            boolean replaced = replaceChild(joinNode, nextNode);
-            // There must be a node in the current tree to be replaced
-            assert(replaced == true);
-        }
-        return joinNode;
-    }
-
-    private boolean replaceChild(JoinNode root, JoinNode node) {
-        // can't replace self
-        assert (root != null && Math.abs(root.m_id) != Math.abs(node.m_id));
-        if (root.m_table != null) {
-            return false;
-        } else if (Math.abs(root.m_leftNode.m_id) == Math.abs(node.m_id)) {
-            root.m_leftNode  = node;
-            return true;
-        } else if (Math.abs(root.m_rightNode.m_id) == Math.abs(node.m_id)) {
-            root.m_rightNode  = node;
-            return true;
-        } else if (replaceChild(root.m_leftNode, node) == true) {
-            return true;
-        } else if (replaceChild(root.m_rightNode, node) == true) {
-            return true;
-        }
-
-        return false;
     }
 
     /**
@@ -546,7 +413,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             // Analyze join and filter conditions
             m_parsedStmt.analyzeJoinExpressions(joinTree);
             // a query that is a little too quirky or complicated.
-            assert(m_parsedStmt.multiTableSelectionList.size() == 0);
             assert(m_parsedStmt.noTableSelectionList.size() == 0);
 
             if ( ! m_partitioning.wasSpecifiedAsSingle()) {
@@ -951,8 +817,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             }
 
             nljNode.addAndLinkChild(innerPlan);
-            // now generate the output schema for this join
-            nljNode.generateOutputSchema(m_db);
             ajNode = nljNode;
         }
         else if (canHaveNLIJ) {
@@ -966,6 +830,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
             // combine the tails plan graph with the new head node
             nlijNode.addAndLinkChild(outerPlan);
+
             ajNode = nlijNode;
         }
         else {
@@ -976,7 +841,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         ajNode.setJoinType(joinNode.m_joinType);
         ajNode.setPreJoinPredicate(ExpressionUtil.combine(joinNode.m_joinOuterList));
         ajNode.setWherePredicate(ExpressionUtil.combine(whereClauses));
-        ajNode.generateOutputSchema(m_db);
+        ajNode.resolveSortDirection();
         return ajNode;
     }
 
@@ -1020,10 +885,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * -- as opposed to TVE references in post-filters that pose no problem with either
      * NLIJ or the more efficient (one-pass through the index) NestLoopJoin.
      *
-     * @param originalInnerOuterExprs The initial list of inner-outer join expressions.
+     * @param innerTable - the Table of all inner TVEs that are exempt from the check.
      * @param indexExprs - a list of expressions used in the indexing
-     * @param endExprs - a list of expressions used in the indexing
      * @param initialExpr - a list of expressions used in the indexing
+     * @param endExprs - a list of expressions used in the indexing
      * @return true if at least one of the expression lists references a TVE.
      */
     private boolean hasInnerOuterIndexExpression(Table innerTable,
