@@ -53,7 +53,7 @@ public class LeaderElector {
 
     private volatile String leader = null;
     private volatile boolean isLeader = false;
-    private ExecutorService es = null;
+    private final ExecutorService es;
     private final AtomicBoolean m_done = new AtomicBoolean(false);
 
     private final Runnable electionEventHandler = new Runnable() {
