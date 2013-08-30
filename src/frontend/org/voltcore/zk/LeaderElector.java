@@ -117,7 +117,7 @@ public class LeaderElector {
         protected void pProcess(WatchedEvent event) {
             try {
                 if (!m_done.get()) {
-                    es.submit(electionEventHandler);
+                    es.submit(childrenEventHandler);
                 }
             } catch (RejectedExecutionException e) {}
         }
