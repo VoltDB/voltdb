@@ -79,6 +79,12 @@ public class DefaultCommandLogReinitiator implements CommandLogReinitiator
     }
 
     @Override
+    public boolean requestIndexSnapshot()
+    {
+        return true;
+    }
+
+    @Override
     public boolean hasReplayedTxns() {
         return false;
     }
@@ -104,4 +110,4 @@ public class DefaultCommandLogReinitiator implements CommandLogReinitiator
 
     @Override
     public void initPartitionTracking() {}
-};
+}

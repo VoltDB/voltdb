@@ -43,7 +43,6 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Exchanger;
-import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 
 import com.google.common.util.concurrent.ListenableFuture;
@@ -54,16 +53,13 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.network.Connection;
-import org.voltcore.network.NIOReadStream;
-import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
-import org.voltdb.ClientResponseImpl;
+import org.voltdb.ClientInterface;
+import org.voltdb.SimpleClientResponseAdapter;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotDaemon;
 import org.voltdb.SnapshotDaemon.ForwardClientException;
@@ -1052,97 +1048,19 @@ public class SnapshotUtil {
     {
         final SnapshotInitiationInfo snapInfo = new SnapshotInitiationInfo(path, nonce, blocking, format, data);
         final Exchanger<ClientResponse> responseExchanger = new Exchanger<ClientResponse>();
-        final Connection c = new Connection() {
+        final SimpleClientResponseAdapter adapter =
+            new SimpleClientResponseAdapter(ClientInterface.SNAPSHOT_UTIL_CID,
+                                            new SimpleClientResponseAdapter.Callback() {
             @Override
-            public WriteStream writeStream() {
-                return new WriteStream() {
-
-                    @Override
-                    public void enqueue(DeferredSerialization ds) {
-                        throw new UnsupportedOperationException();
-                    }
-
-                    @Override
-                    public void enqueue(ByteBuffer b) {
-                        ClientResponseImpl resp = new ClientResponseImpl();
-                        try {
-                            b.position(4);
-                            resp.initFromBuffer(b);
-                            responseExchanger.exchange(resp);
-                        } catch (Exception e) {
-                            throw new RuntimeException(e);
-                        }
-                    }
-
-                    @Override
-                    public void enqueue(ByteBuffer[] b)
-                    {
-                        if (b.length != 1)
-                        {
-                            throw new RuntimeException("Cannot use ByteBuffer chaining in enqueue");
-                        }
-                        enqueue(b[0]);
-                    }
-
-                    @Override
-                    public int calculatePendingWriteDelta(long now) {
-                        throw new UnsupportedOperationException();
-                    }
-
-                    @Override
-                    public boolean isEmpty() {
-                        throw new UnsupportedOperationException();
-                    }
-
-                    @Override
-                    public int getOutstandingMessageCount() {
-                        throw new UnsupportedOperationException();
-                    }
-
-                    @Override
-                    public boolean hadBackPressure() {
-                        throw new UnsupportedOperationException();
-                    }
-
-                };
+            public void handleResponse(ClientResponse response)
+            {
+                try {
+                    responseExchanger.exchange(response);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
             }
-
-            @Override
-            public NIOReadStream readStream() {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public void disableReadSelection() {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public void enableReadSelection() {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public String getHostnameAndIP() {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public long connectionId() {
-                return Long.MIN_VALUE + 2;
-            }
-
-            @Override
-            public Future<?> unregister() {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public void queueTask(Runnable r) {
-                throw new UnsupportedOperationException();
-            }
-
-        };
+        });
 
         final SnapshotDaemon sd = VoltDB.instance().getClientInterfaces().get(0).getSnapshotDaemon();
         Runnable work = new Runnable() {
@@ -1155,7 +1073,7 @@ public class SnapshotUtil {
                 while (System.currentTimeMillis() - startTime <= (120 * 60000)) {
                     try {
                         if (!hasRequested) {
-                            sd.createAndWatchRequestNode(clientHandle, c, snapInfo, notifyChanges);
+                            sd.createAndWatchRequestNode(clientHandle, adapter, snapInfo, notifyChanges);
                             hasRequested = true;
                         }
 
