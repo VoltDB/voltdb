@@ -40,6 +40,8 @@ public class VoltDDLElementTracker {
     final Map<String, ProcedureDescriptor> m_procedureMap =
             new HashMap<String, ProcedureDescriptor>();
     final Set<String> m_exports = new HashSet<String>();
+    // additional non-procedure classes for the jar
+    String[] m_extraClassses = new String[0];
 
     /**
      * Constructor needs a compiler instance to throw VoltCompilerException.
@@ -70,6 +72,13 @@ public class VoltDDLElementTracker {
         }
 
         m_partitionMap.put(tableName.toLowerCase(), colName);
+    }
+
+    /**
+     * Add additional non-procedure classes for the jar.
+     */
+    void addExtraClasses(String[] classNames) {
+        m_extraClassses = classNames;
     }
 
     /**
