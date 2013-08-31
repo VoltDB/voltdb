@@ -226,6 +226,32 @@ public class DDLCompiler {
             );
 
     /**
+     * IMPORT CLASS with pattern for matching classfiles in
+     * the current classpath.
+     */
+    static final Pattern importClassPattern = Pattern.compile(
+            "(?i)" +                                // (ignore case)
+            "\\A" +                                 // (start statement)
+            "IMPORT\\s+CLASS\\s+" +                 // IMPORT CLASS
+            "([^;]+)" +                             // (1) class matching pattern
+            ";\\z"                                  // (end statement)
+            );
+
+    /**
+     * Check that the classname pattern from import class is valid.
+     */
+    static final Pattern validClassMatcherWildcardPattern = Pattern.compile(
+            "\\A" +                                 // (start statement)
+            "[\\p{L}\\*]+" +                        // (first part starts with char or *)
+            "[\\p{L}\\d\\*]*" +                     // (followed by any number of word chars or *)
+            "(\\." +                                // (optionally repeat with . separators)
+            "[\\p{L}\\*]+" +                        //  (first part starts with char or *)
+            "[\\p{L}\\d\\*]*" +                     //  (followed by any number of word chars or *)
+            ")*" +                                  // (end repeat)
+            "\\z"                                   // (end statement)
+            );
+
+    /**
      * Regex to parse the CREATE ROLE statement with optional WITH clause.
      * Leave the WITH clause argument as a single group because regexes
      * aren't capable of producing a variable number of groups.
@@ -320,7 +346,8 @@ public class DDLCompiler {
      * </pre>
      */
     static final Pattern voltdbStatementPrefixPattern = Pattern.compile(
-            "(?i)((?<=\\ACREATE\\s{0,1024})(?:PROCEDURE|ROLE)|\\APARTITION|\\AREPLICATE|\\AEXPORT)\\s"
+            "(?i)((?<=\\ACREATE\\s{0,1024})" +
+            "(?:PROCEDURE|ROLE)|\\APARTITION|\\AREPLICATE|\\AEXPORT|\\AIMPORT)\\s"
             );
 
     static final String TABLE = "TABLE";
@@ -346,8 +373,11 @@ public class DDLCompiler {
     String m_fullDDL = "";
     int m_currLineNo = 1;
 
-    /// Partition descriptors parsed from DDL PARTITION or REPLICATE statements.
+    // Partition descriptors parsed from DDL PARTITION or REPLICATE statements.
     final VoltDDLElementTracker m_tracker;
+
+    // used to match imported class with those in the classpath
+    ClassMatcher m_classMatcher = new ClassMatcher();
 
     HashMap<String, Column> columnMap = new HashMap<String, Column>();
     HashMap<String, Index> indexMap = new HashMap<String, Index>();
@@ -446,6 +476,11 @@ public class DDLCompiler {
         } catch (IOException e) {
             throw m_compiler.new VoltCompilerException("Error closing schema file");
         }
+
+        // process extra classes
+        m_tracker.addExtraClasses(m_classMatcher.getMatchedClassList());
+        // possibly save some memory
+        m_classMatcher.clear();
     }
 
     /**
@@ -620,6 +655,23 @@ public class DDLCompiler {
                     checkIdentifierStart(statementMatcher.group(1), statement),
                     null
                     );
+            return true;
+        }
+
+        // match IMPORT CLASS statements
+        statementMatcher = importClassPattern.matcher(statement);
+        if (statementMatcher.matches()) {
+            String classNameStr = statementMatcher.group(1);
+
+            // check that the match pattern is a valid match pattern
+            Matcher wildcardMatcher = validClassMatcherWildcardPattern.matcher(classNameStr);
+            if (!wildcardMatcher.matches()) {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "Invalid IMPORT CLASS match expression: '%s'",
+                        classNameStr)); // remove trailing semicolon
+            }
+
+            m_classMatcher.addPattern(classNameStr);
             return true;
         }
 

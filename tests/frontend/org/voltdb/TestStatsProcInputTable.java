@@ -28,6 +28,7 @@ import org.voltdb.StatsProcInputTable.ProcInputRow;
 
 public class TestStatsProcInputTable {
 
+    long mB = 1024*1024;
     // result row in java form for test
     static class ResultRow {
         long timestamp;
@@ -94,12 +95,12 @@ public class TestStatsProcInputTable {
         // validate sensical round-trip of one row.
         ProcInputRow[] data = {
                             //proc/part/time/invok/min/max/avg
-            new ProcInputRow("proc", 0L, 12345L, 100L, 2L, 4L, 3L)
+            new ProcInputRow("proc", 0L, 12345L, 100*mB, 2L, 4L, 3L)
         };
 
         ResultRow[] result = {
                             //time/proc/perc/inok/min/max/avg/tot
-            new ResultRow(12345L, "proc", 100L, 100L, 2L, 4L, 3L, 300L)
+            new ResultRow(12345L, "proc", 100L, 100*mB, 2L, 4L, 3L, 300L)
         };
 
         StatsProcInputTable dut = new StatsProcInputTable();
@@ -125,13 +126,13 @@ public class TestStatsProcInputTable {
     @Test
     public void testMultipleProcs() throws Exception {
         ProcInputRow data[] = {     //proc/part/time/invok/min/max/avg
-            new ProcInputRow("A", 0L, 12345L, 300L, 3L, 5L, 4L),
-            new ProcInputRow("B", 0L, 12345L, 100L, 1L, 4L, 2L),
-            new ProcInputRow("B", 1L, 12345L, 100L, 1L, 3L, 2L)
+            new ProcInputRow("A", 0L, 12345L, 300*mB, 3L, 5L, 4L),
+            new ProcInputRow("B", 0L, 12345L, 100*mB, 1L, 4L, 2L),
+            new ProcInputRow("B", 1L, 12345L, 100*mB, 1L, 3L, 2L)
         };
         ResultRow result[] = {  //time/proc/perc/inok/min/max/avg/tot
-            new ResultRow(12345L, "A", 75L, 300L, 3L, 5L, 4L, 1200L),
-            new ResultRow(12345L, "B", 25L, 200L, 1L, 4L, 2L, 400L)
+            new ResultRow(12345L, "A", 75L, 300*mB, 3L, 5L, 4L, 1200L),
+            new ResultRow(12345L, "B", 25L, 200*mB, 1L, 4L, 2L, 400L)
         };
         StatsProcInputTable dut = new StatsProcInputTable();
         loadEmUp(dut, data);
@@ -144,13 +145,13 @@ public class TestStatsProcInputTable {
         // need to not double count invocations at replicas, but do look at
         // min, max, avg
         ProcInputRow data[] = { //proc/part/time/invok/min/max/avg
-            new ProcInputRow("proc", 0L, 12345L, 200L, 4L, 10L, 6L),
-            new ProcInputRow("proc", 0L, 12345L, 100L, 4L, 25L, 10L),
-            new ProcInputRow("proc", 0L, 12345L, 100L, 1L, 4L, 2L),
-            new ProcInputRow("proc", 1L, 12345L, 400L, 2L, 8L, 4L)
+            new ProcInputRow("proc", 0L, 12345L, 200*mB, 4L, 10L, 6L),
+            new ProcInputRow("proc", 0L, 12345L, 100*mB, 4L, 25L, 10L),
+            new ProcInputRow("proc", 0L, 12345L, 100*mB, 1L, 4L, 2L),
+            new ProcInputRow("proc", 1L, 12345L, 400*mB, 2L, 8L, 4L)
         };
         ResultRow result[] = { //time/proc/perc/inok/min/max/avg/tot
-            new ResultRow(12345L, "proc", 100L, 600L, 1L, 25L, 5L, 3000L)
+            new ResultRow(12345L, "proc", 100L, 600*mB, 1L, 25L, 5L, 3000L)
         };
         StatsProcInputTable dut = new StatsProcInputTable();
         loadEmUp(dut, data);
