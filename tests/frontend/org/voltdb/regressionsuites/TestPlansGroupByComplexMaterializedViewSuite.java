@@ -26,6 +26,7 @@ package org.voltdb.regressionsuites;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.text.SimpleDateFormat;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
@@ -37,14 +38,23 @@ import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuite {
 
-    private final String[] procs = {"R1.insert"};
-    //private final String [] tbs = {"R1"};
+    private void compareMVcontents(String mvTable, long[][] expected) {
+        Client client = null;
+        try {
+            client = this.getClient();
+        } catch (Exception e) {
+            fail();
+        }
 
-    private void compareMVcontents(Client client, long[][] expected) {
+        String orderbyCol = mvTable + "_G1";
+        if (mvTable.endsWith("2")) {
+            orderbyCol += "," + mvTable + "_G2";
+        }
+
         VoltTable vt = null;
         try {
-            vt = client.callProcedure
-                    ("@AdHoc", "select * from V_R1 ORDER BY V_R1_dept").getResults()[0];
+            vt = client.callProcedure("@AdHoc",
+                    "select * from " + mvTable + " ORDER BY " + orderbyCol).getResults()[0];
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -55,8 +65,8 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         } else {
             // null result
             try {
-                vt = client.callProcedure
-                        ("@AdHoc", "select count(*) from V_R1").getResults()[0];
+                vt = client.callProcedure("@AdHoc",
+                        "select count(*) from " + mvTable).getResults()[0];
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -82,9 +92,9 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 actual = vt.getLong(i);
             } catch (IllegalArgumentException ex) {
                 try {
-                    actual = (long) vt.getDouble(i);
-                } catch (IllegalArgumentException newEx) {
                     actual = vt.getTimestampAsLong(i);
+                } catch (IllegalArgumentException newEx) {
+                    fail();
                 }
             }
             assertEquals(expected[i], actual);
@@ -94,6 +104,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
     private void loadData() throws IOException, ProcCallException {
         Client client = this.getClient();
         ClientResponse cr = null;
+        String[] procs = {"R1.insert"};
 
         // id, wage, dept, rate
         for (String tb: procs) {
@@ -108,62 +119,206 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
 
     public void testMaterializedViewInsertDelete() throws IOException, ProcCallException {
         System.out.println("Test insert and delete...");
+        String mvTable = "V_R1";
 
         // ID, wage, dept
         // SELECT ABS(dept), count(*), SUM(wage) FROM R1 GROUP BY ABS(dept)
         Client client = this.getClient();
 
-        compareMVcontents(client, null);
+        compareMVcontents(mvTable, null);
 
         client.callProcedure("R1.insert", 1,  10,  -1 );
-        compareMVcontents(client, new long [][]{{1, 1, 10}});
-
+        compareMVcontents(mvTable, new long [][]{{1, 1, 10}});
 
         client.callProcedure("R1.insert", 2,  20,  1 );
-        compareMVcontents(client, new long [][]{{1, 2, 30}});
+        compareMVcontents(mvTable, new long [][]{{1, 2, 30}});
 
         client.callProcedure("R1.insert", 4,  40,  2 );
-        compareMVcontents(client, new long [][]{{1, 2, 30}, {2, 1, 40}});
+        compareMVcontents(mvTable, new long [][]{{1, 2, 30}, {2, 1, 40}});
 
         client.callProcedure("R1.insert", 3,  30,  1 );
-        compareMVcontents(client, new long [][]{{1, 3, 60}, {2, 1, 40}});
+        compareMVcontents(mvTable, new long [][]{{1, 3, 60}, {2, 1, 40}});
 
         client.callProcedure("R1.insert", 5,  50,  2 );
-        compareMVcontents(client, new long [][]{{1, 3, 60}, {2, 2, 90}});
-
+        compareMVcontents(mvTable, new long [][]{{1, 3, 60}, {2, 2, 90}});
 
         client.callProcedure("R1.delete", 5);
-        compareMVcontents(client, new long [][]{{1, 3, 60}, {2, 1, 40}});
+        compareMVcontents(mvTable, new long [][]{{1, 3, 60}, {2, 1, 40}});
 
         client.callProcedure("R1.delete", 3);
-        compareMVcontents(client, new long [][]{{1, 2, 30}, {2, 1, 40}});
+        compareMVcontents(mvTable, new long [][]{{1, 2, 30}, {2, 1, 40}});
 
         client.callProcedure("R1.delete", 1);
-        compareMVcontents(client, new long [][]{{1, 1, 20}, {2, 1, 40}});
+        compareMVcontents(mvTable, new long [][]{{1, 1, 20}, {2, 1, 40}});
 
         client.callProcedure("R1.delete", 2);
-        compareMVcontents(client, new long [][]{{2, 1, 40}});
+        compareMVcontents(mvTable, new long [][]{{2, 1, 40}});
 
         client.callProcedure("R1.delete", 4);
-        compareMVcontents(client, null);
+        compareMVcontents(mvTable, null);
     }
 
     public void testMaterializedViewUpdate() throws IOException, ProcCallException {
         System.out.println("Test update...");
-        loadData();
 
+        Client client = this.getClient();
+        String tb = "R1.insert";
+        client.callProcedure(tb, 1,  10,  1 );
+        client.callProcedure(tb, 2,  20,  1 );
+        client.callProcedure(tb, 3,  30,  1 );
+        client.callProcedure(tb, 4,  40,  2 );
+        client.callProcedure(tb, 5,  50,  2 );
+
+        String mvTable = "V_R1";
         // ID, wage, dept
         // SELECT ABS(dept), count(*), SUM(wage) FROM R1 GROUP BY ABS(dept)
-        Client client = this.getClient();
 
         client.callProcedure("R1.update", 2, 19, 1, 2);
-        compareMVcontents(client, new long [][]{{1, 3, 59}, {2, 2, 90}});
+        compareMVcontents(mvTable, new long [][]{{1, 3, 59}, {2, 2, 90}});
 
         client.callProcedure("R1.update", 4, 41, -1, 4);
-        compareMVcontents(client, new long [][]{{1, 4, 100}, {2, 1, 50}});
+        compareMVcontents(mvTable, new long [][]{{1, 4, 100}, {2, 1, 50}});
 
         client.callProcedure("R1.update", 5, 55, 1, 5);
-        compareMVcontents(client, new long [][]{{1, 5, 155}});
+        compareMVcontents(mvTable, new long [][]{{1, 5, 155}});
+    }
+
+
+    public void testMaterializedViewInsertDeleteR2() throws Exception {
+        System.out.println("Test insert and delete...");
+        String mvTable = "V_R2";
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+
+        long time1 = dateFormat.parse("2013-06-01 00:00:00.000").getTime()*1000;
+        long time23 = dateFormat.parse("2013-07-01 00:00:00.000").getTime()*1000;
+        long time46 = dateFormat.parse("2013-08-01 00:00:00.000").getTime()*1000;
+        long time5 = dateFormat.parse("2013-09-01 00:00:00.000").getTime()*1000;
+
+
+        // ID, wage, dept, tm
+        // "AS SELECT truncate(month,tm), dept count(*), SUM(wage) " +
+        // "FROM R2 GROUP BY truncate(month,tm), dept;" +
+        Client client = this.getClient();
+
+        if (!isHSQL()) {
+            compareMVcontents(mvTable, null);
+
+            // Start to insert
+            client.callProcedure("R2.insert", 1,  10,  1 , "2013-06-11 02:00:00.123457");
+            compareMVcontents(mvTable, new long [][]{{time1, 1, 1, 10}});
+
+            client.callProcedure("R2.insert", 2,  20,  1 , "2013-07-12 03:00:00.123457");
+            compareMVcontents(mvTable, new long [][]{{time1, 1, 1, 10}, {time23, 1, 1, 20}});
+
+            client.callProcedure("R2.insert", 4,  40,  2 , "2013-08-13 04:00:00.123457");
+            compareMVcontents(mvTable, new long [][]{
+                    {time1, 1, 1, 10},
+                    {time23, 1, 1, 20},
+                    {time46, 2, 1, 40}});
+
+            client.callProcedure("R2.insert", 3,  30,  1 , "2013-07-14 05:00:00.123457");
+            compareMVcontents(mvTable, new long [][]{
+                    {time1, 1, 1, 10},
+                    {time23, 1, 2, 50},
+                    {time46, 2, 1, 40}});
+
+            client.callProcedure("R2.insert", 5,  50,  2 , "2013-09-15 06:00:00.123457");
+            compareMVcontents(mvTable, new long [][]{
+                    {time1, 1, 1, 10},
+                    {time23, 1, 2, 50},
+                    {time46, 2, 1, 40},
+                    {time5, 2, 1, 50}});
+
+            client.callProcedure("R2.insert", 6,  60,  2 , "2013-08-16 02:00:00.123457");
+            compareMVcontents(mvTable, new long [][]{
+                    {time1, 1, 1, 10},
+                    {time23, 1, 2, 50},
+                    {time46, 2, 2, 100},
+                    {time5, 2, 1, 50}});
+
+            // Start to delete
+            client.callProcedure("R2.delete", 6);
+            compareMVcontents(mvTable, new long [][]{
+                    {time1, 1, 1, 10},
+                    {time23, 1, 2, 50},
+                    {time46, 2, 1, 40},
+                    {time5, 2, 1, 50}});
+
+            client.callProcedure("R2.delete", 5);
+            compareMVcontents(mvTable, new long [][]{
+                    {time1, 1, 1, 10},
+                    {time23, 1, 2, 50},
+                    {time46, 2, 1, 40}});
+
+            client.callProcedure("R2.delete", 3);
+            compareMVcontents(mvTable, new long [][]{
+                    {time1, 1, 1, 10},
+                    {time23, 1, 1, 20},
+                    {time46, 2, 1, 40}});
+
+            client.callProcedure("R2.delete", 1);
+            compareMVcontents(mvTable, new long [][]{ {time23, 1, 1, 20},{time46, 2, 1, 40}});
+
+            client.callProcedure("R2.delete", 2);
+            compareMVcontents(mvTable, new long [][]{{time46, 2, 1, 40}});
+
+            client.callProcedure("R2.delete", 4);
+            compareMVcontents(mvTable, null);
+
+        }
+    }
+
+    public void testMaterializedViewUpdateR2() throws Exception {
+        System.out.println("Test update...");
+
+        if (!isHSQL()) {
+            Client client = this.getClient();
+            client.callProcedure("R2.insert", 1,  10,  1 , "2013-06-11 02:00:00.123457");
+            client.callProcedure("R2.insert", 2,  20,  1 , "2013-07-12 03:00:00.123457");
+            client.callProcedure("R2.insert", 3,  30,  1 , "2013-07-14 05:00:00.123457");
+            client.callProcedure("R2.insert", 4,  40,  2 , "2013-08-13 04:00:00.123457");
+            client.callProcedure("R2.insert", 5,  50,  2 , "2013-09-15 06:00:00.123457");
+            client.callProcedure("R2.insert", 6,  60,  2 , "2013-08-16 02:00:00.123457");
+
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+            long time1 = dateFormat.parse("2013-06-01 00:00:00.000").getTime()*1000;
+            long time23 = dateFormat.parse("2013-07-01 00:00:00.000").getTime()*1000;
+            long time46 = dateFormat.parse("2013-08-01 00:00:00.000").getTime()*1000;
+            long time5 = dateFormat.parse("2013-09-01 00:00:00.000").getTime()*1000;
+
+            String mvTable = "V_R2";
+            compareMVcontents(mvTable, new long [][]{
+                    {time1, 1, 1, 10},
+                    {time23, 1, 2, 50},
+                    {time46, 2, 2, 100},
+                    {time5, 2, 1, 50}});
+
+            // ID, wage, dept, tm
+            // "AS SELECT truncate(month,tm), dept count(*), SUM(wage) " +
+            // "FROM R2 GROUP BY truncate(month,tm), dept;" +
+
+            client.callProcedure("R2.update", 2, 19, 1, "2013-07-12 03:00:00.123457", 2);
+            compareMVcontents(mvTable, new long [][]{
+                    {time1, 1, 1, 10},
+                    {time23, 1, 2, 49},
+                    {time46, 2, 2, 100},
+                    {time5, 2, 1, 50}});
+
+            client.callProcedure("R2.update", 4, 41, -1, "2013-08-13 04:00:00.123457", 4);
+            compareMVcontents(mvTable, new long [][]{
+                    {time1, 1, 1, 10},
+                    {time23, 1, 2, 49},
+                    {time46, -1, 1, 41},
+                    {time46, 2, 1, 60},
+                    {time5, 2, 1, 50}});
+
+            client.callProcedure("R2.update", 5, 56, 1, "2013-06-11 02:01:00.123457", 5);
+            compareMVcontents(mvTable, new long [][]{
+                    {time1, 1, 2, 66},
+                    {time23, 1, 2, 49},
+                    {time46, -1, 1, 41},
+                    {time46, 2, 1, 60}});
+        }
     }
 
 
@@ -258,11 +413,22 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "DEPT INTEGER, " +
                 "PRIMARY KEY (ID) );" +
 
-                "CREATE VIEW V_R1 (V_R1_dept, V_R1_CNT, V_R1_sum_wage) " +
+                "CREATE VIEW V_R1 (V_R1_G1, V_R1_CNT, V_R1_sum_wage) " +
                 "AS SELECT ABS(dept), count(*), SUM(wage) FROM R1 GROUP BY ABS(dept);" +
 
 //                "CREATE VIEW V_R1 (V_R1_dept,  V_R1_CNT, V_R1_sum_wage) " +
 //                "AS SELECT dept, count(*), SUM(wage) FROM R1 GROUP BY dept;" +
+
+                "CREATE TABLE R2 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "WAGE INTEGER, " +
+                "DEPT INTEGER, " +
+                "TM TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) );" +
+
+                "CREATE VIEW V_R2 (V_R2_G1, V_R2_G2, V_R2_CNT, V_R2_sum_wage) " +
+                "AS SELECT truncate(month,tm), dept, count(*), SUM(wage) " +
+                "FROM R2 GROUP BY truncate(month,tm), dept;" +
                 ""
                 ;
         try {
@@ -275,15 +441,15 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         assertTrue(success);
         builder.addServerConfig(config);
 
-//        config = new LocalCluster("plansgroupby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-//        success = config.compile(project);
-//        assertTrue(success);
-//        builder.addServerConfig(config);
-//
-//        // Cluster
-//        config = new LocalCluster("plansgroupby-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-//        success = config.compile(project);
-//        assertTrue(success);
+        config = new LocalCluster("plansgroupby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        success = config.compile(project);
+        assertTrue(success);
+        builder.addServerConfig(config);
+
+        // Cluster
+        config = new LocalCluster("plansgroupby-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        success = config.compile(project);
+        assertTrue(success);
 
         return builder;
     }
