@@ -48,10 +48,9 @@ MaterializedViewMetadata::MaterializedViewMetadata(
     srcTable->addMaterializedView(this);
     // try to load the predicate from the catalog view
     parsePredicate(metadata);
-    m_hasComplexGroupby = metadata->hasComplexGroupby();
+    VOLT_TRACE("Start to parse complex group by");
+    parseComplexGroupby(metadata);
     if (m_hasComplexGroupby) {
-        VOLT_TRACE("Start to parse complex group by");
-        parseComplexGroupby(metadata);
         m_groupByColumnCount = m_groupbyExprs.size();
     } else {
         m_groupByColumnCount = metadata->groupbycols().size();
@@ -197,15 +196,13 @@ void MaterializedViewMetadata::parsePredicate(catalog::MaterializedViewInfo *met
 
 void MaterializedViewMetadata::parseComplexGroupby(catalog::MaterializedViewInfo *metadata) {
     const std::string expressionsAsText = metadata->groupbyExpressionsJson();
-    if (expressionsAsText.size() == 0)
+    if (expressionsAsText.length() == 0) {
+        m_hasComplexGroupby = false;
         return;
-
-    VOLT_TRACE("Group by Expression: %s\n", expressionsAsText.c_str());
-
-    m_groupbyExprs = TableIndex::simplyIndexColumns();
-    if (expressionsAsText.length() != 0) {
-        ExpressionUtil::loadIndexedExprsFromJson(m_groupbyExprs, expressionsAsText);
     }
+    m_hasComplexGroupby = true;
+    VOLT_TRACE("Group by Expression: %s\n", expressionsAsText.c_str());
+    ExpressionUtil::loadIndexedExprsFromJson(m_groupbyExprs, expressionsAsText);
 }
 
 void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple, bool fallible) {
@@ -231,19 +228,18 @@ void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple, bool fal
         // tuple values should be pulled from the existing tuple in
         // that table. This works around a memory ownership issue
         // related to out-of-line strings.
+        NValue value;
         if (exists) {
-            m_updatedTuple.setNValue(colindex,
-                                 m_existingTuple.getNValue(colindex));
-        }
-        else {
+            value = m_existingTuple.getNValue(colindex);
+        } else {
             if (m_hasComplexGroupby) {
                 AbstractExpression * expr = m_groupbyExprs.at(colindex);
-                m_updatedTuple.setNValue(colindex, expr->eval(&newTuple, NULL));
+                value = expr->eval(&newTuple, NULL);
             } else {
-                m_updatedTuple.setNValue(colindex,
-                        newTuple.getNValue(m_groupByColumns[colindex]));
+                value = newTuple.getNValue(m_groupByColumns[colindex]);
             }
         }
+        m_updatedTuple.setNValue(colindex, value);
     }
 
     // set up the next column, which is a count

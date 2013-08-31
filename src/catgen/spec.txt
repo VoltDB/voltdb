@@ -132,7 +132,6 @@ begin MaterializedViewInfo "Information used to build and update a materialized 
   Table? dest              "The table which will be updated when the source table is updated"
   ColumnRef* groupbycols   "The columns involved in the group by of the aggregation"
   string predicate         "A filtering predicate"
-  bool hasComplexGroupby   "Does this materialized query has complex group by"
   string groupbyExpressionsJson "A serialized representation of the optional expression trees"
 end
 

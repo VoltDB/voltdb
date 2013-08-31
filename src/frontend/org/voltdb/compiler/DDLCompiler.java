@@ -1549,8 +1549,6 @@ public class DDLCompiler {
             List<AbstractExpression> groupbyExprs = null;
 
             if (stmt.hasComplexGroupby()) {
-                matviewinfo.setHascomplexgroupby(true);
-
                 groupbyExprs = new ArrayList<AbstractExpression>();
                 HashSet<TupleValueExpression> tves = new HashSet<TupleValueExpression>();
                 for (ParsedColInfo col: stmt.groupByColumns) {
@@ -1573,7 +1571,6 @@ public class DDLCompiler {
                 matviewinfo.setGroupbyexpressionsjson(groupbyExprsJson);
 
             } else {
-                matviewinfo.setHascomplexgroupby(false);
                 // add the group by columns from the src table
                 for (int i = 0; i < stmt.groupByColumns.size(); i++) {
                     ParsedSelectStmt.ParsedColInfo gbcol = stmt.groupByColumns.get(i);
