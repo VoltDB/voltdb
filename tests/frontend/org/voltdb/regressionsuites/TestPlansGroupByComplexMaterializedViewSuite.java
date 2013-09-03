@@ -31,21 +31,13 @@ import java.text.SimpleDateFormat;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 
 public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuite {
 
-    private void compareMVcontents(String mvTable, long[][] expected) {
-        Client client = null;
-        try {
-            client = this.getClient();
-        } catch (Exception e) {
-            fail();
-        }
-
+    private void compareMVcontents(Client client, String mvTable, long[][] expected) {
         String orderbyCol = mvTable + "_G1";
         if (mvTable.endsWith("2")) {
             orderbyCol += "," + mvTable + "_G2";
@@ -60,8 +52,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         }
 
         if (vt.getRowCount() != 0) {
-            assertEquals(expected.length, vt.getRowCount());
-            compareTable(vt, expected);
+            validateTableOfLongs(vt, expected);
         } else {
             // null result
             try {
@@ -70,51 +61,9 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
             } catch (Exception e) {
                 e.printStackTrace();
             }
-            assertEquals(1, vt.getRowCount());
-            compareTable(vt, new long [][]{{0}});
+            // Nice method to get single row from a VoltTable.
+            assertEquals(0, vt.asScalarLong());
         }
-    }
-
-    private void compareTable(VoltTable vt, long[][] expected) {
-        int len = expected.length;
-        for (int i=0; i < len; i++) {
-            compareRow(vt, expected[i]);
-        }
-    }
-
-    private void compareRow(VoltTable vt, long [] expected) {
-        int len = expected.length;
-        assertTrue(vt.advanceRow());
-        for (int i=0; i < len; i++) {
-            long actual = -10000000;
-            // ENG-4295: hsql bug: HSQLBackend sometimes returns wrong column type.
-            try {
-                actual = vt.getLong(i);
-            } catch (IllegalArgumentException ex) {
-                try {
-                    actual = vt.getTimestampAsLong(i);
-                } catch (IllegalArgumentException newEx) {
-                    fail();
-                }
-            }
-            assertEquals(expected[i], actual);
-        }
-    }
-
-    private void loadData() throws IOException, ProcCallException {
-        Client client = this.getClient();
-        ClientResponse cr = null;
-        String[] procs = {"R1.insert"};
-
-        // id, wage, dept, rate
-        for (String tb: procs) {
-            cr = client.callProcedure(tb, 1,  10,  1 );
-            cr = client.callProcedure(tb, 2,  20,  1 );
-            cr = client.callProcedure(tb, 3,  30,  1 );
-            cr = client.callProcedure(tb, 4,  40,  2 );
-            cr = client.callProcedure(tb, 5,  50,  2 );
-        }
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
     public void testMaterializedViewInsertDelete() throws IOException, ProcCallException {
@@ -125,37 +74,37 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         // SELECT ABS(dept), count(*), SUM(wage) FROM R1 GROUP BY ABS(dept)
         Client client = this.getClient();
 
-        compareMVcontents(mvTable, null);
+        compareMVcontents(client, mvTable, null);
 
         client.callProcedure("R1.insert", 1,  10,  -1 );
-        compareMVcontents(mvTable, new long [][]{{1, 1, 10}});
+        compareMVcontents(client, mvTable, new long [][]{{1, 1, 10}});
 
         client.callProcedure("R1.insert", 2,  20,  1 );
-        compareMVcontents(mvTable, new long [][]{{1, 2, 30}});
+        compareMVcontents(client, mvTable, new long [][]{{1, 2, 30}});
 
         client.callProcedure("R1.insert", 4,  40,  2 );
-        compareMVcontents(mvTable, new long [][]{{1, 2, 30}, {2, 1, 40}});
+        compareMVcontents(client, mvTable, new long [][]{{1, 2, 30}, {2, 1, 40}});
 
         client.callProcedure("R1.insert", 3,  30,  1 );
-        compareMVcontents(mvTable, new long [][]{{1, 3, 60}, {2, 1, 40}});
+        compareMVcontents(client, mvTable, new long [][]{{1, 3, 60}, {2, 1, 40}});
 
         client.callProcedure("R1.insert", 5,  50,  2 );
-        compareMVcontents(mvTable, new long [][]{{1, 3, 60}, {2, 2, 90}});
+        compareMVcontents(client, mvTable, new long [][]{{1, 3, 60}, {2, 2, 90}});
 
         client.callProcedure("R1.delete", 5);
-        compareMVcontents(mvTable, new long [][]{{1, 3, 60}, {2, 1, 40}});
+        compareMVcontents(client, mvTable, new long [][]{{1, 3, 60}, {2, 1, 40}});
 
         client.callProcedure("R1.delete", 3);
-        compareMVcontents(mvTable, new long [][]{{1, 2, 30}, {2, 1, 40}});
+        compareMVcontents(client, mvTable, new long [][]{{1, 2, 30}, {2, 1, 40}});
 
         client.callProcedure("R1.delete", 1);
-        compareMVcontents(mvTable, new long [][]{{1, 1, 20}, {2, 1, 40}});
+        compareMVcontents(client, mvTable, new long [][]{{1, 1, 20}, {2, 1, 40}});
 
         client.callProcedure("R1.delete", 2);
-        compareMVcontents(mvTable, new long [][]{{2, 1, 40}});
+        compareMVcontents(client, mvTable, new long [][]{{2, 1, 40}});
 
         client.callProcedure("R1.delete", 4);
-        compareMVcontents(mvTable, null);
+        compareMVcontents(client, mvTable, null);
     }
 
     public void testMaterializedViewUpdate() throws IOException, ProcCallException {
@@ -174,13 +123,13 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         // SELECT ABS(dept), count(*), SUM(wage) FROM R1 GROUP BY ABS(dept)
 
         client.callProcedure("R1.update", 2, 19, 1, 2);
-        compareMVcontents(mvTable, new long [][]{{1, 3, 59}, {2, 2, 90}});
+        compareMVcontents(client, mvTable, new long [][]{{1, 3, 59}, {2, 2, 90}});
 
         client.callProcedure("R1.update", 4, 41, -1, 4);
-        compareMVcontents(mvTable, new long [][]{{1, 4, 100}, {2, 1, 50}});
+        compareMVcontents(client, mvTable, new long [][]{{1, 4, 100}, {2, 1, 50}});
 
         client.callProcedure("R1.update", 5, 55, 1, 5);
-        compareMVcontents(mvTable, new long [][]{{1, 5, 155}});
+        compareMVcontents(client, mvTable, new long [][]{{1, 5, 155}});
     }
 
 
@@ -201,36 +150,36 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         Client client = this.getClient();
 
         if (!isHSQL()) {
-            compareMVcontents(mvTable, null);
+            compareMVcontents(client, mvTable, null);
 
             // Start to insert
             client.callProcedure("R2.insert", 1,  10,  1 , "2013-06-11 02:00:00.123457");
-            compareMVcontents(mvTable, new long [][]{{time1, 1, 1, 10}});
+            compareMVcontents(client, mvTable, new long [][]{{time1, 1, 1, 10}});
 
             client.callProcedure("R2.insert", 2,  20,  1 , "2013-07-12 03:00:00.123457");
-            compareMVcontents(mvTable, new long [][]{{time1, 1, 1, 10}, {time23, 1, 1, 20}});
+            compareMVcontents(client, mvTable, new long [][]{{time1, 1, 1, 10}, {time23, 1, 1, 20}});
 
             client.callProcedure("R2.insert", 4,  40,  2 , "2013-08-13 04:00:00.123457");
-            compareMVcontents(mvTable, new long [][]{
+            compareMVcontents(client, mvTable, new long [][]{
                     {time1, 1, 1, 10},
                     {time23, 1, 1, 20},
                     {time46, 2, 1, 40}});
 
             client.callProcedure("R2.insert", 3,  30,  1 , "2013-07-14 05:00:00.123457");
-            compareMVcontents(mvTable, new long [][]{
+            compareMVcontents(client, mvTable, new long [][]{
                     {time1, 1, 1, 10},
                     {time23, 1, 2, 50},
                     {time46, 2, 1, 40}});
 
             client.callProcedure("R2.insert", 5,  50,  2 , "2013-09-15 06:00:00.123457");
-            compareMVcontents(mvTable, new long [][]{
+            compareMVcontents(client, mvTable, new long [][]{
                     {time1, 1, 1, 10},
                     {time23, 1, 2, 50},
                     {time46, 2, 1, 40},
                     {time5, 2, 1, 50}});
 
             client.callProcedure("R2.insert", 6,  60,  2 , "2013-08-16 02:00:00.123457");
-            compareMVcontents(mvTable, new long [][]{
+            compareMVcontents(client, mvTable, new long [][]{
                     {time1, 1, 1, 10},
                     {time23, 1, 2, 50},
                     {time46, 2, 2, 100},
@@ -238,32 +187,32 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
 
             // Start to delete
             client.callProcedure("R2.delete", 6);
-            compareMVcontents(mvTable, new long [][]{
+            compareMVcontents(client, mvTable, new long [][]{
                     {time1, 1, 1, 10},
                     {time23, 1, 2, 50},
                     {time46, 2, 1, 40},
                     {time5, 2, 1, 50}});
 
             client.callProcedure("R2.delete", 5);
-            compareMVcontents(mvTable, new long [][]{
+            compareMVcontents(client, mvTable, new long [][]{
                     {time1, 1, 1, 10},
                     {time23, 1, 2, 50},
                     {time46, 2, 1, 40}});
 
             client.callProcedure("R2.delete", 3);
-            compareMVcontents(mvTable, new long [][]{
+            compareMVcontents(client, mvTable, new long [][]{
                     {time1, 1, 1, 10},
                     {time23, 1, 1, 20},
                     {time46, 2, 1, 40}});
 
             client.callProcedure("R2.delete", 1);
-            compareMVcontents(mvTable, new long [][]{ {time23, 1, 1, 20},{time46, 2, 1, 40}});
+            compareMVcontents(client, mvTable, new long [][]{ {time23, 1, 1, 20},{time46, 2, 1, 40}});
 
             client.callProcedure("R2.delete", 2);
-            compareMVcontents(mvTable, new long [][]{{time46, 2, 1, 40}});
+            compareMVcontents(client, mvTable, new long [][]{{time46, 2, 1, 40}});
 
             client.callProcedure("R2.delete", 4);
-            compareMVcontents(mvTable, null);
+            compareMVcontents(client, mvTable, null);
 
         }
     }
@@ -287,7 +236,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
             long time5 = dateFormat.parse("2013-09-01 00:00:00.000").getTime()*1000;
 
             String mvTable = "V_R2";
-            compareMVcontents(mvTable, new long [][]{
+            compareMVcontents(client, mvTable, new long [][]{
                     {time1, 1, 1, 10},
                     {time23, 1, 2, 50},
                     {time46, 2, 2, 100},
@@ -298,14 +247,14 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
             // "FROM R2 GROUP BY truncate(month,tm), dept;" +
 
             client.callProcedure("R2.update", 2, 19, 1, "2013-07-12 03:00:00.123457", 2);
-            compareMVcontents(mvTable, new long [][]{
+            compareMVcontents(client, mvTable, new long [][]{
                     {time1, 1, 1, 10},
                     {time23, 1, 2, 49},
                     {time46, 2, 2, 100},
                     {time5, 2, 1, 50}});
 
             client.callProcedure("R2.update", 4, 41, -1, "2013-08-13 04:00:00.123457", 4);
-            compareMVcontents(mvTable, new long [][]{
+            compareMVcontents(client, mvTable, new long [][]{
                     {time1, 1, 1, 10},
                     {time23, 1, 2, 49},
                     {time46, -1, 1, 41},
@@ -313,14 +262,13 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                     {time5, 2, 1, 50}});
 
             client.callProcedure("R2.update", 5, 56, 1, "2013-06-11 02:01:00.123457", 5);
-            compareMVcontents(mvTable, new long [][]{
+            compareMVcontents(client, mvTable, new long [][]{
                     {time1, 1, 2, 66},
                     {time23, 1, 2, 49},
                     {time46, -1, 1, 41},
                     {time46, 2, 1, 60}});
         }
     }
-
 
     //
     // Suite builder boilerplate
@@ -415,9 +363,6 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
 
                 "CREATE VIEW V_R1 (V_R1_G1, V_R1_CNT, V_R1_sum_wage) " +
                 "AS SELECT ABS(dept), count(*), SUM(wage) FROM R1 GROUP BY ABS(dept);" +
-
-//                "CREATE VIEW V_R1 (V_R1_dept,  V_R1_CNT, V_R1_sum_wage) " +
-//                "AS SELECT dept, count(*), SUM(wage) FROM R1 GROUP BY dept;" +
 
                 "CREATE TABLE R2 ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +

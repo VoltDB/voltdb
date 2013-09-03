@@ -39,7 +39,7 @@ class TableIndex;
 class MaterializedViewMetadata {
 public:
 
-    MaterializedViewMetadata(PersistentTable *srcTable, PersistentTable *destTable, catalog::MaterializedViewInfo *metadata);
+    MaterializedViewMetadata(PersistentTable *srcTable, PersistentTable *destTable, catalog::MaterializedViewInfo *mvInfo);
     ~MaterializedViewMetadata();
 
     /**
@@ -63,9 +63,9 @@ private:
     void allocateBackedTuples();
 
     /** load a predicate from the catalog structure if it's there */
-    void parsePredicate(catalog::MaterializedViewInfo *metadata);
+    void parsePredicate(catalog::MaterializedViewInfo *mvInfo);
 
-    void parseComplexGroupby(catalog::MaterializedViewInfo *metadata);
+    void parseComplexGroupby(catalog::MaterializedViewInfo *mvInfo);
 
     /**
      * build a search key based on the src table value

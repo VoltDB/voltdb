@@ -37,7 +37,7 @@
 namespace voltdb {
 
 MaterializedViewMetadata::MaterializedViewMetadata(
-        PersistentTable *srcTable, PersistentTable *destTable, catalog::MaterializedViewInfo *metadata)
+        PersistentTable *srcTable, PersistentTable *destTable, catalog::MaterializedViewInfo *mvInfo)
         : m_target(destTable), m_filterPredicate(NULL)
 {
 // DEBUG_STREAM_HERE("New mat view on source table " << srcTable->name() << " @" << srcTable << " view table " << m_target->name() << " @" << m_target);
@@ -47,13 +47,13 @@ MaterializedViewMetadata::MaterializedViewMetadata(
     m_target->incrementRefcount();
     srcTable->addMaterializedView(this);
     // try to load the predicate from the catalog view
-    parsePredicate(metadata);
+    parsePredicate(mvInfo);
     VOLT_TRACE("Start to parse complex group by");
-    parseComplexGroupby(metadata);
+    parseComplexGroupby(mvInfo);
     if (m_hasComplexGroupby) {
-        m_groupByColumnCount = m_groupbyExprs.size();
+        m_groupByColumnCount = (int32_t)m_groupbyExprs.size();
     } else {
-        m_groupByColumnCount = metadata->groupbycols().size();
+        m_groupByColumnCount = mvInfo->groupbycols().size();
     }
 
     // set up the group by columns from the catalog info
@@ -61,8 +61,8 @@ MaterializedViewMetadata::MaterializedViewMetadata(
 
     if (!m_hasComplexGroupby) {
         std::map<std::string, catalog::ColumnRef*>::const_iterator colRefIterator;
-        for (colRefIterator = metadata->groupbycols().begin();
-                colRefIterator != metadata->groupbycols().end();
+        for (colRefIterator = mvInfo->groupbycols().begin();
+                colRefIterator != mvInfo->groupbycols().end();
                 colRefIterator++)
         {
             int32_t grouping_order_offset = colRefIterator->second->index();
@@ -71,12 +71,12 @@ MaterializedViewMetadata::MaterializedViewMetadata(
     }
 
     // set up the mapping from input col to output col
-    m_outputColumnCount = metadata->dest()->columns().size();
+    m_outputColumnCount = mvInfo->dest()->columns().size();
     m_outputColumnSrcTableIndexes = new int32_t[m_outputColumnCount];
     m_outputColumnAggTypes = new ExpressionType[m_outputColumnCount];
     std::map<std::string, catalog::Column*>::const_iterator colIterator;
     // iterate the source table
-    for (colIterator = metadata->dest()->columns().begin(); colIterator != metadata->dest()->columns().end(); colIterator++) {
+    for (colIterator = mvInfo->dest()->columns().begin(); colIterator != mvInfo->dest()->columns().end(); colIterator++) {
         const catalog::Column *destCol = colIterator->second;
         int destIndex = destCol->index();
 
@@ -177,8 +177,8 @@ void MaterializedViewMetadata::allocateBackedTuples()
 }
 
 
-void MaterializedViewMetadata::parsePredicate(catalog::MaterializedViewInfo *metadata) {
-    std::string hexString = metadata->predicate();
+void MaterializedViewMetadata::parsePredicate(catalog::MaterializedViewInfo *mvInfo) {
+    std::string hexString = mvInfo->predicate();
     if (hexString.size() == 0)
         return;
 
@@ -194,8 +194,8 @@ void MaterializedViewMetadata::parsePredicate(catalog::MaterializedViewInfo *met
     }
 }
 
-void MaterializedViewMetadata::parseComplexGroupby(catalog::MaterializedViewInfo *metadata) {
-    const std::string expressionsAsText = metadata->groupbyExpressionsJson();
+void MaterializedViewMetadata::parseComplexGroupby(catalog::MaterializedViewInfo *mvInfo) {
+    const std::string expressionsAsText = mvInfo->groupbyExpressionsJson();
     if (expressionsAsText.length() == 0) {
         m_hasComplexGroupby = false;
         return;
@@ -346,15 +346,15 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
 
 bool MaterializedViewMetadata::findExistingTuple(TableTuple &oldTuple, bool expected) {
     // find the key for this tuple (which is the group by columns)
-    if (m_hasComplexGroupby) {
-        for (int i = 0; i < m_groupByColumnCount; i++) {
+    NValue value;
+    for (int i = 0; i < m_groupByColumnCount; i++) {
+        if (m_hasComplexGroupby) {
             AbstractExpression * expr = m_groupbyExprs.at(i);
-            m_searchKey.setNValue(i, expr->eval(&oldTuple,NULL));
+            value = expr->eval(&oldTuple,NULL);
+        } else {
+            value = oldTuple.getNValue(m_groupByColumns[i]);
         }
-    } else {
-        for (int i = 0; i < m_groupByColumnCount; i++) {
-            m_searchKey.setNValue(i, oldTuple.getNValue(m_groupByColumns[i]));
-        }
+        m_searchKey.setNValue(i, value);
     }
 
     // determine if the row exists (create the empty one if it doesn't)

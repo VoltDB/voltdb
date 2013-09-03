@@ -1565,8 +1565,8 @@ public class DDLCompiler {
                 try {
                     groupbyExprsJson = convertToJSONArray(groupbyExprs);
                 } catch (JSONException e) {
-                    // TODO(XIN) : throw reasonable messages
-                    e.printStackTrace();
+                    throw m_compiler.new VoltCompilerException ("Unexpected error serializing non-column " +
+                            "expressions for group by expressions: " + e.toString());
                 }
                 matviewinfo.setGroupbyexpressionsjson(groupbyExprsJson);
 
@@ -1671,7 +1671,7 @@ public class DDLCompiler {
             ParsedSelectStmt.ParsedColInfo outcol = stmt.displayColumns.get(i);
 
             if (!outcol.expression.equals(gbcol.expression)) {
-                msg += "must have expression column at index " + String.valueOf(i) + " of select list.";
+                msg += "must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.";
                 throw m_compiler.new VoltCompilerException(msg);
             }
         }
