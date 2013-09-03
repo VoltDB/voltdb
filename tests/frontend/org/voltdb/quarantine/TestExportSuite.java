@@ -171,23 +171,7 @@ public class TestExportSuite extends TestExportBase {
 
         quiesce(client);
 
-        VoltTable stats = client.callProcedure("@Statistics", "table", (byte)0).getResults()[0];
-        while (stats.advanceRow()) {
-            if (stats.getString("TABLE_NAME").equals("NO_NULLS")) {
-                if (stats.getLong("PARTITION_ID") == 0) {
-                    assertEquals(14, stats.getLong("TUPLE_COUNT"));
-                    assertEquals(3, stats.getLong("TUPLE_ALLOCATED_MEMORY"));
-                } else if (stats.getLong("PARTITION_ID") == 1) {
-                    assertEquals(13, stats.getLong("TUPLE_COUNT"));
-                    assertEquals(2, stats.getLong("TUPLE_ALLOCATED_MEMORY"));
-                } else if (stats.getLong("PARTITION_ID") == 2) {
-                    assertEquals(13, stats.getLong("TUPLE_COUNT"));
-                    assertEquals(2, stats.getLong("TUPLE_ALLOCATED_MEMORY"));
-                } else {
-                    fail();
-                }
-            }
-        }
+        checkForExpectedStats(client, 3, 2, 2);
 
         ExportToFileClient exportClient =
           new ExportToFileClient(
@@ -295,6 +279,39 @@ public class TestExportSuite extends TestExportBase {
         }
     }
 
+    private void checkForExpectedStats(Client client, int mem1, int mem2, int mem3) throws Exception {
+        long start = System.currentTimeMillis();
+        boolean passed = false;
+        VoltTable stats = null;
+        while (System.currentTimeMillis() - start < 60000) {
+            stats = client.callProcedure("@Statistics", "table", (byte)0).getResults()[0];
+            boolean passedThisTime = true;
+            while (stats.advanceRow()) {
+                if (stats.getString("TABLE_NAME").equals("NO_NULLS")) {
+                    if (stats.getLong("PARTITION_ID") == 0) {
+                        if (14 != stats.getLong("TUPLE_COUNT")) passedThisTime = false;
+                        if (mem1 != stats.getLong("TUPLE_ALLOCATED_MEMORY")) passedThisTime = false;
+                    } else if (stats.getLong("PARTITION_ID") == 1) {
+                        if (13 != stats.getLong("TUPLE_COUNT")) passedThisTime = false;
+                        if (mem2 != stats.getLong("TUPLE_ALLOCATED_MEMORY")) passedThisTime = false;
+                    } else if (stats.getLong("PARTITION_ID") == 2) {
+                        if (13 != stats.getLong("TUPLE_COUNT")) passedThisTime = false;
+                        if (mem3 != stats.getLong("TUPLE_ALLOCATED_MEMORY")) passedThisTime = false;
+                    } else {
+                        fail();
+                    }
+                }
+            }
+            if (passedThisTime) {
+                passed = true;
+                break;
+            }
+            Thread.sleep(1);
+        }
+        if (!passed) System.out.println(stats);
+        assertTrue(passed);
+    }
+
     private static class StupidException extends Exception {}
     //
     // Only notify the verifier of the first set of rows. Expect that the rows after will be truncated
@@ -313,23 +330,7 @@ public class TestExportSuite extends TestExportBase {
 
         client.callProcedure("@SnapshotSave", "/tmp/" + System.getProperty("user.name"), "testnonce", (byte)1);
 
-        VoltTable stats = client.callProcedure("@Statistics", "table", (byte)0).getResults()[0];
-        while (stats.advanceRow()) {
-            if (stats.getString("TABLE_NAME").equals("NO_NULLS")) {
-                if (stats.getLong("PARTITION_ID") == 0) {
-                    assertEquals(14, stats.getLong("TUPLE_COUNT"));
-                    assertEquals(3, stats.getLong("TUPLE_ALLOCATED_MEMORY"));
-                } else if (stats.getLong("PARTITION_ID") == 1) {
-                    assertEquals(13, stats.getLong("TUPLE_COUNT"));
-                    assertEquals(2, stats.getLong("TUPLE_ALLOCATED_MEMORY"));
-                } else if (stats.getLong("PARTITION_ID") == 2) {
-                    assertEquals(13, stats.getLong("TUPLE_COUNT"));
-                    assertEquals(2, stats.getLong("TUPLE_ALLOCATED_MEMORY"));
-                } else {
-                    fail();
-                }
-            }
-        }
+        checkForExpectedStats(client, 3, 2, 2);
 
         for (int i=40; i < 50; i++) {
             final Object[] rowdata = TestSQLTypesSuite.m_midValues;
@@ -348,36 +349,8 @@ public class TestExportSuite extends TestExportBase {
         // must still be able to verify the export data.
         quiesceAndVerifyRetryWorkOnIOException(client, m_tester);
 
-        for (int ii = 0; ii < 1000; ii++) {
-            boolean success = true;
-            stats = client.callProcedure("@Statistics", "table", (byte)0).getResults()[0];
-            try {
-                while (stats.advanceRow()) {
-                    if (stats.getString("TABLE_NAME").equals("NO_NULLS")) {
-                        if (stats.getLong("PARTITION_ID") == 0) {
-                            if (14 != stats.getLong("TUPLE_COUNT")) throw new StupidException();
-                            if (0 != stats.getLong("TUPLE_ALLOCATED_MEMORY")) throw new StupidException();
-                        } else if (stats.getLong("PARTITION_ID") == 1) {
-                            if (13 != stats.getLong("TUPLE_COUNT")) throw new StupidException();
-                            if (0 != stats.getLong("TUPLE_ALLOCATED_MEMORY")) throw new StupidException();
-                        } else if (stats.getLong("PARTITION_ID") == 2) {
-                            if (13 != stats.getLong("TUPLE_COUNT")) throw new StupidException();
-                            if (0 != stats.getLong("TUPLE_ALLOCATED_MEMORY")) throw new StupidException();
-                        } else {
-                            fail();
-                        }
-                    }
-                }
-            } catch (StupidException e) {
-                success = false;
-            }
-            if (success) return;
-            Thread.sleep(1);
-        }
-        System.out.println(stats);
-        fail("Allocated tuple memory didn't go to zero for export tables "
-                + "even though all data should have been drained");
-
+        //Allocated memory should go to 0
+        checkForExpectedStats(client, 0, 0, 0);
     }
 
   //
