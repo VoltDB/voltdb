@@ -21,26 +21,28 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb_testprocs.regressionsuites.orderbyprocs;
+package org.voltdb_testprocs.regressionsuites.failureprocs;
 
-import org.voltdb.ProcInfo;
-import org.voltdb.SQLStmt;
+import java.lang.reflect.Field;
+
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo(singlePartition = false)
-public class OrderByOneIndex extends VoltProcedure {
-    public final SQLStmt select =
-            new SQLStmt("select * from O3 where PK1=3 and I4>=5 order by I3 desc limit 3;");
-    public final SQLStmt select_silly = // sort desc then asc by the same column should change nothing
-            new SQLStmt("select * from O3 where PK1=3 and I4>=5 order by I3 desc, I3 limit 3;");
+import sun.misc.Unsafe;
 
-    public VoltTable[] run(int testSillyCase) {
-        if (testSillyCase == 0) {
-            voltQueueSQL(select);
-        } else {
-            voltQueueSQL(select_silly);
+public class CrashJVM extends VoltProcedure {
+    public VoltTable[] run() {
+        try {
+            getUnsafe().getByte(0);
+        } catch (Exception e) {
+
         }
-        return voltExecuteSQL();
+        return null;
+    }
+
+    private static Unsafe getUnsafe() throws NoSuchFieldException, IllegalAccessException {
+        Field theUnsafe = Unsafe.class.getDeclaredField("theUnsafe");
+        theUnsafe.setAccessible(true);
+        return (Unsafe) theUnsafe.get(null);
     }
 }
