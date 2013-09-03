@@ -472,7 +472,7 @@ public class ZKUtil {
      */
     public static abstract class CancellableWatcher implements Watcher {
         volatile boolean canceled = false;
-        final private ExecutorService es;
+        final ExecutorService es;
 
         public CancellableWatcher(ExecutorService es) {
             this.es = es;
@@ -484,7 +484,7 @@ public class ZKUtil {
 
         @Override
         public void process(final WatchedEvent event) {
-            es.execute(new Runnable() {
+           es.execute(new Runnable() {
                @Override
                public void run() {
                    if (canceled) return;
