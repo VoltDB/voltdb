@@ -20,7 +20,6 @@ package org.voltdb;
 import java.util.Map;
 
 import org.voltcore.utils.InstanceId;
-import org.voltdb.catalog.Database;
 import org.voltdb.dtxn.TransactionCreator;
 
 public interface CommandLogReinitiator {
@@ -101,5 +100,16 @@ public interface CommandLogReinitiator {
      */
     public void returnAllSegments();
 
+    /**
+     * Request an elastic index snapshot if the command log will replay @BalancePartitions transactions.
+     * @return true if successfully requested.
+     */
     public boolean requestIndexSnapshot();
+
+    /**
+     * Call @BalancePartitions until the partitions are balanced if necessary. Does nothing if the partitions are
+     * already balanced or if the legacy hashinator is used.
+     * @return true if the partitions are balanced successfully.
+     */
+    public boolean checkAndBalancePartitions();
 }

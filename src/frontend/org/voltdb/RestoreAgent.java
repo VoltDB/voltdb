@@ -1204,6 +1204,13 @@ SnapshotCompletionInterest
             if (m_callback != null) {
                 m_callback.onRestoreCompletion(m_truncationSnapshot, m_truncationSnapshotPerPartition);
             }
+
+            // Call balance partitions after enabling transactions on the node to shorten the recovery time
+            if (m_isLeader) {
+                if (!m_replayAgent.checkAndBalancePartitions()) {
+                    VoltDB.crashLocalVoltDB("Failed to finish balancing partitions", false, null);
+                }
+            }
         }
     }
 

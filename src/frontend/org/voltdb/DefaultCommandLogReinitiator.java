@@ -76,6 +76,12 @@ public class DefaultCommandLogReinitiator implements CommandLogReinitiator
     }
 
     @Override
+    public boolean checkAndBalancePartitions()
+    {
+        return true;
+    }
+
+    @Override
     public boolean hasReplayedTxns() {
         return false;
     }
