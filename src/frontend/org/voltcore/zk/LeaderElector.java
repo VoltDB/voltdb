@@ -241,7 +241,7 @@ public class LeaderElector {
     synchronized public void shutdown() throws InterruptedException, KeeperException {
         m_done.set(true);
         es.shutdown();
-        es.awaitTermination(5, TimeUnit.DAYS);
+        es.awaitTermination(1500, TimeUnit.MILLISECONDS);
         zk.delete(node, -1);
     }
 
