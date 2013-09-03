@@ -165,6 +165,10 @@ public class TestJDBCDriver {
         tableTest(null, "O%", 2);
          // TPCC has 5 tables with names containing "ST"
         tableTest(null, "%ST%", 5);
+        // TPCC has 10 tables
+        tableTest(null, "", 10);
+        // TPCC has 10 tables, but won't match the types array
+        tableTest(new String[] {""}, "", 0);
     }
 
     @Test
@@ -190,7 +194,6 @@ public class TestJDBCDriver {
                                                           table, column);
         int count = 0;
         while (columns.next()) {
- //           assertEquals(table, columns.getString("TABLE_NAME"));
             assertFalse(columns.getString("COLUMN_NAME").isEmpty());
             count++;
         }
@@ -211,10 +214,12 @@ public class TestJDBCDriver {
     @Test
     public void testFilterColumnByWildcard() throws SQLException {
         tableColumnTest("CUSTOMER%", null, 26);
+        tableColumnTest("CUSTOMER%", "", 26);
         tableColumnTest("CUSTOMER%", "%MIDDLE", 1);
         tableColumnTest("CUSTOMER", "____", 1);
         tableColumnTest("%", "%ID", 32);
         tableColumnTest(null, "%ID", 32);
+        tableColumnTest(null, "", 97);
     }
 
     /**
