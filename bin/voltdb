@@ -182,6 +182,8 @@ if \ls -1 $VOLTDB_LIB/extension 2> /dev/null | egrep -q '\.jar$'; then
 fi
 
 # run it
+# note: currently heapdump path in log collector is hardcoded to /tmp
+#       if commandline option gets changed, there should be corresponding modification in log collector
 export CMDVAL="$JAVA -server -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp "
 export CMDVAL=$CMDVAL"-XX:+UseConcMarkSweepGC -XX:+CMSParallelRemarkEnabled "
 # note: bash evals '1.7.x' as > '1.7' so this is really a >= 1.7 jvm check
