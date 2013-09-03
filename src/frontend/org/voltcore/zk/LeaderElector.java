@@ -35,7 +35,8 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltZK;
 
 import com.google.common.collect.ImmutableSet;
-import org.voltcore.zk.ZKUtil.CancellableWatcher;
+import java.util.concurrent.TimeUnit;
+import org.apache.zookeeper_voltpatches.Watcher;
 
 public class LeaderElector {
     // The root is always created as INITIALIZING until the first participant is added,
@@ -66,6 +67,9 @@ public class LeaderElector {
                 // means zk shutdown without the elector being shutdown.
                 // ignore.
                 e.printStackTrace();
+            } catch (FailedWatchingLowerNodeException wlnex) {
+                es.submit(electionEventHandler);
+                return;
             } catch (KeeperException.ConnectionLossException e) {
                 // lost the full connection. some test cases do this...
                 // means shutdoown without the elector being
@@ -113,14 +117,10 @@ public class LeaderElector {
     };
 
     //Cancellable Children watcher cancelled at shutdown time
-    private class ChildrenCancellableWatcher extends CancellableWatcher {
-
-        public ChildrenCancellableWatcher(ExecutorService es) {
-            super(es);
-        }
+    private class ChildrenWatcher implements Watcher {
 
         @Override
-        protected void pProcess(WatchedEvent event) {
+        public void process(WatchedEvent event) {
             try {
                 if (!m_done.get()) {
                     es.submit(childrenEventHandler);
@@ -129,17 +129,13 @@ public class LeaderElector {
             }
         }
     }
-    private final ChildrenCancellableWatcher childWatcher;
+    private final ChildrenWatcher childWatcher = new ChildrenWatcher();
 
     //Cancellable Election watcher cancelled at shutdown time
-    private class ElectionCancellableWatcher extends CancellableWatcher {
-
-        public ElectionCancellableWatcher(ExecutorService es) {
-            super(es);
-        }
+    private class ElectionWatcher implements Watcher {
 
         @Override
-        protected void pProcess(WatchedEvent event) {
+        public void process(final WatchedEvent event) {
             try {
                 if (!m_done.get()) {
                     es.submit(electionEventHandler);
@@ -148,7 +144,7 @@ public class LeaderElector {
             }
         }
     }
-    private final ElectionCancellableWatcher electionWatcher;
+    private final ElectionWatcher electionWatcher = new ElectionWatcher();
 
     public LeaderElector(ZooKeeper zk, String dir, String prefix, byte[] data,
                          LeaderNoticeHandler cb) {
@@ -157,9 +153,7 @@ public class LeaderElector {
         this.prefix = prefix;
         this.data = data;
         this.cb = cb;
-        es = CoreUtils.getCachedSingleThreadExecutor("Leader elector-" + dir, 15000);
-        electionWatcher = new ElectionCancellableWatcher(es);
-        childWatcher = new ChildrenCancellableWatcher(es);
+        es = CoreUtils.getBoundedSingleThreadExecutor("Leader elector-" + dir, 2);
     }
 
     /**
@@ -246,13 +240,13 @@ public class LeaderElector {
      */
     synchronized public void shutdown() throws InterruptedException, KeeperException {
         m_done.set(true);
-        childWatcher.cancel();
-        electionWatcher.cancel();
         es.shutdown();
+        es.awaitTermination(5, TimeUnit.DAYS);
         zk.delete(node, -1);
     }
 
-
+    final class FailedWatchingLowerNodeException extends Exception {
+    }
     /**
      * Set a watch on the node that comes before the specified node in the
      * directory.
@@ -260,7 +254,7 @@ public class LeaderElector {
      * @return The lowest sequential node
      * @throws Exception
      */
-    private String watchNextLowerNode() throws KeeperException, InterruptedException {
+    private String watchNextLowerNode() throws KeeperException, InterruptedException, FailedWatchingLowerNodeException {
         /*
          * Iterate through the sorted list of children and find the given node,
          * then setup a electionWatcher on the previous node if it exists, otherwise the
@@ -272,6 +266,7 @@ public class LeaderElector {
         String lowest = null;
         String previous = null;
         ListIterator<String> iter = children.listIterator();
+        int holes = 0;
         while (iter.hasNext()) {
             String child = ZKUtil.joinZKPath(dir, iter.next());
 
@@ -280,24 +275,30 @@ public class LeaderElector {
                 previous = child;
                 continue;
             }
-
             if (child.equals(node)) {
                 while (zk.exists(previous, electionWatcher) == null) {
+                    // If we reached to the top of the list we know the lowest node.
                     if (previous.equals(lowest)) {
                         /*
                          * If the leader disappeared, and we follow the leader, we
                          * become the leader now
                          */
                         lowest = child;
+                        holes = 0;
                         break;
                     } else {
-                        // reverse the direction of iteration
+                        holes++;
+                        // reverse the direction of iteration and look for previous ones.
                         previous = ZKUtil.joinZKPath(dir, iter.previous());
                     }
                 }
                 break;
             }
+            //Keep looking for myself.
             previous = child;
+        }
+        if (holes > 0) {
+            throw new FailedWatchingLowerNodeException();
         }
 
         return lowest;
