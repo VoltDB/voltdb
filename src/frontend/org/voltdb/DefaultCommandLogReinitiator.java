@@ -47,10 +47,6 @@ public class DefaultCommandLogReinitiator implements CommandLogReinitiator
     }
 
     @Override
-    public void join() throws InterruptedException {
-    }
-
-    @Override
     public boolean hasReplayedSegments() {
         return false;
     }
@@ -63,11 +59,6 @@ public class DefaultCommandLogReinitiator implements CommandLogReinitiator
     @Override
     public Map<Integer, Long> getMaxLastSeenTxnByPartition() {
         return null;
-    }
-
-    @Override
-    public boolean started() {
-        return true;
     }
 
     @Override
