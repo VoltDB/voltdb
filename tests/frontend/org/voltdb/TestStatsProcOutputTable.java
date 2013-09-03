@@ -139,7 +139,10 @@ public void testAllZeros() throws Exception {
         validateEmGood("testMulipleProcs", dut, result);
     }
 
-
+    /*
+       This test needs to be re-written and re-enabled when ENG-5113
+       gets fixed.  The new testcase(s) will need to have SP/RO (no deduping)
+       and other any/RW (do deduping).
     @Test
     public void testSiteDedupe() throws Exception {
         // need to not double count invocations at replicas, but do look at
@@ -157,4 +160,5 @@ public void testAllZeros() throws Exception {
         loadEmUp(dut, data);
         validateEmGood("testSiteDedupe", dut, result);
     }
+    */
 }
