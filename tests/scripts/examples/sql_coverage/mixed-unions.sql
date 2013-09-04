@@ -12,8 +12,6 @@ INSERT INTO _table VALUES (1011, 'desc_1010', 1010, 1010.5)
 INSERT INTO P1 VALUES (1020, 'desc_1020', 1020, 1020.5)
 INSERT INTO R1 VALUES (1020, 'desc_1020', 1020, 1020.5)
 
--- test SET Operations
-  SELECT _variable[#same] FROM _table _setop  SELECT __[#same] FROM _table
-  SELECT _variable[#same] FROM _table _setop  SELECT __[#same] FROM _table   _setop SELECT __[#same] FROM _table
-( SELECT _variable[#same] FROM _table _setop  SELECT __[#same] FROM _table ) _setop SELECT __[#same] FROM _table
-  SELECT _variable[#same] FROM _table _setop (SELECT __[#same] FROM _table   _setop SELECT __[#same] FROM _table )
+-- Expect this case to be rife with type mismatches.
+-- TODO: migrate likely-to-error-out cases like this to their own template/suite
+  SELECT _variable FROM _table _setop  SELECT _variable FROM _table
