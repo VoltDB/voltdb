@@ -466,7 +466,10 @@ public class MiscUtils {
      */
     public static synchronized void printPortsInUse(VoltLogger log) {
         try {
-            Process p = Runtime.getRuntime().exec("lsof -i");
+            /*
+             * Don't do DNS resolution, don't use names for port numbers
+             */
+            Process p = Runtime.getRuntime().exec("lsof -i -n -P");
             java.io.InputStreamReader reader = new java.io.InputStreamReader(p.getInputStream());
             java.io.BufferedReader br = new java.io.BufferedReader(reader);
             String str = null;

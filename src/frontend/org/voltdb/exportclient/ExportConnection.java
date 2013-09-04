@@ -125,12 +125,19 @@ public class ExportConnection {
     }
 
     public void closeExportConnection() {
-        if (m_socket != null) {;
-        if (m_socket.isConnected()) {
+        if (m_socket != null) {
+            if (m_socket.isConnected()) {
                 try {
-            m_socket.close();
+                    m_socket.close();
                 } catch (IOException e) {
                     e.printStackTrace();
+                }
+            } else {
+                try {
+                    m_socket.close();
+                } catch (IOException e) {}
+                finally {
+                    m_socket = null;
                 }
             }
         }
