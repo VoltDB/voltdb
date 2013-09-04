@@ -175,7 +175,7 @@ public enum ExpressionType {
     }
 
     public static ExpressionType get(String name) {
-        // TODO(xin): intern seems to take up 1.5% CPU of Planner.
+        // TODO(XIN): intern function seems to take up 1.5% CPU of Planner.
         ExpressionType ret =
             ExpressionType.name_lookup.get(name.toLowerCase().intern());
         return (ret == null ? ExpressionType.INVALID : ret);

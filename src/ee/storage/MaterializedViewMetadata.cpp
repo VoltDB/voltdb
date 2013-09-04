@@ -17,6 +17,7 @@
 
 #include <cassert>
 #include <cstdio>
+#include <vector>
 #include "common/types.h"
 #include "common/PlannerDomValue.h"
 #include "common/FatalException.hpp"
@@ -26,6 +27,7 @@
 #include "catalog/table.h"
 #include "catalog/materializedviewinfo.h"
 #include "expressions/abstractexpression.h"
+#include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
 #include "storage/persistenttable.h"
 #include "storage/MaterializedViewMetadata.h"
@@ -35,35 +37,46 @@
 namespace voltdb {
 
 MaterializedViewMetadata::MaterializedViewMetadata(
-        PersistentTable *srcTable, PersistentTable *destTable, catalog::MaterializedViewInfo *metadata)
+        PersistentTable *srcTable, PersistentTable *destTable, catalog::MaterializedViewInfo *mvInfo)
         : m_target(destTable), m_filterPredicate(NULL)
 {
 // DEBUG_STREAM_HERE("New mat view on source table " << srcTable->name() << " @" << srcTable << " view table " << m_target->name() << " @" << m_target);
     // best not to have to worry about the destination table disappearing out from under the source table that feeds it.
+    VOLT_TRACE("construct materializedViewMetadata...");
+
     m_target->incrementRefcount();
     srcTable->addMaterializedView(this);
     // try to load the predicate from the catalog view
-    parsePredicate(metadata);
+    parsePredicate(mvInfo);
+    VOLT_TRACE("Start to parse complex group by");
+    parseComplexGroupby(mvInfo);
+    if (m_hasComplexGroupby) {
+        m_groupByColumnCount = (int32_t)m_groupbyExprs.size();
+    } else {
+        m_groupByColumnCount = mvInfo->groupbycols().size();
+    }
 
     // set up the group by columns from the catalog info
-    m_groupByColumnCount = metadata->groupbycols().size();
     m_groupByColumns = new int32_t[m_groupByColumnCount];
-    std::map<std::string, catalog::ColumnRef*>::const_iterator colRefIterator;
-    for (colRefIterator = metadata->groupbycols().begin();
-         colRefIterator != metadata->groupbycols().end();
-         colRefIterator++)
-    {
-        int32_t grouping_order_offset = colRefIterator->second->index();
-        m_groupByColumns[grouping_order_offset] = colRefIterator->second->column()->index();
+
+    if (!m_hasComplexGroupby) {
+        std::map<std::string, catalog::ColumnRef*>::const_iterator colRefIterator;
+        for (colRefIterator = mvInfo->groupbycols().begin();
+                colRefIterator != mvInfo->groupbycols().end();
+                colRefIterator++)
+        {
+            int32_t grouping_order_offset = colRefIterator->second->index();
+            m_groupByColumns[grouping_order_offset] = colRefIterator->second->column()->index();
+        }
     }
 
     // set up the mapping from input col to output col
-    m_outputColumnCount = metadata->dest()->columns().size();
+    m_outputColumnCount = mvInfo->dest()->columns().size();
     m_outputColumnSrcTableIndexes = new int32_t[m_outputColumnCount];
     m_outputColumnAggTypes = new ExpressionType[m_outputColumnCount];
     std::map<std::string, catalog::Column*>::const_iterator colIterator;
     // iterate the source table
-    for (colIterator = metadata->dest()->columns().begin(); colIterator != metadata->dest()->columns().end(); colIterator++) {
+    for (colIterator = mvInfo->dest()->columns().begin(); colIterator != mvInfo->dest()->columns().end(); colIterator++) {
         const catalog::Column *destCol = colIterator->second;
         int destIndex = destCol->index();
 
@@ -104,6 +117,7 @@ MaterializedViewMetadata::MaterializedViewMetadata(
             processTupleInsert(scannedTuple, false);
         }
     }
+    VOLT_TRACE("Finish initialization...");
 }
 
 MaterializedViewMetadata::~MaterializedViewMetadata() {
@@ -113,6 +127,9 @@ MaterializedViewMetadata::~MaterializedViewMetadata() {
     delete[] m_outputColumnSrcTableIndexes;
     delete[] m_outputColumnAggTypes;
     delete m_filterPredicate;
+    if (m_hasComplexGroupby) {
+        m_groupbyExprs.clear();
+    }
     m_target->decrementRefcount();
 }
 
@@ -160,8 +177,8 @@ void MaterializedViewMetadata::allocateBackedTuples()
 }
 
 
-void MaterializedViewMetadata::parsePredicate(catalog::MaterializedViewInfo *metadata) {
-    std::string hexString = metadata->predicate();
+void MaterializedViewMetadata::parsePredicate(catalog::MaterializedViewInfo *mvInfo) {
+    std::string hexString = mvInfo->predicate();
     if (hexString.size() == 0)
         return;
 
@@ -177,6 +194,17 @@ void MaterializedViewMetadata::parsePredicate(catalog::MaterializedViewInfo *met
     }
 }
 
+void MaterializedViewMetadata::parseComplexGroupby(catalog::MaterializedViewInfo *mvInfo) {
+    const std::string expressionsAsText = mvInfo->groupbyExpressionsJson();
+    if (expressionsAsText.length() == 0) {
+        m_hasComplexGroupby = false;
+        return;
+    }
+    m_hasComplexGroupby = true;
+    VOLT_TRACE("Group by Expression: %s\n", expressionsAsText.c_str());
+    ExpressionUtil::loadIndexedExprsFromJson(m_groupbyExprs, expressionsAsText);
+}
+
 void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple, bool fallible) {
     // don't change the view if this tuple doesn't match the predicate
     if (m_filterPredicate
@@ -186,6 +214,7 @@ void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple, bool fal
     bool exists = findExistingTuple(newTuple);
     if (!exists) {
         // create a blank tuple
+        VOLT_TRACE("newTuple does not exist,create a blank tuple");
         m_existingTuple.move(m_emptyTupleBackingStore);
     }
 
@@ -199,14 +228,18 @@ void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple, bool fal
         // tuple values should be pulled from the existing tuple in
         // that table. This works around a memory ownership issue
         // related to out-of-line strings.
+        NValue value;
         if (exists) {
-            m_updatedTuple.setNValue(colindex,
-                                 m_existingTuple.getNValue(colindex));
+            value = m_existingTuple.getNValue(colindex);
+        } else {
+            if (m_hasComplexGroupby) {
+                AbstractExpression * expr = m_groupbyExprs.at(colindex);
+                value = expr->eval(&newTuple, NULL);
+            } else {
+                value = newTuple.getNValue(m_groupByColumns[colindex]);
+            }
         }
-        else {
-            m_updatedTuple.setNValue(colindex,
-                                 newTuple.getNValue(m_groupByColumns[colindex]));
-        }
+        m_updatedTuple.setNValue(colindex, value);
     }
 
     // set up the next column, which is a count
@@ -313,8 +346,15 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
 
 bool MaterializedViewMetadata::findExistingTuple(TableTuple &oldTuple, bool expected) {
     // find the key for this tuple (which is the group by columns)
+    NValue value;
     for (int i = 0; i < m_groupByColumnCount; i++) {
-        m_searchKey.setNValue(i, oldTuple.getNValue(m_groupByColumns[i]));
+        if (m_hasComplexGroupby) {
+            AbstractExpression * expr = m_groupbyExprs.at(i);
+            value = expr->eval(&oldTuple,NULL);
+        } else {
+            value = oldTuple.getNValue(m_groupByColumns[i]);
+        }
+        m_searchKey.setNValue(i, value);
     }
 
     // determine if the row exists (create the empty one if it doesn't)
