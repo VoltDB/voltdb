@@ -145,11 +145,11 @@ const char* FatalLogicError::what() const throw()
 // Reset either or both of these control variables from the debugger to dynamically
 // control the error responses that depend on them.
 int control_assert_or_throw_fatal_or_crash_123 =
-    /* fall through to throw something softer */ 1;  //default
+    /* assert             */ 1;  //default
     // throw fatal                            *-/ 2;
     // crash on the spot                      */ 3;
 int control_ignore_or_throw_fatal_or_crash_123 =
-    /* assert             */ 1;  //default
+    /* fall through to throw something softer */ 1;  //default
     // throw fatal        *-/ 2;
     // crash on the spot  */ 3;
 

@@ -1860,6 +1860,9 @@ TEST CASES
     <condition property="debug_output" value="" else="quietadhoc">
         <isset property="sql_coverage_verbose"/>
     </condition>
+    <condition property="generate_only" value="-g" else="">
+        <isset property="generate_only"/>
+    </condition>
     <condition property="hosts" value="${sql_coverage_hosts}" else="1">
         <isset property="sql_coverage_hosts"/>
     </condition>
@@ -1922,6 +1925,7 @@ TEST CASES
         <arg line="${kfactor}" />
         <arg line="${sitescount}" />
         <arg line="${flushddl}" />
+        <arg line="${generate_only}" />
     </exec>
 </target>
 
