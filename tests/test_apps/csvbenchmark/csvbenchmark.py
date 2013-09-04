@@ -32,6 +32,7 @@ import random
 from subprocess import Popen,PIPE
 import shlex
 import datetime
+from voltdbclient import FastSerializer, VoltProcedure
 
 CSVLOADER = "bin/csvloader"
 #SQLCMD = "$VOLTDB_HOME/bin/sqlcmd --servers=%s" % servers
@@ -48,6 +49,7 @@ CASES = {
     "narrow_long_hasview"        : "data_narrow_long",
     "generic_noix"               : "data_generic",
     "generic_ix"                 : "data_generic",
+    "replicated_pk"              : "data_replicated_pk",
     }
 
 def list_cases():
@@ -101,17 +103,19 @@ def gentext(size):
     assert len(s) == size
     return QUOTE_CHAR + s[:size] + QUOTE_CHAR
 
-def genfixeddecimal(size=38, precision=12):
+def genfixeddecimalstr(size=38, precision=12, signed=True):
     # voltdb decimal is 16-byte with fixed scale of 12 and precision of 38
-    #p = -1*random.randrange(precision)
     p = -1*precision
     r = ''.join(random.sample(NUMERIC_CHARSET, len(NUMERIC_CHARSET)))
     r = r * int(size/len(r)) + r[:size%len(r)]
-    r = r[:p] + '.' + r[p:]
+    if (p>0):
+        r = r[:p] + '.' + r[p:]
+    if signed:
+        r = random.choose(["-","+",""]) + r
     return r
 
 def gencurrency(size=16, precision=4):
-    c = genfixeddecimal(size, precision)
+    c = genfixeddecimalstr(size, precision)
     curr = re.match(r'^0*(\d+\.*\d+)0*$', c)
     print curr.group(1)
     return curr.group(1)
@@ -127,6 +131,12 @@ def genint(size):
         return randint(-2**63+1, 2**63-1)
     else:
         raise RuntimeError ("invalid size for integer %d" % size)
+
+def gennumsequence(__seq):
+    # pass in a list of on one number
+    assert (isinstance(__seq, list) and len(__seq) == 1)
+    __seq[0] += 1
+    return __seq[0]
 
 def gentimestamp():
     return datetime.datetime.today().strftime('"%Y-%m-%d %H:%M:%S"')
@@ -193,7 +203,6 @@ def run_csvloader(schema, data_file):
     if options.statsfile:
         with open(options.statsfile, "a") as sf:
             # report duration in milliseconds for stats collector
-            print "%s,%d,%d,0,0,0,0" % (schema, int(round(avg*1000.0)), rowcount)
             print >>sf, "%s,%d,%d,0,0,0,0" % (schema, int(round(avg*1000.0)), rowcount)
     return (rowcount, avg, stddev)
 
@@ -224,6 +233,29 @@ def csvloader_getstatistics(lines):
     if m and m.lastindex > 0:
         inserting = setscale(m.groups())
     return (elapsed, parsing, inserting)
+
+def get_table_row_count(table_name):
+        result = None
+        # random.shuffle has a bug
+        hosts = []
+        hostsup = options.servers
+        while hostsup:
+            h = random.choice(hostsup)
+            hosts.append(h)
+            hostsup.remove(h)
+        logging.debug("get_count hosts: %s" % hosts)
+        to = int(math.ceil(360.0/len(hosts)))
+        for h in hosts:
+            try:
+                T = self.count_query(host=h, timeout=to)
+                result = T[0]
+            except:
+                pass
+            if result and result > 0:
+                break
+            logging.error("Count query failed for host %s" % h)
+            self.success = False
+        return result
 
 def get_datafile_path(case):
     return os.path.join(DATA_DIR, "csvbench_%s_%d.dat" % (case, options.ROW_COUNT))
@@ -403,6 +435,22 @@ def case_generic_noix():
     schema = "generic_noix"
     data_file = data_generic(False)
     run_csvloader(schema, data_file)
+
+def data_replicated_pk(rebuild=False):
+    data_file = get_datafile_path("replicated_pk")
+    if rebuild or not os.path.exists(data_file):
+        myseq = [0]
+        with open(data_file, "w") as f:
+            for I in range(0, options.ROW_COUNT):
+                print >>f, "%d,%s,%s,%s,%s,%s" % (gennumsequence(myseq),
+                                                    gentext(60),
+                                                    gentext(1024),
+                                                    gentimestamp(),
+                                                    gentext(30),
+                                                    genfixeddecimalstr(size=1, precision=0, signed=False)
+                                                    )
+        print "data file %s was written" % data_file
+    return data_file
 
 parse_cmdline()
 

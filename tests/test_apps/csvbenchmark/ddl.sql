@@ -130,3 +130,13 @@ PARTITION TABLE generic_ix ON COLUMN a;
 CREATE INDEX IX_generic_ix on generic_ix (a);
 
 --CREATE PROCEDURE FROM CLASS csvbenchmark.procedures.DoNothingProcedure;
+
+create table replicated_pk (
+      a integer NOT NULL
+    , c varchar(60)
+    , d varchar(1024)
+    , f timestamp
+    , g varchar(30)
+    , e varchar(1)
+    , CONSTRAINT replicated_pk PRIMARY KEY (c)
+);
