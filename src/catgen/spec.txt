@@ -132,6 +132,7 @@ begin MaterializedViewInfo "Information used to build and update a materialized 
   Table? dest              "The table which will be updated when the source table is updated"
   ColumnRef* groupbycols   "The columns involved in the group by of the aggregation"
   string predicate         "A filtering predicate"
+  string groupbyExpressionsJson "A serialized representation of the optional expression trees"
 end
 
 begin AuthProgram "The name of a program with access to a specific procedure. This is effectively a weak reference to a 'program'"
