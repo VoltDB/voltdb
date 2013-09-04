@@ -738,6 +738,32 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
 
     }
 
+    // Test group by columns do not have to be in display columns.
+    public void testENG5016() throws IOException, ProcCallException {
+        loadData();
+
+        Client client = this.getClient();
+        ClientResponse cr = null;
+        VoltTable vt;
+        long[][] expected;
+
+        for (String tb: tbs) {
+            cr = client.callProcedure("@AdHoc", "SELECT count(*), sum(wage) from " + tb +
+                    " GROUP BY dept ORDER BY sum(wage)");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {3, 60} , {2, 90}};
+            compareTable(vt, expected);
+
+            cr = client.callProcedure("@AdHoc", "SELECT count(*) as tag, sum(wage), sum(wage) from " + tb +
+                    " GROUP BY dept ORDER BY tag");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {2, 90, 90}, {3, 60, 60} };
+            compareTable(vt, expected);
+        }
+    }
+
     public void testSupportedCases() throws IOException, ProcCallException {
         loadData();
 

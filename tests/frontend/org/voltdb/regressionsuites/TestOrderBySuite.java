@@ -313,13 +313,36 @@ public class TestOrderBySuite extends RegressionSuite {
 
     public void testOrderBySingleColumnDescending() throws NoConnectionsException, ProcCallException, IOException, InterruptedException {
         VoltTable vt;
+        int it;
         Client client = this.getClient();
         load(client);
 
         // sort column of ints descending
         vt = client.callProcedure("@AdHoc", "select * from O1 order by A_INT DESC").getResults()[0];
         assertTrue(vt.getRowCount() == 20);
-        int it = 19;
+        it = 19;
+        while (vt.advanceRow()) {
+            Integer key = (Integer) vt.get(0, VoltType.INTEGER);
+            Integer a = (Integer) vt.get(1, VoltType.INTEGER);
+            String b = (String) vt.get(2, VoltType.STRING);
+            String c = (String) vt.get(3, VoltType.STRING);
+
+            int pos = a_int.indexOf(a);   // offset of this value in unsorted data
+
+            assertEquals(it, a.intValue());     // a should be order 1, 2, 3..
+            assertEquals(pos, key.intValue());  // side-effect of insertion method
+            assertEquals(b, a_inline_str.get(pos));
+            assertEquals(c, a_pool_str.get(pos));
+
+            it--;
+        }
+
+        // try that again unperturbed by a silly extra duplicate order by column
+        // -- something very similar used to fail as ENG-631
+        vt = client.callProcedure("@AdHoc",      // order by A_INT DESC, A_INT is just silly
+                                  "select * from O1 order by A_INT DESC, A_INT").getResults()[0];
+        assertTrue(vt.getRowCount() == 20);
+        it = 19;
         while (vt.advanceRow()) {
             Integer key = (Integer) vt.get(0, VoltType.INTEGER);
             Integer a = (Integer) vt.get(1, VoltType.INTEGER);
@@ -354,7 +377,6 @@ public class TestOrderBySuite extends RegressionSuite {
             assertEquals(a, a_int.get(pos));     // retrieved value matches at index in unsorted data
             assertEquals(c, a_pool_str.get(pos));
         }
-
 
         // sort column of non-inlined strings descending
         vt = client.callProcedure("@AdHoc", "select * from O1 order by A_POOL_STR DESC").getResults()[0];
@@ -502,22 +524,26 @@ public class TestOrderBySuite extends RegressionSuite {
         // vt = client.callProcedure("OrderByNonIndex")[0];
         // base = System.currentTimeMillis() - start;
 
-        // sort one index column of ints ascending
-        start = System.currentTimeMillis();
-        vt = client.callProcedure("OrderByOneIndex").getResults()[0];
-        elapsed = System.currentTimeMillis() - start;
-        // at least 3 times faster
-        // TODO (nshi): This should really belong to performance tests.
-        // assertTrue(elapsed <= base / 3);
-        assertTrue(vt.getRowCount() == 3);
-        long it = Integer.MAX_VALUE;
-        while (vt.advanceRow()) {
-            int b = (Integer) vt.get(1, VoltType.INTEGER);
-            int c = (Integer) vt.get(2, VoltType.INTEGER);
-            int d = (Integer) vt.get(3, VoltType.INTEGER);
+        // sort one index column of ints descending.
+        // When testSillyCase goes non-zero, test for non-effect of ENG-631
+        // -- possible confusion caused by "order by I3 desc, I3".
+        for (int testSillyCase = 0; testSillyCase < 2; ++testSillyCase) {
+            start = System.currentTimeMillis();
+            vt = client.callProcedure("OrderByOneIndex", testSillyCase).getResults()[0];
+            elapsed = System.currentTimeMillis() - start;
+            // at least 3 times faster
+            // TODO (nshi): This should really belong to performance tests.
+            // assertTrue(elapsed <= base / 3);
+            assertTrue(vt.getRowCount() == 3);
+            long it = Integer.MAX_VALUE;
+            while (vt.advanceRow()) {
+                int b = (Integer) vt.get(1, VoltType.INTEGER);
+                int c = (Integer) vt.get(2, VoltType.INTEGER);
+                int d = (Integer) vt.get(3, VoltType.INTEGER);
 
-            assertTrue(b == c && c == d && b <= it);
-            it = b;
+                assertTrue(b == c && c == d && b <= it);
+                it = b;
+            }
         }
     }
 
@@ -638,6 +664,44 @@ public class TestOrderBySuite extends RegressionSuite {
         {
             assertEquals(i/2, vt.fetchRow(i).getLong(0));
         }
+    }
+
+    public void testEng4676() throws Exception
+    {
+        Client client = getClient();
+        /*
+         * Column definition for O1 and O3:
+         *   O1 (PKEY, A_INT, A_INLINE_STR, A_POOL_STR)
+         *   O3 (PK1, PK2, I3, I4)
+         */
+        for (int i = 0; i < 10; i++)
+        {
+            client.callProcedure("InsertO1", i, i, "", "");
+            client.callProcedure("InsertO3", i + 1, i + 1, i + 1, i + 1);
+            client.callProcedure("InsertO3", i + 1, i + 2, i + 2, i + 2);
+            client.callProcedure("InsertO3", i + 1, i + 3, i + 3, i + 3);
+        }
+        VoltTable vt;
+
+        vt = client.callProcedure("@AdHoc", "SELECT O3.PK2 FROM O1, O3 WHERE O3.PK1 = O1.A_INT ORDER BY O1.PKEY LIMIT 1").getResults()[0];
+        System.out.println(vt.toString());
+        assertEquals(1, vt.getRowCount());
+        assertEquals(1, vt.fetchRow(0).getLong(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT O3.PK2 FROM O1, O3 WHERE O3.PK1 = O1.A_INT ORDER BY O1.PKEY DESC LIMIT 1").getResults()[0];
+        System.out.println(vt.toString());
+        assertEquals(1, vt.getRowCount());
+        assertEquals(9, vt.fetchRow(0).getLong(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT O1.A_INT FROM O1, O3 WHERE O3.PK2 = O1.A_INT AND O3.PK1 = 5 ORDER BY O1.PKEY LIMIT 1").getResults()[0];
+        System.out.println(vt.toString());
+        assertEquals(1, vt.getRowCount());
+        assertEquals(5, vt.fetchRow(0).getLong(0));
+
+        vt = client.callProcedure("@AdHoc", "SELECT O1.A_INT FROM O1, O3 WHERE O3.PK2 = O1.A_INT AND O3.PK1 = 5 ORDER BY O1.PKEY DESC LIMIT 1").getResults()[0];
+        System.out.println(vt.toString());
+        assertEquals(1, vt.getRowCount());
+        assertEquals(7, vt.fetchRow(0).getLong(0));
     }
 
     public void testEng5021() throws Exception

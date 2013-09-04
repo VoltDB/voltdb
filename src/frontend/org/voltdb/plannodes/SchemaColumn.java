@@ -50,13 +50,21 @@ public class SchemaColumn
      *        without affecting other nodes/columns/plan iterations, so
      *        it clones this expression.
      */
+    SchemaColumn(String tableName, String columnName, String columnAlias) {
+        m_tableName = tableName;
+        m_columnName = columnName;
+        m_columnAlias = columnAlias;
+    }
+
     public SchemaColumn(String tableName, String columnName,
                         String columnAlias, AbstractExpression expression)
     {
         m_tableName = tableName;
         m_columnName = columnName;
         m_columnAlias = columnAlias;
-        m_expression = (AbstractExpression) expression.clone();
+        if (expression != null) {
+            m_expression = (AbstractExpression) expression.clone();
+        }
     }
 
     /**
@@ -68,6 +76,53 @@ public class SchemaColumn
         return new SchemaColumn(m_tableName, m_columnName, m_columnAlias,
                                 m_expression);
     }
+
+    /**
+     * Check if this SchemaColumn provides the column specified by the input
+     * arguments.  An equal match is defined as matching both the table name and
+     * the column name if it is provided, otherwise matching the provided alias.
+     */
+    @Override
+    public boolean equals (Object obj) {
+        if (obj == null) return false;
+        if (obj == this) return true;
+        if (obj instanceof SchemaColumn == false) return false;
+
+        SchemaColumn sc = (SchemaColumn) obj;
+        String tableName = sc.getTableName();
+        if (m_tableName.equals(tableName)) {
+            String columnName = sc.getColumnName();
+            String columnAlias = sc.getColumnAlias();
+
+            if (columnName != null && !columnName.equals("")) {
+                if (columnName.equals(m_columnName)) {
+                    // Next line is not true according to current VoltDB's logic
+                    //assert(m_columnAlias.equals(columnAlias));
+                    return true;
+                }
+            }
+            else if (columnAlias != null && !columnAlias.equals("")) {
+                if (columnAlias.equals(m_columnAlias)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    @Override
+    public int hashCode () {
+        // based on implementation of equals
+        int result = m_tableName.hashCode();
+        if (m_columnName != null && !m_columnName.equals("")) {
+            result += m_columnName.hashCode();
+        } else if (m_columnAlias != null && !m_columnAlias.equals("")) {
+            result += m_columnAlias.hashCode();
+        }
+        return result;
+    }
+
 
     /**
      * Return a copy of this SchemaColumn, but with the input expression
@@ -122,48 +177,6 @@ public class SchemaColumn
     public int getSize()
     {
         return m_expression.getValueSize();
-    }
-
-    /**
-     * Check if this SchemaColumn provides the column specified by the input
-     * arguments.  A match is defined as matching both the table name and
-     * the column name if it is provided, otherwise matching the provided alias.
-     * @param tableName
-     * @param columnName
-     * @param columnAlias
-     * @return
-     */
-    public boolean matches(String tableName, String columnName,
-                           String columnAlias)
-    {
-        boolean retval = false;
-        if (tableName.equals(m_tableName))
-        {
-            if (columnName != null && !columnName.equals(""))
-            {
-                if (columnName.equals(m_columnName))
-                {
-                    retval = true;
-                }
-            }
-            else if (columnAlias != null && !columnAlias.equals(""))
-            {
-                if (columnAlias.equals(m_columnAlias))
-                {
-                    retval = true;
-                }
-            }
-            else if (tableName.equals("VOLT_TEMP_TABLE"))
-            {
-                retval = true;
-            }
-            else
-            {
-                throw new RuntimeException("Attempted to match a SchemaColumn " +
-                                           "but provided no name or alias.");
-            }
-        }
-        return retval;
     }
 
     @Override

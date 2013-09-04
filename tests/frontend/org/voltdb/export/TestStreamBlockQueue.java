@@ -97,6 +97,59 @@ public class TestStreamBlockQueue {
     }
 
     @Test
+    public void testFuzz() throws Exception {
+        byte zero = (byte)0;
+        Random r = new java.util.Random(0);
+
+        /*
+         * Found a lot of issues running the first 1500 iterations, and after
+         * that I stopped having problems. This test is more useful with assertions
+         * enabled.
+         */
+        for (int iteration = 0; iteration < 1500; iteration++) {
+            int action = r.nextInt(6);
+            iteration++;
+            switch (action) {
+                case 5:
+                case 0:
+                    System.out.println("Iteration " + iteration + " Action offer");
+                    m_sbq.offer(getStreamBlockWithFill(zero));
+                    break;
+                case 1:
+                    System.out.println("Iteration " + iteration + " Action sync");
+                    m_sbq.sync(r.nextBoolean());
+                    break;
+                case 2:
+                    System.out.println("Iteration " + iteration + " Action peek");
+                    m_sbq.peek();
+                    break;
+                case 3:
+                    System.out.println("Iteration " + iteration + " Action pop");
+                    try {
+                        m_sbq.pop().deleteContent();
+                    } catch (NoSuchElementException e) {
+                        e.printStackTrace();
+                    }
+                    break;
+                case 4:
+                    System.out.println("Iteration " + iteration + " Action iterate");
+                    Iterator<StreamBlock> i = m_sbq.iterator();
+                    StreamBlock firstBlock = null;
+                    while (i.hasNext()) {
+                       if (firstBlock == null) {
+                           firstBlock = i.next();
+                       } else {
+                           i.next();
+                       }
+                    }
+                    if (firstBlock != null) {
+                        m_sbq.pop().deleteContent();
+                    }
+            }
+        }
+    }
+
+    @Test
     public void testIterator() throws Exception {
         for (byte ii = 0; ii < 32; ii++) {
             StreamBlock sb = getStreamBlockWithFill(ii);

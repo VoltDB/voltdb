@@ -221,6 +221,14 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkOptimizedAgg(pns, true);
     }
 
+    public void testGroupbyColsNotInDisplayCols() {
+        pns = compileToFragments("SELECT sum(PKEY) FROM P1 GROUP BY A1");
+        checkHasComplexAgg(pns);
+
+        pns = compileToFragments("SELECT sum(PKEY), sum(PKEY) FROM P1 GROUP BY A1");
+        checkHasComplexAgg(pns);
+    }
+
     private void checkHasComplexAgg(List<AbstractPlanNode> pns) {
         assertTrue(pns.size() > 0);
         boolean isDistributed = pns.size() > 1 ? true: false;

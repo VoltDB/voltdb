@@ -28,8 +28,12 @@ import org.json_voltpatches.JSONObject;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
+import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
+import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.types.IndexLookupType;
+import org.voltdb.types.PlanNodeType;
 
 public class TestIndexSelection extends PlannerTestCase {
 
@@ -41,9 +45,22 @@ public class TestIndexSelection extends PlannerTestCase {
                     planForSinglePartitionFalse);
     }
 
-    @Override
-    protected void tearDown() throws Exception {
-        super.tearDown();
+    // This tests recognition of a complex expression value
+    // -- an addition -- used as an indexable join key's search key value.
+    // Some time ago, this would throw a casting error in the planner.
+    public void testEng3850ComplexIndexablePlan()
+    {
+        AbstractPlanNode pn = compile("select id from a, t where a.id < (t.a + ?);");
+        pn = pn.getChild(0);
+        pn = pn.getChild(0);
+        // System.out.println("DEBUG: " + pn.toExplainPlanString());
+        assertTrue(pn instanceof NestLoopIndexPlanNode);
+        IndexScanPlanNode indexScan = (IndexScanPlanNode)pn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assertEquals(IndexLookupType.LT, indexScan.getLookupType());
+        assertTrue(indexScan.toJSONString().contains("\"TARGET_INDEX_NAME\":\"SYS_IDX_ID_"));
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof SeqScanPlanNode);
+        assertTrue(pn.toJSONString().contains("\"TABLE_NAME\":\"T\""));
     }
 
     // This tests recognition of covering parameters to prefer a hash index that would use a
@@ -53,14 +70,10 @@ public class TestIndexSelection extends PlannerTestCase {
     {
         AbstractPlanNode pn = compile("select a from t where a = ? and b = ? and c = ? and d = ? " +
                                       "and e >= ? and e <= ?;");
-
         pn = pn.getChild(0);
+        // System.out.println("DEBUG: " + pn.toExplainPlanString());
         assertTrue(pn instanceof IndexScanPlanNode);
         assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"IDX_1_HASH\""));
-
-        if (pn != null) {
-            System.out.println(pn.toJSONString());
-        }
     }
 
     // This tests recognition of prefix parameters and constants to prefer an index that
@@ -69,15 +82,9 @@ public class TestIndexSelection extends PlannerTestCase {
     {
         AbstractPlanNode pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;");
         pn = pn.getChild(0);
+        // System.out.println("DEBUG: " + pn.toExplainPlanString());
         assertTrue(pn instanceof IndexScanPlanNode);
         assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"IDX_B\""));
-
-        if (pn != null) {
-            JSONObject j = new JSONObject(pn.toJSONString());
-            System.out.println(j.toString(2));
-            System.out.println();
-            System.out.println(pn.toExplainPlanString());
-        }
     }
 
     // This tests recognition of a prefix parameter and upper bound to prefer an index that would
@@ -95,12 +102,5 @@ public class TestIndexSelection extends PlannerTestCase {
         pn = pn.getChild(0);
         assertTrue(pn instanceof IndexScanPlanNode);
         assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"DELETED_SINCE_IDX\""));
-
-        if (pn != null) {
-            JSONObject j = new JSONObject(pn.toJSONString());
-            System.out.println(j.toString(2));
-            System.out.println();
-            System.out.println(pn.toExplainPlanString());
-        }
     }
 }

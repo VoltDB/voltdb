@@ -24,6 +24,8 @@ import java.sql.RowIdLifetime;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -192,21 +194,35 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     }
 
     // Retrieves a description of table columns available in the specified catalog.
-    // TODO: implement pattern filtering somewhere (preferably server-side)
     @Override
     public ResultSet getColumns(String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern) throws SQLException
     {
-        assert(tableNamePattern != null && !tableNamePattern.isEmpty());
         checkClosed();
         this.sysCatalog.setString(1, "COLUMNS");
         JDBC4ResultSet res = (JDBC4ResultSet) this.sysCatalog.executeQuery();
         VoltTable vtable = res.getVoltTable().clone(0);
 
+        // If no pattern is specified, default to matching any/all.
+        if (tableNamePattern == null || tableNamePattern.length() == 0)
+        {
+            tableNamePattern = "%";
+        }
+        Pattern table_pattern = computeJavaPattern(tableNamePattern);
+
+        if (columnNamePattern == null || columnNamePattern.length() == 0)
+        {
+            columnNamePattern = "%";
+        }
+        Pattern column_pattern = computeJavaPattern(columnNamePattern);
+
         // Filter columns based on table name and column name
         while (res.next()) {
-            if (res.getString("TABLE_NAME").equals(tableNamePattern)) {
-                if (columnNamePattern == null || columnNamePattern.equals("%") ||
-                    res.getString("COLUMN_NAME").equals(columnNamePattern)) {
+            Matcher table_matcher = table_pattern.matcher(res.getString("TABLE_NAME"));
+            if (table_matcher.matches())
+            {
+                Matcher column_matcher = column_pattern.matcher(res.getString("COLUMN_NAME"));
+                if (column_matcher.matches())
+                {
                     vtable.addRow(res.getRowData());
                 }
             }
@@ -283,7 +299,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     @Override
     public int getDriverMinorVersion()
     {
-        return 0;
+        return 1;
     }
 
     // Retrieves the name of this JDBC driver.
@@ -299,7 +315,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public String getDriverVersion() throws SQLException
     {
         checkClosed();
-        return "1.0";
+        return new String(getDriverMajorVersion() + "." + getDriverMinorVersion());
     }
 
     // Retrieves a description of the foreign key columns that reference the given table's primary key columns (the foreign keys exported by a table).
@@ -315,7 +331,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public String getExtraNameCharacters() throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();
+        return "";
     }
 
     // Retrieves a description of the given catalog's system or user function parameters and return type.
@@ -353,7 +369,6 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     // Retrieves a description of the given table's indices and statistics.
     // NOTE: currently returns the NON_UNIQUE column as a TINYINT due
     // to lack of boolean support in VoltTable schemas.
-    // TODO: implement pattern filtering somewhere (preferably server-side)
     @Override
     public ResultSet getIndexInfo(String catalog, String schema, String table, boolean unique, boolean approximate) throws SQLException
     {
@@ -500,7 +515,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public int getMaxRowSize() throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();
+        return 2 * 1024 * 1024;  // 2 MB
     }
 
     // Retrieves the maximum number of characters that this database allows in a schema name.
@@ -556,11 +571,10 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public String getNumericFunctions() throws SQLException
     {
         checkClosed();
-        throw SQLError.noSupport();
+        return "ABS,CEILING,EXP,FLOOR,POWER,SQRT";
     }
 
     // Retrieves a description of the given table's primary key columns.
-    // TODO: implement pattern filtering somewhere (preferably server-side)
     @Override
     public ResultSet getPrimaryKeys(String catalog, String schema, String table) throws SQLException
     {
@@ -694,7 +708,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public String getStringFunctions() throws SQLException
     {
         checkClosed();
-        return "";
+        return "CHAR_LENGTH,CONCAT,LEFT,OCTET_LENGTH,POSITION,REPEAT,RIGHT,SPACE,SUBSTRING";
     }
 
     // Retrieves a description of the table hierarchies defined in a particular schema in this database.
@@ -729,28 +743,60 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
         throw SQLError.noSupport();
     }
 
+    // Convert the users VoltDB SQL pattern into a regex pattern
+    public static Pattern computeJavaPattern(String sqlPattern)
+    {
+        StringBuffer pattern_buff = new StringBuffer();
+        // Replace "_" with "." (match exactly 1 character)
+        // Replace "%" with ".*" (match 0 or more characters)
+        for (int i=0; i<sqlPattern.length(); i++)
+        {
+            char c = sqlPattern.charAt(i);
+            if (c == '_')
+            {
+                pattern_buff.append('.');
+            }
+            else
+            if (c == '%')
+            {
+                pattern_buff.append(".*");
+            }
+            else
+                pattern_buff.append(c);
+        }
+        return Pattern.compile(pattern_buff.toString());
+    }
+
     // Retrieves a description of the tables available in the given catalog.
-    // TODO: implement pattern filtering somewhere (preferably server-side)
     @Override
     public ResultSet getTables(String catalog, String schemaPattern, String tableNamePattern, String[] types) throws SQLException
     {
-        if ((tableNamePattern != null && !tableNamePattern.equals("%")) ||
-            (types != null && types.length > tableTypes.length))
-            throw new SQLException(String.format("getTables('%s','%s','%s',%d) does not support pattern filtering", catalog, schemaPattern, tableNamePattern, types != null ? types.length : 0));
-
         checkClosed();
         this.sysCatalog.setString(1, "TABLES");
         JDBC4ResultSet res = (JDBC4ResultSet) this.sysCatalog.executeQuery();
         VoltTable vtable = res.getVoltTable().clone(0);
+
         List<String> typeStrings = null;
         if (types != null) {
             typeStrings = Arrays.asList(types);
         }
 
-        // Filter tables based on type
+        // If no pattern is specified, default to matching any/all.
+        if (tableNamePattern == null || tableNamePattern.length() == 0)
+        {
+            tableNamePattern = "%";
+        }
+
+        Pattern table_pattern = computeJavaPattern(tableNamePattern);
+
+        // Filter tables based on type and pattern
         while (res.next()) {
             if (typeStrings == null || typeStrings.contains(res.getString("TABLE_TYPE"))) {
-                vtable.addRow(res.getRowData());
+                Matcher table_matcher = table_pattern.matcher(res.getString("TABLE_NAME"));
+                if (table_matcher.matches())
+                {
+                    vtable.addRow(res.getRowData());
+                }
             }
         }
 

@@ -179,9 +179,9 @@
     <include name='org/voltdb/compiler/Test*.class'/>
     <include name='org/voltdb/dtxn/Test*.class'/>
     <include name='org/voltdb/export/Test*.class'/>
-    <include name='org/voltdb/export/**/Test.class'/>
-    <include name='org/voltdb/exportclient/Test.class'/>
-    <include name='org/voltdb/expressions/Test.class'/>
+    <include name='org/voltdb/export/**/Test*.class'/>
+    <include name='org/voltdb/exportclient/Test*.class'/>
+    <include name='org/voltdb/expressions/Test*.class'/>
     <include name='org/voltdb/iv2/Test*.class'/>
     <include name='org/voltdb/jdbc/Test*.class'/>
     <include name='org/voltdb/jni/Test*.class'/>
@@ -195,7 +195,7 @@
     <include name='org/voltdb/rejoin/Test*.class'/>
     <include name='org/voltdb/sysprocs/saverestore/Test*.class'/>
     <include name='org/voltdb/types/Test*.class'/>
-    <include name='org/voltdb/utils/**/*Test.class'/>
+    <include name='org/voltdb/utils/Test*.class'/>
     <exclude name="**/*$*.class"/>
     <exclude name="org/voltdb/quarantine/**/*.class"/>
     <exclude name="**/TestExportBase.class"/>
@@ -1860,6 +1860,9 @@ TEST CASES
     <condition property="debug_output" value="" else="quietadhoc">
         <isset property="sql_coverage_verbose"/>
     </condition>
+    <condition property="generate_only" value="-g" else="">
+        <isset property="generate_only"/>
+    </condition>
     <condition property="hosts" value="${sql_coverage_hosts}" else="1">
         <isset property="sql_coverage_hosts"/>
     </condition>
@@ -1922,6 +1925,7 @@ TEST CASES
         <arg line="${kfactor}" />
         <arg line="${sitescount}" />
         <arg line="${flushddl}" />
+        <arg line="${generate_only}" />
     </exec>
 </target>
 

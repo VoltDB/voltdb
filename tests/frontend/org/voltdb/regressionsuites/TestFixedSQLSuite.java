@@ -455,7 +455,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         System.out.println("verifyid: " + vts[0]);
         assertTrue(vts[0].getRowCount() == 5);
 
-        for (int i=0; vts[0].advanceRow(); ++i) {
+        while(vts[0].advanceRow()) {
             int p_id = ((Integer)vts[0].get(0, VoltType.INTEGER)).intValue();
             int r_id = ((Integer)vts[0].get(4, VoltType.INTEGER)).intValue();
             int p_n =  ((Integer)vts[0].get(2, VoltType.INTEGER)).intValue();
@@ -475,7 +475,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         // the id of the first should be (5-id) in the second
         // because of the insertion trickery done above
         // verifies trac #125
-        for (int i=0; vts[0].advanceRow(); ++i) {
+        while(vts[0].advanceRow()) {
             int id1 = ((Integer)vts[0].get(0, VoltType.INTEGER)).intValue();
             int id2 = ((Integer)vts[0].get(4, VoltType.INTEGER)).intValue();
             assertEquals(id1, (5 - id2));
@@ -519,7 +519,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
         // the id of the first should be (5-id) in the second once the addition
         // done in the select expression is un-done.
-        for (int i=0; vts[0].advanceRow(); ++i) {
+        while(vts[0].advanceRow()) {
             int p1_id = ((Integer)vts[0].get(0, VoltType.INTEGER)).intValue();
             int r1_id = ((Integer)vts[0].get(1, VoltType.INTEGER)).intValue();
             assertEquals( (p1_id - 20), (5 - (r1_id - 40)) );
@@ -567,7 +567,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
         // the id of the first should be (5-id) in the second once the addition
         // done in the select expression is un-done.
-        for (int i=0; vts[0].advanceRow(); ++i) {
+        while(vts[0].advanceRow()) {
             int p1_id = ((Integer)vts[0].get(1, VoltType.INTEGER)).intValue();
             int r1_id = ((Integer)vts[0].get(0, VoltType.INTEGER)).intValue();
             assertEquals( (p1_id - 20), (5 - r1_id) );
