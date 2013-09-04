@@ -515,7 +515,7 @@ public class JDBC4DatabaseMetaData implements java.sql.DatabaseMetaData
     public int getMaxRowSize() throws SQLException
     {
         checkClosed();
-        return 2 * 1024 * 1024;  // 2 GB
+        return 2 * 1024 * 1024;  // 2 MB
     }
 
     // Retrieves the maximum number of characters that this database allows in a schema name.
