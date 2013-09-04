@@ -1253,7 +1253,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
             fail();
         } catch (ProcCallException e) {
             // should give out of precision range error
-            assertTrue(e.getMessage().contains("has more than  38 digits of precision"));
+            assertTrue(e.getMessage().contains("has more than 38 digits of precision"));
         } catch (Exception e) {
             fail();
         }
@@ -1262,7 +1262,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
             fail();
         } catch (ProcCallException e) {
             // should give out of precision range error
-            assertTrue(e.getMessage().contains("has more than  38 digits of precision"));
+            assertTrue(e.getMessage().contains("has more than 38 digits of precision"));
         } catch (Exception e) {
             fail();
         }
@@ -1271,7 +1271,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
             fail();
         } catch (ProcCallException e) {
             // should give out of precision range error
-            assertTrue(e.getMessage().contains("has more than  38 digits of precision"));
+            assertTrue(e.getMessage().contains("has more than 38 digits of precision"));
         } catch (Exception e) {
             fail();
         }
@@ -1280,7 +1280,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
             fail();
         } catch (ProcCallException e) {
             // should give out of precision range error
-            assertTrue(e.getMessage().contains("has more than  38 digits of precision"));
+            assertTrue(e.getMessage().contains("has more than 38 digits of precision"));
         } catch (Exception e) {
             fail();
         }
