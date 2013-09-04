@@ -26,7 +26,6 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -54,7 +53,6 @@ import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
@@ -1550,16 +1548,9 @@ public class DDLCompiler {
 
             if (stmt.hasComplexGroupby()) {
                 groupbyExprs = new ArrayList<AbstractExpression>();
-                HashSet<TupleValueExpression> tves = new HashSet<TupleValueExpression>();
                 for (ParsedColInfo col: stmt.groupByColumns) {
                     groupbyExprs.add(col.expression);
-                    tves.addAll(ExpressionUtil.getTupleValueExpressions(col.expression));
                 }
-                // Record these column info to optimize base table update operation in future.
-                for (TupleValueExpression tve: tves) {
-                    matviewinfo.getGroupbycols().add(tve.getColumnName());
-                }
-
                 // Parse group by expressions to json string
                 String groupbyExprsJson = null;
                 try {
@@ -1588,7 +1579,7 @@ public class DDLCompiler {
                 for (int i = 0; i < stmt.groupByColumns.size(); i++) {
                     ParsedSelectStmt.ParsedColInfo col = stmt.displayColumns.get(i);
                     Column destColumn = destColumnArray.get(i);
-                    processMaterializedViewColumn(matviewinfo, srcTable, destTable, destColumn,
+                    processMaterializedViewColumn(matviewinfo, srcTable, destColumn,
                             ExpressionType.VALUE_TUPLE, (TupleValueExpression)col.expression);
                 }
             }
@@ -1597,7 +1588,7 @@ public class DDLCompiler {
             ParsedSelectStmt.ParsedColInfo countCol = stmt.displayColumns.get(stmt.groupByColumns.size());
             assert(countCol.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR);
             assert(countCol.expression.getLeft() == null);
-            processMaterializedViewColumn(matviewinfo, srcTable, destTable,
+            processMaterializedViewColumn(matviewinfo, srcTable,
                     destColumnArray.get(stmt.groupByColumns.size()),
                     ExpressionType.AGGREGATE_COUNT_STAR, null);
 
@@ -1616,15 +1607,42 @@ public class DDLCompiler {
             pkConstraint.setType(ConstraintType.PRIMARY_KEY.getValue());
             pkConstraint.setIndex(pkIndex);
 
+            // prepare info for aggregation columns.
+            List<AbstractExpression> aggregationExprs = new ArrayList<AbstractExpression>();
+            boolean hasAggregationExprs = false;
+            for (int i = stmt.groupByColumns.size() + 1; i < stmt.displayColumns.size(); i++) {
+                ParsedSelectStmt.ParsedColInfo col = stmt.displayColumns.get(i);
+                AbstractExpression aggExpr = col.expression.getLeft();
+                if (aggExpr.getExpressionType() != ExpressionType.VALUE_TUPLE) {
+                    hasAggregationExprs = true;
+                }
+                aggregationExprs.add(aggExpr);
+            }
+
+            // set Aggregation Expressions.
+            if (hasAggregationExprs) {
+                String aggregationExprsJson = null;
+                try {
+                    aggregationExprsJson = convertToJSONArray(aggregationExprs);
+                } catch (JSONException e) {
+                    throw m_compiler.new VoltCompilerException ("Unexpected error serializing non-column " +
+                            "expressions for aggregation expressions: " + e.toString());
+                }
+                matviewinfo.setAggregationexpressionsjson(aggregationExprsJson);
+            }
+
             // parse out the aggregation columns into the dest table
             for (int i = stmt.groupByColumns.size() + 1; i < stmt.displayColumns.size(); i++) {
                 ParsedSelectStmt.ParsedColInfo col = stmt.displayColumns.get(i);
                 Column destColumn = destColumnArray.get(i);
 
                 AbstractExpression colExpr = col.expression.getLeft();
-                assert(colExpr.getExpressionType() == ExpressionType.VALUE_TUPLE);
-                processMaterializedViewColumn(matviewinfo, srcTable, destTable, destColumn,
-                        col.expression.getExpressionType(), (TupleValueExpression)colExpr);
+                TupleValueExpression tve = null;
+                if (colExpr.getExpressionType() == ExpressionType.VALUE_TUPLE) {
+                    tve = (TupleValueExpression)colExpr;
+                }
+                processMaterializedViewColumn(matviewinfo, srcTable, destColumn,
+                        col.expression.getExpressionType(), tve);
 
                 // Correctly set the type of the column so that it's consistent.
                 // Otherwise HSQLDB might promote types differently than Volt.
@@ -1689,14 +1707,10 @@ public class DDLCompiler {
                 msg += "must have non-group by columns aggregated by sum or count.";
                 throw m_compiler.new VoltCompilerException(msg);
             }
-            if (outcol.expression.getLeft().getExpressionType() != ExpressionType.VALUE_TUPLE) {
-                msg += "must have non-group by columns use only one level of aggregation.";
-                throw m_compiler.new VoltCompilerException(msg);
-            }
         }
     }
 
-    void processMaterializedViewColumn(MaterializedViewInfo info, Table srcTable, Table destTable,
+    void processMaterializedViewColumn(MaterializedViewInfo info, Table srcTable,
             Column destColumn, ExpressionType type, TupleValueExpression colExpr)
             throws VoltCompiler.VoltCompilerException {
 

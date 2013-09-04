@@ -70,6 +70,8 @@ MaterializedViewMetadata::MaterializedViewMetadata(
         }
     }
 
+    parseComplexAggregation(mvInfo);
+
     // set up the mapping from input col to output col
     m_outputColumnCount = mvInfo->dest()->columns().size();
     m_outputColumnSrcTableIndexes = new int32_t[m_outputColumnCount];
@@ -80,15 +82,15 @@ MaterializedViewMetadata::MaterializedViewMetadata(
         const catalog::Column *destCol = colIterator->second;
         int destIndex = destCol->index();
 
+        m_outputColumnAggTypes[destIndex] = static_cast<ExpressionType>(destCol->aggregatetype());
         const catalog::Column *srcCol = destCol->matviewsource();
 
+        // We set its matview for Complex Aggregation case
         if (srcCol) {
             m_outputColumnSrcTableIndexes[destIndex] = srcCol->index();
-            m_outputColumnAggTypes[destIndex] = static_cast<ExpressionType>(destCol->aggregatetype());
         }
         else {
             m_outputColumnSrcTableIndexes[destIndex] = -1;
-            m_outputColumnAggTypes[destIndex] = EXPRESSION_TYPE_INVALID;
         }
     }
 
@@ -129,6 +131,9 @@ MaterializedViewMetadata::~MaterializedViewMetadata() {
     delete m_filterPredicate;
     if (m_hasComplexGroupby) {
         m_groupbyExprs.clear();
+    }
+    if (m_hasComplexAggregation) {
+        m_aggregationExprs.clear();
     }
     m_target->decrementRefcount();
 }
@@ -205,6 +210,17 @@ void MaterializedViewMetadata::parseComplexGroupby(catalog::MaterializedViewInfo
     ExpressionUtil::loadIndexedExprsFromJson(m_groupbyExprs, expressionsAsText);
 }
 
+void MaterializedViewMetadata::parseComplexAggregation(catalog::MaterializedViewInfo *mvInfo) {
+    const std::string expressionsAsText = mvInfo->aggregationExpressionsJson();
+    if (expressionsAsText.length() == 0) {
+        m_hasComplexAggregation = false;
+        return;
+    }
+    m_hasComplexAggregation = true;
+    VOLT_TRACE("Aggregate Expression: %s\n", expressionsAsText.c_str());
+    ExpressionUtil::loadIndexedExprsFromJson(m_aggregationExprs, expressionsAsText);
+}
+
 void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple, bool fallible) {
     // don't change the view if this tuple doesn't match the predicate
     if (m_filterPredicate
@@ -249,7 +265,13 @@ void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple, bool fal
 
     // set values for the other columns
     for (int i = colindex; i < m_outputColumnCount; i++) {
-        NValue newValue = newTuple.getNValue(m_outputColumnSrcTableIndexes[i]);
+        NValue newValue;
+        if (m_hasComplexAggregation) {
+            AbstractExpression * expr = m_aggregationExprs.at(i-colindex);
+            newValue = expr->eval(&newTuple, NULL);
+        } else {
+            newValue = newTuple.getNValue(m_outputColumnSrcTableIndexes[i]);
+        }
         NValue existingValue = m_existingTuple.getNValue(i);
 
         if (m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_SUM) {
@@ -321,7 +343,13 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
 
     // set values for the other columns
     for (int i = colindex; i < m_outputColumnCount; i++) {
-        NValue oldValue = oldTuple.getNValue(m_outputColumnSrcTableIndexes[i]);
+        NValue oldValue;
+        if (m_hasComplexAggregation) {
+            AbstractExpression * expr = m_aggregationExprs.at(i-colindex);
+            oldValue = expr->eval(&oldTuple, NULL);
+        } else {
+            oldValue = oldTuple.getNValue(m_outputColumnSrcTableIndexes[i]);
+        }
         NValue existingValue = m_existingTuple.getNValue(i);
 
         if (m_outputColumnAggTypes[i] == EXPRESSION_TYPE_AGGREGATE_SUM) {
