@@ -322,7 +322,6 @@ NValue NValue::opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const {
         calc *= lhs.castAsDecimalAndGetValue();
         calc /= NValue::kMaxScaleFactor;
         TTInt retval;
-        retval.FromInt(calc);
         if (retval.FromInt(calc)  || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
             char message[4096];
             snprintf(message, 4096, "Attempted to multiply %s by %s causing overflow/underflow. Unscaled result was %s",
@@ -340,7 +339,6 @@ NValue NValue::opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const {
         calc *= rhs.castAsDecimalAndGetValue();
         calc /= NValue::kMaxScaleFactor;
         TTInt retval;
-        retval.FromInt(calc);
         if (retval.FromInt(calc)  || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
             char message[4096];
             snprintf(message, 4096, "Attempted to multiply %s by %s causing overflow/underflow. Unscaled result was %s",

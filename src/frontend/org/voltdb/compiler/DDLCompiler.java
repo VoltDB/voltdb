@@ -26,6 +26,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -53,9 +54,11 @@ import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
+import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
@@ -1260,16 +1263,14 @@ public class DDLCompiler {
         dummy.setTable(table);
 
         // "parse" the expression trees for an expression-based index (vs. a simple column value index)
-        AbstractExpression[] exprs = null;
+        List<AbstractExpression> exprs = null;
         for (VoltXMLElement subNode : node.children) {
             if (subNode.name.equals("exprs")) {
-                exprs = new AbstractExpression[subNode.children.size()];
-                int j = 0;
+                exprs = new ArrayList<AbstractExpression>();
                 for (VoltXMLElement exprNode : subNode.children) {
-                    exprs[j] = dummy.parseExpressionTree(exprNode);
-                    exprs[j].resolveForTable(table);
-                    exprs[j].finalizeValueTypes();
-                    ++j;
+                    exprs.add( dummy.parseExpressionTree(exprNode) );
+                    exprs.get(exprs.size()-1).resolveForTable(table);
+                    exprs.get(exprs.size()-1).finalizeValueTypes();
                 }
             }
         }
@@ -1406,7 +1407,7 @@ public class DDLCompiler {
         indexMap.put(name, index);
     }
 
-    private static String convertToJSONArray(AbstractExpression[] exprs) throws JSONException {
+    private static String convertToJSONArray(List<AbstractExpression> exprs) throws JSONException {
         JSONStringer stringer = new JSONStringer();
         stringer.array();
         for (AbstractExpression abstractExpression : exprs) {
@@ -1545,20 +1546,54 @@ public class DDLCompiler {
 
             List<Column> srcColumnArray = CatalogUtil.getSortedCatalogItems(srcTable.getColumns(), "index");
             List<Column> destColumnArray = CatalogUtil.getSortedCatalogItems(destTable.getColumns(), "index");
+            List<AbstractExpression> groupbyExprs = null;
 
-            // add the group by columns from the src table
-            for (int i = 0; i < stmt.groupByColumns.size(); i++) {
-                ParsedSelectStmt.ParsedColInfo gbcol = stmt.groupByColumns.get(i);
-                Column srcCol = srcColumnArray.get(gbcol.index);
-                ColumnRef cref = matviewinfo.getGroupbycols().add(srcCol.getTypeName());
-                // groupByColumns is iterating in order of groups. Store that grouping order
-                // in the column ref index. When the catalog is serialized, it will, naturally,
-                // scramble this order like a two year playing dominos, presenting the data
-                // in a meaningless sequence.
-                cref.setIndex(i);           // the column offset in the view's grouping order
-                cref.setColumn(srcCol);     // the source column from the base (non-view) table
+            if (stmt.hasComplexGroupby()) {
+                groupbyExprs = new ArrayList<AbstractExpression>();
+                HashSet<TupleValueExpression> tves = new HashSet<TupleValueExpression>();
+                for (ParsedColInfo col: stmt.groupByColumns) {
+                    groupbyExprs.add(col.expression);
+                    tves.addAll(ExpressionUtil.getTupleValueExpressions(col.expression));
+                }
+                // Record these column info to optimize base table update operation in future.
+                for (TupleValueExpression tve: tves) {
+                    matviewinfo.getGroupbycols().add(tve.getColumnName());
+                }
+
+                // Parse group by expressions to json string
+                String groupbyExprsJson = null;
+                try {
+                    groupbyExprsJson = convertToJSONArray(groupbyExprs);
+                } catch (JSONException e) {
+                    throw m_compiler.new VoltCompilerException ("Unexpected error serializing non-column " +
+                            "expressions for group by expressions: " + e.toString());
+                }
+                matviewinfo.setGroupbyexpressionsjson(groupbyExprsJson);
+
+            } else {
+                // add the group by columns from the src table
+                for (int i = 0; i < stmt.groupByColumns.size(); i++) {
+                    ParsedSelectStmt.ParsedColInfo gbcol = stmt.groupByColumns.get(i);
+                    Column srcCol = srcColumnArray.get(gbcol.index);
+                    ColumnRef cref = matviewinfo.getGroupbycols().add(srcCol.getTypeName());
+                    // groupByColumns is iterating in order of groups. Store that grouping order
+                    // in the column ref index. When the catalog is serialized, it will, naturally,
+                    // scramble this order like a two year playing dominos, presenting the data
+                    // in a meaningless sequence.
+                    cref.setIndex(i);           // the column offset in the view's grouping order
+                    cref.setColumn(srcCol);     // the source column from the base (non-view) table
+                }
+
+                // parse out the group by columns into the dest table
+                for (int i = 0; i < stmt.groupByColumns.size(); i++) {
+                    ParsedSelectStmt.ParsedColInfo col = stmt.displayColumns.get(i);
+                    Column destColumn = destColumnArray.get(i);
+                    processMaterializedViewColumn(matviewinfo, srcTable, destTable, destColumn,
+                            ExpressionType.VALUE_TUPLE, (TupleValueExpression)col.expression);
+                }
             }
 
+            // Set up COUNT(*) column
             ParsedSelectStmt.ParsedColInfo countCol = stmt.displayColumns.get(stmt.groupByColumns.size());
             assert(countCol.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR);
             assert(countCol.expression.getLeft() == null);
@@ -1580,15 +1615,6 @@ public class DDLCompiler {
             Constraint pkConstraint = destTable.getConstraints().add("MATVIEW_PK_CONSTRAINT");
             pkConstraint.setType(ConstraintType.PRIMARY_KEY.getValue());
             pkConstraint.setIndex(pkIndex);
-
-            // parse out the group by columns into the dest table
-            for (int i = 0; i < stmt.groupByColumns.size(); i++) {
-                ParsedSelectStmt.ParsedColInfo col = stmt.displayColumns.get(i);
-                Column destColumn = destColumnArray.get(i);
-
-                processMaterializedViewColumn(matviewinfo, srcTable, destTable, destColumn,
-                        ExpressionType.VALUE_TUPLE, (TupleValueExpression)col.expression);
-            }
 
             // parse out the aggregation columns into the dest table
             for (int i = stmt.groupByColumns.size() + 1; i < stmt.displayColumns.size(); i++) {
@@ -1632,12 +1658,6 @@ public class DDLCompiler {
             throw m_compiler.new VoltCompilerException(msg);
         }
 
-        if (stmt.hasComplexGroupby()) {
-            msg += "contains an expression involving a group by. " +
-                    "Expressions with group by are not currently supported in views.";
-            throw m_compiler.new VoltCompilerException(msg);
-        }
-
         if (stmt.hasComplexAgg()) {
             msg += "contains an expression involving an aggregate function. " +
                     "Expressions with aggregate functions are not currently supported in views.";
@@ -1650,14 +1670,8 @@ public class DDLCompiler {
             ParsedSelectStmt.ParsedColInfo gbcol = stmt.groupByColumns.get(i);
             ParsedSelectStmt.ParsedColInfo outcol = stmt.displayColumns.get(i);
 
-            if (outcol.expression.getExpressionType() != ExpressionType.VALUE_TUPLE) {
-                msg += "must have column at index " + String.valueOf(i) + " be " + gbcol.alias;
-                throw m_compiler.new VoltCompilerException(msg);
-            }
-
-            TupleValueExpression expr = (TupleValueExpression) outcol.expression;
-            if (expr.getColumnIndex() != gbcol.index) {
-                msg += "must have column at index " + String.valueOf(i) + " be " + gbcol.alias;
+            if (!outcol.expression.equals(gbcol.expression)) {
+                msg += "must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.";
                 throw m_compiler.new VoltCompilerException(msg);
             }
         }
