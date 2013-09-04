@@ -1342,12 +1342,6 @@ public class PlanAssembler {
             }
 
             for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.groupByColumns) {
-                if (agg_schema.find(col.tableName, col.columnName, col.alias) == null) {
-                    throw new PlanningErrorException("GROUP BY column " + col.alias +
-                                                     " is not in the display columns." +
-                                                     " Please specify " + col.alias +
-                                                     " as a display column.");
-                }
                 aggNode.addGroupByExpression(col.expression);
 
                 if (topAggNode != null) {
