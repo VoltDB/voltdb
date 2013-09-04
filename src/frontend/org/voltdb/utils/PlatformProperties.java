@@ -187,7 +187,7 @@ public class PlatformProperties implements Serializable {
             hw = getLinuxHardwareInfo();
         }
         else {
-            hostLog.warn("Unable to determine operating system. Catalog is being compiled on unsupported platform.");
+            hostLog.warn("Unable to determine supported operating system. Hardware info such as Memory,CPU will be incorrectly reported.");
             hw = new HardwareInfo();
         }
 
