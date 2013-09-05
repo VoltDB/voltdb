@@ -112,7 +112,6 @@ public class LeaderElector {
         }
     };
 
-    //Cancellable Children watcher cancelled at shutdown time
     private class ChildrenWatcher implements Watcher {
 
         @Override
@@ -127,7 +126,6 @@ public class LeaderElector {
     }
     private final ChildrenWatcher childWatcher = new ChildrenWatcher();
 
-    //Cancellable Election watcher cancelled at shutdown time
     private class ElectionWatcher implements Watcher {
 
         @Override
