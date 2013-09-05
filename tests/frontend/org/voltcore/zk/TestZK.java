@@ -381,6 +381,91 @@ public class TestZK extends ZKTestBase {
         elector4.shutdown();
     }
 
+    @Test
+    public void testLeaderFailoverHoles() throws Exception {
+        // as above but put multiple failed nodes between the new and previous?
+        ZooKeeper zk0 = getClient(0);
+        ZooKeeper zk1 = getClient(1);
+        ZooKeeper zk2 = getClient(2);
+        ZooKeeper zk3 = getClient(3);
+        ZooKeeper zk4 = getClient(4);
+        ZooKeeper zk5 = getClient(5);
+        ZooKeeper zk6 = getClient(6);
+        ZooKeeper zk7 = getClient(7);
+
+        zk0.create("/election", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+
+        final Semaphore sem1 = new Semaphore(0);
+        LeaderNoticeHandler r1 = new LeaderNoticeHandler() {
+            @Override
+            public void becomeLeader() {
+                sem1.release();
+            }
+
+            @Override
+            public void noticedTopologyChange() {
+            }
+        };
+        final Semaphore sem7 = new Semaphore(0);
+        LeaderNoticeHandler r7 = new LeaderNoticeHandler() {
+            @Override
+            public void becomeLeader() {
+                sem7.release();
+            }
+
+            @Override
+            public void noticedTopologyChange() {
+            }
+        };
+
+        LeaderElector elector0 = new LeaderElector(zk0, "/election", "node", new byte[0], null);
+        LeaderElector elector1 = new LeaderElector(zk1, "/election", "node", new byte[0], r1);
+        LeaderElector elector2 = new LeaderElector(zk2, "/election", "node", new byte[0], null);
+        LeaderElector elector3 = new LeaderElector(zk3, "/election", "node", new byte[0], null);
+        LeaderElector elector4 = new LeaderElector(zk4, "/election", "node", new byte[0], null);
+        LeaderElector elector5 = new LeaderElector(zk5, "/election", "node", new byte[0], null);
+        LeaderElector elector6 = new LeaderElector(zk6, "/election", "node", new byte[0], null);
+        LeaderElector elector7 = new LeaderElector(zk7, "/election", "node", new byte[0], r7);
+
+        elector0.start(true);
+        elector1.start(true);
+        elector2.start(true);
+        elector3.start(true);
+        elector4.start(true);
+        elector5.start(true);
+        elector6.start(true);
+        elector7.start(true);
+
+        assertTrue(elector0.isLeader());
+        assertFalse(elector1.isLeader());
+        assertFalse(elector2.isLeader());
+        assertFalse(elector3.isLeader());
+        assertFalse(elector4.isLeader());
+        assertFalse(elector5.isLeader());
+        assertFalse(elector6.isLeader());
+        assertFalse(elector7.isLeader());
+
+        // 4 should become the leader
+        elector6.shutdown();
+        elector4.shutdown();
+        elector2.shutdown();
+        elector0.shutdown();
+
+        assertTrue(sem1.tryAcquire(5, TimeUnit.SECONDS));
+        assertTrue(elector1.isLeader());
+        assertFalse(elector3.isLeader());
+        assertFalse(elector5.isLeader());
+        assertFalse(elector7.isLeader());
+
+        elector5.shutdown();
+        elector3.shutdown();
+        elector1.shutdown();
+        assertTrue(sem7.tryAcquire(5, TimeUnit.SECONDS));
+        assertTrue(elector7.isLeader());
+
+        // cleanup.
+        elector7.shutdown();
+    }
 
 
     @Test
