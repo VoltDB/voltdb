@@ -258,13 +258,15 @@ public class LeaderElector {
         List<String> children = zk.getChildren(dir, false);
         Collections.sort(children);
         ListIterator<String> iter = children.listIterator();
+        String me = null;
         //Go till I find myself.
         while (iter.hasNext()) {
-            String child = ZKUtil.joinZKPath(dir, iter.next());
-            if (!child.equals(node)) {
-                continue;
+            me = ZKUtil.joinZKPath(dir, iter.next());
+            if (me.equals(node)) {
+                break;
             }
         }
+        assert (me != null);
         //Back on me
         iter.previous();
         String lowest = null;
