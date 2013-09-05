@@ -147,7 +147,7 @@ public class LeaderElector {
         this.prefix = prefix;
         this.data = data;
         this.cb = cb;
-        es = CoreUtils.getBoundedSingleThreadExecutor("Leader elector-" + dir, 2);
+        es = CoreUtils.getCachedSingleThreadExecutor("Leader elector-" + dir, 15000);
     }
 
     /**
