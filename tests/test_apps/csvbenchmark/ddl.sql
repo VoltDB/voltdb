@@ -138,5 +138,5 @@ create table replicated_pk (
     , f timestamp
     , g varchar(30)
     , e varchar(1)
-    , CONSTRAINT replicated_pk PRIMARY KEY (c)
+    , CONSTRAINT replicated_pk PRIMARY KEY (a)
 );
