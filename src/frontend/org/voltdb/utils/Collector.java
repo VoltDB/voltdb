@@ -33,6 +33,8 @@ import java.util.List;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 
+import org.apache.log4j.Logger;
+import org.apache.log4j.varia.NullAppender;
 import org.hsqldb_voltpatches.lib.tar.TarGenerator;
 import org.hsqldb_voltpatches.lib.tar.TarMalformatException;
 import org.json_voltpatches.JSONArray;
@@ -55,37 +57,42 @@ public class Collector {
     private static String m_catalogJarPath = null;
     private static String m_deploymentPath = null;
 
-    private static String m_uniqueid = "";
+    private static String m_prefix = "";
     private static String m_host = "";
     private static String m_username = "";
     private static String m_password = "";
     private static boolean m_noPrompt = false;
     private static boolean m_dryRun = false;
-    private static boolean m_noHeapDump = false;
+    private static boolean m_skipHeapDump = false;
     private static boolean m_calledFromVEM = false;
+    private static boolean m_copyToVEM = false;
     private static boolean m_fileInfoOnly = false;
 
-    private static int m_pid = 0;
     private static String m_workingDir = null;
     private static List<String> m_logPaths = new ArrayList<String>();
 
     public static String[] cmdFilenames = {"sardata", "dmesgdata"};
 
     public static void main(String[] args) {
+        // get rid of log4j "no appenders could be found for logger" warning when called from VEM
+        Logger.getRootLogger().addAppender(new NullAppender());
+
         m_voltDbRootPath = args[0];
-        m_uniqueid = args[1];
+        m_prefix = args[1];
         m_host = args[2];
         m_username = args[3];
         m_password = args[4];
         m_noPrompt = Boolean.parseBoolean(args[5]);
         m_dryRun = Boolean.parseBoolean(args[6]);
-        m_noHeapDump = Boolean.parseBoolean(args[7]);
+        m_skipHeapDump = Boolean.parseBoolean(args[7]);
 
         // arguments only used when Collector is called from VEM
         if (args.length > 8) {
+            m_calledFromVEM = true;
+
             // generate resulting file in voltdbroot instead of current working dir and do not append timestamp in filename
             // so the resulting file is easier to be located and copied to VEM
-            m_calledFromVEM = Boolean.parseBoolean(args[8]);
+            m_copyToVEM = Boolean.parseBoolean(args[8]);
 
             // generate a list of information (server name, size, and path) of files rather than actually collect files
             // used by files display panel in VEM UI
@@ -103,7 +110,7 @@ public class Collector {
         JSONObject jsonObject = parseJSONFile(m_configInfoPath);
         parseJSONObject(jsonObject);
 
-        List<String> collectionFilesList = listCollection(m_noHeapDump);
+        List<String> collectionFilesList = listCollection(m_skipHeapDump);
 
         if (m_dryRun) {
             System.out.println("List of the files to be collected:");
@@ -114,14 +121,14 @@ public class Collector {
             System.out.println("          Use --upload option to enable uploading via SFTP");
         }
         else if (m_fileInfoOnly) {
-            String collectionFilesListPath = m_voltDbRootPath + File.separator + m_uniqueid;
+            String collectionFilesListPath = m_voltDbRootPath + File.separator + m_prefix;
 
             byte jsonBytes[] = null;
             try {
                 JSONStringer stringer = new JSONStringer();
 
                 stringer.object();
-                stringer.key("server").value(m_uniqueid);
+                stringer.key("server").value(m_prefix);
                 stringer.key("files").array();
                 for (String path: collectionFilesList) {
                     stringer.object();
@@ -159,7 +166,7 @@ public class Collector {
             }
         }
         else {
-            generateCollection(collectionFilesList, m_calledFromVEM);
+            generateCollection(collectionFilesList, m_copyToVEM);
         }
     }
 
@@ -171,7 +178,7 @@ public class Collector {
         m_deploymentPath = configLogDirPath + "deployment.xml";
     }
 
-    private static JSONObject parseJSONFile(String configInfoPath) {
+    public static JSONObject parseJSONFile(String configInfoPath) {
         JSONObject jsonObject = null;
 
         try {
@@ -198,7 +205,6 @@ public class Collector {
 
     private static void parseJSONObject(JSONObject jsonObject) {
         try {
-            m_pid = jsonObject.getInt("pid");
             m_workingDir = jsonObject.getString("workingDir");
 
             m_logPaths.clear();
@@ -212,12 +218,16 @@ public class Collector {
         }
     }
 
-    private static List<String> listCollection(boolean noHeapDump) {
+    private static List<String> listCollection(boolean skipHeapDump) {
         List<String> collectionFilesList = new ArrayList<String>();
 
         try {
-            collectionFilesList.add(m_deploymentPath);
-            collectionFilesList.add(m_catalogJarPath);
+            if (new File(m_deploymentPath).exists()) {
+                collectionFilesList.add(m_deploymentPath);
+            }
+            if (new File(m_catalogJarPath).exists()) {
+                collectionFilesList.add(m_catalogJarPath);
+            }
 
             for (String path: m_logPaths) {
                 for (File file: new File(path).getParentFile().listFiles()) {
@@ -237,14 +247,14 @@ public class Collector {
                 if (file.getName().startsWith("voltdb_crash") && file.getName().endsWith(".txt")) {
                     collectionFilesList.add(file.getCanonicalPath());
                 }
-                if (file.getName().equals("hs_err_pid" + m_pid + ".log")) {
+                if (file.getName().startsWith("hs_err_pid") && file.getName().endsWith(".log")) {
                     collectionFilesList.add(file.getCanonicalPath());
                 }
             }
 
-            if (!noHeapDump) {
+            if (!skipHeapDump) {
                 for (File file: new File("/tmp").listFiles()) {
-                    if (file.getName().equals("java_pid" + m_pid + ".hprof")) {
+                    if (file.getName().startsWith("java_pid") && file.getName().endsWith(".hprof")) {
                         collectionFilesList.add(file.getCanonicalPath());
                     }
                 }
@@ -270,12 +280,12 @@ public class Collector {
         return collectionFilesList;
     }
 
-    private static void generateCollection(List<String> paths, boolean calledFromVEM) {
+    private static void generateCollection(List<String> paths, boolean copyToVEM) {
         try {
             String timestamp = "";
             String rootpath = "";
 
-            if (calledFromVEM) {
+            if (copyToVEM) {
                 rootpath = m_voltDbRootPath;
             }
             else {
@@ -288,7 +298,7 @@ public class Collector {
                 rootpath = System.getProperty("user.dir");
             }
 
-            String collectionFilePath = rootpath + File.separator + m_uniqueid + timestamp + ".tgz";
+            String collectionFilePath = rootpath + File.separator + m_prefix + timestamp + ".tgz";
             File collectionFile = new File(collectionFilePath);
             TarGenerator tarGenerator = new TarGenerator(collectionFile, true, null);
 
@@ -327,11 +337,19 @@ public class Collector {
             String[] dmesgCmd = {"bash", "-c", "/bin/dmesg"};
             cmd(tarGenerator, dmesgCmd, "dmesgdata");
 
-            tarGenerator.write(false, true);
+            if (m_calledFromVEM) {
+                // if collector is called by VEM, do not output the list of files included in the compressed file to stdout
+                tarGenerator.write(false, false);
+            }
+            else {
+                tarGenerator.write(false, true);
+            }
 
             long sizeInByte = collectionFile.length();
             String sizeStringInKB = String.format("%5.2f", (double)sizeInByte / 1000);
-            System.out.println("Collection file created at " + collectionFilePath + " size: " + sizeStringInKB + " KB");
+            if (!m_calledFromVEM) {
+                System.out.println("Collection file created at " + collectionFilePath + " size: " + sizeStringInKB + " KB");
+            }
 
             boolean upload = false;
             if (!m_host.isEmpty()) {
@@ -345,11 +363,11 @@ public class Collector {
 
             if (upload) {
                 if (org.voltdb.utils.MiscUtils.isPro()) {
-                    if (m_username.isEmpty()) {
+                    if (m_username.isEmpty() && !m_noPrompt) {
                         System.out.print("username: ");
                         m_username = System.console().readLine();
                     }
-                    if (m_password.isEmpty()) {
+                    if (m_password.isEmpty() && !m_noPrompt) {
                         System.out.print("password: ");
                         m_password = new String(System.console().readPassword());
                     }
@@ -370,9 +388,11 @@ public class Collector {
                         if (delLocalCopy) {
                             try {
                                 collectionFile.delete();
-                                System.out.println("Local copy "  + collectionFilePath + " deleted");
+                                if (!m_calledFromVEM) {
+                                    System.out.println("Local copy "  + collectionFilePath + " deleted");
+                                }
                             } catch (SecurityException e) {
-                                System.out.println("Failed to delete local copy " + collectionFilePath + ". " + e.getMessage());
+                                System.err.println("Failed to delete local copy " + collectionFilePath + ". " + e.getMessage());
                             }
                         }
                     } catch (Exception e) {
@@ -466,14 +486,15 @@ public class Collector {
 
     public static void attemptConnect(String host, String username, String password) throws Exception {
         SSHTools ssh = new SSHTools(username, null);
+        SFTPSession sftp = null;
 
         try {
             HostAndPort hostAndPort = HostAndPort.fromString(host);
             if (hostAndPort.hasPort()) {
-                ssh.getSftpSession(username, password, null, hostAndPort.getHostText(), hostAndPort.getPort(), null);
+                sftp = ssh.getSftpSession(username, password, null, hostAndPort.getHostText(), hostAndPort.getPort(), null);
             }
             else {
-                ssh.getSftpSession(username, password, null, host, null);
+                sftp = ssh.getSftpSession(username, password, null, host, null);
             }
         } catch (SFTPException e) {
             String errorMsg = e.getCause().getMessage();
@@ -506,6 +527,10 @@ public class Collector {
             String errorMsg = e.getMessage();
 
             throw new Exception(errorMsg.substring(0, 1).toUpperCase() + errorMsg.substring(1));
+        } finally {
+            if (sftp != null) {
+                sftp.terminate();
+            }
         }
     }
 }

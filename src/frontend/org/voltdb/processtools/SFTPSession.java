@@ -23,7 +23,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.Reader;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -57,7 +56,7 @@ public class SFTPSession {
     /**
      * default logger
      */
-    protected static final VoltLogger sftpLog = new VoltLogger(SFTPSession.class.getName());
+    protected static final VoltLogger sftpLog = new VoltLogger("HOST");
     /*
      * regular expression that matches file names ending in jar, so, and jnilib
      */
