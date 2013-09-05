@@ -58,7 +58,7 @@ public class TestStatsProcProfTable {
     // push rows from data in to the table.
     void loadEmUp(StatsProcProfTable dut, ProcProfRow[] data) {
         for (int ii = 0; ii < data.length; ++ii) {
-            dut.updateTable(false,
+            dut.updateTable(true,
                     data[ii].timestamp,
                     data[ii].procedure,
                     data[ii].partition,
@@ -74,7 +74,7 @@ public class TestStatsProcProfTable {
     // push rows from data in to the table.
     void loadEmUpNoDedup(StatsProcProfTable dut, ProcProfRow[] data) {
         for (int ii = 0; ii < data.length; ++ii) {
-            dut.updateTable(true,
+            dut.updateTable(false,
                     data[ii].timestamp,
                     data[ii].procedure,
                     data[ii].partition,
@@ -97,13 +97,16 @@ public class TestStatsProcProfTable {
             System.out.printf("%s: validating row %d\n", testname, ii);
             assertEquals(data[ii].timestamp, vt.getLong("TIMESTAMP"));
             assertEquals(data[ii].procedure, vt.getString("PROCEDURE"));
-            assertEquals(data[ii].weighted_perc, vt.getLong("WEIGHTED_PERC"));
+            long l = vt.getLong("WEIGHTED_PERC");
+            assertEquals(data[ii].weighted_perc, l);
             assertEquals(data[ii].invocations, vt.getLong("INVOCATIONS"));
             assertEquals(data[ii].avg, vt.getLong("AVG"));
             assertEquals(data[ii].min, vt.getLong("MIN"));
             assertEquals(data[ii].max, vt.getLong("MAX"));
-            assertEquals(data[ii].aborts, vt.getLong("ABORTS"));
-            assertEquals(data[ii].failures, vt.getLong("FAILURES"));
+            l = vt.getLong("ABORTS");
+            assertEquals(data[ii].aborts, l);
+            l = vt.getLong("FAILURES");
+            assertEquals(data[ii].failures, l);
             ++ii;
         }
     }
@@ -191,9 +194,9 @@ public class TestStatsProcProfTable {
             new ProcProfRow(1371587140278L, "B", 1L, 100L, 4L, 4L, 3L, 17L, 18L)
         };
         ResultRow result[] = {
-            //                         TS/Proc/wtd/invok/avg/min/max/abort/fail
-            new ResultRow(1371587140278L, "B", 95L, 200L, 3L, 1L, 5L, 36L, 34L),
-            new ResultRow(1371587140278L, "A", 4L, 1L, 30L, 10L, 20L, 18L, 0L)
+            //               TS/         Proc /wtd/ invok/avg/ min/max/fail/abort
+            new ResultRow(1371587140278L, "B", 96L, 300L, 3L, 1L, 5L, 54L, 51L),
+            new ResultRow(1371587140278L, "A", 3L, 1L, 30L, 10L, 20L, 18L, 0L)
         };
         StatsProcProfTable dut = new StatsProcProfTable();
         loadEmUpNoDedup(dut, data);

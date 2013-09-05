@@ -77,11 +77,13 @@ public class StatsProcInputTable
             this.minIN = Math.min(this.minIN, in.minIN);
             this.maxIN = Math.max(this.maxIN, in.maxIN);
 
-            if (dedup && !seenPartitions.contains(in.partition)) {
+            if (!dedup) {
                 this.invocations += in.invocations;
-                seenPartitions.add(in.partition);
             } else {
-                this.invocations += in.invocations;
+                if (!seenPartitions.contains(in.partition)) {
+                    this.invocations += in.invocations;
+                    seenPartitions.add(in.partition);
+                }
             }
         }
     }

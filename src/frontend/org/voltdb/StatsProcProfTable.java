@@ -69,16 +69,18 @@ public class StatsProcProfTable {
             this.min = Math.min(this.min, in.min);
             this.max = Math.max(this.max, in.max);
 
-            // invocations, failures and aborts per-logical-partition
-            if (dedup && !seenPartitions.contains(in.partition)) {
+            if (!dedup) {
                 this.invocations += in.invocations;
                 this.failures += in.failures;
                 this.aborts += in.aborts;
-                seenPartitions.add(in.partition);
             } else {
-                this.invocations += in.invocations;
-                this.failures += in.failures;
-                this.aborts += in.aborts;
+                // invocations, failures and aborts per-logical-partition
+                if (!seenPartitions.contains(in.partition)) {
+                    this.invocations += in.invocations;
+                    this.failures += in.failures;
+                    this.aborts += in.aborts;
+                    seenPartitions.add(in.partition);
+                }
             }
         }
 

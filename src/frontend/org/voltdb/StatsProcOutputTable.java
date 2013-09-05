@@ -75,11 +75,13 @@ public class StatsProcOutputTable
             this.minOUT = Math.min(this.minOUT, in.minOUT);
             this.maxOUT = Math.max(this.maxOUT, in.maxOUT);
 
-            if (dedup && !seenPartitions.contains(in.partition)) {
+            if (!dedup) {
                 this.invocations += in.invocations;
-                seenPartitions.add(in.partition);
             } else {
-                this.invocations += in.invocations;
+                if (!seenPartitions.contains(in.partition)) {
+                    this.invocations += in.invocations;
+                    seenPartitions.add(in.partition);
+                }
             }
         }
     }
