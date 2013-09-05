@@ -70,17 +70,18 @@ public class StatsProcInputTable
         }
 
         // Augment this ProcInputRow with a new input row
-        void updateWith(ProcInputRow in)
-        {
+        void updateWith(boolean dedup, ProcInputRow in)        {
             // adjust the avg across all replicas.
             this.avgIN = calculateAverage(this.avgIN, this.invocations,
                 in.avgIN, in.invocations);
             this.minIN = Math.min(this.minIN, in.minIN);
             this.maxIN = Math.max(this.maxIN, in.maxIN);
 
-            if (!seenPartitions.contains(in.partition)) {
+            if (dedup && !seenPartitions.contains(in.partition)) {
                 this.invocations += in.invocations;
                 seenPartitions.add(in.partition);
+            } else {
+                this.invocations += in.invocations;
             }
         }
     }
@@ -127,14 +128,14 @@ public class StatsProcInputTable
     }
 
     // Add or update the corresponding row.
-    public void updateTable(String procedure, long partition, long timestamp,
-        long invocations, long minIN, long maxIN, long avgIN)
+    public void updateTable(boolean dedup, String procedure, long partition, long timestamp,
+            long invocations, long minIN, long maxIN, long avgIN)
     {
         ProcInputRow in = new ProcInputRow(procedure, partition, timestamp,
             invocations, minIN, maxIN, avgIN);
         ProcInputRow exists = m_rowsTable.ceiling(in);
         if (exists != null && in.procedure.equals(exists.procedure)) {
-            exists.updateWith(in);
+            exists.updateWith(dedup, in);
         } else {
             m_rowsTable.add(in);
         }

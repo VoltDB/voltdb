@@ -61,8 +61,7 @@ public class StatsProcProfTable {
         }
 
         // Augment this ProcProfRow with a new input row
-        void updateWith(ProcProfRow in)
-        {
+        void updateWith(boolean dedup, ProcProfRow in)        {
             // adjust the min, max and avg across all replicas.
             this.avg = calculateAverage(
                     this.avg, this.invocations,
@@ -71,11 +70,15 @@ public class StatsProcProfTable {
             this.max = Math.max(this.max, in.max);
 
             // invocations, failures and aborts per-logical-partition
-            if (!seenPartitions.contains(in.partition)) {
+            if (dedup && !seenPartitions.contains(in.partition)) {
                 this.invocations += in.invocations;
                 this.failures += in.failures;
                 this.aborts += in.aborts;
                 seenPartitions.add(in.partition);
+            } else {
+                this.invocations += in.invocations;
+                this.failures += in.failures;
+                this.aborts += in.aborts;
             }
         }
 
@@ -116,7 +119,7 @@ public class StatsProcProfTable {
     }
 
     // Add or update the corresponding row.
-    public void updateTable(long timestamp, String procedure, long partition,
+    public void updateTable(boolean dedup, long timestamp, String procedure, long partition,
             long invocations, long min, long max, long avg, long failures, long aborts)
     {
         ProcProfRow in = new ProcProfRow(timestamp, procedure, partition,
@@ -124,7 +127,7 @@ public class StatsProcProfTable {
                 min, max, avg, failures, aborts);
         ProcProfRow exists = m_table.ceiling(in);
         if (exists != null && in.procedure.equals(exists.procedure)) {
-            exists.updateWith(in);
+            exists.updateWith(dedup, in);
         }
         else {
             m_table.add(in);

@@ -193,7 +193,7 @@ fi
 export CMDVAL=$CMDVAL"-XX:+UseTLAB -XX:CMSInitiatingOccupancyFraction=75 -XX:+UseCMSInitiatingOccupancyOnly "
 export CMDVAL=$CMDVAL"-XX:+UseParNewGC "
 export CMDVAL=$CMDVAL"$JAVA_HEAP_MAX $VOLTDB_OPTS "
-export CMDVAL=$CMDVAL"-Dsun.net.inetaddr.ttl=300 -Dsun.net.inetaddr.negative.ttl=3600 "
+export CMDVAL=$CMDVAL"-Djava.awt.headless=true -Dsun.net.inetaddr.ttl=300 -Dsun.net.inetaddr.negative.ttl=3600 "
 export CMDVAL=$CMDVAL"-Dlog4j.configuration=file://${LOG4J_CONFIG_PATH} "
 export CMDVAL=$CMDVAL"-Djava.library.path=${JAVA_LIBRARY_PATH} -classpath $CLASSPATH "
 export CMDVAL=$CMDVAL"org.voltdb.VoltDB "

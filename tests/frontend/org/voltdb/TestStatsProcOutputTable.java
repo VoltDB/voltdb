@@ -58,8 +58,8 @@ public class TestStatsProcOutputTable {
     // push rows from data in to the table.
     void loadEmUp(StatsProcOutputTable dut, ProcOutputRow[] data) {
         for (int ii = 0; ii < data.length; ++ii) {
-         dut.updateTable(
-            data[ii].procedure,
+            dut.updateTable(true,
+                    data[ii].procedure,
             data[ii].partition,
             data[ii].timestamp,
             data[ii].invocations,
