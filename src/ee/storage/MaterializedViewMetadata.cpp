@@ -50,7 +50,7 @@ MaterializedViewMetadata::MaterializedViewMetadata(
     parsePredicate(mvInfo);
     VOLT_TRACE("Start to parse complex group by");
     parseComplexGroupby(mvInfo);
-    if (m_hasComplexGroupby) {
+    if (m_groupbyExprs.size() != 0) {
         m_groupByColumnCount = (int32_t)m_groupbyExprs.size();
     } else {
         m_groupByColumnCount = mvInfo->groupbycols().size();
@@ -59,7 +59,7 @@ MaterializedViewMetadata::MaterializedViewMetadata(
     // set up the group by columns from the catalog info
     m_groupByColumns = new int32_t[m_groupByColumnCount];
 
-    if (!m_hasComplexGroupby) {
+    if (m_groupbyExprs.size() == 0) {
         std::map<std::string, catalog::ColumnRef*>::const_iterator colRefIterator;
         for (colRefIterator = mvInfo->groupbycols().begin();
                 colRefIterator != mvInfo->groupbycols().end();
@@ -129,12 +129,6 @@ MaterializedViewMetadata::~MaterializedViewMetadata() {
     delete[] m_outputColumnSrcTableIndexes;
     delete[] m_outputColumnAggTypes;
     delete m_filterPredicate;
-    if (m_hasComplexGroupby) {
-        m_groupbyExprs.clear();
-    }
-    if (m_hasComplexAggregation) {
-        m_aggregationExprs.clear();
-    }
     m_target->decrementRefcount();
 }
 
@@ -202,10 +196,8 @@ void MaterializedViewMetadata::parsePredicate(catalog::MaterializedViewInfo *mvI
 void MaterializedViewMetadata::parseComplexGroupby(catalog::MaterializedViewInfo *mvInfo) {
     const std::string expressionsAsText = mvInfo->groupbyExpressionsJson();
     if (expressionsAsText.length() == 0) {
-        m_hasComplexGroupby = false;
         return;
     }
-    m_hasComplexGroupby = true;
     VOLT_TRACE("Group by Expression: %s\n", expressionsAsText.c_str());
     ExpressionUtil::loadIndexedExprsFromJson(m_groupbyExprs, expressionsAsText);
 }
@@ -213,10 +205,8 @@ void MaterializedViewMetadata::parseComplexGroupby(catalog::MaterializedViewInfo
 void MaterializedViewMetadata::parseComplexAggregation(catalog::MaterializedViewInfo *mvInfo) {
     const std::string expressionsAsText = mvInfo->aggregationExpressionsJson();
     if (expressionsAsText.length() == 0) {
-        m_hasComplexAggregation = false;
         return;
     }
-    m_hasComplexAggregation = true;
     VOLT_TRACE("Aggregate Expression: %s\n", expressionsAsText.c_str());
     ExpressionUtil::loadIndexedExprsFromJson(m_aggregationExprs, expressionsAsText);
 }
@@ -248,7 +238,7 @@ void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple, bool fal
         if (exists) {
             value = m_existingTuple.getNValue(colindex);
         } else {
-            if (m_hasComplexGroupby) {
+            if (m_groupbyExprs.size() != 0) {
                 AbstractExpression * expr = m_groupbyExprs.at(colindex);
                 value = expr->eval(&newTuple, NULL);
             } else {
@@ -266,7 +256,7 @@ void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple, bool fal
     // set values for the other columns
     for (int i = colindex; i < m_outputColumnCount; i++) {
         NValue newValue;
-        if (m_hasComplexAggregation) {
+        if (m_aggregationExprs.size() != 0) {
             AbstractExpression * expr = m_aggregationExprs.at(i-colindex);
             newValue = expr->eval(&newTuple, NULL);
         } else {
@@ -344,7 +334,7 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple, bool fal
     // set values for the other columns
     for (int i = colindex; i < m_outputColumnCount; i++) {
         NValue oldValue;
-        if (m_hasComplexAggregation) {
+        if (m_aggregationExprs.size() != 0) {
             AbstractExpression * expr = m_aggregationExprs.at(i-colindex);
             oldValue = expr->eval(&oldTuple, NULL);
         } else {
@@ -376,7 +366,7 @@ bool MaterializedViewMetadata::findExistingTuple(TableTuple &oldTuple, bool expe
     // find the key for this tuple (which is the group by columns)
     NValue value;
     for (int i = 0; i < m_groupByColumnCount; i++) {
-        if (m_hasComplexGroupby) {
+        if (m_groupbyExprs.size() != 0) {
             AbstractExpression * expr = m_groupbyExprs.at(i);
             value = expr->eval(&oldTuple,NULL);
         } else {

@@ -95,9 +95,7 @@ private:
     // part of the aggregation in the materialized view
     AbstractExpression *m_filterPredicate;
 
-    bool m_hasComplexGroupby;
     std::vector<AbstractExpression *> m_groupbyExprs;
-    bool m_hasComplexAggregation;
     std::vector<AbstractExpression *> m_aggregationExprs;
 
     // how many columns is the view aggregated on
