@@ -16,6 +16,7 @@
  */
 package org.voltcore.zk;
 
+import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.List;
 import java.util.ListIterator;
@@ -32,11 +33,9 @@ import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.VoltZK;
-
-import com.google.common.collect.ImmutableSet;
 import java.util.concurrent.TimeUnit;
 import org.apache.zookeeper_voltpatches.Watcher;
+import org.voltdb.VoltZK;
 
 public class LeaderElector {
     // The root is always created as INITIALIZING until the first participant is added,
@@ -67,9 +66,6 @@ public class LeaderElector {
                 // means zk shutdown without the elector being shutdown.
                 // ignore.
                 e.printStackTrace();
-            } catch (FailedWatchingLowerNodeException wlnex) {
-                es.submit(electionEventHandler);
-                return;
             } catch (KeeperException.ConnectionLossException e) {
                 // lost the full connection. some test cases do this...
                 // means shutdoown without the elector being
@@ -241,12 +237,10 @@ public class LeaderElector {
     synchronized public void shutdown() throws InterruptedException, KeeperException {
         m_done.set(true);
         es.shutdown();
-        es.awaitTermination(1500, TimeUnit.MILLISECONDS);
+        es.awaitTermination(365, TimeUnit.DAYS);
         zk.delete(node, -1);
     }
 
-    final class FailedWatchingLowerNodeException extends Exception {
-    }
     /**
      * Set a watch on the node that comes before the specified node in the
      * directory.
@@ -254,7 +248,7 @@ public class LeaderElector {
      * @return The lowest sequential node
      * @throws Exception
      */
-    private String watchNextLowerNode() throws KeeperException, InterruptedException, FailedWatchingLowerNodeException {
+    private String watchNextLowerNode() throws KeeperException, InterruptedException {
         /*
          * Iterate through the sorted list of children and find the given node,
          * then setup a electionWatcher on the previous node if it exists, otherwise the
@@ -263,46 +257,33 @@ public class LeaderElector {
          */
         List<String> children = zk.getChildren(dir, false);
         Collections.sort(children);
-        String lowest = null;
-        String previous = null;
         ListIterator<String> iter = children.listIterator();
-        int holes = 0;
+        //Go till I find myself.
         while (iter.hasNext()) {
             String child = ZKUtil.joinZKPath(dir, iter.next());
-
-            if (lowest == null) {
-                lowest = child;
-                previous = child;
+            if (!child.equals(node)) {
                 continue;
             }
-            if (child.equals(node)) {
-                while (zk.exists(previous, electionWatcher) == null) {
-                    // If we reached to the top of the list we know the lowest node.
-                    if (previous.equals(lowest)) {
-                        /*
-                         * If the leader disappeared, and we follow the leader, we
-                         * become the leader now
-                         */
-                        lowest = child;
-                        holes = 0;
-                        break;
-                    } else {
-                        holes++;
-                        // reverse the direction of iteration and look for previous ones.
-                        previous = ZKUtil.joinZKPath(dir, iter.previous());
-                    }
-                }
+        }
+        //Back on me
+        iter.previous();
+        String lowest = null;
+        //Until we have previous nodes and we set a watch on previous node.
+        while (iter.hasPrevious()) {
+            //Proess my lower nodes and put a watch on whats live
+            String previous = ZKUtil.joinZKPath(dir, iter.previous());
+            if (zk.exists(previous, electionWatcher) != null) {
+                lowest = previous;
                 break;
             }
-            //Keep looking for myself.
-            previous = child;
         }
-        if (holes > 0) {
-            throw new FailedWatchingLowerNodeException();
+        //If we could not watch any lower node we are lowest and must become leader.
+        if (lowest == null) {
+            return node;
         }
-
         return lowest;
     }
+
 
     /*
      * Check for a change in present nodes
