@@ -129,6 +129,12 @@ MaterializedViewMetadata::~MaterializedViewMetadata() {
     delete[] m_outputColumnSrcTableIndexes;
     delete[] m_outputColumnAggTypes;
     delete m_filterPredicate;
+    for (int ii = 0; ii < m_groupbyExprs.size(); ++ii) {
+        delete m_groupbyExprs[ii];
+    }
+    for (int ii = 0; ii < m_aggregationExprs.size(); ++ii) {
+        delete m_aggregationExprs[ii];
+    }
     m_target->decrementRefcount();
 }
 
