@@ -1032,7 +1032,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             isReadonly,
                             true, // Only SP could be mis-partitioned
                             false, // Only SP could be mis-partitioned
-                            new int[] {partition},
+                            partition,
                             messageSize,
                             now);
                     return true;
@@ -1106,7 +1106,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final boolean isReadOnly,
             final boolean isSinglePartition,
             final boolean isEveryPartition,
-            final int partitions[],
+            final int partition,
             final int messageSize,
             final long now)
     {
@@ -1118,7 +1118,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 isReadOnly,
                 isSinglePartition,
                 isEveryPartition,
-                partitions,
+                partition,
                 messageSize,
                 now,
                 false);  // is for replay.
@@ -1133,11 +1133,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final boolean isReadOnly,
             final boolean isSinglePartition,
             final boolean isEveryPartition,
-            final int partitions[],
+            final int partition,
             final int messageSize,
             final long now,
             final boolean isForReplay)
     {
+        assert(!isSinglePartition || (partition >= 0));
         final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
 
         Long initiatorHSId = null;
@@ -1149,12 +1150,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          */
         if (isSinglePartition && !isEveryPartition) {
             if (isReadOnly) {
-                initiatorHSId = m_localReplicas.get(partitions[0]);
+                initiatorHSId = m_localReplicas.get(partition);
             }
             if (initiatorHSId != null) {
                 isShortCircuitRead = true;
             } else {
-                initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partitions[0]);
+                initiatorHSId = m_cartographer.getHSIdForSinglePartitionMaster(partition);
             }
         }
         else {
@@ -1164,11 +1165,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         if (initiatorHSId == null) {
             hostLog.error("Failed to find master initiator for partition: "
-                    + Integer.toString(partitions[0]) + ". Transaction not initiated.");
+                    + Integer.toString(partition) + ". Transaction not initiated.");
             return false;
         }
 
-        long handle = cihm.getHandle(isSinglePartition, partitions[0], invocation.getClientHandle(),
+        long handle = cihm.getHandle(isSinglePartition, partition, invocation.getClientHandle(),
                 messageSize, now, invocation.getProcName(), initiatorHSId, isReadOnly, isShortCircuitRead);
 
         Iv2InitiateTaskMessage workRequest =
@@ -1686,26 +1687,25 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                         ClientInputHandler handler,
                                                         Connection ccxn)
     {
-        int[] involvedPartitions = null;
+        int partition = -1;
         try {
             CatalogMap<Table> tables = m_catalogContext.get().database.getTables();
             int partitionParamType = getLoadSinglePartitionTablePartitionParamType(tables, task);
             byte[] valueToHash = (byte[])task.getParameterAtIndex(0);
-            involvedPartitions =
-                new int[]{ TheHashinator.getPartitionForParameter(partitionParamType, valueToHash)};
+            partition = TheHashinator.getPartitionForParameter(partitionParamType, valueToHash);
         }
         catch (Exception e) {
             authLog.warn(e.getMessage());
             return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                                           new VoltTable[0], e.getMessage(), task.clientHandle);
         }
-        assert(involvedPartitions != null);
+        assert(partition != -1);
         createTransaction(handler.connectionId(),
                           task,
                           catProc.getReadonly(),
                           catProc.getSinglepartition(),
                           catProc.getEverysite(),
-                          involvedPartitions,
+                          partition,
                           buf.capacity(),
                           System.currentTimeMillis());
         return null;
@@ -1815,7 +1815,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 sysProc.getReadonly(),
                 sysProc.getSinglepartition(),
                 sysProc.getEverysite(),
-                m_allPartitions,
+                0,//No partition needed for multi-part
                 buf.capacity(),
                 System.currentTimeMillis());
 
@@ -1978,19 +1978,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         }
 
-        int[] involvedPartitions;
-        if (catProc.getSinglepartition() == false) {
-            involvedPartitions = m_allPartitions;
-        }
-        else {
+        int partition = -1;
+        if (catProc.getSinglepartition()) {
             // break out the Hashinator and calculate the appropriate partition
             try {
-                involvedPartitions = new int[] {
+                partition =
                         getPartitionForProcedure(
                                 catProc.getPartitionparameter(),
                                 catProc.getPartitioncolumn().getType(),
-                                task)
-                };
+                                task);
             }
             catch (RuntimeException e) {
                 // unable to hash to a site, return an error
@@ -2016,7 +2012,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         catProc.getReadonly(),
                         catProc.getSinglepartition(),
                         catProc.getEverysite(),
-                        involvedPartitions,
+                        partition,
                         buf.capacity(),
                         now);
         if (!success) {
@@ -2064,7 +2060,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // pick the sysproc based on the presence of partition info
         // HSQL does not specifically implement AdHoc SP -- instead, use its always-SP implementation of AdHoc
         boolean isSinglePartition = plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForHSQL;
-        int partitions[] = null;
+        int partition = -1;
 
         if (isSinglePartition) {
             if (plannedStmtBatch.isReadOnly()) {
@@ -2081,7 +2077,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (plannedStmtBatch.partitionParam != null) {
                 type = VoltType.typeFromObject(plannedStmtBatch.partitionParam).getValue();
             }
-            partitions = new int[] { TheHashinator.getPartitionForParameter(type, plannedStmtBatch.partitionParam) };
+            partition = TheHashinator.getPartitionForParameter(type, plannedStmtBatch.partitionParam);
         }
         else {
             if (plannedStmtBatch.isReadOnly()) {
@@ -2090,7 +2086,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             else {
                 task.procName = "@AdHoc_RW_MP";
             }
-            partitions = m_allPartitions;
         }
 
         // Set up the parameters.
@@ -2141,7 +2136,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // initiate the transaction
         createTransaction(plannedStmtBatch.connectionId, task,
                 plannedStmtBatch.isReadOnly(), isSinglePartition, false,
-                partitions,
+                partition,
                 serializedSize, EstTime.currentTimeMillis());
     }
 
@@ -2265,7 +2260,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             // initiate the transaction. These hard-coded values from catalog
                             // procedure are horrible, horrible, horrible.
                             createTransaction(changeResult.connectionId,
-                                    task, false, false, false, m_allPartitions, task.getSerializedSize(),
+                                    task, false, false, false, 0, task.getSerializedSize(),
                                     EstTime.currentTimeMillis());
                         }
                     }
@@ -2483,7 +2478,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         createTransaction(m_snapshotDaemonAdapter.connectionId(),
                 spi, catProc.getReadonly(),
                 catProc.getSinglepartition(), catProc.getEverysite(),
-                m_allPartitions,
+                0,
                 0, EstTime.currentTimeMillis());
     }
 

@@ -36,14 +36,14 @@ public class Iv2TransactionCreator implements TransactionCreator
     @Override
     public final boolean createTransaction(long connectionId,
             StoredProcedureInvocation invocation, boolean isReadOnly,
-            boolean isSinglePartition, boolean isEverySite, int[] partitions, int messageSize, long now)
+            boolean isSinglePartition, boolean isEverySite, int partition, int messageSize, long now)
     {
         return m_ci.createTransaction(connectionId,
                 invocation,
                 isReadOnly,
                 isSinglePartition,
                 isEverySite,
-                partitions,
+                partition,
                 messageSize,
                 now);
     }
@@ -53,7 +53,7 @@ public class Iv2TransactionCreator implements TransactionCreator
             long txnId,
             long uniqueId,
             StoredProcedureInvocation invocation, boolean isReadOnly,
-            boolean isSinglePartition, boolean isEverySite, int[] partitions, int messageSize, long now)
+            boolean isSinglePartition, boolean isEverySite, int partition, int messageSize, long now)
     {
         return m_ci.createTransaction(connectionId,
                 txnId,
@@ -62,7 +62,7 @@ public class Iv2TransactionCreator implements TransactionCreator
                 isReadOnly,
                 isSinglePartition,
                 isEverySite,
-                partitions,
+                partition,
                 messageSize,
                 now,
                 true);
