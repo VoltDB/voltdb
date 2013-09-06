@@ -75,8 +75,8 @@ public class StatsAgent extends OpsAgent
      */
     private boolean isReadOnlyProcedure(String pname) {
         synchronized (this) {
-            Map<String, Boolean> mm = new HashMap<String, Boolean>();
             if (m_procInfo == null) {
+                Map<String, Boolean> mm = new HashMap<String, Boolean>();
                 CatalogContext ctx = VoltDB.instance().getCatalogContext();
                 for (Procedure p : ctx.procedures) {
                     mm.put(p.getClassname(), p.getReadonly());
@@ -84,7 +84,11 @@ public class StatsAgent extends OpsAgent
                 m_procInfo = mm;
             }
         }
-        return (m_procInfo.containsKey(pname) && m_procInfo.get(pname));
+        final Boolean b = m_procInfo.get(pname);
+        if (b == null) {
+            return false;
+        }
+        return b;
     }
 
     /**
