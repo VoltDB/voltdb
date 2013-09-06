@@ -81,7 +81,7 @@ public class InvokeDroppedProcedureThread extends Thread {
             } else {
                 try { Thread.sleep(1); } catch (Exception e) {}
             }
-  
+
 
             // get a permit to send a transaction
             try {
