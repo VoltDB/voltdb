@@ -23,16 +23,16 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 {
-    "P1": {
+    "P_COUNT": {
         "columns": (("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("POINTS", FastSerializer.VOLTTYPE_INTEGER)),
-        "partitions": (),
-        "indexes": ("ID")
+        "partitions": ("ID",),
+        "indexes": ("POINTS",)
     },
-    "R1": {
+    "R_COUNT": {
         "columns": (("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("POINTS", FastSerializer.VOLTTYPE_INTEGER)),
         "partitions": (),
-        "indexes": ("ID")
+        "indexes": ("POINTS",)
     }
 }

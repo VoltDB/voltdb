@@ -58,16 +58,30 @@ public class TestStatsProcOutputTable {
     // push rows from data in to the table.
     void loadEmUp(StatsProcOutputTable dut, ProcOutputRow[] data) {
         for (int ii = 0; ii < data.length; ++ii) {
-         dut.updateTable(
-            data[ii].procedure,
-            data[ii].partition,
-            data[ii].timestamp,
-            data[ii].invocations,
-            data[ii].minOUT,
-            data[ii].maxOUT,
-            data[ii].avgOUT);
-     }
- }
+            dut.updateTable(true,
+                    data[ii].procedure,
+                    data[ii].partition,
+                    data[ii].timestamp,
+                    data[ii].invocations,
+                    data[ii].minOUT,
+                    data[ii].maxOUT,
+                    data[ii].avgOUT);
+        }
+    }
+
+    // push rows from data in to the table.
+    void loadEmUpNoDeDup(StatsProcOutputTable dut, ProcOutputRow[] data) {
+        for (int ii = 0; ii < data.length; ++ii) {
+            dut.updateTable(false,
+                    data[ii].procedure,
+                    data[ii].partition,
+                    data[ii].timestamp,
+                    data[ii].invocations,
+                    data[ii].minOUT,
+                    data[ii].maxOUT,
+                    data[ii].avgOUT);
+        }
+    }
 
     // validate contents of sorted dut vs. expectation of ResultRow[]
  void validateEmGood(String testname, StatsProcOutputTable dut, ResultRow[] data) {
@@ -139,10 +153,6 @@ public void testAllZeros() throws Exception {
         validateEmGood("testMulipleProcs", dut, result);
     }
 
-    /*
-       This test needs to be re-written and re-enabled when ENG-5113
-       gets fixed.  The new testcase(s) will need to have SP/RO (no deduping)
-       and other any/RW (do deduping).
     @Test
     public void testSiteDedupe() throws Exception {
         // need to not double count invocations at replicas, but do look at
@@ -154,11 +164,10 @@ public void testAllZeros() throws Exception {
             new ProcOutputRow("proc", 1L, 12345L, 400*mB, 2L, 8L, 4L)
         };
         ResultRow result[] = { //time/proc/perc/inok/min/max/avg/tot
-            new ResultRow(12345L, "proc", 100L, 600*mB, 1L, 25L, 5L, 3000L)
+            new ResultRow(12345L, "proc", 100L, 800 * mB, 1L, 25L, 4L, 3200L)
         };
         StatsProcOutputTable dut = new StatsProcOutputTable();
-        loadEmUp(dut, data);
+        loadEmUpNoDeDup(dut, data);
         validateEmGood("testSiteDedupe", dut, result);
     }
-    */
 }

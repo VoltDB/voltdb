@@ -58,7 +58,23 @@ public class TestStatsProcProfTable {
     // push rows from data in to the table.
     void loadEmUp(StatsProcProfTable dut, ProcProfRow[] data) {
         for (int ii = 0; ii < data.length; ++ii) {
-            dut.updateTable(
+            dut.updateTable(true,
+                    data[ii].timestamp,
+                    data[ii].procedure,
+                    data[ii].partition,
+                    data[ii].invocations,
+                    data[ii].min,
+                    data[ii].max,
+                    data[ii].avg,
+                    data[ii].failures,
+                    data[ii].aborts);
+        }
+    }
+
+    // push rows from data in to the table.
+    void loadEmUpNoDedup(StatsProcProfTable dut, ProcProfRow[] data) {
+        for (int ii = 0; ii < data.length; ++ii) {
+            dut.updateTable(false,
                     data[ii].timestamp,
                     data[ii].procedure,
                     data[ii].partition,
@@ -160,6 +176,27 @@ public class TestStatsProcProfTable {
         };
         StatsProcProfTable dut = new StatsProcProfTable();
         loadEmUp(dut, data);
+        validateEmGood("testAllZeros", dut, result);
+    }
+
+    @Test
+    public void testSiteNoDedupe() throws Exception {
+        // need to not double count invocations at replicas, but do look at
+        // min, max, avg, fail, abort
+        ProcProfRow data[] = {
+            //                          TS/Proc/Part/invok/min/max/avg/fail/abort
+            new ProcProfRow(1371587140278L, "B", 0L, 100L, 2L, 5L, 4L, 17L, 18L),
+            new ProcProfRow(1371587140278L, "A", 1L, 1L, 10L, 20L, 30L, 0L, 18L),
+            new ProcProfRow(1371587140278L, "B", 0L, 100L, 1L, 2L, 2L, 17L, 18L),
+            new ProcProfRow(1371587140278L, "B", 1L, 100L, 4L, 4L, 3L, 17L, 18L)
+        };
+        ResultRow result[] = {
+            //               TS/         Proc /wtd/ invok/avg/ min/max/fail/abort
+            new ResultRow(1371587140278L, "B", 96L, 300L, 3L, 1L, 5L, 54L, 51L),
+            new ResultRow(1371587140278L, "A", 3L, 1L, 30L, 10L, 20L, 18L, 0L)
+        };
+        StatsProcProfTable dut = new StatsProcProfTable();
+        loadEmUpNoDedup(dut, data);
         validateEmGood("testAllZeros", dut, result);
     }
 }
