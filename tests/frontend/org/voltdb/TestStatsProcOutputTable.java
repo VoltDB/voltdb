@@ -60,11 +60,11 @@ public class TestStatsProcOutputTable {
         for (int ii = 0; ii < data.length; ++ii) {
             dut.updateTable(true,
                     data[ii].procedure,
-            data[ii].partition,
-            data[ii].timestamp,
-            data[ii].invocations,
-            data[ii].minOUT,
-            data[ii].maxOUT,
+                    data[ii].partition,
+                    data[ii].timestamp,
+                    data[ii].invocations,
+                    data[ii].minOUT,
+                    data[ii].maxOUT,
                     data[ii].avgOUT);
         }
     }

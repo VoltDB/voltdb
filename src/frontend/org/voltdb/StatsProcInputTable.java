@@ -70,6 +70,7 @@ public class StatsProcInputTable
         }
 
         // Augment this ProcInputRow with a new input row
+        // dedup flag indicates if we should dedup data based on partition for proc.
         void updateWith(boolean dedup, ProcInputRow in)        {
             // adjust the avg across all replicas.
             this.avgIN = calculateAverage(this.avgIN, this.invocations,
@@ -78,6 +79,7 @@ public class StatsProcInputTable
             this.maxIN = Math.max(this.maxIN, in.maxIN);
 
             if (!dedup) {
+                //Not deduping so add up all values.
                 this.invocations += in.invocations;
             } else {
                 if (!seenPartitions.contains(in.partition)) {
@@ -129,7 +131,7 @@ public class StatsProcInputTable
         }
     }
 
-    // Add or update the corresponding row.
+    // Add or update the corresponding row. dedup flag indicates if we should dedup data based on partition for proc.
     public void updateTable(boolean dedup, String procedure, long partition, long timestamp,
             long invocations, long minIN, long maxIN, long avgIN)
     {
