@@ -164,7 +164,7 @@ public void testAllZeros() throws Exception {
             new ProcOutputRow("proc", 1L, 12345L, 400*mB, 2L, 8L, 4L)
         };
         ResultRow result[] = { //time/proc/perc/inok/min/max/avg/tot
-            new ResultRow(12345L, "proc", 100L, 800 * mB, 1L, 25L, 5L, 3000L)
+            new ResultRow(12345L, "proc", 100L, 800 * mB, 1L, 25L, 4L, 3200L)
         };
         StatsProcOutputTable dut = new StatsProcOutputTable();
         loadEmUpNoDeDup(dut, data);

@@ -72,7 +72,7 @@ public class TestStatsProcInputTable {
 
     void loadEmUpNoDedup(StatsProcInputTable dut, ProcInputRow[] data) {
         for (int ii = 0; ii < data.length; ++ii) {
-            dut.updateTable(true,
+            dut.updateTable(false,
                     data[ii].procedure,
                     data[ii].partition,
                     data[ii].timestamp,
@@ -163,7 +163,7 @@ public class TestStatsProcInputTable {
             new ProcInputRow("proc", 1L, 12345L, 400*mB, 2L, 8L, 4L)
         };
         ResultRow result[] = { //time/proc/perc/inok/min/max/avg/tot
-            new ResultRow(12345L, "proc", 100L, 800 * mB, 1L, 25L, 4L, 3000L)
+            new ResultRow(12345L, "proc", 100L, 800 * mB, 1L, 25L, 4L, 3200L)
         };
         StatsProcInputTable dut = new StatsProcInputTable();
         loadEmUpNoDedup(dut, data);
