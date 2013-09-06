@@ -59,14 +59,27 @@ public class TestStatsProcInputTable {
     // push rows from data in to the table.
     void loadEmUp(StatsProcInputTable dut, ProcInputRow[] data) {
         for (int ii = 0; ii < data.length; ++ii) {
-            dut.updateTable(
-                data[ii].procedure,
+            dut.updateTable(true,
+                    data[ii].procedure,
                 data[ii].partition,
                 data[ii].timestamp,
                 data[ii].invocations,
                 data[ii].minIN,
                 data[ii].maxIN,
                 data[ii].avgIN);
+        }
+    }
+
+    void loadEmUpNoDedup(StatsProcInputTable dut, ProcInputRow[] data) {
+        for (int ii = 0; ii < data.length; ++ii) {
+            dut.updateTable(false,
+                    data[ii].procedure,
+                    data[ii].partition,
+                    data[ii].timestamp,
+                    data[ii].invocations,
+                    data[ii].minIN,
+                    data[ii].maxIN,
+                    data[ii].avgIN);
         }
     }
 
@@ -139,10 +152,6 @@ public class TestStatsProcInputTable {
         validateEmGood("testMulipleProcs", dut, result);
     }
 
-    /*
-       This test needs to be re-written and re-enabled when ENG-5113
-       gets fixed.  The new testcase(s) will need to have SP/RO (no deduping)
-       and other any/RW (do deduping).
     @Test
     public void testSiteDedupe() throws Exception {
         // need to not double count invocations at replicas, but do look at
@@ -154,11 +163,10 @@ public class TestStatsProcInputTable {
             new ProcInputRow("proc", 1L, 12345L, 400*mB, 2L, 8L, 4L)
         };
         ResultRow result[] = { //time/proc/perc/inok/min/max/avg/tot
-            new ResultRow(12345L, "proc", 100L, 600*mB, 1L, 25L, 5L, 3000L)
+            new ResultRow(12345L, "proc", 100L, 800 * mB, 1L, 25L, 4L, 3200L)
         };
         StatsProcInputTable dut = new StatsProcInputTable();
-        loadEmUp(dut, data);
+        loadEmUpNoDedup(dut, data);
         validateEmGood("testSiteDedupe", dut, result);
     }
-    */
 }
