@@ -729,7 +729,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                  indexIter != catalogTable->indexes().end();
                  indexIter++)
             {
-                std::string indexName = indexIter->first;
+                std::string indexName = indexIter->second->name();
                 std::string catalogIndexId = TableCatalogDelegate::getIndexIdString(*indexIter->second);
 
                 // Look for an index on the table to match the catalog index
