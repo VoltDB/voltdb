@@ -1,3 +1,4 @@
+<grammar.sql>
 -- a large block of inserts that work as a deterministic loader
 -- the real work / testcases follow this. sorry.
 
