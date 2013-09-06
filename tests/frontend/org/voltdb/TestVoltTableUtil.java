@@ -23,17 +23,14 @@
 
 package org.voltdb;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import au.com.bytecode.opencsv_voltpatches.CSVReader;
+import static org.junit.Assert.*;
+
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
 
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -42,8 +39,15 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.utils.VoltTableUtil;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
+import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.mockito.Mockito;
 
-public class TestVoltTableUtil {
+public class TestVoltTableUtil extends Mockito {
     @Test
     public void testCSVNullConversion() throws IOException {
         CSVWriter writer = mock(CSVWriter.class);
@@ -107,6 +111,71 @@ public class TestVoltTableUtil {
     }
 
     @Test
+    public void testCSVReader() {
+        try {
+            // To make sure we have microseconds we get millisecond from current timestamp
+            // and add remainder to ensure we have micros in timestamp.
+            TimestampType ts = new TimestampType((System.currentTimeMillis() * 1000) + System.currentTimeMillis() % 1000);
+
+            ColumnInfo[] columns = new ColumnInfo[]{
+                new ColumnInfo("TINYINT", VoltType.TINYINT),
+                new ColumnInfo("SMALLINT", VoltType.SMALLINT),
+                new ColumnInfo("INTEGER", VoltType.INTEGER),
+                new ColumnInfo("BIGINT", VoltType.BIGINT),
+                new ColumnInfo("FLOAT", VoltType.FLOAT),
+                new ColumnInfo("DECIMAL", VoltType.DECIMAL),
+                new ColumnInfo("VARCHAR", VoltType.STRING),
+                new ColumnInfo("VARBINARY", VoltType.VARBINARY),
+                new ColumnInfo("TIMESTAMP", VoltType.TIMESTAMP)
+            };
+            ArrayList<VoltType> columnTypes = new ArrayList<VoltType>();
+            for (ColumnInfo ci : columns) {
+                columnTypes.add(ci.type);
+            }
+            CSVReader reader = mock(CSVReader.class);
+            String line[] = {String.valueOf(1),
+                String.valueOf(10),
+                String.valueOf(100000),
+                String.valueOf(100000000),
+                String.valueOf(3.712),
+                (new BigDecimal("718877.11888")).toString(),
+                "test-varchar",
+                "test-varbinary",
+                ts.toString(),};
+            stub(reader.readNext()).toReturn(line);
+
+            ArrayList<String> colNames = new ArrayList<String>();
+            colNames.add("TINYINT");
+            colNames.add("SMALLINT");
+            colNames.add("INTEGER");
+            colNames.add("BIGINT");
+            colNames.add("FLOAT");
+            colNames.add("DECIMAL");
+            colNames.add("VARCHAR");
+            colNames.add("VARBINARY");
+            colNames.add("TIMESTAMP");
+            VoltTable tab = VoltTableUtil.toVoltTableFromCSV(reader, colNames, columnTypes);
+            assertEquals(tab.getRowCount(), 1);
+            assert (tab.advanceRow());
+            assertEquals(tab.getColumnCount(), 9);
+            assertEquals(tab.getLong(0), 1);
+            assertEquals(tab.getLong(1), 10);
+            assertEquals(tab.getLong(2), 100000);
+            assertEquals(tab.getLong(3), 100000000);
+            assertEquals(tab.getDouble(4), 3.712, 0);
+            BigDecimal bd1 = tab.getDecimalAsBigDecimal(5);
+
+            assertTrue((bd1.compareTo(new BigDecimal("718877.11888"))) == 0);
+            assertEquals(tab.getString(6), "test-varchar");
+            assertTrue(Arrays.equals(tab.getVarbinary(7), ("test-varbinary").getBytes()));
+            assertEquals(tab.getTimestampAsTimestamp(8), ts);
+
+        } catch (IOException ex) {
+            Logger.getLogger(TestVoltTableUtil.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    @Test
     public void testUnionTables()
     {
         VoltTable.ColumnInfo[] columns =
@@ -131,7 +200,8 @@ public class TestVoltTableUtil {
         }
 
         assertEquals(2, numbers.size());
-        assertTrue(numbers.contains(1l));
-        assertTrue(numbers.contains(2l));
+        assertEquals(numbers.contains(1l), true);
+        assertEquals(numbers.contains(2l), true);
     }
+
 }

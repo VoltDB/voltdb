@@ -16,6 +16,8 @@
  */
 package org.voltdb.utils;
 
+import au.com.bytecode.opencsv_voltpatches.CSVReader;
+import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.math.BigDecimal;
@@ -27,10 +29,10 @@ import java.util.TimeZone;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
 
-import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 
 /*
  * Utility methods for work with VoltTables.
@@ -59,6 +61,110 @@ public class VoltTableUtil {
             return sdf;
         }
     };
+
+    public static VoltTable toVoltTableFromCSV(CSVReader csv, ArrayList<String> columnNames, ArrayList<VoltType> columnTypes) {
+        VoltTable table = null;
+        ColumnInfo colInfo[] = new ColumnInfo[columnTypes.size()];
+        for (int i = 0; i < columnTypes.size(); i++) {
+            VoltType type = columnTypes.get(i);
+            String cname = columnNames.get(i);
+            ColumnInfo ci = new ColumnInfo(cname, type);
+            colInfo[i] = ci;
+        }
+        table = new VoltTable(colInfo);
+
+        final String[] fields;
+        try {
+            fields = csv.readNext();
+        } catch (IOException ex) {
+            return table;
+        }
+        if (fields == null || fields.length <= 0) {
+            return table;
+        }
+        Object row_args[] = new Object[fields.length];
+
+        for (int i = 0; i < fields.length; i++) {
+            String field = fields[i];
+            final VoltType type = columnTypes.get(i);
+            Object obj;
+            if (type == VoltType.BIGINT
+                    || type == VoltType.INTEGER
+                    || type == VoltType.SMALLINT
+                    || type == VoltType.TINYINT) {
+                Long l = Long.parseLong(field);
+                obj = l;
+            } else if (type == VoltType.FLOAT) {
+                Double l = Double.parseDouble(field);
+                obj = l;
+            } else if (type == VoltType.DECIMAL) {
+                BigDecimal l = new BigDecimal(field);
+                obj = l;
+            } else if (type == VoltType.STRING) {
+                obj = field;
+            } else if (type == VoltType.TIMESTAMP) {
+                TimestampType ts = new TimestampType(field);
+                obj = ts;
+            } else if (type == VoltType.VARBINARY) {
+                obj = field.getBytes();
+            } else {
+                obj = null;
+            }
+            if (obj != null) {
+                row_args[i] = obj;
+            }
+        }
+        table.addRow(row_args);
+        return table;
+    }
+
+    /**
+     * Add rows data to VoltTable.
+     *
+     * @param table
+     * @param fields
+     * @param columnTypes
+     * @return
+     */
+    public static VoltTable toVoltTableFromLine(VoltTable table, String fields[], ArrayList<VoltType> columnTypes) {
+
+        if (fields == null || fields.length <= 0) {
+            return table;
+        }
+        Object row_args[] = new Object[fields.length];
+
+        for (int i = 0; i < fields.length; i++) {
+            final VoltType type = columnTypes.get(i);
+            Object obj;
+            if (type == VoltType.BIGINT
+                    || type == VoltType.INTEGER
+                    || type == VoltType.SMALLINT
+                    || type == VoltType.TINYINT) {
+                Long l = Long.parseLong(fields[i]);
+                obj = l;
+            } else if (type == VoltType.FLOAT) {
+                Double l = Double.parseDouble(fields[i]);
+                obj = l;
+            } else if (type == VoltType.DECIMAL) {
+                BigDecimal l = new BigDecimal(fields[i]);
+                obj = l;
+            } else if (type == VoltType.STRING) {
+                obj = fields[i];
+            } else if (type == VoltType.TIMESTAMP) {
+                TimestampType ts = new TimestampType(fields[i]);
+                obj = ts;
+            } else if (type == VoltType.VARBINARY) {
+                obj = fields[i].getBytes();
+            } else {
+                obj = null;
+            }
+            if (obj != null) {
+                row_args[i] = obj;
+            }
+        }
+        table.addRow(row_args);
+        return table;
+    }
 
     public static void toCSVWriter(CSVWriter csv, VoltTable vt, ArrayList<VoltType> columnTypes) throws IOException {
         final SimpleDateFormat sdf = m_sdf.get();
